@@ -334,6 +334,7 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout }) {
                 onUpdateItem={localMode.handleUpdateBpuItem}
                 setItemToDuplicate={(item) => modals.openAddBpuModal(item)}
                 isAdmin={isAdmin}
+                onForceRefresh={db.forceRefresh}
                 onClearObservedPrices={async () => {
                   const items = localMode.currentBpu.filter(i => i.observedPrice);
                   if (items.length === 0) return;

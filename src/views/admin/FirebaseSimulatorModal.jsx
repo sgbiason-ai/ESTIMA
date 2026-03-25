@@ -1,5 +1,7 @@
-import React from 'react';
-import { X, TrendingUp } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../../firebase';
+import { X, TrendingUp, RefreshCw } from 'lucide-react';
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
@@ -7,10 +9,10 @@ const SPARK_STORAGE_GB  = 1;
 const SPARK_READS_DAY   = 50000;
 const SPARK_WRITES_DAY  = 20000;
 
-const SIM_PROFILES = {
-  light:  { label: 'Legere',    desc: 'Peu de BPU, 2-3 projets simples',     color: '#00dc82', storageMB: 0.6,  docs: 80,  readsPerDay: 120, writesPerDay: 30  },
-  medium: { label: 'Moyenne',   desc: 'BPU complet, ~5 projets actifs',       color: '#60a5fa', storageMB: 1.7,  docs: 293, readsPerDay: 350, writesPerDay: 80  },
-  heavy:  { label: 'Intensive', desc: 'Gros BPU, 10+ projets, RAO actif',     color: '#f472b6', storageMB: 4.5,  docs: 700, readsPerDay: 900, writesPerDay: 200 },
+const COLLECTIONS = ['projects', 'bpu', 'categories', 'units', 'resources'];
+
+const estimateBytes = (data) => {
+  try { return new Blob([JSON.stringify(data)]).size; } catch { return 0; }
 };
 
 const simFmtMB  = (mb) => mb >= 1024 ? `${(mb/1024).toFixed(2)} Go` : `${mb.toFixed(1)} Mo`;
@@ -62,29 +64,82 @@ const SimBar = ({ label, used, max, color, unit='' }) => {
 
 // ─── Modale principale ───────────────────────────────────────────────────────
 
-const FirebaseSimulatorModal = ({ onClose }) => {
-  const [profile,  setProfile]  = React.useState('medium');
-  const [count,    setCount]    = React.useState(5);
-  const [overhead, setOverhead] = React.useState(1.35);
+const FirebaseSimulatorModal = ({ companies, onClose }) => {
+  const [count,    setCount]    = useState(companies.length || 5);
+  const [overhead, setOverhead] = useState(1.35);
+  const [realData, setRealData] = useState(null);
+  const [loading,  setLoading]  = useState(false);
 
-  const p = SIM_PROFILES[profile];
+  // Fetch real stats from Firebase on mount
+  const fetchRealStats = async () => {
+    if (!companies || companies.length === 0) return;
+    setLoading(true);
+    try {
+      const results = await Promise.all(
+        companies.map(async (company) => {
+          let totalBytes = estimateBytes({ id: company.id, name: company.name });
+          let totalDocs = 0;
+
+          await Promise.all(COLLECTIONS.map(async (colName) => {
+            try {
+              const snap = await getDocs(collection(db, 'companies', company.id, colName));
+              totalDocs += snap.size;
+              snap.docs.forEach(d => { totalBytes += estimateBytes(d.data()); });
+            } catch { /* skip */ }
+          }));
+
+          return { id: company.id, name: company.name, totalBytes, totalDocs };
+        })
+      );
+
+      const totalBytes = results.reduce((s, r) => s + r.totalBytes, 0);
+      const totalDocs  = results.reduce((s, r) => s + r.totalDocs, 0);
+      const avgBytes   = results.length > 0 ? totalBytes / results.length : 0;
+      const avgDocs    = results.length > 0 ? totalDocs / results.length : 0;
+      const avgMB      = avgBytes / (1024 * 1024);
+
+      // Estimate reads/writes based on docs count (heuristic: ~1.2 reads per doc per day, ~0.3 writes)
+      const avgReadsPerDay  = Math.round(avgDocs * 1.2);
+      const avgWritesPerDay = Math.round(avgDocs * 0.3);
+
+      setRealData({
+        companyCount: results.length,
+        totalBytes, totalDocs,
+        avgMB, avgDocs,
+        avgReadsPerDay, avgWritesPerDay,
+        perCompany: results,
+      });
+    } catch (e) {
+      console.error('Erreur chargement stats simulateur:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchRealStats(); }, []);
+
+  const avgMB         = realData?.avgMB ?? 1.7;
+  const avgDocs       = realData?.avgDocs ?? 293;
+  const avgReadsDay   = realData?.avgReadsPerDay ?? 350;
+  const avgWritesDay  = realData?.avgWritesPerDay ?? 80;
+
   const n = Math.max(1, count);
 
-  const sim = React.useMemo(() => {
-    const storageMB   = p.storageMB * overhead * n;
+  const sim = useMemo(() => {
+    const storageMB   = avgMB * overhead * n;
     const storageGB   = storageMB / 1024;
     const storagePct  = (storageGB / SPARK_STORAGE_GB) * 100;
-    const maxByStorage = Math.floor((SPARK_STORAGE_GB*1024) / (p.storageMB*overhead));
-    const maxByReads   = Math.floor(SPARK_READS_DAY  / p.readsPerDay);
-    const maxByWrites  = Math.floor(SPARK_WRITES_DAY / p.writesPerDay);
+    const maxByStorage = Math.floor((SPARK_STORAGE_GB*1024) / (avgMB*overhead));
+    const maxByReads   = Math.floor(SPARK_READS_DAY  / avgReadsDay);
+    const maxByWrites  = Math.floor(SPARK_WRITES_DAY / avgWritesDay);
     const bottleneck   = Math.min(maxByStorage, maxByReads, maxByWrites);
     return {
       storageMB, storageGB, storagePct,
-      readsDay:  p.readsPerDay  * n,
-      writesDay: p.writesPerDay * n,
+      readsDay:  avgReadsDay  * n,
+      writesDay: avgWritesDay * n,
       maxByStorage, maxByReads, maxByWrites, bottleneck,
     };
-  }, [p, n, overhead]);
+  }, [avgMB, avgReadsDay, avgWritesDay, n, overhead]);
 
   const statusColor = sim.storagePct > 85 ? '#f87171' : sim.storagePct > 60 ? '#fbbf24' : '#00dc82';
   const statusLabel = sim.storagePct > 85 ? '🔴 Critique' : sim.storagePct > 60 ? '🟡 Attention' : '🟢 Confortable';
@@ -102,7 +157,6 @@ const FirebaseSimulatorModal = ({ onClose }) => {
           @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=DM+Mono:wght@400;500&display=swap');
           .sim-range { -webkit-appearance:none; appearance:none; height:4px; border-radius:2px; background:rgba(255,255,255,0.1); outline:none; cursor:pointer; width:100%; }
           .sim-range::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:#00dc82; box-shadow:0 0 6px #00dc8266; cursor:pointer; }
-          .sim-profile { cursor:pointer; transition:all 0.15s; border:1px solid rgba(255,255,255,0.07); background:rgba(255,255,255,0.02); border-radius:10px; padding:10px 12px; }
           .sim-scroll::-webkit-scrollbar { width:4px; } .sim-scroll::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.12); border-radius:2px; }
         `}</style>
 
@@ -117,15 +171,25 @@ const FirebaseSimulatorModal = ({ onClose }) => {
             <div>
               <p style={{ color:'white', fontWeight:800, fontSize:14, lineHeight:1 }}>Simulateur de capacite</p>
               <p style={{ color:'rgba(255,255,255,0.25)', fontSize:10, marginTop:2, fontFamily:'monospace' }}>
-                Plan Spark · 1 GiB · 50k lectures/j · 20k ecritures/j · Mesure reelle : 1.70 Mo / entreprise
+                Plan Spark · 1 GiB · 50k lectures/j · 20k ecritures/j
+                {realData && ` · Mesure reelle : ${avgMB.toFixed(2)} Mo / ${Math.round(avgDocs)} docs par entreprise`}
               </p>
             </div>
           </div>
-          <button onClick={onClose} style={{ padding:8, borderRadius:10, background:'rgba(255,255,255,0.05)',
-            border:'1px solid rgba(255,255,255,0.1)', cursor:'pointer', color:'rgba(255,255,255,0.5)',
-            display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <X size={16} />
-          </button>
+          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+            <button onClick={fetchRealStats} disabled={loading}
+              style={{ padding:8, borderRadius:10, background:'rgba(0,220,130,0.08)',
+                border:'1px solid rgba(0,220,130,0.2)', cursor: loading ? 'not-allowed' : 'pointer',
+                color:'#00dc82', display:'flex', alignItems:'center', justifyContent:'center' }}
+              title="Actualiser les donnees reelles">
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            </button>
+            <button onClick={onClose} style={{ padding:8, borderRadius:10, background:'rgba(255,255,255,0.05)',
+              border:'1px solid rgba(255,255,255,0.1)', cursor:'pointer', color:'rgba(255,255,255,0.5)',
+              display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         {/* Corps */}
@@ -134,37 +198,47 @@ const FirebaseSimulatorModal = ({ onClose }) => {
           {/* COL GAUCHE - Parametres */}
           <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
 
-            {/* Profil */}
-            <div style={{ background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:12, padding:14 }}>
-              <p style={{ fontSize:9, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.15em', color:'rgba(255,255,255,0.3)', marginBottom:10 }}>
-                Profil d'entreprise
-              </p>
-              <div style={{ display:'flex', flexDirection:'column', gap:7 }}>
-                {Object.entries(SIM_PROFILES).map(([key, pr]) => (
-                  <div key={key} className="sim-profile" onClick={() => setProfile(key)}
-                    style={{ borderColor: profile===key ? pr.color+'50':undefined, background: profile===key ? pr.color+'0d':undefined }}>
-                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                      <div>
-                        <span style={{ fontWeight:800, fontSize:12, color: profile===key ? pr.color : 'rgba(255,255,255,0.75)' }}>{pr.label}</span>
-                        <p style={{ fontSize:9, color:'rgba(255,255,255,0.28)', margin:'2px 0 0' }}>{pr.desc}</p>
-                      </div>
-                      <div style={{ textAlign:'right' }}>
-                        <p style={{ fontFamily:'monospace', fontSize:11, fontWeight:700, color: profile===key ? pr.color : 'rgba(255,255,255,0.35)' }}>
-                          {pr.storageMB} Mo
-                        </p>
-                        <p style={{ fontFamily:'monospace', fontSize:8, color:'rgba(255,255,255,0.18)' }}>{pr.docs} docs</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+            {/* Donnees reelles */}
+            <div style={{ background:'rgba(0,220,130,0.04)', border:'1px solid rgba(0,220,130,0.15)', borderRadius:12, padding:14 }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+                <p style={{ fontSize:9, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.15em', color:'rgba(0,220,130,0.6)', margin:0 }}>
+                  Donnees reelles (moyenne / entreprise)
+                </p>
+                {loading && <RefreshCw size={11} className="animate-spin" style={{ color:'#00dc82' }} />}
               </div>
+              {realData ? (
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                  {[
+                    { label:'Stockage', value:`${avgMB.toFixed(2)} Mo`, color:'#00dc82' },
+                    { label:'Documents', value:`${Math.round(avgDocs)}`, color:'#60a5fa' },
+                    { label:'Lect. estimees/j', value:simFmtNum(avgReadsDay), color:'#a78bfa' },
+                    { label:'Ecrit. estimees/j', value:simFmtNum(avgWritesDay), color:'#f472b6' },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} style={{ padding:'8px 10px', borderRadius:8,
+                      background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                      <p style={{ fontSize:8, color:'rgba(255,255,255,0.3)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:3 }}>{label}</p>
+                      <p style={{ fontFamily:'monospace', fontSize:14, fontWeight:900, color, lineHeight:1 }}>{value}</p>
+                    </div>
+                  ))}
+                  <div style={{ gridColumn:'span 2', padding:'6px 10px', borderRadius:6,
+                    background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.05)' }}>
+                    <p style={{ fontSize:8, color:'rgba(255,255,255,0.25)', fontFamily:'monospace' }}>
+                      Base sur {realData.companyCount} entreprise(s) · Total : {simFmtMB(realData.totalBytes / (1024*1024))} · {realData.totalDocs} docs
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p style={{ fontSize:11, color:'rgba(255,255,255,0.3)', textAlign:'center', padding:'12px 0' }}>
+                  {loading ? 'Chargement des donnees Firebase...' : 'Aucune donnee disponible'}
+                </p>
+              )}
             </div>
 
             {/* Nb entreprises */}
             <div style={{ background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:12, padding:14 }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
                 <p style={{ fontSize:9, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.15em', color:'rgba(255,255,255,0.3)', margin:0 }}>
-                  Nb entreprises
+                  Nb entreprises (projection)
                 </p>
                 <span style={{ fontFamily:'monospace', fontSize:26, fontWeight:900, color:'white', lineHeight:1 }}>{n}</span>
               </div>
@@ -228,7 +302,7 @@ const FirebaseSimulatorModal = ({ onClose }) => {
             {/* Capacite max */}
             <div style={{ background:'rgba(255,255,255,0.02)', border:`1px solid ${statusColor}22`, borderRadius:12, padding:14 }}>
               <p style={{ fontSize:9, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.15em', color:'rgba(255,255,255,0.3)', marginBottom:12 }}>
-                Max plan Spark — profil <span style={{ color:p.color }}>{p.label}</span>
+                Max plan Spark — <span style={{ color:'#00dc82' }}>donnees reelles</span>
               </p>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:7, marginBottom:14 }}>
                 {[
@@ -265,7 +339,7 @@ const FirebaseSimulatorModal = ({ onClose }) => {
                 <div style={{ marginTop:9, padding:'8px 12px', borderRadius:8,
                   background:'rgba(251,191,36,0.06)', border:'1px solid rgba(251,191,36,0.18)' }}>
                   <p style={{ fontSize:10, color:'#fbbf24', fontWeight:700 }}>
-                    💡 Plan Blaze recommande des 10+ clients
+                    Plan Blaze recommande des 10+ clients
                   </p>
                   <p style={{ fontSize:8, color:'rgba(255,255,255,0.25)', marginTop:2 }}>
                     ~0.18$/Go · Premier GiB gratuit · Pas de plafond
@@ -280,9 +354,9 @@ const FirebaseSimulatorModal = ({ onClose }) => {
         {/* Footer */}
         <div style={{ padding:'10px 20px 14px', borderTop:'1px solid rgba(255,255,255,0.05)' }}>
           <p style={{ fontFamily:'monospace', fontSize:8, color:'rgba(255,255,255,0.15)' }}>
-            {'\u26A0'} Simulation indicative — Mesure reelle : Papyrus BET = 1.70 Mo / 293 docs.
+            {'\u26A0'} Simulation basee sur les donnees reelles Firebase — Moyenne : {avgMB.toFixed(2)} Mo / {Math.round(avgDocs)} docs par entreprise.
             Overhead {'\u00D7'}{overhead} applique (index Firestore, metadata, padding).
-            Lectures/ecritures estimees selon usage typique BPU + CCTP + projet actif.
+            Lectures/ecritures estimees a partir du nombre de documents.
           </p>
         </div>
       </div>

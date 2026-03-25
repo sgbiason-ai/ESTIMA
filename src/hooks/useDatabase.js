@@ -93,6 +93,28 @@ export const useDatabase = (user, companyId) => {
     }
   }, [isBpuLoaded, companyId]);
 
+  const forceRefresh = useCallback(async () => {
+    if (!companyId) return;
+    try {
+      setIsLoading(true);
+      const [bpuSnap, catSnap, unitSnap] = await Promise.all([
+        getDocs(col(companyId, 'bpu')),
+        getDocs(col(companyId, 'categories')),
+        getDocs(col(companyId, 'units')),
+      ]);
+      setBpu(bpuSnap.docs.map(d => d.data()));
+      setCategories(catSnap.docs.map(d => d.data()));
+      setUnits(unitSnap.docs.map(d => d.data()));
+      setIsBpuLoaded(true);
+      setDatabaseVersion(v => v + 1);
+    } catch (error) {
+      console.error('Erreur actualisation :', error);
+      toast.error('Impossible d\'actualiser les donnees.', { title: 'Erreur' });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [companyId]);
+
   // ─── ACTIONS BPU ──────────────────────────────────────────────────────────
 
   const addToBpu = async (item) => {
@@ -314,7 +336,7 @@ export const useDatabase = (user, companyId) => {
     units,
     databaseVersion,
     isLoading,
-    loadBpu, isBpuLoaded,
+    loadBpu, isBpuLoaded, forceRefresh,
     addToBpu, updateBpuItem, deleteFromBpu, clearBpu,
     addCategory, deleteCategory, renameCategory, assignCategoryToItem,
     saveUnit, deleteUnit,
