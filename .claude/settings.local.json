@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs grep:*)",
+      "Bash(node -e \"const l = require\\(''lucide-react''\\); const icons = [''PanelLeft'',''CloudUpload'',''Save'',''Eye'',''Pencil'',''PlusCircle'',''BarChart3'',''Table2'',''Info'',''FileText'',''FileOutput'',''Upload'']; icons.forEach\\(i => console.log\\(i, typeof l[i] === ''undefined'' ? ''MISSING'' : ''OK''\\)\\)\")",
+      "Bash(node -e \"const l = require\\(''lucide-react''\\); console.log\\(''Archive:'', typeof l.Archive === ''undefined'' ? ''MISSING'' : ''OK''\\)\")",
+      "Bash(npx vite:*)",
+      "mcp__Claude_Preview__preview_start"
+    ]
+  }
+}

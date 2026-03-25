@@ -1,0 +1,91 @@
+import { useState } from 'react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+import { cleanText } from '../../../utils/helpers';
+import { toast } from '../../../utils/globalUI';
+import { PAGE_WIDTH_PX, PAGE_HEIGHT_PX } from '../constants/bpuLayout';
+
+/**
+ * useBpuPdfExport
+ * Génère et télécharge le PDF du BPU via html2canvas (page de garde + pages A4).
+ *
+ * Les indicateurs visuels d'override (fond amber, ring) sont retirés directement
+ * sur le clone DOM avant capture — plus fiable qu'un <style> injecté que
+ * html2canvas peut ignorer.
+ */
+export const useBpuPdfExport = ({ project, pages }) => {
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  // ── Nettoie les classes visuelles UI sur un nœud cloné ──────────────────────
+  // Appelé après cloneNode() pour s'assurer que le PDF ne montre jamais
+  // le fond amber ni le ring des champs modifiés.
+  const stripOverrideStyles = (root) => {
+    const targets = root.querySelectorAll(
+      '.bg-amber-50, .ring-amber-300, .ring-1'
+    );
+    targets.forEach((el) => {
+      el.classList.remove('bg-amber-50', 'ring-amber-300', 'ring-1');
+      el.style.backgroundColor = 'transparent';
+      el.style.boxShadow = 'none';
+    });
+  };
+
+  const handleDownloadPdf = async () => {
+    setIsGeneratingPdf(true);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    try {
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+      const pageWidth  = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+
+      // ── PAGE DE GARDE (div cachée #bpu-pdf-cover) ────────────────────────
+      const coverElement = document.getElementById('bpu-pdf-cover');
+      if (coverElement) {
+        coverElement.style.display = 'block';
+        const coverCanvas = await html2canvas(coverElement, {
+          scale: 2, useCORS: true, logging: false,
+          backgroundColor: '#ffffff',
+          windowWidth: PAGE_WIDTH_PX, windowHeight: PAGE_HEIGHT_PX,
+        });
+        coverElement.style.display = 'none';
+        doc.addImage(coverCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pageWidth, pageHeight, undefined, 'FAST');
+      }
+
+      // ── PAGES CONTENU (.bpu-page-to-pdf) ────────────────────────────────
+      const pageElements = document.querySelectorAll('.bpu-page-to-pdf');
+      for (let i = 0; i < pageElements.length; i++) {
+        doc.addPage();
+
+        const clone = pageElements[i].cloneNode(true);
+
+        // Retirer les styles visuels d'override AVANT la capture
+        stripOverrideStyles(clone);
+
+        Object.assign(clone.style, {
+          position: 'fixed', top: '0', left: '0', zIndex: '-9999',
+          margin: '0', width: `${PAGE_WIDTH_PX}px`, height: `${PAGE_HEIGHT_PX}px`,
+          transform: 'none', overflow: 'hidden',
+        });
+
+        document.body.appendChild(clone);
+        const canvas = await html2canvas(clone, {
+          scale: 2, useCORS: true, logging: false,
+          backgroundColor: '#ffffff',
+          windowWidth: PAGE_WIDTH_PX, windowHeight: PAGE_HEIGHT_PX,
+        });
+        document.body.removeChild(clone);
+
+        doc.addImage(canvas.toDataURL('image/jpeg', 0.80), 'JPEG', 0, 0, pageWidth, pageHeight, undefined, 'FAST');
+      }
+
+      doc.save(`BPU_${project?.name ? cleanText(project.name) : 'PROJET'}_${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (error) {
+      console.error('Erreur PDF:', error);
+      toast.error('Erreur lors de la génération PDF.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  return { isGeneratingPdf, handleDownloadPdf };
+};

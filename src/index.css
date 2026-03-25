@@ -1,0 +1,91 @@
+/* 1. IMPORTATION DE TAILWIND CSS (VERSION 3 STANDARD) */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 2. RÉGLAGES DE BASE ET TYPOGRAPHIE */
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: light;
+  /* On force un rendu fluide sur les navigateurs */
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 3. RESET DU BODY POUR L'APPLICATION */
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  /* On utilise une couleur de fond légère pour le contraste avec les cartes blanches */
+  background-color: #f1f5f9; 
+  display: block; /* On annule le centrage par défaut de Vite */
+}
+
+/* 4. SUPPRESSION DES FLÈCHES (SPIN BUTTONS) DANS LES INPUTS NUMBER */
+/* Pour Chrome, Safari, Edge et Opera */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Pour Firefox */
+input[type=number] {
+  -moz-appearance: textfield;
+}
+
+/* 5. RESET DES BOUTONS PAR DÉFAUT */
+/* Pour éviter que les boutons n'aient le style gris moche par défaut du navigateur */
+button {
+  background-color: transparent;
+  color: inherit;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  outline: inherit;
+}
+
+/* 6. STYLES POUR L'ÉDITEUR DE TEXTE RICHE (RichTextEditor) */
+/* Ces règles permettent d'afficher correctement les listes dans les zones contentEditable */
+.ProseMirror ul, 
+[contenteditable] ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
+}
+
+.ProseMirror b, 
+[contenteditable] b, 
+[contenteditable] strong {
+  font-weight: bold;
+}
+
+.ProseMirror u, 
+[contenteditable] u {
+  text-decoration: underline;
+}
+
+/* 7. CLASSES UTILITAIRES PERSONNALISÉES (Optionnel) */
+/* Pour améliorer la barre de défilement (scrollbar) sur les zones de contenu */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1; /* slate-300 */
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8; /* slate-400 */
+}
