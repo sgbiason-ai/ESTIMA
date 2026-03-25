@@ -1,26 +1,21 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, GripHorizontal } from 'lucide-react';
+import { safeEvalMathExpr } from '../../utils/projectCalculations';
 
-// Fonction de calcul sécurisée (Remplace eval)
+// Fonction de calcul sécurisée (parseur mathématique sans eval)
 const safeCalculate = (expression) => {
   try {
-    // 1. Nettoyage : On n'autorise que les chiffres, +, -, *, /, ., ( et )
-    // On remplace aussi 'x' par '*' si besoin, et ',' par '.'
     const sanitized = String(expression)
       .replace(/x/g, '*')
       .replace(/,/g, '.')
       .replace(/[^-()\d/*+.]/g, '');
 
-    // Si la chaîne est vide après nettoyage, on retourne ''
     if (!sanitized) return '';
 
-    // 2. Calcul sécurisé avec new Function
-    // eslint-disable-next-line no-new-func
-    const result = new Function('return ' + sanitized)();
-    
-    // On vérifie que le résultat est un nombre fini
+    const result = safeEvalMathExpr(sanitized);
+
     if (!isFinite(result) || isNaN(result)) return 'Erreur';
-    
+
     return result;
   } catch (error) {
     return 'Erreur';

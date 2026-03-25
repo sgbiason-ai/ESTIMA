@@ -6,6 +6,7 @@ import { GripVertical, Layers, Trash2, Plus, ShieldCheck, AlertCircle, FunctionS
 import { ProjectContext } from '../context/ProjectContext';
 import { EditableTitle, FormattedInput, OptionToggle } from './ProjectUI';
 import { formatPrice, cleanText, normalizeUnitSymbol } from '../utils/helpers';
+import { safeEvalMathExpr } from '../utils/projectCalculations';
 
 // --------------------
 // FORMULA INPUT — calculatrice PM + formules style Excel
@@ -78,7 +79,7 @@ const FormulaInput = ({ value, formula, formulaMode, setFormulaMode, onCommit, d
       const sanitized = String(expression).replace(/,/g, '.').trim();
       if (!sanitized) return 0;
       if (!/^[0-9+\-*/().\s]*$/.test(sanitized)) return 0;
-      const result = new Function('return ' + sanitized)();
+      const result = safeEvalMathExpr(sanitized);
       if (isNaN(result) || !isFinite(result)) return 0;
       return Math.round(result * 100) / 100;
     } catch { return 0; }

@@ -3,7 +3,7 @@ import { Lock, Mail, ArrowRight, AlertCircle, Loader2, ArrowLeft, CheckCircle } 
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../firebase'; 
 
-const LoginView = () => {
+const LoginView = ({ onShowLegal }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -176,6 +176,17 @@ const LoginView = () => {
             </button>
           )}
         </form>
+      </div>
+
+      {/* Liens légaux */}
+      <div className="absolute bottom-6 left-0 right-0 text-center z-10">
+        <button
+          type="button"
+          onClick={onShowLegal}
+          className="text-slate-600 hover:text-slate-400 text-[10px] font-bold uppercase tracking-widest transition-colors"
+        >
+          Mentions légales &middot; Politique de confidentialité
+        </button>
       </div>
     </div>
   );

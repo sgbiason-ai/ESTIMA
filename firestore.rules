@@ -1,0 +1,97 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helper functions ───────────────────────────────────────────
+
+    // Returns the authenticated user's profile document
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // True if the caller belongs to the given company
+    function isCompanyMember(companyId) {
+      return request.auth != null && getUserData().companyId == companyId;
+    }
+
+    // True if the caller is an admin of the given company
+    function isCompanyAdmin(companyId) {
+      return isCompanyMember(companyId) && getUserData().isAdmin == true;
+    }
+
+    // True if the incoming write does NOT touch the isAdmin field
+    function doesNotModifyAdminField() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin']);
+    }
+
+    // True if the document is being created without the isAdmin field
+    function doesNotSetAdminField() {
+      return !('isAdmin' in request.resource.data);
+    }
+
+    // ─── Block everything by default ────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ─── User profiles (/users/{uid}) ───────────────────────────────
+    match /users/{uid} {
+      // Users can read their own profile
+      allow read: if request.auth != null && request.auth.uid == uid;
+
+      // Users can update their own profile BUT cannot change isAdmin
+      allow update: if request.auth != null
+                    && request.auth.uid == uid
+                    && doesNotModifyAdminField();
+
+      // Only a superadmin (someone already flagged isAdmin in the same
+      // company) can create or fully update user docs (including isAdmin)
+      allow create: if request.auth != null
+                    && getUserData().isAdmin == true
+                    && getUserData().companyId == request.resource.data.companyId;
+
+      // Admins of the same company can read any member profile
+      allow read: if request.auth != null
+                  && resource.data.companyId != null
+                  && isCompanyAdmin(resource.data.companyId);
+
+      // Admins of the same company can write any member profile
+      // (including toggling isAdmin)
+      allow update: if request.auth != null
+                    && resource.data.companyId != null
+                    && isCompanyAdmin(resource.data.companyId);
+    }
+
+    // ─── Company documents (/companies/{companyId}) ─────────────────
+    match /companies/{companyId} {
+      // All company members can read
+      allow read: if isCompanyMember(companyId);
+
+      // Only company admins can write
+      allow write: if isCompanyAdmin(companyId);
+
+      // ─── Sub-collections ────────────────────────────────────────
+      // projects, bpu, categories, units, resources
+      // Readable and writable by all members of the company
+      match /projects/{projectId} {
+        allow read, write: if isCompanyMember(companyId);
+      }
+
+      match /bpu/{itemId} {
+        allow read, write: if isCompanyMember(companyId);
+      }
+
+      match /categories/{catId} {
+        allow read, write: if isCompanyMember(companyId);
+      }
+
+      match /units/{unitId} {
+        allow read, write: if isCompanyMember(companyId);
+      }
+
+      match /resources/{resId} {
+        allow read, write: if isCompanyMember(companyId);
+      }
+    }
+  }
+}

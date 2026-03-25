@@ -107,6 +107,94 @@ export const formatPercent = (val) => {
   return `${sign}${n.toFixed(2)}%`;
 };
 
+// ─── ÉVALUATEUR MATHÉMATIQUE SÉCURISÉ ────────────────────────────────────────
+
+/**
+ * Parse et évalue une expression mathématique de façon sécurisée.
+ * Supporte : nombres (entiers, décimaux, notation scientifique),
+ *            opérateurs +, -, *, /, parenthèses, et le moins unaire.
+ * Retourne 0 pour : division par zéro, expression vide, expression invalide.
+ *
+ * Implémentation : parseur par descente récursive (aucun eval / new Function).
+ */
+export function safeEvalMathExpr(expr) {
+  if (typeof expr !== 'string') return 0;
+  const src = expr.replace(/\s+/g, '');
+  if (src.length === 0) return 0;
+
+  let pos = 0;
+
+  const peek = () => src[pos] ?? '';
+  const advance = () => src[pos++];
+
+  // number = [0-9]+ ( '.' [0-9]* )? ( [eE] [+-]? [0-9]+ )?
+  function parseNumber() {
+    const start = pos;
+    while (pos < src.length && (src[pos] >= '0' && src[pos] <= '9')) pos++;
+    if (pos < src.length && src[pos] === '.') {
+      pos++;
+      while (pos < src.length && (src[pos] >= '0' && src[pos] <= '9')) pos++;
+    }
+    if (pos < src.length && (src[pos] === 'e' || src[pos] === 'E')) {
+      pos++;
+      if (pos < src.length && (src[pos] === '+' || src[pos] === '-')) pos++;
+      while (pos < src.length && (src[pos] >= '0' && src[pos] <= '9')) pos++;
+    }
+    if (pos === start) return NaN;
+    return Number(src.slice(start, pos));
+  }
+
+  // atom = number | '(' expr ')' | unary-minus atom
+  function parseAtom() {
+    if (peek() === '(') {
+      advance(); // skip '('
+      const val = parseAddSub();
+      if (peek() !== ')') return NaN; // mismatched parens
+      advance(); // skip ')'
+      return val;
+    }
+    if (peek() === '-') {
+      advance();
+      return -parseAtom();
+    }
+    if (peek() === '+') {
+      advance();
+      return parseAtom();
+    }
+    return parseNumber();
+  }
+
+  // mulDiv = atom ( ('*'|'/') atom )*
+  function parseMulDiv() {
+    let left = parseAtom();
+    while (peek() === '*' || peek() === '/') {
+      const op = advance();
+      const right = parseAtom();
+      if (op === '*') left = left * right;
+      else left = right === 0 ? 0 : left / right; // division by zero → 0
+    }
+    return left;
+  }
+
+  // addSub = mulDiv ( ('+'|'-') mulDiv )*
+  function parseAddSub() {
+    let left = parseMulDiv();
+    while (peek() === '+' || peek() === '-') {
+      const op = advance();
+      const right = parseMulDiv();
+      left = op === '+' ? left + right : left - right;
+    }
+    return left;
+  }
+
+  const result = parseAddSub();
+
+  // If there are leftover characters the expression was invalid
+  if (pos !== src.length) return 0;
+  if (!Number.isFinite(result)) return 0;
+  return result;
+}
+
 // ─── ÉVALUATEUR DE FORMULES ───────────────────────────────────────────────────
 
 /**
@@ -135,8 +223,7 @@ export function evaluateFormula(formulaStr, qtyMap, nameMap = {}) {
     });
 
     if (!/^[\d\s+\-*/().e]+$/i.test(expr)) return null;
-    // eslint-disable-next-line no-new-func
-    const result = new Function(`"use strict"; return (${expr})`)();
+    const result = safeEvalMathExpr(expr);
     return isFinite(result) ? result : 0;
   } catch {
     return null;
@@ -187,7 +274,7 @@ export function recalculateProject(chapters, tranches = []) {
           detectedIds.add(id);
           return contextMap[id] !== undefined ? contextMap[id] : 0;
         });
-        const result = new Function('return ' + expr)();
+        const result = safeEvalMathExpr(expr);
         return Number.isFinite(result) ? result : 0;
       } catch { return 0; }
     };

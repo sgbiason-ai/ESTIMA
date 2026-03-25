@@ -23,6 +23,7 @@ import ProjectDetailsModal  from './components/modals/ProjectDetailsModal';
 
 // ─── VUES ─────────────────────────────────────────────────────────────────────
 import LoginView            from './views/LoginView';
+import LegalView            from './views/LegalView';
 import ProjectManagerView   from './views/projectManager/ProjectManagerView';
 import ProjectView          from './views/ProjectView';
 import DatabaseView         from './views/DatabaseView';
@@ -47,8 +48,16 @@ export default function App() {
   // ── 0. Détection mobile ───────────────────────────────────────────────────
   const isMobile = useIsMobile(768);
 
+  // ── 0b. Page légale (accessible sans auth) ────────────────────────────────
+  const [showLegal, setShowLegal] = useState(false);
+
   // ── 1. Auth ─────────────────────────────────────────────────────────────────
   const { user, companyId, isAdmin, authLoading, handleLogout } = useAppAuth();
+
+  // ── Page légale (rendue avant les gardes d'auth) ──────────────────────────
+  if (showLegal) {
+    return <LegalView onBack={() => setShowLegal(false)} />;
+  }
 
   // ── Gardes d'auth (communs mobile + desktop) ──────────────────────────────
 
@@ -60,7 +69,7 @@ export default function App() {
     );
   }
 
-  if (!user) return <LoginView />;
+  if (!user) return <LoginView onShowLegal={() => setShowLegal(true)} />;
 
   if (!companyId) {
     return (

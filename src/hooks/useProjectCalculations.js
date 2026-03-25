@@ -1,45 +1,6 @@
 // src/hooks/useProjectCalculations.js
 import { useMemo, useEffect } from 'react';
-
-// --- ÉVALUATEUR DE FORMULES ---
-// Remplace les {id} par les valeurs du qtyMap et évalue l'expression mathématique.
-// Supporte : +, -, *, /, ( )
-// Résout une formule qui peut contenir :
-//   - {itemId}         → format stocké par la barre de formule après conversion
-//   - [Désignation]    → format lisible (si la conversion n'a pas pu trouver l'id)
-const evaluateFormula = (formulaStr, qtyMap, nameMap = {}) => {
-  if (!formulaStr || typeof formulaStr !== 'string' || !formulaStr.startsWith('=')) return null;
-  try {
-    let expr = formulaStr.substring(1).trim();
-
-    // 1) Remplace les {id} par leur valeur numérique
-    expr = expr.replace(/\{([^}]+)\}/g, (_, id) => {
-      const val = qtyMap?.[id];
-      const num = Number(val);
-      return (val !== undefined && val !== null && !isNaN(num)) ? num : 0;
-    });
-
-    // 2) Remplace les [Nom d'article] par leur valeur (fallback si {id} n'a pas été résolu)
-    expr = expr.replace(/\[([^\]]+)\]/g, (_, name) => {
-      // Cherche en ignorant la casse et les espaces superflus
-      const key = Object.keys(nameMap).find(
-        k => k.trim().toLowerCase() === name.trim().toLowerCase()
-      );
-      const val = key !== undefined ? nameMap[key] : undefined;
-      const num = Number(val);
-      return (val !== undefined && val !== null && !isNaN(num)) ? num : 0;
-    });
-
-    // 3) Sécurité : uniquement chiffres et opérateurs mathématiques
-    if (!/^[\d\s+\-*/().e]+$/i.test(expr)) return null;
-
-    // eslint-disable-next-line no-new-func
-    const result = new Function(`"use strict"; return (${expr})`)();
-    return isFinite(result) ? result : 0;
-  } catch {
-    return null;
-  }
-};
+import { evaluateFormula } from '../utils/projectCalculations';
 
 export const useProjectCalculations = ({
   project,

@@ -109,7 +109,8 @@ export const useDatabase = (user, companyId) => {
       setDatabaseVersion(v => v + 1);
     } catch (error) {
       console.error('Erreur actualisation :', error);
-      toast.error('Impossible d\'actualiser les donnees.', { title: 'Erreur' });
+      setIsBpuLoaded(false);
+      toast.error('Impossible d\'actualiser les données.', { title: 'Erreur' });
     } finally {
       setIsLoading(false);
     }
@@ -120,12 +121,15 @@ export const useDatabase = (user, companyId) => {
   const addToBpu = async (item) => {
     if (!companyId) return;
     const newItem = { ...item, id: generateId(), updatedAt: new Date().toISOString() };
+    const prevBpu = bpu;
     setBpu(prev => [...prev, newItem]);
     setDatabaseVersion(v => v + 1);
     try {
       await setDoc(dref(companyId, 'bpu', newItem.id), newItem);
       toast.success('Article ajouté à la bibliothèque.');
     } catch {
+      setBpu(prevBpu);
+      setDatabaseVersion(v => v + 1);
       toast.error("L'article n'a pas pu être sauvegardé sur le Cloud.", { title: 'Erreur sauvegarde' });
     }
   };
@@ -133,23 +137,29 @@ export const useDatabase = (user, companyId) => {
   const updateBpuItem = async (id, fields) => {
     if (!companyId) return;
     const updated = { ...fields, updatedAt: new Date().toISOString() };
+    const prevBpu = bpu;
     setBpu(prev => prev.map(i => i.id === id ? { ...i, ...updated } : i));
     setDatabaseVersion(v => v + 1);
     try {
       await updateDoc(dref(companyId, 'bpu', id), updated);
     } catch {
+      setBpu(prevBpu);
+      setDatabaseVersion(v => v + 1);
       toast.error('Modification non sauvegardée sur le Cloud.', { title: 'Erreur sauvegarde' });
     }
   };
 
   const deleteFromBpu = async (id) => {
     if (!companyId) return;
+    const prevBpu = bpu;
     setBpu(prev => prev.filter(i => i.id !== id));
     setDatabaseVersion(v => v + 1);
     try {
       await deleteDoc(dref(companyId, 'bpu', id));
       toast.success('Article supprimé.');
     } catch {
+      setBpu(prevBpu);
+      setDatabaseVersion(v => v + 1);
       toast.error('Suppression non synchronisée sur le Cloud.', { title: 'Erreur' });
     }
   };
@@ -170,11 +180,13 @@ export const useDatabase = (user, companyId) => {
   const addCategory = async (name) => {
     if (!companyId) return;
     const newCat = { id: generateId(), name: name.toUpperCase() };
+    const prevCategories = categories;
     setCategories(prev => [...prev, newCat]);
     try {
       await setDoc(dref(companyId, 'categories', newCat.id), newCat);
       toast.success(`Dossier "${newCat.name}" créé.`);
     } catch {
+      setCategories(prevCategories);
       toast.error('Dossier non sauvegardé sur le Cloud.', { title: 'Erreur' });
     }
   };
@@ -187,6 +199,8 @@ export const useDatabase = (user, companyId) => {
       confirmLabel: 'Supprimer',
     });
     if (!ok) return;
+    const prevCategories = categories;
+    const prevBpu = bpu;
     setCategories(prev => prev.filter(c => c.id !== id));
     setBpu(prev => prev.map(item => item.categoryId === id ? { ...item, categoryId: null } : item));
     setDatabaseVersion(v => v + 1);
@@ -194,6 +208,9 @@ export const useDatabase = (user, companyId) => {
       await deleteDoc(dref(companyId, 'categories', id));
       toast.success('Dossier supprimé.');
     } catch {
+      setCategories(prevCategories);
+      setBpu(prevBpu);
+      setDatabaseVersion(v => v + 1);
       toast.error('Suppression non synchronisée.', { title: 'Erreur' });
     }
   };
@@ -201,10 +218,12 @@ export const useDatabase = (user, companyId) => {
   const renameCategory = async (id, newName) => {
     if (!companyId) return;
     const name = newName.toUpperCase();
+    const prevCategories = categories;
     setCategories(prev => prev.map(c => c.id === id ? { ...c, name } : c));
     try {
       await updateDoc(dref(companyId, 'categories', id), { name });
     } catch {
+      setCategories(prevCategories);
       toast.error('Renommage non sauvegardé.', { title: 'Erreur' });
     }
   };
@@ -212,6 +231,7 @@ export const useDatabase = (user, companyId) => {
   const assignCategoryToItem = async (itemId, catId) => {
     if (!companyId) return;
     const idToFind = String(itemId);
+    const prevBpu = bpu;
     setBpu(prev => prev.map(item =>
       String(item.id) === idToFind ? { ...item, categoryId: catId } : item
     ));
@@ -219,6 +239,8 @@ export const useDatabase = (user, companyId) => {
     try {
       await updateDoc(dref(companyId, 'bpu', idToFind), { categoryId: catId });
     } catch {
+      setBpu(prevBpu);
+      setDatabaseVersion(v => v + 1);
       toast.error('Catégorie non sauvegardée.', { title: 'Erreur' });
     }
   };
@@ -228,6 +250,7 @@ export const useDatabase = (user, companyId) => {
   const saveUnit = async (symb, lab) => {
     if (!companyId) return;
     const newItem = { symbol: symb, label: lab };
+    const prevUnits = units;
     setUnits(prev => {
       const exists = prev.find(u => u.symbol === newItem.symbol);
       return exists ? prev.map(u => u.symbol === newItem.symbol ? newItem : u) : [...prev, newItem];
@@ -236,17 +259,20 @@ export const useDatabase = (user, companyId) => {
       await setDoc(dref(companyId, 'units', newItem.symbol), newItem);
       toast.success(`Unité "${symb}" sauvegardée.`);
     } catch {
+      setUnits(prevUnits);
       toast.error('Unité non sauvegardée sur le Cloud.', { title: 'Erreur' });
     }
   };
 
   const deleteUnit = async (symbol) => {
     if (!companyId) return;
+    const prevUnits = units;
     setUnits(prev => prev.filter(u => u.symbol !== symbol));
     try {
       await deleteDoc(dref(companyId, 'units', symbol));
       toast.success(`Unité "${symbol}" supprimée.`);
     } catch {
+      setUnits(prevUnits);
       toast.error('Suppression non synchronisée.', { title: 'Erreur' });
     }
   };
@@ -277,10 +303,17 @@ export const useDatabase = (user, companyId) => {
           })
           .filter(Boolean);
 
+        const prevBpu = bpu;
         setBpu(prev => [...prev, ...newItems]);
         setDatabaseVersion(v => v + 1);
-        await Promise.all(newItems.map(item => setDoc(dref(companyId, 'bpu', item.id), item)));
-        toast.success(`${newItems.length} article(s) importé(s) avec succès.`, { title: 'Import terminé' });
+        try {
+          await Promise.all(newItems.map(item => setDoc(dref(companyId, 'bpu', item.id), item)));
+          toast.success(`${newItems.length} article(s) importé(s) avec succès.`, { title: 'Import terminé' });
+        } catch {
+          setBpu(prevBpu);
+          setDatabaseVersion(v => v + 1);
+          toast.error("L'import n'a pas pu être sauvegardé sur le Cloud.", { title: 'Erreur sauvegarde' });
+        }
       } catch {
         toast.error('Impossible de lire le fichier Excel.', { title: 'Erreur import' });
       }

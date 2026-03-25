@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc, addDoc, collection } from 'firebase/firestore';
 import { db } from '../firebase';
 import { generateId } from '../utils/helpers';
+import { safeEvalMathExpr } from '../utils/projectCalculations';
 
 // Clé localStorage spécifique à chaque entreprise pour éviter les collisions
 const lastProjectKey = (companyId) => `last_active_project_id__${companyId}`;
@@ -228,7 +229,7 @@ export const useProjectManager = (user, companyId) => {
             detectedSourceIds.add(id);
             return contextMap[id] !== undefined ? contextMap[id] : 0;
           });
-          const result = new Function('return ' + expr)();
+          const result = safeEvalMathExpr(expr);
           return Number.isFinite(result) ? result : 0;
         } catch { return 0; }
       };
