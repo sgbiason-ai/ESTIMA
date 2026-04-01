@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import Icon from './Icon';
 import { fmt } from './formatters';
 import { flattenItems } from './helpers';
-import { normalizeUnitSymbol } from '../../utils/helpers';
+import { normalizeUnitSymbol, sanitizeHtml } from '../../utils/helpers';
 
 export default function BPUView({ project, bpuDescMap, refMap, search, onSearch }) {
   const [expandedId, setExpandedId] = useState(null);
@@ -96,7 +96,7 @@ export default function BPUView({ project, bpuDescMap, refMap, search, onSearch 
                     </div>
                     <div
                       className="prose-mobile"
-                      dangerouslySetInnerHTML={{ __html: description }}
+                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(description) }}
                     />
                   </div>
                 )}

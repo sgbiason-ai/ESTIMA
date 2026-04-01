@@ -2,6 +2,7 @@
 import React from 'react';
 import { Eye, Palette, Download, Edit3, FileText } from 'lucide-react';
 import { generateWordCCTP } from '../../utils/cctpExport';
+import { sanitizeHtml } from '../../utils/helpers';
 
 const CctpPreview = ({
   cctpData,
@@ -66,7 +67,7 @@ const CctpPreview = ({
           <div 
             className="text-sm leading-relaxed text-justify cctp-content" 
             style={{ fontFamily: branding?.fonts?.main || 'Arial', color: branding?.colors?.text || '#374151' }} 
-            dangerouslySetInnerHTML={{__html: text}} 
+            dangerouslySetInnerHTML={{__html: sanitizeHtml(text)}} 
           />
           <button 
             onClick={() => openEditor(node)} 

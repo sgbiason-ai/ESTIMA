@@ -3,6 +3,7 @@ import {
   UserPlus, Trash2, X, ExternalLink, Shield, BookOpen,
   CheckCircle2, ArrowRight
 } from 'lucide-react';
+import { sanitizeHtml } from '../../utils/helpers';
 
 const HelpPanel = ({ onClose }) => {
   const [activeSection, setActiveSection] = useState('nouveau_client');
@@ -139,7 +140,7 @@ const HelpPanel = ({ onClose }) => {
                     {step.steps.map((s, i) => (
                       <div key={i} className="flex items-start gap-2">
                         <ArrowRight size={12} className="text-slate-600 mt-0.5 shrink-0" />
-                        <span dangerouslySetInnerHTML={{ __html: s.replace(/"([^"]+)"/g, '<strong class="text-white">"$1"</strong>') }} />
+                        <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(s.replace(/"([^"]+)"/g, '<strong class="text-white">"$1"</strong>')) }} />
                       </div>
                     ))}
                     {step.code && (

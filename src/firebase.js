@@ -7,14 +7,15 @@ import {
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
-// Votre configuration (celle que vous m'avez envoyée)
+// Configuration Firebase via variables d'environnement
+// Voir .env.example pour le format attendu
 const firebaseConfig = {
-  apiKey: "AIzaSyDby1BlayoezgzZ31qsB4881ryg66_YYBI",
-  authDomain: "estimavrd-app.firebaseapp.com",
-  projectId: "estimavrd-app",
-  storageBucket: "estimavrd-app.firebasestorage.app",
-  messagingSenderId: "738719651607",
-  appId: "1:738719651607:web:c2d9102e0edf7714058952"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
 // Initialisation

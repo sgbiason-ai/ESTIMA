@@ -24,25 +24,29 @@ export const useProjectManager = (user, companyId) => {
     if (!user || !companyId) return;
 
     const loadProject = async () => {
-      const lastActiveId = localStorage.getItem(lastProjectKey(companyId));
-      const projectId = lastActiveId || 'draft_project';
+      try {
+        const lastActiveId = localStorage.getItem(lastProjectKey(companyId));
+        const projectId = lastActiveId || 'draft_project';
 
-      const docRef  = doc(db, 'companies', companyId, 'projects', projectId);
-      const docSnap = await getDoc(docRef);
+        const docRef  = doc(db, 'companies', companyId, 'projects', projectId);
+        const docSnap = await getDoc(docRef);
 
-      if (docSnap.exists()) {
-        setProject(docSnap.data());
-        setProjectVersion(v => v + 1);
-        return;
-      }
-
-      if (lastActiveId) {
-        const fallbackRef  = doc(db, 'companies', companyId, 'projects', 'draft_project');
-        const fallbackSnap = await getDoc(fallbackRef);
-        if (fallbackSnap.exists()) {
-          setProject(fallbackSnap.data());
+        if (docSnap.exists()) {
+          setProject(docSnap.data());
           setProjectVersion(v => v + 1);
+          return;
         }
+
+        if (lastActiveId) {
+          const fallbackRef  = doc(db, 'companies', companyId, 'projects', 'draft_project');
+          const fallbackSnap = await getDoc(fallbackRef);
+          if (fallbackSnap.exists()) {
+            setProject(fallbackSnap.data());
+            setProjectVersion(v => v + 1);
+          }
+        }
+      } catch (e) {
+        console.error('[useProjectManager] Erreur chargement projet:', e.message);
       }
     };
 
@@ -80,12 +84,17 @@ export const useProjectManager = (user, companyId) => {
     const now = new Date().toISOString();
 
     // Sauvegarde principale
+    try {
     await setDoc(doc(db, 'companies', companyId, 'projects', projectId), {
       ...projectToStore,
       id: projectId,
       lastSaved: now,
       updatedBy: user.email,
     });
+    } catch (e) {
+      console.error('[useProjectManager] Erreur sauvegarde projet:', e.message);
+      throw e;
+    }
 
     // ── Audit trail — snapshot léger dans history/
     // Ne stocke pas le projet complet (trop volumineux).

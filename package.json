@@ -14,8 +14,10 @@
   },
   "dependencies": {
     "@hello-pangea/dnd": "^16.5.0",
+    "@sentry/react": "^10.47.0",
     "@tanstack/react-virtual": "^3.13.23",
     "docx": "^9.5.1",
+    "dompurify": "^3.3.3",
     "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
     "firebase": "^12.8.0",

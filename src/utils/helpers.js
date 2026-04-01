@@ -1,6 +1,12 @@
 // src/utils/helpers.js
+import DOMPurify from 'dompurify';
 
 export const generateId = () => Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+
+export const sanitizeHtml = (html) => {
+  if (!html) return '';
+  return DOMPurify.sanitize(html);
+};
 
 export const formatPrice = (amount) => {
   return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount || 0);

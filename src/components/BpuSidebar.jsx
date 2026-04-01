@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Package, PanelLeftClose, Search, Filter } from 'lucide-react';
-import { formatPrice, cleanText, normalizeUnitSymbol } from '../utils/helpers';
+import { formatPrice, cleanText, normalizeUnitSymbol, sanitizeHtml } from '../utils/helpers';
 
 const BpuSidebar = ({
   showBpu,
@@ -138,8 +138,8 @@ const BpuSidebar = ({
         <div className="z-[9999] w-72 p-3 bg-slate-800 text-white rounded-xl shadow-2xl border border-slate-600 animate-in fade-in zoom-in-95 duration-200 flex flex-col gap-2 pointer-events-none" style={tooltipState.style}>
           <div className={`absolute -left-2 w-4 h-4 bg-slate-800 transform rotate-45 border-l border-b border-slate-600 ${tooltipState.style.bottom !== 'auto' ? 'bottom-4' : 'top-4'}`} />
           <div className="shrink-0 font-bold text-xs text-emerald-400 uppercase tracking-wider border-b border-slate-600 pb-2">Article Bibliothèque</div>
-          <div className="text-xs font-bold" dangerouslySetInnerHTML={{ __html: tooltipState.item.designation || '' }} />
-          <div className={`text-[10px] text-slate-400 ${tooltipState.item.description ? '' : 'hidden'}`} dangerouslySetInnerHTML={{ __html: tooltipState.item.description || '' }} />
+          <div className="text-xs font-bold" dangerouslySetInnerHTML={{ __html: sanitizeHtml(tooltipState.item.designation || '') }} />
+          <div className={`text-[10px] text-slate-400 ${tooltipState.item.description ? '' : 'hidden'}`} dangerouslySetInnerHTML={{ __html: sanitizeHtml(tooltipState.item.description || '') }} />
         </div>,
         document.body
       )}

@@ -75,10 +75,25 @@ service cloud.firestore {
       // Readable and writable by all members of the company
       match /projects/{projectId} {
         allow read, write: if isCompanyMember(companyId);
+
+        // Audit trail — lecture seule pour les membres, écriture par le système
+        match /history/{entryId} {
+          allow read: if isCompanyMember(companyId);
+          allow create: if isCompanyMember(companyId);
+          allow update, delete: if false;
+        }
+
+        // Archives de projets
+        match /archives/{archiveId} {
+          allow read, write: if isCompanyMember(companyId);
+        }
       }
 
       match /bpu/{itemId} {
-        allow read, write: if isCompanyMember(companyId);
+        allow read: if isCompanyMember(companyId);
+        allow write: if isCompanyMember(companyId)
+                     && request.resource.data.keys().hasAll(['designation', 'unit', 'price'])
+                     && request.resource.data.price is number;
       }
 
       match /categories/{catId} {
@@ -91,6 +106,13 @@ service cloud.firestore {
 
       match /resources/{resId} {
         allow read, write: if isCompanyMember(companyId);
+      }
+
+      // Présence en temps réel
+      match /presence/{presenceId} {
+        allow read: if isCompanyMember(companyId);
+        allow write: if isCompanyMember(companyId)
+                     && request.auth.uid == presenceId;
       }
     }
   }

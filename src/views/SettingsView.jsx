@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { confirm } from '../utils/globalUI';
 import * as XLSX from 'xlsx';
 import BrandingView from './BrandingView'; // <-- Ajout de l'import de BrandingView
+import AccountSection from '../components/settings/AccountSection';
 import { 
   Settings, Ruler, Trash2, Upload, FileSpreadsheet, 
   AlertTriangle, Edit2, X, Check, ListOrdered, Hash, 
@@ -9,19 +10,21 @@ import {
   MousePointer2, Palette, ArrowLeft
 } from 'lucide-react';
 
-const SettingsView = ({ 
-  units, 
-  saveUnit, 
-  deleteUnit, 
-  importFromExcel, 
-  clearBpu, 
-  bpuConfig, 
+const SettingsView = ({
+  units,
+  saveUnit,
+  deleteUnit,
+  importFromExcel,
+  clearBpu,
+  bpuConfig,
   setBpuConfig,
-  importWarnings = [], 
+  importWarnings = [],
   setImportWarnings,
   masterBranding = null,
   onSaveMasterBranding,
-  project //
+  project, //
+  user,
+  companyId
 }) => {
   // --- ÉTATS LOCAUX ---
   const [symb, setSymb] = useState("");
@@ -536,6 +539,11 @@ const SettingsView = ({
               ))}
             </div>
           </section>
+
+          {/* SECTION COMPTE & DONNEES PERSONNELLES */}
+          {user && companyId && (
+            <AccountSection user={user} companyId={companyId} />
+          )}
 
           {/* ZONE DE DANGER */}
           <section className="bg-white p-8 rounded-xl border border-red-200 shadow-sm border-t-4 border-t-red-500">

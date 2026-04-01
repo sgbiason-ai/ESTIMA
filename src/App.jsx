@@ -419,6 +419,8 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout }) {
                 setImportWarnings={modals.setImportWarnings}
                 masterBranding={resources.masterBranding}
                 onSaveMasterBranding={resources.handleSaveMasterBranding}
+                user={user}
+                companyId={companyId}
               />
             )}
 

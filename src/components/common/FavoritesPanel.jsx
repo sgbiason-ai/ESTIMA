@@ -1,6 +1,7 @@
 // src/components/common/FavoritesPanel.jsx
 import React, { useState, useMemo } from 'react';
 import { Star, X, Search, ChevronRight, FileText, BookOpen, Trash2, PlusCircle, Clock } from 'lucide-react';
+import { sanitizeHtml } from '../../utils/helpers';
 
 // ─── Prévisualisation HTML sécurisée ──────────────────────────────────────────
 const HtmlPreview = ({ html }) => {
@@ -8,7 +9,7 @@ const HtmlPreview = ({ html }) => {
   return (
     <div
       className="text-xs text-slate-600 leading-relaxed line-clamp-3 fav-preview"
-      dangerouslySetInnerHTML={{ __html: html }}
+      dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }}
     />
   );
 };

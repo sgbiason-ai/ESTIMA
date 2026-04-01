@@ -11,6 +11,7 @@
 // Les Error Boundaries doivent être des class components (contrainte React).
 
 import React from 'react';
+import * as Sentry from '@sentry/react';
 
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -28,8 +29,7 @@ export default class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     this.setState({ errorInfo });
-    // Ici on pourrait envoyer l'erreur à Sentry quand il sera installé :
-    // Sentry.captureException(error, { extra: errorInfo });
+    Sentry.captureException(error, { extra: errorInfo });
     console.error('[ErrorBoundary] Erreur interceptée :', error, errorInfo);
   }
 
