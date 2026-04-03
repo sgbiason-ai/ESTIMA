@@ -11,7 +11,7 @@
 // Les Error Boundaries doivent être des class components (contrainte React).
 
 import React from 'react';
-import * as Sentry from '@sentry/react';
+import { Sentry } from '../../sentry';
 
 export default class ErrorBoundary extends React.Component {
   constructor(props) {

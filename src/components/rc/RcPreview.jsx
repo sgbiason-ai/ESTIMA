@@ -1,8 +1,9 @@
 // src/components/rc/RcPreview.jsx
 import React from 'react';
-import { Eye, Palette, Download, Edit3, FileText } from 'lucide-react';
+import { Eye, Palette, Download, Edit3, FileText, FileSignature, Cloud, RefreshCw, CheckSquare } from 'lucide-react';
 import { generateWordRC } from '../../utils/rcExport';
 import { sanitizeHtml } from '../../utils/helpers';
+import { RibbonGroup, RibbonBtnLarge, RibbonBtnSmall, RibbonContainer, RibbonSpacer } from '../common/RibbonParts';
 
 const RcPreview = ({
   rcData,
@@ -11,7 +12,11 @@ const RcPreview = ({
   branding,
   setBrandingModalOpen,
   handlePreviewScroll,
-  openEditor
+  openEditor,
+  handleExportPdf,
+  saveToCloud,
+  saveStatus,
+  onEditProject,
 }) => {
   
   const previewContent = [];
@@ -90,40 +95,52 @@ const RcPreview = ({
   return (
     <div className="w-2/3 flex flex-col bg-slate-100/50 relative">
 
-      {/* Barre d'outils */}
-      <div className="p-4 border-b border-slate-200 bg-white h-16 flex justify-between items-center shadow-sm z-10 sticky top-0">
-        <div className="flex items-center gap-4">
-          <div className="p-2 bg-slate-100 rounded-lg text-slate-500"><Eye size={20} /></div>
-          <div>
-            <h3 className="font-black text-slate-700 uppercase text-sm tracking-widest">Aperçu du document</h3>
-            <p className="text-[10px] text-slate-400 font-bold">
-              {selectedIds.size} chapitre{selectedIds.size > 1 ? 's' : ''} sélectionné{selectedIds.size > 1 ? 's' : ''}
-              {missingVars > 0 && (
-                <span className="ml-2 text-red-400" title={`${missingVars} variable(s) non renseignée(s) dans la fiche projet`}>
-                  · {missingVars} var. manquante{missingVars > 1 ? 's' : ''}
-                </span>
-              )}
-            </p>
+      {/* ═══ RIBBON OFFICE ═══ */}
+      <RibbonContainer>
+        <RibbonGroup label="Aperçu">
+          <div className="flex flex-col items-center gap-0.5 px-1">
+            <Eye size={20} className="text-slate-400" />
+            <span className="text-[10px] font-bold text-slate-500">
+              {selectedIds.size} chap.
+            </span>
+            {missingVars > 0 && (
+              <span className="text-[9px] text-red-400 font-bold" title={`${missingVars} variable(s) non renseignée(s)`}>
+                {missingVars} var. ⚠
+              </span>
+            )}
           </div>
-        </div>
+        </RibbonGroup>
 
-        <div className="flex gap-2">
-          <button 
-            onClick={() => setBrandingModalOpen(true)} 
-            className="px-4 py-2 hover:bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100 shadow-sm flex items-center gap-2 text-xs font-black uppercase tracking-wider transition-all"
-            title="Modifier la charte graphique (couleurs, polices, logo) depuis les Paramètres"
-          >
-            <Palette size={16} /> Style
-          </button>
-          <button 
-            onClick={() => generateWordRC(selectedIds, variables, rcData, branding)} 
-            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-lg shadow-indigo-200 flex items-center gap-2 transition-all active:scale-95 text-xs font-black uppercase tracking-wider hover:-translate-y-0.5"
-            title="Générer et télécharger le document Word (.docx) avec les chapitres sélectionnés et les variables du projet"
-          >
-            <Download size={16} /> Générer le Word (.docx)
-          </button>
-        </div>
-      </div>
+        <RibbonGroup label="Document">
+          <RibbonBtnLarge icon={Palette} label="Style" onClick={() => setBrandingModalOpen(true)} title="Modifier la charte graphique (couleurs, polices, logo)" accent="text-indigo-600" />
+          <RibbonBtnLarge icon={FileSignature} label="Projet" onClick={onEditProject} title="Modifier la fiche projet" accent="text-blue-600" />
+        </RibbonGroup>
+
+        <RibbonGroup label="Exporter">
+          <RibbonBtnLarge icon={Download} label={<>Word<br/><span className="text-[8px] opacity-60">.docx</span></>} onClick={() => generateWordRC(selectedIds, variables, rcData, branding)} title="Générer et télécharger le document Word (.docx)" accent="text-indigo-600" />
+          <div className="flex flex-col gap-0.5">
+            <RibbonBtnSmall icon={FileText} label="Export PDF" onClick={handleExportPdf} title="Exporter le RC en PDF" accent="text-red-600" />
+          </div>
+        </RibbonGroup>
+
+        <RibbonSpacer />
+
+        <RibbonGroup label="Cloud" noBorder>
+          <div className="flex flex-col items-center gap-1">
+            <RibbonBtnLarge icon={Cloud} label="Sauver" onClick={saveToCloud} title="Sauvegarder en Cloud" />
+            {saveStatus === 'saving' && (
+              <span className="text-[9px] font-bold text-amber-500 uppercase flex items-center gap-1">
+                <RefreshCw size={10} className="animate-spin" /> Sync...
+              </span>
+            )}
+            {saveStatus === 'saved' && (
+              <span className="text-[9px] font-bold text-emerald-500 uppercase flex items-center gap-1">
+                <CheckSquare size={10} /> À jour
+              </span>
+            )}
+          </div>
+        </RibbonGroup>
+      </RibbonContainer>
       
       {/* Aperçu A4 */}
       <div 

@@ -1,11 +1,83 @@
 import React from 'react';
 import {
-  Upload, Save, FolderOpen, Copy, CheckCheck, RefreshCw, Cpu, Cloud, CheckCircle2,
+  Upload, Save, FolderOpen, Copy, CheckCheck, RefreshCw, Cpu, Cloud, CheckCircle2, FileText, Layers, PlusCircle, HelpCircle
 } from 'lucide-react';
+
+const RibbonGroup = ({ label, children, noBorder }) => (
+  <div className="flex flex-col h-full relative">
+    <div className="flex items-center justify-center gap-1.5 px-4 flex-1 py-1">
+      {children}
+    </div>
+    <div className="text-center pb-1 px-2">
+      <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest select-none whitespace-nowrap leading-none">
+        {label}
+      </span>
+    </div>
+    {!noBorder && (
+      <div className="absolute right-0 top-2 bottom-2 w-px bg-slate-800" />
+    )}
+  </div>
+);
+
+const RibbonBtnLarge = ({ icon: Icon, label, onClick, title, active, accent, disabled, loading }) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    title={title || label}
+    className={`
+      group flex flex-col items-center justify-center gap-1.5 px-4 py-2 rounded-xl min-w-[72px]
+      transition-all duration-150
+      ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer active:scale-95'}
+      ${active
+        ? 'bg-emerald-500/10 border border-emerald-500/20 shadow-sm'
+        : 'border border-transparent hover:bg-slate-800 hover:border-slate-700'
+      }
+    `}
+  >
+    <div className={`transition-colors ${accent || 'text-slate-400'} ${!disabled && !active ? 'group-hover:text-slate-200' : ''}`}>
+      <Icon size={22} strokeWidth={1.5} className={loading ? 'animate-spin' : ''} />
+    </div>
+    <span className={`text-[10px] leading-tight text-center font-semibold transition-colors
+      ${active ? 'text-emerald-400' : 'text-slate-400'}
+      ${!disabled && !active ? 'group-hover:text-slate-200' : ''}
+    `}>
+      {label}
+    </span>
+  </button>
+);
+
+const RibbonBtnSmall = ({ icon: Icon, label, onClick, title, active, accent, disabled }) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    title={title || label}
+    className={`
+      group flex items-center gap-2 px-3 py-1.5 rounded-lg w-full
+      transition-all duration-150
+      ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer active:scale-95'}
+      ${active
+        ? 'bg-emerald-500/10 border border-emerald-500/20'
+        : 'border border-transparent hover:bg-slate-800 hover:border-slate-700'
+      }
+    `}
+  >
+    <div className={`transition-colors shrink-0 ${accent || 'text-slate-400'} ${!disabled && !active ? 'group-hover:text-slate-200' : ''}`}>
+      <Icon size={14} strokeWidth={2} />
+    </div>
+    {label && (
+      <span className={`text-[11px] leading-none whitespace-nowrap font-medium transition-colors
+        ${active ? 'text-emerald-400' : 'text-slate-400'}
+        ${!disabled && !active ? 'group-hover:text-slate-200' : ''}
+      `}>
+        {label}
+      </span>
+    )}
+  </button>
+);
 
 /**
  * PmLeftColumn
- * Panneau gauche : infos projet actif, mini stats, boutons d'action.
+ * Barre superieure (Ribbon) : infos projet actif, mini stats, boutons d'action.
  */
 const PmLeftColumn = ({
   project,
@@ -20,102 +92,115 @@ const PmLeftColumn = ({
   onClone,
   fileInputRef,
   onImportChange,
+  onNewProject,
+  onShowHelp,
 }) => (
-  <div className="w-[300px] shrink-0 flex flex-col border-r border-slate-800 bg-slate-900/50 overflow-hidden">
+  <div className="flex-none flex items-stretch bg-slate-900 border-b border-slate-800 h-[88px] select-none z-20 overflow-x-auto">
+
+    {/* ── App Branding / Workspace ── */}
+    <div className="flex flex-col justify-center px-6 border-r border-slate-800 bg-slate-900/50 min-w-[180px]">
+      <div className="flex items-center gap-3">
+        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-400/20 to-emerald-600/20 flex items-center justify-center border border-emerald-500/30">
+          <Layers size={16} className="text-emerald-400" />
+        </div>
+        <div>
+          <h1 className="text-sm font-black text-white uppercase tracking-wider leading-none">Workspace</h1>
+          <p className="text-[9px] text-slate-400 font-medium mt-1">Estima V2</p>
+        </div>
+      </div>
+    </div>
 
     {/* ── Session en cours ── */}
-    <div className="p-6 border-b border-slate-800">
-      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Session en cours</p>
-      <h3 className="text-base font-semibold text-slate-100 leading-snug mb-2 line-clamp-2" title={project?.name || 'Nouveau Projet'}>
-        {project?.name || 'Nouveau Projet'}
-      </h3>
-      <p className="text-xs font-mono text-slate-500 truncate mb-4">ID: {project?.id || 'Non sauvegardé'}</p>
-
-      <div className="flex items-center gap-2 mb-5">
-        <span className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 px-2.5 py-1 rounded text-xs font-medium border border-emerald-500/20">
-          <CheckCircle2 size={12} /> Actif
+    <div className="flex flex-col justify-center px-6 border-r border-slate-800 min-w-[240px] max-w-[320px]">
+      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Session en cours</p>
+      <div className="flex items-center gap-2 mb-2">
+        <span className="flex items-center gap-1 bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border border-emerald-500/20">
+          <CheckCircle2 size={10} /> Actif
         </span>
-        <span className="flex items-center gap-1.5 bg-slate-800 text-slate-300 px-2.5 py-1 rounded text-xs font-medium border border-slate-700">
-          <Cloud size={12} /> Synchronisé
+        <span className="text-sm font-bold text-slate-100 truncate flex-1" title={project?.name || 'Nouveau Projet'}>
+          {project?.name || 'Nouveau Projet'}
         </span>
       </div>
-
-      {/* Mini stats */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 flex flex-col items-center">
-          <span className="text-xl font-semibold text-slate-100">{chapCount}</span>
-          <span className="text-xs text-slate-400 font-medium mt-1">Chapitres</span>
-        </div>
-        <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 flex flex-col items-center">
-          <span className="text-xl font-semibold text-slate-100">{itemCount}</span>
-          <span className="text-xs text-slate-400 font-medium mt-1">Éléments</span>
-        </div>
+      <div className="flex items-center gap-3 text-[10px] font-medium text-slate-400">
+        <span className="flex items-center gap-1 bg-slate-800 px-1.5 py-0.5 rounded"><Layers size={10} /> {chapCount} chapitres</span>
+        <span className="flex items-center gap-1 bg-slate-800 px-1.5 py-0.5 rounded"><FileText size={10} /> {itemCount} éléments</span>
+        {lastSaved && (
+          <span className="flex items-center gap-1 text-slate-500 ml-auto" title={`Dernière sauvegarde : ${lastSaved}`}>
+            <Cloud size={10} /> Sync
+          </span>
+        )}
       </div>
     </div>
 
-    {/* ── Actions ── */}
-    <div className="flex-1 flex flex-col gap-3 p-5 overflow-y-auto">
-      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Actions</p>
+    {/* ── Général ── */}
+    <RibbonGroup label="Général">
+      <RibbonBtnLarge
+        icon={PlusCircle}
+        label="Nouveau"
+        onClick={onNewProject}
+        accent="text-emerald-500"
+      />
+      <RibbonBtnLarge
+        icon={HelpCircle}
+        label="Guide"
+        onClick={onShowHelp}
+        accent="text-blue-400"
+      />
+    </RibbonGroup>
 
-      {/* Cloud Save */}
-      <button
+    {/* ── Actions Cloud ── */}
+    <RibbonGroup label="Cloud">
+      <RibbonBtnLarge
+        icon={cloudSaving ? RefreshCw : cloudSaved ? CheckCheck : Upload}
+        label={cloudSaving ? 'Sauvegarde...' : cloudSaved ? 'Sauvegardé' : 'Sauvegarder'}
         onClick={onCloudSave}
         disabled={cloudSaving}
-        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors border ${
-          cloudSaved
-            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-            : 'bg-emerald-600 hover:bg-emerald-500 border-transparent text-white shadow-sm'
-        }`}
-      >
-        <div className="flex items-center justify-center shrink-0">
-          {cloudSaving ? <RefreshCw size={18} className="animate-spin" />
-            : cloudSaved ? <CheckCheck size={18} />
-            : <Upload size={18} />}
-        </div>
-        <div className="text-left flex-1">
-          <p>{cloudSaving ? 'Sauvegarde...' : cloudSaved ? 'Sauvegardé avec succès' : 'Sauvegarder (Cloud)'}</p>
-        </div>
-      </button>
+        active={cloudSaved}
+        accent={cloudSaved ? 'text-emerald-400' : 'text-emerald-500'}
+        loading={cloudSaving}
+      />
+    </RibbonGroup>
 
-      {/* Export JSON */}
-      <button
-        onClick={onExport}
-        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 text-slate-200 transition-colors"
-      >
-        <Save size={18} className="text-blue-400" />
-        <div className="text-left flex-1"><p>Exporter (JSON)</p></div>
-      </button>
-
-      {/* Charger JSON */}
-      <button
-        onClick={onImportClick}
-        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 text-slate-200 transition-colors"
-      >
-        <FolderOpen size={18} className="text-purple-400" />
-        <div className="text-left flex-1"><p>Charger (JSON)</p></div>
+    {/* ── Actions Fichier ── */}
+    <RibbonGroup label="Local & Fichier">
+      <div className="flex flex-col gap-0.5 justify-center">
+        <RibbonBtnSmall
+          icon={FolderOpen}
+          label="Ouvrir JSON"
+          onClick={onImportClick}
+          accent="text-amber-400"
+        />
         <input type="file" ref={fileInputRef} onChange={onImportChange} accept=".json" className="hidden" />
-      </button>
-
-      {/* Dupliquer */}
-      <button
-        onClick={onClone}
-        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 text-slate-200 transition-colors"
-      >
-        <Copy size={18} className="text-indigo-400" />
-        <div className="text-left flex-1"><p>Dupliquer le projet</p></div>
-      </button>
-    </div>
-
-    {/* Footer */}
-    <div className="flex-none p-4 border-t border-slate-800 flex items-center justify-between text-slate-500 bg-slate-900">
-      <div className="flex items-center gap-2 text-xs font-mono">
-        <Cpu size={14} />
-        <span>ENGINE_V2.4.5</span>
+        <RibbonBtnSmall
+          icon={Save}
+          label="Exporter JSON"
+          onClick={onExport}
+          accent="text-blue-400"
+        />
       </div>
-      <span className="text-xs font-mono">
-        {(JSON.stringify(localStorage).length / 1024).toFixed(1)} KB
-      </span>
+      <div className="flex flex-col gap-0.5 justify-center">
+        <RibbonBtnSmall
+          icon={Copy}
+          label="Dupliquer le projet"
+          onClick={onClone}
+          accent="text-indigo-400"
+        />
+      </div>
+    </RibbonGroup>
+
+    <div className="flex-1 min-w-[16px]" />
+
+    {/* ── Infos Systeme & Status ── */}
+    <div className="flex flex-col justify-center items-end px-6 border-l border-slate-800 text-right bg-slate-900/50 min-w-[160px]">
+      <div className="flex items-center gap-2 mb-2">
+        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_10px_#10b981]" />
+        <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Connecté</span>
+      </div>
+      <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-500 bg-slate-800 px-2 py-0.5 rounded">
+        <Cpu size={10} /> ENGINE_V2.4.5
+      </div>
     </div>
+
   </div>
 );
 

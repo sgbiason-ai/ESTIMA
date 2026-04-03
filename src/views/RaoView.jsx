@@ -22,52 +22,7 @@ const TABS = [
   { id: 'recap',        label: 'Récapitulatif',  icon: BarChart2 },
 ];
 
-/* ════════════════════════════════════════════════════════════════════
-   RIBBON — Composants réutilisables (même style que ProjectToolbar)
-   ════════════════════════════════════════════════════════════════════ */
-
-const RibbonGroup = ({ label, children, noBorder }) => (
-  <div className="flex flex-col h-full relative">
-    <div className="flex items-center justify-center gap-1.5 px-4 flex-1 py-1">
-      {children}
-    </div>
-    <div className="text-center pb-1 px-2">
-      <span className="text-[10px] text-slate-400 font-normal tracking-wide select-none whitespace-nowrap leading-none">
-        {label}
-      </span>
-    </div>
-    {!noBorder && (
-      <div className="absolute right-0 top-2 bottom-2 w-px bg-gradient-to-b from-transparent via-slate-200 to-transparent" />
-    )}
-  </div>
-);
-
-const RibbonBtnLarge = ({ icon: Icon, label, onClick, title, active, accent, disabled }) => (
-  <button
-    onClick={onClick}
-    disabled={disabled}
-    title={title || label}
-    className={`
-      group flex flex-col items-center justify-center gap-1 px-3 py-1.5 rounded min-w-[52px]
-      transition-all duration-100
-      ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-default'}
-      ${active
-        ? 'bg-blue-50 border border-blue-200 shadow-sm'
-        : 'border border-transparent hover:bg-[#dce6f0] hover:border-[#c4d5e8] active:bg-[#b8cce0]'
-      }
-    `}
-  >
-    <div className={`transition-colors ${accent || 'text-slate-600'} ${!disabled && !active ? 'group-hover:text-slate-800' : ''}`}>
-      <Icon size={22} strokeWidth={1.6} />
-    </div>
-    <span className={`text-[10.5px] leading-tight text-center font-normal transition-colors
-      ${active ? 'text-blue-700 font-medium' : 'text-slate-600'}
-      ${!disabled && !active ? 'group-hover:text-slate-800' : ''}
-    `}>
-      {label}
-    </span>
-  </button>
-);
+import { RibbonGroup, RibbonBtnLarge } from '../components/common/RibbonParts';
 
 const RaoView = ({ 
   project, 

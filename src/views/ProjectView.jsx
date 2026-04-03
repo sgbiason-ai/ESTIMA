@@ -26,6 +26,7 @@ import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import ArchiveManagerModal from '../components/modals/ArchiveManagerModal';
 import ArchiveAuditModal from '../components/modals/ArchiveAuditModal';
 import PriceAuditModal from '../components/modals/PriceAuditModal';
+import CloudProjectPicker from '../components/modals/CloudProjectPicker';
 
 // NOS CUSTOM HOOKS
 import { useProjectTranches } from '../hooks/useProjectTranches';
@@ -61,6 +62,8 @@ const ProjectView = ({
   units = [],
   masterCctp = [],
   allBpuItems = [],
+  companyId,
+  onLoadCloudProject,
   // Archives
   archives = [],
   activeArchive = null,
@@ -78,6 +81,7 @@ const ProjectView = ({
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [showArchiveManager, setShowArchiveManager] = useState(false);
   const [showPriceAudit, setShowPriceAudit] = useState(false);
+  const [showCloudPicker, setShowCloudPicker] = useState(false);
 
   const handleArchive = async () => {
     if (!onCreateArchive) return;
@@ -597,12 +601,28 @@ const ProjectView = ({
             bpuConfig={bpuConfig} setBpuConfig={setBpuConfig}
             onSaveAffaire={handleSaveAffaire}
             onOpenAffaire={() => handleOpenAffaire(null)}
+            onOpenCloudProject={() => setShowCloudPicker(v => !v)}
             onArchive={handleArchive}
             archiveCount={archives.length}
             onOpenArchiveManager={() => setShowArchiveManager(true)}
             onOpenPriceAudit={() => setShowPriceAudit(true)}
           />
           <input ref={loadAffaireRef} type="file" accept=".json" className="hidden" onChange={handleOpenAffaireFallback} />
+
+          {/* Picker projet cloud */}
+          {showCloudPicker && companyId && (
+            <div className="relative shrink-0">
+              <CloudProjectPicker
+                companyId={companyId}
+                currentProjectId={project?.id}
+                onSelect={(proj) => {
+                  setShowCloudPicker(false);
+                  if (onLoadCloudProject) onLoadCloudProject(proj);
+                }}
+                onClose={() => setShowCloudPicker(false)}
+              />
+            </div>
+          )}
 
           {/* Bandeau archive active */}
           {activeArchive && (

@@ -33,7 +33,7 @@ const ProjectManagerView = ({
   const [viewMode,   setViewMode]   = useState('grid'); // 'grid' | 'list'
 
   // ── Hooks ──────────────────────────────────────────────────────────────────
-  const local = usePmLocalHistory({ project, setProject, bpuConfig, clientPercent, setBpuConfig, setClientPercent });
+  const local = usePmLocalHistory({ project, setProject, bpuConfig, clientPercent, setBpuConfig, setClientPercent, companyId });
 
   const cloud = usePmCloudProjects({
     companyId, historyTab,
@@ -89,73 +89,31 @@ const ProjectManagerView = ({
         />
       )}
 
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header className="flex-none flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900 z-10">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
-            <Layers size={16} className="text-emerald-500" />
-          </div>
-          <div>
-            <h2 className="text-sm font-semibold text-slate-100 tracking-tight">Gestion de Projet</h2>
-            <p className="text-xs text-slate-500 font-medium">Workspace</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-3 mr-2">
-            {lastSaved && (
-              <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                <Clock size={14} />
-                <span>Sauvegardé le {lastSaved}</span>
-              </div>
-            )}
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 rounded-md border border-emerald-500/20">
-              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-              <span className="text-xs font-medium text-emerald-400">Connecté</span>
-            </div>
-          </div>
-          <div className="h-6 w-px bg-slate-800" />
-          <button
-            onClick={() => setShowHelp(true)}
-            className="flex items-center gap-2 px-3 py-2 hover:bg-slate-800 text-slate-400 hover:text-slate-100 rounded-lg text-sm font-medium transition-colors"
-          >
-            <HelpCircle size={16} /> Guide
-          </button>
-          <button
-            onClick={async () => { const ok = await confirm('Créer un nouveau projet ?'); if (ok) resetProject(); }}
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm text-sm"
-          >
-            <PlusCircle size={16} /> Nouveau projet
-          </button>
-        </div>
-      </header>
+      {/* ── Ribbon (ex Col gauche) ─────────────────────────────────────────── */}
+      <PmLeftColumn
+        project={project}
+        chapCount={chapCount}
+        itemCount={itemCount}
+        lastSaved={lastSaved}
+        cloudSaving={cloud.cloudSaving}
+        cloudSaved={cloud.cloudSaved}
+        onCloudSave={cloud.handleCloudSave}
+        onExport={local.handleExport}
+        onImportClick={() => local.fileInputRef.current?.click()}
+        onClone={local.handleClone}
+        fileInputRef={local.fileInputRef}
+        onImportChange={local.handleImport}
+        onNewProject={async () => { const ok = await confirm('Créer un nouveau projet ?'); if (ok) resetProject(); }}
+        onShowHelp={() => setShowHelp(true)}
+      />
 
       {/* ── Body ───────────────────────────────────────────────────────────── */}
       <div className="flex-1 flex min-h-0">
-
-        {/* Col gauche */}
-        <PmLeftColumn
-          project={project}
-          chapCount={chapCount}
-          itemCount={itemCount}
-          lastSaved={lastSaved}
-          cloudSaving={cloud.cloudSaving}
-          cloudSaved={cloud.cloudSaved}
-          onCloudSave={cloud.handleCloudSave}
-          onExport={local.handleExport}
-          onImportClick={() => local.fileInputRef.current?.click()}
-          onClone={local.handleClone}
-          fileInputRef={local.fileInputRef}
-          onImportChange={local.handleImport}
-        />
-
-        {/* Col droite */}
         <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-slate-950">
-
-          {/* Header col droite */}
           <div className="flex-none px-8 py-5 border-b border-slate-800 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <h3 className="text-lg font-semibold text-slate-100">Mes Projets</h3>
+              
               {historyTab === 'cloud' && (
                 <div className="relative">
                   <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
@@ -207,7 +165,6 @@ const ProjectManagerView = ({
                   <Clock size={16} /> Local
                 </button>
               </div>
-
 
               {/* Tri — visible uniquement sur l'onglet Cloud */}
               {historyTab === 'cloud' && cloud.cloudProjects.length > 0 && (

@@ -279,8 +279,19 @@ export const useDatabase = (user, companyId) => {
 
   // ─── IMPORTS ──────────────────────────────────────────────────────────────
 
+  const MAX_IMPORT_ROWS = 5000;
+  const MAX_DESIGNATION_LENGTH = 500;
+
   const importFromExcel = (file) => {
     if (!companyId) return;
+
+    // Validation type de fichier
+    const ext = (file.name || '').split('.').pop().toLowerCase();
+    if (!['xlsx', 'xls', 'csv'].includes(ext)) {
+      toast.error('Format non supporté. Utilisez un fichier .xlsx, .xls ou .csv.', { title: 'Fichier invalide' });
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
@@ -288,34 +299,63 @@ export const useDatabase = (user, companyId) => {
         const workbook = XLSX.read(data, { type: 'array' });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+        // Limite du nombre de lignes
+        if (jsonData.length > MAX_IMPORT_ROWS) {
+          toast.error(`Le fichier contient ${jsonData.length} lignes (max ${MAX_IMPORT_ROWS}). Réduisez le fichier.`, { title: 'Fichier trop volumineux' });
+          return;
+        }
+
+        let skipped = 0;
         const newItems = jsonData
           .map((row) => {
             if (!row || !row[0]) return null;
+
+            // Validation designation
+            const designation = String(row[0] ?? '').trim();
+            if (!designation || designation.length > MAX_DESIGNATION_LENGTH) { skipped++; return null; }
+
+            // Validation description
+            const description = String(row[1] ?? '').trim().slice(0, 1000);
+
+            // Validation unite
+            const unit = String(row[2] ?? 'u').trim().slice(0, 20) || 'u';
+
+            // Validation prix
+            const price = Number(row[3]);
+            if (!isFinite(price) || price < 0) { skipped++; return null; }
+
             return {
               id: generateId(),
-              designation: row[0],
-              description: row[1] || '',
-              unit: row[2] || 'u',
-              price: Number(row[3]) || 0,
+              designation,
+              description,
+              unit,
+              price,
               categoryId: null,
               updatedAt: new Date().toISOString(),
             };
           })
           .filter(Boolean);
 
+        if (newItems.length === 0) {
+          toast.warning(`Aucun article valide trouvé dans le fichier.${skipped > 0 ? ` ${skipped} ligne(s) ignorée(s).` : ''}`, { title: 'Import vide' });
+          return;
+        }
+
         const prevBpu = bpu;
         setBpu(prev => [...prev, ...newItems]);
         setDatabaseVersion(v => v + 1);
         try {
           await Promise.all(newItems.map(item => setDoc(dref(companyId, 'bpu', item.id), item)));
-          toast.success(`${newItems.length} article(s) importé(s) avec succès.`, { title: 'Import terminé' });
+          const msg = `${newItems.length} article(s) importé(s).${skipped > 0 ? ` ${skipped} ligne(s) ignorée(s) (données invalides).` : ''}`;
+          toast.success(msg, { title: 'Import terminé' });
         } catch {
           setBpu(prevBpu);
           setDatabaseVersion(v => v + 1);
           toast.error("L'import n'a pas pu être sauvegardé sur le Cloud.", { title: 'Erreur sauvegarde' });
         }
       } catch {
-        toast.error('Impossible de lire le fichier Excel.', { title: 'Erreur import' });
+        toast.error('Impossible de lire le fichier Excel. Vérifiez le format.', { title: 'Erreur import' });
       }
     };
     reader.readAsArrayBuffer(file);

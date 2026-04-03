@@ -220,32 +220,47 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
         });
       });
 
+      let totalRows = 0;
+      let skippedRows = 0;
+      let unmatchedRows = 0;
+      let invalidPriceRows = 0;
+
       worksheet.eachRow((row, rowNumber) => {
         if (rowNumber <= 5) return;
+        totalRows++;
         const cell2 = row.getCell(2);
         const rawDesig = cell2.value ?? cell2.text ?? '';
         const designation = (typeof rawDesig === 'string' ? rawDesig : String(rawDesig ?? '')).trim().toUpperCase();
 
-        if (!designation || !projectItemsMap.has(designation)) return;
+        if (!designation) { skippedRows++; return; }
+        if (!projectItemsMap.has(designation)) { unmatchedRows++; return; }
 
         const cell5 = row.getCell(5);
         let val = cell5.value;
         if (val !== null && typeof val === 'object' && 'result' in val) val = val.result;
         const price = Number(val ?? 0);
-        if (!isFinite(price)) return;
+        if (!isFinite(price)) { invalidPriceRows++; return; }
 
         importedOffers[projectItemsMap.get(designation)] = price;
       });
 
       const matchCount = Object.keys(importedOffers).length;
       if (matchCount === 0) {
-        toast.warning("Aucune correspondance trouvée entre le fichier et les articles du projet.");
+        const details = [];
+        if (unmatchedRows > 0) details.push(`${unmatchedRows} désignation(s) non trouvée(s)`);
+        if (invalidPriceRows > 0) details.push(`${invalidPriceRows} prix invalide(s)`);
+        if (skippedRows > 0) details.push(`${skippedRows} ligne(s) vide(s)`);
+        toast.warning(`Aucune correspondance trouvée.${details.length > 0 ? ' ' + details.join(', ') + '.' : ''}`);
         event.target.value = null;
         return;
       }
 
       setCompanies(prev => [...prev, { id: `import_${Date.now()}`, name: companyName.trim() || suggestedName, offers: importedOffers, isManual: false }]);
-      toast.success(`${matchCount} offre(s) importée(s) pour "${companyName}".`);
+      const warnings = [];
+      if (unmatchedRows > 0) warnings.push(`${unmatchedRows} non trouvé(s)`);
+      if (invalidPriceRows > 0) warnings.push(`${invalidPriceRows} prix invalide(s)`);
+      const detail = warnings.length > 0 ? ` (${warnings.join(', ')})` : '';
+      toast.success(`${matchCount}/${totalRows} offre(s) importée(s) pour "${companyName}".${detail}`);
     } catch (error) {
       console.error("Erreur lecture fichier Excel:", error);
       toast.error("Impossible de lire le fichier. Vérifiez le format Excel.");
@@ -290,7 +305,7 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
     const result = {};
     chaptersData.forEach(chap => {
       chap.items.forEach(item => {
-        const prices = companies.map(c => Number(c.offers?.[item.id] ?? 0)).filter(p => p > 0);
+        const prices = companies.map(c => Number(c.offers?.[item.id] ?? 0)).filter(p => p !== 0);
         if (prices.length === 0) return;
         const threshold = calculateOABThreshold(prices);
         const validPrices = prices.filter(p => p >= threshold);

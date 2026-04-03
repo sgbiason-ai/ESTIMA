@@ -3,7 +3,6 @@ import React, { useState, useCallback } from 'react';
 import CctpSidebar from '../components/cctp/CctpSidebar';
 import CctpPreview from '../components/cctp/CctpPreview';
 import CctpEditorModal from '../components/modals/CctpEditorModal';
-import ProjectDetailsModal from '../components/modals/ProjectDetailsModal';
 import FavoritesPanel from '../components/common/FavoritesPanel';
 import { useCctpManager } from '../hooks/useCctpManager';
 import { useFavorites } from '../hooks/useFavorites';
@@ -15,7 +14,6 @@ const CctpGeneratorView = ({
   onEditBranding,
 }) => {
   
-  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isFavoritesPanelOpen, setIsFavoritesPanelOpen] = useState(false);
 
   const manager = useCctpManager({
@@ -48,18 +46,9 @@ const CctpGeneratorView = ({
     );
   }, [manager, project]);
 
+  // Utilise le modal global de App.jsx via onEditProject (= modals.openProjectModal)
   const handleEditProject = () => {
-    setIsProjectModalOpen(true);
     onEditProject?.();
-  };
-
-  const handleSaveProject = (formData) => {
-    // On fusionne le formulaire dans le projet existant pour préserver
-    // id, cctpSelectedIds, cctpExpandedIds et tous les autres champs internes.
-    // Le useMemo "variables" du hook se recalcule automatiquement dès que
-    // project change, ce qui met à jour le preview en temps réel.
-    onUpdateProject?.({ ...project, ...formData });
-    setIsProjectModalOpen(false);
   };
 
   return (
@@ -93,7 +82,7 @@ const CctpGeneratorView = ({
         onOpenFavorites={() => setIsFavoritesPanelOpen(true)}
       />
 
-      <CctpPreview 
+      <CctpPreview
         cctpData={manager.cctpData}
         selectedIds={manager.selectedIds}
         variables={manager.variables}
@@ -101,6 +90,10 @@ const CctpGeneratorView = ({
         setBrandingModalOpen={() => onEditBranding?.()}
         handlePreviewScroll={manager.handlePreviewScroll}
         openEditor={manager.openEditor}
+        handleExportPdf={handleExportPdf}
+        saveToCloud={manager.saveToCloud}
+        saveStatus={manager.saveStatus}
+        onEditProject={handleEditProject}
       />
 
       <CctpEditorModal 
@@ -109,14 +102,6 @@ const CctpGeneratorView = ({
         node={manager.nodeToEdit} 
         onSave={manager.handleSaveNode} 
         availableVariables={manager.variables} 
-      />
-
-      <ProjectDetailsModal
-        isOpen={isProjectModalOpen}
-        onClose={() => setIsProjectModalOpen(false)}
-        project={project}
-        onSave={handleSaveProject}
-        branding={manager.branding}
       />
 
       {/* ── Bouton flottant Favoris ── */}

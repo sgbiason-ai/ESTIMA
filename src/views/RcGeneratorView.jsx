@@ -3,7 +3,6 @@ import React, { useState, useCallback } from 'react';
 import RcSidebar from '../components/rc/RcSidebar';
 import RcPreview from '../components/rc/RcPreview';
 import RcEditorModal from '../components/modals/RcEditorModal';
-import ProjectDetailsModal from '../components/modals/ProjectDetailsModal';
 import FavoritesPanel from '../components/common/FavoritesPanel';
 import { useRcManager } from '../hooks/useRcManager';
 import { useFavorites } from '../hooks/useFavorites';
@@ -15,7 +14,6 @@ const RcGeneratorView = ({
   onEditBranding,
 }) => {
   
-  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isFavoritesPanelOpen, setIsFavoritesPanelOpen] = useState(false);
 
   const manager = useRcManager({
@@ -47,18 +45,9 @@ const RcGeneratorView = ({
     );
   }, [manager, project]);
 
+  // Utilise le modal global de App.jsx via onEditProject (= modals.openProjectModal)
   const handleEditProject = () => {
-    setIsProjectModalOpen(true);
     onEditProject?.();
-  };
-
-  const handleSaveProject = (formData) => {
-    // On fusionne le formulaire dans le projet existant pour préserver
-    // id, rcSelectedIds, rcExpandedIds et tous les autres champs internes.
-    // Le useMemo "variables" du hook se recalcule automatiquement dès que
-    // project change, ce qui met à jour le preview en temps réel.
-    onUpdateProject?.({ ...project, ...formData });
-    setIsProjectModalOpen(false);
   };
 
   return (
@@ -91,7 +80,7 @@ const RcGeneratorView = ({
         onOpenFavorites={() => setIsFavoritesPanelOpen(true)}
       />
 
-      <RcPreview 
+      <RcPreview
         rcData={manager.rcData}
         selectedIds={manager.selectedIds}
         variables={manager.variables}
@@ -99,6 +88,10 @@ const RcGeneratorView = ({
         setBrandingModalOpen={() => onEditBranding?.()}
         handlePreviewScroll={manager.handlePreviewScroll}
         openEditor={manager.openEditor}
+        handleExportPdf={handleExportPdf}
+        saveToCloud={manager.saveToCloud}
+        saveStatus={manager.saveStatus}
+        onEditProject={handleEditProject}
       />
 
       <RcEditorModal 
@@ -107,14 +100,6 @@ const RcGeneratorView = ({
         node={manager.nodeToEdit} 
         onSave={manager.handleSaveNode} 
         availableVariables={manager.variables} 
-      />
-
-      <ProjectDetailsModal
-        isOpen={isProjectModalOpen}
-        onClose={() => setIsProjectModalOpen(false)}
-        project={project}
-        onSave={handleSaveProject}
-        branding={manager.branding}
       />
 
       {/* ── Bouton flottant Favoris ── */}

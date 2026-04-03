@@ -9,85 +9,7 @@ import {
 } from 'lucide-react';
 
 import { formatPrice } from '../utils/helpers';
-
-/* ════════════════════════════════════════════════════════════════════
-   OFFICE RIBBON — Composants de base
-   ════════════════════════════════════════════════════════════════════ */
-
-// ─── Groupe Ribbon avec label en bas et séparateur droit intégré ────
-const RibbonGroup = ({ label, children, className = '', noBorder }) => (
-  <div className={`flex flex-col h-full relative ${className}`}>
-    <div className="flex items-center justify-center gap-1.5 px-4 flex-1 py-1">
-      {children}
-    </div>
-    <div className="text-center pb-1 px-2">
-      <span className="text-[10px] text-slate-400 font-normal tracking-wide select-none whitespace-nowrap leading-none">
-        {label}
-      </span>
-    </div>
-    {!noBorder && (
-      <div className="absolute right-0 top-2 bottom-2 w-px bg-gradient-to-b from-transparent via-slate-200 to-transparent" />
-    )}
-  </div>
-);
-
-// ─── Bouton large : icône 22px + texte dessous ─────────────────────
-const RibbonBtnLarge = ({ icon: Icon, label, onClick, title, active, accent, disabled }) => (
-  <button
-    onClick={onClick}
-    disabled={disabled}
-    title={title || label}
-    className={`
-      group flex flex-col items-center justify-center gap-1 px-3 py-1.5 rounded min-w-[52px]
-      transition-all duration-100
-      ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-default'}
-      ${active
-        ? 'bg-blue-50 border border-blue-200 shadow-sm'
-        : 'border border-transparent hover:bg-[#dce6f0] hover:border-[#c4d5e8] active:bg-[#b8cce0]'
-      }
-    `}
-  >
-    <div className={`transition-colors ${accent || 'text-slate-600'} ${!disabled && !active ? 'group-hover:text-slate-800' : ''}`}>
-      <Icon size={22} strokeWidth={1.6} />
-    </div>
-    <span className={`text-[10.5px] leading-tight text-center font-normal transition-colors
-      ${active ? 'text-blue-700 font-medium' : 'text-slate-600'}
-      ${!disabled && !active ? 'group-hover:text-slate-800' : ''}
-    `}>
-      {label}
-    </span>
-  </button>
-);
-
-// ─── Bouton petit : icône 16px + texte à côté ──────────────────────
-const RibbonBtnSmall = ({ icon: Icon, label, onClick, title, active, accent, disabled }) => (
-  <button
-    onClick={onClick}
-    disabled={disabled}
-    title={title || label}
-    className={`
-      group flex items-center gap-2 px-2.5 py-[5px] rounded w-full
-      transition-all duration-100
-      ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-default'}
-      ${active
-        ? 'bg-blue-50 border border-blue-200'
-        : 'border border-transparent hover:bg-[#dce6f0] hover:border-[#c4d5e8] active:bg-[#b8cce0]'
-      }
-    `}
-  >
-    <div className={`transition-colors shrink-0 ${accent || 'text-slate-500'} ${!disabled && !active ? 'group-hover:text-slate-700' : ''}`}>
-      <Icon size={16} strokeWidth={1.6} />
-    </div>
-    {label && (
-      <span className={`text-[11px] leading-none whitespace-nowrap font-normal transition-colors
-        ${active ? 'text-blue-700 font-medium' : 'text-slate-600'}
-        ${!disabled && !active ? 'group-hover:text-slate-800' : ''}
-      `}>
-        {label}
-      </span>
-    )}
-  </button>
-);
+import { RibbonGroup, RibbonBtnLarge, RibbonBtnSmall } from './common/RibbonParts';
 
 /* ════════════════════════════════════════════════════════════════════
    OFFICE RIBBON — Composant principal
@@ -115,6 +37,7 @@ const ProjectToolbar = ({
   setBpuConfig,
   onSaveAffaire,
   onOpenAffaire,
+  onOpenCloudProject,
   onArchive,
   archiveCount = 0,
   onOpenArchiveManager,
@@ -227,6 +150,7 @@ const ProjectToolbar = ({
                 <div className="flex flex-col gap-[3px] justify-center">
                   <RibbonBtnSmall icon={FolderOpen} label="Ouvrir" onClick={onOpenAffaire} title="Charger une affaire (.json)" accent="text-amber-500" />
                   <RibbonBtnSmall icon={Save} label="Enregistrer" onClick={onSaveAffaire} title="Sauvegarder l'affaire (.json)" accent="text-blue-500" />
+                  <RibbonBtnSmall icon={Cloud} label="Ouvrir Cloud" onClick={onOpenCloudProject} title="Ouvrir un projet depuis le Cloud" accent="text-sky-500" />
                 </div>
                 <RibbonBtnLarge
                   icon={Upload}

@@ -15,6 +15,22 @@ const cleanTitle = (text) => (text || "").replace(/^[0-9IVX.\-\s]+/, "").trim();
 const stripHtmlComments = (html) =>
   (html || "").replace(/<!--[\s\S]*?-->/g, "");
 
+// --- UTIL: sanitise HTML dangereux (scripts, event handlers, iframes) ---
+const sanitizeHtml = (html) => {
+  if (!html) return "";
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
+    .replace(/<object[\s\S]*?<\/object>/gi, "")
+    .replace(/<embed[\s\S]*?>/gi, "")
+    .replace(/<link[\s\S]*?>/gi, "")
+    .replace(/\son\w+\s*=\s*["'][^"']*["']/gi, "")
+    .replace(/\son\w+\s*=\s*[^\s>]*/gi, "")
+    .replace(/javascript\s*:/gi, "");
+};
+
+const MAX_CONTENT_LENGTH = 50000; // 50 Ko par section
+
 // --- UTIL: normalisation "spéciale tableaux" ---
 const normalizeTablesHtml = (html) => {
   const parser = new DOMParser();
@@ -66,7 +82,18 @@ const normalizeTablesHtml = (html) => {
   return doc.body.innerHTML;
 };
 
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 Mo max
+
 export const parseDocxToTree = async (file) => {
+  // Validation fichier
+  const ext = (file.name || '').split('.').pop().toLowerCase();
+  if (ext !== 'docx') {
+    throw new Error('Format non supporté. Utilisez un fichier .docx.');
+  }
+  if (file.size > MAX_FILE_SIZE) {
+    throw new Error(`Fichier trop volumineux (${Math.round(file.size / 1024 / 1024)} Mo). Maximum : 20 Mo.`);
+  }
+
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
@@ -128,11 +155,11 @@ const buildTreeFromHtml = (htmlString) => {
 
   const appendContent = (html) => {
     if (!html) return;
-    if (currentLevel5) currentLevel5.content += html;
-    else if (currentLevel4) currentLevel4.content += html;
-    else if (currentLevel3) currentLevel3.content += html;
-    else if (currentLevel2) currentLevel2.content += html;
-    else if (currentLevel1) currentLevel1.content += html;
+    const clean = sanitizeHtml(html);
+    const target = currentLevel5 || currentLevel4 || currentLevel3 || currentLevel2 || currentLevel1;
+    if (target && target.content.length < MAX_CONTENT_LENGTH) {
+      target.content += clean.slice(0, MAX_CONTENT_LENGTH - target.content.length);
+    }
   };
 
   elements.forEach((el) => {

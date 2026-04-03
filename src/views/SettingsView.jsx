@@ -1,13 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { confirm } from '../utils/globalUI';
 import * as XLSX from 'xlsx';
-import BrandingView from './BrandingView'; // <-- Ajout de l'import de BrandingView
-import AccountSection from '../components/settings/AccountSection';
-import { 
-  Settings, Ruler, Trash2, Upload, FileSpreadsheet, 
-  AlertTriangle, Edit2, X, Check, ListOrdered, Hash, 
+import {
+  Settings, Ruler, Trash2, Upload, FileSpreadsheet,
+  AlertTriangle, Edit2, X, Check, ListOrdered, Hash,
   HelpCircle, Info, AlertCircle, FileJson, ArrowRight, Save,
-  MousePointer2, Palette, ArrowLeft
+  MousePointer2
 } from 'lucide-react';
 
 const SettingsView = ({
@@ -20,11 +18,6 @@ const SettingsView = ({
   setBpuConfig,
   importWarnings = [],
   setImportWarnings,
-  masterBranding = null,
-  onSaveMasterBranding,
-  project, //
-  user,
-  companyId
 }) => {
   // --- ÉTATS LOCAUX ---
   const [symb, setSymb] = useState("");
@@ -32,9 +25,6 @@ const SettingsView = ({
   const [originalSymb, setOriginalSymb] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  
-  // État pour afficher/masquer le composant BrandingView
-  const [showBranding, setShowBranding] = useState(false);
   
   // --- ÉTATS POUR LA CONVERSION JSON & MAPPING ---
   const [pendingJsonData, setPendingJsonData] = useState(null); 
@@ -163,33 +153,6 @@ const SettingsView = ({
     setBpuConfig(prev => ({ ...prev, numberingMode: mode }));
   };
 
-  // ─── RENDU CONDITIONNEL POUR L'ÉDITEUR DE CHARTE GRAPHIQUE ──────────
-  if (showBranding) {
-    return (
-      <div className="flex-1 flex flex-col h-full bg-slate-50 relative">
-        <div className="flex-none bg-white px-6 py-4 border-b border-slate-200 shadow-sm z-10 flex items-center gap-6">
-          <button
-            onClick={() => setShowBranding(false)}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors"
-          >
-            <ArrowLeft size={16} /> Retour aux paramètres
-          </button>
-          <div>
-            <h2 className="text-xl font-black uppercase text-slate-800 leading-none">Éditeur de Charte Graphique</h2>
-            <p className="text-[10px] font-bold text-violet-600 uppercase tracking-widest mt-1.5">Personnalisation des exports</p>
-          </div>
-        </div>
-        <div className="flex-1 overflow-hidden">
-          <BrandingView 
-            masterBranding={masterBranding}
-            onSaveMasterBranding={onSaveMasterBranding}
-            project={project} //
-          />
-        </div>
-      </div>
-    );
-  }
-
   // ─── RENDU STANDARD DES PARAMÈTRES ──────────
   return (
     <div className="flex-1 flex flex-col h-full bg-slate-50 overflow-hidden relative">
@@ -267,28 +230,6 @@ const SettingsView = ({
       <div className="flex-1 overflow-y-auto p-8">
         <div className="max-w-4xl w-full mx-auto space-y-8 pb-24">
           
-          {/* SECTION 0 : BRANDING / IDENTITÉ */}
-          <section className="bg-white rounded-xl border border-slate-200 shadow-sm border-t-4 border-t-violet-500 p-8 flex flex-col md:flex-row items-center justify-between gap-6 hover:shadow-md transition-shadow">
-            <div className="flex items-start gap-4">
-              <div className="bg-violet-100 p-3 rounded-lg">
-                <Palette size={24} className="text-violet-600" />
-              </div>
-              <div>
-                <h3 className="font-black uppercase text-sm tracking-widest text-slate-700">Identité & Charte Graphique</h3>
-                <p className="text-[11px] text-slate-500 mt-2 max-w-md leading-relaxed">
-                  Configurez le logo de votre entreprise, vos informations de contact, vos couleurs et la typographie. Ces éléments personnaliseront automatiquement tous vos exports de documents (PDF, Excel, Word).
-                </p>
-              </div>
-            </div>
-            
-            <button
-              onClick={() => setShowBranding(true)}
-              className="flex-shrink-0 bg-violet-600 hover:bg-violet-700 text-white px-6 py-3.5 rounded-lg font-black text-[11px] uppercase tracking-[0.15em] shadow-md flex items-center gap-3 transition-all active:scale-95"
-            >
-              <Palette size={16} /> Ouvrir l'éditeur de charte
-            </button>
-          </section>
-
           {/* SECTION 1 : CONFIGURATION NUMÉROTATION */}
           <section className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm relative group/section">
             <div className="absolute top-4 right-4 opacity-0 group-hover/section:opacity-100 transition-opacity">
@@ -539,11 +480,6 @@ const SettingsView = ({
               ))}
             </div>
           </section>
-
-          {/* SECTION COMPTE & DONNEES PERSONNELLES */}
-          {user && companyId && (
-            <AccountSection user={user} companyId={companyId} />
-          )}
 
           {/* ZONE DE DANGER */}
           <section className="bg-white p-8 rounded-xl border border-red-200 shadow-sm border-t-4 border-t-red-500">

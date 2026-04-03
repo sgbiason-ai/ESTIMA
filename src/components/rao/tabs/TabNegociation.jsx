@@ -361,7 +361,7 @@ const TabNegociation = ({
         // Moyenne PU parmi toutes les entreprises ayant chiffré cet article
         const allPUs = analysisCompanies
           .map(co => Number(co.offers?.[item.id] ?? 0))
-          .filter(p => p > 0);
+          .filter(p => p !== 0);
         if (allPUs.length < 2) return; // pas de comparaison possible avec 1 seule offre
         const averagePU = allPUs.reduce((a, b) => a + b, 0) / allPUs.length;
 

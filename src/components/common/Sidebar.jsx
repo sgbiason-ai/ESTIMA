@@ -1,23 +1,23 @@
 import React, { useState } from 'react';
-import { 
-  LayoutDashboard, 
-  Database, 
-  Settings, 
-  FileText, 
+import {
+  LayoutDashboard,
+  Database,
+  Settings,
+  FileText,
   Calculator,
   Folder,
-  LineChart, 
-  LogOut,    
+  LineChart,
+  LogOut,
   User,
   PanelLeftClose,
   PanelLeftOpen,
   BookOpen,
   FileCheck,
-  ShieldCheck,  // ← icône Admin
+  ArrowLeft,
   Cloud, CheckCircle2, AlertCircle, Loader
 } from 'lucide-react';
 
-const Sidebar = ({ activeTab, setActiveTab, onLogout, userEmail, onOpenCalculator, onToggle, isAdmin, saveStatus, projectName }) => {
+const Sidebar = ({ activeTab, setActiveTab, onLogout, userEmail, onOpenCalculator, onToggle, isAdmin, saveStatus, projectName, onBackToHub }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const toggleSidebar = () => {
@@ -28,12 +28,6 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout, userEmail, onOpenCalculato
 
   // --- 1. DEFINITION DES SECTIONS DU HAUT ---
   const sections = [
-    {
-      id: 'gestion_section',
-      items: [
-        { id: 'projects_manager', label: 'Gestion Projets', icon: Folder }
-      ]
-    },
     {
       id: 'travail_section',
       items: [
@@ -59,7 +53,6 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout, userEmail, onOpenCalculato
   // --- 2. ITEMS DU BAS (FIXES) ---
   const libraryItem  = { id: 'database',  label: 'Bibliothèque', icon: Database };
   const settingsItem = { id: 'settings',  label: 'Paramètres',   icon: Settings };
-  const adminItem    = { id: 'admin',     label: 'Administration', icon: ShieldCheck };
 
   // --- COMPOSANT BOUTON DE NAVIGATION ---
   const NavButton = ({ item, highlight }) => {
@@ -121,9 +114,25 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout, userEmail, onOpenCalculato
 
       {/* HEADER : LOGO & CALCULATRICE */}
       <div className="p-4 mb-2 relative z-10 flex flex-col gap-4">
-        {/* Bouton Toggle */}
-        <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-end'}`}>
-          <button 
+        {/* Bouton Toggle + Retour Hub */}
+        <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
+          {/* Bouton retour au Hub */}
+          {onBackToHub && (
+            <button
+              onClick={onBackToHub}
+              title="Retour aux modules"
+              className={`flex items-center gap-2 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 border border-transparent hover:border-emerald-500/20 transition-all ${
+                isCollapsed ? 'p-1.5' : 'px-2.5 py-1.5'
+              }`}
+            >
+              <ArrowLeft size={16} />
+              {!isCollapsed && (
+                <span className="text-[9px] font-black uppercase tracking-widest">Modules</span>
+              )}
+            </button>
+          )}
+
+          <button
             onClick={toggleSidebar}
             className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-400 hover:bg-white/5 transition-colors"
           >
@@ -168,21 +177,10 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout, userEmail, onOpenCalculato
         {/* ESPACE VIDE FLEXIBLE */}
         <div className="flex-1" />
 
-        {/* --- ZONE DU BAS : BIBLIOTHÈQUE + PARAMÈTRES + ADMIN --- */}
+        {/* --- ZONE DU BAS : BIBLIOTHÈQUE + PARAMÈTRES --- */}
         <div className="pb-4 border-t border-white/10 pt-4 flex flex-col gap-1">
           <NavButton item={libraryItem} />
           <NavButton item={settingsItem} />
-
-          {/* Onglet Admin — visible uniquement si isAdmin === true */}
-          {isAdmin && (
-            <>
-              {/* Séparateur */}
-              {!isCollapsed && (
-                <div className="h-[1px] w-8 bg-gradient-to-r from-amber-500/40 to-transparent my-2 ml-4 rounded-full" />
-              )}
-              <NavButton item={adminItem} highlight={true} />
-            </>
-          )}
         </div>
       </nav>
 

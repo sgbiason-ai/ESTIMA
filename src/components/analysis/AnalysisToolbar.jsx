@@ -1,85 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   FileSpreadsheet, FileText, Plus, Upload, Trash2, History, CheckCircle2, BarChart3,
   Calculator, Settings2, Thermometer, AlertTriangle, EyeOff, Layers, ChevronDown,
   FileDown, Database
 } from 'lucide-react';
 
-/* ════════════════════════════════════════════════════════════════════
-   RIBBON — Composants (même style que ProjectToolbar)
-   ════════════════════════════════════════════════════════════════════ */
-
-const RibbonGroup = ({ label, children, noBorder }) => (
-  <div className="flex flex-col h-full relative">
-    <div className="flex items-center justify-center gap-1.5 px-4 flex-1 py-1">
-      {children}
-    </div>
-    <div className="text-center pb-1 px-2">
-      <span className="text-[10px] text-slate-400 font-normal tracking-wide select-none whitespace-nowrap leading-none">
-        {label}
-      </span>
-    </div>
-    {!noBorder && (
-      <div className="absolute right-0 top-2 bottom-2 w-px bg-gradient-to-b from-transparent via-slate-200 to-transparent" />
-    )}
-  </div>
-);
-
-const RibbonBtnLarge = ({ icon: Icon, label, onClick, title, active, accent, disabled }) => (
-  <button
-    onClick={onClick}
-    disabled={disabled}
-    title={title || label}
-    className={`
-      group flex flex-col items-center justify-center gap-1 px-3 py-1.5 rounded min-w-[52px]
-      transition-all duration-100
-      ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-default'}
-      ${active
-        ? 'bg-blue-50 border border-blue-200 shadow-sm'
-        : 'border border-transparent hover:bg-[#dce6f0] hover:border-[#c4d5e8] active:bg-[#b8cce0]'
-      }
-    `}
-  >
-    <div className={`transition-colors ${accent || 'text-slate-600'} ${!disabled && !active ? 'group-hover:text-slate-800' : ''}`}>
-      <Icon size={22} strokeWidth={1.6} />
-    </div>
-    <span className={`text-[10.5px] leading-tight text-center font-normal transition-colors
-      ${active ? 'text-blue-700 font-medium' : 'text-slate-600'}
-      ${!disabled && !active ? 'group-hover:text-slate-800' : ''}
-    `}>
-      {label}
-    </span>
-  </button>
-);
-
-const RibbonBtnSmall = ({ icon: Icon, label, onClick, title, active, accent, disabled }) => (
-  <button
-    onClick={onClick}
-    disabled={disabled}
-    title={title || label}
-    className={`
-      group flex items-center gap-2 px-2.5 py-[5px] rounded w-full
-      transition-all duration-100
-      ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-default'}
-      ${active
-        ? 'bg-blue-50 border border-blue-200'
-        : 'border border-transparent hover:bg-[#dce6f0] hover:border-[#c4d5e8] active:bg-[#b8cce0]'
-      }
-    `}
-  >
-    <div className={`transition-colors shrink-0 ${accent || 'text-slate-500'} ${!disabled && !active ? 'group-hover:text-slate-700' : ''}`}>
-      <Icon size={16} strokeWidth={1.6} />
-    </div>
-    {label && (
-      <span className={`text-[11px] leading-none whitespace-nowrap font-normal transition-colors
-        ${active ? 'text-blue-700 font-medium' : 'text-slate-600'}
-        ${!disabled && !active ? 'group-hover:text-slate-800' : ''}
-      `}>
-        {label}
-      </span>
-    )}
-  </button>
-);
+import { RibbonGroup, RibbonBtnLarge, RibbonBtnSmall } from '../common/RibbonParts';
 
 /* ════════════════════════════════════════════════════════════════════
    ANALYSIS TOOLBAR — Ribbon style Office
@@ -106,6 +32,7 @@ const AnalysisToolbar = ({
   onPushAveragesToBpu, averagesHorsOABCount = 0
 }) => {
   const [showScoringSettings, setShowScoringSettings] = useState(false);
+  const fileInputRef = useRef(null);
 
   return (
     <div className="font-[system-ui,'Segoe_UI',sans-serif] select-none relative">
@@ -217,10 +144,23 @@ const AnalysisToolbar = ({
         {/* ── Données ── */}
         <RibbonGroup label="Données">
           <div className="flex flex-col gap-[3px] justify-center">
-            <label className="cursor-pointer">
-              <RibbonBtnSmall icon={Upload} label="Importer" accent="text-indigo-500" title="Importer un fichier Excel" />
-              <input type="file" accept=".xlsx, .xls" onChange={onImportOffer} className="hidden" />
-            </label>
+            <RibbonBtnSmall 
+              icon={Upload} 
+              label="Importer" 
+              onClick={() => fileInputRef.current?.click()} 
+              accent="text-indigo-500" 
+              title="Importer un fichier Excel" 
+            />
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              accept=".xlsx, .xls" 
+              onChange={(e) => {
+                if (e.target.files.length > 0) onImportOffer(e);
+                e.target.value = ''; // Permet de réimporter le même fichier si on s'est trompé
+              }} 
+              className="hidden" 
+            />
             <RibbonBtnSmall icon={Plus} label="Ajouter" onClick={onAddManualCompany} accent="text-emerald-500" title="Ajouter une entreprise" />
           </div>
           <div className="flex flex-col gap-[3px] justify-center">

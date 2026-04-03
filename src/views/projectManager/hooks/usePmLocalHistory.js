@@ -13,6 +13,7 @@ export const usePmLocalHistory = ({
   clientPercent,
   setBpuConfig,
   setClientPercent,
+  companyId,
 }) => {
   const [recentProjects, setRecentProjects] = useState([]);
   const fileInputRef = useRef(null);
@@ -53,6 +54,10 @@ export const usePmLocalHistory = ({
       if (raw) {
         const loaded = JSON.parse(raw);
         setProject(loaded);
+        // Persister l'ID pour que ESTIMA VRD charge le bon projet
+        if (companyId && loaded.id) {
+          localStorage.setItem(`last_active_project_id__${companyId}`, loaded.id);
+        }
         addToHistory(loaded);
       } else {
         toast.error('Projet introuvable dans le cache.');
@@ -128,6 +133,9 @@ export const usePmLocalHistory = ({
           }
 
           setProject(imported);
+          if (companyId && imported.id) {
+            localStorage.setItem(`last_active_project_id__${companyId}`, imported.id);
+          }
           addToHistory(imported);
           if (restoredBpuConfig     && typeof setBpuConfig      === 'function') setBpuConfig(restoredBpuConfig);
           if (restoredClientPercent !== null && typeof setClientPercent === 'function') setClientPercent(restoredClientPercent);
@@ -151,6 +159,9 @@ export const usePmLocalHistory = ({
       const existing = localStorage.getItem(`price_analysis_data_${project.id}`);
       if (existing) localStorage.setItem(`price_analysis_data_${newId}`, existing);
       setProject(clone);
+      if (companyId && clone.id) {
+        localStorage.setItem(`last_active_project_id__${companyId}`, clone.id);
+      }
       addToHistory(clone);
     } catch (e) {
       console.error('Erreur clonage', e);

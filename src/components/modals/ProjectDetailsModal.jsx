@@ -214,8 +214,13 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
     if (modalRef.current) modalRef.current.style.transition = '';
   };
 
+  const wasOpenRef = useRef(false);
+
   useEffect(() => {
-    if (isOpen) {
+    // Réinitialiser le formulaire UNIQUEMENT à l'ouverture du modal,
+    // pas à chaque changement de project (sinon onSave → update project
+    // → useEffect ré-écrase formData et empêche la fermeture).
+    if (isOpen && !wasOpenRef.current) {
       position.current = { x: 0, y: 0 };
       if (modalRef.current) modalRef.current.style.transform = 'translate(0px, 0px)';
       const today = new Date().toISOString().split('T')[0];
@@ -237,6 +242,7 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
         signatories: project.signatories || ['', '', '', ''],
       });
     }
+    wasOpenRef.current = isOpen;
   }, [isOpen, project]);
 
   if (!isOpen) return null;

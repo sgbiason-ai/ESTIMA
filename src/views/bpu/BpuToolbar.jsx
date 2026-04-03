@@ -1,5 +1,6 @@
 import React from 'react';
 import { FileDown, FileText, Loader2, ArrowUpDown, ZoomIn, ZoomOut, RefreshCw } from 'lucide-react';
+import { RibbonGroup, RibbonBtnLarge, RibbonBtnSmall, RibbonContainer, RibbonHeader, RibbonSpacer } from '../../components/common/RibbonParts';
 
 const ZOOM_STEPS = [0.5, 0.6, 0.75, 0.85, 1, 1.25, 1.5, 1.75, 2];
 
@@ -23,117 +24,100 @@ const BpuToolbar = ({
   showAudit,
   onToggleAudit,
 }) => (
-  <div className="bg-slate-900 text-white p-3 flex justify-between items-center shadow-lg print:hidden sticky top-0 z-50 h-[50px]">
-    {/* Compteur de pages */}
-    <h2 className="font-bold uppercase text-xs flex items-center gap-2">
-      <span className="bg-emerald-600 px-2 py-0.5 rounded text-[10px]">Aperçu A4</span>
-      {pages.length} Page{pages.length > 1 ? 's' : ''} générée{pages.length > 1 ? 's' : ''}
-    </h2>
+  <div className="font-[system-ui,'Segoe_UI',sans-serif] select-none sticky top-0 z-50 print:hidden">
 
-    <div className="flex items-center gap-3">
-      {/* Contrôles de zoom */}
-      <div className="flex items-center bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
-        <button
-          onClick={onZoomOut}
-          disabled={zoom === ZOOM_STEPS[0]}
-          className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          title="Dézoomer"
-        >
-          <ZoomOut size={14} />
-        </button>
-        <button
-          onClick={onZoomReset}
-          className="px-2.5 py-1 text-[10px] font-black text-slate-300 hover:text-white hover:bg-slate-700 transition-colors min-w-[46px] text-center tabular-nums"
-          title="Réinitialiser le zoom"
-        >
-          {Math.round(zoom * 100)}%
-        </button>
-        <button
-          onClick={onZoomIn}
-          disabled={zoom === ZOOM_STEPS[ZOOM_STEPS.length - 1]}
-          className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          title="Zoomer"
-        >
-          <ZoomIn size={14} />
-        </button>
-      </div>
+    {/* ═══════ BARRE TITRE ═══════ */}
+    <RibbonHeader
+      title={`Aperçu BPU — ${pages.length} page${pages.length > 1 ? 's' : ''}`}
+      rightContent={
+        overrideCount > 0 && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-bold text-amber-600">{overrideCount} modif.</span>
+            <button
+              onClick={onResetAllOverrides}
+              className="text-[10px] font-bold text-red-400 hover:text-red-600 underline"
+            >
+              Réinitialiser
+            </button>
+          </div>
+        )
+      }
+    />
 
-      {/* Badge modifications */}
-      {overrideCount > 0 && (
-        <div className="flex items-center gap-2">
-          <span className="px-2.5 py-1 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded text-[10px] font-bold uppercase">
-            {overrideCount} modification{overrideCount > 1 ? 's' : ''}
-          </span>
+    {/* ═══════ CONTENU DU RIBBON ═══════ */}
+    <RibbonContainer>
+
+      {/* ── Zoom ── */}
+      <RibbonGroup label="Zoom">
+        <div className="flex items-center bg-slate-100 border border-slate-200 rounded-lg overflow-hidden">
           <button
-            onClick={onResetAllOverrides}
-            className="px-2.5 py-1 bg-slate-700 hover:bg-red-900/50 text-slate-400 hover:text-red-400 border border-slate-600 hover:border-red-500/50 rounded text-[10px] font-bold uppercase transition-all"
-            title="Réinitialiser toutes les modifications"
+            onClick={onZoomOut}
+            disabled={zoom === ZOOM_STEPS[0]}
+            className="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            title="Dézoomer"
           >
-            Réinitialiser
+            <ZoomOut size={14} />
+          </button>
+          <button
+            onClick={onZoomReset}
+            className="px-2.5 py-1 text-[10px] font-black text-slate-600 hover:text-slate-800 hover:bg-slate-200 transition-colors min-w-[46px] text-center tabular-nums"
+            title="Réinitialiser le zoom"
+          >
+            {Math.round(zoom * 100)}%
+          </button>
+          <button
+            onClick={onZoomIn}
+            disabled={zoom === ZOOM_STEPS[ZOOM_STEPS.length - 1]}
+            className="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            title="Zoomer"
+          >
+            <ZoomIn size={14} />
           </button>
         </div>
-      )}
+      </RibbonGroup>
 
-      {/* Tri manuel (mode numérotation manuelle uniquement) */}
-      {bpuConfig?.numberingMode === 'manual' && (
-        <button
-          onClick={onToggleSort}
-          className={`px-3 py-1.5 rounded font-bold text-xs uppercase flex items-center gap-2 transition-all ${
-            forceManualSort ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300'
-          }`}
-        >
-          <ArrowUpDown size={14} />
-          {forceManualSort ? 'Tri: Numérique' : 'Tri: Visuel'}
-        </button>
-      )}
-
-      {/* Bouton Audit */}
-      <button
-        onClick={onToggleAudit}
-        className={`relative px-3 py-1.5 rounded font-bold text-xs uppercase flex items-center gap-2 transition-all border ${
-          showAudit
-            ? 'bg-slate-700 text-white border-slate-500'
-            : audit?.stats?.errors > 0
-              ? 'bg-amber-600/20 text-amber-400 border-amber-500/40 hover:bg-amber-600/30'
-              : 'bg-emerald-600/20 text-emerald-400 border-emerald-500/40 hover:bg-emerald-600/30'
-        }`}
-        title="Vérifier la cohérence avec la base BPU"
-      >
-        <RefreshCw size={14} />
-        Audit
-        {audit?.stats?.errors > 0 && (
-          <span className="bg-amber-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none">
-            {audit.stats.errors}
-          </span>
+      {/* ── Options ── */}
+      <RibbonGroup label="Options">
+        {bpuConfig?.numberingMode === 'manual' && (
+          <RibbonBtnLarge
+            icon={ArrowUpDown}
+            label={forceManualSort ? 'Tri: N°' : 'Tri: Visuel'}
+            onClick={onToggleSort}
+            active={forceManualSort}
+            accent="text-blue-500"
+          />
         )}
-      </button>
+        <RibbonBtnLarge
+          icon={RefreshCw}
+          label={<>Audit{audit?.stats?.errors > 0 && <span className="ml-0.5 text-[9px] opacity-70">({audit.stats.errors})</span>}</>}
+          onClick={onToggleAudit}
+          active={showAudit}
+          accent={audit?.stats?.errors > 0 ? 'text-amber-500' : 'text-emerald-500'}
+          title="Vérifier la cohérence avec la base BPU"
+        />
+      </RibbonGroup>
 
-      {/* Export Word */}
-      <button
-        onClick={onDownloadWord}
-        disabled={isGeneratingWord || sortedCatalogLength === 0}
-        className={`bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded font-bold text-xs uppercase flex items-center gap-2 transition-all shadow-md hover:scale-105 active:scale-95 ${
-          isGeneratingWord || sortedCatalogLength === 0 ? 'opacity-70 cursor-not-allowed' : ''
-        }`}
-      >
-        {isGeneratingWord
-          ? <><Loader2 size={16} className="animate-spin" /> Word...</>
-          : <><FileText size={16} /> Word (.docx)</>}
-      </button>
+      <RibbonSpacer />
 
-      {/* Export PDF */}
-      <button
-        onClick={onDownloadPdf}
-        disabled={isGeneratingPdf || pages.length === 0}
-        className={`bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-1.5 rounded font-bold text-xs uppercase flex items-center gap-2 transition-all shadow-md hover:scale-105 active:scale-95 ${
-          isGeneratingPdf || pages.length === 0 ? 'opacity-70 cursor-not-allowed' : ''
-        }`}
-      >
-        {isGeneratingPdf
-          ? <><Loader2 size={16} className="animate-spin" /> Génération...</>
-          : <><FileDown size={16} /> PDF Officiel</>}
-      </button>
-    </div>
+      {/* ── Export ── */}
+      <RibbonGroup label="Export" noBorder>
+        <RibbonBtnLarge
+          icon={FileText}
+          label={isGeneratingWord ? 'Word...' : 'Word'}
+          onClick={onDownloadWord}
+          disabled={isGeneratingWord || sortedCatalogLength === 0}
+          accent="text-blue-500"
+        />
+        <RibbonBtnLarge
+          icon={FileDown}
+          label={isGeneratingPdf ? 'PDF...' : 'PDF'}
+          onClick={onDownloadPdf}
+          disabled={isGeneratingPdf || pages.length === 0}
+          accent="text-red-500"
+        />
+      </RibbonGroup>
+
+    </RibbonContainer>
   </div>
 );
 

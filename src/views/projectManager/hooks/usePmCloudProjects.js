@@ -65,6 +65,11 @@ export const usePmCloudProjects = ({
     const ok = await confirm(`Ouvrir "${proj.name || 'Sans nom'}" ?`);
     if (!ok) return;
     setProject(proj);
+    // Persister l'ID du projet actif pour que les autres modules (ESTIMA VRD)
+    // chargent le bon projet via useProjectManager
+    if (companyId && proj.id) {
+      localStorage.setItem(`last_active_project_id__${companyId}`, proj.id);
+    }
     addToHistory(proj);
     if (proj.priceAnalysisData && proj.id) {
       localStorage.setItem(`price_analysis_data_${proj.id}`, JSON.stringify(proj.priceAnalysisData));

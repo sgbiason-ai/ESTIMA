@@ -203,10 +203,10 @@ const PmProjectGrid = ({
           <div
             key={proj.id}
             onClick={() => onLoadProject(proj)}
-            className={`group relative cursor-pointer bg-slate-900 border rounded-lg p-4 transition-all duration-200 flex flex-col h-full ${
+              className={`group relative cursor-pointer bg-slate-900 border rounded-lg p-4 transition-all duration-200 flex flex-col h-full ${
               isActive
-                ? 'border-emerald-500/50 shadow-sm shadow-emerald-500/10 ring-1 ring-emerald-500/20'
-                : 'border-slate-800 hover:border-slate-600 hover:bg-slate-800/50'
+                  ? 'border-emerald-500/50 shadow-sm shadow-emerald-500/10 ring-1 ring-emerald-500/20'
+                  : 'border-slate-800 hover:border-slate-600 hover:bg-slate-800/50'
             }`}
           >
             {/* En-tete carte */}
