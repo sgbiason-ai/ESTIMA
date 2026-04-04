@@ -57,7 +57,7 @@ const MODULE_GROUPS = [
         description: "Proposition d'honoraires de maîtrise d'œuvre VRD",
         icon: Receipt,
         color: 'indigo',
-        access: 'all',
+        access: 'admin_only',
         tag: 'Finance',
       },
       {

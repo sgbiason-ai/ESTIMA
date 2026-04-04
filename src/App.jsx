@@ -36,9 +36,9 @@ import SettingsView         from './views/SettingsView';
 import BrandingView         from './views/BrandingView';
 import AdminView            from './views/AdminView';
 import RaoAnalysisView      from './views/RaoAnalysisView';
-import CrcView              from './views/CrcView';
+import CrcView              from './views/crc/CrcView';
 import DocAdminView         from './views/DocAdminView';
-import DevisMoeView         from './views/DevisMoeView';
+import DevisMoeView         from './views/devisMoe/DevisMoeView';
 import AccountSection       from './components/settings/AccountSection';
 
 // ─── VUE MOBILE ───────────────────────────────────────────────────────────────
@@ -170,6 +170,7 @@ export default function App() {
 
   // Module : Devis MOE
   if (activeModule === 'devis_moe') {
+    if (!isAdmin) { setActiveModule(null); return null; }
     return <DevisMoeView onBackToHub={handleBackToHub} user={user} companyId={companyId} />;
   }
 
