@@ -9,7 +9,7 @@ const SPARK_STORAGE_GB  = 1;
 const SPARK_READS_DAY   = 50000;
 const SPARK_WRITES_DAY  = 20000;
 
-const COLLECTIONS = ['projects', 'bpu', 'categories', 'units', 'resources'];
+const COLLECTIONS = ['projects', 'bpu', 'categories', 'units', 'resources', 'crr', 'devisMoe', 'fichesMarche', 'folders', 'presence'];
 
 const estimateBytes = (data) => {
   try { return new Blob([JSON.stringify(data)]).size; } catch { return 0; }
@@ -98,9 +98,11 @@ const FirebaseSimulatorModal = ({ companies, onClose }) => {
       const avgDocs    = results.length > 0 ? totalDocs / results.length : 0;
       const avgMB      = avgBytes / (1024 * 1024);
 
-      // Estimate reads/writes based on docs count (heuristic: ~1.2 reads per doc per day, ~0.3 writes)
-      const avgReadsPerDay  = Math.round(avgDocs * 1.2);
-      const avgWritesPerDay = Math.round(avgDocs * 0.3);
+      // Heuristique lectures/ecritures par jour :
+      // - Modules classiques (estimation, BPU) : ~1.2 lectures, ~0.3 ecritures par doc
+      // - Module CRC : plus intensif (WYSIWYG, autosave, images base64) : +50% lectures, +80% ecritures
+      const avgReadsPerDay  = Math.round(avgDocs * 1.5);
+      const avgWritesPerDay = Math.round(avgDocs * 0.5);
 
       setRealData({
         companyCount: results.length,
@@ -354,9 +356,9 @@ const FirebaseSimulatorModal = ({ companies, onClose }) => {
         {/* Footer */}
         <div style={{ padding:'10px 20px 14px', borderTop:'1px solid rgba(255,255,255,0.05)' }}>
           <p style={{ fontFamily:'monospace', fontSize:8, color:'rgba(255,255,255,0.15)' }}>
-            {'\u26A0'} Simulation basee sur les donnees reelles Firebase — Moyenne : {avgMB.toFixed(2)} Mo / {Math.round(avgDocs)} docs par entreprise.
+            {'\u26A0'} Simulation basee sur les donnees reelles Firebase (10 collections : Projets, BPU, CRC, Devis MOE, Fiches Marche, Ressources, Dossiers, etc.) — Moyenne : {avgMB.toFixed(2)} Mo / {Math.round(avgDocs)} docs par entreprise.
             Overhead {'\u00D7'}{overhead} applique (index Firestore, metadata, padding).
-            Lectures/ecritures estimees a partir du nombre de documents.
+            Heuristiques ajustees pour le module CRC (autosave, WYSIWYG, images).
           </p>
         </div>
       </div>

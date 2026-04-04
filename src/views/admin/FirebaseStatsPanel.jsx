@@ -19,6 +19,11 @@ const COL_META = {
   categories: { label: 'Categories',   color: '#a78bfa', icon: '🏷️' },
   units:      { label: 'Unites',       color: '#fb923c', icon: '📐' },
   resources:  { label: 'Ressources',   color: '#f472b6', icon: '🎨' },
+  crr:        { label: 'CRC',          color: '#34d399', icon: '📝' },
+  devisMoe:   { label: 'Devis MOE',   color: '#fbbf24', icon: '💰' },
+  fichesMarche:{ label: 'Fiches Marche',color: '#e879f9', icon: '📄' },
+  folders:    { label: 'Dossiers',     color: '#94a3b8', icon: '📂' },
+  presence:   { label: 'Presence',     color: '#22d3ee', icon: '🟢' },
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -58,7 +63,7 @@ const FirebaseStatsPanel = ({ companies, users }) => {
     try {
       const results = await Promise.all(
         companies.map(async (company) => {
-          const cols = ['projects', 'bpu', 'categories', 'units', 'resources'];
+          const cols = Object.keys(COL_META);
           const colStats = {};
           let totalBytes = estimateBytes({ id: company.id, name: company.name });
 
