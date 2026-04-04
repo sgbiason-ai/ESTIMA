@@ -6,7 +6,8 @@ import React, { useState } from 'react';
 import {
   X, BookOpen, Users, ClipboardList, FileDown, Lightbulb,
   Calendar, Plus, Copy, ArrowLeftRight, Trash2, Eye, Edit3,
-  Building2, ListTree, Mail, ImagePlus, Compass,
+  Building2, ListTree, Mail, ImagePlus, Compass, Archive, Bold,
+  Underline, Highlighter,
 } from 'lucide-react';
 
 const TABS = [
@@ -103,24 +104,32 @@ const TabObservations = () => (
       <ClipboardList size={18} /> Observations et suivi
     </h3>
     <Step number={1} color="bg-blue-500" title="Ajouter une observation">
-      Cliquez sur <strong className="text-white/80">+ Observation</strong> en bas de chaque categorie. Renseignez l'emetteur, le texte, et attribuez un responsable.
+      Cliquez sur <strong className="text-white/80">+ Ajouter</strong> en bas de chaque categorie. Renseignez l'emetteur, le texte, et attribuez un responsable.
     </Step>
     <Step number={2} color="bg-emerald-500" title="Statuts">
-      Chaque observation a un statut cliquable :
+      Chaque observation a un statut cliquable qui cycle entre :
       <div className="flex gap-2 mt-2 flex-wrap">
+        <Badge bg="bg-slate-700/50" text="text-slate-400">Vide</Badge>
         <Badge bg="bg-amber-900/50" text="text-amber-400">Ouvert</Badge>
         <Badge bg="bg-blue-900/50" text="text-blue-400">En cours</Badge>
         <Badge bg="bg-emerald-900/50" text="text-emerald-400">FAIT</Badge>
       </div>
+      <div className="mt-1 text-[10px] text-white/40">Le statut <strong className="text-white/60">Vide</strong> n'affiche aucune pastille dans l'apercu et les exports.</div>
     </Step>
-    <Step number={3} color="bg-amber-500" title="Photos jointes">
+    <Step number={3} color="bg-amber-500" title="Mise en forme du texte">
+      Utilisez la barre d'outils au-dessus du champ texte pour formater :
+      <div className="flex gap-3 mt-2 items-center">
+        <span className="flex items-center gap-1 text-white/70"><Bold size={12} /> <strong>Gras</strong> <Kbd>Ctrl+B</Kbd></span>
+        <span className="flex items-center gap-1 text-white/70"><Underline size={12} /> <span className="underline">Souligne</span> <Kbd>Ctrl+U</Kbd></span>
+        <span className="flex items-center gap-1 text-white/70"><Highlighter size={12} /> <span className="bg-yellow-300/40 px-0.5 rounded">Fluo</span> <Kbd>Ctrl+H</Kbd></span>
+      </div>
+      <div className="mt-1 text-[10px] text-white/40">Selectionnez du texte puis cliquez le bouton ou utilisez le raccourci clavier.</div>
+    </Step>
+    <Step number={4} color="bg-purple-500" title="Photos jointes">
       Ajoutez des photos aux observations via le bouton <strong className="text-white/80">Photo</strong>. Les images sont incluses dans les exports PDF et Word.
     </Step>
-    <Step number={4} color="bg-purple-500" title="Categories">
-      Les observations sont classees par categories (Administratif, Planning, Travaux...). Gerez-les via <strong className="text-white/80">Categories</strong> dans le ruban.
-    </Step>
-    <Step number={5} color="bg-rose-500" title="Carry-forward">
-      Lors de la duplication d'une reunion, les observations <strong className="text-white/80">non resolues</strong> (Ouvert, En cours) sont automatiquement reportees dans le nouveau CR avec la mention du numero d'origine.
+    <Step number={5} color="bg-rose-500" title="Categories et carry-forward">
+      Les observations sont classees par categories. Lors de la <strong className="text-white/80">duplication</strong> d'une reunion, les observations non resolues sont automatiquement reportees avec la mention du CR d'origine.
     </Step>
   </div>
 );
@@ -128,18 +137,28 @@ const TabObservations = () => (
 const TabExports = () => (
   <div>
     <h3 className="text-base font-bold text-emerald-400 mb-4 flex items-center gap-2">
-      <FileDown size={18} /> Exports et partage
+      <FileDown size={18} /> Exports, partage et archivage
     </h3>
-    <Step number={1} color="bg-blue-500" title="Export PDF">
-      Genere un document PDF professionnel avec en-tete, participants, observations et pied de page. Ideal pour archivage officiel.
+    <Step number={1} color="bg-blue-500" title="Export PDF / Word">
+      Genere un document PDF ou Word professionnel avec en-tete, participants, observations (formatage gras/souligne/fluo preserve) et pied de page.
     </Step>
-    <Step number={2} color="bg-emerald-500" title="Export Word">
-      Genere un fichier .doc ouvert dans Word. Utile pour modifier le contenu avant envoi ou pour archivage modifiable.
+    <Step number={2} color="bg-emerald-500" title="Envoi par email (Outlook)">
+      Sauvegarde le PDF dans le dossier configure, genere un script VBS qui ouvre Outlook avec les destinataires et le CR en piece jointe. Double-cliquez sur <strong className="text-white/80">Envoyer_CR.vbs</strong> pour ouvrir Outlook.
     </Step>
-    <Step number={3} color="bg-amber-500" title="Envoi par email">
-      Ouvre votre client mail avec les destinataires CPR pre-remplis et le CR en piece jointe. Les contacts marques <strong className="text-white/80">CPR</strong> recoivent automatiquement le mail.
+    <Step number={3} color="bg-amber-500" title="Dossier et nom de fichier">
+      Dans <strong className="text-white/80">Info Chantier</strong>, configurez le dossier d'export et le pattern de nom de fichier. Variables disponibles :
+      <div className="flex gap-3 mt-1.5 text-[10px] font-mono text-white/50">
+        <span>{'{N}'} = numero</span>
+        <span>{'{NOM}'} = chantier</span>
+        <span>{'{DATE}'} = date</span>
+      </div>
+      <div className="mt-1 text-[10px] text-white/40">Sur Chrome/Edge, le bouton <strong className="text-white/60">Parcourir</strong> permet de choisir un dossier ou les exports sont enregistres automatiquement.</div>
     </Step>
-    <Step number={4} color="bg-purple-500" title="Mode apercu">
+    <Step number={4} color="bg-purple-500" title="Archiver / Importer (.crcestima)">
+      <strong className="text-white/80">Archiver</strong> exporte l'affaire complete (config, tous les CR, participants, observations, images) dans un fichier <strong className="text-white/80">.crcestima</strong>.{' '}
+      <strong className="text-white/80">Importer</strong> permet de restaurer une affaire archivee, avec le choix d'ecraser le chantier actif ou d'en creer un nouveau.
+    </Step>
+    <Step number={5} color="bg-rose-500" title="Mode apercu">
       Basculez en mode <strong className="text-white/80">Apercu</strong> pour visualiser le rendu final avant export. L'apercu reproduit fidelement le PDF.
     </Step>
 
@@ -184,7 +203,15 @@ const TabAstuces = () => (
       <div className="p-3 rounded-lg bg-white/5 border border-white/10">
         <div className="text-xs font-bold text-emerald-400 mb-2">Toggles rapides</div>
         <div className="text-[11px] text-white/60">
-          Cliquez sur les boutons de presence pour cycler : <strong className="text-white/80">P → E → A → NC → P</strong>. Meme principe pour les statuts d'observations : <strong className="text-white/80">Ouvert → En cours → FAIT → Ouvert</strong>.
+          Cliquez sur les boutons de presence pour cycler : <strong className="text-white/80">P → E → A → NC → P</strong>. Meme principe pour les statuts d'observations : <strong className="text-white/80">Vide → Ouvert → En cours → FAIT → Vide</strong>.
+        </div>
+      </div>
+
+      <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+        <div className="text-xs font-bold text-emerald-400 mb-2">Raccourcis formatage</div>
+        <div className="text-[11px] text-white/60 space-y-1">
+          <div><Kbd>Ctrl+B</Kbd> Gras &nbsp; <Kbd>Ctrl+U</Kbd> Souligne &nbsp; <Kbd>Ctrl+H</Kbd> Fluo</div>
+          <div>Selectionnez du texte dans une observation puis utilisez le raccourci ou cliquez l'icone dans la barre d'outils.</div>
         </div>
       </div>
 

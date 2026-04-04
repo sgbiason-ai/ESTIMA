@@ -8,7 +8,7 @@ import {
   ArrowLeft, ClipboardList, FileDown, Mail, Eye, Edit3, Plus, X, Trash2, Check,
   ChevronDown, ChevronLeft, ChevronRight, FolderOpen, Info, MapPin, Calendar, Clock, Building2,
   Users, ListTree, FileText as FileWord, Copy, ArrowLeftRight, BookUser, Upload, Download, UserPlus,
-  GripVertical, HelpCircle, Compass,
+  GripVertical, HelpCircle, Compass, HardDrive, FileSignature, Archive, UploadCloud,
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import * as XLSX from 'xlsx';
@@ -267,12 +267,25 @@ const ChantierField = ({ label, icon: Icon, field, type = 'text', placeholder, c
   </div>
 );
 
-const InfoChantierModal = ({ isOpen, onClose, chantierInfo, updateChantierInfo }) => {
+const InfoChantierModal = ({ isOpen, onClose, chantierInfo, updateChantierInfo, exportDirKey }) => {
   if (!isOpen) return null;
+
+  const handlePickFolder = async () => {
+    try {
+      if (!('showDirectoryPicker' in window)) {
+        alert('Cette fonctionnalite necessite Chrome ou Edge.');
+        return;
+      }
+      const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+      const { saveDirHandle } = await import('../utils/exportHelpers');
+      await saveDirHandle(exportDirKey, handle);
+      updateChantierInfo({ exportPath: handle.name });
+    } catch { /* utilisateur a annule */ }
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center" onMouseDown={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-[520px] overflow-hidden" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl shadow-2xl w-[520px] max-h-[90vh] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-emerald-50 to-teal-50">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-emerald-100">
@@ -298,6 +311,57 @@ const InfoChantierModal = ({ isOpen, onClose, chantierInfo, updateChantierInfo }
           <div className="grid grid-cols-2 gap-4">
             <ChantierField label="Date de debut" icon={Calendar} field="dateDebut" type="date" chantierInfo={chantierInfo} updateChantierInfo={updateChantierInfo} />
             <ChantierField label="Date de fin" icon={Calendar} field="dateFin" type="date" chantierInfo={chantierInfo} updateChantierInfo={updateChantierInfo} />
+          </div>
+
+          {/* Section Exports */}
+          <div className="pt-3 mt-2 border-t border-slate-100">
+            <p className="text-[11px] font-bold text-slate-600 mb-3 flex items-center gap-1.5">
+              <Download size={12} />
+              Configuration des exports
+            </p>
+
+            {/* Dossier export */}
+            <div className="mb-3">
+              <label className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium mb-1.5">
+                <HardDrive size={11} />
+                Dossier d'export
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={chantierInfo.exportPath || ''}
+                  onChange={(e) => updateChantierInfo({ exportPath: e.target.value })}
+                  placeholder="Aucun dossier selectionne"
+                  readOnly
+                  className="flex-1 px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 text-slate-600 cursor-default"
+                />
+                <button
+                  onClick={handlePickFolder}
+                  className="px-3 py-2 bg-emerald-50 text-emerald-600 text-xs font-medium rounded-xl hover:bg-emerald-100 transition-all border border-emerald-200 flex items-center gap-1.5 whitespace-nowrap"
+                >
+                  <FolderOpen size={13} />
+                  Parcourir
+                </button>
+              </div>
+            </div>
+
+            {/* Pattern nom de fichier */}
+            <div>
+              <label className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium mb-1.5">
+                <FileSignature size={11} />
+                Nom des fichiers exports
+              </label>
+              <input
+                type="text"
+                value={chantierInfo.exportPattern || ''}
+                onChange={(e) => updateChantierInfo({ exportPattern: e.target.value })}
+                placeholder="CR{N}_{NOM}_{DATE}"
+                className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all text-slate-800 font-mono"
+              />
+              <p className="text-[9px] text-slate-400 mt-1">
+                Variables : <span className="font-mono text-slate-500">{'{N}'}</span> numero CR &nbsp;|&nbsp; <span className="font-mono text-slate-500">{'{NOM}'}</span> nom chantier &nbsp;|&nbsp; <span className="font-mono text-slate-500">{'{DATE}'}</span> date reunion
+              </p>
+            </div>
           </div>
         </div>
 
@@ -1328,7 +1392,9 @@ export default function CrcView({ onBackToHub, user, companyId }) {
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [showHelpPanel, setShowHelpPanel] = useState(false);
-  const [showGuidedTour, setShowGuidedTour] = useState(() => !localStorage.getItem('crc-tour-dismissed'));
+  const [showGuidedTour, setShowGuidedTour] = useState(false);
+  const [importModal, setImportModal] = useState(null); // { summary, data }
+  const importFileRef = useRef(null);
   const handleSaveLibrary = useCallback(async (contacts) => {
     setParticipantLibrary(contacts);
     if (companyId) {
@@ -1368,27 +1434,138 @@ export default function CrcView({ onBackToHub, user, companyId }) {
 
   const handleExportPdf = useCallback(async () => {
     const { generatePdfCrr } = await import('../utils/pdfCrrGenerator');
-    await generatePdfCrr(manager.activeMeeting, manager.crrConfig, chantierName, branding);
-  }, [manager, chantierName, branding]);
+    const { buildExportFilename, loadDirHandle, saveToDirectory } = await import('../utils/exportHelpers');
+    const info = manager.crrConfig.chantierInfo || {};
+    const meeting = manager.activeMeeting;
+
+    // Construire le filename avec le pattern
+    const filename = buildExportFilename(info.exportPattern, {
+      number: meeting.number, projectName: chantierName, date: meeting.date, ext: 'pdf',
+    });
+
+    // Tenter l'enregistrement dans le dossier choisi
+    const dirKey = `${companyId}_${crrDoc?.id || 'default'}`;
+    const dirHandle = await loadDirHandle(dirKey);
+    if (dirHandle) {
+      const result = await generatePdfCrr(meeting, manager.crrConfig, chantierName, branding, { returnBlob: true });
+      if (result?.blob) {
+        const saved = await saveToDirectory(dirHandle, filename, result.blob);
+        if (saved) { toast.success(`Export: ${filename}`); return; }
+      }
+    }
+    // Fallback : download classique avec le bon nom
+    await generatePdfCrr(meeting, manager.crrConfig, chantierName, branding, { filename });
+  }, [manager, chantierName, branding, companyId, crrDoc]);
 
   const handleExportWord = useCallback(async () => {
     const { generateWordCrr } = await import('../utils/crrWordExporter');
-    generateWordCrr(manager.activeMeeting, manager.crrConfig, chantierName, branding);
-  }, [manager, chantierName, branding]);
+    const { buildExportFilename, loadDirHandle, saveToDirectory } = await import('../utils/exportHelpers');
+    const info = manager.crrConfig.chantierInfo || {};
+    const meeting = manager.activeMeeting;
+
+    const filename = buildExportFilename(info.exportPattern, {
+      number: meeting.number, projectName: chantierName, date: meeting.date, ext: 'doc',
+    });
+
+    const dirKey = `${companyId}_${crrDoc?.id || 'default'}`;
+    const dirHandle = await loadDirHandle(dirKey);
+    generateWordCrr(meeting, manager.crrConfig, chantierName, branding, { filename, dirHandle, saveToDirectory });
+  }, [manager, chantierName, branding, companyId, crrDoc]);
+
+  // ── Archive export (.crcestima) ──
+  const handleArchiveExport = useCallback(async () => {
+    if (!crrDoc) return;
+    const { exportCrcArchive } = await import('../utils/crcArchive');
+    const { loadDirHandle, saveToDirectory } = await import('../utils/exportHelpers');
+    const { blob, filename } = exportCrcArchive(crrDoc, user?.email);
+
+    // Tenter le dossier configure
+    const dirKey = `${companyId}_${crrDoc.id || 'default'}`;
+    const dirHandle = await loadDirHandle(dirKey);
+    if (dirHandle) {
+      const saved = await saveToDirectory(dirHandle, filename, blob);
+      if (saved) { toast.success(`Archive : ${filename}`); return; }
+    }
+    // Fallback download
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Archive : ${filename}`);
+  }, [crrDoc, user, companyId]);
+
+  // ── Archive import (.crcestima) ──
+  const handleImportFile = useCallback(async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    const { importCrcArchive } = await import('../utils/crcArchive');
+    const result = await importCrcArchive(file);
+    if (!result.valid) {
+      toast.error(result.error);
+      return;
+    }
+    setImportModal({ summary: result.summary, data: result.data });
+  }, []);
+
+  const handleImportConfirm = useCallback(async (mode) => {
+    if (!importModal) return;
+    const { data } = importModal;
+
+    if (mode === 'overwrite' && crrDoc) {
+      // Ecraser le chantier actif
+      const updated = { ...crrDoc, crrConfig: data.crrConfig, crrMeetings: data.crrMeetings };
+      await setDoc(doc(db, 'companies', companyId, 'crr', crrDoc.id), {
+        ...updated, lastSaved: new Date().toISOString(), updatedBy: user?.email,
+      });
+      setCrrDocs(prev => prev.map(d => d.id === crrDoc.id ? updated : d));
+      toast.success('Affaire importee (ecrasement).');
+    } else {
+      // Creer un nouveau chantier
+      const newId = `crr_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+      const newDoc = {
+        id: newId,
+        crrConfig: data.crrConfig,
+        crrMeetings: data.crrMeetings,
+        createdAt: new Date().toISOString(),
+        lastSaved: new Date().toISOString(),
+        updatedBy: user?.email,
+      };
+      await setDoc(doc(db, 'companies', companyId, 'crr', newId), newDoc);
+      setCrrDocs(prev => [...prev, newDoc]);
+      setActiveCrrDocId(newId);
+      toast.success('Affaire importee (nouveau chantier).');
+    }
+    setImportModal(null);
+  }, [importModal, crrDoc, companyId, user]);
 
   const handleSendMail = useCallback(async () => {
     if (manager.diffusionEmails.length === 0) {
       toast.warning('Aucun destinataire avec email et diffusion cochee.');
       return;
     }
+    const { buildExportFilename, loadDirHandle } = await import('../utils/exportHelpers');
+    const info = manager.crrConfig.chantierInfo || {};
+    const meeting = manager.activeMeeting;
+
+    // Construire le filename avec le pattern configure
+    const filename = buildExportFilename(info.exportPattern, {
+      number: meeting.number, projectName: chantierName, date: meeting.date, ext: 'pdf',
+    });
+
+    // Charger le handle du dossier configure dans Info Chantier
+    const dirKey = `${companyId}_${crrDoc?.id || 'default'}`;
+    const dirHandle = await loadDirHandle(dirKey);
+
     // Generer le PDF en memoire
     const { generatePdfCrr } = await import('../utils/pdfCrrGenerator');
     const pdfData = await generatePdfCrr(
-      manager.activeMeeting, manager.crrConfig, chantierName, branding, { returnBlob: true }
+      meeting, manager.crrConfig, chantierName, branding, { returnBlob: true, filename }
     );
+
     // Sauvegarder le PDF + generer le script Outlook
     const { openOutlookMail } = await import('../utils/crrMailer');
-    const result = await openOutlookMail(manager.activeMeeting, manager.crrConfig, chantierName, manager.diffusionEmails, pdfData);
+    const result = await openOutlookMail(meeting, manager.crrConfig, chantierName, manager.diffusionEmails, pdfData, { dirHandle });
     if (!result.pdfSaved) {
       toast.info('Envoi annule.');
       return;
@@ -1398,7 +1575,7 @@ export default function CrcView({ onBackToHub, user, companyId }) {
     } else if (result.fallback) {
       toast.success('PDF telecharge — glissez-le dans la fenetre Outlook.');
     }
-  }, [manager, chantierName, branding]);
+  }, [manager, chantierName, branding, companyId, crrDoc]);
 
   // ── Rendu ─────────────────────────────────────────────────────────────────
 
@@ -1516,6 +1693,14 @@ export default function CrcView({ onBackToHub, user, companyId }) {
             <RibbonButton icon={Compass} label="Tour" onClick={() => setShowGuidedTour(true)} title="Lancer le tour guide interactif" />
           </RibbonGroup>
 
+          <RibbonDivider />
+
+          {/* ── GROUPE : ARCHIVAGE ── */}
+          <RibbonGroup label="Archivage" dataTour="archivage">
+            <RibbonButton icon={Archive} label="Archiver" onClick={handleArchiveExport} disabled={!crrDoc} title="Exporter l'affaire complete (.crcestima)" />
+            <RibbonButton icon={UploadCloud} label="Importer" onClick={() => importFileRef.current?.click()} title="Importer une affaire (.crcestima)" />
+          </RibbonGroup>
+
         </div>
       </div>
 
@@ -1609,7 +1794,87 @@ export default function CrcView({ onBackToHub, user, companyId }) {
         onClose={() => setShowInfoChantierModal(false)}
         chantierInfo={manager.crrConfig.chantierInfo}
         updateChantierInfo={manager.updateChantierInfo}
+        exportDirKey={`${companyId}_${crrDoc?.id || 'default'}`}
       />
+
+      {/* Input file hidden pour import .crcestima */}
+      <input
+        ref={importFileRef}
+        type="file"
+        accept=".crcestima"
+        className="hidden"
+        onChange={handleImportFile}
+      />
+
+      {/* Modal import .crcestima */}
+      {importModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center" onMouseDown={() => setImportModal(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-[460px] overflow-hidden" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-blue-100">
+                  <UploadCloud size={18} className="text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">Importer une affaire</h3>
+                  <p className="text-[10px] text-slate-500">Fichier .crcestima</p>
+                </div>
+              </div>
+              <button onClick={() => setImportModal(null)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-all">
+                <X size={16} className="text-slate-400" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-3">
+              <div className="bg-slate-50 rounded-xl p-4 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Chantier</span>
+                  <span className="font-bold text-slate-800">{importModal.summary.chantierName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Comptes rendus</span>
+                  <span className="font-medium text-slate-700">{importModal.summary.meetingCount}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Observations</span>
+                  <span className="font-medium text-slate-700">{importModal.summary.observationCount}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Images</span>
+                  <span className="font-medium text-slate-700">{importModal.summary.imageCount}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Groupes participants</span>
+                  <span className="font-medium text-slate-700">{importModal.summary.participantGroups}</span>
+                </div>
+                {importModal.summary.exportedAt && (
+                  <div className="flex justify-between text-[11px] pt-1 border-t border-slate-200">
+                    <span className="text-slate-400">Exporte le</span>
+                    <span className="text-slate-500">{new Date(importModal.summary.exportedAt).toLocaleString('fr-FR')}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                {crrDoc && (
+                  <button
+                    onClick={() => handleImportConfirm('overwrite')}
+                    className="flex-1 px-4 py-2.5 bg-orange-50 text-orange-600 text-sm font-medium rounded-xl hover:bg-orange-100 transition-all border border-orange-200"
+                  >
+                    Ecraser le chantier actif
+                  </button>
+                )}
+                <button
+                  onClick={() => handleImportConfirm('new')}
+                  className="flex-1 px-4 py-2.5 bg-emerald-500 text-white text-sm font-medium rounded-xl hover:bg-emerald-600 transition-all shadow-sm"
+                >
+                  Creer nouveau chantier
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <DuplicateMeetingModal
         isOpen={showDuplicateModal}

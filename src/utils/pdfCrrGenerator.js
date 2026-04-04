@@ -11,6 +11,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { DEFAULT_BRANDING } from '../data/branding';
 import { MEETING_TYPES, GROUP_COLORS, abbreviateGroup } from '../data/crrData';
+import { parseObsHtml, stripHtml } from './formatObsText.jsx';
 
 // ─── HELPERS ────────────────────────────────────────────────────────────────
 
@@ -338,24 +339,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
   doc.setTextColor(255, 255, 255);
   doc.text('PARTICIPANTS', M.left + 5, cursor.y + 5.5);
 
-  // Legende a droite du bandeau
-  const legendY = cursor.y + 2;
-  const legendItems = [
-    { label: 'Present', bg: THEME.presentBg, txt: THEME.presentTxt },
-    { label: 'Excuse',  bg: THEME.excusedBg, txt: THEME.excusedTxt },
-  ];
-  let lx = PW - M.right - 5;
-  for (let i = legendItems.length - 1; i >= 0; i--) {
-    const item = legendItems[i];
-    doc.setFont(fontB, 'bold');
-    doc.setFontSize(5.5);
-    const tw = doc.getTextWidth(item.label) + 3;
-    lx -= tw + 2;
-    doc.setFillColor(...item.bg);
-    roundedRect(doc, lx, legendY, tw + 2, 4, 1, 'F');
-    doc.setTextColor(...item.txt);
-    doc.text(item.label, lx + 1.5, legendY + 3);
-  }
+  // (Legende retiree du bandeau PARTICIPANTS)
 
   cursor.y += 10;
 
@@ -691,19 +675,21 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
     const obsRowMeta = []; // { obs, type: 'text'|'images', imgs? }
 
     catObs.forEach((obs) => {
-      let text = obs.text || '';
-      if (obs.originMeetingNumber) text += ` (Report CR n${obs.originMeetingNumber})`;
+      let rawText = obs.text || '';
+      if (obs.originMeetingNumber) rawText += ` (Report CR n${obs.originMeetingNumber})`;
+      // Strip HTML/markdown pour autoTable (calcul dimensions)
+      const plainText = stripHtml(rawText);
 
       // Ligne texte — emitter et actionBy sont dessines en pastilles via didDrawCell
       obsBody.push([
         '',
         formatDate(obs.date),
-        text,
+        plainText,
         '', // STATUT — badge dessine par didDrawCell
         '',
         formatDate(obs.actionDeadline),
       ]);
-      obsRowMeta.push({ obs, type: 'text', emitter: obs.emitter || '', actionBy: obs.actionBy || '' });
+      obsRowMeta.push({ obs, type: 'text', rawText, emitter: obs.emitter || '', actionBy: obs.actionBy || '' });
 
       // Ligne images si necessaire (ligne separee pour gerer les sauts de page)
       const imgs = (obs.images || []).filter(u => imageCache.has(u));
@@ -873,6 +859,66 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
           }
         }
 
+        // Texte formate (gras, souligne, fluo) dans colonne observation (col 2)
+        if (meta.type === 'text' && data.column.index === 2 && meta.rawText) {
+          try {
+            const segments = parseObsHtml(meta.rawText);
+            const hasFormatting = segments.some(s => s.bold || s.underline || s.highlight);
+            if (hasFormatting) {
+              // Effacer le texte brut dessine par autoTable
+              const c = data.cell;
+              const fill = Array.isArray(c.styles.fillColor) ? c.styles.fillColor : [255, 255, 255];
+              doc.setFillColor(...fill);
+              doc.rect(c.x + 0.1, c.y + 0.1, c.width - 0.2, c.height - 0.2, 'F');
+
+              const pad = c.styles.cellPadding;
+              const padL = (typeof pad === 'object' ? pad.left : pad) || 2;
+              const padT = (typeof pad === 'object' ? pad.top : pad) || 2;
+              const padR = (typeof pad === 'object' ? pad.right : pad) || 1.5;
+              const maxW = c.width - padL - padR;
+              const fontSize = c.styles.fontSize || 6.5;
+              const lineH = fontSize * 0.45;
+              let curX = c.x + padL;
+              let curY = c.y + padT + fontSize * 0.3;
+              const txtColor = Array.isArray(c.styles.textColor) ? c.styles.textColor : THEME.text;
+
+              for (const seg of segments) {
+                const style = seg.bold ? 'bold' : 'normal';
+                doc.setFont(fontB, style);
+                doc.setFontSize(fontSize);
+                doc.setTextColor(...txtColor);
+
+                // Decouper le segment en lignes puis en mots pour le word-wrap
+                const lines = seg.text.split('\n');
+                for (let li = 0; li < lines.length; li++) {
+                  if (li > 0) { curX = c.x + padL; curY += lineH; }
+                  const words = lines[li].split(/(\s+)/);
+                  for (const word of words) {
+                    const ww = doc.getTextWidth(word);
+                    if (curX + ww > c.x + padL + maxW && word.trim()) {
+                      curX = c.x + padL;
+                      curY += lineH;
+                    }
+                    if (curY > c.y + c.height - 1) break;
+
+                    if (seg.highlight) {
+                      doc.setFillColor(253, 230, 138); // amber-200
+                      doc.rect(curX, curY - fontSize * 0.28, ww, fontSize * 0.38, 'F');
+                    }
+                    doc.text(word, curX, curY);
+                    if (seg.underline) {
+                      doc.setDrawColor(...txtColor);
+                      doc.setLineWidth(0.15);
+                      doc.line(curX, curY + 0.5, curX + ww, curY + 0.5);
+                    }
+                    curX += ww;
+                  }
+                }
+              }
+            }
+          } catch { /* fallback: autoTable texte brut deja dessine */ }
+        }
+
         // Pastilles groupes emetteur (col 0) et actionBy (col 4)
         if (meta.type === 'text' && data.column.index === 0) {
           drawGroupBadges(doc, data.cell, meta.emitter, groupIndexMap, fontH);
@@ -888,7 +934,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
             drawBadge(doc, data.cell, 'FAIT', THEME.doneBg.map(c => Math.max(0, c - 20)), THEME.doneTxt, fontH);
           } else if (obs.status === 'in_progress') {
             drawBadge(doc, data.cell, 'En cours', THEME.progressBg.map(c => Math.max(0, c - 20)), THEME.progressTxt, fontH);
-          } else {
+          } else if (obs.status !== 'empty') {
             drawBadge(doc, data.cell, 'Ouvert', THEME.openBg.map(c => Math.max(0, c - 20)), THEME.openTxt, fontH);
           }
         }
@@ -948,9 +994,15 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
   // 8. SAUVEGARDE
   // ═══════════════════════════════════════════════════════════════════════════
 
-  const safeName = sanitizeFilename(projectName || 'PROJET').toUpperCase();
-  const crNum = String(meeting.number).padStart(2, '0');
-  const filename = `CR_${crNum}_${safeName}_${meeting.date || 'ND'}.pdf`;
+  // Nom de fichier : priorite au parametre options.filename, sinon pattern par defaut
+  let filename;
+  if (options?.filename) {
+    filename = options.filename;
+  } else {
+    const safeName = sanitizeFilename(projectName || 'PROJET').toUpperCase();
+    const crNum = String(meeting.number).padStart(2, '0');
+    filename = `CR_${crNum}_${safeName}_${meeting.date || 'ND'}.pdf`;
+  }
 
   // Si returnBlob, retourner le blob + filename sans telecharger
   if (options?.returnBlob) {

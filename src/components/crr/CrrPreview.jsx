@@ -4,6 +4,7 @@
 
 import React from 'react';
 import { MEETING_TYPES, OBSERVATION_STATUSES, GROUP_COLORS, abbreviateGroup } from '../../data/crrData';
+import { renderFormattedText } from '../../utils/formatObsText.jsx';
 
 const CAT_COLORS = [
   { r: 40, g: 110, b: 85 },   // emerald
@@ -36,7 +37,7 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding }) => {
     if (!val) return null;
     const names = val.split(',').map((s) => s.trim()).filter(Boolean);
     return (
-      <div className="flex flex-wrap gap-0.5 justify-center">
+      <div className="flex flex-col gap-0.5 items-center">
         {names.map((name) => {
           const idx = groupIndexMap[name] ?? 0;
           const c = GROUP_COLORS[idx % GROUP_COLORS.length];
@@ -161,10 +162,6 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding }) => {
         {/* Bandeau titre */}
         <div className="rounded-lg px-4 py-2 flex items-center justify-between" style={{ backgroundColor: primary }}>
           <span className="text-white font-bold text-xs tracking-wide">PARTICIPANTS</span>
-          <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded text-[9px] font-bold" style={{ backgroundColor: 'rgb(232,250,240)', color: 'rgb(22,130,76)' }}>Present</span>
-            <span className="px-2 py-0.5 rounded text-[9px] font-bold" style={{ backgroundColor: 'rgb(255,247,230)', color: 'rgb(180,120,20)' }}>Excuse</span>
-          </div>
         </div>
 
         {/* Tableau */}
@@ -324,6 +321,7 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding }) => {
                     {catObs.map((obs, oi) => {
                       const isDone = obs.status === 'done';
                       const isProgress = obs.status === 'in_progress';
+                      const isEmpty = obs.status === 'empty';
                       const images = obs.images || [];
 
                       const rowBg = isDone
@@ -343,7 +341,7 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding }) => {
                           <td className="px-2 py-1.5 border border-slate-200 whitespace-pre-wrap align-top" style={{
                             color: isDone ? 'rgb(22,120,70)' : isProgress ? 'rgb(30,90,170)' : '#282828',
                           }}>
-                            {obs.text}
+                            {renderFormattedText(obs.text)}
                             {obs.originMeetingNumber && (
                               <span className="text-slate-400 ml-1">(Report CR n{obs.originMeetingNumber})</span>
                             )}
@@ -379,7 +377,7 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding }) => {
                             {isProgress && (
                               <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold" style={{ backgroundColor: 'rgb(210,230,255)', color: 'rgb(30,90,170)' }}>En cours</span>
                             )}
-                            {!isDone && !isProgress && (
+                            {!isDone && !isProgress && !isEmpty && (
                               <span className="inline-block px-2 py-0.5 rounded text-[9px] font-bold" style={{ backgroundColor: 'rgb(245,227,210)', color: 'rgb(190,110,20)' }}>Ouvert</span>
                             )}
                           </td>

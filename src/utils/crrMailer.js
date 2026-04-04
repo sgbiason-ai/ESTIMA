@@ -232,7 +232,7 @@ Set fso = Nothing
  *
  * @returns {{ pdfSaved: boolean, vbsCreated?: boolean, fallback?: boolean }}
  */
-export const openOutlookMail = async (meeting, crrConfig, projectName, emails, pdfData) => {
+export const openOutlookMail = async (meeting, crrConfig, projectName, emails, pdfData, options = {}) => {
   // ── Fallback si File System Access API indisponible ──
   if (!window.showDirectoryPicker) {
     const url = URL.createObjectURL(pdfData.blob);
@@ -252,10 +252,21 @@ export const openOutlookMail = async (meeting, crrConfig, projectName, emails, p
     return { pdfSaved: true, vbsCreated: false, fallback: true };
   }
 
-  // ── Obtenir le dossier d'export ──
+  // ── Obtenir le dossier d'export (priorite au handle configure dans Info Chantier) ──
   let dir;
   try {
-    dir = await getExportDir();
+    if (options.dirHandle) {
+      // Verifier/redemander la permission sur le handle configure
+      const perm = await options.dirHandle.queryPermission({ mode: 'readwrite' });
+      if (perm === 'granted') {
+        dir = options.dirHandle;
+      } else {
+        const req = await options.dirHandle.requestPermission({ mode: 'readwrite' });
+        dir = req === 'granted' ? options.dirHandle : await getExportDir();
+      }
+    } else {
+      dir = await getExportDir();
+    }
   } catch (err) {
     if (err.name === 'AbortError') return { pdfSaved: false };
     throw err;

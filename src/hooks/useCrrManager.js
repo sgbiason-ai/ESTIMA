@@ -29,13 +29,16 @@ export const useCrrManager = ({
       participantGroups: cfg.participantGroups || DEFAULT_PARTICIPANT_GROUPS,
       categories: cfg.categories || [...DEFAULT_CATEGORIES],
       legalText: cfg.legalText !== undefined ? cfg.legalText : LEGAL_TEXT,
-      chantierInfo: cfg.chantierInfo || {
+      chantierInfo: {
         nom: '',
         lieu: '',
         dureePreparation: '',
         dureeChantier: '',
         dateDebut: '',
         dateFin: '',
+        exportPath: '',
+        exportPattern: 'CR{N}_{NOM}_{DATE}',
+        ...(cfg.chantierInfo || {}),
       },
     };
   }, [project?.crrConfig]);

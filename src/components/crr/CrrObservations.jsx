@@ -1,12 +1,13 @@
 // src/components/crr/CrrObservations.jsx
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Plus, Trash2, ChevronDown, ChevronRight,
-  Circle, Loader, CheckCircle2, Calendar, User, MessageSquare,
-  ImagePlus, X,
+  MinusCircle, Circle, Loader, CheckCircle2, Calendar, User, MessageSquare,
+  ImagePlus, X, Bold, Underline, Highlighter,
 } from 'lucide-react';
 import { OBSERVATION_STATUSES, getGroupColor, abbreviateGroup } from '../../data/crrData';
 import { confirm } from '../../utils/globalUI';
+import { normalizeObsText } from '../../utils/formatObsText.jsx';
 
 // ── Pastille de groupe (partagee entre observations et participants) ─────────
 
@@ -124,13 +125,14 @@ const compressImage = (file, maxW = 800, quality = 0.7) =>
 
 const StatusBadge = ({ status, onChange }) => {
   const cycle = () => {
-    const states = ['open', 'in_progress', 'done'];
+    const states = ['empty', 'open', 'in_progress', 'done'];
     const idx = states.indexOf(status);
     onChange(states[(idx + 1) % states.length]);
   };
 
   const st = OBSERVATION_STATUSES.find((s) => s.value === status) || OBSERVATION_STATUSES[0];
   const icons = {
+    minus: <MinusCircle size={12} />,
     circle: <Circle size={12} />,
     loader: <Loader size={12} className="animate-spin" />,
     check: <CheckCircle2 size={12} />,
@@ -151,6 +153,65 @@ const StatusBadge = ({ status, onChange }) => {
 const ObservationRow = ({ obs, onUpdate, onDelete, meetingDate, participantGroups }) => {
   const [expanded, setExpanded] = useState(true);
   const fileRef = useRef(null);
+  const editorRef = useRef(null);
+  const lastHtmlRef = useRef('');
+
+  // Synchroniser le contenu HTML quand obs.text change (ex: undo externe)
+  useEffect(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    const normalized = normalizeObsText(obs.text);
+    if (normalized !== lastHtmlRef.current) {
+      lastHtmlRef.current = normalized;
+      el.innerHTML = normalized;
+    }
+  }, [obs.text]);
+
+  const handleEditorInput = useCallback(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    const html = el.innerHTML;
+    // Eviter les boucles : ne mettre a jour que si le contenu a change
+    if (html !== lastHtmlRef.current) {
+      lastHtmlRef.current = html;
+      onUpdate(obs.id, { text: html === '<br>' ? '' : html });
+    }
+  }, [obs.id, onUpdate]);
+
+  const execFormat = useCallback((cmd, value) => {
+    editorRef.current?.focus();
+    document.execCommand(cmd, false, value ?? null);
+    handleEditorInput();
+  }, [handleEditorInput]);
+
+  const handleHighlight = useCallback(() => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) return;
+    editorRef.current?.focus();
+    // Verifier si deja surligne pour toggle
+    const parent = sel.anchorNode?.parentElement;
+    if (parent?.tagName === 'MARK') {
+      // Retirer le surlignage
+      const text = document.createTextNode(parent.textContent);
+      parent.replaceWith(text);
+    } else {
+      const range = sel.getRangeAt(0);
+      const mark = document.createElement('mark');
+      mark.style.backgroundColor = '#fde68a';
+      mark.style.borderRadius = '2px';
+      mark.style.padding = '0 1px';
+      range.surroundContents(mark);
+    }
+    handleEditorInput();
+  }, [handleEditorInput]);
+
+  const handleKeyDown = useCallback((e) => {
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
+      if (e.key === 'b') { e.preventDefault(); execFormat('bold'); }
+      else if (e.key === 'u') { e.preventDefault(); execFormat('underline'); }
+      else if (e.key === 'h') { e.preventDefault(); handleHighlight(); }
+    }
+  }, [execFormat, handleHighlight]);
 
   const isCarried = obs.originMeetingNumber && obs.originMeetingNumber !== undefined;
   const images = obs.images || [];
@@ -198,15 +259,45 @@ const ObservationRow = ({ obs, onUpdate, onDelete, meetingDate, participantGroup
           />
 
           {/* Texte observation + images */}
-          <div className="flex-1 flex flex-col gap-1.5">
-            <textarea
-              value={obs.text}
-              onChange={(e) => onUpdate(obs.id, { text: e.target.value })}
-              placeholder="Observation..."
-              rows={2}
+          <div className="flex-1 flex flex-col gap-1">
+            {/* Mini-toolbar formatage */}
+            <div className="flex items-center gap-0.5">
+              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat('bold')} title="Gras (Ctrl+B)"
+                className="p-0.5 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors">
+                <Bold size={13} strokeWidth={2.5} />
+              </button>
+              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat('underline')} title="Souligné (Ctrl+U)"
+                className="p-0.5 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors">
+                <Underline size={13} strokeWidth={2.5} />
+              </button>
+              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={handleHighlight} title="Fluo (Ctrl+H)"
+                className="p-0.5 rounded hover:bg-amber-50 text-slate-400 hover:text-amber-500 transition-colors">
+                <Highlighter size={13} strokeWidth={2.5} />
+              </button>
+            </div>
+            {/* Editeur WYSIWYG */}
+            <div
+              ref={(el) => {
+                editorRef.current = el;
+                if (el && !el.hasAttribute('data-init')) {
+                  el.setAttribute('data-init', '1');
+                  el.innerHTML = normalizeObsText(obs.text);
+                  lastHtmlRef.current = el.innerHTML;
+                }
+              }}
+              contentEditable
+              onInput={handleEditorInput}
+              onKeyDown={handleKeyDown}
+              onPaste={(e) => {
+                e.preventDefault();
+                const text = e.clipboardData.getData('text/plain');
+                document.execCommand('insertText', false, text);
+              }}
               spellCheck
               lang="fr"
-              className="w-full text-xs px-2 py-1 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 resize-y min-h-[32px] text-slate-800"
+              data-placeholder="Observation..."
+              className="w-full text-xs px-2 py-1 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 min-h-[28px] text-slate-800 whitespace-pre-wrap empty:before:content-[attr(data-placeholder)] empty:before:text-slate-300"
+              style={{ outline: 'none' }}
             />
 
             {/* Miniatures images */}

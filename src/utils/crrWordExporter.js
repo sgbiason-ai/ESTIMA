@@ -4,6 +4,7 @@
 // Genere un document HTML avec styles inline que Word ouvre nativement.
 
 import { MEETING_TYPES } from '../data/crrData';
+import { obsTextToHtml } from './formatObsText.jsx';
 
 const formatDate = (dateStr) => {
   if (!dateStr) return '';
@@ -29,7 +30,7 @@ const sanitizeFilename = (name) => {
 };
 
 const statusLabel = (s) =>
-  s === 'done' ? 'FAIT' : s === 'in_progress' ? 'En cours' : 'Ouvert';
+  s === 'done' ? 'FAIT' : s === 'in_progress' ? 'En cours' : s === 'empty' ? '' : 'Ouvert';
 
 const statusColor = (s) =>
   s === 'done' ? '#16783c' : s === 'in_progress' ? '#1e5aaa' : '#be6e14';
@@ -37,7 +38,7 @@ const statusColor = (s) =>
 const statusBg = (s) =>
   s === 'done' ? '#e8faf0' : s === 'in_progress' ? '#e6f2ff' : '#fff7e6';
 
-export const generateWordCrr = (meeting, crrConfig, projectName = '', branding = {}) => {
+export const generateWordCrr = (meeting, crrConfig, projectName = '', branding = {}, options = {}) => {
   if (!meeting) return;
 
   const primary = branding?.colors?.primary || '#286E55';
@@ -189,7 +190,7 @@ export const generateWordCrr = (meeting, crrConfig, projectName = '', branding =
       html += `<tr class="${rowClass}">`;
       html += `<td style="width:11%;text-align:center;font-weight:bold;color:${primary}">${obs.emitter || ''}</td>`;
       html += `<td style="width:10%;text-align:center;color:#64748b">${formatDate(obs.date)}</td>`;
-      html += `<td>${obs.text || ''}${obs.originMeetingNumber ? ` <span style="color:#94a3b8">(Report CR n${obs.originMeetingNumber})</span>` : ''}${imgHtml}</td>`;
+      html += `<td>${obsTextToHtml(obs.text)}${obs.originMeetingNumber ? ` <span style="color:#94a3b8">(Report CR n${obs.originMeetingNumber})</span>` : ''}${imgHtml}</td>`;
       html += `<td style="width:10%;text-align:center"><span class="status-badge" style="background:${statusBg(obs.status)};color:${statusColor(obs.status)}">${statusLabel(obs.status)}</span></td>`;
       html += `<td style="width:13%;text-align:center;font-weight:bold">${obs.actionBy || ''}</td>`;
       html += `<td style="width:11%;text-align:center;color:#64748b">${formatDate(obs.actionDeadline)}</td>`;
@@ -209,12 +210,33 @@ export const generateWordCrr = (meeting, crrConfig, projectName = '', branding =
 
   // Telechargement
   const blob = new Blob(['\ufeff' + html], { type: 'application/msword' });
+
+  // Nom de fichier : priorite au parametre options.filename
+  let filename;
+  if (options.filename) {
+    filename = options.filename;
+  } else {
+    const safeName = sanitizeFilename(projectName || 'PROJET').toUpperCase();
+    const crNum = String(meeting.number).padStart(2, '0');
+    filename = `CR_${crNum}_${safeName}_${meeting.date || 'ND'}.doc`;
+  }
+
+  // Tenter l'enregistrement dans le dossier choisi (File System Access)
+  if (options.dirHandle && options.saveToDirectory) {
+    options.saveToDirectory(options.dirHandle, filename, blob).then((saved) => {
+      if (!saved) fallbackDownload(blob, filename);
+    }).catch(() => fallbackDownload(blob, filename));
+    return;
+  }
+
+  fallbackDownload(blob, filename);
+};
+
+const fallbackDownload = (blob, filename) => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  const safeName = sanitizeFilename(projectName || 'PROJET').toUpperCase();
-  const crNum = String(meeting.number).padStart(2, '0');
   a.href = url;
-  a.download = `CR_${crNum}_${safeName}_${meeting.date || 'ND'}.doc`;
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
 };

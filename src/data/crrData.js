@@ -22,8 +22,9 @@ export const PRESENCE_OPTIONS = [
 ];
 
 export const OBSERVATION_STATUSES = [
-  { value: 'open',        label: 'Ouvert',   color: 'text-orange-500', bg: 'bg-orange-50',  icon: 'circle' },
-  { value: 'in_progress', label: 'En cours', color: 'text-blue-500',   bg: 'bg-blue-50',    icon: 'loader' },
+  { value: 'empty',       label: 'Vide',     color: 'text-slate-400',   bg: 'bg-slate-50',   icon: 'minus' },
+  { value: 'open',        label: 'Ouvert',   color: 'text-orange-500',  bg: 'bg-orange-50',  icon: 'circle' },
+  { value: 'in_progress', label: 'En cours', color: 'text-blue-500',    bg: 'bg-blue-50',    icon: 'loader' },
   { value: 'done',        label: 'FAIT',     color: 'text-emerald-500', bg: 'bg-emerald-50', icon: 'check' },
 ];
 
@@ -138,7 +139,7 @@ export const createEmptyObservation = (category) => ({
   text: '',
   actionBy: '',
   actionDeadline: '',
-  status: 'open',
+  status: 'empty',
   originMeetingNumber: null,
   images: [],
 });
