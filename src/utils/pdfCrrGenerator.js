@@ -12,77 +12,27 @@ import autoTable from 'jspdf-autotable';
 import { DEFAULT_BRANDING } from '../data/branding';
 import { MEETING_TYPES, GROUP_COLORS, abbreviateGroup } from '../data/crrData';
 import { parseObsHtml, stripHtml } from './formatObsText.jsx';
+import { lightenRgb, darkenRgb, loadImage, formatDateFr, formatDateLong, sanitizeFilename } from './pdf/pdfSharedHelpers';
+import { buildTheme as _buildTheme } from './pdf/buildTheme';
 
 // ─── HELPERS ────────────────────────────────────────────────────────────────
 
-const hexToRgb = (hex) => {
-  if (!hex || typeof hex !== 'string') return null;
-  const c = hex.replace('#', '');
-  if (c.length !== 6) return null;
-  return [parseInt(c.slice(0, 2), 16), parseInt(c.slice(2, 4), 16), parseInt(c.slice(4, 6), 16)];
+const CRR_OVERRIDES = {
+  borders:     [210, 218, 226],
+  presentBg:   [232, 250, 240],
+  presentTxt:  [22, 130, 76],
+  excusedBg:   [255, 247, 230],
+  excusedTxt:  [180, 120, 20],
+  absentTxt:   [180, 180, 190],
+  doneBg:      [232, 250, 240],
+  doneTxt:     [22, 120, 70],
+  progressBg:  [230, 242, 255],
+  progressTxt: [30, 90, 170],
+  openBg:      [255, 247, 230],
+  openTxt:     [190, 110, 20],
 };
 
-const lighten = (rgb, f = 0.85) => rgb.map((c) => Math.round(c + (255 - c) * f));
-const darken  = (rgb, f = 0.15) => rgb.map((c) => Math.round(c * (1 - f)));
-
-const buildTheme = (branding) => {
-  const p  = hexToRgb(branding?.colors?.primary)   || [40, 110, 85];
-  const a  = hexToRgb(branding?.colors?.secondary)  || [50, 180, 130];
-  const t  = hexToRgb(branding?.colors?.text)        || [40, 40, 40];
-  const lt = hexToRgb(branding?.colors?.subtle)      || [100, 116, 139];
-  return {
-    primary: p, accent: a, text: t, lightText: lt,
-    headerBg:   lighten(p, 0.92),
-    categoryBg: lighten(p, 0.82),
-    tableBg:    lighten(p, 0.88),
-    borders:    [210, 218, 226],
-    lightBg:    lighten(p, 0.96),
-    presentBg:  [232, 250, 240],
-    presentTxt: [22, 130, 76],
-    excusedBg:  [255, 247, 230],
-    excusedTxt: [180, 120, 20],
-    absentTxt:  [180, 180, 190],
-    doneBg:     [232, 250, 240],
-    doneTxt:    [22, 120, 70],
-    progressBg: [230, 242, 255],
-    progressTxt:[30, 90, 170],
-    openBg:     [255, 247, 230],
-    openTxt:    [190, 110, 20],
-  };
-};
-
-const formatDate = (dateStr) => {
-  if (!dateStr) return '';
-  const [y, m, d] = dateStr.split('-');
-  return `${d}/${m}/${y}`;
-};
-
-const formatDateLong = (dateStr) => {
-  if (!dateStr) return '';
-  try {
-    const d = new Date(dateStr + 'T00:00:00');
-    return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  } catch { return formatDate(dateStr); }
-};
-
-const sanitizeFilename = (name) => {
-  if (!name || typeof name !== 'string') return 'Document';
-  return name
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9]/g, '_')
-    .replace(/_+/g, '_').replace(/^_|_$/g, '')
-    .substring(0, 40);
-};
-
-const loadImage = (url) =>
-  new Promise((resolve) => {
-    if (!url) return resolve(null);
-    const img = new Image();
-    img.crossOrigin = 'Anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = () => resolve(null);
-    img.src = url;
-  });
+const buildTheme = (branding) => _buildTheme(branding, CRR_OVERRIDES);
 
 // Couleurs tournantes pour les categories
 const CAT_COLORS = [
@@ -276,7 +226,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
   doc.setFont(fontB, 'normal');
   doc.setFontSize(9);
   doc.setTextColor(...THEME.lightText);
-  doc.text(`Date : ${formatDate(meeting.date)}`, M.left + 6, cursor.y + 22);
+  doc.text(`Date : ${formatDateFr(meeting.date)}`, M.left + 6, cursor.y + 22);
 
   cursor.y += 31;
 
@@ -422,8 +372,8 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
       valign: 'middle',
     },
     headStyles: {
-      fillColor: lighten(THEME.primary, 0.78),
-      textColor: darken(THEME.primary, 0.1),
+      fillColor: lightenRgb(THEME.primary, 0.78),
+      textColor: darkenRgb(THEME.primary, 0.1),
       fontStyle: 'bold',
       font: fontH,
       halign: 'center',
@@ -486,7 +436,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
       // Col 5 : CPR badge
       if (data.column.index === 5) {
         if (row.cpr) {
-          drawBadgeLabel(doc, data.cell, 'C', THEME.primary, lighten(THEME.primary, 0.82), fontH);
+          drawBadgeLabel(doc, data.cell, 'C', THEME.primary, lightenRgb(THEME.primary, 0.82), fontH);
         }
       }
       // Col 6 : Presence — lettre seule (legende en bas du tableau)
@@ -608,14 +558,14 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
     }
   }
 
-  const IMG_ROW_H = 30; // mm par rangee d'images
+  const IMG_ROW_H = 25; // mm par rangee d'images
   const OBS_COL_W = CW - 20 - 18 - 18 - 24 - 20; // largeur auto de la colonne obs
 
   // Par categorie
   const OBS_HEAD = [['EMETTEUR', 'DATE', 'OBSERVATIONS', 'STATUT', 'PAR', 'POUR LE']];
   const obsHeadStyles = {
-    fillColor: lighten(THEME.primary, 0.78),
-    textColor: darken(THEME.primary, 0.1),
+    fillColor: lightenRgb(THEME.primary, 0.78),
+    textColor: darkenRgb(THEME.primary, 0.1),
     fontStyle: 'bold',
     font: fontH,
     halign: 'center',
@@ -638,7 +588,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
     ensureSpace(doc, cursor, 14);
 
     // Bandeau categorie avec pastille coloree
-    doc.setFillColor(...lighten(catColor, 0.88));
+    doc.setFillColor(...lightenRgb(catColor, 0.88));
     roundedRect(doc, M.left, cursor.y, CW, 7, 1, 'F');
 
     // Pastille laterale
@@ -654,7 +604,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
     const catCount = catObs.length;
     doc.setFont(fontB, 'normal');
     doc.setFontSize(6.5);
-    doc.setTextColor(...lighten(catColor, 0.3));
+    doc.setTextColor(...lightenRgb(catColor, 0.3));
     doc.text(`${catCount} observation${catCount > 1 ? 's' : ''}`, PW - M.right - 4, cursor.y + 5, { align: 'right' });
 
     cursor.y += 9;
@@ -668,43 +618,62 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
       continue;
     }
 
-    // Tableau observations — lignes texte + lignes images separees
-    // Les images sont dans des lignes dediees pour que autoTable gere
-    // correctement la hauteur et les sauts de page.
-    const obsBody = [];
-    const obsRowMeta = []; // { obs, type: 'text'|'images', imgs? }
+    // Un autoTable par observation pour garantir que texte + images
+    // ne sont jamais séparés par un saut de page.
+    const pageBottom = PH - M.bottom;
 
-    catObs.forEach((obs) => {
+    catObs.forEach((obs, obsIdx) => {
       let rawText = obs.text || '';
       if (obs.originMeetingNumber) rawText += ` (Report CR n${obs.originMeetingNumber})`;
-      // Strip HTML/markdown pour autoTable (calcul dimensions)
       const plainText = stripHtml(rawText);
+      const imgs = (obs.images || []).filter(u => imageCache.has(u));
 
-      // Ligne texte — emitter et actionBy sont dessines en pastilles via didDrawCell
-      obsBody.push([
-        '',
-        formatDate(obs.date),
-        plainText,
-        '', // STATUT — badge dessine par didDrawCell
-        '',
-        formatDate(obs.actionDeadline),
-      ]);
+      const obsBody = [];
+      const obsRowMeta = [];
+
+      obsBody.push(['', formatDateFr(obs.date), plainText, '', '', formatDateFr(obs.actionDeadline)]);
       obsRowMeta.push({ obs, type: 'text', rawText, emitter: obs.emitter || '', actionBy: obs.actionBy || '' });
 
-      // Ligne images si necessaire (ligne separee pour gerer les sauts de page)
-      const imgs = (obs.images || []).filter(u => imageCache.has(u));
       if (imgs.length > 0) {
         obsBody.push(['', '', '', '', '', '']);
         obsRowMeta.push({ obs, type: 'images', imgs });
       }
-    });
+
+      // Estimer la hauteur de cette observation (texte ~10mm + images)
+      const textH = Math.max(10, Math.ceil(plainText.length / 60) * 3.5 + 6);
+      let imgH = 0;
+      if (imgs.length === 1) {
+        const cached = imageCache.get(imgs[0]);
+        if (cached) {
+          const w = OBS_COL_W - 4;
+          imgH = Math.min(w / (cached.w / cached.h) + 4, 70);
+        }
+      } else if (imgs.length > 1) {
+        const slotW = (OBS_COL_W - 6) / 2;
+        for (let i = 0; i < imgs.length; i += 2) {
+          let rh = IMG_ROW_H;
+          for (let j = 0; j < 2 && i + j < imgs.length; j++) {
+            const c = imageCache.get(imgs[i + j]);
+            if (c) rh = Math.max(rh, Math.min(slotW / (c.w / c.h) + 2, 50));
+          }
+          imgH += rh;
+        }
+        imgH += 2;
+      }
+      const estH = textH + imgH + (isFirstObsTable && obsIdx === 0 ? 8 : 0);
+
+      // Saut de page si l'observation ne rentre pas
+      if (cursor.y + estH > pageBottom && cursor.y > M.top + 20) {
+        doc.addPage();
+        cursor.y = M.top;
+      }
 
     autoTable(doc, {
       startY: cursor.y,
       margin: { left: M.left, right: M.right, top: M.top, bottom: M.bottom },
       tableWidth: CW,
-      head: isFirstObsTable ? OBS_HEAD : [],
-      showHead: isFirstObsTable ? 'firstPage' : 'never',
+      head: isFirstObsTable && obsIdx === 0 ? OBS_HEAD : [],
+      showHead: isFirstObsTable && obsIdx === 0 ? 'firstPage' : 'never',
       body: obsBody,
       theme: 'grid',
       styles: {
@@ -757,22 +726,36 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
           if (meta.type === 'text' && data.column.index === 2) data.cell.styles.textColor = THEME.text;
         }
 
-        // Ligne images : hauteur minimale pour contenir les images
+        // Ligne images : hauteur pour contenir les photos
         if (meta.type === 'images') {
-          if (meta.imgs.length === 1) {
-            // Image unique : hauteur basee sur le ratio reel de l'image
-            const cached = imageCache.get(meta.imgs[0]);
+          const { imgs } = meta;
+          if (imgs.length === 1) {
+            const cached = imageCache.get(imgs[0]);
             if (cached) {
               const colW = data.cell.width || 80;
-              const imgW = colW - 3;
+              const imgW = colW - 4;
               const imgH = imgW / (cached.w / cached.h);
-              data.cell.styles.minCellHeight = Math.min(imgH + 3, 80); // max 80mm
+              data.cell.styles.minCellHeight = Math.min(imgH + 4, 70);
             } else {
               data.cell.styles.minCellHeight = IMG_ROW_H;
             }
           } else {
-            const imgRows = Math.ceil(meta.imgs.length / 2);
-            data.cell.styles.minCellHeight = imgRows * IMG_ROW_H;
+            const colW = data.cell.width || 80;
+            const slotW = (colW - 6) / 2;
+            // Calculer la hauteur max par rangée de 2
+            let totalH = 0;
+            for (let i = 0; i < imgs.length; i += 2) {
+              let rowH = IMG_ROW_H;
+              for (let j = 0; j < 2 && i + j < imgs.length; j++) {
+                const c = imageCache.get(imgs[i + j]);
+                if (c) {
+                  const h = slotW / (c.w / c.h);
+                  rowH = Math.max(rowH, Math.min(h + 2, 50));
+                }
+              }
+              totalH += rowH;
+            }
+            data.cell.styles.minCellHeight = totalH + 2;
           }
         }
       },
@@ -781,8 +764,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
         const meta = obsRowMeta[data.row.index];
         if (!meta) return;
 
-        // Effacer la bordure horizontale entre ligne texte et ligne images
-        // pour qu'elles apparaissent comme une seule ligne
+        // Fusionner visuellement ligne texte et ligne images (effacer bordure entre)
         const getFill = (obs) =>
           obs.status === 'done' ? THEME.doneBg
           : obs.status === 'in_progress' ? THEME.progressBg
@@ -791,70 +773,62 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
         if (meta.type === 'text') {
           const nextMeta = obsRowMeta[data.row.index + 1];
           if (nextMeta?.type === 'images') {
-            // Effacer la bordure basse de la ligne texte
             const fill = getFill(meta.obs);
             doc.setFillColor(...fill);
             doc.rect(data.cell.x + 0.06, data.cell.y + data.cell.height - 0.12, data.cell.width - 0.12, 0.24, 'F');
           }
         }
         if (meta.type === 'images') {
-          // Effacer la bordure haute de la ligne images
           const fill = getFill(meta.obs);
           doc.setFillColor(...fill);
           doc.rect(data.cell.x + 0.06, data.cell.y - 0.12, data.cell.width - 0.12, 0.24, 'F');
         }
 
-        // Dessiner les images dans la colonne observations (lignes images uniquement)
+        // Dessiner les images dans la colonne observations
         if (meta.type === 'images' && data.column.index === 2) {
           const { imgs } = meta;
           const colW = data.cell.width;
           const cellTop = data.cell.y;
           const cellBottom = data.cell.y + data.cell.height;
-          const maxCellH = cellBottom - cellTop;
 
           if (imgs.length === 1) {
-            // Image unique : pleine largeur de la colonne
+            // Image unique : pleine largeur
             const cached = imageCache.get(imgs[0]);
             if (cached) {
               const aspect = cached.w / cached.h;
-              let imgW = colW - 3;
+              let imgW = colW - 4;
               let imgH = imgW / aspect;
-              // Limiter a la hauteur disponible dans la cellule
-              if (imgH > maxCellH - 2) {
-                imgH = maxCellH - 2;
-                imgW = imgH * aspect;
-              }
+              const maxH = cellBottom - cellTop - 2;
+              if (imgH > maxH) { imgH = maxH; imgW = imgH * aspect; }
               const imgX = data.cell.x + (colW - imgW) / 2;
-              const imgY = cellTop + (maxCellH - imgH) / 2;
-              try {
-                doc.addImage(cached.uri, 'JPEG', imgX, imgY, imgW, imgH);
-              } catch { /* image invalide */ }
+              const imgY = cellTop + (cellBottom - cellTop - imgH) / 2;
+              try { doc.addImage(cached.uri, 'JPEG', imgX, imgY, imgW, imgH); } catch {}
             }
           } else {
-            // Plusieurs images : 2 par ligne
-            const slotW = (colW - 3) / 2;
-            for (let i = 0; i < imgs.length; i++) {
-              const cached = imageCache.get(imgs[i]);
-              if (!cached) continue;
-              const imgRow = Math.floor(i / 2);
-              const col = i % 2;
-              const aspect = cached.w / cached.h;
-
-              let imgW = slotW;
-              let imgH = imgW / aspect;
-              if (imgH > IMG_ROW_H - 2) {
-                imgH = IMG_ROW_H - 2;
-                imgW = imgH * aspect;
+            // 2 par ligne, moitié-moitié
+            const slotW = (colW - 6) / 2;
+            let drawY = cellTop + 1;
+            for (let i = 0; i < imgs.length; i += 2) {
+              let rowH = IMG_ROW_H;
+              const pair = [];
+              for (let j = 0; j < 2 && i + j < imgs.length; j++) {
+                const cached = imageCache.get(imgs[i + j]);
+                if (!cached) continue;
+                const aspect = cached.w / cached.h;
+                let iW = slotW;
+                let iH = iW / aspect;
+                if (iH > 50) { iH = 50; iW = iH * aspect; }
+                pair.push({ cached, imgW: iW, imgH: iH });
+                rowH = Math.max(rowH, iH + 2);
               }
-
-              const imgX = data.cell.x + 1.5 + col * (slotW + 1);
-              const imgY = cellTop + 1 + imgRow * IMG_ROW_H;
-
-              if (imgY >= cellTop - 0.5 && imgY + imgH <= cellBottom + 0.5) {
-                try {
-                  doc.addImage(cached.uri, 'JPEG', imgX, imgY, imgW, imgH);
-                } catch { /* image invalide */ }
-              }
+              pair.forEach((p, j) => {
+                const imgX = data.cell.x + 2 + j * (slotW + 2);
+                const imgY = drawY + (rowH - p.imgH) / 2;
+                if (imgY + p.imgH <= cellBottom + 0.5) {
+                  try { doc.addImage(p.cached.uri, 'JPEG', imgX, imgY, p.imgW, p.imgH); } catch {}
+                }
+              });
+              drawY += rowH;
             }
           }
         }
@@ -942,8 +916,11 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
       didDrawPage: () => { cursor.y = M.top; },
     });
 
+    cursor.y = doc.lastAutoTable.finalY;
+    }); // fin forEach obs
+
     isFirstObsTable = false;
-    cursor.y = doc.lastAutoTable.finalY + 3;
+    cursor.y += 3;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

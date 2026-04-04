@@ -2,15 +2,30 @@
 // Génération du document EXE1-T (Ordre de Service) au format .docx
 // Reproduit fidèlement la structure officielle du formulaire ministériel
 
-import {
-  Document, Packer, Paragraph, TextRun, AlignmentType,
-  Table, TableRow, TableCell, WidthType, BorderStyle,
-  HeadingLevel, PageBreak, Header, Footer, PageNumber,
-  ShadingType, VerticalAlign, TabStopPosition, TabStopType,
-  ImageRun,
-} from 'docx';
 import { saveAs } from 'file-saver';
 import { loadMoeSignatureWithDimensions } from './moeDefaults.js';
+import { formatDateLocale } from '../dateHelpers';
+
+let Document, Packer, Paragraph, TextRun, AlignmentType,
+    Table, TableRow, TableCell, WidthType, BorderStyle,
+    HeadingLevel, PageBreak, Header, Footer, PageNumber,
+    ShadingType, VerticalAlign, TabStopPosition, TabStopType,
+    ImageRun;
+
+let BORDER_THIN, BORDER_NONE, SHADING_GRAY;
+
+const ensureDocx = async () => {
+  if (Document) return;
+  const docx = await import('docx');
+  ({ Document, Packer, Paragraph, TextRun, AlignmentType,
+     Table, TableRow, TableCell, WidthType, BorderStyle,
+     HeadingLevel, PageBreak, Header, Footer, PageNumber,
+     ShadingType, VerticalAlign, TabStopPosition, TabStopType,
+     ImageRun } = docx);
+  BORDER_THIN = { style: BorderStyle.SINGLE, size: 1, color: '000000' };
+  BORDER_NONE = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+  SHADING_GRAY = { type: ShadingType.SOLID, color: 'D9D9D9' };
+};
 
 // ─── CONSTANTES ─────────────────────────────────────────────────────────────
 const FONT = 'Arial';
@@ -19,10 +34,6 @@ const SIZE_SMALL = 18;      // 9pt
 const SIZE_TITLE = 22;      // 11pt
 const SIZE_HEADER = 24;     // 12pt
 const SIZE_LARGE = 28;      // 14pt
-
-const BORDER_THIN = { style: BorderStyle.SINGLE, size: 1, color: '000000' };
-const BORDER_NONE = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
-const SHADING_GRAY = { type: ShadingType.SOLID, color: 'D9D9D9' };
 
 // ─── HELPERS ────────────────────────────────────────────────────────────────
 
@@ -83,14 +94,7 @@ const OS_TYPE_LABELS_DOCX = {
   reprise: 'de reprise des travaux',
 };
 
-const formatDate = (dateStr) => {
-  if (!dateStr) return dots(20);
-  try {
-    return new Date(dateStr).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  } catch {
-    return dateStr;
-  }
-};
+const formatDate = (s) => formatDateLocale(s, { fallback: dots(20) });
 
 const formatEntreprise = (ent) => {
   if (!ent) return dots(60);
@@ -116,6 +120,7 @@ const multilineParagraphs = (content, opts = {}) => {
 // ─── CONSTRUCTION DU DOCUMENT ───────────────────────────────────────────────
 
 export const generateExe1Document = async (fiche, exe1Data) => {
+  await ensureDocx();
   const A = fiche.sectionA || {};
   const B = fiche.sectionB || {};
   const C = fiche.sectionC || {};

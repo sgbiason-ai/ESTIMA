@@ -3,7 +3,7 @@ import Icon from './Icon';
 import { fmt, fmtShort, dateFr } from './formatters';
 import { flattenItems } from './helpers';
 
-export default function ProjectDetail({ project, calcHook, onNavigate, onExport }) {
+export default function ProjectDetail({ project, calcHook, onNavigate, onExport, isLandscape }) {
   const totalClient = calcHook.projectStats?.client?.base + calcHook.projectStats?.client?.option || 0;
   const totalStudy  = calcHook.projectStats?.study?.base + calcHook.projectStats?.study?.option || 0;
   const nbTranches  = (project.tranches || []).length;
@@ -52,7 +52,7 @@ export default function ProjectDetail({ project, calcHook, onNavigate, onExport 
       </div>
 
       {/* Menu */}
-      <div className="px-4">
+      <div className={`px-4 ${isLandscape ? 'grid grid-cols-2 gap-2' : ''}`}>
         {menuItems.map(item => (
           <button key={item.key} onClick={() => onNavigate(item.key)}
             className="flex items-center gap-3 w-full py-3.5 border-b border-white/5 text-left transition hover:bg-white/5 active:bg-white/10">

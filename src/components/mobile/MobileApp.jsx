@@ -21,29 +21,49 @@ const loadRaoPdf            = () => import('../../utils/pdfRaoGenerator');
 import { setShareMode } from '../../utils/fileSaver';
 
 // ─── COMPOSANTS MOBILE ──────────────────────────────────────────────────────
-import MobileStyles   from './MobileStyles';
-import Icon           from './Icon';
-import ProjectsList   from './ProjectsList';
-import ProjectDetail  from './ProjectDetail';
-import BPUView        from './BPUView';
-import DQEView        from './DQEView';
-import TranchesView   from './TranchesView';
-import RAOView        from './RAOView';
-import ExportsView    from './ExportsView';
+import MobileStyles    from './MobileStyles';
+import MobileHubView   from './MobileHubView';
+import Icon            from './Icon';
+import ProjectsList    from './ProjectsList';
+import ProjectDetail   from './ProjectDetail';
+import BPUView         from './BPUView';
+import DQEView         from './DQEView';
+import TranchesView    from './TranchesView';
+import RAOView         from './RAOView';
+import ExportsView     from './ExportsView';
+import CrcListView     from './CrcListView';
+import CrcDetailView   from './CrcDetailView';
+import MoeListView     from './MoeListView';
+import MoeDetailView   from './MoeDetailView';
+import { useMobileCrc }       from '../../hooks/useMobileCrc';
+import { useMobileDevisMoe } from '../../hooks/useMobileDevisMoe';
+import { useCrrManager }     from '../../hooks/useCrrManager';
+import { useOrientation }   from '../../hooks/useOrientation';
 
 // ─── MAIN MOBILE APP ────────────────────────────────────────────────────────
 export default function MobileApp({ user, companyId, onLogout }) {
+  const { isLandscape } = useOrientation();
+
   // ── Données ──
   const { projects, folders, isLoading: projectsLoading, refetch, loadProject } = useMobileProjects(user, companyId);
+  const { chantiers: crcChantiers, isLoading: crcLoading, refetch: crcRefetch, loadChantier, saveChantier } = useMobileCrc(user, companyId);
+  const { devisList: moeDevisList, isLoading: moeLoading, refetch: moeRefetch, loadDevis: loadMoeDevis } = useMobileDevisMoe(user, companyId);
   const dbHook = useDatabase(user, companyId);
   const resources = useAppResources(user, companyId);
 
   // ── Navigation ──
+  const [activeModule, setActiveModule]       = useState(null); // null = hub
   const [selectedProject, setSelectedProject] = useState(null);
   const [fullProject, setFullProject]         = useState(null);
   const [subView, setSubView]                 = useState(null);
   const [searchTerm, setSearchTerm]           = useState('');
   const [projectLoading, setProjectLoading]   = useState(false);
+  const [selectedChantier, setSelectedChantier] = useState(null);
+  const [fullChantier, setFullChantier]       = useState(null);
+  const [chantierLoading, setChantierLoading] = useState(false);
+  const [selectedMoeDevis, setSelectedMoeDevis] = useState(null);
+  const [fullMoeDevis, setFullMoeDevis]       = useState(null);
+  const [moeDevisLoading, setMoeDevisLoading] = useState(false);
   const [toast, setToast]                     = useState(null);
 
   // ── Hooks métier (activés quand un projet est chargé) ──
@@ -59,6 +79,23 @@ export default function MobileApp({ user, companyId, onLogout }) {
     bpuConfig: { numberingMode: fullProject?.bpuConfig?.numberingMode || 'auto' },
   });
 
+  // ── CRR Manager (édition CRC mobile) ──
+  const handleSaveCrrDoc = useCallback(async (data) => {
+    if (!selectedChantier?.id) return;
+    try {
+      await saveChantier(selectedChantier.id, data);
+    } catch (err) {
+      console.error('[Mobile] Erreur sauvegarde CRC:', err);
+    }
+  }, [selectedChantier, saveChantier]);
+
+  const crrManager = useCrrManager({
+    project: fullChantier,
+    onUpdateProject: setFullChantier,
+    onSaveProject: handleSaveCrrDoc,
+    masterBranding: resources.masterBranding,
+  });
+
   // ── Charger le BPU pour les descriptions ──
   useEffect(() => { dbHook.loadBpu(); }, []);
 
@@ -72,13 +109,37 @@ export default function MobileApp({ user, companyId, onLogout }) {
     setProjectLoading(false);
   }, [loadProject]);
 
+  const handleSelectChantier = useCallback(async (ch) => {
+    setSelectedChantier(ch);
+    setChantierLoading(true);
+    const data = await loadChantier(ch.id);
+    setFullChantier(data);
+    setChantierLoading(false);
+  }, [loadChantier]);
+
+  const handleSelectMoeDevis = useCallback(async (d) => {
+    setSelectedMoeDevis(d);
+    setMoeDevisLoading(true);
+    const data = await loadMoeDevis(d.id);
+    setFullMoeDevis(data);
+    setMoeDevisLoading(false);
+  }, [loadMoeDevis]);
+
   const goBack = useCallback(() => {
     if (subView) { setSubView(null); }
     else if (selectedProject) {
       setSelectedProject(null);
       setFullProject(null);
+    } else if (selectedChantier) {
+      setSelectedChantier(null);
+      setFullChantier(null);
+    } else if (selectedMoeDevis) {
+      setSelectedMoeDevis(null);
+      setFullMoeDevis(null);
+    } else if (activeModule) {
+      setActiveModule(null);
     }
-  }, [subView, selectedProject]);
+  }, [subView, selectedProject, selectedChantier, selectedMoeDevis, activeModule]);
 
   const triggerToast = useCallback((msg) => {
     setToast(msg);
@@ -207,8 +268,27 @@ export default function MobileApp({ user, companyId, onLogout }) {
     if (subView === 'rao') return 'Analyse des Offres';
     if (subView === 'exports') return 'Exports';
     if (selectedProject) return selectedProject.name;
+    if (selectedChantier) return selectedChantier.name;
+    if (selectedMoeDevis) return selectedMoeDevis.nom;
+    if (activeModule === 'projects') return 'Mes Projets';
+    if (activeModule === 'crc') return 'Comptes Rendus';
+    if (activeModule === 'moe') return 'Devis MOE';
+    if (activeModule === 'exports') return 'Exports Rapides';
     return null;
-  }, [subView, selectedProject]);
+  }, [subView, selectedProject, activeModule]);
+
+  // ── Sélection module depuis le hub ──
+  const handleSelectModule = useCallback((moduleId) => {
+    setActiveModule(moduleId);
+    setSelectedProject(null);
+    setFullProject(null);
+    setSelectedChantier(null);
+    setFullChantier(null);
+    setSelectedMoeDevis(null);
+    setFullMoeDevis(null);
+    setSubView(null);
+    setSearchTerm('');
+  }, []);
 
   // ── BPU map pour descriptions ──
   const bpuDescMap = useMemo(() => {
@@ -220,37 +300,39 @@ export default function MobileApp({ user, companyId, onLogout }) {
   }, [dbHook.bpu]);
 
   return (
-    <div className="flex flex-col h-screen bg-[#040a0e] font-sans max-w-md mx-auto shadow-2xl">
+    <div className={`flex flex-col h-screen bg-[#040a0e] font-sans shadow-2xl ${isLandscape ? 'w-full' : 'max-w-md mx-auto'}`}>
       <MobileStyles />
-      {/* ── Header ── */}
-      <header className="flex items-center justify-between px-3 py-2.5 bg-gradient-to-br from-[#040a0e] to-[#0a1628] text-white sticky top-0 z-20">
-        {selectedProject || subView ? (
+      {/* ── Header (masqué sur le hub — il a son propre header) ── */}
+      {activeModule && (
+        <header className={`flex items-center justify-between px-3 bg-gradient-to-br from-[#040a0e] to-[#0a1628] text-white sticky top-0 z-20 ${isLandscape ? 'py-1' : 'py-2.5'}`}>
           <button onClick={goBack} className="p-2 rounded-lg hover:bg-white/10 transition">
             <Icon name="back" size={20} color="#fff" />
           </button>
-        ) : (
-          <div className="flex items-baseline pl-2">
-            <span className="font-extrabold text-sm tracking-tight">ESTIMA</span>
-            <span className="font-normal text-xs opacity-60 ml-0.5">VRD</span>
+          <div className="flex-1 text-center overflow-hidden">
+            {currentTitle && (
+              <span className="text-sm font-semibold truncate max-w-[220px] inline-block">
+                {currentTitle}
+              </span>
+            )}
           </div>
-        )}
-        <div className="flex-1 text-center overflow-hidden">
-          {currentTitle && (
-            <span className="text-sm font-semibold truncate max-w-[220px] inline-block">
-              {currentTitle}
-            </span>
-          )}
-        </div>
-        {!selectedProject ? (
-          <button onClick={onLogout} className="p-2 rounded-lg hover:bg-white/10 transition">
-            <Icon name="logout" size={18} color="#64748b" />
-          </button>
-        ) : <div className="w-9" />}
-      </header>
+          <div className="w-9" />
+        </header>
+      )}
 
       {/* ── Content ── */}
       <main className="flex-1 overflow-y-auto pb-20">
-        {!selectedProject && (
+        {/* Hub (écran d'accueil) */}
+        {!activeModule && (
+          <MobileHubView
+            userEmail={user?.email}
+            onSelectModule={handleSelectModule}
+            onLogout={onLogout}
+            isLandscape={isLandscape}
+          />
+        )}
+
+        {/* Module Projets — liste */}
+        {activeModule === 'projects' && !selectedProject && (
           <ProjectsList
             projects={projects}
             folders={folders}
@@ -259,6 +341,7 @@ export default function MobileApp({ user, companyId, onLogout }) {
             onSearch={setSearchTerm}
             onSelect={handleSelectProject}
             onRefresh={refetch}
+            isLandscape={isLandscape}
           />
         )}
         {selectedProject && !subView && (
@@ -273,6 +356,7 @@ export default function MobileApp({ user, companyId, onLogout }) {
               calcHook={calcHook}
               onNavigate={setSubView}
               onExport={handleExport}
+              isLandscape={isLandscape}
             />
           ) : null
         )}
@@ -304,6 +388,70 @@ export default function MobileApp({ user, companyId, onLogout }) {
         )}
         {subView === 'exports' && (
           <ExportsView onExport={handleExport} />
+        )}
+
+        {/* Module CRC — liste chantiers */}
+        {activeModule === 'crc' && !selectedChantier && (
+          <CrcListView
+            chantiers={crcChantiers}
+            loading={crcLoading}
+            onSelect={handleSelectChantier}
+            onRefresh={crcRefetch}
+            isLandscape={isLandscape}
+          />
+        )}
+        {activeModule === 'crc' && selectedChantier && (
+          chantierLoading ? (
+            <div className="flex items-center justify-center py-20 gap-2 text-slate-500">
+              <div className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+              <span className="text-sm">Chargement…</span>
+            </div>
+          ) : fullChantier ? (
+            <CrcDetailView chantier={fullChantier} branding={resources.masterBranding} onToast={triggerToast} manager={crrManager} isLandscape={isLandscape} />
+          ) : null
+        )}
+
+        {/* Module MOE — liste devis */}
+        {activeModule === 'moe' && !selectedMoeDevis && (
+          <MoeListView
+            devisList={moeDevisList}
+            loading={moeLoading}
+            onSelect={handleSelectMoeDevis}
+            onRefresh={moeRefetch}
+            isLandscape={isLandscape}
+          />
+        )}
+        {activeModule === 'moe' && selectedMoeDevis && (
+          moeDevisLoading ? (
+            <div className="flex items-center justify-center py-20 gap-2 text-slate-500">
+              <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+              <span className="text-sm">Chargement…</span>
+            </div>
+          ) : fullMoeDevis ? (
+            <MoeDetailView devis={fullMoeDevis} />
+          ) : null
+        )}
+
+        {/* Module Exports rapides (depuis le hub, sans projet) */}
+        {activeModule === 'exports' && !selectedProject && (
+          <div className="px-4 py-6">
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center mb-4">
+                <Icon name="download" size={28} color="#22d3ee" />
+              </div>
+              <h2 className="text-lg font-bold text-slate-200 mb-2">Exports Rapides</h2>
+              <p className="text-sm text-slate-500 max-w-[260px] leading-relaxed mb-6">
+                Sélectionnez d'abord un projet depuis <strong className="text-slate-300">Mes Projets</strong> pour accéder aux exports.
+              </p>
+              <button
+                onClick={() => handleSelectModule('projects')}
+                className="flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 text-sm font-semibold transition active:scale-95"
+              >
+                <Icon name="folder" size={16} color="#34d399" />
+                Ouvrir Mes Projets
+              </button>
+            </div>
+          </div>
         )}
       </main>
 

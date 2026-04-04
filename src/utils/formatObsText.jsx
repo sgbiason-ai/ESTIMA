@@ -103,11 +103,15 @@ export const renderFormattedText = (text) => {
 export const stripHtml = (html) => {
   if (!html) return '';
   const normalized = normalizeObsText(html);
-  return normalized
+  const text = normalized
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/div>\s*<div[^>]*>/gi, '\n')
     .replace(/<\/p>\s*<p[^>]*>/gi, '\n')
     .replace(/<[^>]*>/g, '');
+  // Décoder les entités HTML (&nbsp; &amp; &lt; &gt; &quot; &#xxx;)
+  const el = typeof document !== 'undefined' && document.createElement('textarea');
+  if (el) { el.innerHTML = text; return el.value; }
+  return text.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
 };
 
 // ── Conversion pour export Word (deja en HTML, juste normaliser) ─────────────

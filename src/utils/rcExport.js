@@ -1,9 +1,18 @@
-import {
-  Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, Header, Footer, PageNumber, TableOfContents, PageBreak, ImageRun, Table, TableRow, TableCell, WidthType, BorderStyle, VerticalAlign,
-} from "docx";
 import { saveAs } from "file-saver";
 import { DEFAULT_BRANDING } from "../data/branding";
 import { buildCoverPageElements } from "./wordCoverPage";
+
+let Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
+    Header, Footer, PageNumber, TableOfContents, PageBreak, ImageRun,
+    Table, TableRow, TableCell, WidthType, BorderStyle, VerticalAlign;
+
+const ensureDocx = async () => {
+  if (Document) return;
+  const docx = await import("docx");
+  ({ Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
+     Header, Footer, PageNumber, TableOfContents, PageBreak, ImageRun,
+     Table, TableRow, TableCell, WidthType, BorderStyle, VerticalAlign } = docx);
+};
 
 // --- UTILITAIRES ---
 const cleanColor = (hex) => hex ? hex.replace(/^#/, "").toUpperCase() : "000000";
@@ -126,6 +135,7 @@ const createDocStyles = (branding) => ({
 
 // --- EXPORT PRINCIPAL RC ---
 export const generateWordRC = async (selectedNodes, variables, masterData, branding = DEFAULT_BRANDING) => {
+  await ensureDocx();
   // ── Section 1 : page de garde PNG (rendu canvas identique au PDF) ──────────
   const coverElements = await buildCoverPageElements("RC", variables, branding);
 

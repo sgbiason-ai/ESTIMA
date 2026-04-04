@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import Icon from './Icon';
 import { dateFr } from './formatters';
 
-export default function ProjectsList({ projects, folders, loading, search, onSearch, onSelect, onRefresh }) {
+export default function ProjectsList({ projects, folders, loading, search, onSearch, onSelect, onRefresh, isLandscape }) {
   // ── Navigation dans les dossiers ──
   const [currentFolderId, setCurrentFolderId] = useState(null); // null = racine
 
@@ -136,9 +136,11 @@ export default function ProjectsList({ projects, folders, loading, search, onSea
       )}
 
       {/* Projects */}
-      {!loading && currentProjects.map((p) => (
+      {!loading && currentProjects.length > 0 && (
+      <div className={isLandscape ? 'grid grid-cols-2 gap-2 px-4' : 'contents'}>
+      {currentProjects.map((p) => (
         <button key={p.id} onClick={() => onSelect(p)}
-          className="block w-[calc(100%-2rem)] mx-4 mb-2 p-3.5 bg-white/5 rounded-xl border border-white/10 text-left transition hover:shadow-md active:scale-[0.99]">
+          className={`block p-3.5 bg-white/5 rounded-xl border border-white/10 text-left transition hover:shadow-md active:scale-[0.99] ${isLandscape ? '' : 'w-[calc(100%-2rem)] mx-4 mb-2'}`}>
           <div className="flex justify-between items-start">
             <div className="flex-1 min-w-0">
               <div className="text-sm font-bold text-slate-200 leading-tight truncate">{p.name}</div>
@@ -160,6 +162,8 @@ export default function ProjectsList({ projects, folders, loading, search, onSea
           </div>
         </button>
       ))}
+      </div>
+      )}
 
       {/* Empty state */}
       {!loading && currentProjects.length === 0 && subFolders.length === 0 && (

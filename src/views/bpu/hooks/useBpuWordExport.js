@@ -1,15 +1,23 @@
 import { useState } from 'react';
 import { toast } from '../../../utils/globalUI';
-import {
-  Document, Packer, Paragraph, Table, TableCell, TableRow,
-  WidthType, BorderStyle, TextRun, AlignmentType,
-  Header, Footer, ImageRun, TableLayoutType,
-  VerticalAlign, HeightRule, SimpleField,
-} from 'docx';
 import { saveAs } from 'file-saver';
 import { cleanText, normalizeUnitSymbol } from '../../../utils/helpers';
 import { hexToDocxColor } from '../utils/bpuBrandingUtils';
 import { getRawDescription, normalizeToHtml } from '../utils/bpuDescriptionUtils';
+
+let Document, Packer, Paragraph, Table, TableCell, TableRow,
+    WidthType, BorderStyle, TextRun, AlignmentType,
+    Header, Footer, ImageRun, TableLayoutType,
+    VerticalAlign, HeightRule, SimpleField;
+
+const ensureDocx = async () => {
+  if (Document) return;
+  const docx = await import('docx');
+  ({ Document, Packer, Paragraph, Table, TableCell, TableRow,
+     WidthType, BorderStyle, TextRun, AlignmentType,
+     Header, Footer, ImageRun, TableLayoutType,
+     VerticalAlign, HeightRule, SimpleField } = docx);
+};
 
 /**
  * useBpuWordExport
@@ -85,6 +93,7 @@ export const useBpuWordExport = ({
   const handleDownloadWord = async () => {
     setIsGeneratingWord(true);
     try {
+      await ensureDocx();
       const primaryColorDocx   = hexToDocxColor(branding.colors.primary);
       const secondaryColorDocx = hexToDocxColor(branding.colors.secondary);
       const headingFont = branding.fonts.headings;

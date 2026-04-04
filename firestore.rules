@@ -24,11 +24,6 @@ service cloud.firestore {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin']);
     }
 
-    // True if the document is being created without the isAdmin field
-    function doesNotSetAdminField() {
-      return !('isAdmin' in request.resource.data);
-    }
-
     // ─── Block everything by default ────────────────────────────────
     match /{document=**} {
       allow read, write: if false;
@@ -106,6 +101,23 @@ service cloud.firestore {
 
       match /resources/{resId} {
         allow read, write: if isCompanyMember(companyId);
+      }
+
+      // Dossiers de classement des projets
+      match /folders/{folderId} {
+        allow read, write: if isCompanyMember(companyId);
+      }
+
+      // Comptes rendus de chantier (CRC/CRR)
+      match /crr/{crrId} {
+        allow read: if isCompanyMember(companyId);
+        allow write: if isCompanyMember(companyId);
+      }
+
+      // Devis MOE — lecture membres, écriture admins uniquement
+      match /devisMoe/{devisId} {
+        allow read: if isCompanyMember(companyId);
+        allow write: if isCompanyAdmin(companyId);
       }
 
       // Présence en temps réel

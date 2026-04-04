@@ -1,0 +1,72 @@
+// src/hooks/useMobileCrc.js
+//
+// Charge les données CRC (Compte Rendu Chantier) depuis Firestore.
+// Utilisé par la vue mobile — lecture + écriture.
+// Chemin : companies/{companyId}/crr/
+
+import { useState, useEffect, useCallback } from 'react';
+import { collection, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+
+export const useMobileCrc = (user, companyId) => {
+  const [chantiers, setChantiers] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError]         = useState(null);
+
+  const fetchChantiers = useCallback(async () => {
+    if (!user || !companyId) return;
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const snap = await getDocs(collection(db, 'companies', companyId, 'crr'));
+      const list = snap.docs.map(d => {
+        const data = d.data();
+        const config = data.crrConfig || {};
+        const meetings = data.crrMeetings || [];
+        return {
+          id: d.id,
+          name: config.chantierInfo?.nom || '(Sans nom)',
+          lieu: config.chantierInfo?.lieu || '',
+          meetingCount: meetings.length,
+          lastMeetingDate: meetings.length > 0
+            ? meetings[meetings.length - 1].date || ''
+            : '',
+          lastSaved: data.lastSaved || '',
+        };
+      })
+        .sort((a, b) => (b.lastSaved || '').localeCompare(a.lastSaved || ''));
+
+      setChantiers(list);
+    } catch (e) {
+      console.error('[useMobileCrc] Erreur chargement chantiers:', e);
+      setError('Impossible de charger les chantiers.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, companyId]);
+
+  useEffect(() => { fetchChantiers(); }, [fetchChantiers]);
+
+  const loadChantier = useCallback(async (chantierId) => {
+    if (!companyId) return null;
+    try {
+      const snap = await getDoc(doc(db, 'companies', companyId, 'crr', chantierId));
+      return snap.exists() ? snap.data() : null;
+    } catch (e) {
+      console.error('[useMobileCrc] Erreur chargement chantier:', e);
+      return null;
+    }
+  }, [companyId]);
+
+  const saveChantier = useCallback(async (chantierId, data) => {
+    if (!companyId) return;
+    await setDoc(doc(db, 'companies', companyId, 'crr', chantierId), {
+      ...data,
+      lastSaved: new Date().toISOString(),
+      updatedBy: user?.email || '',
+    });
+  }, [companyId, user]);
+
+  return { chantiers, isLoading, error, refetch: fetchChantiers, loadChantier, saveChantier };
+};

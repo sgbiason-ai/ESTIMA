@@ -1,26 +1,19 @@
-import {
-  Document,
-  Packer,
-  Paragraph,
-  TextRun,
-  HeadingLevel,
-  AlignmentType,
-  Header,
-  Footer,
-  PageNumber,
-  TableOfContents,
-  PageBreak,
-  ImageRun,
-  Table,
-  TableRow,
-  TableCell,
-  WidthType,
-  BorderStyle,
-  VerticalAlign,
-} from "docx";
 import { saveAs } from "file-saver";
 import { DEFAULT_BRANDING } from "../data/branding";
 import { buildCoverPageElements } from "./wordCoverPage";
+
+// Lazy-loaded docx classes (initialisées au premier appel de generateWordCCTP)
+let Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
+    Header, Footer, PageNumber, TableOfContents, PageBreak, ImageRun,
+    Table, TableRow, TableCell, WidthType, BorderStyle, VerticalAlign;
+
+const ensureDocx = async () => {
+  if (Document) return;
+  const docx = await import("docx");
+  ({ Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
+     Header, Footer, PageNumber, TableOfContents, PageBreak, ImageRun,
+     Table, TableRow, TableCell, WidthType, BorderStyle, VerticalAlign } = docx);
+};
 
 // --- 1. UTILITAIRES ET SÉCURISATION ---
 
@@ -281,6 +274,7 @@ const createDocStyles = (branding) => ({
 
 // --- 4. EXPORT PRINCIPAL ---
 export const generateWordCCTP = async (selectedNodes, variables, masterData, branding = DEFAULT_BRANDING) => {
+  await ensureDocx();
   // ── Section 1 : page de garde PNG (rendu canvas identique au PDF) ──────────
   const coverElements = await buildCoverPageElements("CCTP", variables, branding);
 

@@ -8,7 +8,6 @@
 // l'image A4 occupe exactement toute la page.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { Paragraph, ImageRun } from "docx";
 import { buildCoverPageCanvas } from "./coverPageCanvas";
 
 const base64DataURLToUint8Array = (dataURL) => {
@@ -37,6 +36,7 @@ const base64DataURLToUint8Array = (dataURL) => {
  * @returns {Promise<Paragraph[]>}
  */
 export const buildCoverPageElements = async (docType, variables, branding) => {
+  const { Paragraph, ImageRun } = await import("docx");
   const docLabel =
     docType === "CCTP"
       ? "CAHIER DES CLAUSES TECHNIQUES PARTICULIÈRES"

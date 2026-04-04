@@ -1,0 +1,284 @@
+// src/components/mobile/ObservationEditSheet.jsx
+//
+// Bottom sheet pour éditer une observation CRC sur mobile.
+// contentEditable pour le texte, capture caméra + galerie pour les images.
+
+import React, { useState, useRef, useCallback } from 'react';
+import Icon from './Icon';
+import { compressImage } from '../../utils/imageCompressor';
+import { useOrientation } from '../../hooks/useOrientation';
+
+// ─── STATUS CONFIG ─────────────────────────────────────────────────────────
+const STATUSES = [
+  { value: 'empty',       label: 'Vide',     bg: 'bg-slate-500/20',   activeBg: 'bg-slate-500',   text: 'text-slate-300' },
+  { value: 'open',        label: 'Ouvert',   bg: 'bg-orange-500/20',  activeBg: 'bg-orange-500',  text: 'text-orange-300' },
+  { value: 'in_progress', label: 'En cours', bg: 'bg-blue-500/20',    activeBg: 'bg-blue-500',    text: 'text-blue-300' },
+  { value: 'done',        label: 'FAIT',     bg: 'bg-emerald-500/20', activeBg: 'bg-emerald-500', text: 'text-emerald-300' },
+];
+
+// ─── FIELD WRAPPER ─────────────────────────────────────────────────────────
+const Field = ({ label, children }) => (
+  <div className="flex flex-col gap-1.5">
+    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{label}</label>
+    {children}
+  </div>
+);
+
+const selectClass = 'w-full px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-slate-200 appearance-none';
+const inputClass  = 'w-full px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-slate-200';
+
+// ─── COMPOSANT PRINCIPAL ───────────────────────────────────────────────────
+export default function ObservationEditSheet({
+  obs,
+  participantGroups = [],
+  onUpdate,
+  onDelete,
+  onClose,
+  onViewImage,
+}) {
+  const { isLandscape } = useOrientation();
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const cameraRef = useRef(null);
+  const galleryRef = useRef(null);
+  const textRef = useRef(null);
+
+  const images = obs?.images || [];
+
+  // ── Handlers ──
+  const update = useCallback((patch) => {
+    if (onUpdate && obs) onUpdate(obs.id, patch);
+  }, [onUpdate, obs]);
+
+  const handleImageFiles = useCallback(async (files) => {
+    if (!files || files.length === 0) return;
+    const fileList = Array.from(files);
+    const compressed = await Promise.all(fileList.map((f) => compressImage(f)));
+    update({ images: [...images, ...compressed] });
+  }, [images, update]);
+
+  const handleRemoveImage = useCallback((idx) => {
+    const next = images.filter((_, i) => i !== idx);
+    update({ images: next });
+  }, [images, update]);
+
+  const handleTextBlur = useCallback(() => {
+    if (textRef.current) {
+      update({ text: textRef.current.innerHTML });
+    }
+  }, [update]);
+
+  const handleDelete = useCallback(() => {
+    if (onDelete && obs) {
+      onDelete(obs.id);
+      onClose();
+    }
+  }, [onDelete, obs, onClose]);
+
+  // ── Group names for selects ──
+  const groupNames = participantGroups.map((g) => g.name).filter(Boolean);
+
+  if (!obs) return null;
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+
+      {/* Sheet */}
+      <div className={`fixed inset-x-0 bottom-0 z-50 flex flex-col bg-[#0c1220] border-t border-white/[0.08] rounded-t-3xl overflow-hidden animate-slideUp ${isLandscape ? 'max-h-[95vh]' : 'max-h-[88vh]'}`}>
+
+        {/* Handle + header */}
+        <div className="flex flex-col items-center pt-3 pb-2 px-4 shrink-0">
+          <div className="w-10 h-1 rounded-full bg-white/20 mb-3" />
+          <div className="flex items-center justify-between w-full">
+            <h3 className="text-sm font-bold text-slate-200">Modifier l'observation</h3>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10">
+              <Icon name="close" size={18} color="#94a3b8" />
+            </button>
+          </div>
+        </div>
+
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-4">
+
+          {/* Status pills */}
+          <Field label="Statut">
+            <div className="flex gap-2">
+              {STATUSES.map((s) => (
+                <button
+                  key={s.value}
+                  onClick={() => update({ status: s.value })}
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold text-center transition-all ${
+                    obs.status === s.value
+                      ? `${s.activeBg} text-white shadow-lg`
+                      : `${s.bg} ${s.text}`
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          {/* Emitter + Date row */}
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Émetteur">
+              <select
+                value={obs.emitter || ''}
+                onChange={(e) => update({ emitter: e.target.value })}
+                className={selectClass}
+              >
+                <option value="">—</option>
+                {groupNames.map((g) => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Date">
+              <input
+                type="date"
+                value={obs.date || ''}
+                onChange={(e) => update({ date: e.target.value })}
+                className={inputClass}
+              />
+            </Field>
+          </div>
+
+          {/* Text (contentEditable) */}
+          <Field label="Observation">
+            <div
+              ref={textRef}
+              contentEditable
+              suppressContentEditableWarning
+              onBlur={handleTextBlur}
+              className="min-h-[100px] px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-slate-200 leading-relaxed focus:outline-none focus:border-emerald-500/40"
+              dangerouslySetInnerHTML={{ __html: obs.text || '' }}
+            />
+          </Field>
+
+          {/* Action by + Deadline */}
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Action par">
+              <select
+                value={obs.actionBy || ''}
+                onChange={(e) => update({ actionBy: e.target.value })}
+                className={selectClass}
+              >
+                <option value="">—</option>
+                {groupNames.map((g) => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Échéance">
+              <input
+                type="date"
+                value={obs.actionDeadline || ''}
+                onChange={(e) => update({ actionDeadline: e.target.value })}
+                className={inputClass}
+              />
+            </Field>
+          </div>
+
+          {/* Images */}
+          <Field label={`Photos (${images.length})`}>
+            {/* Thumbnails grid */}
+            {images.length > 0 && (
+              <div className="grid grid-cols-4 gap-2 mb-2">
+                {images.map((src, idx) => (
+                  <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-white/[0.08]">
+                    <img
+                      src={src}
+                      alt={`Photo ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                      onClick={() => onViewImage?.(src)}
+                    />
+                    <button
+                      onClick={() => handleRemoveImage(idx)}
+                      className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500/90 flex items-center justify-center"
+                    >
+                      <Icon name="close" size={10} color="#fff" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Camera + Gallery buttons */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => cameraRef.current?.click()}
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 text-xs font-semibold active:scale-[0.98] transition"
+              >
+                <Icon name="camera" size={16} color="#34d399" />
+                Photo
+              </button>
+              <button
+                onClick={() => galleryRef.current?.click()}
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-blue-500/15 border border-blue-500/20 text-blue-400 text-xs font-semibold active:scale-[0.98] transition"
+              >
+                <Icon name="image" size={16} color="#60a5fa" />
+                Galerie
+              </button>
+            </div>
+
+            {/* Hidden file inputs */}
+            <input
+              ref={cameraRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => { handleImageFiles(e.target.files); e.target.value = ''; }}
+            />
+            <input
+              ref={galleryRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => { handleImageFiles(e.target.files); e.target.value = ''; }}
+            />
+          </Field>
+
+          {/* Delete button */}
+          <div className="pt-2 border-t border-white/[0.06]">
+            {!showDeleteConfirm ? (
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-red-400 text-xs font-semibold hover:bg-red-500/10 transition"
+              >
+                <Icon name="trash" size={14} color="#f87171" />
+                Supprimer cette observation
+              </button>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 py-3 rounded-xl bg-white/[0.04] text-slate-400 text-xs font-semibold"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="flex-1 py-3 rounded-xl bg-red-500 text-white text-xs font-bold"
+                >
+                  Confirmer
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Animation keyframe */}
+      <style>{`
+        @keyframes slideUp {
+          from { transform: translateY(100%); }
+          to   { transform: translateY(0); }
+        }
+        .animate-slideUp { animation: slideUp 0.3s ease-out; }
+      `}</style>
+    </>
+  );
+}

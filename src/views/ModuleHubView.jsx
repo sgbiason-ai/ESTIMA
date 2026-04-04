@@ -201,11 +201,12 @@ function ModuleCard({ mod, colors, accessible, onSelect }) {
     <button
       onClick={() => accessible && onSelect(mod.id)}
       disabled={!accessible}
+      style={accessible ? { '--card-glow': `0 8px 30px -10px ${colors.glow}` } : undefined}
       className={`
         group relative flex flex-col text-left w-full h-[200px] rounded-2xl border backdrop-blur-xl
         transition-all duration-400 ease-out overflow-hidden
         ${accessible
-          ? `${colors.border} bg-white/[0.02] hover:bg-white/[0.04] ${colors.hoverBorder} hover:shadow-[0_8px_30px_-10px_${colors.glow}] hover:-translate-y-1`
+          ? `${colors.border} bg-white/[0.02] hover:bg-white/[0.04] ${colors.hoverBorder} hover:shadow-[var(--card-glow)] hover:-translate-y-1`
           : 'border-white/[0.02] bg-white/[0.01] cursor-not-allowed opacity-60'
         }
       `}
@@ -221,10 +222,12 @@ function ModuleCard({ mod, colors, accessible, onSelect }) {
       <div className="relative z-10 p-5 flex flex-col h-full w-full">
         {/* Header : icône + tag */}
         <div className="flex items-start justify-between mb-4">
-          <div className={`
+          <div
+            style={accessible ? { '--icon-glow': `0 0 15px ${colors.glow}` } : undefined}
+            className={`
             p-3 rounded-xl border transition-all duration-300
             ${accessible
-              ? `${colors.iconBg} ${colors.iconRing} group-hover:scale-110 group-hover:shadow-[0_0_15px_${colors.glow}]`
+              ? `${colors.iconBg} ${colors.iconRing} group-hover:scale-110 group-hover:shadow-[var(--icon-glow)]`
               : 'bg-white/[0.02] border-white/[0.05]'
             }
           `}>
