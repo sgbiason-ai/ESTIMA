@@ -87,7 +87,7 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
     }
   }, [meeting, config, chantierName, branding, onToast, manager]);
 
-  // ── Envoi par mail aux diffusés ──
+  // ── Envoi par mail aux diffusés (même sujet/corps/destinataires que PC) ──
   const handleSendMail = useCallback(async () => {
     if (!meeting || !manager) return;
     const emails = manager.diffusionEmails || [];
@@ -98,29 +98,44 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
     setExporting('mail');
     try {
       const { generatePdfCrr } = await import('../../utils/pdfCrrGenerator');
+      const { buildMailSubject, buildMailBodyPlainText } = await import('../../utils/crrMailer');
       const exportCfg = (manager?.crrConfig || config).chantierInfo || {};
       const filename = buildExportFilename(exportCfg.exportPattern, { number: meeting.number, projectName: chantierName, date: meeting.date, ext: 'pdf' });
       const pdfData = await generatePdfCrr(meeting, manager.crrConfig, chantierName, branding || {}, { returnBlob: true, filename });
 
-      // Tenter le partage natif avec le fichier PDF
+      const subject = buildMailSubject(meeting, chantierName);
+      const body = buildMailBodyPlainText(meeting, chantierName);
+
+      // navigator.share envoie le PDF en pièce jointe avec sujet + corps
       if (navigator.share && navigator.canShare) {
         const file = new File([pdfData.blob], filename, { type: 'application/pdf' });
         if (navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            title: `CR n°${meeting.number} — ${chantierName}`,
-            text: `Destinataires : ${emails.join(', ')}`,
-            files: [file],
-          });
-          onToast?.('CR partagé');
+          // Copier les destinataires AVANT le share (disponibles dans Outlook)
+          const dest = emails.join(', ');
+          if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(dest).catch(() => {});
+          }
+          onToast?.(`Destinataires copiés : ${dest}`);
+          await navigator.share({ title: subject, text: body, files: [file] });
           setExporting(null);
           return;
         }
       }
 
-      // Fallback : télécharger + ouvrir mailto
-      const { openOutlookMail } = await import('../../utils/crrMailer');
-      await openOutlookMail(meeting, manager.crrConfig, chantierName, emails, pdfData);
-      onToast?.('Mail préparé — attachez le PDF');
+      // Fallback : télécharger le PDF + ouvrir mailto (sans pièce jointe)
+      const url = URL.createObjectURL(pdfData.blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = pdfData.filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      const to = emails.join(',');
+      setTimeout(() => {
+        window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      }, 500);
     } catch (err) {
       if (err.name !== 'AbortError') {
         console.error('[CrcDetailView] Envoi mail:', err);
@@ -129,7 +144,7 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
     } finally {
       setExporting(null);
     }
-  }, [meeting, manager, chantierName, branding, onToast]);
+  }, [meeting, manager, config, chantierName, branding, onToast]);
 
   // ── Observations par catégorie ──
   const obsByCategory = useMemo(() => {
@@ -168,19 +183,10 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
   return (
     <div className="flex flex-col h-full">
 
-      {/* ── Chantier info ──────────────────────────────────────────────── */}
-      {config.chantierInfo?.nom && (
-        <div className="px-4 pt-3 pb-2">
-          <div className="text-xs text-slate-500 font-semibold uppercase tracking-wide mb-0.5">Chantier</div>
-          <div className="text-base font-bold text-slate-200">{config.chantierInfo.nom}</div>
-          {config.chantierInfo.lieu && (
-            <div className="text-xs text-slate-500 mt-0.5">{config.chantierInfo.lieu}</div>
-          )}
-        </div>
-      )}
+      {/* ── Chantier info — supprimé, le nom est déjà dans le header parent ── */}
 
       {/* ── Meeting tabs (scroll horizontal) ───────────────────────────── */}
-      <div className="flex gap-1.5 px-4 py-2 overflow-x-auto scrollbar-none">
+      <div className={`flex gap-1.5 px-4 overflow-x-auto scrollbar-none ${isLandscape ? 'py-1' : 'py-2'}`}>
         {meetings.map((m, idx) => {
           const isActive = idx === activeMeetingIdx;
           return (
@@ -200,7 +206,7 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
 
       {/* ── Meeting header ─────────────────────────────────────────────── */}
       {meeting && (
-        <div className="mx-4 mt-1 mb-2 p-3 bg-white/5 rounded-xl border border-white/10">
+        <div className={`mx-4 bg-white/5 rounded-xl border border-white/10 ${isLandscape ? 'mt-0.5 mb-1 p-2' : 'mt-1 mb-2 p-3'}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-amber-400">
@@ -246,7 +252,7 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
               )}
             </div>
           </div>
-          {meeting.nextMeeting?.date && (
+          {meeting.nextMeeting?.date && !isLandscape && (
             <div className="flex items-center gap-2 mt-2 px-2.5 py-1.5 bg-amber-500/10 rounded-lg border border-amber-500/15">
               <span className="text-[10px] font-bold text-amber-400 uppercase">Prochaine</span>
               <span className="text-xs text-slate-300">
@@ -260,7 +266,7 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
       )}
 
       {/* ── Section toggle ─────────────────────────────────────────────── */}
-      <div className="flex gap-1 mx-4 mb-2 p-1 bg-white/5 rounded-lg">
+      <div className={`flex gap-1 mx-4 p-1 bg-white/5 rounded-lg ${isLandscape ? 'mb-1' : 'mb-2'}`}>
         <SectionTab
           label="Observations"
           active={activeSection === 'observations'}

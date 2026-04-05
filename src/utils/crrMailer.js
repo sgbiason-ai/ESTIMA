@@ -10,7 +10,7 @@ import { MEETING_TYPES } from '../data/crrData';
 
 // ─── HELPERS ────────────────────────────────────────────────────────────────
 
-const formatDateFR = (dateStr) => {
+export const formatDateFR = (dateStr) => {
   if (!dateStr) return '';
   const [y, m, d] = dateStr.split('-');
   return `${d}/${m}/${y}`;
@@ -120,6 +120,35 @@ const buildMailHtml = (meeting, projectName) => {
   h += 'Ce compte rendu est consid&eacute;r&eacute; comme approuv&eacute; sous 48h ';
   h += "en l'absence d'observations &eacute;crites.</p>";
   return h;
+};
+
+// ─── Sujet et corps texte brut (reutilises par vue mobile + fallback mailto) ──
+
+export const buildMailSubject = (meeting, projectName) => {
+  const typeLabel =
+    MEETING_TYPES.find((t) => t.value === meeting.type)?.label || 'Reunion';
+  return `${typeLabel} n\u00B0${meeting.number} - ${projectName || 'Projet'} - ${formatDateFR(meeting.date)}`;
+};
+
+export const buildMailBodyPlainText = (meeting, projectName) => {
+  const date = formatDateFR(meeting.date);
+  const num = meeting.number || '';
+  let body = 'Bonjour,\n\n';
+  body += 'Vous trouverez ci-joint le compte rendu';
+  if (num) body += ` n\u00B0${num}`;
+  body += ` de l'op\u00E9ration \u00AB ${projectName || ''} \u00BB`;
+  if (date) body += ` en date du ${date}`;
+  body += '.\n\n';
+  if (meeting.nextMeeting?.date) {
+    const parts = [];
+    if (meeting.nextMeeting.lieu) parts.push(meeting.nextMeeting.lieu);
+    if (meeting.nextMeeting.heure) parts.push(`\u00E0 ${meeting.nextMeeting.heure}`);
+    parts.push(`le ${formatDateFR(meeting.nextMeeting.date)}`);
+    body += `Prochaine r\u00E9union : ${parts.join(' ')}\n\n`;
+  }
+  body += 'Ce compte rendu est consid\u00E9r\u00E9 comme approuv\u00E9 sous 48h ';
+  body += "en l'absence d'observations \u00E9crites.";
+  return body;
 };
 
 // ─── Fichier de donnees mail (UTF-8, lu par le VBS via ADODB.Stream) ────────
@@ -244,11 +273,10 @@ export const openOutlookMail = async (meeting, crrConfig, projectName, emails, p
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    const typeLabel =
-      MEETING_TYPES.find((t) => t.value === meeting.type)?.label || 'Reunion';
-    const subject = `${typeLabel} n\u00B0${meeting.number} - ${projectName || 'Projet'} - ${formatDateFR(meeting.date)}`;
-    const to = emails.join(';');
-    window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}`;
+    const subject = buildMailSubject(meeting, projectName);
+    const to = emails.join(',');
+    const body = buildMailBodyPlainText(meeting, projectName);
+    window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     return { pdfSaved: true, vbsCreated: false, fallback: true };
   }
 
@@ -276,9 +304,7 @@ export const openOutlookMail = async (meeting, crrConfig, projectName, emails, p
   await writeFile(dir, pdfData.filename, pdfData.blob);
 
   // ── 2. Generer le fichier de donnees mail (UTF-8) ──
-  const typeLabel =
-    MEETING_TYPES.find((t) => t.value === meeting.type)?.label || 'Reunion';
-  const subject = `${typeLabel} n\u00B0${meeting.number} - ${projectName || 'Projet'} - ${formatDateFR(meeting.date)}`;
+  const subject = buildMailSubject(meeting, projectName);
   const to = emails.join(';');
   const htmlBody = buildMailHtml(meeting, projectName);
   const mailData = buildMailData(pdfData.filename, to, subject, htmlBody);

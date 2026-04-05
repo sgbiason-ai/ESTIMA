@@ -5,6 +5,7 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useMobileProjects }      from '../../hooks/useMobileProjects';
+import { useMobileFichesMarche } from '../../hooks/useMobileFichesMarche';
 import { useDatabase }            from '../../hooks/useDatabase';
 import { useAppResources }        from '../../hooks/useAppResources';
 import { useProjectCalculations } from '../../hooks/useProjectCalculations';
@@ -35,6 +36,8 @@ import CrcListView     from './CrcListView';
 import CrcDetailView   from './CrcDetailView';
 import MoeListView     from './MoeListView';
 import MoeDetailView   from './MoeDetailView';
+import DocAdminListView   from './DocAdminListView';
+import DocAdminDetailView from './DocAdminDetailView';
 import { useMobileCrc }       from '../../hooks/useMobileCrc';
 import { useMobileDevisMoe } from '../../hooks/useMobileDevisMoe';
 import { useCrrManager }     from '../../hooks/useCrrManager';
@@ -48,6 +51,7 @@ export default function MobileApp({ user, companyId, onLogout }) {
   const { projects, folders, isLoading: projectsLoading, refetch, loadProject } = useMobileProjects(user, companyId);
   const { chantiers: crcChantiers, isLoading: crcLoading, refetch: crcRefetch, loadChantier, saveChantier } = useMobileCrc(user, companyId);
   const { devisList: moeDevisList, isLoading: moeLoading, refetch: moeRefetch, loadDevis: loadMoeDevis } = useMobileDevisMoe(user, companyId);
+  const { fiches: adminFiches, isLoading: adminLoading, refetch: adminRefetch, loadFiche } = useMobileFichesMarche(user, companyId);
   const dbHook = useDatabase(user, companyId);
   const resources = useAppResources(user, companyId);
 
@@ -64,6 +68,9 @@ export default function MobileApp({ user, companyId, onLogout }) {
   const [selectedMoeDevis, setSelectedMoeDevis] = useState(null);
   const [fullMoeDevis, setFullMoeDevis]       = useState(null);
   const [moeDevisLoading, setMoeDevisLoading] = useState(false);
+  const [selectedFiche, setSelectedFiche]     = useState(null);
+  const [fullFiche, setFullFiche]             = useState(null);
+  const [ficheLoading, setFicheLoading]       = useState(false);
   const [toast, setToast]                     = useState(null);
 
   // ── Hooks métier (activés quand un projet est chargé) ──
@@ -125,6 +132,14 @@ export default function MobileApp({ user, companyId, onLogout }) {
     setMoeDevisLoading(false);
   }, [loadMoeDevis]);
 
+  const handleSelectFiche = useCallback(async (f) => {
+    setSelectedFiche(f);
+    setFicheLoading(true);
+    const data = await loadFiche(f.id);
+    setFullFiche(data);
+    setFicheLoading(false);
+  }, [loadFiche]);
+
   const goBack = useCallback(() => {
     if (subView) { setSubView(null); }
     else if (selectedProject) {
@@ -136,10 +151,13 @@ export default function MobileApp({ user, companyId, onLogout }) {
     } else if (selectedMoeDevis) {
       setSelectedMoeDevis(null);
       setFullMoeDevis(null);
+    } else if (selectedFiche) {
+      setSelectedFiche(null);
+      setFullFiche(null);
     } else if (activeModule) {
       setActiveModule(null);
     }
-  }, [subView, selectedProject, selectedChantier, selectedMoeDevis, activeModule]);
+  }, [subView, selectedProject, selectedChantier, selectedMoeDevis, selectedFiche, activeModule]);
 
   const triggerToast = useCallback((msg) => {
     setToast(msg);
@@ -268,14 +286,19 @@ export default function MobileApp({ user, companyId, onLogout }) {
     if (subView === 'rao') return 'Analyse des Offres';
     if (subView === 'exports') return 'Exports';
     if (selectedProject) return selectedProject.name;
-    if (selectedChantier) return selectedChantier.name;
+    if (selectedChantier) {
+      const lieu = fullChantier?.crrConfig?.chantierInfo?.lieu;
+      return `Compte Rendu${lieu ? ` — ${lieu}` : ''}`;
+    }
     if (selectedMoeDevis) return selectedMoeDevis.nom;
+    if (selectedFiche) return selectedFiche.nom;
     if (activeModule === 'projects') return 'Mes Projets';
     if (activeModule === 'crc') return 'Comptes Rendus';
     if (activeModule === 'moe') return 'Devis MOE';
+    if (activeModule === 'doc_admin') return 'Documents Admin';
     if (activeModule === 'exports') return 'Exports Rapides';
     return null;
-  }, [subView, selectedProject, activeModule]);
+  }, [subView, selectedProject, selectedChantier, fullChantier, selectedFiche, selectedMoeDevis, activeModule]);
 
   // ── Sélection module depuis le hub ──
   const handleSelectModule = useCallback((moduleId) => {
@@ -286,6 +309,8 @@ export default function MobileApp({ user, companyId, onLogout }) {
     setFullChantier(null);
     setSelectedMoeDevis(null);
     setFullMoeDevis(null);
+    setSelectedFiche(null);
+    setFullFiche(null);
     setSubView(null);
     setSearchTerm('');
   }, []);
@@ -300,7 +325,7 @@ export default function MobileApp({ user, companyId, onLogout }) {
   }, [dbHook.bpu]);
 
   return (
-    <div className={`flex flex-col h-screen bg-[#040a0e] font-sans shadow-2xl ${isLandscape ? 'w-full' : 'max-w-md mx-auto'}`}>
+    <div className={`flex flex-col h-dvh bg-[#040a0e] font-sans shadow-2xl ${isLandscape ? 'w-full' : 'max-w-md mx-auto'}`} style={{ height: '100dvh' }}>
       <MobileStyles />
       {/* ── Header (masqué sur le hub — il a son propre header) ── */}
       {activeModule && (
@@ -320,7 +345,7 @@ export default function MobileApp({ user, companyId, onLogout }) {
       )}
 
       {/* ── Content ── */}
-      <main className="flex-1 overflow-y-auto pb-20">
+      <main className={`flex-1 overflow-y-auto ${isLandscape ? 'pb-2' : 'pb-2'}`}>
         {/* Hub (écran d'accueil) */}
         {!activeModule && (
           <MobileHubView
@@ -432,6 +457,27 @@ export default function MobileApp({ user, companyId, onLogout }) {
           ) : null
         )}
 
+        {/* Module Documents Admin — liste fiches marché */}
+        {activeModule === 'doc_admin' && !selectedFiche && (
+          <DocAdminListView
+            fiches={adminFiches}
+            loading={adminLoading}
+            onSelect={handleSelectFiche}
+            onRefresh={adminRefetch}
+            isLandscape={isLandscape}
+          />
+        )}
+        {activeModule === 'doc_admin' && selectedFiche && (
+          ficheLoading ? (
+            <div className="flex items-center justify-center py-20 gap-2 text-slate-500">
+              <div className="w-5 h-5 border-2 border-rose-500 border-t-transparent rounded-full animate-spin" />
+              <span className="text-sm">Chargement…</span>
+            </div>
+          ) : fullFiche ? (
+            <DocAdminDetailView fiche={fullFiche} branding={resources.masterBranding} onToast={triggerToast} isLandscape={isLandscape} />
+          ) : null
+        )}
+
         {/* Module Exports rapides (depuis le hub, sans projet) */}
         {activeModule === 'exports' && !selectedProject && (
           <div className="px-4 py-6">
@@ -457,7 +503,7 @@ export default function MobileApp({ user, companyId, onLogout }) {
 
       {/* ── Toast ── */}
       {toast && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 flex items-center gap-2 px-5 py-3 bg-emerald-500/90 text-white rounded-xl text-sm font-semibold shadow-xl z-50 backdrop-blur">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 px-5 py-3 bg-emerald-500/90 text-white rounded-xl text-sm font-semibold shadow-xl z-50 backdrop-blur">
           <Icon name="check" size={16} color="#34d399" />
           {toast}
         </div>

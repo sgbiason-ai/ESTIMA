@@ -120,6 +120,11 @@ service cloud.firestore {
         allow write: if isCompanyAdmin(companyId);
       }
 
+      // Fiches marché (Documents Administratifs)
+      match /fichesMarche/{ficheId} {
+        allow read, write: if isCompanyMember(companyId);
+      }
+
       // Présence en temps réel
       match /presence/{presenceId} {
         allow read: if isCompanyMember(companyId);

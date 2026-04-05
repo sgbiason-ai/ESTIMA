@@ -34,6 +34,14 @@ const MOBILE_MODULES = [
     tag: 'MOE',
   },
   {
+    id: 'doc_admin',
+    label: 'Documents Admin',
+    description: 'Fiches marché et documents EXE',
+    icon: 'file',
+    color: 'rose',
+    tag: 'EXE',
+  },
+  {
     id: 'exports',
     label: 'Exports Rapides',
     description: 'PDF, Excel — télécharger ou partager',
@@ -100,6 +108,17 @@ const COLORS = {
     tagText: 'text-purple-300',
     tagBorder: 'border-purple-500/20',
     glow: 'rgba(168,85,247,0.12)',
+  },
+  rose: {
+    bg: 'bg-rose-500/10',
+    border: 'border-rose-500/20',
+    activeBorder: 'active:border-rose-400/50',
+    text: 'text-rose-400',
+    icon: '#fb7185',
+    tagBg: 'bg-rose-500/10',
+    tagText: 'text-rose-300',
+    tagBorder: 'border-rose-500/20',
+    glow: 'rgba(244,63,94,0.12)',
   },
 };
 

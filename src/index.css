@@ -16,13 +16,24 @@
 }
 
 /* 3. RESET DU BODY POUR L'APPLICATION */
-body {
+html, body, #root {
   margin: 0;
   padding: 0;
-  min-height: 100vh;
-  /* On utilise une couleur de fond légère pour le contraste avec les cartes blanches */
-  background-color: #f1f5f9; 
+  height: 100%;
+  min-height: 100%;
+}
+
+body {
+  /* Fond sombre pour PWA mobile (évite bande noire/blanche en bas) */
+  background-color: #040a0e;
   display: block; /* On annule le centrage par défaut de Vite */
+}
+
+/* Vue desktop : fond clair */
+@media (min-width: 768px) {
+  body {
+    background-color: #f1f5f9;
+  }
 }
 
 /* 4. SUPPRESSION DES FLÈCHES (SPIN BUTTONS) DANS LES INPUTS NUMBER */
