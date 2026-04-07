@@ -5,6 +5,8 @@
 import React from 'react';
 import { MEETING_TYPES, OBSERVATION_STATUSES, GROUP_COLORS, abbreviateGroup } from '../../data/crrData';
 import { renderFormattedText } from '../../utils/formatObsText.jsx';
+import { formatDateFr, formatDateLong } from '../../utils/dateHelpers';
+import { lightenHex } from '../../utils/colorHelpers';
 
 const CAT_COLORS = [
   { r: 40, g: 110, b: 85 },   // emerald
@@ -57,27 +59,8 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding }) => {
   const primary = branding?.colors?.primary || '#286E55';
   const secondary = branding?.colors?.secondary || '#32B482';
 
-  const lighten = (hex, factor = 0.88) => {
-    const c = hex.replace('#', '');
-    const r = parseInt(c.slice(0, 2), 16);
-    const g = parseInt(c.slice(2, 4), 16);
-    const b = parseInt(c.slice(4, 6), 16);
-    return `rgb(${Math.round(r + (255 - r) * factor)},${Math.round(g + (255 - g) * factor)},${Math.round(b + (255 - b) * factor)})`;
-  };
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '';
-    const [y, m, d] = dateStr.split('-');
-    return `${d}/${m}/${y}`;
-  };
-
-  const formatDateLong = (dateStr) => {
-    if (!dateStr) return '';
-    try {
-      const d = new Date(dateStr + 'T00:00:00');
-      return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-    } catch { return formatDate(dateStr); }
-  };
+  const formatDate = formatDateFr;
 
   const typeLabel = MEETING_TYPES.find((t) => t.value === meeting.type)?.label || 'Reunion';
   const groups = crrConfig.participantGroups || [];
@@ -103,7 +86,7 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding }) => {
 
       {/* ── EN-TETE ── */}
       <div className="mx-6 mt-5">
-        <div className="rounded-lg relative overflow-hidden flex items-start justify-between px-5 py-4" style={{ backgroundColor: lighten(primary, 0.92) }}>
+        <div className="rounded-lg relative overflow-hidden flex items-center justify-between px-5 py-4" style={{ backgroundColor: lightenHex(primary, 0.92) }}>
           {/* Filet colore gauche */}
           <div className="absolute left-0 top-0 w-[5px] h-full rounded-r" style={{ backgroundColor: primary }} />
 
@@ -112,18 +95,27 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding }) => {
               {typeLabel.toUpperCase()}
             </div>
             <div className="text-3xl font-black mt-1" style={{ color: primary }}>
-              N {meeting.number}
+              N° {meeting.number}
             </div>
             <div className="text-xs mt-1" style={{ color: '#64748b' }}>
               Date : {formatDate(meeting.date)}
             </div>
           </div>
 
-          {/* Logo */}
+          {/* Logo commune — centré */}
+          {crrConfig.chantierInfo?.communeLogo && (
+            <img
+              src={crrConfig.chantierInfo.communeLogo}
+              alt="Logo commune"
+              className="h-14 object-contain"
+            />
+          )}
+
+          {/* Logo MOE — droite */}
           {branding?.logo && (
             <img
               src={branding.logo}
-              alt="Logo"
+              alt="Logo MOE"
               className="h-12 object-contain"
             />
           )}
@@ -167,7 +159,7 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding }) => {
         {/* Tableau */}
         <table className="w-full text-[10px] border-collapse mt-0">
           <thead>
-            <tr style={{ backgroundColor: lighten(primary, 0.78) }}>
+            <tr style={{ backgroundColor: lightenHex(primary, 0.78) }}>
               <th className="text-center px-1 py-2 border border-slate-200 font-bold w-10" style={{ color: primary }}></th>
               <th className="text-center px-2 py-2 border border-slate-200 font-bold" style={{ color: primary, width: '18%' }}>ROLE / INTERVENANT</th>
               <th className="text-center px-2 py-2 border border-slate-200 font-bold" style={{ color: primary, width: '13%' }}>LABEL</th>
@@ -182,7 +174,7 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding }) => {
             {groups.map((group, gi) => (
               <React.Fragment key={group.id}>
                 {group.contacts.length === 0 && (
-                  <tr style={{ backgroundColor: lighten(primary, 0.96) }}>
+                  <tr style={{ backgroundColor: lightenHex(primary, 0.96) }}>
                     <td className="px-2 py-1.5 font-bold border border-slate-200" colSpan={8} style={{ color: primary }}>
                       {group.name}{group.subLabel ? ` : ${group.subLabel}` : ''}
                     </td>
@@ -279,7 +271,7 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding }) => {
         {/* En-tete colonnes */}
         <table className="w-full text-[10px] border-collapse mt-0">
           <thead>
-            <tr style={{ backgroundColor: lighten(primary, 0.78) }}>
+            <tr style={{ backgroundColor: lightenHex(primary, 0.78) }}>
               <th className="text-center px-2 py-2 border border-slate-200 font-bold w-[11%]" style={{ color: primary }}>EMETTEUR</th>
               <th className="text-center px-2 py-2 border border-slate-200 font-bold w-[10%]" style={{ color: primary }}>DATE</th>
               <th className="text-left px-2 py-2 border border-slate-200 font-bold" style={{ color: primary }}>OBSERVATIONS</th>

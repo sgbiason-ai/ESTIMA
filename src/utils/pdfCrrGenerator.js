@@ -185,8 +185,11 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
   const typeLabel = MEETING_TYPES.find((t) => t.value === meeting.type)?.label || 'Reunion';
   const pdfProjectName = (projectName || 'PROJET').toUpperCase();
 
-  // Logo
+  // Logos
   const logoMoe = await loadImage(branding?.logo || '/logo.jpg').catch(() => null);
+  const logoCommune = crrConfig.chantierInfo?.communeLogo
+    ? await loadImage(crrConfig.chantierInfo.communeLogo).catch(() => null)
+    : null;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // 1. EN-TETE
@@ -204,12 +207,23 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
   doc.setFillColor(...THEME.primary);
   roundedRect(doc, M.left, cursor.y, 1.5, 28, 0.75, 'F');
 
-  // Logo en haut a droite
-  if (logoMoe) {
-    const mxW = 30, mxH = 14, r = logoMoe.width / logoMoe.height;
+  // Logo commune centre dans la bande header
+  if (logoCommune) {
+    const mxW = 22, mxH = 18, r = logoCommune.width / logoCommune.height;
     let w = mxW, h = w / r;
     if (h > mxH) { h = mxH; w = h * r; }
-    doc.addImage(logoMoe, 'JPEG', PW - M.right - w - 4, cursor.y + 2, w, h);
+    const cx = PW / 2 - w / 2;
+    const cy = cursor.y + (28 - h) / 2;
+    doc.addImage(logoCommune, 'JPEG', cx, cy, w, h);
+  }
+
+  // Logo MOE en haut a droite, centre verticalement dans la bande (28mm)
+  if (logoMoe) {
+    const mxW = 30, mxH = 18, r = logoMoe.width / logoMoe.height;
+    let w = mxW, h = w / r;
+    if (h > mxH) { h = mxH; w = h * r; }
+    const my = cursor.y + (28 - h) / 2;
+    doc.addImage(logoMoe, 'JPEG', PW - M.right - w - 4, my, w, h);
   }
 
   // Type de reunion + numero

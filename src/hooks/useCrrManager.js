@@ -573,6 +573,36 @@ export const useCrrManager = ({
     [activeMeeting, updateActiveMeeting]
   );
 
+  const reorderObservations = useCallback(
+    (obsId, toCategory, toIndex) => {
+      if (!activeMeeting) return;
+      const obs = [...(activeMeeting.observations || [])];
+
+      // Retirer l'observation de sa position actuelle
+      const fromIdx = obs.findIndex(o => o.id === obsId);
+      if (fromIdx === -1) return;
+      const [moved] = obs.splice(fromIdx, 1);
+
+      // Mettre à jour la catégorie si changement
+      moved.category = toCategory;
+
+      // Trouver l'index d'insertion global correspondant à toIndex dans la catégorie cible
+      const catObs = obs.filter(o => o.category === toCategory);
+      if (toIndex >= catObs.length) {
+        const lastInCat = catObs[catObs.length - 1];
+        const globalIdx = lastInCat ? obs.indexOf(lastInCat) + 1 : obs.length;
+        obs.splice(globalIdx, 0, moved);
+      } else {
+        const targetObs = catObs[toIndex];
+        const globalIdx = obs.indexOf(targetObs);
+        obs.splice(globalIdx, 0, moved);
+      }
+
+      updateActiveMeeting({ observations: obs });
+    },
+    [activeMeeting, updateActiveMeeting]
+  );
+
   // ── OBSERVATIONS GROUPEES PAR CATEGORIE ───────────────────────────────
 
   const observationsByCategory = useMemo(() => {
@@ -665,6 +695,7 @@ export const useCrrManager = ({
     addObservation,
     updateObservation,
     deleteObservation,
+    reorderObservations,
 
     // Utils
     allContacts,

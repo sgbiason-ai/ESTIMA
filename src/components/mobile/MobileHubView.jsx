@@ -1,128 +1,48 @@
 // src/components/mobile/MobileHubView.jsx
-//
-// Hub d'accueil mobile — écran d'atterrissage avec accès aux modules.
-// Design adapté du ModuleHubView desktop pour contexte tactile.
-
+// Hub mobile — Bento Box Apple-style, fond clair
 import React, { useState, useEffect } from 'react';
 import Icon from './Icon';
 
-// ─── DÉFINITION DES MODULES MOBILES ─────────────────────────────────────────
+// ─── MODULES MOBILES ───────────────────────────────────────────────────────
 
 const MOBILE_MODULES = [
-  {
-    id: 'projects',
-    label: 'Mes Projets',
-    description: 'Consultation des devis, DQE et analyses',
-    icon: 'folder',
-    color: 'emerald',
-    tag: 'Core',
-  },
-  {
-    id: 'crc',
-    label: 'Comptes Rendus',
-    description: 'Consultation des CR de chantier',
-    icon: 'clipboard',
-    color: 'amber',
-    tag: 'CRC',
-  },
-  {
-    id: 'moe',
-    label: 'Devis MOE',
-    description: 'Honoraires maîtrise d\'œuvre',
-    icon: 'euro',
-    color: 'purple',
-    tag: 'MOE',
-  },
-  {
-    id: 'doc_admin',
-    label: 'Documents Admin',
-    description: 'Fiches marché et documents EXE',
-    icon: 'file',
-    color: 'rose',
-    tag: 'EXE',
-  },
-  {
-    id: 'exports',
-    label: 'Exports Rapides',
-    description: 'PDF, Excel — télécharger ou partager',
-    icon: 'download',
-    color: 'cyan',
-    tag: 'Export',
-  },
+  { id: 'projects',  label: 'Mes Projets',         description: 'Consultation des devis, DQE et analyses',      icon: 'folder',    tag: 'Core',   row: 1 },
+  { id: 'crc',       label: 'Comptes Rendus',      description: 'Consultation des CR de chantier',              icon: 'clipboard', tag: 'CRC',    row: 1 },
+  { id: 'moe',       label: 'Devis MOE',           description: 'Honoraires maîtrise d\'œuvre',                 icon: 'euro',      tag: 'MOE',    row: 2 },
+  { id: 'doc_admin', label: 'Documents Admin',      description: 'Fiches marché et documents EXE',              icon: 'file',      tag: 'EXE',    row: 2 },
+  { id: 'exports',   label: 'Exports Rapides',      description: 'PDF, Excel — télécharger ou partager',        icon: 'download',  tag: 'Export', row: 3 },
 ];
 
-// ─── COULEURS ───────────────────────────────────────────────────────────────
+// ─── THÈMES PAR ROW ───────────────────────────────────────────────────────
 
-const COLORS = {
-  emerald: {
-    bg: 'bg-emerald-500/10',
-    border: 'border-emerald-500/20',
-    activeBorder: 'active:border-emerald-400/50',
-    text: 'text-emerald-400',
-    icon: '#34d399',
-    tagBg: 'bg-emerald-500/10',
-    tagText: 'text-emerald-300',
-    tagBorder: 'border-emerald-500/20',
-    glow: 'rgba(16,185,129,0.12)',
+const ROW_THEMES = {
+  1: {
+    card: 'bg-white border-gray-200/70',
+    iconBg: 'bg-gray-50',
+    iconColor: '#374151',
+    title: 'text-gray-900',
+    desc: 'text-gray-500',
+    badge: 'bg-gray-100 text-gray-500 border-gray-200/60',
   },
-  cyan: {
-    bg: 'bg-cyan-500/10',
-    border: 'border-cyan-500/20',
-    activeBorder: 'active:border-cyan-400/50',
-    text: 'text-cyan-400',
-    icon: '#22d3ee',
-    tagBg: 'bg-cyan-500/10',
-    tagText: 'text-cyan-300',
-    tagBorder: 'border-cyan-500/20',
-    glow: 'rgba(6,182,212,0.12)',
+  2: {
+    card: 'bg-gradient-to-br from-amber-950/90 via-stone-900/95 to-stone-950/90 border-amber-700/30',
+    iconBg: 'bg-amber-800/40',
+    iconColor: '#fbbf24',
+    title: 'text-amber-50',
+    desc: 'text-amber-200/60',
+    badge: 'bg-amber-800/40 text-amber-300/80 border-amber-600/30',
   },
-  amber: {
-    bg: 'bg-amber-500/10',
-    border: 'border-amber-500/20',
-    activeBorder: 'active:border-amber-400/50',
-    text: 'text-amber-400',
-    icon: '#fbbf24',
-    tagBg: 'bg-amber-500/10',
-    tagText: 'text-amber-300',
-    tagBorder: 'border-amber-500/20',
-    glow: 'rgba(245,158,11,0.12)',
-  },
-  blue: {
-    bg: 'bg-blue-500/10',
-    border: 'border-blue-500/20',
-    activeBorder: 'active:border-blue-400/50',
-    text: 'text-blue-400',
-    icon: '#60a5fa',
-    tagBg: 'bg-blue-500/10',
-    tagText: 'text-blue-300',
-    tagBorder: 'border-blue-500/20',
-    glow: 'rgba(59,130,246,0.12)',
-  },
-  purple: {
-    bg: 'bg-purple-500/10',
-    border: 'border-purple-500/20',
-    activeBorder: 'active:border-purple-400/50',
-    text: 'text-purple-400',
-    icon: '#a78bfa',
-    tagBg: 'bg-purple-500/10',
-    tagText: 'text-purple-300',
-    tagBorder: 'border-purple-500/20',
-    glow: 'rgba(168,85,247,0.12)',
-  },
-  rose: {
-    bg: 'bg-rose-500/10',
-    border: 'border-rose-500/20',
-    activeBorder: 'active:border-rose-400/50',
-    text: 'text-rose-400',
-    icon: '#fb7185',
-    tagBg: 'bg-rose-500/10',
-    tagText: 'text-rose-300',
-    tagBorder: 'border-rose-500/20',
-    glow: 'rgba(244,63,94,0.12)',
+  3: {
+    card: 'bg-gradient-to-br from-violet-950/90 via-purple-950/95 to-slate-950/90 border-violet-700/30',
+    iconBg: 'bg-violet-800/40',
+    iconColor: '#a78bfa',
+    title: 'text-violet-50',
+    desc: 'text-violet-200/60',
+    badge: 'bg-violet-800/40 text-violet-300/80 border-violet-600/30',
   },
 };
 
-// ─── COMPOSANT ──────────────────────────────────────────────────────────────
+// ─── COMPOSANT ─────────────────────────────────────────────────────────────
 
 export default function MobileHubView({ userEmail, onSelectModule, onLogout, isLandscape }) {
   const [mounted, setMounted] = useState(false);
@@ -134,103 +54,94 @@ export default function MobileHubView({ userEmail, onSelectModule, onLogout, isL
   const greeting = hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-[#f5f5f7]"
+      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
 
-      {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      <div
-        className={`px-5 ${isLandscape ? 'pt-3 pb-2' : 'pt-6 pb-4'} transition-all duration-500 ${
-          mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'
-        }`}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-baseline gap-1">
-            <span className="font-extrabold text-base text-white tracking-tight">Estima</span>
-            <span className="text-xs font-medium text-slate-500">Suite</span>
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <div className={`px-5 ${isLandscape ? 'pt-2 pb-1' : 'pt-5 pb-3'} bg-white/70 backdrop-blur-xl border-b border-gray-200/50 shrink-0`}>
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-base font-semibold text-gray-900 tracking-tight"
+            style={{ fontFamily: '"SF Pro Display", Georgia, serif' }}>
+            Estima Suite
+          </span>
+          <div className="flex items-center gap-3">
+            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+              <span className="text-[10px] font-bold text-white">{firstName.charAt(0).toUpperCase()}</span>
+            </div>
+            <button
+              onClick={onLogout}
+              className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition"
+            >
+              <Icon name="logout" size={16} color="currentColor" />
+            </button>
           </div>
-          <button
-            onClick={onLogout}
-            className="p-2 -mr-1 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition"
-          >
-            <Icon name="logout" size={18} color="currentColor" />
-          </button>
         </div>
 
-        <h1 className="text-2xl font-extrabold text-white tracking-tight mb-1">
+        <h1 className={`${isLandscape ? 'text-xl' : 'text-2xl'} font-semibold text-gray-900 tracking-tight leading-tight`}
+          style={{ fontFamily: '"SF Pro Display", Georgia, -apple-system, serif' }}>
           {greeting},{' '}
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-500 via-cyan-500 to-teal-400">
             {displayName}
-          </span>
+          </span>.
         </h1>
-        <p className="text-sm text-slate-400 leading-relaxed">
+        <p className="text-sm text-gray-400 mt-1 font-light">
           Sélectionnez un module pour commencer.
         </p>
       </div>
 
-      {/* ── Module cards ─────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-4 pb-6">
+      {/* ── Cards ──────────────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto px-4 py-4">
         <div className={isLandscape ? 'grid grid-cols-2 gap-3' : 'flex flex-col gap-3'}>
           {MOBILE_MODULES.map((mod, idx) => {
-            const c = COLORS[mod.color];
+            const theme = ROW_THEMES[mod.row];
             return (
               <button
                 key={mod.id}
                 onClick={() => onSelectModule(mod.id)}
                 className={`
-                  relative flex items-center gap-4 w-full p-4 rounded-2xl
-                  border backdrop-blur-sm text-left
-                  transition-all duration-300 active:scale-[0.98]
-                  ${c.border} ${c.activeBorder} bg-white/[0.02]
+                  relative flex items-center gap-4 w-full p-4 rounded-[20px]
+                  border text-left transition-all duration-300 active:scale-[0.97]
+                  ${theme.card}
                 `}
                 style={{
-                  transitionDelay: mounted ? `${100 + idx * 60}ms` : '0ms',
+                  transitionDelay: mounted ? `${80 + idx * 50}ms` : '0ms',
                   opacity: mounted ? 1 : 0,
-                  transform: mounted ? 'translateY(0)' : 'translateY(12px)',
+                  transform: mounted ? 'translateY(0)' : 'translateY(10px)',
                 }}
               >
                 {/* Icon */}
-                <div className={`
-                  w-12 h-12 rounded-xl ${c.bg} border ${c.border}
-                  flex items-center justify-center shrink-0
-                `}>
-                  <Icon name={mod.icon} size={22} color={c.icon} />
+                <div className={`w-11 h-11 rounded-2xl ${theme.iconBg} flex items-center justify-center shrink-0`}>
+                  <Icon name={mod.icon} size={20} color={theme.iconColor} />
                 </div>
 
                 {/* Text */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-sm font-bold text-slate-100">{mod.label}</span>
+                    <span className={`text-sm font-semibold ${theme.title}`}>{mod.label}</span>
                     {mod.tag && (
-                      <span className={`
-                        px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest
-                        border ${c.tagBg} ${c.tagText} ${c.tagBorder}
-                      `}>
+                      <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider border ${theme.badge}`}>
                         {mod.tag}
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-slate-500 leading-snug">{mod.description}</p>
+                  <p className={`text-xs leading-snug ${theme.desc}`}>{mod.description}</p>
                 </div>
 
                 {/* Chevron */}
-                <Icon name="chevron" size={16} color="#475569" />
+                <Icon name="chevron" size={14} color={mod.row === 1 ? '#d1d5db' : mod.row === 2 ? '#92400e50' : '#7c3aed50'} />
               </button>
             );
           })}
         </div>
 
-        {/* ── Status footer ────────────────────────────────────────────── */}
+        {/* ── Footer status ──────────────────────────────────────────── */}
         <div
-          className={`flex items-center justify-center gap-2 mt-8 transition-all duration-500 ${
-            mounted ? 'opacity-100' : 'opacity-0'
-          }`}
-          style={{ transitionDelay: '400ms' }}
+          className={`flex items-center justify-center gap-2 mt-6 transition-all duration-500 ${mounted ? 'opacity-100' : 'opacity-0'}`}
+          style={{ transitionDelay: '350ms' }}
         >
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-          </span>
-          <span className="text-[10px] text-slate-600 font-medium">
-            Connecté · v2.0.0
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+          <span className="text-[10px] text-gray-400 font-medium">
+            Opérationnel · v2.0.0
           </span>
         </div>
       </div>
@@ -238,5 +149,4 @@ export default function MobileHubView({ userEmail, onSelectModule, onLogout, isL
   );
 }
 
-// ─── EXPORT DES MODULES POUR USAGE EXTERNE ──────────────────────────────────
-export { MOBILE_MODULES, COLORS };
+export { MOBILE_MODULES };

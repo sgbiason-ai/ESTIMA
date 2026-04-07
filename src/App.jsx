@@ -191,16 +191,17 @@ export default function App() {
   // Module : Administration
   if (activeModule === 'admin') {
     return (
-      <div className="flex flex-col h-screen bg-[#040a0e] text-slate-300 overflow-hidden">
-        <header className="flex items-center gap-4 px-6 py-3 border-b border-white/5 shrink-0">
+      <div className="flex flex-col h-screen bg-[#f5f5f7] text-gray-900 overflow-hidden"
+        style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
+        <header className="flex items-center gap-4 px-6 py-3 border-b border-gray-200/60 shrink-0 bg-white/80 backdrop-blur-xl">
           <button
             onClick={handleBackToHub}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/10 transition-all"
+            className="flex items-center gap-2 px-3 py-2 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all"
           >
-            <span className="text-[10px] font-black uppercase tracking-widest">← Hub</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest">← Hub</span>
           </button>
-          <div className="h-6 w-px bg-white/10" />
-          <h1 className="font-black text-lg text-white tracking-tight">Administration</h1>
+          <div className="h-5 w-px bg-gray-200/60" />
+          <h1 className="font-bold text-lg text-gray-900 tracking-tight">Administration</h1>
         </header>
         <div className="flex-1 overflow-hidden">
           <AdminView currentUserEmail={user.email} />

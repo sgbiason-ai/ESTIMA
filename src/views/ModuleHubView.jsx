@@ -1,297 +1,185 @@
-// src/views/ModuleHubView.jsx
+// src/views/ModuleHubView.jsx — Bento Box Apple-style
 import React, { useState, useEffect } from 'react';
 import {
   Calculator, BarChart3, ClipboardList, FileStack, ShieldCheck,
-  Folder, LogOut, User, Lock, ArrowRight, Sparkles, Briefcase, Wrench, Receipt,
-  ChevronRight, Zap, Globe, Layers, Settings, Palette, Shield
+  Folder, LogOut, Lock, Briefcase, Wrench, Receipt,
+  Layers, Settings, Palette, Shield,
+  Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudDrizzle, CloudFog, MapPin, ChevronRight, Sparkles
 } from 'lucide-react';
+import { APP_VERSION } from '../data/changelog';
+import ChangelogModal from '../components/ChangelogModal';
 
-// ─── DÉFINITION DES GROUPES DE MODULES ──────────────────────────────────────
+// ─── WIDGET MÉTÉO ──────────────────────────────────────────────────────────
 
-const MODULE_GROUPS = [
-  {
-    id: 'project',
-    label: 'Projet & Estimation',
-    description: 'Gestion de vos projets VRD, chiffrage et analyse',
-    icon: Briefcase,
-    modules: [
-      {
-        id: 'projects_manager',
-        label: 'Gestion de Projets',
-        description: 'Création, organisation et gestion de vos projets VRD',
-        icon: Folder,
-        color: 'cyan',
-        access: 'all',
-        tag: 'Core',
-      },
-      {
-        id: 'estima',
-        label: 'ESTIMA VRD',
-        description: 'Estimation, chiffrage et documents de consultation',
-        icon: Calculator,
-        color: 'emerald',
-        access: 'all',
-        tag: 'Core',
-        featured: true,
-      },
-      {
-        id: 'rao_analysis',
-        label: 'RAO & Analyse',
-        description: "Rapport d'analyse des offres et analyse comparative",
-        icon: BarChart3,
-        color: 'blue',
-        access: 'all',
-        tag: 'Analyse',
-      },
-    ],
-  },
-  {
-    id: 'tools',
-    label: 'Outils & Administration',
-    description: 'Modules complémentaires et gestion',
-    icon: Wrench,
-    modules: [
-      {
-        id: 'devis_moe',
-        label: 'Devis MOE',
-        description: "Proposition d'honoraires de maîtrise d'œuvre VRD",
-        icon: Receipt,
-        color: 'indigo',
-        access: 'admin_only',
-        tag: 'Finance',
-      },
-      {
-        id: 'crc',
-        label: 'Compte Rendu Chantier',
-        description: 'Suivi de chantier et comptes rendus de réunion',
-        icon: ClipboardList,
-        color: 'amber',
-        access: 'admin_or_unlocked',
-        tag: 'Terrain',
-      },
-      {
-        id: 'doc_admin',
-        label: 'Documents Administratifs',
-        description: 'Génération des documents administratifs de marché',
-        icon: FileStack,
-        color: 'purple',
-        access: 'admin_or_unlocked',
-        tag: 'Admin',
-      },
-    ],
-  },
-  {
-    id: 'settings',
-    label: 'Paramètres & Compte',
-    description: 'Configuration, identité visuelle et gestion du compte',
-    icon: Settings,
-    modules: [
-      {
-        id: 'branding',
-        label: 'Identité & Charte Graphique',
-        description: 'Logo, couleurs, typographie et informations de contact pour vos exports',
-        icon: Palette,
-        color: 'purple',
-        access: 'all',
-        tag: 'Branding',
-      },
-      {
-        id: 'rgpd',
-        label: 'Mon Compte & Données',
-        description: 'RGPD — Portabilité des données et droit à l\'effacement',
-        icon: Shield,
-        color: 'blue',
-        access: 'all',
-        tag: 'RGPD',
-      },
-      {
-        id: 'admin',
-        label: 'Administration',
-        description: "Utilisateurs, entreprise et paramètres",
-        icon: ShieldCheck,
-        color: 'red',
-        access: 'admin_only',
-        tag: 'Système',
-      },
-    ],
-  },
+const WMO_ICONS = {
+  0: Sun, 1: Sun, 2: Cloud, 3: Cloud, 45: CloudFog, 48: CloudFog,
+  51: CloudDrizzle, 53: CloudDrizzle, 55: CloudDrizzle,
+  61: CloudRain, 63: CloudRain, 65: CloudRain,
+  71: CloudSnow, 73: CloudSnow, 75: CloudSnow,
+  80: CloudRain, 81: CloudRain, 82: CloudRain, 85: CloudSnow, 86: CloudSnow,
+  95: CloudLightning, 96: CloudLightning, 99: CloudLightning,
+};
+
+function WeatherWidget() {
+  const [weather, setWeather] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchWeather() {
+      try {
+        const pos = await new Promise((r, j) => navigator.geolocation.getCurrentPosition(r, j, { timeout: 5000 }));
+        const { latitude, longitude } = pos.coords;
+        const meteoRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code&timezone=auto`);
+        const meteo = await meteoRes.json();
+        const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&zoom=10&accept-language=fr`);
+        const geo = await geoRes.json();
+        const city = geo.address?.city || geo.address?.town || geo.address?.village || geo.address?.municipality || '';
+        if (!cancelled) setWeather({ temp: Math.round(meteo.current.temperature_2m), code: meteo.current.weather_code, city });
+      } catch { /* pas de géolocalisation */ }
+    }
+    fetchWeather();
+    return () => { cancelled = true; };
+  }, []);
+  if (!weather) return null;
+  const WeatherIcon = WMO_ICONS[weather.code] || Cloud;
+  return (
+    <div className="flex items-center gap-2">
+      <WeatherIcon size={16} className="text-amber-500" strokeWidth={1.5} />
+      <span className="text-sm font-medium text-gray-600">{weather.temp}°C</span>
+    </div>
+  );
+}
+
+// ─── MODULES — Flat list avec row assignment ───────────────────────────────
+
+const MODULES = [
+  // Row 1 — Projet & Estimation (white)
+  { id: 'projects_manager', label: 'Gestion de Projets', description: 'Création, organisation et gestion de vos projets VRD', icon: Folder, access: 'all', tag: 'Core', row: 1 },
+  { id: 'estima', label: 'ESTIMA VRD', description: 'Estimation, chiffrage et documents de consultation', icon: Calculator, access: 'all', tag: 'Core', row: 1, featured: true },
+  { id: 'rao_analysis', label: 'RAO & Analyse', description: "Rapport d'analyse des offres et analyse comparative", icon: BarChart3, access: 'all', tag: 'Analyse', row: 1 },
+  // Row 2 — Outils & Administration (copper glass)
+  { id: 'devis_moe', label: 'Devis MOE', description: "Proposition d'honoraires de maîtrise d'œuvre VRD", icon: Receipt, access: 'admin_only', tag: 'Finance', row: 2 },
+  { id: 'crc', label: 'Compte Rendu Chantier', description: 'Suivi de chantier et comptes rendus de réunion', icon: ClipboardList, access: 'admin_or_unlocked', tag: 'Terrain', row: 2 },
+  { id: 'doc_admin', label: 'Documents Administratifs', description: 'Génération des documents administratifs de marché', icon: FileStack, access: 'admin_or_unlocked', tag: 'Admin', row: 2 },
+  // Row 3 — Paramètres & Compte (amethyst glass)
+  { id: 'branding', label: 'Identité & Charte Graphique', description: 'Logo, couleurs, typographie et informations de contact', icon: Palette, access: 'all', tag: 'Branding', row: 3 },
+  { id: 'rgpd', label: 'Mon Compte & Données', description: 'RGPD — Portabilité des données et droit à l\'effacement', icon: Shield, access: 'all', tag: 'RGPD', row: 3 },
+  { id: 'admin', label: 'Administration', description: "Utilisateurs, entreprise et paramètres", icon: ShieldCheck, access: 'admin_only', tag: 'Système', row: 3 },
 ];
 
-// ─── COULEURS ───────────────────────────────────────────────────────────────
+// ─── ROW THEMES ────────────────────────────────────────────────────────────
 
-const COLOR_MAP = {
-  cyan: {
-    border: 'border-cyan-500/20',
-    hoverBorder: 'group-hover:border-cyan-400/60',
-    text: 'text-cyan-400',
-    iconBg: 'bg-cyan-500/10',
-    iconRing: 'border-cyan-500/30',
-    tagBg: 'bg-cyan-500/10 text-cyan-300 border-cyan-500/20',
-    glow: 'rgba(6,182,212,0.3)',
-    accent: 'rgba(6,182,212,0.15)',
+const ROW_THEMES = {
+  1: {
+    // Clean white
+    card: 'bg-white border-gray-200/70',
+    cardHover: 'hover:shadow-lg hover:shadow-gray-200/60 hover:-translate-y-0.5',
+    iconBg: 'bg-gray-50',
+    iconColor: 'text-gray-700',
+    title: 'text-gray-900',
+    desc: 'text-gray-500',
+    badge: 'bg-gray-100 text-gray-500 border border-gray-200/60',
+    status: 'text-gray-400',
+    statusLabel: 'Prêt à l\'emploi',
   },
-  emerald: {
-    border: 'border-emerald-500/20',
-    hoverBorder: 'group-hover:border-emerald-400/60',
-    text: 'text-emerald-400',
-    iconBg: 'bg-emerald-500/10',
-    iconRing: 'border-emerald-500/30',
-    tagBg: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20',
-    glow: 'rgba(16,185,129,0.3)',
-    accent: 'rgba(16,185,129,0.15)',
+  2: {
+    // Dark copper glass
+    card: 'bg-gradient-to-br from-amber-950/90 via-stone-900/95 to-stone-950/90 border-amber-700/30',
+    cardHover: 'hover:shadow-xl hover:shadow-amber-900/20 hover:-translate-y-0.5',
+    iconBg: 'bg-amber-800/40',
+    iconColor: 'text-amber-400',
+    title: 'text-amber-50',
+    desc: 'text-amber-200/60',
+    badge: 'bg-amber-800/40 text-amber-300/80 border border-amber-600/30',
+    status: 'text-amber-400/50',
+    statusLabel: 'Prêt à l\'emploi',
   },
-  blue: {
-    border: 'border-blue-500/20',
-    hoverBorder: 'group-hover:border-blue-400/60',
-    text: 'text-blue-400',
-    iconBg: 'bg-blue-500/10',
-    iconRing: 'border-blue-500/30',
-    tagBg: 'bg-blue-500/10 text-blue-300 border-blue-500/20',
-    glow: 'rgba(59,130,246,0.3)',
-    accent: 'rgba(59,130,246,0.15)',
-  },
-  amber: {
-    border: 'border-amber-500/20',
-    hoverBorder: 'group-hover:border-amber-400/60',
-    text: 'text-amber-400',
-    iconBg: 'bg-amber-500/10',
-    iconRing: 'border-amber-500/30',
-    tagBg: 'bg-amber-500/10 text-amber-300 border-amber-500/20',
-    glow: 'rgba(245,158,11,0.3)',
-    accent: 'rgba(245,158,11,0.15)',
-  },
-  purple: {
-    border: 'border-purple-500/20',
-    hoverBorder: 'group-hover:border-purple-400/60',
-    text: 'text-purple-400',
-    iconBg: 'bg-purple-500/10',
-    iconRing: 'border-purple-500/30',
-    tagBg: 'bg-purple-500/10 text-purple-300 border-purple-500/20',
-    glow: 'rgba(168,85,247,0.3)',
-    accent: 'rgba(168,85,247,0.15)',
-  },
-  red: {
-    border: 'border-red-500/20',
-    hoverBorder: 'group-hover:border-red-400/60',
-    text: 'text-red-400',
-    iconBg: 'bg-red-500/10',
-    iconRing: 'border-red-500/30',
-    tagBg: 'bg-red-500/10 text-red-300 border-red-500/20',
-    glow: 'rgba(239,68,68,0.3)',
-    accent: 'rgba(239,68,68,0.15)',
-  },
-  indigo: {
-    border: 'border-indigo-500/20',
-    hoverBorder: 'group-hover:border-indigo-400/60',
-    text: 'text-indigo-400',
-    iconBg: 'bg-indigo-500/10',
-    iconRing: 'border-indigo-500/30',
-    tagBg: 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20',
-    glow: 'rgba(99,102,241,0.3)',
-    accent: 'rgba(99,102,241,0.15)',
+  3: {
+    // Dark amethyst glass
+    card: 'bg-gradient-to-br from-violet-950/90 via-purple-950/95 to-slate-950/90 border-violet-700/30',
+    cardHover: 'hover:shadow-xl hover:shadow-violet-900/20 hover:-translate-y-0.5',
+    iconBg: 'bg-violet-800/40',
+    iconColor: 'text-violet-400',
+    title: 'text-violet-50',
+    desc: 'text-violet-200/60',
+    badge: 'bg-violet-800/40 text-violet-300/80 border border-violet-600/30',
+    status: 'text-violet-400/50',
+    statusLabel: 'Prêt à l\'emploi',
   },
 };
 
-// ─── COMPOSANT CARTE MODULE ────────────────────────────────────────────────
+// ─── BENTO CARD ────────────────────────────────────────────────────────────
 
-function ModuleCard({ mod, colors, accessible, onSelect }) {
+function BentoCard({ mod, theme, accessible, onSelect, mounted, delay }) {
   const Icon = mod.icon;
 
   return (
     <button
       onClick={() => accessible && onSelect(mod.id)}
       disabled={!accessible}
-      style={accessible ? { '--card-glow': `0 8px 30px -10px ${colors.glow}` } : undefined}
       className={`
-        group relative flex flex-col text-left w-full h-[200px] rounded-2xl border backdrop-blur-xl
-        transition-all duration-400 ease-out overflow-hidden
-        ${accessible
-          ? `${colors.border} bg-white/[0.02] hover:bg-white/[0.04] ${colors.hoverBorder} hover:shadow-[var(--card-glow)] hover:-translate-y-1`
-          : 'border-white/[0.02] bg-white/[0.01] cursor-not-allowed opacity-60'
-        }
+        group relative flex flex-col flex-1 text-left rounded-[24px] border p-6 transition-all duration-500 ease-out
+        ${theme.card}
+        ${accessible ? `${theme.cardHover} cursor-pointer` : 'opacity-50 cursor-not-allowed'}
+        ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}
       `}
+      style={{ transitionDelay: `${delay}ms` }}
     >
-      {/* Top glow effect on hover */}
-      {accessible && (
-        <div
-          className="absolute -top-[100px] -left-[100px] w-[200px] h-[200px] rounded-full blur-[80px] opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-          style={{ background: colors.accent }}
-        />
-      )}
-
-      <div className="relative z-10 p-5 flex flex-col h-full w-full">
-        {/* Header : icône + tag */}
-        <div className="flex items-start justify-between mb-4">
-          <div
-            style={accessible ? { '--icon-glow': `0 0 15px ${colors.glow}` } : undefined}
-            className={`
-            p-3 rounded-xl border transition-all duration-300
-            ${accessible
-              ? `${colors.iconBg} ${colors.iconRing} group-hover:scale-110 group-hover:shadow-[var(--icon-glow)]`
-              : 'bg-white/[0.02] border-white/[0.05]'
-            }
-          `}>
-            <Icon
-              size={22}
-              className={`transition-colors duration-300 ${accessible ? colors.text : 'text-slate-500'}`}
-              strokeWidth={1.5}
-            />
-          </div>
-
-          {!accessible ? (
-            <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.03] border border-white/[0.05]">
-              <Lock size={12} className="text-slate-500" />
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Verrouillé</span>
-            </span>
-          ) : mod.tag ? (
-            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${colors.tagBg}`}>
-              {mod.tag}
-            </span>
-          ) : null}
+      {/* Header: icon + badge */}
+      <div className="flex items-start justify-between mb-4">
+        <div className={`p-3 rounded-2xl ${theme.iconBg} transition-transform duration-200 ${accessible ? 'group-hover:scale-110' : ''}`}>
+          <Icon size={24} className={accessible ? theme.iconColor : 'text-gray-400'} strokeWidth={1.5} />
         </div>
+        {!accessible ? (
+          <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gray-200/50 text-gray-400">
+            <Lock size={10} />
+            <span className="text-[9px] font-semibold uppercase tracking-wide">Verrouillé</span>
+          </span>
+        ) : mod.tag ? (
+          <span className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider ${theme.badge}`}>
+            {mod.tag}
+          </span>
+        ) : null}
+      </div>
 
-        {/* Texte */}
-        <div className="flex-1 mt-1">
-          <h3 className={`
-              font-bold text-base tracking-tight mb-1.5 transition-colors duration-300
-              ${accessible ? 'text-slate-100 group-hover:text-white' : 'text-slate-400'}
-          `}>
-            {mod.label}
-          </h3>
-          <p className={`
-              text-[13px] leading-relaxed line-clamp-2 transition-colors duration-300
-              ${accessible ? 'text-slate-400 group-hover:text-slate-300' : 'text-slate-600'}
-          `}>
-            {mod.description}
-          </p>
-        </div>
+      {/* Text */}
+      <div className="flex-1">
+        <h3 className={`font-semibold text-[15px] tracking-tight mb-1.5 ${accessible ? theme.title : 'text-gray-400'}`}>
+          {mod.label}
+        </h3>
+        <p className={`text-[12px] leading-relaxed ${accessible ? theme.desc : 'text-gray-300'}`}>
+          {mod.description}
+        </p>
+      </div>
 
-        {/* Footer */}
-        <div className={`mt-auto pt-3 border-t transition-colors duration-300 relative h-9 overflow-hidden ${accessible ? 'border-white/[0.05] group-hover:border-white/[0.1]' : 'border-white/[0.02]'}`}>
-          <div className={`absolute inset-0 flex items-center justify-between transition-all duration-300 ${accessible ? 'group-hover:opacity-0 group-hover:-translate-x-4' : ''}`}>
-            <span className="text-[11px] font-medium text-slate-500">
-              {accessible ? 'Prêt à l\'emploi' : 'Accès restreint'}
-              </span>
-            </div>
-            {accessible && (
-              <div className={`absolute inset-0 flex items-center justify-between opacity-0 translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300`}>
-              <span className={`text-[12px] font-bold ${colors.text}`}>
-                Accéder au module
-              </span>
-              <ArrowRight size={16} className={`${colors.text}`} />
-            </div>
-          )}
-        </div>
+      {/* Footer */}
+      <div className="mt-4 flex items-center justify-between">
+        <span className={`text-[11px] font-medium ${theme.status}`}>
+          {accessible ? theme.statusLabel : 'Accès restreint'}
+        </span>
+        {accessible && (
+          <ChevronRight
+            size={16}
+            className={`${theme.status} opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200`}
+          />
+        )}
       </div>
     </button>
   );
 }
 
+// ─── ROW LABELS ────────────────────────────────────────────────────────────
+
+const ROW_LABELS = {
+  1: { label: 'Projet & Estimation', icon: Briefcase },
+  2: { label: 'Outils & Administration', icon: Wrench },
+  3: { label: 'Paramètres & Compte', icon: Settings },
+};
+
 // ─── COMPOSANT PRINCIPAL ────────────────────────────────────────────────────
 
 export default function ModuleHubView({ isAdmin, userEmail, onSelectModule, onLogout }) {
-
   const [mounted, setMounted] = useState(false);
+  const [showChangelog, setShowChangelog] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
   const canAccess = (mod) => {
@@ -311,169 +199,120 @@ export default function ModuleHubView({ isAdmin, userEmail, onSelectModule, onLo
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
 
+  const visibleModules = MODULES.filter(isVisible);
+  const rows = [1, 2, 3];
+
   return (
-    <div className="flex flex-col h-screen w-full bg-[#0a101d] text-slate-300 overflow-hidden font-sans selection:bg-emerald-500/30">
+    <div className="flex flex-col h-screen w-full bg-[#f5f5f7] text-gray-900 overflow-hidden selection:bg-blue-200"
+      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif' }}>
 
-      {/* ── Background effects ─────────────────────────────────────────────── */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div
-          className="absolute inset-0 opacity-20"
-          style={{
-            backgroundImage: `url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgc3Ryb2tlPSJyZ2JhKDI1NSwgMjU1LCAyNTUsIDAuMDUpIiBzdHJva2Utd2lkdGg9IjEiIGZpbGw9Im5vbmUiPjxwb2x5Z29uIHBvaW50cz0iNjAsMCA2MCw2MCAwLDYwIi8+PC9nPjwvc3ZnPg==")`,
-            backgroundSize: '60px 60px',
-          }}
-        />
-        
-        {/* Soft floating orbs */}
-        <div className="absolute top-[-10%] left-[-5%] w-[40%] h-[40%] bg-emerald-500/10 rounded-full blur-[120px] mix-blend-screen" />
-        <div className="absolute bottom-[-10%] right-[-5%] w-[40%] h-[40%] bg-blue-600/10 rounded-full blur-[120px] mix-blend-screen" />
-        <div className="absolute top-[20%] right-[20%] w-[30%] h-[30%] bg-purple-500/5 rounded-full blur-[100px] mix-blend-screen" />
-      </div>
-
-      {/* ── Top bar ────────────────────────────────────────────────────────── */}
-      <header className="relative z-10 flex items-center justify-between px-8 lg:px-12 py-5 shrink-0 bg-white/[0.01] backdrop-blur-md border-b border-white/5">
-        {/* Logo */}
-        <div className="flex items-center gap-4">
-          <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-b from-white/10 to-white/5 ring-1 ring-white/10 shadow-[0_0_20px_rgba(255,255,255,0.05)]">
-            <Layers size={20} className="text-white" strokeWidth={1.5} />
-          </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="font-extrabold text-xl tracking-tight text-white">Estima</span>
-            <span className="text-xs font-medium text-slate-400">Suite</span>
-          </div>
+      {/* ── Top bar ────────────────────────────────────────────────────── */}
+      <header className="relative z-10 flex items-center justify-between px-8 lg:px-12 py-3 shrink-0 bg-white/70 backdrop-blur-2xl border-b border-gray-200/50">
+        <div className="flex items-center gap-3">
+          <span className="text-lg font-semibold tracking-tight text-gray-900" style={{ fontFamily: '"SF Pro Display", Georgia, serif' }}>
+            Estima Suite
+          </span>
         </div>
 
-        {/* User area */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-white/[0.02] border border-white/[0.05] shadow-sm backdrop-blur-md">
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center shadow-inner">
-              <span className="text-xs font-bold text-white shadow-sm">
-                {firstName.charAt(0).toUpperCase()}
-              </span>
+        <div className="flex items-center gap-5">
+          <WeatherWidget />
+          <span className="text-sm text-gray-500 capitalize hidden md:block">
+            {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+          </span>
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+              <span className="text-[11px] font-bold text-white">{firstName.charAt(0).toUpperCase()}</span>
             </div>
-            <div className="flex flex-col pr-1">
-              <span className="text-[11px] text-white font-bold leading-none mb-0.5">{displayName}</span>
-              <span className="text-[9px] text-slate-400 font-medium leading-none">{isAdmin ? 'Administrateur' : 'Utilisateur'}</span>
-            </div>
+            <span className="text-sm font-medium text-gray-700 hidden md:block">{displayName}</span>
           </div>
           <button
             onClick={onLogout}
-            className="flex items-center justify-center w-10 h-10 rounded-full bg-white/[0.02] border border-white/[0.05] text-slate-400 hover:text-red-400 hover:bg-red-500/10 hover:border-red-500/20 transition-all duration-300 backdrop-blur-md"
+            className="flex items-center justify-center w-8 h-8 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all duration-200"
             title="Se déconnecter"
           >
-            <LogOut size={16} strokeWidth={2} />
+            <LogOut size={15} strokeWidth={2} />
           </button>
         </div>
       </header>
 
-      {/* ── Main content ───────────────────────────────────────────────────── */}
-      <main className="relative z-10 flex-1 overflow-y-auto">
-        <div className="flex flex-col justify-center min-h-full max-w-[1400px] w-full mx-auto px-8 lg:px-12 py-8">
+      {/* ── Main content ───────────────────────────────────────────────── */}
+      <main className="relative z-10 flex-1 min-h-0 flex flex-col">
+        <div className="flex flex-col flex-1 min-h-0 max-w-[1360px] w-full mx-auto px-8 lg:px-12 py-6">
 
-          {/* Hero section */}
-          <div
-            className={`shrink-0 mb-6 transition-all duration-700 ease-out ${
-              mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-            }`}
-          >
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-              <div>
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.03] border border-white/[0.05] text-slate-300 text-[10px] font-bold uppercase tracking-widest mb-3 backdrop-blur-md">
-                  <Sparkles size={14} className="text-emerald-400" /> Estima Suite · {isAdmin ? 'Administrateur' : 'Utilisateur'}
-                </div>
-                <h1 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-white tracking-tight mb-2">
-                  {greeting}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">{displayName}</span>.
-                </h1>
-                <p className="text-sm lg:text-base text-slate-400 max-w-xl leading-snug">
-                  Sélectionnez un module pour accéder à votre espace de travail. Vos données sont synchronisées et sécurisées en temps réel.
-                </p>
-              </div>
-              <div className="hidden md:flex flex-col items-end">
-                <p className="text-sm font-semibold text-slate-300 capitalize">
-                  {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
-                </p>
-                <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-1">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                  </span>
-                  Système en ligne
-                </p>
-              </div>
-            </div>
+          {/* Hero */}
+          <div className={`shrink-0 mb-6 transition-all duration-700 ease-out ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+            <h1 className="text-4xl md:text-5xl lg:text-[3.25rem] font-semibold text-gray-900 tracking-tight leading-tight"
+              style={{ fontFamily: '"SF Pro Display", Georgia, -apple-system, serif' }}>
+              {greeting},{' '}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-500 via-cyan-500 to-teal-400">
+                {displayName}
+              </span>.
+            </h1>
+            <p className="text-lg text-gray-400 mt-2 font-light">
+              Sélectionnez un module pour commencer.
+            </p>
           </div>
 
-          {/* Module groups */}
-          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-8 xl:gap-12">
-            {MODULE_GROUPS.map((group, groupIdx) => {
-              const visibleModules = group.modules.filter(isVisible);
-              if (visibleModules.length === 0) return null;
-
-              const GroupIcon = group.icon;
+          {/* Bento Grid — 3 columns, cards stacked vertically */}
+          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {rows.map((rowNum) => {
+              const colModules = visibleModules.filter(m => m.row === rowNum);
+              if (colModules.length === 0) return null;
+              const ColIcon = ROW_LABELS[rowNum].icon;
 
               return (
-                <section
-                  key={group.id}
-                  className={`flex flex-col h-full min-h-0 transition-all duration-700 ease-out ${
-                    mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
-                  }`}
-                  style={{ transitionDelay: `${150 + groupIdx * 100}ms` }}
-                >
-                  {/* Section header */}
-                  <div className="flex items-center gap-3 mb-6 shrink-0">
-                    <div className="w-8 h-8 rounded-xl bg-white/[0.03] border border-white/[0.05] flex items-center justify-center shadow-inner">
-                      <GroupIcon size={16} className="text-slate-300" strokeWidth={1.5} />
-                    </div>
-                    <h2 className="text-lg font-bold text-white tracking-tight">
-                      {group.label}
-                    </h2>
+                <div key={rowNum} className="flex flex-col min-h-0">
+                  {/* Column label */}
+                  <div className={`flex items-center gap-2 mb-3 shrink-0 transition-all duration-700 ease-out ${mounted ? 'opacity-100' : 'opacity-0'}`}
+                    style={{ transitionDelay: `${100 + rowNum * 80}ms` }}>
+                    <ColIcon size={14} className={rowNum === 1 ? 'text-gray-400' : rowNum === 2 ? 'text-amber-500/70' : 'text-violet-500/70'} strokeWidth={1.5} />
+                    <span className={`text-xs font-medium uppercase tracking-widest ${rowNum === 1 ? 'text-gray-400' : rowNum === 2 ? 'text-amber-600/50' : 'text-violet-600/50'}`}>
+                      {ROW_LABELS[rowNum].label}
+                    </span>
                   </div>
-
-                  {/* Cards grid */}
-                  <div className="flex-1 min-h-0 flex flex-col justify-start gap-4">
-                    {visibleModules.map((mod, modIdx) => {
-                      const colors = COLOR_MAP[mod.color];
-                      const accessible = canAccess(mod);
-
-                      return (
-                        <div
-                          key={mod.id}
-                          className={`transition-all duration-700 ease-out ${
-                            mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-                          }`}
-                          style={{ transitionDelay: `${250 + groupIdx * 100 + modIdx * 60}ms` }}
-                        >
-                          <ModuleCard
-                            mod={mod}
-                            colors={colors}
-                            accessible={accessible}
-                            onSelect={onSelectModule}
-                          />
-                        </div>
-                      );
-                    })}
+                  {/* Cards stacked */}
+                  <div className="flex-1 min-h-0 flex flex-col gap-4">
+                    {colModules.map((mod, idx) => (
+                      <BentoCard
+                        key={mod.id}
+                        mod={mod}
+                        theme={ROW_THEMES[rowNum]}
+                        accessible={canAccess(mod)}
+                        onSelect={onSelectModule}
+                        mounted={mounted}
+                        delay={200 + rowNum * 100 + idx * 60}
+                      />
+                    ))}
                   </div>
-                </section>
+                </div>
               );
             })}
           </div>
         </div>
       </main>
 
-      {/* ── Footer ─────────────────────────────────────────────────────────── */}
-      <footer className="relative z-10 flex items-center justify-between px-8 py-4 border-t border-white/[0.04] shrink-0 bg-white/[0.01] backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-          </span>
-          <span className="text-[11px] font-semibold text-slate-400">Tous les systèmes opérationnels</span>
+      {/* ── Footer ─────────────────────────────────────────────────────── */}
+      <footer className="relative z-10 flex items-center justify-center gap-4 px-8 py-2 shrink-0 bg-transparent">
+        <div className="flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          <span className="text-[10px] font-medium text-gray-400">Opérationnel</span>
         </div>
-        <p className="text-[10px] text-slate-500 tracking-widest uppercase font-bold">
-          Estima Suite &copy; {new Date().getFullYear()}
-        </p>
-        <span className="text-[11px] font-mono text-slate-600 font-medium">v2.0.0</span>
+        <span className="text-[10px] text-gray-300">·</span>
+        <span className="text-[10px] text-gray-400">Estima Suite &copy; {new Date().getFullYear()}</span>
+        <span className="text-[10px] text-gray-300">·</span>
+        <span className="text-[10px] font-mono text-gray-300">v{APP_VERSION}</span>
+        <span className="text-[10px] text-gray-300">·</span>
+        <button
+          onClick={() => setShowChangelog(true)}
+          className="flex items-center gap-1 text-[10px] font-medium text-gray-400 hover:text-blue-500 transition-colors"
+        >
+          <Sparkles size={10} />
+          Nouveautés
+        </button>
       </footer>
+
+      {/* ── Changelog modal ── */}
+      {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
     </div>
   );
 }

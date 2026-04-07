@@ -9,24 +9,22 @@ import {
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
-const QUOTA_LIMIT_BYTES = 1 * 1024 * 1024 * 1024; // 1 GiB
+const QUOTA_LIMIT_BYTES = 1 * 1024 * 1024 * 1024;
 const WARN_THRESHOLD  = 0.60;
 const DANGER_THRESHOLD = 0.85;
 
 const COL_META = {
-  projects:   { label: 'Projets',      color: '#00dc82', icon: '📁' },
-  bpu:        { label: 'BPU',          color: '#60a5fa', icon: '📋' },
-  categories: { label: 'Categories',   color: '#a78bfa', icon: '🏷️' },
-  units:      { label: 'Unites',       color: '#fb923c', icon: '📐' },
-  resources:  { label: 'Ressources',   color: '#f472b6', icon: '🎨' },
-  crr:        { label: 'CRC',          color: '#34d399', icon: '📝' },
-  devisMoe:   { label: 'Devis MOE',   color: '#fbbf24', icon: '💰' },
-  fichesMarche:{ label: 'Fiches Marche',color: '#e879f9', icon: '📄' },
-  folders:    { label: 'Dossiers',     color: '#94a3b8', icon: '📂' },
-  presence:   { label: 'Presence',     color: '#22d3ee', icon: '🟢' },
+  projects:   { label: 'Projets',       color: '#059669', icon: '📁' },
+  bpu:        { label: 'BPU',           color: '#2563eb', icon: '📋' },
+  categories: { label: 'Catégories',    color: '#7c3aed', icon: '🏷️' },
+  units:      { label: 'Unités',        color: '#ea580c', icon: '📐' },
+  resources:  { label: 'Ressources',    color: '#db2777', icon: '🎨' },
+  crr:        { label: 'CRC',           color: '#0d9488', icon: '📝' },
+  devisMoe:   { label: 'Devis MOE',    color: '#ca8a04', icon: '💰' },
+  fichesMarche:{ label: 'Fiches Marché',color: '#a21caf', icon: '📄' },
+  folders:    { label: 'Dossiers',      color: '#64748b', icon: '📂' },
+  presence:   { label: 'Présence',      color: '#0891b2', icon: '🟢' },
 };
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const estimateBytes = (data) => {
   try { return new Blob([JSON.stringify(data)]).size; } catch { return 0; }
@@ -41,8 +39,8 @@ const fmtSize = (bytes) => {
 const BarMini = ({ value, max, color }) => {
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
   return (
-    <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.07)', width: '100%' }}>
-      <div style={{ height: '100%', width: `${pct}%`, borderRadius: 2, background: color, transition: 'width 0.6s ease' }} />
+    <div className="h-1 rounded-full bg-gray-200 w-full">
+      <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: color }} />
     </div>
   );
 };
@@ -66,23 +64,17 @@ const FirebaseStatsPanel = ({ companies, users }) => {
           const cols = Object.keys(COL_META);
           const colStats = {};
           let totalBytes = estimateBytes({ id: company.id, name: company.name });
-
           await Promise.all(cols.map(async (colName) => {
             try {
               const snap = await getDocs(collection(db, 'companies', company.id, colName));
               let bytes = 0;
-              const docs = snap.docs.map(d => {
-                const data = d.data();
-                bytes += estimateBytes(data);
-                return data;
-              });
-              colStats[colName] = { count: snap.size, bytes, docs };
+              snap.docs.forEach(d => { bytes += estimateBytes(d.data()); });
+              colStats[colName] = { count: snap.size, bytes };
               totalBytes += bytes;
             } catch {
-              colStats[colName] = { count: 0, bytes: 0, docs: [] };
+              colStats[colName] = { count: 0, bytes: 0 };
             }
           }));
-
           const memberCount = users.filter(u => u.companyId === company.id).length;
           return { company, colStats, totalBytes, memberCount };
         })
@@ -96,61 +88,38 @@ const FirebaseStatsPanel = ({ companies, users }) => {
   };
 
   const sorted = stats ? [...stats].sort((a, b) => {
-    let va, vb;
-    if (sortBy === 'size')     { va = a.totalBytes; vb = b.totalBytes; }
-    else if (sortBy === 'name'){ va = a.company.name; vb = b.company.name; return sortDir * va.localeCompare(vb, 'fr'); }
-    else { va = a.colStats[sortBy]?.count ?? 0; vb = b.colStats[sortBy]?.count ?? 0; }
-    return sortDir * (va - vb);
+    if (sortBy === 'name') return sortDir * a.company.name.localeCompare(b.company.name, 'fr');
+    if (sortBy === 'size') return sortDir * (a.totalBytes - b.totalBytes);
+    return sortDir * ((a.colStats[sortBy]?.count ?? 0) - (b.colStats[sortBy]?.count ?? 0));
   }) : [];
 
-  const globalBytes  = stats ? stats.reduce((a, b) => a + b.totalBytes, 0) : 0;
-  const globalDocs   = stats ? stats.reduce((a, b) => Object.values(b.colStats).reduce((s, c) => s + c.count, 0) + a, 0) : 0;
-  const maxBytes     = stats ? Math.max(...stats.map(s => s.totalBytes), 1) : 1;
+  const globalBytes = stats ? stats.reduce((a, b) => a + b.totalBytes, 0) : 0;
+  const globalDocs  = stats ? stats.reduce((a, b) => Object.values(b.colStats).reduce((s, c) => s + c.count, 0) + a, 0) : 0;
+  const maxBytes    = stats ? Math.max(...stats.map(s => s.totalBytes), 1) : 1;
 
   const toggleSort = (col) => {
     if (sortBy === col) setSortDir(d => -d);
     else { setSortBy(col); setSortDir(-1); }
   };
 
-  const thCls = (col) =>
-    `cursor-pointer select-none text-[9px] font-black uppercase tracking-[0.12em] transition-colors px-2 py-2 text-left ${sortBy === col ? 'text-white' : 'hover:text-slate-300'}`;
-
   return (
-    <>
-      <style>{`
-        .fb-scroll { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.12) transparent; }
-        .fb-scroll::-webkit-scrollbar { height: 4px; }
-        .fb-scroll::-webkit-scrollbar-track { background: transparent; }
-        .fb-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
-        .fb-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
-      `}</style>
-    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16 }}>
+    <div className="bg-white border border-gray-200/60 rounded-2xl overflow-hidden">
 
-      {/* Header panel */}
-      <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(0,220,130,0.1)', border: '1px solid rgba(0,220,130,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <BarChart2 size={15} style={{ color: '#00dc82' }} />
+      {/* Header */}
+      <div className="px-5 py-4 border-b border-gray-200/60 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-emerald-50">
+            <BarChart2 size={16} className="text-emerald-600" />
           </div>
           <div>
-            <p style={{ color: 'white', fontWeight: 800, fontSize: 13, lineHeight: 1 }}>Occupation Firebase</p>
-            <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, marginTop: 2, fontFamily: 'monospace' }}>
-              Estimation par serialisation JSON · Donnees en temps reel
-            </p>
+            <p className="text-sm font-bold text-gray-900">Occupation Firebase</p>
+            <p className="text-[10px] text-gray-400 font-mono mt-0.5">Estimation par sérialisation JSON · Données en temps réel</p>
           </div>
         </div>
-        <button
-          onClick={loadStats}
-          disabled={loading}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '6px 14px', borderRadius: 8,
-            background: stats ? 'rgba(255,255,255,0.05)' : 'rgba(0,220,130,0.1)',
-            border: `1px solid ${stats ? 'rgba(255,255,255,0.1)' : 'rgba(0,220,130,0.25)'}`,
-            color: stats ? 'rgba(255,255,255,0.55)' : '#00dc82',
-            fontSize: 11, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer',
-            transition: 'all 0.15s',
-          }}>
+        <button onClick={loadStats} disabled={loading}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium transition-all ${
+            stats ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-gray-900 text-white hover:bg-gray-800'
+          } ${loading ? 'cursor-not-allowed opacity-60' : ''}`}>
           <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
           {loading ? 'Analyse en cours...' : stats ? 'Actualiser' : 'Analyser Firebase'}
         </button>
@@ -158,17 +127,17 @@ const FirebaseStatsPanel = ({ companies, users }) => {
 
       {/* Error */}
       {error && (
-        <div style={{ margin: 16, padding: '10px 14px', borderRadius: 10, background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)', color: 'rgba(248,113,113,0.9)', fontSize: 12 }}>
-          {'\u26A0'} {error}
+        <div className="mx-4 my-3 px-4 py-3 rounded-xl bg-red-50 border border-red-200/60 text-red-600 text-xs font-medium">
+          ⚠ {error}
         </div>
       )}
 
       {/* Empty state */}
       {!stats && !loading && !error && (
-        <div style={{ padding: '48px 20px', textAlign: 'center', color: 'rgba(255,255,255,0.15)' }}>
-          <Database size={32} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
-          <p style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.2)' }}>Lance l'analyse pour voir l'occupation Firebase</p>
-          <p style={{ fontSize: 10, marginTop: 4, fontFamily: 'monospace' }}>Interroge toutes les sous-collections de chaque entreprise</p>
+        <div className="py-12 text-center">
+          <Database size={32} className="mx-auto mb-3 text-gray-300" />
+          <p className="text-sm font-medium text-gray-500">Lance l'analyse pour voir l'occupation Firebase</p>
+          <p className="text-[10px] text-gray-400 font-mono mt-1">Interroge toutes les sous-collections de chaque entreprise</p>
         </div>
       )}
 
@@ -178,103 +147,75 @@ const FirebaseStatsPanel = ({ companies, users }) => {
           {/* KPI Cards */}
           {(() => {
             const globalQuotaPct = globalBytes / QUOTA_LIMIT_BYTES;
-            const globalQuotaColor = globalQuotaPct > DANGER_THRESHOLD ? '#f87171' : globalQuotaPct > WARN_THRESHOLD ? '#fbbf24' : '#00dc82';
+            const globalQuotaColor = globalQuotaPct > DANGER_THRESHOLD ? '#ef4444' : globalQuotaPct > WARN_THRESHOLD ? '#f59e0b' : '#10b981';
             const kpis = [
-              { label: 'Entreprises',     value: companies.length,                   icon: Building2, color: '#00dc82', sub: 'clients actifs' },
-              { label: 'Documents total', value: globalDocs.toLocaleString('fr-FR'), icon: FileStack,  color: '#60a5fa', sub: 'docs Firestore' },
-              { label: 'Utilisateurs',    value: users.length,                       icon: User,       color: '#fb923c', sub: 'comptes assignes' },
+              { label: 'Entreprises',     value: companies.length,                   icon: Building2, color: '#10b981', sub: 'clients actifs' },
+              { label: 'Documents total', value: globalDocs.toLocaleString('fr-FR'), icon: FileStack,  color: '#3b82f6', sub: 'docs Firestore' },
+              { label: 'Utilisateurs',    value: users.length,                       icon: User,       color: '#f97316', sub: 'comptes assignés' },
             ];
             return (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: `repeat(${kpis.length}, 1fr) 2fr`, gap: 0, borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                <div className="grid border-b border-gray-200/60" style={{ gridTemplateColumns: `repeat(${kpis.length}, 1fr) 2fr` }}>
                   {kpis.map((kpi, i) => {
                     const Icon = kpi.icon;
                     return (
-                      <div key={i} style={{ padding: '14px 16px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                          <div style={{ width: 26, height: 26, borderRadius: 6, background: `${kpi.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Icon size={13} style={{ color: kpi.color }} />
+                      <div key={i} className="px-4 py-4 border-r border-gray-100">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: `${kpi.color}15` }}>
+                            <Icon size={14} style={{ color: kpi.color }} />
                           </div>
-                          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{kpi.label}</span>
+                          <span className="text-[9px] text-gray-400 font-mono uppercase tracking-widest">{kpi.label}</span>
                         </div>
-                        <p style={{ fontSize: 22, fontWeight: 900, color: 'white', lineHeight: 1, marginBottom: 2 }}>{kpi.value}</p>
-                        <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', fontFamily: 'monospace' }}>{kpi.sub}</p>
+                        <p className="text-2xl font-bold text-gray-900">{kpi.value}</p>
+                        <p className="text-[9px] text-gray-400 font-mono mt-0.5">{kpi.sub}</p>
                       </div>
                     );
                   })}
 
                   {/* Quota card */}
-                  <div style={{ padding: '14px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ width: 26, height: 26, borderRadius: 6, background: `${globalQuotaColor}15`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <HardDrive size={13} style={{ color: globalQuotaColor }} />
+                  <div className="px-5 py-4 flex flex-col justify-between">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: `${globalQuotaColor}15` }}>
+                          <HardDrive size={14} style={{ color: globalQuotaColor }} />
                         </div>
-                        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                          Quota Firestore · Plan Spark
-                        </span>
+                        <span className="text-[9px] text-gray-400 font-mono uppercase tracking-widest">Quota Firestore · Spark</span>
                       </div>
-                      <span style={{
-                        fontSize: 10, fontWeight: 800, fontFamily: 'monospace',
-                        padding: '2px 10px', borderRadius: 6,
-                        background: `${globalQuotaColor}15`,
-                        border: `1px solid ${globalQuotaColor}30`,
-                        color: globalQuotaColor,
-                      }}>
+                      <span className="text-[10px] font-bold font-mono px-2.5 py-1 rounded-lg" style={{ background: `${globalQuotaColor}15`, color: globalQuotaColor }}>
                         {(globalQuotaPct * 100).toFixed(2)} %
                       </span>
                     </div>
 
-                    {/* Grande barre de quota */}
-                    <div style={{ marginBottom: 8 }}>
-                      <div style={{ height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.07)', overflow: 'hidden', position: 'relative' }}>
-                        <div style={{
-                          height: '100%',
-                          width: `${Math.min(100, globalQuotaPct * 100)}%`,
-                          borderRadius: 4,
-                          background: `linear-gradient(90deg, ${globalQuotaColor}aa, ${globalQuotaColor})`,
-                          transition: 'width 0.8s ease',
-                          boxShadow: `0 0 8px ${globalQuotaColor}55`,
-                        }} />
-                        {[25, 50, 75].map(p => (
-                          <div key={p} style={{
-                            position: 'absolute', top: 0, bottom: 0, left: `${p}%`,
-                            width: 1, background: 'rgba(255,255,255,0.12)',
-                          }} />
-                        ))}
+                    <div className="mb-2">
+                      <div className="h-2 rounded-full bg-gray-100 overflow-hidden relative">
+                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${Math.min(100, globalQuotaPct * 100)}%`, background: globalQuotaColor }} />
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                    <div className="flex justify-between items-end">
                       <div>
-                        <p style={{ fontSize: 20, fontWeight: 900, color: 'white', lineHeight: 1 }}>{fmtSize(globalBytes)}</p>
-                        <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', fontFamily: 'monospace', marginTop: 2 }}>utilises sur 1 GiB</p>
+                        <p className="text-xl font-bold text-gray-900">{fmtSize(globalBytes)}</p>
+                        <p className="text-[9px] text-gray-400 font-mono mt-0.5">utilisés sur 1 GiB</p>
                       </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <p style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.35)', fontFamily: 'monospace' }}>{fmtSize(QUOTA_LIMIT_BYTES - globalBytes)}</p>
-                        <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.15)', fontFamily: 'monospace', marginTop: 1 }}>restants</p>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold text-gray-400 font-mono">{fmtSize(QUOTA_LIMIT_BYTES - globalBytes)}</p>
+                        <p className="text-[9px] text-gray-300 font-mono mt-0.5">restants</p>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Alerte quota */}
                 {globalQuotaPct > WARN_THRESHOLD && (
-                  <div style={{
-                    margin: '0', padding: '8px 20px',
-                    background: globalQuotaPct > DANGER_THRESHOLD ? 'rgba(248,113,113,0.07)' : 'rgba(251,191,36,0.07)',
-                    borderBottom: `1px solid ${globalQuotaColor}25`,
-                    display: 'flex', alignItems: 'center', gap: 8,
-                  }}>
-                    <AlertCircle size={12} style={{ color: globalQuotaColor, flexShrink: 0 }} />
-                    <p style={{ fontSize: 11, color: globalQuotaColor, fontWeight: 600 }}>
+                  <div className="px-5 py-2.5 border-b border-gray-100 flex items-center gap-2" style={{ background: `${globalQuotaColor}08` }}>
+                    <AlertCircle size={12} style={{ color: globalQuotaColor }} />
+                    <p className="text-xs font-medium" style={{ color: globalQuotaColor }}>
                       {globalQuotaPct > DANGER_THRESHOLD
-                        ? '🔴 Quota critique — Passe en plan Blaze (pay-as-you-go) pour eviter les blocages.'
-                        : '🟡 Quota eleve — Surveille ta consommation ou anticipe la migration vers Blaze.'}
+                        ? 'Quota critique — Passez en plan Blaze pour éviter les blocages.'
+                        : 'Quota élevé — Surveillez votre consommation.'}
                     </p>
                     <a href="https://console.firebase.google.com" target="_blank" rel="noreferrer"
-                      style={{ marginLeft: 'auto', fontSize: 10, color: globalQuotaColor, fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                      Firebase Console <ExternalLink size={10} />
+                      className="ml-auto flex items-center gap-1 text-[10px] font-bold" style={{ color: globalQuotaColor }}>
+                      Console <ExternalLink size={10} />
                     </a>
                   </div>
                 )}
@@ -283,54 +224,46 @@ const FirebaseStatsPanel = ({ companies, users }) => {
           })()}
 
           {/* Table */}
-          <div style={{ overflowX: 'auto' }} className="fb-scroll">
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
               <thead>
-                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(0,0,0,0.2)' }}>
-                  <th className={thCls('name')}  onClick={() => toggleSort('name')}   style={{ color: sortBy === 'name' ? 'white' : 'rgba(255,255,255,0.25)', paddingLeft: 20, minWidth: 180 }}>
-                    Entreprise {sortBy === 'name' ? (sortDir > 0 ? '\u2191' : '\u2193') : ''}
+                <tr className="border-b border-gray-200/60 bg-gray-50">
+                  <th onClick={() => toggleSort('name')}
+                    className={`cursor-pointer select-none text-[9px] font-bold uppercase tracking-widest px-5 py-2.5 text-left ${sortBy === 'name' ? 'text-gray-900' : 'text-gray-400 hover:text-gray-600'}`} style={{ minWidth: 180 }}>
+                    Entreprise {sortBy === 'name' ? (sortDir > 0 ? '↑' : '↓') : ''}
                   </th>
                   {Object.entries(COL_META).map(([col, m]) => (
-                    <th key={col} className={thCls(col)} onClick={() => toggleSort(col)}
-                      style={{ color: sortBy === col ? m.color : 'rgba(255,255,255,0.25)', minWidth: 72, textAlign: 'center' }}>
-                      {m.label} {sortBy === col ? (sortDir > 0 ? '\u2191' : '\u2193') : ''}
+                    <th key={col} onClick={() => toggleSort(col)}
+                      className={`cursor-pointer select-none text-[9px] font-bold uppercase tracking-widest px-2 py-2.5 text-center ${sortBy === col ? 'text-gray-900' : 'text-gray-400 hover:text-gray-600'}`} style={{ minWidth: 72 }}>
+                      {m.label} {sortBy === col ? (sortDir > 0 ? '↑' : '↓') : ''}
                     </th>
                   ))}
-                  <th className={thCls('size')} onClick={() => toggleSort('size')}
-                    style={{ color: sortBy === 'size' ? 'white' : 'rgba(255,255,255,0.25)', minWidth: 140, paddingRight: 20 }}>
-                    Taille estimee {sortBy === 'size' ? (sortDir > 0 ? '\u2191' : '\u2193') : ''}
+                  <th onClick={() => toggleSort('size')}
+                    className={`cursor-pointer select-none text-[9px] font-bold uppercase tracking-widest px-5 py-2.5 text-left ${sortBy === 'size' ? 'text-gray-900' : 'text-gray-400 hover:text-gray-600'}`} style={{ minWidth: 140 }}>
+                    Taille estimée {sortBy === 'size' ? (sortDir > 0 ? '↑' : '↓') : ''}
                   </th>
-                  <th style={{ width: 36 }}></th>
+                  <th style={{ width: 36 }} />
                 </tr>
               </thead>
               <tbody>
                 {sorted.map(({ company, colStats, totalBytes, memberCount }) => {
                   const quotaPct = totalBytes / QUOTA_LIMIT_BYTES;
-                  const barColor = quotaPct > DANGER_THRESHOLD ? '#f87171' : quotaPct > WARN_THRESHOLD ? '#fbbf24' : '#00dc82';
-                  const isExp    = expanded === company.id;
+                  const barColor = quotaPct > DANGER_THRESHOLD ? '#ef4444' : quotaPct > WARN_THRESHOLD ? '#f59e0b' : '#10b981';
+                  const isExp = expanded === company.id;
 
                   return (
                     <React.Fragment key={company.id}>
                       <tr
-                        style={{
-                          borderBottom: '1px solid rgba(255,255,255,0.04)',
-                          background: isExp ? 'rgba(0,220,130,0.04)' : undefined,
-                          cursor: 'pointer', transition: 'background 0.1s',
-                        }}
-                        onMouseEnter={e => { if (!isExp) e.currentTarget.style.background = 'rgba(255,255,255,0.025)'; }}
-                        onMouseLeave={e => { if (!isExp) e.currentTarget.style.background = ''; }}
                         onClick={() => setExpanded(isExp ? null : company.id)}
+                        className={`border-b border-gray-100 cursor-pointer transition-colors ${isExp ? 'bg-blue-50/50' : 'hover:bg-gray-50'}`}
                       >
-                        <td style={{ padding: '10px 8px 10px 20px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            {isExp
-                              ? <ChevronDown size={13} style={{ color: '#00dc82', shrink: 0 }} />
-                              : <ChevronRight size={13} style={{ color: 'rgba(255,255,255,0.2)', shrink: 0 }} />
-                            }
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-2">
+                            {isExp ? <ChevronDown size={13} className="text-blue-500 shrink-0" /> : <ChevronRight size={13} className="text-gray-300 shrink-0" />}
                             <div>
-                              <p style={{ color: 'rgba(255,255,255,0.9)', fontWeight: 700, fontSize: 13 }}>{company.name}</p>
-                              <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 9, fontFamily: 'monospace', marginTop: 1 }}>
-                                {memberCount} utilisateur{memberCount !== 1 ? 's' : ''} · cree {company.createdAt ? new Date(company.createdAt).toLocaleDateString('fr-FR') : '—'}
+                              <p className="text-sm font-semibold text-gray-900">{company.name}</p>
+                              <p className="text-[9px] text-gray-400 font-mono mt-0.5">
+                                {memberCount} utilisateur{memberCount !== 1 ? 's' : ''} · créé {company.createdAt ? new Date(company.createdAt).toLocaleDateString('fr-FR') : '—'}
                               </p>
                             </div>
                           </div>
@@ -340,74 +273,58 @@ const FirebaseStatsPanel = ({ companies, users }) => {
                           const c = colStats[col] || { count: 0 };
                           const m = COL_META[col];
                           return (
-                            <td key={col} style={{ textAlign: 'center', padding: '10px 8px' }}>
-                              <span style={{
-                                display: 'inline-block',
-                                minWidth: 28, padding: '2px 8px', borderRadius: 6,
-                                fontSize: 12, fontWeight: 700, fontFamily: 'monospace',
-                                background: c.count > 0 ? `${m.color}12` : 'transparent',
-                                color: c.count > 0 ? m.color : 'rgba(255,255,255,0.15)',
-                              }}>
+                            <td key={col} className="text-center px-2 py-3">
+                              <span className="inline-block min-w-[28px] px-2 py-0.5 rounded-lg text-xs font-bold font-mono"
+                                style={{
+                                  background: c.count > 0 ? `${m.color}12` : 'transparent',
+                                  color: c.count > 0 ? m.color : '#d1d5db',
+                                }}>
                                 {c.count > 0 ? c.count : '—'}
                               </span>
                             </td>
                           );
                         })}
 
-                        <td style={{ padding: '10px 20px 10px 8px', minWidth: 140 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                                <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)', fontFamily: 'monospace' }}>
-                                  {fmtSize(totalBytes)}
-                                </span>
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                              <div className="flex justify-between mb-1">
+                                <span className="text-xs font-semibold text-gray-700 font-mono">{fmtSize(totalBytes)}</span>
                                 {quotaPct > WARN_THRESHOLD && (
-                                  <span style={{ fontSize: 9, fontWeight: 700, color: barColor, fontFamily: 'monospace' }}>
-                                    {(quotaPct * 100).toFixed(0)}%
-                                  </span>
+                                  <span className="text-[9px] font-bold font-mono" style={{ color: barColor }}>{(quotaPct * 100).toFixed(0)}%</span>
                                 )}
                               </div>
                               <BarMini value={totalBytes} max={maxBytes} color={barColor} />
                             </div>
-                            {quotaPct > WARN_THRESHOLD && (
-                              <AlertCircle size={12} style={{ color: barColor, flexShrink: 0 }} />
-                            )}
+                            {quotaPct > WARN_THRESHOLD && <AlertCircle size={12} style={{ color: barColor }} className="shrink-0" />}
                           </div>
                         </td>
 
-                        <td style={{ padding: '10px 12px 10px 4px' }}>
-                          <div style={{ opacity: isExp ? 1 : 0, transition: 'opacity 0.15s' }}>
-                            <Zap size={11} style={{ color: '#00dc82' }} />
-                          </div>
+                        <td className="px-3 py-3">
+                          {isExp && <Zap size={11} className="text-emerald-500" />}
                         </td>
                       </tr>
 
-                      {/* Detail expande */}
                       {isExp && (
-                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                          <td colSpan={7} style={{ padding: '0 20px 16px 52px', background: 'rgba(0,0,0,0.2)' }}>
-                            <div style={{ paddingTop: 12, display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 }}>
+                        <tr className="border-b border-gray-200/60">
+                          <td colSpan={13} className="px-5 pb-4 pt-2 bg-gray-50/80" style={{ paddingLeft: 52 }}>
+                            <div className="grid grid-cols-5 gap-2 pt-2">
                               {Object.entries(COL_META).map(([col, m]) => {
                                 const cs = colStats[col] || { count: 0, bytes: 0 };
                                 return (
-                                  <div key={col} style={{
-                                    padding: '10px 12px', borderRadius: 10,
-                                    background: cs.count > 0 ? `${m.color}08` : 'rgba(255,255,255,0.02)',
-                                    border: `1px solid ${cs.count > 0 ? m.color + '22' : 'rgba(255,255,255,0.05)'}`,
+                                  <div key={col} className="p-3 rounded-xl border" style={{
+                                    background: cs.count > 0 ? `${m.color}08` : '#f9fafb',
+                                    borderColor: cs.count > 0 ? `${m.color}25` : '#e5e7eb',
                                   }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                                      <span style={{ fontSize: 14 }}>{m.icon}</span>
-                                      <span style={{ fontSize: 10, fontWeight: 700, color: cs.count > 0 ? m.color : 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                                    <div className="flex items-center gap-1.5 mb-2">
+                                      <span className="text-sm">{m.icon}</span>
+                                      <span className="text-[9px] font-bold uppercase tracking-widest" style={{ color: cs.count > 0 ? m.color : '#9ca3af' }}>
                                         {m.label}
                                       </span>
                                     </div>
-                                    <p style={{ fontSize: 20, fontWeight: 900, color: cs.count > 0 ? 'white' : 'rgba(255,255,255,0.15)', lineHeight: 1, marginBottom: 2 }}>
-                                      {cs.count}
-                                    </p>
-                                    <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', fontFamily: 'monospace' }}>
-                                      {fmtSize(cs.bytes)}
-                                    </p>
-                                    <div style={{ marginTop: 8 }}>
+                                    <p className="text-xl font-bold" style={{ color: cs.count > 0 ? '#111827' : '#d1d5db' }}>{cs.count}</p>
+                                    <p className="text-[9px] text-gray-400 font-mono mt-0.5">{fmtSize(cs.bytes)}</p>
+                                    <div className="mt-2">
                                       <BarMini value={cs.bytes} max={totalBytes || 1} color={m.color} />
                                     </div>
                                   </div>
@@ -423,47 +340,40 @@ const FirebaseStatsPanel = ({ companies, users }) => {
               </tbody>
 
               <tfoot>
-                <tr style={{ borderTop: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.25)' }}>
-                  <td style={{ padding: '10px 8px 10px 20px', fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.5)', fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                <tr className="border-t border-gray-200/60 bg-gray-50">
+                  <td className="px-5 py-3 text-xs font-bold text-gray-500 font-mono uppercase tracking-wider">
                     TOTAL ({companies.length})
                   </td>
                   {Object.keys(COL_META).map(col => {
                     const total = stats.reduce((s, r) => s + (r.colStats[col]?.count ?? 0), 0);
                     return (
-                      <td key={col} style={{ textAlign: 'center', padding: '10px 8px', fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,0.5)', fontFamily: 'monospace' }}>
-                        {total}
-                      </td>
+                      <td key={col} className="text-center px-2 py-3 text-xs font-bold text-gray-500 font-mono">{total}</td>
                     );
                   })}
-                  <td style={{ padding: '10px 20px 10px 8px', fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,0.6)', fontFamily: 'monospace' }}>
-                    {fmtSize(globalBytes)}
-                  </td>
+                  <td className="px-5 py-3 text-xs font-bold text-gray-700 font-mono">{fmtSize(globalBytes)}</td>
                   <td />
                 </tr>
               </tfoot>
             </table>
           </div>
 
-          {/* Legende quota */}
-          <div style={{ padding: '10px 20px', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', fontFamily: 'monospace' }}>
-              Barre par entreprise : relative au max · Quota global : 1 GiB Firestore Spark
-            </span>
+          {/* Légende */}
+          <div className="px-5 py-3 border-t border-gray-100 flex items-center gap-4 flex-wrap">
+            <span className="text-[9px] text-gray-400 font-mono">Barre par entreprise : relative au max · Quota global : 1 GiB Spark</span>
             {[
-              { color: '#00dc82', label: 'Normal' },
-              { color: '#fbbf24', label: `Attention > ${WARN_THRESHOLD * 100}% du quota` },
-              { color: '#f87171', label: `Critique > ${DANGER_THRESHOLD * 100}% du quota` },
+              { color: '#10b981', label: 'Normal' },
+              { color: '#f59e0b', label: `Attention > ${WARN_THRESHOLD * 100}%` },
+              { color: '#ef4444', label: `Critique > ${DANGER_THRESHOLD * 100}%` },
             ].map(l => (
-              <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <div style={{ width: 10, height: 4, borderRadius: 2, background: l.color }} />
-                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>{l.label}</span>
+              <div key={l.label} className="flex items-center gap-1.5">
+                <div className="w-2.5 h-1 rounded-full" style={{ background: l.color }} />
+                <span className="text-[9px] text-gray-400 font-mono">{l.label}</span>
               </div>
             ))}
           </div>
         </>
       )}
     </div>
-    </>
   );
 };
 

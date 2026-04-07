@@ -3,8 +3,9 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Plus, Trash2, ChevronDown, ChevronRight,
   MinusCircle, Circle, Loader, CheckCircle2, Calendar, User, MessageSquare,
-  ImagePlus, X, Bold, Underline, Highlighter,
+  ImagePlus, X, Bold, Underline, Highlighter, GripVertical,
 } from 'lucide-react';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { OBSERVATION_STATUSES, getGroupColor, abbreviateGroup } from '../../data/crrData';
 import { confirm } from '../../utils/globalUI';
 import { normalizeObsText } from '../../utils/formatObsText.jsx';
@@ -131,7 +132,7 @@ const StatusBadge = ({ status, onChange }) => {
   );
 };
 
-const ObservationRow = ({ obs, onUpdate, onDelete, meetingDate, participantGroups }) => {
+const ObservationRow = ({ obs, onUpdate, onDelete, meetingDate, participantGroups, dragHandleProps }) => {
   const [expanded, setExpanded] = useState(true);
   const fileRef = useRef(null);
   const editorRef = useRef(null);
@@ -222,6 +223,12 @@ const ObservationRow = ({ obs, onUpdate, onDelete, meetingDate, participantGroup
       <div className="px-3 py-2">
         {/* Ligne principale */}
         <div className="flex items-start gap-2">
+          {/* Drag handle */}
+          {dragHandleProps && (
+            <div {...dragHandleProps} className="flex items-center pt-1.5 cursor-grab active:cursor-grabbing shrink-0" title="Glisser pour réordonner">
+              <GripVertical size={14} className="text-gray-300 hover:text-gray-500 transition-colors" />
+            </div>
+          )}
           {/* Emetteur */}
           <GroupPicker
             value={obs.emitter}
@@ -374,6 +381,7 @@ const CrrObservations = ({
   addObservation,
   updateObservation,
   deleteObservation,
+  reorderObservations,
   legalText,
   participantGroups = [],
 }) => {
@@ -386,9 +394,17 @@ const CrrObservations = ({
     setCollapsedCats(s);
   };
 
+  const handleDragEnd = useCallback((result) => {
+    const { source, destination, draggableId } = result;
+    if (!destination) return;
+    if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+    reorderObservations?.(draggableId, destination.droppableId, destination.index);
+  }, [reorderObservations]);
+
   if (!meeting) return null;
 
   return (
+    <DragDropContext onDragEnd={handleDragEnd}>
     <div className="space-y-3">
       {/* Texte legal */}
       <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
@@ -398,8 +414,9 @@ const CrrObservations = ({
       </div>
 
       {/* En-tete tableau */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="grid grid-cols-[100px_120px_1fr_280px_30px] gap-1 px-4 py-2.5 bg-slate-100 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="grid grid-cols-[30px_100px_120px_1fr_280px_30px] gap-1 px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+          <span />
           <span>Emetteur</span>
           <span>Date</span>
           <span>Observations</span>
@@ -417,17 +434,17 @@ const CrrObservations = ({
           <div key={cat} className="space-y-1.5">
             {/* Bandeau categorie */}
             <div
-              className="flex items-center justify-between bg-gradient-to-r from-teal-500/10 to-emerald-500/10 border border-emerald-200 rounded-lg px-4 py-2.5 cursor-pointer hover:from-teal-500/15 hover:to-emerald-500/15 transition-all"
+              className="flex items-center justify-between bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/60 rounded-xl px-4 py-2.5 cursor-pointer hover:from-blue-100/80 hover:to-indigo-100/80 transition-all"
               onClick={() => toggleCat(cat)}
             >
               <div className="flex items-center gap-2">
                 {isCollapsed ? (
-                  <ChevronRight size={14} className="text-emerald-600" />
+                  <ChevronRight size={14} className="text-blue-600" />
                 ) : (
-                  <ChevronDown size={14} className="text-emerald-600" />
+                  <ChevronDown size={14} className="text-blue-600" />
                 )}
-                <span className="text-sm font-bold text-emerald-800">{cat}</span>
-                <span className="text-[10px] text-slate-500">
+                <span className="text-sm font-bold text-gray-900">{cat}</span>
+                <span className="text-[10px] text-gray-400">
                   ({obs.length} observation{obs.length !== 1 ? 's' : ''})
                 </span>
               </div>
@@ -436,37 +453,57 @@ const CrrObservations = ({
                   e.stopPropagation();
                   addObservation(cat);
                 }}
-                className="flex items-center gap-1 px-2 py-1 text-[11px] bg-emerald-500/20 text-emerald-700 rounded-md hover:bg-emerald-500/30 transition-all font-medium"
+                className="flex items-center gap-1 px-2.5 py-1 text-[11px] bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200/80 transition-all font-medium"
               >
                 <Plus size={10} />
                 Ajouter
               </button>
             </div>
 
-            {/* Observations */}
+            {/* Observations — Droppable zone */}
             {!isCollapsed && (
-              <div className="space-y-1.5 pl-2">
-                {obs.length === 0 && (
-                  <div className="text-center text-slate-400 text-xs py-4 italic">
-                    Aucune observation dans cette categorie
+              <Droppable droppableId={cat}>
+                {(provided, snapshot) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className={`space-y-1.5 pl-2 min-h-[40px] rounded-xl transition-colors ${snapshot.isDraggingOver ? 'bg-blue-50/50' : ''}`}
+                  >
+                    {obs.length === 0 && (
+                      <div className="text-center text-gray-400 text-xs py-4 italic">
+                        Aucune observation — glissez-en une ici ou cliquez Ajouter
+                      </div>
+                    )}
+                    {obs.map((ob, idx) => (
+                      <Draggable key={ob.id} draggableId={ob.id} index={idx}>
+                        {(prov, snap) => (
+                          <div
+                            ref={prov.innerRef}
+                            {...prov.draggableProps}
+                            className={`${snap.isDragging ? 'shadow-lg ring-2 ring-blue-300 rounded-lg' : ''}`}
+                          >
+                            <ObservationRow
+                              obs={ob}
+                              onUpdate={updateObservation}
+                              onDelete={deleteObservation}
+                              meetingDate={meeting.date}
+                              participantGroups={participantGroups}
+                              dragHandleProps={prov.dragHandleProps}
+                            />
+                          </div>
+                        )}
+                      </Draggable>
+                    ))}
+                    {provided.placeholder}
                   </div>
                 )}
-                {obs.map((ob) => (
-                  <ObservationRow
-                    key={ob.id}
-                    obs={ob}
-                    onUpdate={updateObservation}
-                    onDelete={deleteObservation}
-                    meetingDate={meeting.date}
-                    participantGroups={participantGroups}
-                  />
-                ))}
-              </div>
+              </Droppable>
             )}
           </div>
         );
       })}
     </div>
+    </DragDropContext>
   );
 };
 

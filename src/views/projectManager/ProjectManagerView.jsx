@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Layers, HelpCircle, PlusCircle, Clock, Cloud, RefreshCw, Trash2, ArrowUpDown, Search, LayoutGrid, List } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { HelpCircle, PlusCircle, Clock, Cloud, RefreshCw, Trash2, ArrowUpDown, Search, LayoutGrid, List } from 'lucide-react';
+import { buildFolderColorMap } from './folderColors';
 import { confirm } from '../../utils/globalUI';
 
 import { usePresenceReader }     from '../../hooks/usePresence';
@@ -15,71 +16,46 @@ import PmProjectGrid     from './PmProjectGrid';
 import PmLocalHistory    from './PmLocalHistory';
 
 const ProjectManagerView = ({
-  project,
-  setProject,
-  resetProject,
-  onSaveProject,
-  bpuConfig,
-  clientPercent,
-  setBpuConfig,
-  setClientPercent,
-  companyId,
-  currentUserUid,
+  project, setProject, resetProject, onSaveProject,
+  bpuConfig, clientPercent, setBpuConfig, setClientPercent,
+  companyId, currentUserUid,
 }) => {
   const [historyTab, setHistoryTab] = useState('cloud');
   const [showHelp,   setShowHelp]   = useState(false);
-  const [sortBy,     setSortBy]     = useState('date'); // 'date' | 'code' | 'name'
+  const [sortBy,     setSortBy]     = useState('date');
   const [search,     setSearch]     = useState('');
-  const [viewMode,   setViewMode]   = useState('grid'); // 'grid' | 'list'
+  const [viewMode,   setViewMode]   = useState('grid');
 
-  // ── Hooks ──────────────────────────────────────────────────────────────────
   const local = usePmLocalHistory({ project, setProject, bpuConfig, clientPercent, setBpuConfig, setClientPercent, companyId });
-
   const cloud = usePmCloudProjects({
-    companyId, historyTab,
-    project, setProject,
-    bpuConfig, setBpuConfig,
-    clientPercent, setClientPercent,
-    onSaveProject,
-    addToHistory: local.addToHistory,
+    companyId, historyTab, project, setProject,
+    bpuConfig, setBpuConfig, clientPercent, setClientPercent,
+    onSaveProject, addToHistory: local.addToHistory,
   });
-
-  const fm = usePmFolders({
-    companyId,
-    cloudProjects: cloud.cloudProjects,
-    setCloudProjects: cloud.setCloudProjects,
-    project, setProject,
-  });
-
+  const fm = usePmFolders({ companyId, cloudProjects: cloud.cloudProjects, setCloudProjects: cloud.setCloudProjects, project, setProject });
   const { presenceByProject } = usePresenceReader({ companyId, currentUserId: currentUserUid });
 
-  // ── Tri des projets ──────────────────────────────────────────────────────────
   const removeAccents = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-
   const sortedProjects = [...fm.filteredProjects]
     .filter(p => !search.trim() || removeAccents(p.name).includes(removeAccents(search)))
     .sort((a, b) => {
-    if (sortBy === 'date') return new Date(b.lastSaved || 0) - new Date(a.lastSaved || 0);
-    if (sortBy === 'code') return (a.code || '').localeCompare(b.code || '', 'fr', { numeric: true });
-    if (sortBy === 'name') return (a.name || '').localeCompare(b.name || '', 'fr');
-    return 0;
-  });
+      if (sortBy === 'date') return new Date(b.lastSaved || 0) - new Date(a.lastSaved || 0);
+      if (sortBy === 'code') return (a.code || '').localeCompare(b.code || '', 'fr', { numeric: true });
+      if (sortBy === 'name') return (a.name || '').localeCompare(b.name || '', 'fr');
+      return 0;
+    });
 
-  // ── Données d'affichage ────────────────────────────────────────────────────
+  const folderColorMap = useMemo(() => buildFolderColorMap(fm.folders), [fm.folders]);
+
   const chapCount = (project?.chapters || []).length;
-  const itemCount = (project?.chapters || []).reduce((acc, c) => {
-    return acc + (c.children || c.items || c.rows || []).length;
-  }, 0);
-  const lastSaved = project?.lastSaved
-    ? new Date(project.lastSaved).toLocaleString('fr-FR')
-    : null;
+  const itemCount = (project?.chapters || []).reduce((acc, c) => acc + (c.children || c.items || c.rows || []).length, 0);
+  const lastSaved = project?.lastSaved ? new Date(project.lastSaved).toLocaleString('fr-FR') : null;
 
-  // ── Rendu ──────────────────────────────────────────────────────────────────
   return (
-    <div className="h-screen w-full bg-slate-950 overflow-hidden flex flex-col font-sans text-slate-300 select-none">
+    <div className="h-screen w-full bg-[#f5f5f7] overflow-hidden flex flex-col text-gray-900 select-none"
+      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif' }}>
 
       {showHelp && <HelpPanel onClose={() => setShowHelp(false)} />}
-
       {fm.movingProject && (
         <MoveFolderModal
           project={fm.movingProject}
@@ -89,136 +65,105 @@ const ProjectManagerView = ({
         />
       )}
 
-      {/* ── Ribbon (ex Col gauche) ─────────────────────────────────────────── */}
+      {/* ── Toolbar ───────────────────────────────────────────────────────── */}
       <PmLeftColumn
-        project={project}
-        chapCount={chapCount}
-        itemCount={itemCount}
-        lastSaved={lastSaved}
-        cloudSaving={cloud.cloudSaving}
-        cloudSaved={cloud.cloudSaved}
-        onCloudSave={cloud.handleCloudSave}
-        onExport={local.handleExport}
-        onImportClick={() => local.fileInputRef.current?.click()}
-        onClone={local.handleClone}
-        fileInputRef={local.fileInputRef}
-        onImportChange={local.handleImport}
+        project={project} chapCount={chapCount} itemCount={itemCount} lastSaved={lastSaved}
+        cloudSaving={cloud.cloudSaving} cloudSaved={cloud.cloudSaved}
+        onCloudSave={cloud.handleCloudSave} onExport={local.handleExport}
+        onImportClick={() => local.fileInputRef.current?.click()} onClone={local.handleClone}
+        fileInputRef={local.fileInputRef} onImportChange={local.handleImport}
         onNewProject={async () => { const ok = await confirm('Créer un nouveau projet ?'); if (ok) resetProject(); }}
         onShowHelp={() => setShowHelp(true)}
       />
 
-      {/* ── Body ───────────────────────────────────────────────────────────── */}
+      {/* ── Content bar ───────────────────────────────────────────────────── */}
       <div className="flex-1 flex min-h-0">
-        <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-slate-950">
-          <div className="flex-none px-8 py-5 border-b border-slate-800 flex items-center justify-between gap-4">
+        <div className="flex-1 flex flex-col min-w-0 min-h-0">
+
+          {/* Filters bar */}
+          <div className="flex-none px-8 py-3 bg-white/60 backdrop-blur-sm border-b border-gray-200/50 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <h3 className="text-lg font-semibold text-slate-100">Mes Projets</h3>
-              
+              <h3 className="text-lg font-semibold text-gray-900">Mes Projets</h3>
+
               {historyTab === 'cloud' && (
                 <div className="relative">
-                  <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                  <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                   <input
                     type="text"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     placeholder="Rechercher…"
-                    className="pl-7 pr-3 py-1.5 bg-slate-800 border border-slate-700 hover:border-slate-600 focus:border-emerald-500 rounded-lg text-xs text-slate-200 placeholder-slate-500 outline-none transition-colors w-44 focus:w-56"
+                    className="pl-7 pr-3 py-1.5 bg-gray-100 border border-gray-200/60 hover:border-gray-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 rounded-xl text-xs text-gray-700 placeholder-gray-400 outline-none transition-all w-44 focus:w-56"
                     style={{ transition: 'width 0.2s ease, border-color 0.15s' }}
                   />
                   {search && (
-                    <button
-                      onClick={() => setSearch('')}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
-                    >
-                      ×
-                    </button>
+                    <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">×</button>
                   )}
                 </div>
               )}
+
               {historyTab === 'cloud' && cloud.cloudProjects.length > 0 && (
-                <span className="bg-slate-800 text-slate-300 border border-slate-700 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                <span className="bg-gray-100 text-gray-500 border border-gray-200/60 text-xs font-medium px-2.5 py-0.5 rounded-full">
                   {fm.filteredProjects.length}
-                  {fm.selectedFolderId !== '__all__' && (
-                    <span className="text-slate-500"> / {cloud.cloudProjects.length}</span>
-                  )}
+                  {fm.selectedFolderId !== '__all__' && <span className="text-gray-300"> / {cloud.cloudProjects.length}</span>}
                 </span>
               )}
             </div>
 
-            <div className="flex items-center gap-4">
-              {/* Onglets */}
-              <div className="flex p-1 bg-slate-900 border border-slate-800 rounded-lg">
+            <div className="flex items-center gap-3">
+              {/* Tabs */}
+              <div className="flex p-0.5 bg-gray-100 border border-gray-200/60 rounded-xl">
                 <button
                   onClick={() => setHistoryTab('cloud')}
-                  className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                    historyTab === 'cloud' ? 'bg-slate-700 text-slate-100 shadow-sm' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    historyTab === 'cloud' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                   }`}
                 >
-                  <Cloud size={16} /> Cloud
+                  <Cloud size={14} /> Cloud
                 </button>
                 <button
                   onClick={() => setHistoryTab('local')}
-                  className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                    historyTab === 'local' ? 'bg-slate-700 text-slate-100 shadow-sm' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    historyTab === 'local' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                   }`}
                 >
-                  <Clock size={16} /> Local
+                  <Clock size={14} /> Local
                 </button>
               </div>
 
-              {/* Tri — visible uniquement sur l'onglet Cloud */}
               {historyTab === 'cloud' && cloud.cloudProjects.length > 0 && (
                 <>
-                  <div className="h-6 w-px bg-slate-800" />
-                  <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-1">
-                    <span className="flex items-center gap-1 text-[10px] text-slate-600 font-semibold uppercase tracking-wider px-2">
-                      <ArrowUpDown size={11} /> Tri
+                  <div className="h-5 w-px bg-gray-200/60" />
+                  <div className="flex items-center gap-0.5 bg-gray-100 border border-gray-200/60 rounded-xl p-0.5">
+                    <span className="flex items-center gap-1 text-[10px] text-gray-400 font-medium uppercase tracking-wider px-2">
+                      <ArrowUpDown size={10} /> Tri
                     </span>
-                    {[
-                      { id: 'date', label: 'Date' },
-                      { id: 'code', label: 'N°' },
-                      { id: 'name', label: 'Nom' },
-                    ].map(opt => (
+                    {[{ id: 'date', label: 'Date' }, { id: 'code', label: 'N°' }, { id: 'name', label: 'Nom' }].map(opt => (
                       <button
                         key={opt.id}
                         onClick={() => setSortBy(opt.id)}
-                        className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                          sortBy === opt.id
-                            ? 'bg-slate-700 text-slate-100 shadow-sm'
-                            : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/50'
+                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                          sortBy === opt.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                         }`}
                       >
                         {opt.label}
                       </button>
                     ))}
                   </div>
-                </>
-              )}
 
-              {/* Toggle vue grille / liste */}
-              {historyTab === 'cloud' && cloud.cloudProjects.length > 0 && (
-                <>
-                  <div className="h-6 w-px bg-slate-800" />
-                  <div className="flex items-center bg-slate-900 border border-slate-800 rounded-lg p-1">
+                  <div className="h-5 w-px bg-gray-200/60" />
+                  <div className="flex items-center bg-gray-100 border border-gray-200/60 rounded-xl p-0.5">
                     <button
                       onClick={() => setViewMode('grid')}
                       title="Vue en dalles"
-                      className={`p-1.5 rounded-md transition-colors ${
-                        viewMode === 'grid'
-                          ? 'bg-slate-700 text-slate-100 shadow-sm'
-                          : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/50'
-                      }`}
+                      className={`p-1.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
                     >
                       <LayoutGrid size={14} />
                     </button>
                     <button
                       onClick={() => setViewMode('list')}
                       title="Vue en liste"
-                      className={`p-1.5 rounded-md transition-colors ${
-                        viewMode === 'list'
-                          ? 'bg-slate-700 text-slate-100 shadow-sm'
-                          : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/50'
-                      }`}
+                      className={`p-1.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
                     >
                       <List size={14} />
                     </button>
@@ -226,29 +171,29 @@ const ProjectManagerView = ({
                 </>
               )}
 
-              <div className="h-6 w-px bg-slate-800" />
+              <div className="h-5 w-px bg-gray-200/60" />
 
               {historyTab === 'cloud' && (
                 <button
                   onClick={cloud.loadCloudProjects}
                   disabled={cloud.cloudLoading}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-all"
                 >
-                  <RefreshCw size={16} className={cloud.cloudLoading ? 'animate-spin' : ''} /> Actualiser
+                  <RefreshCw size={14} className={cloud.cloudLoading ? 'animate-spin' : ''} /> Actualiser
                 </button>
               )}
               {historyTab === 'local' && local.recentProjects.length > 0 && (
                 <button
                   onClick={local.clearHistory}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-gray-500 hover:text-red-500 hover:bg-red-50 transition-all"
                 >
-                  <Trash2 size={16} /> Vider l'historique
+                  <Trash2 size={14} /> Vider
                 </button>
               )}
             </div>
           </div>
 
-          {/* Onglet Cloud */}
+          {/* Cloud tab */}
           {historyTab === 'cloud' && (
             <div className="flex-1 flex min-h-0">
               <PmFolderSidebar
@@ -271,7 +216,7 @@ const ProjectManagerView = ({
                 handleRenameFolder={fm.handleRenameFolder}
                 handleDeleteFolder={fm.handleDeleteFolder}
               />
-              <div className="flex-1 overflow-y-auto p-8">
+              <div className="flex-1 overflow-y-auto p-6">
                 <PmProjectGrid
                   viewMode={viewMode}
                   cloudLoading={cloud.cloudLoading}
@@ -282,6 +227,7 @@ const ProjectManagerView = ({
                   setSelectedFolderId={fm.setSelectedFolderId}
                   project={project}
                   folders={fm.folders}
+                  folderColorMap={folderColorMap}
                   presenceByProject={presenceByProject}
                   deletingId={cloud.deletingId}
                   onLoadProject={cloud.handleLoadCloudProject}
@@ -293,9 +239,9 @@ const ProjectManagerView = ({
             </div>
           )}
 
-          {/* Onglet Local */}
+          {/* Local tab */}
           {historyTab === 'local' && (
-            <div className="flex-1 overflow-y-auto p-8">
+            <div className="flex-1 overflow-y-auto p-6">
               <PmLocalHistory
                 recentProjects={local.recentProjects}
                 onLoadFromHistory={local.loadFromHistory}

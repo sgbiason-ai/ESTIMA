@@ -1,6 +1,7 @@
 // src/views/BrandingView.jsx
 import React, { useState, useCallback, useRef } from 'react';
 import { confirm } from '../utils/globalUI';
+import { hexToRgbString, lightenHex } from '../utils/colorHelpers';
 
 // ─── SCHÉMA PAR DÉFAUT ────────────────────────────────────────────────────────
 export const DEFAULT_BRANDING = {
@@ -62,35 +63,17 @@ const TABS = [
   { id: 'typography',  label: 'Typographie',    icon: '✍️' },
 ];
 
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
-const hexToRgb = (hex) => {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `${r}, ${g}, ${b}`;
-};
-
-const lighten = (hex, amount = 0.9) => {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  const lr = Math.round(r + (255 - r) * amount);
-  const lg = Math.round(g + (255 - g) * amount);
-  const lb = Math.round(b + (255 - b) * amount);
-  return `rgb(${lr}, ${lg}, ${lb})`;
-};
-
 // ─── SOUS-COMPOSANTS ──────────────────────────────────────────────────────────
 
 const SectionTitle = ({ children }) => (
-  <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3 mt-5 first:mt-0">
+  <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3 mt-6 first:mt-0">
     {children}
   </h3>
 );
 
 const Field = ({ label, children }) => (
   <div className="mb-3">
-    <label className="block text-xs font-medium text-slate-500 mb-1">{label}</label>
+    <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
     {children}
   </div>
 );
@@ -101,9 +84,9 @@ const Input = ({ value, onChange, placeholder, type = 'text' }) => (
     value={value || ''}
     onChange={e => onChange(e.target.value)}
     placeholder={placeholder}
-    className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg 
-               text-slate-700 placeholder-slate-300 
-               focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400
+    className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200/60 rounded-xl
+               text-gray-800 placeholder-gray-300
+               focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 focus:bg-white
                transition-all duration-150"
   />
 );
@@ -112,9 +95,9 @@ const Select = ({ value, onChange, options }) => (
   <select
     value={value}
     onChange={e => onChange(e.target.value)}
-    className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg 
-               text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-100 
-               focus:border-blue-400 transition-all duration-150"
+    className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200/60 rounded-xl
+               text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-100
+               focus:border-blue-400 focus:bg-white transition-all duration-150"
   >
     {options.map(o => (
       <option key={o} value={o}>{o}</option>
@@ -123,31 +106,31 @@ const Select = ({ value, onChange, options }) => (
 );
 
 const ColorPicker = ({ label, value, onChange, description }) => (
-  <div className="flex items-center gap-3 mb-3">
+  <div className="flex items-center gap-3 mb-3 p-3 rounded-2xl bg-gray-50/80 border border-gray-100">
     <div className="relative group">
       <div
-        className="w-10 h-10 rounded-lg border-2 border-white shadow-md cursor-pointer 
-                   ring-1 ring-slate-200 transition-transform group-hover:scale-105"
+        className="w-10 h-10 rounded-xl shadow-sm cursor-pointer
+                   transition-transform group-hover:scale-105"
         style={{ backgroundColor: value }}
       />
       <input
         type="color"
         value={value}
         onChange={e => onChange(e.target.value)}
-        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full rounded-lg"
+        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full rounded-xl"
         title={`Changer ${label.toLowerCase()}`}
       />
     </div>
     <div className="flex-1 min-w-0">
-      <div className="text-sm font-medium text-slate-700">{label}</div>
-      {description && <div className="text-xs text-slate-400 truncate">{description}</div>}
+      <div className="text-sm font-medium text-gray-800">{label}</div>
+      {description && <div className="text-xs text-gray-400 truncate">{description}</div>}
       <input
         type="text"
         value={value}
         onChange={e => {
           if (/^#[0-9A-Fa-f]{0,6}$/.test(e.target.value)) onChange(e.target.value);
         }}
-        className="text-xs font-mono text-slate-500 bg-transparent border-none 
+        className="text-xs font-mono text-gray-500 bg-transparent border-none
                    outline-none w-24 mt-0.5"
         maxLength={7}
       />
@@ -156,20 +139,19 @@ const ColorPicker = ({ label, value, onChange, description }) => (
 );
 
 const SizeSlider = ({ label, value, onChange, min = 14, max = 40 }) => {
-  // Valeur en demi-points → affichage en pt
   const pt = (value / 2).toFixed(0);
   return (
     <div className="flex items-center gap-3 mb-2.5">
-      <span className="text-xs text-slate-500 w-14 flex-shrink-0">{label}</span>
+      <span className="text-xs text-gray-500 w-14 flex-shrink-0">{label}</span>
       <input
         type="range"
         min={min}
         max={max}
         value={value}
         onChange={e => onChange(Number(e.target.value))}
-        className="flex-1 h-1.5 accent-blue-500"
+        className="flex-1 h-1.5 accent-blue-500 rounded-full"
       />
-      <span className="text-xs font-mono text-slate-600 w-10 text-right">{pt} pt</span>
+      <span className="text-xs font-mono text-gray-600 w-10 text-right bg-gray-100 px-1.5 py-0.5 rounded-lg">{pt} pt</span>
     </div>
   );
 };
@@ -190,7 +172,7 @@ const CoverPreview = ({ branding, activeDocType, project }) => {
   const secondary = branding.colors.secondary;
   const textColor = branding.colors.text;
   const subtle    = branding.colors.subtle;
-  const bgLight   = lighten(primary, 0.93);
+  const bgLight   = lightenHex(primary, 0.93);
 
   const headingFont = branding.fonts.headings;
   const mainFont    = branding.fonts.main;
@@ -274,7 +256,7 @@ const CoverPreview = ({ branding, activeDocType, project }) => {
         style={{
           top: '14.5%',
           height: '1px',
-          backgroundColor: `rgba(${hexToRgb(primary)}, 0.15)`,
+          backgroundColor: `rgba(${hexToRgbString(primary)}, 0.15)`,
         }}
       />
 
@@ -392,7 +374,7 @@ const CoverPreview = ({ branding, activeDocType, project }) => {
           style={{
             left: '50%',
             width: '1px',
-            backgroundColor: `rgba(${hexToRgb(primary)}, 0.15)`,
+            backgroundColor: `rgba(${hexToRgbString(primary)}, 0.15)`,
           }}
         />
 
@@ -453,7 +435,7 @@ const CoverPreview = ({ branding, activeDocType, project }) => {
         >
           <div
             className="h-px mb-2"
-            style={{ backgroundColor: `rgba(${hexToRgb(primary)}, 0.15)` }}
+            style={{ backgroundColor: `rgba(${hexToRgbString(primary)}, 0.15)` }}
           />
           <div className="flex justify-between items-end">
             <div>
@@ -607,39 +589,39 @@ const BrandingView = ({
   };
 
   return (
-    <div className="flex h-full w-full bg-slate-50 overflow-hidden">
+    <div className="flex h-full w-full bg-[#f5f5f7] overflow-hidden"
+      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
 
       {/* ── PANNEAU GAUCHE : ÉDITEUR ── */}
-      <div className="w-80 flex-shrink-0 flex flex-col bg-white border-r border-slate-100 shadow-sm overflow-hidden">
+      <div className="w-80 flex-shrink-0 flex flex-col bg-white/80 backdrop-blur-xl border-r border-gray-200/60 overflow-hidden">
 
         {/* Header */}
-        <div className="px-5 py-4 border-b border-slate-100 flex-shrink-0">
-          <h2 className="text-sm font-bold text-slate-800 tracking-wide">
+        <div className="px-5 py-4 border-b border-gray-200/60 flex-shrink-0">
+          <h2 className="text-sm font-bold text-gray-900 tracking-tight">
             Charte graphique
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-gray-400 mt-0.5">
             Appliquée à tous les documents exportés
           </p>
         </div>
 
-        {/* Onglets */}
-        <div className="flex border-b border-slate-100 flex-shrink-0">
-          {TABS.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 py-2.5 text-xs font-medium transition-all duration-150 relative
-                ${activeTab === tab.id
-                  ? 'text-slate-800'
-                  : 'text-slate-400 hover:text-slate-600'}`}
-            >
-              <span className="block text-base mb-0.5">{tab.icon}</span>
-              {tab.label}
-              {activeTab === tab.id && (
-                <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-blue-500 rounded-t" />
-              )}
-            </button>
-          ))}
+        {/* Onglets — segmented control Apple */}
+        <div className="px-4 py-3 border-b border-gray-200/60 flex-shrink-0">
+          <div className="flex p-0.5 bg-gray-100 rounded-xl">
+            {TABS.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all duration-200
+                  ${activeTab === tab.id
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-400 hover:text-gray-600'}`}
+              >
+                <span className="text-sm">{tab.icon}</span>
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Contenu de l'onglet */}
@@ -653,11 +635,11 @@ const BrandingView = ({
                 onDrop={handleDrop}
                 onDragOver={e => e.preventDefault()}
                 onClick={() => fileInputRef.current?.click()}
-                className={`relative w-full rounded-xl border-2 border-dashed cursor-pointer
-                            transition-all duration-150 mb-4
+                className={`relative w-full rounded-2xl border-2 border-dashed cursor-pointer
+                            transition-all duration-200 mb-4
                             ${branding.logo
-                              ? 'border-slate-200 bg-slate-50 p-3'
-                              : 'border-slate-200 hover:border-blue-300 bg-slate-50 hover:bg-blue-50 p-6'}`}
+                              ? 'border-gray-200 bg-gray-50 p-3'
+                              : 'border-gray-200 hover:border-blue-300 bg-gray-50 hover:bg-blue-50/50 p-6'}`}
               >
                 {branding.logo ? (
                   <div className="flex items-center gap-3">
@@ -667,7 +649,7 @@ const BrandingView = ({
                       className="max-h-12 max-w-[120px] object-contain rounded"
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs text-slate-500 truncate">Logo chargé</p>
+                      <p className="text-xs text-gray-500 truncate">Logo chargé</p>
                       <button
                         onClick={e => { e.stopPropagation(); update('logo', null); }}
                         className="text-xs text-red-400 hover:text-red-600 mt-1"
@@ -679,10 +661,10 @@ const BrandingView = ({
                 ) : (
                   <div className="text-center">
                     <div className="text-2xl mb-2">🖼️</div>
-                    <p className="text-xs font-medium text-slate-500">
+                    <p className="text-xs font-medium text-gray-500">
                       Glisser-déposer ou cliquer
                     </p>
-                    <p className="text-xs text-slate-400 mt-1">PNG, JPG, SVG</p>
+                    <p className="text-xs text-gray-400 mt-1">PNG, JPG, SVG</p>
                   </div>
                 )}
                 <input
@@ -801,7 +783,7 @@ const BrandingView = ({
                       className="w-full aspect-square rounded-lg shadow-sm mb-1"
                       style={{ backgroundColor: val }}
                     />
-                    <div className="text-xs text-slate-400 text-center truncate capitalize">
+                    <div className="text-xs text-gray-400 text-center truncate capitalize">
                       {key}
                     </div>
                   </div>
@@ -811,7 +793,7 @@ const BrandingView = ({
               <div
                 className="rounded-xl p-4 text-sm font-medium"
                 style={{
-                  backgroundColor: lighten(branding.colors.primary, 0.93),
+                  backgroundColor: lightenHex(branding.colors.primary, 0.93),
                   color: branding.colors.primary,
                   fontWeight: 600,
                 }}
@@ -854,7 +836,7 @@ const BrandingView = ({
                   options={FONT_OPTIONS}
                 />
                 <div
-                  className="mt-2 text-sm truncate text-slate-600"
+                  className="mt-2 text-sm truncate text-gray-600"
                   style={{ fontFamily: branding.fonts.main }}
                 >
                   Texte de paragraphe en {branding.fonts.main}
@@ -862,7 +844,7 @@ const BrandingView = ({
               </Field>
 
               <SectionTitle>Tailles (documents Word)</SectionTitle>
-              <p className="text-xs text-slate-400 mb-3 -mt-1">
+              <p className="text-xs text-gray-400 mb-3 -mt-1">
                 Utilisées dans les exports CCTP et RC. La valeur est en points (pt).
               </p>
               {[
@@ -883,7 +865,7 @@ const BrandingView = ({
 
               <SectionTitle>Aperçu hiérarchie</SectionTitle>
               <div
-                className="rounded-xl p-4 space-y-2 bg-slate-50 border border-slate-100"
+                className="rounded-xl p-4 space-y-2 bg-gray-50 border border-gray-100"
                 style={{ fontFamily: branding.fonts.headings }}
               >
                 {[
@@ -914,25 +896,25 @@ const BrandingView = ({
         </div>
 
         {/* Footer : Boutons d'action */}
-        <div className="px-5 py-4 border-t border-slate-100 flex-shrink-0 space-y-2">
+        <div className="px-5 py-4 border-t border-gray-200/60 flex-shrink-0 space-y-2">
           <button
             onClick={handleSave}
             disabled={saveStatus === 'saving'}
-            className={`w-full py-2.5 rounded-xl text-sm font-semibold text-white transition-all duration-200
+            className={`w-full py-2.5 rounded-xl text-sm font-semibold text-white transition-all duration-200 active:scale-[0.97]
               ${saveStatus === 'saved'
                 ? 'bg-emerald-500'
                 : saveStatus === 'saving'
                 ? 'bg-blue-400 cursor-not-allowed'
-                : 'bg-blue-500 hover:bg-blue-600 active:scale-[0.98]'}`}
+                : 'bg-gray-900 hover:bg-gray-800'}`}
           >
-            {saveStatus === 'saving' ? '⏳ Sauvegarde…'
-             : saveStatus === 'saved' ? '✅ Enregistré !'
-             : '💾 Enregistrer la charte'}
+            {saveStatus === 'saving' ? 'Sauvegarde…'
+             : saveStatus === 'saved' ? 'Enregistré !'
+             : 'Enregistrer la charte'}
           </button>
           <button
             onClick={handleReset}
-            className="w-full py-2 rounded-xl text-xs text-slate-400 hover:text-slate-600 
-                       hover:bg-slate-50 transition-all duration-150"
+            className="w-full py-2 rounded-xl text-xs text-gray-400 hover:text-gray-600
+                       hover:bg-gray-100 transition-all duration-200"
           >
             Réinitialiser aux valeurs par défaut
           </button>
@@ -943,18 +925,18 @@ const BrandingView = ({
       <div className="flex-1 flex flex-col overflow-hidden">
 
         {/* Barre supérieure : sélection du type de document */}
-        <div className="flex-shrink-0 bg-white border-b border-slate-100 px-6 py-3">
+        <div className="flex-shrink-0 bg-white/60 backdrop-blur-sm border-b border-gray-200/50 px-6 py-3">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-semibold text-slate-400 mr-1">APERÇU POUR :</span>
+            <span className="text-xs font-medium text-gray-400 uppercase tracking-wider mr-1">Aperçu pour :</span>
             {DOC_TYPES.map(dt => (
               <button
                 key={dt.id}
                 onClick={() => setActiveDocType(dt.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium
-                            transition-all duration-150
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium
+                            transition-all duration-200
                             ${activeDocType === dt.id
-                              ? 'bg-slate-800 text-white shadow-sm'
-                              : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                              ? 'bg-gray-900 text-white shadow-sm'
+                              : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
               >
                 <span>{dt.icon}</span>
                 {dt.label}
@@ -968,16 +950,16 @@ const BrandingView = ({
           <div className="w-full max-w-md">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-semibold text-slate-700">
+                <h3 className="text-sm font-semibold text-gray-800">
                   Page de garde — Format A4
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-gray-400 mt-0.5">
                   Basé sur les informations de votre projet actuel
                 </p>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                <span className="text-xs text-slate-500">Mise à jour en temps réel</span>
+                <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span className="text-xs text-gray-400">Temps réel</span>
               </div>
             </div>
 
@@ -988,8 +970,8 @@ const BrandingView = ({
             />
 
             {/* Légende des documents impactés */}
-            <div className="mt-5 p-4 bg-white rounded-xl border border-slate-100 shadow-sm">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+            <div className="mt-5 p-4 bg-white rounded-2xl border border-gray-200/60">
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">
                 Documents utilisant cette charte
               </p>
               <div className="grid grid-cols-2 gap-2">
@@ -1003,10 +985,10 @@ const BrandingView = ({
                 ].map(item => (
                   <div
                     key={item.label}
-                    className="px-3 py-2 rounded-lg bg-slate-50 border border-slate-100"
+                    className="px-3 py-2 rounded-xl bg-gray-50 border border-gray-100"
                   >
-                    <div className="text-xs font-medium text-slate-700 truncate">{item.label}</div>
-                    <div className="text-xs text-slate-400 mt-0.5 truncate">
+                    <div className="text-xs font-medium text-gray-700 truncate">{item.label}</div>
+                    <div className="text-xs text-gray-400 mt-0.5 truncate">
                       {item.uses.join(', ')}
                     </div>
                   </div>
