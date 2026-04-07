@@ -72,8 +72,8 @@ export default function App() {
 
   if (authLoading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#040a0e] text-white">
-        <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+      <div className="flex h-screen items-center justify-center bg-[#f5f5f7]">
+        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -82,15 +82,15 @@ export default function App() {
 
   if (!companyId) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#040a0e] text-white flex-col gap-4">
-        <div className="text-2xl font-bold text-slate-300">Compte non configuré</div>
-        <p className="text-slate-500 text-sm max-w-sm text-center">
+      <div className="flex h-screen items-center justify-center bg-[#f5f5f7] flex-col gap-4">
+        <div className="text-2xl font-bold text-gray-900">Compte non configuré</div>
+        <p className="text-gray-500 text-sm max-w-sm text-center">
           Votre compte n'est pas encore associé à une entreprise.
           Contactez l'administrateur de l'application.
         </p>
         <button
           onClick={handleLogout}
-          className="mt-4 px-6 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-xl text-sm font-bold transition-colors"
+          className="mt-4 px-6 py-2 bg-red-50 hover:bg-red-100 text-red-500 rounded-xl text-sm font-medium transition-colors border border-red-200/60"
         >
           Se déconnecter
         </button>
@@ -229,16 +229,15 @@ function ProjectManagerModule({ user, companyId, onBackToHub, onOpenEstima }) {
   const [clientPercent, setClientPercent] = useState(10);
 
   return (
-    <div className="flex flex-col h-screen bg-[#040a0e] text-slate-300 overflow-hidden">
-      <header className="flex items-center gap-4 px-6 py-3 border-b border-white/5 shrink-0">
-        <button
-          onClick={onBackToHub}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/10 transition-all"
-        >
-          <span className="text-[10px] font-black uppercase tracking-widest">← Hub</span>
+    <div className="flex flex-col h-screen bg-[#f5f5f7] text-gray-900 overflow-hidden"
+      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
+      <header className="flex items-center gap-4 px-6 py-3 border-b border-gray-200/60 shrink-0 bg-white/80 backdrop-blur-xl">
+        <button onClick={onBackToHub}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all">
+          <span className="text-[10px] font-bold uppercase tracking-widest">← Hub</span>
         </button>
-        <div className="h-6 w-px bg-white/10" />
-        <h1 className="font-black text-lg text-white tracking-tight">Gestion de Projets</h1>
+        <div className="h-5 w-px bg-gray-200/60" />
+        <h1 className="font-bold text-lg text-gray-900 tracking-tight">Gestion de Projets</h1>
       </header>
       <div className="flex-1 overflow-hidden">
         <ProjectManagerView
@@ -298,7 +297,7 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub }) {
   });
 
   // ── 6. États UI ─────────────────────────────────────────────────────────────
-  const [activeTab,      setActiveTab]      = useState('hub');
+  const [activeTab,      setActiveTab]      = useState('project');
   const [saveStatus,     setSaveStatus]     = useState('saved');
   const [viewMode,       setViewMode]       = useState('study');
   const [bpuSearch,      setBpuSearch]      = useState('');
@@ -344,7 +343,8 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub }) {
 
   // ── Render desktop ────────────────────────────────────────────────────────────
   return (
-    <div className="flex h-screen bg-[#040a0e] text-slate-300 font-sans overflow-hidden relative">
+    <div className="flex h-screen bg-[#f5f5f7] text-gray-900 font-sans overflow-hidden relative"
+      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
 
       {/* ── Calculatrice flottante ─────────────────────────────────────────── */}
       <DraggableCalculator
@@ -417,9 +417,9 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub }) {
       {/* ── Contenu principal ─────────────────────────────────────────────── */}
       <div className="flex-1 flex overflow-hidden">
         {db.isLoading && !localMode.isLocalMode ? (
-          <div className="flex-1 flex items-center justify-center text-white gap-3">
-            <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-            <span>Chargement Cloud...</span>
+          <div className="flex-1 flex items-center justify-center text-gray-500 gap-3">
+            <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            <span className="text-sm">Chargement Cloud...</span>
           </div>
         ) : (
           <>
@@ -594,16 +594,15 @@ function BrandingModule({ user, companyId, onBackToHub }) {
   const resources = useAppResources(user, companyId);
 
   return (
-    <div className="flex flex-col h-screen bg-[#040a0e] text-slate-300 overflow-hidden">
-      <header className="flex items-center gap-4 px-6 py-3 border-b border-white/5 shrink-0">
-        <button
-          onClick={onBackToHub}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/10 transition-all"
-        >
-          <span className="text-[10px] font-black uppercase tracking-widest">← Hub</span>
+    <div className="flex flex-col h-screen bg-[#f5f5f7] text-gray-900 overflow-hidden"
+      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
+      <header className="flex items-center gap-4 px-6 py-3 border-b border-gray-200/60 shrink-0 bg-white/80 backdrop-blur-xl">
+        <button onClick={onBackToHub}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all">
+          <span className="text-[10px] font-bold uppercase tracking-widest">← Hub</span>
         </button>
-        <div className="h-6 w-px bg-white/10" />
-        <h1 className="font-black text-lg text-white tracking-tight">Identité & Charte Graphique</h1>
+        <div className="h-5 w-px bg-gray-200/60" />
+        <h1 className="font-bold text-lg text-gray-900 tracking-tight">Identité & Charte Graphique</h1>
       </header>
       <div className="flex-1 overflow-hidden">
         <BrandingView
@@ -619,18 +618,17 @@ function BrandingModule({ user, companyId, onBackToHub }) {
 // ─── MODULE MON COMPTE & RGPD (autonome, hors ESTIMA) ──────────────────────
 function RgpdModule({ user, companyId, onBackToHub }) {
   return (
-    <div className="flex flex-col h-screen bg-[#040a0e] text-slate-300 overflow-hidden">
-      <header className="flex items-center gap-4 px-6 py-3 border-b border-white/5 shrink-0">
-        <button
-          onClick={onBackToHub}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/10 transition-all"
-        >
-          <span className="text-[10px] font-black uppercase tracking-widest">← Hub</span>
+    <div className="flex flex-col h-screen bg-[#f5f5f7] text-gray-900 overflow-hidden"
+      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
+      <header className="flex items-center gap-4 px-6 py-3 border-b border-gray-200/60 shrink-0 bg-white/80 backdrop-blur-xl">
+        <button onClick={onBackToHub}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all">
+          <span className="text-[10px] font-bold uppercase tracking-widest">← Hub</span>
         </button>
-        <div className="h-6 w-px bg-white/10" />
-        <h1 className="font-black text-lg text-white tracking-tight">Mon Compte & Données Personnelles</h1>
+        <div className="h-5 w-px bg-gray-200/60" />
+        <h1 className="font-bold text-lg text-gray-900 tracking-tight">Mon Compte & Données Personnelles</h1>
       </header>
-      <div className="flex-1 overflow-y-auto p-8">
+      <div className="flex-1 overflow-y-auto p-8 bg-[#f5f5f7]">
         <div className="max-w-3xl mx-auto">
           <AccountSection user={user} companyId={companyId} />
         </div>

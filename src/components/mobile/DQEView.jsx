@@ -64,10 +64,10 @@ export default function DQEView({ project, calcHook, tranchesHook }) {
   return (
     <div className="py-2">
       {/* Total */}
-      <div className="mx-4 mb-3 p-4 bg-white/5 rounded-2xl border border-white/10 text-center">
-        <div className="text-xs text-slate-500 font-bold uppercase tracking-wider">DQE Total Client</div>
-        <div className="text-2xl font-extrabold text-emerald-400 mt-1">{fmt(dqeData.total)}</div>
-        <div className="text-xs text-slate-500 mt-1">
+      <div className="mx-4 mb-3 p-4 bg-white rounded-2xl border border-gray-200 text-center">
+        <div className="text-xs text-gray-700 font-bold uppercase tracking-wider">DQE Total Client</div>
+        <div className="text-2xl font-extrabold text-blue-600 mt-1">{fmt(dqeData.total)}</div>
+        <div className="text-xs text-gray-700 mt-1">
           {dqeData.chapters.length} chapitres •{' '}
           {dqeData.chapters.reduce((s, c) => s + c.lignes.length, 0)} lignes
         </div>
@@ -80,8 +80,8 @@ export default function DQEView({ project, calcHook, tranchesHook }) {
             onClick={() => { setActiveTranche('global'); setExpandedChap({}); }}
             className={`px-3 py-2 rounded-lg border text-xs font-bold whitespace-nowrap transition ${
               activeTranche === 'global'
-                ? 'bg-emerald-500 border-emerald-500 text-white'
-                : 'bg-white/5 border-white/10 text-slate-400'
+                ? 'bg-gray-900 border-gray-900 text-white shadow-sm'
+                : 'bg-white border-gray-200 text-gray-600'
             }`}>
             Global
           </button>
@@ -90,8 +90,8 @@ export default function DQEView({ project, calcHook, tranchesHook }) {
               onClick={() => { setActiveTranche(t.id); setExpandedChap({}); }}
               className={`px-3 py-2 rounded-lg border text-xs font-bold whitespace-nowrap transition ${
                 activeTranche === t.id
-                  ? 'bg-emerald-500 border-emerald-500 text-white'
-                  : 'bg-white/5 border-white/10 text-slate-400'
+                  ? 'bg-gray-900 border-gray-900 text-white shadow-sm'
+                  : 'bg-white border-gray-200 text-gray-600'
               }`}>
               {t.name}
             </button>
@@ -106,48 +106,48 @@ export default function DQEView({ project, calcHook, tranchesHook }) {
         return (
           <div key={idx} className="mx-4 mb-1.5">
             <button onClick={() => toggleChap(idx)}
-              className={`flex items-center gap-2 w-full p-3 bg-white/5 border border-white/10 text-left ${isOpen ? 'rounded-t-xl' : 'rounded-xl'}`}>
+              className={`flex items-center gap-2 w-full p-3 bg-white border border-gray-200 text-left ${isOpen ? 'rounded-t-xl' : 'rounded-xl'}`}>
               <div className="flex-1">
-                <div className="text-[13px] font-bold text-slate-200 uppercase">{chap.nom}</div>
-                <div className="text-[11px] text-slate-500 mt-0.5">{chap.lignes.length} ligne{chap.lignes.length > 1 ? 's' : ''} • {pct}%</div>
+                <div className="text-[13px] font-bold text-gray-900 uppercase">{chap.nom}</div>
+                <div className="text-[11px] text-gray-700 mt-0.5">{chap.lignes.length} ligne{chap.lignes.length > 1 ? 's' : ''} • {pct}%</div>
               </div>
-              <span className="text-sm font-extrabold text-slate-300">{fmt(chap.sousTotal)}</span>
+              <span className="text-sm font-extrabold text-gray-600">{fmt(chap.sousTotal)}</span>
               <span className={`transition-transform ${isOpen ? 'rotate-90' : ''}`}>
                 <Icon name="chevron" size={14} color="#64748b" />
               </span>
             </button>
 
             {isOpen && (
-              <div className="bg-white/[0.03] border border-t-0 border-white/10 rounded-b-xl overflow-hidden">
+              <div className="bg-white border border-t-0 border-gray-200 rounded-b-xl overflow-hidden">
                 {/* Header */}
-                <div className="grid grid-cols-[1fr_46px_62px_84px] gap-0.5 px-2.5 py-1.5 text-[9px] font-extrabold text-slate-400 uppercase tracking-wider border-b border-white/5">
+                <div className="grid grid-cols-[1fr_46px_62px_84px] gap-0.5 px-2.5 py-1.5 text-[9px] font-extrabold text-gray-600 uppercase tracking-wider border-b border-gray-100">
                   <span>Désign.</span>
                   <span className="text-right">Qté</span>
                   <span className="text-right">P.U.</span>
                   <span className="text-right">Total</span>
                 </div>
                 {chap.lignes.map((l, lIdx) => (
-                  <div key={lIdx} className="grid grid-cols-[1fr_46px_62px_84px] gap-0.5 px-2.5 py-2 border-b border-white/5 items-start">
+                  <div key={lIdx} className="grid grid-cols-[1fr_46px_62px_84px] gap-0.5 px-2.5 py-2 border-b border-gray-100 items-start">
                     <div className="min-w-0 pr-1 overflow-hidden">
-                      <div className="text-[10px] text-emerald-400 font-bold tabular-nums">{l.ref}</div>
-                      <div className="text-[11px] text-slate-300 font-medium leading-tight truncate" title={l.designation}>{l.designation}</div>
+                      <div className="text-[10px] text-blue-600 font-bold tabular-nums">{l.ref}</div>
+                      <div className="text-[11px] text-gray-600 font-medium leading-tight truncate" title={l.designation}>{l.designation}</div>
                     </div>
-                    <div className="text-right text-[11px] font-semibold text-slate-300 tabular-nums whitespace-nowrap">
+                    <div className="text-right text-[11px] font-semibold text-gray-600 tabular-nums whitespace-nowrap">
                       {l.qte.toLocaleString('fr-FR')}
-                      <div className="text-[9px] text-slate-400 font-normal">{l.unite}</div>
+                      <div className="text-[9px] text-gray-600 font-normal">{l.unite}</div>
                     </div>
-                    <div className="text-right text-[11px] font-semibold text-slate-400 tabular-nums whitespace-nowrap">
+                    <div className="text-right text-[11px] font-semibold text-gray-600 tabular-nums whitespace-nowrap">
                       {l.pu.toLocaleString('fr-FR', { minimumFractionDigits: 0 })}€
                     </div>
-                    <div className="text-right text-[11px] font-extrabold text-emerald-400 tabular-nums whitespace-nowrap">
+                    <div className="text-right text-[11px] font-extrabold text-blue-600 tabular-nums whitespace-nowrap">
                       {l.total.toLocaleString('fr-FR', { minimumFractionDigits: 0 })}€
                     </div>
                   </div>
                 ))}
                 {/* Sous-total */}
-                <div className="flex justify-between px-3 py-2.5 bg-white/5 border-t border-white/10">
-                  <span className="text-xs font-bold text-slate-400">Sous-total</span>
-                  <span className="text-[13px] font-extrabold text-emerald-400">{fmt(chap.sousTotal)}</span>
+                <div className="flex justify-between px-3 py-2.5 bg-white border-t border-gray-200">
+                  <span className="text-xs font-bold text-gray-600">Sous-total</span>
+                  <span className="text-[13px] font-extrabold text-blue-600">{fmt(chap.sousTotal)}</span>
                 </div>
               </div>
             )}
@@ -156,8 +156,8 @@ export default function DQEView({ project, calcHook, tranchesHook }) {
       })}
 
       {/* Footer total */}
-      <div className="flex justify-between mx-4 mt-2 mb-4 p-4 bg-gradient-to-br from-[#040a0e] to-[#0a1628] rounded-xl">
-        <span className="text-sm font-bold text-slate-400">Total DQE</span>
+      <div className="flex justify-between mx-4 mt-2 mb-4 p-4 bg-gray-900 rounded-xl">
+        <span className="text-sm font-bold text-white">Total DQE</span>
         <span className="text-lg font-extrabold text-white">{fmt(dqeData.total)}</span>
       </div>
     </div>

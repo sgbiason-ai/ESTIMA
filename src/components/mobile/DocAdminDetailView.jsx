@@ -88,8 +88,8 @@ const extractTimeline = (fiche) => {
 // ─── Helpers ───────────────────────────────────────────────────────────────
 const SectionTab = ({ label, active, onClick }) => (
   <button onClick={onClick}
-    className={`flex-1 py-2 text-xs font-bold rounded-md transition ${
-      active ? 'bg-white/10 text-slate-100' : 'text-slate-500'
+    className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition ${
+      active ? 'bg-gray-900 text-white shadow-sm' : 'bg-gray-100 text-gray-600'
     }`}>
     {label}
   </button>
@@ -98,18 +98,18 @@ const SectionTab = ({ label, active, onClick }) => (
 const InfoRow = ({ label, value }) => {
   if (!value) return null;
   return (
-    <div className="flex justify-between items-start gap-2 py-1.5 border-b border-white/5 last:border-0">
-      <span className="text-[11px] text-slate-500 font-semibold shrink-0">{label}</span>
-      <span className="text-xs text-slate-300 text-right">{value}</span>
+    <div className="flex justify-between items-start gap-2 py-1.5 border-b border-gray-100 last:border-0">
+      <span className="text-[11px] text-gray-700 font-semibold shrink-0">{label}</span>
+      <span className="text-xs text-gray-600 text-right">{value}</span>
     </div>
   );
 };
 
 const SectionCard = ({ title, icon, color, children }) => (
-  <div className="bg-white/[0.03] rounded-xl border border-white/10 overflow-hidden mb-3">
-    <div className="flex items-center gap-2 px-3 py-2 border-b border-white/5">
+  <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-3">
+    <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100">
       <Icon name={icon} size={14} color={color} />
-      <span className="text-xs font-bold text-slate-300">{title}</span>
+      <span className="text-xs font-bold text-gray-600">{title}</span>
     </div>
     <div className="px-3 py-1.5">
       {children}
@@ -209,16 +209,16 @@ export default function DocAdminDetailView({ fiche, branding, onToast, isLandsca
     <div className="flex flex-col h-full">
 
       {/* ── Header fiche ──────────────────────────────────────────────── */}
-      <div className={`mx-4 bg-white/5 rounded-xl border border-white/10 ${isLandscape ? 'mt-0.5 mb-1 p-2' : 'mt-2 mb-2 p-3'}`}>
+      <div className={`mx-4 bg-white rounded-xl border border-gray-200 ${isLandscape ? 'mt-0.5 mb-1 p-2' : 'mt-2 mb-2 p-3'}`}>
         <div className="flex items-center justify-between">
           <div className="flex-1 min-w-0">
             <span className="text-xs font-semibold text-rose-400">{fiche.nom}</span>
             {sectionD?.referenceMarche && (
-              <span className="text-[10px] text-slate-500 ml-2">Réf. {sectionD.referenceMarche}</span>
+              <span className="text-[10px] text-gray-700 ml-2">Réf. {sectionD.referenceMarche}</span>
             )}
           </div>
           {sectionD?.dateNotification && (
-            <span className="text-xs text-slate-500 shrink-0">
+            <span className="text-xs text-gray-700 shrink-0">
               Notif. {dateFr(sectionD.dateNotification)}
             </span>
           )}
@@ -226,7 +226,7 @@ export default function DocAdminDetailView({ fiche, branding, onToast, isLandsca
       </div>
 
       {/* ── Tabs ──────────────────────────────────────────────────────── */}
-      <div className={`flex gap-1 mx-4 p-1 bg-white/5 rounded-lg ${isLandscape ? 'mb-1' : 'mb-2'}`}>
+      <div className={`flex gap-1.5 mx-4 p-1 bg-gray-100 rounded-2xl ${isLandscape ? 'mb-1' : 'mb-2'}`}>
         <SectionTab label="Résumé" active={activeTab === 'resume'} onClick={() => setActiveTab('resume')} />
         <SectionTab label="Frise" active={activeTab === 'frise'} onClick={() => setActiveTab('frise')} />
         <SectionTab label="EXE Docs" active={activeTab === 'exe'} onClick={() => setActiveTab('exe')} />
@@ -289,7 +289,7 @@ export default function DocAdminDetailView({ fiche, branding, onToast, isLandsca
         {activeTab === 'exe' && (
           <div>
             {allExeEntries.length === 0 && (
-              <div className="text-center py-10 text-slate-500 text-sm">
+              <div className="text-center py-10 text-gray-700 text-sm">
                 Aucun document EXE renseigné
               </div>
             )}
@@ -304,15 +304,15 @@ export default function DocAdminDetailView({ fiche, branding, onToast, isLandsca
                 {/* EXE1-T — Ordres de Service */}
                 <SectionCard title="EXE1-T — Ordres de Service" icon="file" color="#fb7185">
                   {(data.exe1 || []).length === 0 && (
-                    <div className="py-2 text-xs text-slate-500">Aucun OS</div>
+                    <div className="py-2 text-xs text-gray-700">Aucun OS</div>
                   )}
                   {(data.exe1 || []).map((os, idx) => (
-                    <div key={idx} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
+                    <div key={idx} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
                       <div className="flex-1 min-w-0">
-                        <div className="text-xs font-semibold text-slate-300">
+                        <div className="text-xs font-semibold text-gray-600">
                           OS n°{os.numeroOrdreService || idx + 1}
                         </div>
-                        <div className="text-[11px] text-slate-500">
+                        <div className="text-[11px] text-gray-700">
                           {OS_LABELS[os.typeOS] || os.typeOS}
                           {os.dateDemarragePrestations && ` — ${dateFr(os.dateDemarragePrestations)}`}
                         </div>
@@ -333,21 +333,21 @@ export default function DocAdminDetailView({ fiche, branding, onToast, isLandsca
                 {/* EXE4/5/6 — Réception */}
                 <SectionCard title="Réception (EXE4/5/6)" icon="check" color="#34d399">
                   {(!data.reception || Object.keys(data.reception).length === 0) ? (
-                    <div className="py-2 text-xs text-slate-500">Non renseigné</div>
+                    <div className="py-2 text-xs text-gray-700">Non renseigné</div>
                   ) : (
                     <div className="space-y-2">
                       {/* EXE4 — OPR */}
                       <div className="flex items-center justify-between py-1.5">
                         <div>
-                          <div className="text-xs font-semibold text-slate-300">EXE4 — OPR</div>
-                          <div className="text-[11px] text-slate-500">
+                          <div className="text-xs font-semibold text-gray-600">EXE4 — OPR</div>
+                          <div className="text-[11px] text-gray-700">
                             {data.reception.dateOPR ? `OPR le ${dateFr(data.reception.dateOPR)}` : 'Date non renseignée'}
                           </div>
                         </div>
                         <button
                           onClick={() => handleExport('exe4', groupeId)}
                           disabled={!!exporting}
-                          className="shrink-0 w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center active:bg-emerald-500/30 transition disabled:opacity-40"
+                          className="shrink-0 w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center active:bg-emerald-500/30 transition disabled:opacity-40"
                         >
                           {exporting === `exe4-${groupeId}-`
                             ? <div className="w-3.5 h-3.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
@@ -356,14 +356,14 @@ export default function DocAdminDetailView({ fiche, branding, onToast, isLandsca
                       </div>
 
                       {/* EXE5 — Propositions */}
-                      <div className="flex items-center justify-between py-1.5 border-t border-white/5">
+                      <div className="flex items-center justify-between py-1.5 border-t border-gray-100">
                         <div>
-                          <div className="text-xs font-semibold text-slate-300">EXE5 — Propositions MOE</div>
+                          <div className="text-xs font-semibold text-gray-600">EXE5 — Propositions MOE</div>
                         </div>
                         <button
                           onClick={() => handleExport('exe5', groupeId)}
                           disabled={!!exporting}
-                          className="shrink-0 w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center active:bg-emerald-500/30 transition disabled:opacity-40"
+                          className="shrink-0 w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center active:bg-emerald-500/30 transition disabled:opacity-40"
                         >
                           {exporting === `exe5-${groupeId}-`
                             ? <div className="w-3.5 h-3.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
@@ -372,14 +372,14 @@ export default function DocAdminDetailView({ fiche, branding, onToast, isLandsca
                       </div>
 
                       {/* EXE6 — Décision */}
-                      <div className="flex items-center justify-between py-1.5 border-t border-white/5">
+                      <div className="flex items-center justify-between py-1.5 border-t border-gray-100">
                         <div>
-                          <div className="text-xs font-semibold text-slate-300">EXE6 — Décision de réception</div>
+                          <div className="text-xs font-semibold text-gray-600">EXE6 — Décision de réception</div>
                         </div>
                         <button
                           onClick={() => handleExport('exe6', groupeId)}
                           disabled={!!exporting}
-                          className="shrink-0 w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center active:bg-emerald-500/30 transition disabled:opacity-40"
+                          className="shrink-0 w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center active:bg-emerald-500/30 transition disabled:opacity-40"
                         >
                           {exporting === `exe6-${groupeId}-`
                             ? <div className="w-3.5 h-3.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
@@ -397,7 +397,7 @@ export default function DocAdminDetailView({ fiche, branding, onToast, isLandsca
                       EXE10 Avenant ✓
                     </span>
                   ) : (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-white/5 text-slate-600 border-white/10">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-white text-gray-600 border-gray-200">
                       EXE10 —
                     </span>
                   )}
@@ -448,7 +448,7 @@ function TimelineTab({ fiche, allExeEntries }) {
 
   if (!hasDates) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+      <div className="flex flex-col items-center justify-center py-12 text-gray-700">
         <Icon name="calendar" size={28} color="#475569" />
         <span className="text-sm mt-3 font-semibold">Planning non défini</span>
         <span className="text-xs mt-1">Renseignez les dates sur la version desktop</span>
@@ -461,12 +461,12 @@ function TimelineTab({ fiche, allExeEntries }) {
 
       {/* ── Barre de progression ──────────────────────────────────────── */}
       {progress !== null && (
-        <div className="bg-white/[0.03] rounded-xl border border-white/10 p-3">
+        <div className="bg-white rounded-xl border border-gray-200 p-3">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Avancement</span>
-            <span className="text-xs font-extrabold text-slate-200">{Math.round(progress)}%</span>
+            <span className="text-[10px] font-bold text-gray-700 uppercase tracking-wide">Avancement</span>
+            <span className="text-xs font-extrabold text-gray-900">{Math.round(progress)}%</span>
           </div>
-          <div className="h-2.5 bg-white/5 rounded-full overflow-hidden">
+          <div className="h-2.5 bg-white rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all ${progress >= 100 ? 'bg-amber-500' : 'bg-blue-500'}`}
               style={{ width: `${Math.min(progress, 100)}%` }}
@@ -476,9 +476,9 @@ function TimelineTab({ fiche, allExeEntries }) {
       )}
 
       {/* ── Dates clés ────────────────────────────────────────────────── */}
-      <div className="bg-white/[0.03] rounded-xl border border-white/10 overflow-hidden">
-        <div className="px-3 py-2 border-b border-white/5">
-          <span className="text-xs font-bold text-slate-300">Dates clés</span>
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-3 py-2 border-b border-gray-100">
+          <span className="text-xs font-bold text-gray-600">Dates clés</span>
         </div>
         <div className="divide-y divide-white/5">
           {tl.notification && (
@@ -502,9 +502,9 @@ function TimelineTab({ fiche, allExeEntries }) {
 
       {/* ── Arrêts de chantier ────────────────────────────────────────── */}
       {tl.arretData.periodes.length > 0 && (
-        <div className="bg-white/[0.03] rounded-xl border border-white/10 overflow-hidden">
-          <div className="px-3 py-2 border-b border-white/5 flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-300">Arrêts de chantier</span>
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between">
+            <span className="text-xs font-bold text-gray-600">Arrêts de chantier</span>
             <span className="text-[10px] font-extrabold text-red-400">
               {tl.arretData.totalArretDays} jour{tl.arretData.totalArretDays > 1 ? 's' : ''}
             </span>
@@ -514,7 +514,7 @@ function TimelineTab({ fiche, allExeEntries }) {
               <div key={i} className="flex items-center justify-between px-3 py-2">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-red-500" />
-                  <span className="text-xs text-slate-300">
+                  <span className="text-xs text-gray-600">
                     {formatD(p.debut)} → {p.enCours ? 'en cours' : formatD(p.fin)}
                   </span>
                 </div>
@@ -527,17 +527,17 @@ function TimelineTab({ fiche, allExeEntries }) {
 
       {/* ── Intempéries ───────────────────────────────────────────────── */}
       {tl.intemperies > 0 && (
-        <div className="bg-white/[0.03] rounded-xl border border-white/10 p-3 flex items-center justify-between">
-          <span className="text-xs font-semibold text-slate-400">Jours intempéries</span>
+        <div className="bg-white rounded-xl border border-gray-200 p-3 flex items-center justify-between">
+          <span className="text-xs font-semibold text-gray-600">Jours intempéries</span>
           <span className="text-xs font-extrabold text-cyan-400">+{tl.intemperies} jour{tl.intemperies > 1 ? 's' : ''}</span>
         </div>
       )}
 
       {/* ── Liste des OS ��─────────────────────────────────────────────── */}
       {tl.osList.length > 0 && (
-        <div className="bg-white/[0.03] rounded-xl border border-white/10 overflow-hidden">
-          <div className="px-3 py-2 border-b border-white/5">
-            <span className="text-xs font-bold text-slate-300">Ordres de Service</span>
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-3 py-2 border-b border-gray-100">
+            <span className="text-xs font-bold text-gray-600">Ordres de Service</span>
           </div>
           <div className="divide-y divide-white/5">
             {tl.osList.map((os, i) => {
@@ -547,14 +547,14 @@ function TimelineTab({ fiche, allExeEntries }) {
                 <div key={i} className="flex items-center gap-2.5 px-3 py-2">
                   <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: typeColor }} />
                   <div className="flex-1 min-w-0">
-                    <span className="text-xs font-semibold text-slate-300">
+                    <span className="text-xs font-semibold text-gray-600">
                       OS n°{os.numeroOrdreService || i + 1}
                     </span>
-                    <span className="text-[11px] text-slate-500 ml-1.5">
+                    <span className="text-[11px] text-gray-700 ml-1.5">
                       {OS_LABELS[os.typeOS] || os.typeOS}
                     </span>
                   </div>
-                  <span className="text-[11px] text-slate-500 shrink-0">{formatD(osDate)}</span>
+                  <span className="text-[11px] text-gray-700 shrink-0">{formatD(osDate)}</span>
                 </div>
               );
             })}
@@ -570,9 +570,9 @@ function TimelineRow({ color, label, date, highlight }) {
     <div className={`flex items-center justify-between px-3 py-2.5 ${highlight ? 'bg-amber-500/5' : ''}`}>
       <div className="flex items-center gap-2.5">
         <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-        <span className="text-xs font-semibold text-slate-300">{label}</span>
+        <span className="text-xs font-semibold text-gray-600">{label}</span>
       </div>
-      <span className={`text-xs font-bold ${highlight ? 'text-amber-400' : 'text-slate-400'}`}>{date}</span>
+      <span className={`text-xs font-bold ${highlight ? 'text-amber-400' : 'text-gray-600'}`}>{date}</span>
     </div>
   );
 }

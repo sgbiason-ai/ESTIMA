@@ -292,7 +292,7 @@ const ObservationRow = ({ obs, onUpdate, onDelete, meetingDate, participantGroup
             {images.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {images.map((src, idx) => (
-                  <div key={idx} className="relative group w-16 h-16 rounded border border-slate-200 overflow-hidden bg-slate-100">
+                  <div key={idx} className="relative group w-16 h-16 rounded border border-gray-200 overflow-hidden bg-gray-100">
                     <img src={src} alt="" className="w-full h-full object-cover" />
                     <button
                       onClick={() => removeImage(idx)}

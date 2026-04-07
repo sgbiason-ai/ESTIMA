@@ -39,9 +39,9 @@ export default function TranchesView({ project, calcHook, tranchesHook }) {
 
   return (
     <div className="py-2">
-      <div className="mx-4 mb-3 p-4 bg-white/5 rounded-2xl border border-white/10 text-center">
-        <div className="text-xs text-slate-500 font-bold uppercase tracking-wider">Montant total</div>
-        <div className="text-2xl font-extrabold text-emerald-400 mt-1">{fmt(grandTotal)}</div>
+      <div className="mx-4 mb-3 p-4 bg-white rounded-2xl border border-gray-200 text-center">
+        <div className="text-xs text-gray-700 font-bold uppercase tracking-wider">Montant total</div>
+        <div className="text-2xl font-extrabold text-blue-600 mt-1">{fmt(grandTotal)}</div>
       </div>
 
       {trancheData.map((tr, i) => {
@@ -50,28 +50,28 @@ export default function TranchesView({ project, calcHook, tranchesHook }) {
         return (
           <div key={i} className="mx-4 mb-2">
             <button onClick={() => setOpenIdx(isOpen ? -1 : i)}
-              className="flex items-center gap-1 w-full p-3.5 bg-white/5 border border-white/10 rounded-xl text-left">
+              className="flex items-center gap-1 w-full p-3.5 bg-white border border-gray-200 rounded-xl text-left">
               <div className="flex-1">
-                <div className="text-sm font-bold text-slate-200">{tr.nom}</div>
-                <div className="text-xs text-slate-500 mt-0.5">{pct}% du total</div>
+                <div className="text-sm font-bold text-gray-900">{tr.nom}</div>
+                <div className="text-xs text-gray-700 mt-0.5">{pct}% du total</div>
               </div>
-              <span className="text-base font-extrabold text-emerald-400">{fmtShort(tr.montant)}</span>
+              <span className="text-base font-extrabold text-blue-600">{fmtShort(tr.montant)}</span>
               <span className={`ml-2 transition-transform ${isOpen ? 'rotate-90' : ''}`}>
                 <Icon name="chevron" size={14} color="#64748b" />
               </span>
             </button>
 
             {isOpen && (
-              <div className="bg-white/[0.03] border border-t-0 border-white/10 rounded-b-xl p-3 -mt-1">
+              <div className="bg-white border border-t-0 border-gray-200 rounded-b-xl p-3 -mt-1">
                 {tr.chapitres.map((ch, j) => {
                   const barW = tr.montant > 0 ? (ch.montant / tr.montant) * 100 : 0;
                   return (
-                    <div key={j} className="py-2 border-b border-white/5 last:border-0">
+                    <div key={j} className="py-2 border-b border-gray-100 last:border-0">
                       <div className="flex justify-between mb-1">
-                        <span className="text-[13px] text-slate-300 font-semibold">{ch.nom}</span>
-                        <span className="text-[13px] text-slate-200 font-bold">{fmtShort(ch.montant)}</span>
+                        <span className="text-[13px] text-gray-600 font-semibold">{ch.nom}</span>
+                        <span className="text-[13px] text-gray-900 font-bold">{fmtShort(ch.montant)}</span>
                       </div>
-                      <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                      <div className="h-1.5 bg-white rounded-full overflow-hidden">
                         <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full transition-all"
                           style={{ width: `${barW}%` }} />
                       </div>

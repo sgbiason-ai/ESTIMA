@@ -325,17 +325,18 @@ export default function MobileApp({ user, companyId, onLogout }) {
   }, [dbHook.bpu]);
 
   return (
-    <div className={`flex flex-col h-dvh bg-[#040a0e] font-sans shadow-2xl ${isLandscape ? 'w-full' : 'max-w-md mx-auto'}`} style={{ height: '100dvh' }}>
+    <div className={`flex flex-col h-dvh bg-[#f5f5f7] font-sans ${isLandscape ? 'w-full' : 'max-w-md mx-auto'}`}
+      style={{ height: '100dvh', fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
       <MobileStyles />
       {/* ── Header (masqué sur le hub — il a son propre header) ── */}
       {activeModule && (
-        <header className={`flex items-center justify-between px-3 bg-gradient-to-br from-[#040a0e] to-[#0a1628] text-white sticky top-0 z-20 ${isLandscape ? 'py-1' : 'py-2.5'}`}>
-          <button onClick={goBack} className="p-2 rounded-lg hover:bg-white/10 transition">
-            <Icon name="back" size={20} color="#fff" />
+        <header className={`flex items-center justify-between px-3 bg-white/70 backdrop-blur-xl border-b border-gray-200/50 text-gray-900 sticky top-0 z-20 ${isLandscape ? 'py-1' : 'py-2.5'}`}>
+          <button onClick={goBack} className="p-2 rounded-xl hover:bg-gray-100 transition">
+            <Icon name="back" size={20} color="#6b7280" />
           </button>
           <div className="flex-1 text-center overflow-hidden">
             {currentTitle && (
-              <span className="text-sm font-semibold truncate max-w-[220px] inline-block">
+              <span className="text-sm font-semibold text-gray-900 truncate max-w-[220px] inline-block">
                 {currentTitle}
               </span>
             )}
@@ -372,7 +373,7 @@ export default function MobileApp({ user, companyId, onLogout }) {
         {selectedProject && !subView && (
           projectLoading ? (
             <div className="flex items-center justify-center py-20 gap-2 text-slate-500">
-              <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+              <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
               <span className="text-sm">Chargement…</span>
             </div>
           ) : fullProject ? (
@@ -428,7 +429,7 @@ export default function MobileApp({ user, companyId, onLogout }) {
         {activeModule === 'crc' && selectedChantier && (
           chantierLoading ? (
             <div className="flex items-center justify-center py-20 gap-2 text-slate-500">
-              <div className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+              <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
               <span className="text-sm">Chargement…</span>
             </div>
           ) : fullChantier ? (
@@ -449,7 +450,7 @@ export default function MobileApp({ user, companyId, onLogout }) {
         {activeModule === 'moe' && selectedMoeDevis && (
           moeDevisLoading ? (
             <div className="flex items-center justify-center py-20 gap-2 text-slate-500">
-              <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+              <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
               <span className="text-sm">Chargement…</span>
             </div>
           ) : fullMoeDevis ? (
@@ -470,7 +471,7 @@ export default function MobileApp({ user, companyId, onLogout }) {
         {activeModule === 'doc_admin' && selectedFiche && (
           ficheLoading ? (
             <div className="flex items-center justify-center py-20 gap-2 text-slate-500">
-              <div className="w-5 h-5 border-2 border-rose-500 border-t-transparent rounded-full animate-spin" />
+              <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
               <span className="text-sm">Chargement…</span>
             </div>
           ) : fullFiche ? (
@@ -482,18 +483,18 @@ export default function MobileApp({ user, companyId, onLogout }) {
         {activeModule === 'exports' && !selectedProject && (
           <div className="px-4 py-6">
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center mb-4">
-                <Icon name="download" size={28} color="#22d3ee" />
+              <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
+                <Icon name="download" size={28} color="#9ca3af" />
               </div>
-              <h2 className="text-lg font-bold text-slate-200 mb-2">Exports Rapides</h2>
-              <p className="text-sm text-slate-500 max-w-[260px] leading-relaxed mb-6">
-                Sélectionnez d'abord un projet depuis <strong className="text-slate-300">Mes Projets</strong> pour accéder aux exports.
+              <h2 className="text-lg font-bold text-gray-900 mb-2">Exports Rapides</h2>
+              <p className="text-sm text-gray-400 max-w-[260px] leading-relaxed mb-6">
+                Sélectionnez d'abord un projet depuis <strong className="text-gray-700">Mes Projets</strong> pour accéder aux exports.
               </p>
               <button
                 onClick={() => handleSelectModule('projects')}
-                className="flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 text-sm font-semibold transition active:scale-95"
+                className="flex items-center gap-2 px-5 py-3 rounded-xl bg-gray-900 text-white text-sm font-medium transition active:scale-[0.97]"
               >
-                <Icon name="folder" size={16} color="#34d399" />
+                <Icon name="folder" size={16} color="#fff" />
                 Ouvrir Mes Projets
               </button>
             </div>
@@ -503,8 +504,8 @@ export default function MobileApp({ user, companyId, onLogout }) {
 
       {/* ── Toast ── */}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 px-5 py-3 bg-emerald-500/90 text-white rounded-xl text-sm font-semibold shadow-xl z-50 backdrop-blur">
-          <Icon name="check" size={16} color="#34d399" />
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 px-5 py-3 bg-gray-900 text-white rounded-2xl text-sm font-medium shadow-xl z-50">
+          <Icon name="check" size={16} color="#fff" />
           {toast}
         </div>
       )}

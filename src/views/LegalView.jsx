@@ -14,50 +14,48 @@ export default function LegalView({ onBack }) {
   const [active, setActive] = useState('mentions');
 
   return (
-    <div className="flex h-screen bg-[#040a0e] items-start justify-center relative overflow-auto font-sans text-slate-300">
-      {/* Fond décoratif */}
-      <div className="absolute top-0 right-0 w-2/3 h-2/3 bg-emerald-500/5 blur-[120px] pointer-events-none rounded-full" />
-      <div className="absolute bottom-0 left-0 w-1/2 h-1/2 bg-blue-600/5 blur-[100px] pointer-events-none rounded-full" />
+    <div className="flex h-screen bg-[#f5f5f7] items-start justify-center relative overflow-auto"
+      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
 
       <div className="w-full max-w-3xl my-10 mx-4 relative z-10">
         {/* Bouton retour */}
         <button
           onClick={onBack}
-          className="flex items-center gap-2 text-slate-500 hover:text-emerald-400 text-xs font-bold uppercase tracking-widest mb-6 transition-colors"
+          className="flex items-center gap-2 text-gray-400 hover:text-gray-700 text-xs font-medium mb-6 transition-colors"
         >
           <ArrowLeft size={14} /> Retour à la connexion
         </button>
 
         {/* Titre */}
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-black text-white uppercase tracking-wider">
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
             Informations légales
           </h1>
-          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-2">
-            EstimaVRD — Estimation VRD &amp; Études
+          <p className="text-gray-400 text-sm mt-1.5">
+            Estima Suite — Estimation VRD &amp; Études
           </p>
         </div>
 
         {/* Navigation onglets */}
-        <div className="flex gap-2 mb-8 justify-center flex-wrap">
+        <div className="flex gap-1.5 mb-8 justify-center flex-wrap p-0.5 bg-gray-100 rounded-xl mx-auto w-fit">
           {SECTIONS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               onClick={() => setActive(id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium transition-all ${
                 active === id
-                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                  : 'bg-slate-900/40 text-slate-500 border border-white/5 hover:text-slate-300 hover:border-white/10'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-400 hover:text-gray-600'
               }`}
             >
-              <Icon size={14} />
+              <Icon size={13} />
               {label}
             </button>
           ))}
         </div>
 
         {/* Contenu */}
-        <div className="bg-slate-900/40 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl">
+        <div className="bg-white border border-gray-200/60 rounded-3xl p-8 shadow-sm">
           {active === 'mentions' && <MentionsLegales />}
           {active === 'confidentialite' && <PolitiqueConfidentialite />}
           {active === 'cookies' && <CookiesSection />}
@@ -66,7 +64,7 @@ export default function LegalView({ onBack }) {
         </div>
 
         {/* Pied de page */}
-        <p className="text-center text-slate-600 text-[10px] mt-6">
+        <p className="text-center text-gray-400 text-[10px] mt-6">
           Dernière mise à jour : avril 2026
         </p>
       </div>
@@ -76,16 +74,16 @@ export default function LegalView({ onBack }) {
 
 /* ─── Styles partagés ──────────────────────────────────────────────────────── */
 const H2 = ({ children }) => (
-  <h2 className="text-lg font-black text-white uppercase tracking-wider mb-4">{children}</h2>
+  <h2 className="text-lg font-bold text-gray-900 tracking-tight mb-4">{children}</h2>
 );
 const H3 = ({ children }) => (
-  <h3 className="text-sm font-bold text-emerald-400 uppercase tracking-wider mt-6 mb-2">{children}</h3>
+  <h3 className="text-sm font-semibold text-blue-600 mt-6 mb-2">{children}</h3>
 );
 const P = ({ children }) => (
-  <p className="text-sm text-slate-400 leading-relaxed mb-3">{children}</p>
+  <p className="text-sm text-gray-500 leading-relaxed mb-3">{children}</p>
 );
 const Li = ({ children }) => (
-  <li className="text-sm text-slate-400 leading-relaxed">{children}</li>
+  <li className="text-sm text-gray-500 leading-relaxed">{children}</li>
 );
 
 /* ─── Mentions légales ─────────────────────────────────────────────────────── */
@@ -96,7 +94,7 @@ function MentionsLegales() {
 
       <H3>Éditeur du site</H3>
       <P>
-        <strong className="text-slate-200">[Nom de la société]</strong><br />
+        <strong className="text-gray-800">[Nom de la société]</strong><br />
         Forme juridique : [SAS / SARL / etc.]<br />
         Capital social : [montant] €<br />
         Siège social : [adresse complète]<br />
@@ -104,14 +102,14 @@ function MentionsLegales() {
         SIRET : [numéro SIRET]<br />
         N° TVA intracommunautaire : [numéro]<br />
         Directeur de la publication : [nom du responsable]<br />
-        Email : <span className="text-emerald-400">[email@entreprise.com]</span><br />
+        Email : <span className="text-blue-500">[email@entreprise.com]</span><br />
         Téléphone : [numéro]
       </P>
 
       <H3>Hébergement</H3>
       <P>
         L'application EstimaVRD est hébergée par :<br />
-        <strong className="text-slate-200">Google Cloud Platform (Firebase)</strong><br />
+        <strong className="text-gray-800">Google Cloud Platform (Firebase)</strong><br />
         Google Ireland Limited<br />
         Gordon House, Barrow Street, Dublin 4, Irlande<br />
         Les données sont stockées dans des centres de données situés dans l'Union européenne
@@ -152,16 +150,16 @@ function PolitiqueConfidentialite() {
 
       <H3>Responsable du traitement</H3>
       <P>
-        Le responsable du traitement est <strong className="text-slate-200">[Nom de la société]</strong>,
-        joignable à l'adresse : <span className="text-emerald-400">[email@entreprise.com]</span>.
+        Le responsable du traitement est <strong className="text-gray-800">[Nom de la société]</strong>,
+        joignable à l'adresse : <span className="text-blue-500">[email@entreprise.com]</span>.
       </P>
 
       <H3>Données collectées</H3>
       <P>Dans le cadre de l'utilisation d'EstimaVRD, nous collectons les données suivantes :</P>
       <ul className="list-disc list-inside space-y-1 mb-3 ml-2">
-        <Li><strong className="text-slate-200">Données d'identification</strong> : adresse email (utilisée pour l'authentification)</Li>
-        <Li><strong className="text-slate-200">Données professionnelles</strong> : données de projets (estimations, chiffrages, articles BPU, CCTP, etc.)</Li>
-        <Li><strong className="text-slate-200">Données techniques</strong> : logs de connexion, adresse IP (collectés automatiquement par Firebase Authentication)</Li>
+        <Li><strong className="text-gray-800">Données d'identification</strong> : adresse email (utilisée pour l'authentification)</Li>
+        <Li><strong className="text-gray-800">Données professionnelles</strong> : données de projets (estimations, chiffrages, articles BPU, CCTP, etc.)</Li>
+        <Li><strong className="text-gray-800">Données techniques</strong> : logs de connexion, adresse IP (collectés automatiquement par Firebase Authentication)</Li>
       </ul>
 
       <H3>Finalités du traitement</H3>
@@ -181,9 +179,9 @@ function PolitiqueConfidentialite() {
 
       <H3>Durée de conservation</H3>
       <ul className="list-disc list-inside space-y-1 mb-3 ml-2">
-        <Li><strong className="text-slate-200">Données de compte</strong> : conservées pendant toute la durée d'utilisation du service, puis supprimées dans un délai de 12 mois après la clôture du compte</Li>
-        <Li><strong className="text-slate-200">Données de projets</strong> : conservées pendant toute la durée d'utilisation du service</Li>
-        <Li><strong className="text-slate-200">Logs techniques</strong> : conservés 12 mois maximum conformément aux recommandations de la CNIL</Li>
+        <Li><strong className="text-gray-800">Données de compte</strong> : conservées pendant toute la durée d'utilisation du service, puis supprimées dans un délai de 12 mois après la clôture du compte</Li>
+        <Li><strong className="text-gray-800">Données de projets</strong> : conservées pendant toute la durée d'utilisation du service</Li>
+        <Li><strong className="text-gray-800">Logs techniques</strong> : conservés 12 mois maximum conformément aux recommandations de la CNIL</Li>
       </ul>
 
       <H3>Destinataires des données</H3>
@@ -207,16 +205,16 @@ function PolitiqueConfidentialite() {
         Conformément au RGPD, vous disposez des droits suivants sur vos données personnelles :
       </P>
       <ul className="list-disc list-inside space-y-1 mb-3 ml-2">
-        <Li><strong className="text-slate-200">Droit d'accès</strong> : obtenir la confirmation que vos données sont traitées et en recevoir une copie</Li>
-        <Li><strong className="text-slate-200">Droit de rectification</strong> : demander la correction de données inexactes ou incomplètes</Li>
-        <Li><strong className="text-slate-200">Droit à l'effacement</strong> : demander la suppression de vos données personnelles</Li>
-        <Li><strong className="text-slate-200">Droit à la portabilité</strong> : recevoir vos données dans un format structuré et couramment utilisé</Li>
-        <Li><strong className="text-slate-200">Droit à la limitation</strong> : demander la limitation du traitement dans certains cas</Li>
-        <Li><strong className="text-slate-200">Droit d'opposition</strong> : vous opposer au traitement de vos données pour des motifs légitimes</Li>
+        <Li><strong className="text-gray-800">Droit d'accès</strong> : obtenir la confirmation que vos données sont traitées et en recevoir une copie</Li>
+        <Li><strong className="text-gray-800">Droit de rectification</strong> : demander la correction de données inexactes ou incomplètes</Li>
+        <Li><strong className="text-gray-800">Droit à l'effacement</strong> : demander la suppression de vos données personnelles</Li>
+        <Li><strong className="text-gray-800">Droit à la portabilité</strong> : recevoir vos données dans un format structuré et couramment utilisé</Li>
+        <Li><strong className="text-gray-800">Droit à la limitation</strong> : demander la limitation du traitement dans certains cas</Li>
+        <Li><strong className="text-gray-800">Droit d'opposition</strong> : vous opposer au traitement de vos données pour des motifs légitimes</Li>
       </ul>
       <P>
         Pour exercer ces droits, contactez-nous à :
-        <span className="text-emerald-400"> [email@entreprise.com]</span>. Nous nous engageons
+        <span className="text-blue-500"> [email@entreprise.com]</span>. Nous nous engageons
         à répondre dans un délai d'un mois.
       </P>
 
@@ -224,8 +222,8 @@ function PolitiqueConfidentialite() {
       <P>
         Pour toute question relative à la protection de vos données, vous pouvez contacter
         notre référent RGPD :<br />
-        <strong className="text-slate-200">[Nom du DPO / Référent]</strong><br />
-        Email : <span className="text-emerald-400">[dpo@entreprise.com]</span>
+        <strong className="text-gray-800">[Nom du DPO / Référent]</strong><br />
+        Email : <span className="text-blue-500">[dpo@entreprise.com]</span>
       </P>
 
       <H3>Réclamation</H3>
@@ -234,7 +232,7 @@ function PolitiqueConfidentialite() {
         vous pouvez introduire une réclamation auprès de la CNIL :<br />
         Commission Nationale de l'Informatique et des Libertés<br />
         3, place de Fontenoy — TSA 80715 — 75334 Paris Cedex 07<br />
-        <span className="text-emerald-400">www.cnil.fr</span>
+        <span className="text-blue-500">www.cnil.fr</span>
       </P>
     </>
   );
@@ -255,19 +253,19 @@ function CookiesSection() {
 
       <H3>Cookies utilisés par EstimaVRD</H3>
       <P>
-        L'application EstimaVRD utilise <strong className="text-slate-200">uniquement des cookies
+        L'application EstimaVRD utilise <strong className="text-gray-800">uniquement des cookies
         techniques strictement nécessaires</strong> au fonctionnement du service. Aucun cookie
         publicitaire, analytique ou de traçage n'est utilisé.
       </P>
       <ul className="list-disc list-inside space-y-1 mb-3 ml-2">
         <Li>
-          <strong className="text-slate-200">Cookie d'authentification Firebase</strong> :
+          <strong className="text-gray-800">Cookie d'authentification Firebase</strong> :
           permet de maintenir votre session de connexion active. Ce cookie est indispensable
           au fonctionnement de l'application et ne nécessite pas votre consentement
           conformément à l'article 82 de la loi Informatique et Libertés.
         </Li>
         <Li>
-          <strong className="text-slate-200">Stockage local (localStorage)</strong> :
+          <strong className="text-gray-800">Stockage local (localStorage)</strong> :
           utilisé pour conserver certaines préférences d'interface (mode d'affichage, etc.)
           côté navigateur uniquement.
         </Li>
@@ -297,7 +295,7 @@ function CGU() {
       <H2>Conditions Générales d'Utilisation</H2>
       <P>
         Les présentes Conditions Générales d'Utilisation (ci-après « CGU ») régissent l'accès
-        et l'utilisation du service EstimaVRD, édité par <strong className="text-slate-200">[Nom
+        et l'utilisation du service EstimaVRD, édité par <strong className="text-gray-800">[Nom
         de la société]</strong>. En accédant au service, l'utilisateur accepte sans réserve les
         présentes CGU.
       </P>
@@ -379,7 +377,7 @@ function CGU() {
       <H3>7. Responsabilité</H3>
       <P>
         Les estimations, chiffrages et calculs produits par EstimaVRD sont fournis
-        à <strong className="text-slate-200">titre indicatif uniquement</strong> et ne
+        à <strong className="text-gray-800">titre indicatif uniquement</strong> et ne
         constituent en aucun cas des devis engageants ou des documents ayant valeur
         contractuelle. Il appartient à l'utilisateur de vérifier, valider et adapter les
         résultats produits par le logiciel avant toute utilisation dans le cadre d'un marché
@@ -394,13 +392,13 @@ function CGU() {
       <H3>8. Résiliation</H3>
       <P>
         Chaque partie peut résilier le contrat d'utilisation avec un préavis
-        de <strong className="text-slate-200">30 jours</strong>, notifié par email à l'autre
+        de <strong className="text-gray-800">30 jours</strong>, notifié par email à l'autre
         partie. En cas de manquement grave de l'utilisateur aux présentes CGU, l'éditeur se
         réserve le droit de suspendre ou résilier l'accès au service sans préavis.
       </P>
       <P>
         À la suite de la résiliation, l'utilisateur dispose d'un délai
-        de <strong className="text-slate-200">30 jours</strong> pour exporter l'ensemble de ses
+        de <strong className="text-gray-800">30 jours</strong> pour exporter l'ensemble de ses
         données. Passé ce délai, l'éditeur procédera à la suppression définitive des données
         de l'utilisateur.
       </P>
@@ -409,7 +407,7 @@ function CGU() {
       <P>
         L'éditeur se réserve le droit de modifier les présentes CGU à tout moment. Les
         utilisateurs seront informés de toute modification
-        substantielle <strong className="text-slate-200">30 jours avant</strong> son entrée en
+        substantielle <strong className="text-gray-800">30 jours avant</strong> son entrée en
         vigueur, par notification dans l'application ou par email. La poursuite de l'utilisation
         du service après l'entrée en vigueur des modifications vaut acceptation des nouvelles
         CGU.
@@ -424,7 +422,7 @@ function CGU() {
       </P>
 
       <P>
-        <em className="text-slate-500">Date de dernière mise à jour : avril 2026</em>
+        <em className="text-gray-400">Date de dernière mise à jour : avril 2026</em>
       </P>
     </>
   );
@@ -437,7 +435,7 @@ function CGV() {
       <H2>Conditions Générales de Vente</H2>
       <P>
         Les présentes Conditions Générales de Vente (ci-après « CGV ») régissent les relations
-        contractuelles entre <strong className="text-slate-200">[Nom de la société]</strong>,
+        contractuelles entre <strong className="text-gray-800">[Nom de la société]</strong>,
         éditeur du service EstimaVRD (ci-après « le Prestataire »), et tout professionnel
         souscrivant un abonnement au service (ci-après « le Client »).
       </P>
@@ -457,12 +455,12 @@ function CGV() {
         ajoutée au taux en vigueur au moment de la facturation.
       </P>
       <ul className="list-disc list-inside space-y-1 mb-3 ml-2">
-        <Li><strong className="text-slate-200">Abonnement mensuel</strong> : facturation au début de chaque mois d'utilisation</Li>
-        <Li><strong className="text-slate-200">Abonnement annuel</strong> : facturation en une seule fois au début de la période annuelle, avec un tarif préférentiel</Li>
+        <Li><strong className="text-gray-800">Abonnement mensuel</strong> : facturation au début de chaque mois d'utilisation</Li>
+        <Li><strong className="text-gray-800">Abonnement annuel</strong> : facturation en une seule fois au début de la période annuelle, avec un tarif préférentiel</Li>
       </ul>
       <P>
         Le Prestataire se réserve le droit de modifier ses tarifs. Toute modification tarifaire
-        sera notifiée au Client au moins <strong className="text-slate-200">30 jours</strong> avant
+        sera notifiée au Client au moins <strong className="text-gray-800">30 jours</strong> avant
         son entrée en vigueur et sera applicable au prochain renouvellement de l'abonnement.
       </P>
 
@@ -475,7 +473,7 @@ function CGV() {
         En cas de retard de paiement, des pénalités de retard seront automatiquement et de plein
         droit appliquées, au taux d'intérêt légal en vigueur majoré de 3 points, sans qu'un
         rappel soit nécessaire. Conformément à l'article L.441-10 du Code de commerce, une
-        indemnité forfaitaire de <strong className="text-slate-200">40 euros</strong> pour frais de
+        indemnité forfaitaire de <strong className="text-gray-800">40 euros</strong> pour frais de
         recouvrement sera due en cas de retard de paiement.
       </P>
 
@@ -490,12 +488,12 @@ function CGV() {
       <H3>5. Résiliation anticipée</H3>
       <P>
         Chaque partie peut résilier l'abonnement en cours en respectant un préavis
-        de <strong className="text-slate-200">30 jours</strong> avant la fin de la période en
+        de <strong className="text-gray-800">30 jours</strong> avant la fin de la période en
         cours, par notification écrite (email avec accusé de réception).
       </P>
       <ul className="list-disc list-inside space-y-1 mb-3 ml-2">
-        <Li><strong className="text-slate-200">Abonnement mensuel</strong> : la résiliation prend effet à la fin du mois en cours. Aucun remboursement du mois entamé.</Li>
-        <Li><strong className="text-slate-200">Abonnement annuel</strong> : en cas de résiliation anticipée par le Client, aucun remboursement ne sera effectué pour la période restante, sauf en cas de manquement avéré du Prestataire à ses obligations. En cas de résiliation anticipée par le Prestataire, un remboursement au prorata de la période restante sera effectué.</Li>
+        <Li><strong className="text-gray-800">Abonnement mensuel</strong> : la résiliation prend effet à la fin du mois en cours. Aucun remboursement du mois entamé.</Li>
+        <Li><strong className="text-gray-800">Abonnement annuel</strong> : en cas de résiliation anticipée par le Client, aucun remboursement ne sera effectué pour la période restante, sauf en cas de manquement avéré du Prestataire à ses obligations. En cas de résiliation anticipée par le Prestataire, un remboursement au prorata de la période restante sera effectué.</Li>
       </ul>
       <P>
         En cas de manquement grave par l'une des parties à ses obligations contractuelles, et
@@ -510,7 +508,7 @@ function CGV() {
         délai raisonnable tout dysfonctionnement reproductible signalé par le Client.
       </P>
       <P>
-        Toutefois, le Prestataire <strong className="text-slate-200">ne garantit aucun résultat</strong> quant
+        Toutefois, le Prestataire <strong className="text-gray-800">ne garantit aucun résultat</strong> quant
         aux estimations et chiffrages produits par le logiciel. Les résultats sont fournis à
         titre indicatif et l'utilisateur est seul responsable de leur validation et de leur
         utilisation dans le cadre de ses activités professionnelles.
@@ -519,7 +517,7 @@ function CGV() {
       <H3>7. Limitation de responsabilité</H3>
       <P>
         La responsabilité du Prestataire, toutes causes confondues, est
-        expressément <strong className="text-slate-200">plafonnée au montant total des sommes
+        expressément <strong className="text-gray-800">plafonnée au montant total des sommes
         effectivement versées par le Client au titre de l'abonnement au cours des 12 derniers
         mois</strong> précédant le fait générateur de responsabilité.
       </P>
@@ -555,7 +553,7 @@ function CGV() {
       </P>
 
       <P>
-        <em className="text-slate-500">Date de dernière mise à jour : avril 2026</em>
+        <em className="text-gray-400">Date de dernière mise à jour : avril 2026</em>
       </P>
     </>
   );

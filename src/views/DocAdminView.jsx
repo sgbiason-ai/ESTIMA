@@ -15,13 +15,8 @@ import ExeReceptionForm from '../components/docAdmin/ExeReceptionForm';
 import ExeLeveeForm from '../components/docAdmin/ExeLeveeForm';
 import Exe10Form from '../components/docAdmin/Exe10Form';
 import FicheRecap from '../components/docAdmin/FicheRecap';
-import { exportExe1Docx, exportExe1Pdf } from '../utils/docAdmin/generateExe1';
-import { exportExe4Docx, exportExe4Pdf } from '../utils/docAdmin/generateExe4';
-import { exportExe5Docx, exportExe5Pdf } from '../utils/docAdmin/generateExe5';
-import { exportExe6Docx, exportExe6Pdf } from '../utils/docAdmin/generateExe6';
-import { exportExe8Docx, exportExe8Pdf } from '../utils/docAdmin/generateExe8';
-import { exportExe9Docx, exportExe9Pdf } from '../utils/docAdmin/generateExe9';
-import { exportExe10Docx, exportExe10Pdf } from '../utils/docAdmin/generateExe10';
+// Generators chargés dynamiquement pour le code-splitting
+const loadExeGenerator = (n) => import(`../utils/docAdmin/generateExe${n}.js`);
 
 // ─── Utilitaires de calcul de la date de fin révisée ────────────────────────
 export const getOSDate = (os) => {
@@ -270,15 +265,15 @@ export default function DocAdminView({ onBackToHub, user, companyId }) {
 
   // ── Génération EXE1-T ─────────────────────────────────────────────────────
   const handleGenerateExe1 = async (exe1Data, format) => {
-    // Utiliser virtualFiche en mode alloti pour filtrer lots + entreprise
     const ficheExport = virtualFiche || selectedFiche;
     if (!ficheExport) return;
     try {
+      const mod = await loadExeGenerator(1);
       if (format === 'docx') {
-        await exportExe1Docx(ficheExport, exe1Data);
+        await mod.exportExe1Docx(ficheExport, exe1Data);
         toast.success('Document EXE1-T généré (.docx)');
       } else {
-        await exportExe1Pdf(ficheExport, exe1Data);
+        await mod.exportExe1Pdf(ficheExport, exe1Data);
         toast.success('Document EXE1-T généré (.pdf)');
       }
     } catch (err) {
@@ -289,28 +284,22 @@ export default function DocAdminView({ onBackToHub, user, companyId }) {
 
   // ── Génération EXE4/5/6/8/9/10 ───────────────────────────────────────────
   const handleGenerateExeReception = async (exeType, exeData, format) => {
-    // Utiliser virtualFiche en mode alloti pour filtrer lots + entreprise
     const ficheExport = virtualFiche || selectedFiche;
     if (!ficheExport) return;
-    const generators = {
-      exe4: { docx: exportExe4Docx, pdf: exportExe4Pdf, label: 'EXE4' },
-      exe5: { docx: exportExe5Docx, pdf: exportExe5Pdf, label: 'EXE5' },
-      exe6: { docx: exportExe6Docx, pdf: exportExe6Pdf, label: 'EXE6' },
-      exe8: { docx: exportExe8Docx, pdf: exportExe8Pdf, label: 'EXE8' },
-      exe9: { docx: exportExe9Docx, pdf: exportExe9Pdf, label: 'EXE9' },
-      exe10: { docx: exportExe10Docx, pdf: exportExe10Pdf, label: 'EXE10' },
-    };
-    const gen = generators[exeType];
-    if (!gen) return;
+    const exeNum = exeType.replace('exe', '');
+    const label = `EXE${exeNum}`;
     try {
+      const mod = await loadExeGenerator(exeNum);
+      const fnDocx = mod[`exportExe${exeNum}Docx`];
+      const fnPdf  = mod[`exportExe${exeNum}Pdf`];
       if (format === 'docx') {
-        await gen.docx(ficheExport, exeData);
+        await fnDocx(ficheExport, exeData);
       } else {
-        await gen.pdf(ficheExport, exeData);
+        await fnPdf(ficheExport, exeData);
       }
-      toast.success(`Document ${gen.label} généré (.${format})`);
+      toast.success(`Document ${label} généré (.${format})`);
     } catch (err) {
-      console.error(`Erreur génération ${gen.label}:`, err);
+      console.error(`Erreur génération ${label}:`, err);
       toast.error('Erreur lors de la génération du document');
     }
   };

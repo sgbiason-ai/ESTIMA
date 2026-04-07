@@ -32,9 +32,9 @@ export default function MoeDetailView({ devis }) {
 
       {/* ── Devis header ──────────────────────────────────────────────── */}
       <div className="px-4 pt-3 pb-2">
-        <div className="text-xs text-slate-500 font-semibold uppercase tracking-wide mb-0.5">Devis MOE</div>
-        <div className="text-base font-bold text-slate-200">{devis.nom || '(Sans nom)'}</div>
-        <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
+        <div className="text-xs text-gray-700 font-semibold uppercase tracking-wide mb-0.5">Devis MOE</div>
+        <div className="text-base font-bold text-gray-900">{devis.nom || '(Sans nom)'}</div>
+        <div className="flex items-center gap-3 mt-1 text-xs text-gray-700">
           {devis.reference && <span>Réf. {devis.reference}</span>}
           {devis.dateDevis && <span>{dateFr(devis.dateDevis)}</span>}
           <span className="px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 text-[10px] font-bold">
@@ -44,7 +44,7 @@ export default function MoeDetailView({ devis }) {
       </div>
 
       {/* ── Tab bar ───────────────────────────────────────────────────── */}
-      <div className="flex gap-1 mx-4 mb-2 p-1 bg-white/5 rounded-lg">
+      <div className="flex gap-1.5 mx-4 mb-2 p-1 bg-gray-100 rounded-2xl">
         <TabBtn label="Récap" active={activeTab === 'recap'} onClick={() => setActiveTab('recap')} />
         <TabBtn label="Phases" active={activeTab === 'phases'} onClick={() => setActiveTab('phases')} />
         <TabBtn label="Infos" active={activeTab === 'infos'} onClick={() => setActiveTab('infos')} />
@@ -73,8 +73,8 @@ export default function MoeDetailView({ devis }) {
 function TabBtn({ label, active, onClick }) {
   return (
     <button onClick={onClick}
-      className={`flex-1 py-2 text-xs font-bold rounded-md transition ${
-        active ? 'bg-white/10 text-slate-200' : 'text-slate-500'
+      className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition ${
+        active ? 'bg-gray-900 text-white shadow-sm' : 'bg-gray-100 text-gray-600'
       }`}>
       {label}
     </button>
@@ -123,7 +123,7 @@ function RecapTab({ devis, cats, lots, taches, isPct, activePhases, moeType, isG
       <div className="p-4 bg-indigo-500/10 rounded-xl border border-indigo-500/20 text-center">
         <div className="text-[10px] text-indigo-400 font-bold uppercase tracking-wide mb-1">Honoraires TTC</div>
         <div className="text-2xl font-black text-indigo-300">{fmtE(honAvecMarge + montantTVA)}</div>
-        <div className="flex justify-center gap-4 mt-2 text-[11px] text-slate-400">
+        <div className="flex justify-center gap-4 mt-2 text-[11px] text-gray-600">
           <span>HT : {fmtE(totalHonHT)}</span>
           {marge > 0 && <span>Marge {marge}% : +{fmtE(montantMarge)}</span>}
           <span>TVA {tva}% : {fmtE(montantTVA)}</span>
@@ -131,19 +131,19 @@ function RecapTab({ devis, cats, lots, taches, isPct, activePhases, moeType, isG
       </div>
 
       {/* Phases summary */}
-      <div className="bg-white/[0.03] rounded-xl border border-white/10 overflow-hidden">
-        <div className="px-3 py-2 border-b border-white/5">
-          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Par phase</span>
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-3 py-2 border-b border-gray-100">
+          <span className="text-[10px] font-bold uppercase tracking-wide text-gray-700">Par phase</span>
         </div>
         {phasesSummary.map(phase => (
           <div key={phase.id} className="flex items-center justify-between px-3 py-2 border-t border-white/[0.03]">
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-bold text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded">{phase.code}</span>
-              <span className="text-xs text-slate-300 truncate max-w-[160px]">{phase.label}</span>
+              <span className="text-xs text-gray-600 truncate max-w-[160px]">{phase.label}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-slate-200">{fmtE(phase.total)}</span>
-              <span className="text-[10px] text-slate-500">
+              <span className="text-xs font-semibold text-gray-900">{fmtE(phase.total)}</span>
+              <span className="text-[10px] text-gray-700">
                 {totalHonHT > 0 ? `${fmt(phase.total / totalHonHT * 100)}%` : '—'}
               </span>
             </div>
@@ -153,16 +153,16 @@ function RecapTab({ devis, cats, lots, taches, isPct, activePhases, moeType, isG
 
       {/* Groupement */}
       {isGrp && (honByAssignee || honByAssigneeTemps) && (
-        <div className="bg-white/[0.03] rounded-xl border border-white/10 overflow-hidden">
-          <div className="px-3 py-2 border-b border-white/5">
-            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Par membre</span>
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-3 py-2 border-b border-gray-100">
+            <span className="text-[10px] font-bold uppercase tracking-wide text-gray-700">Par membre</span>
           </div>
           {isPct && honByAssignee && Object.entries(honByAssignee).map(([key, data]) => (
             <div key={key} className="flex items-center justify-between px-3 py-2 border-t border-white/[0.03]">
-              <span className="text-xs font-semibold text-slate-300">{getAssigneeName(key, devis)}</span>
+              <span className="text-xs font-semibold text-gray-600">{getAssigneeName(key, devis)}</span>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-slate-200">{fmtE(data.totalHonHT)}</span>
-                <span className="text-[10px] text-slate-500">
+                <span className="text-xs font-semibold text-gray-900">{fmtE(data.totalHonHT)}</span>
+                <span className="text-[10px] text-gray-700">
                   {totalHonHT > 0 ? `${fmt(data.totalHonHT / totalHonHT * 100)}%` : '—'}
                 </span>
               </div>
@@ -170,10 +170,10 @@ function RecapTab({ devis, cats, lots, taches, isPct, activePhases, moeType, isG
           ))}
           {!isPct && honByAssigneeTemps && recapAssigneeKeys && recapAssigneeKeys.map(aKey => (
             <div key={aKey} className="flex items-center justify-between px-3 py-2 border-t border-white/[0.03]">
-              <span className="text-xs font-semibold text-slate-300">{getAssigneeName(aKey, devis)}</span>
+              <span className="text-xs font-semibold text-gray-600">{getAssigneeName(aKey, devis)}</span>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-slate-200">{fmtE(honByAssigneeTemps[aKey] || 0)}</span>
-                <span className="text-[10px] text-slate-500">
+                <span className="text-xs font-semibold text-gray-900">{fmtE(honByAssigneeTemps[aKey] || 0)}</span>
+                <span className="text-[10px] text-gray-700">
                   {totalHonHT > 0 ? `${fmt((honByAssigneeTemps[aKey] || 0) / totalHonHT * 100)}%` : '—'}
                 </span>
               </div>
@@ -185,7 +185,7 @@ function RecapTab({ devis, cats, lots, taches, isPct, activePhases, moeType, isG
       {/* Synthèse financière */}
       <div className="space-y-2">
         <Row label="Honoraires HT" value={fmtE(totalHonHT)} />
-        {marge > 0 && <Row label={`Marge ${marge}%`} value={`+ ${fmtE(montantMarge)}`} accent="text-emerald-400" />}
+        {marge > 0 && <Row label={`Marge ${marge}%`} value={`+ ${fmtE(montantMarge)}`} accent="text-blue-600" />}
         {marge > 0 && <Row label="HT avec marge" value={fmtE(honAvecMarge)} />}
         <Row label={`TVA ${tva}%`} value={fmtE(montantTVA)} />
         <div className="flex justify-between items-center px-3 py-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
@@ -199,9 +199,9 @@ function RecapTab({ devis, cats, lots, taches, isPct, activePhases, moeType, isG
 
 function Row({ label, value, accent }) {
   return (
-    <div className="flex justify-between items-center px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/10">
-      <span className="text-xs text-slate-400">{label}</span>
-      <span className={`text-sm font-bold ${accent || 'text-slate-200'}`}>{value}</span>
+    <div className="flex justify-between items-center px-3 py-2.5 rounded-xl bg-white border border-gray-200">
+      <span className="text-xs text-gray-600">{label}</span>
+      <span className={`text-sm font-bold ${accent || 'text-gray-900'}`}>{value}</span>
     </div>
   );
 }
@@ -234,29 +234,29 @@ function PhasesTab({ devis, cats, lots, taches, isPct, activePhases }) {
             s + cats.reduce((s2, c) => s2 + (parseFloat(t.temps?.[c.id]) || 0) * (parseFloat(c.tauxHoraire) || 0), 0), 0);
 
           return (
-            <div key={phase.id} className="bg-white/[0.03] rounded-xl border border-white/10 overflow-hidden">
+            <div key={phase.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <button onClick={() => togglePhase(phase.id)}
                 className="flex items-center justify-between w-full px-3 py-2.5 text-left">
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-bold text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded">{phase.code}</span>
-                  <span className="text-sm font-bold text-slate-200">{phase.label}</span>
-                  <span className="text-[10px] text-slate-500 font-bold bg-white/5 px-1.5 py-0.5 rounded">{phaseTaches.length}</span>
+                  <span className="text-sm font-bold text-gray-900">{phase.label}</span>
+                  <span className="text-[10px] text-gray-700 font-bold bg-white px-1.5 py-0.5 rounded">{phaseTaches.length}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-slate-300">{fmtE(phaseTotal)}</span>
+                  <span className="text-xs font-semibold text-gray-600">{fmtE(phaseTotal)}</span>
                   <Chevron expanded={expanded} />
                 </div>
               </button>
               {expanded && phaseTaches.map(t => (
-                <div key={t.id} className="px-3 py-2 border-t border-white/5">
-                  <div className="text-xs text-slate-300">{t.label || '(Sans libellé)'}</div>
+                <div key={t.id} className="px-3 py-2 border-t border-gray-100">
+                  <div className="text-xs text-gray-600">{t.label || '(Sans libellé)'}</div>
                   <div className="flex gap-3 mt-1">
                     {cats.map(c => {
                       const h = parseFloat(t.temps?.[c.id]) || 0;
                       if (h === 0) return null;
                       return (
-                        <span key={c.id} className="text-[10px] text-slate-500">
-                          {c.label} : <span className="font-semibold text-slate-400">{h}h</span>
+                        <span key={c.id} className="text-[10px] text-gray-700">
+                          {c.label} : <span className="font-semibold text-gray-600">{h}h</span>
                         </span>
                       );
                     })}
@@ -270,7 +270,7 @@ function PhasesTab({ devis, cats, lots, taches, isPct, activePhases }) {
     );
   }
 
-  return <div className="text-center py-8 text-slate-500 text-sm">Aucune donnée.</div>;
+  return <div className="text-center py-8 text-gray-700 text-sm">Aucune donnée.</div>;
 }
 
 function LotsView({ devis, lots, cats, isPct, activePhases }) {
@@ -291,22 +291,22 @@ function LotsView({ devis, lots, cats, isPct, activePhases }) {
         const expanded = expandedLots.has(lot.id);
 
         return (
-          <div key={lot.id} className="bg-white/[0.03] rounded-xl border border-white/10 overflow-hidden">
+          <div key={lot.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             <button onClick={() => toggleLot(lot.id)}
               className="flex items-center justify-between w-full px-3 py-2.5 text-left">
               <div className="flex items-center gap-2 min-w-0 flex-1">
-                <span className="text-[10px] font-bold text-slate-500">#{i + 1}</span>
-                <span className="text-sm font-bold text-slate-200 truncate">{lot.designation || '(Sans désignation)'}</span>
+                <span className="text-[10px] font-bold text-gray-700">#{i + 1}</span>
+                <span className="text-sm font-bold text-gray-900 truncate">{lot.designation || '(Sans désignation)'}</span>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <span className="text-xs font-semibold text-slate-300">{fmtE(honLot)}</span>
+                <span className="text-xs font-semibold text-gray-600">{fmtE(honLot)}</span>
                 <Chevron expanded={expanded} />
               </div>
             </button>
             {expanded && (
-              <div className="px-3 py-2 border-t border-white/5 space-y-1">
-                <div className="text-[11px] text-slate-500">
-                  Travaux HT : <span className="font-semibold text-slate-400">{fmtE(parseFloat(lot.montantTravauxHT) || 0)}</span>
+              <div className="px-3 py-2 border-t border-gray-100 space-y-1">
+                <div className="text-[11px] text-gray-700">
+                  Travaux HT : <span className="font-semibold text-gray-600">{fmtE(parseFloat(lot.montantTravauxHT) || 0)}</span>
                 </div>
                 {activePhases.map(ph => {
                   const phHon = isPct
@@ -315,8 +315,8 @@ function LotsView({ devis, lots, cats, isPct, activePhases }) {
                   if (phHon === 0) return null;
                   return (
                     <div key={ph.id} className="flex justify-between text-[11px]">
-                      <span className="text-slate-500">{ph.code}</span>
-                      <span className="text-slate-400 font-semibold">{fmtE(phHon)}</span>
+                      <span className="text-gray-700">{ph.code}</span>
+                      <span className="text-gray-600 font-semibold">{fmtE(phHon)}</span>
                     </div>
                   );
                 })}
@@ -407,7 +407,7 @@ function InfosTab({ devis, isGrp }) {
         {(devis.phases || PHASES_LOI_MOP).filter(p => p.actif).map(p => (
           <div key={p.id} className="flex items-center gap-2 px-3 py-1.5 border-t border-white/[0.03] first:border-0">
             <span className="text-[10px] font-bold text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded">{p.code}</span>
-            <span className="text-xs text-slate-300">{p.label}</span>
+            <span className="text-xs text-gray-600">{p.label}</span>
           </div>
         ))}
       </InfoSection>
@@ -417,9 +417,9 @@ function InfosTab({ devis, isGrp }) {
 
 function InfoSection({ title, children }) {
   return (
-    <div className="bg-white/[0.03] rounded-xl border border-white/10 overflow-hidden">
-      <div className="px-3 py-2 border-b border-white/5">
-        <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{title}</span>
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="px-3 py-2 border-b border-gray-100">
+        <span className="text-[10px] font-bold uppercase tracking-wide text-gray-700">{title}</span>
       </div>
       {children}
     </div>
@@ -430,8 +430,8 @@ function InfoRow({ label, value }) {
   if (!value) return null;
   return (
     <div className="flex justify-between items-center px-3 py-2 border-t border-white/[0.03] first:border-0">
-      <span className="text-[11px] text-slate-500 font-medium">{label}</span>
-      <span className="text-xs text-slate-300 font-semibold text-right max-w-[60%] truncate">{value}</span>
+      <span className="text-[11px] text-gray-700 font-medium">{label}</span>
+      <span className="text-xs text-gray-600 font-semibold text-right max-w-[60%] truncate">{value}</span>
     </div>
   );
 }

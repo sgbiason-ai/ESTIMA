@@ -343,7 +343,7 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding }) => {
                                 <img
                                   src={images[0]}
                                   alt=""
-                                  className="rounded border border-slate-200"
+                                  className="rounded border border-gray-200"
                                   style={{ width: '100%', height: 'auto' }}
                                 />
                               </div>
@@ -355,7 +355,7 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding }) => {
                                     key={idx}
                                     src={src}
                                     alt=""
-                                    className="rounded border border-slate-200 object-cover"
+                                    className="rounded border border-gray-200 object-cover"
                                     style={{ width: 'calc(50% - 3px)', maxHeight: '80px' }}
                                   />
                                 ))}

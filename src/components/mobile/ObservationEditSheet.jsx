@@ -10,7 +10,7 @@ import { useOrientation } from '../../hooks/useOrientation';
 
 // ─── STATUS CONFIG ─────────────────────────────────────────────────────────
 const STATUSES = [
-  { value: 'empty',       label: 'Vide',     bg: 'bg-slate-500/20',   activeBg: 'bg-slate-500',   text: 'text-slate-300' },
+  { value: 'empty',       label: 'Vide',     bg: 'bg-gray-500/20',   activeBg: 'bg-gray-500',   text: 'text-gray-600' },
   { value: 'open',        label: 'Ouvert',   bg: 'bg-orange-500/20',  activeBg: 'bg-orange-500',  text: 'text-orange-300' },
   { value: 'in_progress', label: 'En cours', bg: 'bg-blue-500/20',    activeBg: 'bg-blue-500',    text: 'text-blue-300' },
   { value: 'done',        label: 'FAIT',     bg: 'bg-emerald-500/20', activeBg: 'bg-emerald-500', text: 'text-emerald-300' },
@@ -19,13 +19,13 @@ const STATUSES = [
 // ─── FIELD WRAPPER ─────────────────────────────────────────────────────────
 const Field = ({ label, children }) => (
   <div className="flex flex-col gap-1.5">
-    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{label}</label>
+    <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider">{label}</label>
     {children}
   </div>
 );
 
-const selectClass = 'w-full px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-slate-200 appearance-none';
-const inputClass  = 'w-full px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-slate-200';
+const selectClass = 'w-full px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-gray-900 appearance-none';
+const inputClass  = 'w-full px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-gray-900';
 
 // ─── COMPOSANT PRINCIPAL ───────────────────────────────────────────────────
 export default function ObservationEditSheet({
@@ -85,14 +85,14 @@ export default function ObservationEditSheet({
       <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       {/* Sheet */}
-      <div className={`fixed inset-x-0 bottom-0 z-50 flex flex-col bg-[#0c1220] border-t border-white/[0.08] rounded-t-3xl overflow-hidden animate-slideUp ${isLandscape ? 'max-h-[95vh]' : 'max-h-[88vh]'}`}>
+      <div className={`fixed inset-x-0 bottom-0 z-50 flex flex-col bg-white border-t border-gray-200 rounded-t-3xl overflow-hidden animate-slideUp shadow-2xl ${isLandscape ? 'max-h-[95vh]' : 'max-h-[88vh]'}`}>
 
         {/* Handle + header */}
         <div className="flex flex-col items-center pt-3 pb-2 px-4 shrink-0">
-          <div className="w-10 h-1 rounded-full bg-white/20 mb-3" />
+          <div className="w-10 h-1 rounded-full bg-gray-300 mb-3" />
           <div className="flex items-center justify-between w-full">
-            <h3 className="text-sm font-bold text-slate-200">Modifier l'observation</h3>
-            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10">
+            <h3 className="text-sm font-bold text-gray-900">Modifier l'observation</h3>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white">
               <Icon name="close" size={18} color="#94a3b8" />
             </button>
           </div>
@@ -151,7 +151,7 @@ export default function ObservationEditSheet({
               contentEditable
               suppressContentEditableWarning
               onBlur={handleTextBlur}
-              className="min-h-[100px] px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-slate-200 leading-relaxed focus:outline-none focus:border-emerald-500/40"
+              className="min-h-[100px] px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-gray-900 leading-relaxed focus:outline-none focus:border-emerald-500/40"
               dangerouslySetInnerHTML={{ __html: obs.text || '' }}
             />
           </Field>
@@ -208,7 +208,7 @@ export default function ObservationEditSheet({
             <div className="flex gap-2">
               <button
                 onClick={() => cameraRef.current?.click()}
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 text-xs font-semibold active:scale-[0.98] transition"
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-600 text-xs font-semibold active:scale-[0.98] transition"
               >
                 <Icon name="camera" size={16} color="#34d399" />
                 Photo
@@ -255,7 +255,7 @@ export default function ObservationEditSheet({
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowDeleteConfirm(false)}
-                  className="flex-1 py-3 rounded-xl bg-white/[0.04] text-slate-400 text-xs font-semibold"
+                  className="flex-1 py-3 rounded-xl bg-white/[0.04] text-gray-600 text-xs font-semibold"
                 >
                   Annuler
                 </button>
