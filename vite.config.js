@@ -56,8 +56,12 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 Mo
+        skipWaiting: true,
+        clientsClaim: true,
         // Exclut les requêtes Firestore du cache SW
         navigateFallbackDenylist: [/^\/__(\/|$)/],
+        // Ne pas intercepter les requêtes Firestore / APIs externes
+        navigateFallback: '/index.html',
         runtimeCaching: [
           {
             // Cache les fonts Google
