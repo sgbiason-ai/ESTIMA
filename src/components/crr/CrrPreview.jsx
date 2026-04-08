@@ -338,27 +338,27 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding }) => {
                               <span className="text-slate-400 ml-1">(Report CR n{obs.originMeetingNumber})</span>
                             )}
                             {/* Images */}
-                            {images.length === 1 && (
-                              <div className="mt-2">
-                                <img
-                                  src={images[0]}
-                                  alt=""
-                                  className="rounded border border-gray-200"
-                                  style={{ width: '100%', height: 'auto' }}
-                                />
-                              </div>
-                            )}
-                            {images.length > 1 && (
-                              <div className="flex flex-wrap gap-1.5 mt-2" style={{ maxWidth: '50%' }}>
-                                {images.map((src, idx) => (
-                                  <img
-                                    key={idx}
-                                    src={src}
-                                    alt=""
-                                    className="rounded border border-gray-200 object-cover"
-                                    style={{ width: 'calc(50% - 3px)', maxHeight: '80px' }}
-                                  />
-                                ))}
+                            {images.length > 0 && (
+                              <div className={`flex flex-wrap gap-1.5 mt-2`} style={{ maxWidth: images.length === 1 ? '100%' : '50%' }}>
+                                {images.map((img, idx) => {
+                                  const imgSrc = typeof img === 'string' ? img : img.src;
+                                  const lat = typeof img === 'object' ? img.lat : null;
+                                  const lng = typeof img === 'object' ? img.lng : null;
+                                  const hasGps = lat != null && lng != null;
+                                  return (
+                                    <div key={idx} className="flex flex-col">
+                                      <img src={imgSrc} alt="" loading="lazy"
+                                        className="rounded border border-gray-200 object-cover"
+                                        style={images.length === 1 ? { width: '100%', height: 'auto' } : { width: 'calc(50% - 3px)', minWidth: 60, maxHeight: '80px' }} />
+                                      {hasGps && (
+                                        <a href={`https://www.google.com/maps?q=${lat},${lng}`} target="_blank" rel="noreferrer"
+                                          className="text-[8px] italic text-blue-600 hover:underline mt-0.5 block text-center">
+                                          Localisation
+                                        </a>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             )}
                           </td>

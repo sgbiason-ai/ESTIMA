@@ -185,22 +185,26 @@ export default function ObservationEditSheet({
             {/* Thumbnails grid */}
             {images.length > 0 && (
               <div className="grid grid-cols-4 gap-2 mb-2">
-                {images.map((src, idx) => (
-                  <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-white/[0.08]">
-                    <img
-                      src={src}
-                      alt={`Photo ${idx + 1}`}
-                      className="w-full h-full object-cover"
-                      onClick={() => onViewImage?.(src)}
-                    />
-                    <button
-                      onClick={() => handleRemoveImage(idx)}
-                      className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500/90 flex items-center justify-center"
-                    >
-                      <Icon name="close" size={10} color="#fff" />
-                    </button>
-                  </div>
-                ))}
+                {images.map((img, idx) => {
+                  const imgSrc = typeof img === 'string' ? img : img.src;
+                  return (
+                    <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-gray-200">
+                      <img
+                        src={imgSrc}
+                        alt={`Photo ${idx + 1}`}
+                        className="w-full h-full object-cover"
+                        onClick={() => onViewImage?.(imgSrc)}
+                        loading="lazy"
+                      />
+                      <button
+                        onClick={() => handleRemoveImage(idx)}
+                        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500/90 flex items-center justify-center"
+                      >
+                        <Icon name="close" size={10} color="#fff" />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
 

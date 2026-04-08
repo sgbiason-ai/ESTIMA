@@ -14,6 +14,7 @@ import { setShareMode, canNativeShare } from '../../utils/fileSaver';
 import ImageViewerModal from './ImageViewerModal';
 
 const ObservationEditSheet = lazy(() => import('./ObservationEditSheet'));
+import GpsTrackingSection from './GpsTrackingSection';
 
 // ─── HELPERS ────────────────────────────────────────────────────────────────
 
@@ -287,7 +288,7 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
       )}
 
       {/* ── Section toggle ─────────────────────────────────────────────── */}
-      <div className={`flex gap-1.5 mx-4 p-1 bg-gray-100 rounded-2xl ${isLandscape ? 'mb-1' : 'mb-2'}`}>
+      <div className={`flex gap-1 mx-4 p-1 bg-gray-100 rounded-2xl ${isLandscape ? 'mb-1' : 'mb-2'}`}>
         <SectionTab
           label="Observations"
           active={activeSection === 'observations'}
@@ -297,6 +298,11 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
           label="Participants"
           active={activeSection === 'participants'}
           onClick={() => setActiveSection('participants')}
+        />
+        <SectionTab
+          label="Terrain"
+          active={activeSection === 'terrain'}
+          onClick={() => setActiveSection('terrain')}
         />
       </div>
 
@@ -326,6 +332,14 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
             canEdit={canEdit}
             onSetAttendance={canEdit ? manager.setAttendance : undefined}
             onSetDiffusion={canEdit ? manager.setDiffusion : undefined}
+          />
+        )}
+        {activeSection === 'terrain' && meeting && (
+          <GpsTrackingSection
+            meeting={meeting}
+            manager={canEdit ? manager : null}
+            obsByCategory={obsByCategory}
+            onToast={onToast}
           />
         )}
       </div>
@@ -519,15 +533,18 @@ function ObservationCard({ obs, contactName, canEdit, onEdit, onTap, onViewImage
       {/* Image thumbnails */}
       {images.length > 0 && (
         <div className="flex gap-1.5 mt-2" onClick={(e) => e.stopPropagation()}>
-          {images.slice(0, 4).map((src, idx) => (
-            <div
-              key={idx}
-              className="w-10 h-10 rounded-lg overflow-hidden border border-gray-200 shrink-0"
-              onClick={() => onViewImage?.(src)}
-            >
-              <img src={src} alt="" className="w-full h-full object-cover" />
-            </div>
-          ))}
+          {images.slice(0, 4).map((img, idx) => {
+            const imgSrc = typeof img === 'string' ? img : img.src;
+            return (
+              <div
+                key={idx}
+                className="w-10 h-10 rounded-lg overflow-hidden border border-gray-200 shrink-0"
+                onClick={() => onViewImage?.(imgSrc)}
+              >
+                <img src={imgSrc} alt="" className="w-full h-full object-cover" loading="lazy" />
+              </div>
+            );
+          })}
           {images.length > 4 && (
             <div className="w-10 h-10 rounded-lg bg-white border border-gray-200 flex items-center justify-center">
               <span className="text-[10px] font-bold text-gray-600">+{images.length - 4}</span>
@@ -569,11 +586,26 @@ function SwiperSlide({ obs, allContacts, onViewImage }) {
       )}
 
       {images.length > 0 && (
-        <div className="flex flex-col gap-2 mb-4">
-          {images.map((src, idx) => (
-            <img key={idx} src={src} alt="" className="w-full rounded-xl border border-gray-200"
-              onClick={() => onViewImage?.(src)} />
-          ))}
+        <div className="flex flex-col gap-3 mb-4">
+          {images.map((img, idx) => {
+            const imgSrc = typeof img === 'string' ? img : img.src;
+            const lat = typeof img === 'object' ? img.lat : null;
+            const lng = typeof img === 'object' ? img.lng : null;
+            const hasGps = lat != null && lng != null;
+            return (
+              <div key={idx}>
+                <img src={imgSrc} alt="" className="w-full rounded-xl border border-gray-200" loading="lazy"
+                  onClick={() => onViewImage?.(imgSrc)} />
+                {hasGps && (
+                  <a href={`https://www.google.com/maps?q=${lat},${lng}`} target="_blank" rel="noreferrer"
+                    onClick={e => e.stopPropagation()}
+                    className="text-[11px] italic text-blue-600 hover:underline mt-1 block">
+                    Localisation
+                  </a>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 

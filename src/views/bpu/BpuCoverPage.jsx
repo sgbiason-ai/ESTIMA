@@ -28,7 +28,7 @@ const BpuCoverPage = ({ project, branding, resolvedLogo, today, onLogoError }) =
       <div style={{ position: 'absolute', top: '3%', left: '5%', right: '5%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '10%' }}>
         <div style={{ height: '100%', display: 'flex', alignItems: 'center' }}>
           {resolvedLogo ? (
-            <img src={resolvedLogo} alt="logo MOE" style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} onError={onLogoError} />
+            <img src={resolvedLogo} alt="logo MOE" style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} onError={onLogoError} loading="lazy" />
           ) : (
             <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 12px', borderRadius: '4px', backgroundColor: lighten(colors.primary, 0.93), color: colors.primary, fontFamily: fonts.headings, minWidth: '80px', fontSize: '14px', fontWeight: 'bold' }}>
               {companyName || 'VOTRE SOCIÉTÉ'}
@@ -37,7 +37,7 @@ const BpuCoverPage = ({ project, branding, resolvedLogo, today, onLogoError }) =
         </div>
         <div style={{ height: '70%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {project?.clientLogo && (
-            <img src={project.clientLogo} alt="logo client" style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} />
+            <img src={project.clientLogo} alt="logo client" style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} loading="lazy" />
           )}
         </div>
       </div>

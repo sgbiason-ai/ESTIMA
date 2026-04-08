@@ -22,8 +22,8 @@
           { "key": "X-Content-Type-Options", "value": "nosniff" },
           { "key": "X-Frame-Options", "value": "DENY" },
           { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-          { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" },
-          { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' https://apis.google.com https://*.firebaseapp.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasestorage.app; img-src 'self' data: blob:; frame-src 'self' https://*.firebaseapp.com https://*.google.com; frame-ancestors 'none'" }
+          { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(self)" },
+          { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' https://apis.google.com https://*.firebaseapp.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasestorage.app https://api.open-meteo.com https://nominatim.openstreetmap.org; img-src 'self' data: blob:; frame-src 'self' blob: https://*.firebaseapp.com https://*.google.com; frame-ancestors 'none'" }
         ]
       },
       {

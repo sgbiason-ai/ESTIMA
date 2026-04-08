@@ -83,7 +83,7 @@ const BpuPageView = ({
                 {/* Logo MOE */}
                 <div className="w-[20%] h-full flex flex-col items-end justify-center">
                   {resolvedLogo ? (
-                    <img src={resolvedLogo} alt="Logo" className="object-contain max-h-[70px] max-w-full" onError={onLogoError} />
+                    <img src={resolvedLogo} alt="Logo" className="object-contain max-h-[70px] max-w-full" onError={onLogoError} loading="lazy" />
                   ) : (
                     <span className="text-[10px] font-black text-slate-300 uppercase">Logo manquant</span>
                   )}

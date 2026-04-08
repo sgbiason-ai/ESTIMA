@@ -243,7 +243,7 @@ const CoverPreview = ({ branding, activeDocType, project }) => {
           }}
         >
           {clientLogo ? (
-            <img src={clientLogo} alt="logo client" className="max-h-full max-w-full object-contain" />
+            <img src={clientLogo} alt="logo client" className="max-h-full max-w-full object-contain" loading="lazy" />
           ) : (
             <span className="opacity-40 px-3">LOGO CLIENT</span>
           )}

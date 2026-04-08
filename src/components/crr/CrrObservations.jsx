@@ -290,19 +290,35 @@ const ObservationRow = ({ obs, onUpdate, onDelete, meetingDate, participantGroup
 
             {/* Miniatures images */}
             {images.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {images.map((src, idx) => (
-                  <div key={idx} className="relative group w-16 h-16 rounded border border-gray-200 overflow-hidden bg-gray-100">
-                    <img src={src} alt="" className="w-full h-full object-cover" />
-                    <button
-                      onClick={() => removeImage(idx)}
-                      className="absolute top-0 right-0 p-0.5 bg-red-500 text-white rounded-bl opacity-0 group-hover:opacity-100 transition-opacity"
-                      title="Supprimer"
-                    >
-                      <X size={10} />
-                    </button>
-                  </div>
-                ))}
+              <div className="flex flex-wrap gap-2">
+                {images.map((img, idx) => {
+                  const imgSrc = typeof img === 'string' ? img : img.src;
+                  const lat = typeof img === 'object' ? img.lat : null;
+                  const lng = typeof img === 'object' ? img.lng : null;
+                  const hasGps = lat != null && lng != null;
+                  return (
+                    <div key={idx} className="relative group flex flex-col items-center">
+                      <div className="w-16 h-16 rounded border border-gray-200 overflow-hidden bg-gray-100">
+                        <img src={imgSrc} alt="" className="w-full h-full object-cover" loading="lazy" />
+                        <button
+                          onClick={() => removeImage(idx)}
+                          className="absolute top-0 right-0 p-0.5 bg-red-500 text-white rounded-bl opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Supprimer"
+                        >
+                          <X size={10} />
+                        </button>
+                      </div>
+                      {hasGps && (
+                        <a href={`https://www.google.com/maps?q=${lat},${lng}`} target="_blank" rel="noreferrer"
+                          onClick={e => e.stopPropagation()}
+                          className="text-[9px] italic text-blue-500 hover:text-blue-700 hover:underline mt-0.5"
+                          title={`${lat.toFixed(5)}, ${lng.toFixed(5)}`}>
+                          Localisation
+                        </a>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
 

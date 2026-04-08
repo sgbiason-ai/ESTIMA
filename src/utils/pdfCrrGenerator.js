@@ -561,13 +561,18 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
 
   cursor.y += 13;
 
-  // Precharger toutes les images des observations
+  // Precharger toutes les images des observations (supporte string ou { src, lat, lng })
   const imageCache = new Map();
+  const imageGps = new Map();
   for (const obs of observations) {
-    for (const uri of (obs.images || [])) {
-      if (!imageCache.has(uri)) {
-        const img = await loadImage(uri).catch(() => null);
-        if (img) imageCache.set(uri, { w: img.width, h: img.height, uri });
+    for (const imgEntry of (obs.images || [])) {
+      const src = typeof imgEntry === 'string' ? imgEntry : imgEntry.src;
+      if (!imageCache.has(src)) {
+        const img = await loadImage(src).catch(() => null);
+        if (img) imageCache.set(src, { w: img.width, h: img.height, uri: src });
+      }
+      if (typeof imgEntry === 'object' && imgEntry.lat != null && imgEntry.lng != null) {
+        imageGps.set(src, { lat: imgEntry.lat, lng: imgEntry.lng });
       }
     }
   }
@@ -640,7 +645,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
       let rawText = obs.text || '';
       if (obs.originMeetingNumber) rawText += ` (Report CR n${obs.originMeetingNumber})`;
       const plainText = stripHtml(rawText);
-      const imgs = (obs.images || []).filter(u => imageCache.has(u));
+      const imgs = (obs.images || []).map(e => typeof e === 'string' ? e : e.src).filter(u => imageCache.has(u));
 
       const obsBody = [];
       const obsRowMeta = [];
@@ -805,21 +810,35 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
           const cellTop = data.cell.y;
           const cellBottom = data.cell.y + data.cell.height;
 
+          // Lien "Localisation" sous une image si GPS disponible
+          const addGpsLink = (src, x, y, w) => {
+            const gps = imageGps.get(src);
+            if (!gps) return 0;
+            const url = `https://www.google.com/maps?q=${gps.lat},${gps.lng}`;
+            doc.setFont(fontB, 'italic');
+            doc.setFontSize(5.5);
+            doc.setTextColor(59, 130, 246);
+            const label = 'Localisation';
+            const tw = doc.getTextWidth(label);
+            doc.textWithLink(label, x + (w - tw) / 2, y, { url });
+            doc.setTextColor(...THEME.text);
+            return 3;
+          };
+
           if (imgs.length === 1) {
-            // Image unique : pleine largeur
             const cached = imageCache.get(imgs[0]);
             if (cached) {
               const aspect = cached.w / cached.h;
               let imgW = colW - 4;
               let imgH = imgW / aspect;
-              const maxH = cellBottom - cellTop - 2;
+              const maxH = cellBottom - cellTop - 5;
               if (imgH > maxH) { imgH = maxH; imgW = imgH * aspect; }
               const imgX = data.cell.x + (colW - imgW) / 2;
-              const imgY = cellTop + (cellBottom - cellTop - imgH) / 2;
+              const imgY = cellTop + (cellBottom - cellTop - imgH - 4) / 2;
               try { doc.addImage(cached.uri, 'JPEG', imgX, imgY, imgW, imgH); } catch {}
+              addGpsLink(imgs[0], imgX, imgY + imgH + 2, imgW);
             }
           } else {
-            // 2 par ligne, moitié-moitié
             const slotW = (colW - 6) / 2;
             let drawY = cellTop + 1;
             for (let i = 0; i < imgs.length; i += 2) {
@@ -832,14 +851,15 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
                 let iW = slotW;
                 let iH = iW / aspect;
                 if (iH > 50) { iH = 50; iW = iH * aspect; }
-                pair.push({ cached, imgW: iW, imgH: iH });
-                rowH = Math.max(rowH, iH + 2);
+                pair.push({ cached, imgW: iW, imgH: iH, src: imgs[i + j] });
+                rowH = Math.max(rowH, iH + 5);
               }
               pair.forEach((p, j) => {
                 const imgX = data.cell.x + 2 + j * (slotW + 2);
-                const imgY = drawY + (rowH - p.imgH) / 2;
+                const imgY = drawY + (rowH - p.imgH - 3) / 2;
                 if (imgY + p.imgH <= cellBottom + 0.5) {
                   try { doc.addImage(p.cached.uri, 'JPEG', imgX, imgY, p.imgW, p.imgH); } catch {}
+                  addGpsLink(p.src, imgX, imgY + p.imgH + 1.5, p.imgW);
                 }
               });
               drawY += rowH;

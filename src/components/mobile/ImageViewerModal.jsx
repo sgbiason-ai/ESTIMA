@@ -5,7 +5,8 @@
 import React from 'react';
 import Icon from './Icon';
 
-export default function ImageViewerModal({ src, onClose }) {
+export default function ImageViewerModal({ src: rawSrc, onClose }) {
+  const src = typeof rawSrc === 'object' ? rawSrc?.src : rawSrc;
   if (!src) return null;
 
   return (

@@ -495,7 +495,7 @@ const TabEXE4 = ({ fiche, data, update, updateReserve, addReserve, removeReserve
                 <div className="px-2.5 pb-2.5 flex items-center gap-3">
                   {r.image ? (
                     <div className="relative group">
-                      <img src={r.image} alt={`Réserve ${r.numero}`} className="h-16 w-auto rounded-md border border-gray-200 object-cover" />
+                      <img src={r.image} alt={`Réserve ${r.numero}`} className="h-16 w-auto rounded-md border border-gray-200 object-cover" loading="lazy" />
                       <button onClick={() => updateReserve(idx, 'image', null)} className="absolute -top-1.5 -right-1.5 p-0.5 rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"><X size={10} /></button>
                     </div>
                   ) : (
@@ -682,7 +682,7 @@ const TabEXE5 = ({ fiche, data, update, updateReserve, addReserve, removeReserve
                         <div className="px-2.5 pb-2.5 flex items-center gap-3">
                           {r.image ? (
                             <div className="relative group">
-                              <img src={r.image} alt={`Réserve ${r.numero}`} className="h-16 w-auto rounded-md border border-gray-200 object-cover" />
+                              <img src={r.image} alt={`Réserve ${r.numero}`} className="h-16 w-auto rounded-md border border-gray-200 object-cover" loading="lazy" />
                               <button onClick={() => updateReserve(idx, 'image', null)} className="absolute -top-1.5 -right-1.5 p-0.5 rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"><X size={10} /></button>
                             </div>
                           ) : (
