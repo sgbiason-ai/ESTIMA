@@ -1,12 +1,21 @@
-// src/views/crc/CrcChantierDropdown.jsx — EstimaStyle
-import React, { useState } from 'react';
+// src/views/crc/CrcChantierDropdown.jsx — EstimaStyle (fixed dropdown)
+import React, { useState, useRef, useEffect } from 'react';
 import { Plus, Trash2, FolderOpen, ChevronDown } from 'lucide-react';
 import { confirm } from '../../utils/globalUI';
 
 export default function CrcChantierDropdown({ chantiers, activeId, onSelect, onCreate, onDelete }) {
   const [open, setOpen] = useState(false);
+  const btnRef = useRef(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
   const active = chantiers.find((c) => c.id === activeId);
   const nom = active?.crrConfig?.chantierInfo?.nom || 'Sélectionner...';
+
+  useEffect(() => {
+    if (open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 4, left: r.left });
+    }
+  }, [open]);
 
   const handleDelete = async (e, chantier) => {
     e.stopPropagation();
@@ -17,18 +26,22 @@ export default function CrcChantierDropdown({ chantiers, activeId, onSelect, onC
   return (
     <div className="relative">
       <button
+        ref={btnRef}
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 pl-2.5 pr-2 py-1.5 rounded-xl bg-gray-50 border border-gray-200/60 hover:border-blue-400 text-sm transition-all min-w-[180px] max-w-[260px]"
+        className="flex items-center gap-2 pl-2.5 pr-2 py-1.5 rounded-xl bg-gray-50 border border-gray-200/60 hover:border-blue-400 text-sm transition-all min-w-[160px] max-w-[240px]"
       >
         <FolderOpen size={14} className="text-blue-500 shrink-0" />
-        <span className="text-gray-800 font-medium truncate flex-1 text-left">{nom}</span>
+        <span className="text-gray-800 font-medium truncate flex-1 text-left text-xs">{nom}</span>
         <ChevronDown size={12} className="text-gray-400 shrink-0" />
       </button>
 
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute top-full left-0 mt-1 w-80 bg-white border border-gray-200/60 rounded-2xl shadow-xl z-50 max-h-72 overflow-y-auto">
+          <div
+            className="fixed w-80 bg-white border border-gray-200 rounded-2xl shadow-2xl z-50 max-h-72 overflow-y-auto"
+            style={{ top: pos.top, left: pos.left }}
+          >
             <button
               onClick={() => { onCreate(); setOpen(false); }}
               className="w-full text-left px-4 py-2.5 text-sm text-blue-600 hover:bg-blue-50 transition-colors border-b border-gray-100 flex items-center gap-2 font-medium"

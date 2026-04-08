@@ -30,7 +30,7 @@
     "mammoth": "^1.11.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-leaflet": "^5.0.0",
+    "react-leaflet": "^4.2.1",
     "react-quill": "^2.0.0",
     "xlsx": "^0.18.5"
   },

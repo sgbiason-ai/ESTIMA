@@ -2,6 +2,8 @@
 // Hub mobile — Bento Box Apple-style, fond clair
 import React, { useState, useEffect } from 'react';
 import Icon from './Icon';
+import { APP_VERSION } from '../../data/changelog';
+import ChangelogModal from '../ChangelogModal';
 
 // ─── MODULES MOBILES ───────────────────────────────────────────────────────
 
@@ -46,6 +48,7 @@ const ROW_THEMES = {
 
 export default function MobileHubView({ userEmail, onSelectModule, onLogout, isLandscape }) {
   const [mounted, setMounted] = useState(false);
+  const [showChangelog, setShowChangelog] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
   const firstName = userEmail?.split('@')[0]?.split('.')[0] || '';
@@ -141,10 +144,19 @@ export default function MobileHubView({ userEmail, onSelectModule, onLogout, isL
         >
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
           <span className="text-[10px] text-gray-400 font-medium">
-            Opérationnel · v2.0.0
+            Opérationnel · v{APP_VERSION}
           </span>
+          <span className="text-[10px] text-gray-300">·</span>
+          <button
+            onClick={() => setShowChangelog(true)}
+            className="text-[10px] font-medium text-blue-500"
+          >
+            Nouveautés
+          </button>
         </div>
       </div>
+
+      {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
     </div>
   );
 }

@@ -8,7 +8,7 @@ import {
   ArrowLeft, ClipboardList, Plus, Trash2, Copy,
   Building2, Users, ListTree, Edit3, Eye, FileDown, Mail, FolderOpen,
   HelpCircle, Compass, Archive, UploadCloud, ArrowLeftRight,
-  FileText as FileWord, X,
+  FileText as FileWord, X, MapPin,
 } from 'lucide-react';
 import { doc, getDoc, setDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -32,6 +32,7 @@ import CrcInfoChantierModal from './CrcInfoChantierModal';
 import CrcDuplicateModal from './CrcDuplicateModal';
 import CrcLibraryModal from './CrcLibraryModal';
 import CrcAuditModal from './CrcAuditModal';
+import CrcTerrainView from './CrcTerrainView';
 
 // ── VUE PRINCIPALE ──────────────────────────────────────────────────────────
 
@@ -335,7 +336,7 @@ export default function CrcView({ onBackToHub, user, companyId }) {
       {/* ═══════════════════════════════════════════════════════════════════════
           RUBAN ESTIMASTYLE
           ═══════════════════════════════════════════════════════════════════════ */}
-      <div className="shrink-0 bg-white/80 backdrop-blur-xl border-b border-gray-200/60">
+      <div className="shrink-0 bg-white/80 backdrop-blur-xl border-b border-gray-200/60 min-w-0 w-full">
 
         {/* Ligne superieure : titre + retour */}
         <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-200/60">
@@ -354,7 +355,7 @@ export default function CrcView({ onBackToHub, user, companyId }) {
         </div>
 
         {/* Ruban principal */}
-        <div className="flex items-end gap-1 px-3 py-1.5">
+        <div className="flex items-end gap-0.5 px-2 py-1 overflow-x-auto max-w-full" style={{ scrollbarWidth: 'none' }}>
 
           {/* ── GROUPE : CHANTIER ── */}
           <RibbonGroup label="Chantier" dataTour="chantier">
@@ -390,29 +391,21 @@ export default function CrcView({ onBackToHub, user, companyId }) {
 
           {/* ── GROUPE : MODE ── */}
           <RibbonGroup label="Mode" dataTour="mode">
-            <div className="flex items-center bg-gray-100 rounded-xl p-0.5">
-              <button
-                onClick={() => setViewMode('edit')}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                  viewMode === 'edit'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-400 hover:text-gray-600'
-                }`}
-              >
-                <Edit3 size={14} />
-                Édition
-              </button>
-              <button
-                onClick={() => setViewMode('preview')}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                  viewMode === 'preview'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-400 hover:text-gray-600'
-                }`}
-              >
-                <Eye size={14} />
-                Aperçu
-              </button>
+            <div className="flex items-center bg-gray-100 rounded-lg xl:rounded-xl p-0.5">
+              {[
+                { id: 'edit', icon: Edit3, label: 'Édition' },
+                { id: 'preview', icon: Eye, label: 'Aperçu' },
+                { id: 'terrain', icon: MapPin, label: 'Terrain' },
+              ].map(m => (
+                <button key={m.id} onClick={() => setViewMode(m.id)}
+                  className={`flex items-center gap-1 px-2 xl:px-3 py-1.5 xl:py-2 rounded-md xl:rounded-lg text-[10px] xl:text-xs font-medium transition-all ${
+                    viewMode === m.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'
+                  }`}>
+                  <m.icon size={12} className="xl:hidden" />
+                  <m.icon size={14} className="hidden xl:block" />
+                  {m.label}
+                </button>
+              ))}
             </div>
           </RibbonGroup>
 
@@ -479,6 +472,10 @@ export default function CrcView({ onBackToHub, user, companyId }) {
                 <div className="flex flex-col items-center justify-center h-full text-gray-400">
                   <Edit3 size={48} className="mb-4 opacity-30" />
                   <p className="text-sm">Cliquez sur « Nouveau CR » pour créer le premier compte rendu</p>
+                </div>
+              ) : viewMode === 'terrain' ? (
+                <div className="p-6 h-full">
+                  <CrcTerrainView meeting={manager.activeMeeting} observationsByCategory={manager.observationsByCategory} />
                 </div>
               ) : viewMode === 'preview' ? (
                 <div className="p-6 bg-gray-100 min-h-full">
