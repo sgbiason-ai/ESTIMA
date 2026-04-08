@@ -4,6 +4,27 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  test: {
+    include: ['src/test/**/*.test.{js,jsx}'],
+    exclude: ['node_modules', '.claude/worktrees/**'],
+    coverage: {
+      provider: 'v8',
+      include: [
+        'src/utils/helpers.js',
+        'src/utils/normalizeProject.js',
+        'src/utils/projectCalculations.js',
+        'src/utils/devisMoeCalculations.js',
+        'src/utils/crcArchive.js',
+        'src/utils/exportHelpers.js',
+        'src/utils/formatObsText.jsx',
+        'src/utils/globalUI.js',
+        'src/utils/pdf/pdfSharedHelpers.js',
+        'src/data/**',
+        'src/hooks/useDevisMoe.js',
+        'src/hooks/useBranding.js',
+      ],
+    },
+  },
   plugins: [
     react(),
     VitePWA({
@@ -54,6 +75,16 @@ export default defineConfig({
             options: {
               cacheName: 'gstatic-fonts-cache',
               expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            // Cache tuiles satellite ESRI (usage terrain)
+            urlPattern: /^https:\/\/.*\.arcgisonline\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'esri-tiles-cache',
+              expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 30 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },
