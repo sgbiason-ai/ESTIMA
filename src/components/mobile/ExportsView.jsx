@@ -39,13 +39,13 @@ export default function ExportsView({ onExport }) {
 
         return (
           <div key={ex.key} className="flex items-center gap-3 py-3.5 border-b border-gray-100">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
               ex.format === 'PDF' ? 'bg-red-100' : 'bg-emerald-100'
             }`}>
               <Icon name="file" size={18} color={ex.format === 'PDF' ? '#dc2626' : '#059669'} />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-bold text-gray-900">{ex.key}</div>
+              <div className="text-[15px] font-bold text-gray-900">{ex.key}</div>
               <div className="text-[11px] text-gray-500 font-medium">{ex.desc} · {ex.format}</div>
             </div>
             <div className="flex gap-1.5 shrink-0">

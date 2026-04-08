@@ -330,18 +330,18 @@ export default function MobileApp({ user, companyId, onLogout }) {
       <MobileStyles />
       {/* ── Header (masqué sur le hub — il a son propre header) ── */}
       {activeModule && (
-        <header className={`flex items-center justify-between px-3 bg-white/70 backdrop-blur-xl border-b border-gray-200/50 text-gray-900 sticky top-0 z-20 ${isLandscape ? 'py-1' : 'py-2.5'}`}>
-          <button onClick={goBack} className="p-2 rounded-xl hover:bg-gray-100 transition">
-            <Icon name="back" size={20} color="#6b7280" />
+        <header className={`flex items-center justify-between px-3 bg-white/70 backdrop-blur-xl border-b border-gray-200/50 text-gray-900 sticky top-0 z-20 ${isLandscape ? 'py-1' : 'py-3'}`}>
+          <button onClick={goBack} className="p-2.5 rounded-xl hover:bg-gray-100 transition">
+            <Icon name="back" size={22} color="#6b7280" />
           </button>
           <div className="flex-1 text-center overflow-hidden">
             {currentTitle && (
-              <span className="text-sm font-semibold text-gray-900 truncate max-w-[220px] inline-block">
+              <span className="text-[15px] font-semibold text-gray-900 truncate max-w-[260px] inline-block">
                 {currentTitle}
               </span>
             )}
           </div>
-          <div className="w-9" />
+          <div className="w-10" />
         </header>
       )}
 

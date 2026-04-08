@@ -41,21 +41,21 @@ export default function ProjectsList({ projects, folders, loading, search, onSea
         <input
           type="text" placeholder="Rechercher un projet…"
           value={search} onChange={(e) => onSearch(e.target.value)}
-          className="flex-1 border-none outline-none text-sm bg-transparent text-gray-800 placeholder-gray-400"
+          className="flex-1 border-none outline-none text-[15px] bg-transparent text-gray-800 placeholder-gray-400"
         />
       </div>
 
       {/* Stats */}
       <div className="flex gap-2 px-4 py-1 mb-2">
         <div className="flex-1 bg-white rounded-xl p-3 border border-gray-200/60 text-center">
-          <div className="text-lg font-bold text-gray-900">{projects.length}</div>
-          <div className="text-xs text-gray-400 font-medium">Projets</div>
+          <div className="text-xl font-bold text-gray-900">{projects.length}</div>
+          <div className="text-[13px] text-gray-400 font-medium">Projets</div>
         </div>
         <div className="flex-1 bg-white rounded-xl p-3 border border-gray-200/60 text-center">
-          <div className="text-lg font-bold text-gray-900">
+          <div className="text-xl font-bold text-gray-900">
             {projects.filter(p => p.tranches.length > 0).length}
           </div>
-          <div className="text-xs text-gray-400 font-medium">Multi-tranches</div>
+          <div className="text-[13px] text-gray-400 font-medium">Multi-tranches</div>
         </div>
         <button onClick={onRefresh} className="bg-white rounded-xl p-3 border border-gray-200/60 flex items-center justify-center hover:bg-gray-50 transition active:scale-[0.97]">
           <Icon name="refresh" size={18} color="#3b82f6" />
@@ -102,7 +102,7 @@ export default function ProjectsList({ projects, folders, loading, search, onSea
               </svg>
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold text-gray-900 truncate">{folder.name}</div>
+              <div className="text-[15px] font-semibold text-gray-900 truncate">{folder.name}</div>
               <div className="text-xs text-gray-400 mt-0.5">{count} projet{count > 1 ? 's' : ''}</div>
             </div>
             <Icon name="chevron" size={14} color="#d1d5db" />
@@ -119,14 +119,14 @@ export default function ProjectsList({ projects, folders, loading, search, onSea
       <div className={isLandscape ? 'grid grid-cols-2 gap-2 px-4' : 'contents'}>
       {currentProjects.map((p) => (
         <button key={p.id} onClick={() => onSelect(p)}
-          className={`block p-3.5 bg-white rounded-xl border border-gray-200/60 text-left transition hover:shadow-md active:scale-[0.98] ${isLandscape ? '' : 'w-[calc(100%-2rem)] mx-4 mb-2'}`}>
+          className={`block p-4 bg-white rounded-xl border border-gray-200/60 text-left transition hover:shadow-md active:scale-[0.98] ${isLandscape ? '' : 'w-[calc(100%-2rem)] mx-4 mb-2'}`}>
           <div className="flex justify-between items-start">
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold text-gray-900 leading-tight truncate">{p.name}</div>
-              {p.client && <div className="text-xs text-gray-400 font-medium mt-0.5">{p.client}</div>}
+              <div className="text-[15px] font-semibold text-gray-900 leading-tight truncate">{p.name}</div>
+              {p.client && <div className="text-[13px] text-gray-400 font-medium mt-0.5">{p.client}</div>}
             </div>
           </div>
-          <div className="flex items-center gap-2 mt-2 text-xs text-gray-400 font-medium">
+          <div className="flex items-center gap-2 mt-2 text-[13px] text-gray-400 font-medium">
             <span>{p.chaptersCount} chap.</span>
             <span className="text-gray-300">·</span>
             <span>{p.itemsCount} articles</span>

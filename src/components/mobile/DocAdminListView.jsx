@@ -7,12 +7,12 @@ export default function DocAdminListView({ fiches, loading, onSelect, onRefresh,
     <div className="pb-2">
       <div className="flex gap-2 px-4 pt-3 pb-2 mb-1">
         <div className="flex-1 bg-white rounded-xl p-3 border border-gray-200 text-center">
-          <div className="text-lg font-bold text-gray-900">{fiches.length}</div>
-          <div className="text-xs text-gray-500 font-semibold">Fiches</div>
+          <div className="text-xl font-bold text-gray-900">{fiches.length}</div>
+          <div className="text-[13px] text-gray-500 font-semibold">Fiches</div>
         </div>
         <div className="flex-1 bg-white rounded-xl p-3 border border-gray-200 text-center">
-          <div className="text-lg font-bold text-gray-900">{fiches.filter(f => f.hasExe1).length}</div>
-          <div className="text-xs text-gray-500 font-semibold">Avec OS</div>
+          <div className="text-xl font-bold text-gray-900">{fiches.filter(f => f.hasExe1).length}</div>
+          <div className="text-[13px] text-gray-500 font-semibold">Avec OS</div>
         </div>
         <button onClick={onRefresh} className="bg-white rounded-xl p-3 border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition active:scale-[0.97]">
           <Icon name="refresh" size={18} color="#3b82f6" />
@@ -30,15 +30,15 @@ export default function DocAdminListView({ fiches, loading, onSelect, onRefresh,
         <div className={isLandscape ? 'grid grid-cols-2 gap-2 px-4' : 'contents'}>
           {fiches.map(f => (
             <button key={f.id} onClick={() => onSelect(f)}
-              className={`block p-3.5 bg-white rounded-xl border border-gray-200 text-left transition hover:shadow-md active:scale-[0.98] ${isLandscape ? '' : 'w-[calc(100%-2rem)] mx-4 mb-2'}`}>
+              className={`block p-4 bg-white rounded-xl border border-gray-200 text-left transition hover:shadow-md active:scale-[0.98] ${isLandscape ? '' : 'w-[calc(100%-2rem)] mx-4 mb-2'}`}>
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center shrink-0 mt-0.5">
+                <div className="w-12 h-12 rounded-xl bg-rose-100 flex items-center justify-center shrink-0 mt-0.5">
                   <Icon name="file" size={18} color="#e11d48" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-bold text-gray-900 leading-tight truncate">{f.nom}</div>
-                  {f.pouvoirAdj && <div className="text-xs text-gray-500 font-medium mt-0.5 truncate">{f.pouvoirAdj}</div>}
-                  <div className="flex items-center gap-2 mt-1.5 text-xs text-gray-500 font-semibold">
+                  <div className="text-[15px] font-bold text-gray-900 leading-tight truncate">{f.nom}</div>
+                  {f.pouvoirAdj && <div className="text-[13px] text-gray-500 font-medium mt-0.5 truncate">{f.pouvoirAdj}</div>}
+                  <div className="flex items-center gap-2 mt-1.5 text-[13px] text-gray-500 font-semibold">
                     {f.nbLots > 0 && <span>{f.nbLots} lot{f.nbLots > 1 ? 's' : ''}</span>}
                     {f.nbLots > 0 && f.updatedAt && <span className="text-gray-300">·</span>}
                     {f.updatedAt && <span>{dateFr(f.updatedAt)}</span>}

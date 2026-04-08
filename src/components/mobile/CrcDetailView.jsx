@@ -213,7 +213,7 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
           return (
             <button key={m.id || idx} onClick={() => handleSelectMeeting(idx)}
               className={`
-                shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold transition border
+                shrink-0 px-3 py-1.5 rounded-xl text-[13px] font-bold transition border
                 ${isActive
                   ? 'bg-gray-900 text-white border-gray-900 shadow-sm'
                   : 'bg-white text-gray-600 border-gray-200'
@@ -230,7 +230,7 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
         <div className={`mx-4 bg-white rounded-xl border border-gray-200 ${isLandscape ? 'mt-0.5 mb-1 p-2' : 'mt-1 mb-2 p-3'}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-amber-400">
+              <span className="text-[13px] font-semibold text-amber-400">
                 {meetingTypeLabel(meeting.type)} n°{meeting.number}
               </span>
               {canEdit && manager.saveStatus && (
@@ -374,7 +374,7 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
 function SectionTab({ label, active, onClick }) {
   return (
     <button onClick={onClick}
-      className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition ${
+      className={`flex-1 py-3 text-[13px] font-bold rounded-xl transition ${
         active ? 'bg-gray-900 text-white shadow-sm' : 'bg-gray-100 text-gray-600'
       }`}>
       {label}
@@ -418,7 +418,7 @@ function ObservationsSection({ obsByCategory, allContacts, canEdit, isLandscape,
             <button onClick={() => toggleCat(cat)}
               className="flex items-center justify-between w-full px-3 py-2.5 text-left">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-gray-900">{cat}</span>
+                <span className="text-[15px] font-bold text-gray-900">{cat}</span>
                 <span className="text-[10px] font-bold text-gray-700 bg-white px-1.5 py-0.5 rounded">
                   {obs.length}
                 </span>
@@ -495,7 +495,7 @@ function ObservationCard({ obs, contactName, canEdit, onEdit, onTap, onViewImage
 
       {/* Text */}
       {text && (
-        <p className="text-xs text-gray-600 leading-relaxed mt-1 whitespace-pre-line line-clamp-4">
+        <p className="text-[13px] text-gray-600 leading-relaxed mt-1 whitespace-pre-line line-clamp-4">
           {text}
         </p>
       )}
@@ -549,12 +549,19 @@ function SwiperSlide({ obs, allContacts, onViewImage }) {
 
   return (
     <div className="px-5 py-4" style={{ scrollbarWidth: 'none', height: '100%', overflowY: 'auto' }}>
+      {/* Catégorie */}
+      {obs._cat && (
+        <div className="mb-3 pb-2 border-b border-gray-100">
+          <span className="text-[11px] font-bold text-blue-600 uppercase tracking-wider">{obs._cat}</span>
+        </div>
+      )}
+
       <div className="flex items-center gap-2 mb-3">
-        <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase border ${statusColorMobile(obs.status)}`}>
+        <span className={`px-2.5 py-1 rounded-lg text-[12px] font-bold uppercase border ${statusColorMobile(obs.status)}`}>
           {st.label}
         </span>
-        {obs.emitter && <span className="text-xs text-gray-700 font-medium">{obs.emitter}</span>}
-        {obs.date && <span className="text-xs text-gray-400 ml-auto">{dateFr(obs.date)}</span>}
+        {obs.emitter && <span className="text-[13px] text-gray-700 font-medium">{obs.emitter}</span>}
+        {obs.date && <span className="text-[13px] text-gray-400 ml-auto">{dateFr(obs.date)}</span>}
       </div>
 
       {text && (
@@ -649,21 +656,16 @@ function ObservationSwiper({ observations, currentIdx, onChangeIdx, onClose, onE
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end justify-center" onClick={onClose}>
-      <div
-        className="w-full max-w-md bg-white rounded-t-3xl shadow-2xl flex flex-col overflow-hidden"
-        style={{ maxHeight: '92vh' }}
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Handle + header */}
-        <div className="flex flex-col items-center pt-3 pb-2 px-4 shrink-0 border-b border-gray-100">
-          <div className="w-10 h-1 rounded-full bg-gray-300 mb-3" />
+    <div className="fixed inset-0 z-50 bg-white flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="w-full h-full flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="flex flex-col items-center pt-2 pb-2 px-4 shrink-0 border-b border-gray-200/60 bg-white/80 backdrop-blur-xl">
           <div className="flex items-center justify-between w-full">
             <button onClick={onClose} className="p-1.5 rounded-xl hover:bg-gray-100 transition">
               <Icon name="close" size={18} color="#6b7280" />
             </button>
             <div className="text-center flex-1">
-              <span className="text-xs font-bold text-gray-900">{obs._cat}</span>
+              <span className="text-[14px] font-bold text-gray-900">{obs._cat}</span>
               <span className="text-[10px] text-gray-400 ml-2">{currentIdx + 1} / {observations.length}</span>
             </div>
             {onEdit && (
@@ -760,7 +762,7 @@ function ParticipantsSection({ groups, attendance, diffusion, canEdit, onSetAtte
             <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100">
               <div className={`w-2.5 h-2.5 rounded-full`}
                 style={{ backgroundColor: `rgb(${color.rgb.join(',')})` }} />
-              <span className="text-sm font-bold text-gray-900">{group.name}</span>
+              <span className="text-[15px] font-bold text-gray-900">{group.name}</span>
               {group.subLabel && (
                 <span className="text-[10px] text-gray-700">{group.subLabel}</span>
               )}

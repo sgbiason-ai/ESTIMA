@@ -88,7 +88,7 @@ const extractTimeline = (fiche) => {
 // ─── Helpers ───────────────────────────────────────────────────────────────
 const SectionTab = ({ label, active, onClick }) => (
   <button onClick={onClick}
-    className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition ${
+    className={`flex-1 py-3 text-[13px] font-bold rounded-xl transition ${
       active ? 'bg-gray-900 text-white shadow-sm' : 'bg-gray-100 text-gray-600'
     }`}>
     {label}

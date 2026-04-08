@@ -77,14 +77,14 @@ export default function MobileHubView({ userEmail, onSelectModule, onLogout, isL
           </div>
         </div>
 
-        <h1 className={`${isLandscape ? 'text-xl' : 'text-2xl'} font-semibold text-gray-900 tracking-tight leading-tight`}
+        <h1 className={`${isLandscape ? 'text-xl' : 'text-[1.75rem]'} font-semibold text-gray-900 tracking-tight leading-tight`}
           style={{ fontFamily: '"SF Pro Display", Georgia, -apple-system, serif' }}>
           {greeting},{' '}
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-500 via-cyan-500 to-teal-400">
             {displayName}
           </span>.
         </h1>
-        <p className="text-sm text-gray-400 mt-1 font-light">
+        <p className="text-[15px] text-gray-400 mt-1 font-light">
           Sélectionnez un module pour commencer.
         </p>
       </div>
@@ -99,7 +99,7 @@ export default function MobileHubView({ userEmail, onSelectModule, onLogout, isL
                 key={mod.id}
                 onClick={() => onSelectModule(mod.id)}
                 className={`
-                  relative flex items-center gap-4 w-full p-4 rounded-[20px]
+                  relative flex items-center gap-4 w-full p-5 rounded-[20px]
                   border text-left transition-all duration-300 active:scale-[0.97]
                   ${theme.card}
                 `}
@@ -110,21 +110,21 @@ export default function MobileHubView({ userEmail, onSelectModule, onLogout, isL
                 }}
               >
                 {/* Icon */}
-                <div className={`w-11 h-11 rounded-2xl ${theme.iconBg} flex items-center justify-center shrink-0`}>
-                  <Icon name={mod.icon} size={20} color={theme.iconColor} />
+                <div className={`w-12 h-12 rounded-2xl ${theme.iconBg} flex items-center justify-center shrink-0`}>
+                  <Icon name={mod.icon} size={22} color={theme.iconColor} />
                 </div>
 
                 {/* Text */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
-                    <span className={`text-sm font-semibold ${theme.title}`}>{mod.label}</span>
+                    <span className={`text-[15px] font-semibold ${theme.title}`}>{mod.label}</span>
                     {mod.tag && (
                       <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider border ${theme.badge}`}>
                         {mod.tag}
                       </span>
                     )}
                   </div>
-                  <p className={`text-xs leading-snug ${theme.desc}`}>{mod.description}</p>
+                  <p className={`text-[13px] leading-snug ${theme.desc}`}>{mod.description}</p>
                 </div>
 
                 {/* Chevron */}

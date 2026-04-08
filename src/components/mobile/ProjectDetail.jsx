@@ -30,7 +30,7 @@ export default function ProjectDetail({ project, calcHook, onNavigate, onExport,
         <div className="flex justify-between items-baseline">
           <div>
             <div className="text-[10px] text-gray-700 font-bold uppercase tracking-wide">Étude</div>
-            <div className="text-lg font-bold text-gray-900">{fmt(totalStudy)}</div>
+            <div className="text-xl font-bold text-gray-900">{fmt(totalStudy)}</div>
           </div>
           {totalStudy > 0 && totalClient !== totalStudy && (
             <div className="text-center">
@@ -41,7 +41,7 @@ export default function ProjectDetail({ project, calcHook, onNavigate, onExport,
           )}
           <div className="text-right">
             <div className="text-[10px] text-gray-700 font-bold uppercase tracking-wide">Client</div>
-            <div className="text-lg font-bold text-blue-600">{fmt(totalClient)}</div>
+            <div className="text-xl font-bold text-blue-600">{fmt(totalClient)}</div>
           </div>
         </div>
         <div className="flex gap-4 mt-2 text-xs text-gray-700 font-medium">
@@ -56,11 +56,11 @@ export default function ProjectDetail({ project, calcHook, onNavigate, onExport,
         {menuItems.map(item => (
           <button key={item.key} onClick={() => onNavigate(item.key)}
             className="flex items-center gap-3 w-full py-3.5 border-b border-gray-100 text-left transition hover:bg-gray-50 active:bg-gray-100 active:scale-[0.98]">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+            <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
               <Icon name={item.icon} size={20} color="#2563eb" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-bold text-gray-900">{item.label}</div>
+              <div className="text-[15px] font-bold text-gray-900">{item.label}</div>
               <div className="text-xs text-gray-700 mt-0.5">{item.desc}</div>
             </div>
             <Icon name="chevron" size={16} color="#d1d5db" />
