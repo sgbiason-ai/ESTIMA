@@ -2,9 +2,31 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.1.0';
+export const APP_VERSION = '2.2.0';
 
 export const CHANGELOG = [
+  {
+    version: '2.2.0',
+    date: '2026-04-08',
+    title: 'Module Visite de Site + Carte terrain avancée',
+    highlights: [
+      'Nouveau module "Visite de Site" — carnet terrain léger avec photos géolocalisées et GPS',
+      'Carte satellite / plan / cadastre avec sélecteur intégré',
+      'Suivi GPS en arrière-plan (continue entre les onglets)',
+      'Outil de mesure de distance sur la carte (clic points → distance)',
+      'Observations numérotées avec pastilles synchronisées carte ↔ liste',
+      'Clic pastille = highlight orange + scroll automatique',
+      'Vue desktop split redimensionnable (divider draggable)',
+      'Carte plein écran sur mobile et desktop',
+      'Export PDF des visites de site avec photos et liens localisation',
+      'Appui long sur onglet CR → Dupliquer / Supprimer (mobile)',
+      'Suppression de visite par appui long (mobile) et bouton (desktop)',
+      'Bouton PDF mobile télécharge directement le fichier',
+      'Anti-chevauchement des pastilles sur la carte',
+      'Fix Service Worker : skipWaiting + clientsClaim (mise à jour immédiate)',
+      'Fix CSP : géolocalisation, tuiles ESRI/OSM/cadastre autorisées',
+    ],
+  },
   {
     version: '2.1.0',
     date: '2026-04-07',
