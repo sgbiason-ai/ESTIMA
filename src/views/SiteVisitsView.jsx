@@ -1,11 +1,12 @@
 // src/views/SiteVisitsView.jsx
-// Vue desktop des visites de site — lecture seule avec carte terrain.
+// Vue desktop — sidebar liste | observations gauche | carte droite + plein écran + export + suppression.
 
 import React, { useState, useEffect, useCallback, useMemo, Suspense, lazy } from 'react';
-import { collection, getDocs, getDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { MapPin, RefreshCw, Camera, MessageSquare, Navigation, Clock, Ruler, ChevronRight } from 'lucide-react';
+import { MapPin, RefreshCw, Camera, MessageSquare, Navigation, Ruler, Trash2, FileDown, Maximize2, X } from 'lucide-react';
 import { stripHtml } from '../utils/formatObsText';
+import { confirm } from '../utils/globalUI';
 
 const GpsMapView = lazy(() => import('../components/mobile/GpsMapView'));
 
@@ -15,6 +16,7 @@ export default function SiteVisitsView({ companyId }) {
   const [selectedId, setSelectedId] = useState(null);
   const [fullVisit, setFullVisit] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [fullscreenMap, setFullscreenMap] = useState(false);
 
   const fetchVisits = useCallback(async () => {
     if (!companyId) return;
@@ -43,6 +45,24 @@ export default function SiteVisitsView({ companyId }) {
     finally { setDetailLoading(false); }
   }, [companyId]);
 
+  const handleDelete = useCallback(async (visitId, visitNom) => {
+    const ok = await confirm(`Supprimer la visite "${visitNom}" et toutes ses données ?`, { danger: true });
+    if (!ok) return;
+    try {
+      await deleteDoc(doc(db, 'companies', companyId, 'site_visits', visitId));
+      setVisits(prev => prev.filter(v => v.id !== visitId));
+      if (selectedId === visitId) { setSelectedId(null); setFullVisit(null); }
+    } catch (e) { console.error('Erreur suppression:', e); }
+  }, [companyId, selectedId]);
+
+  const handleExportPdf = useCallback(async () => {
+    if (!fullVisit) return;
+    try {
+      const { generateSiteVisitPdf } = await import('../utils/pdfSiteVisitGenerator');
+      await generateSiteVisitPdf(fullVisit);
+    } catch (e) { console.error('Erreur export PDF:', e); }
+  }, [fullVisit]);
+
   const tracking = fullVisit?.gpsTracking || {};
   const coordinates = tracking.coordinates || [];
   const observations = fullVisit?.observations || [];
@@ -57,105 +77,111 @@ export default function SiteVisitsView({ companyId }) {
     return markers;
   }, [observations]);
 
+  const hasMap = coordinates.length > 0 || photoMarkers.length > 0;
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
   const fmtDist = (m) => m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(2)} km`;
 
   return (
     <div className="flex h-full bg-[#f5f5f7]" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
 
-      {/* Sidebar — liste des visites */}
-      <div className="w-72 shrink-0 border-r border-gray-200/60 bg-white/80 backdrop-blur-xl flex flex-col overflow-hidden">
+      {/* ── Sidebar liste ── */}
+      <div className="w-64 shrink-0 border-r border-gray-200/60 bg-white/80 backdrop-blur-xl flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200/60 shrink-0">
-          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Visites de site</span>
+          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Visites</span>
           <button onClick={fetchVisits} className="p-1 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition">
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
         </div>
-
         <div className="flex-1 overflow-y-auto py-2 px-2">
           {loading && <div className="text-center py-8 text-gray-400 text-xs">Chargement…</div>}
           {visits.map(v => (
-            <button key={v.id} onClick={() => loadDetail(v.id)}
-              className={`w-full text-left px-3 py-2.5 rounded-xl mb-1 transition-all ${
-                selectedId === v.id ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'
-              }`}>
-              <div className="text-xs font-semibold truncate">{v.nom}</div>
-              {v.lieu && <div className="text-[10px] text-gray-400 truncate mt-0.5">{v.lieu}</div>}
-              <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-400">
-                <span>{v.obsCount} obs.</span>
-                {v.date && <span>{fmtDate(v.date)}</span>}
-              </div>
-            </button>
+            <div key={v.id} className={`group flex items-center rounded-xl mb-1 transition-all ${selectedId === v.id ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
+              <button onClick={() => loadDetail(v.id)} className="flex-1 text-left px-3 py-2.5 min-w-0">
+                <div className={`text-xs font-semibold truncate ${selectedId === v.id ? 'text-blue-700' : 'text-gray-600'}`}>{v.nom}</div>
+                {v.lieu && <div className="text-[10px] text-gray-400 truncate mt-0.5">{v.lieu}</div>}
+                <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-400">
+                  <span>{v.obsCount} obs.</span>
+                  {v.date && <span>{fmtDate(v.date)}</span>}
+                </div>
+              </button>
+              <button onClick={() => handleDelete(v.id, v.nom)}
+                className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all mr-1 shrink-0"
+                title="Supprimer">
+                <Trash2 size={13} />
+              </button>
+            </div>
           ))}
           {!loading && visits.length === 0 && (
-            <div className="text-center py-8 text-gray-400 text-xs">Aucune visite. Créez-en une depuis le mobile.</div>
+            <div className="text-center py-8 text-gray-400 text-xs">Aucune visite.<br />Créez-en depuis le mobile.</div>
           )}
         </div>
       </div>
 
-      {/* Contenu principal */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {detailLoading && (
-          <div className="flex-1 flex items-center justify-center text-gray-400">
-            <RefreshCw size={20} className="animate-spin mr-2" /> Chargement…
-          </div>
-        )}
+      {/* ── Contenu principal : split vertical ── */}
+      {detailLoading && (
+        <div className="flex-1 flex items-center justify-center text-gray-400">
+          <RefreshCw size={20} className="animate-spin mr-2" /> Chargement…
+        </div>
+      )}
 
-        {!detailLoading && !fullVisit && (
-          <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
-            <MapPin size={48} className="mb-4 opacity-30" />
-            <p className="text-sm">Sélectionnez une visite</p>
-          </div>
-        )}
+      {!detailLoading && !fullVisit && (
+        <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
+          <MapPin size={48} className="mb-4 opacity-30" />
+          <p className="text-sm">Sélectionnez une visite</p>
+        </div>
+      )}
 
-        {!detailLoading && fullVisit && (
-          <div className="flex-1 overflow-y-auto p-6">
+      {!detailLoading && fullVisit && (
+        <div className="flex-1 flex min-h-0">
+
+          {/* ── Gauche : infos + observations ── */}
+          <div className="w-1/2 flex flex-col border-r border-gray-200/60 overflow-hidden">
             {/* Header */}
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">{fullVisit.nom || 'Visite sans nom'}</h2>
-              <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
-                {fullVisit.lieu && <span>📍 {fullVisit.lieu}</span>}
-                {fullVisit.client && <span>👤 {fullVisit.client}</span>}
-                {fullVisit.date && <span>📅 {fmtDate(fullVisit.date)}</span>}
+            <div className="px-5 py-4 border-b border-gray-200/60 shrink-0">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">{fullVisit.nom || 'Visite sans nom'}</h2>
+                  <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                    {fullVisit.lieu && <span>📍 {fullVisit.lieu}</span>}
+                    {fullVisit.client && <span>👤 {fullVisit.client}</span>}
+                    {fullVisit.date && <span>📅 {fmtDate(fullVisit.date)}</span>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button onClick={handleExportPdf}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white rounded-xl text-xs font-medium hover:bg-gray-800 transition active:scale-[0.97]">
+                    <FileDown size={13} /> PDF
+                  </button>
+                  <button onClick={() => handleDelete(fullVisit.id, fullVisit.nom)}
+                    className="p-1.5 rounded-xl text-gray-300 hover:text-red-500 hover:bg-red-50 transition">
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Stats */}
+              <div className="flex gap-2 mt-3">
+                {coordinates.length > 0 && (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 rounded-lg text-[10px] font-bold text-gray-700">
+                    <Navigation size={10} className="text-blue-500" /> {coordinates.length} pts
+                  </div>
+                )}
+                {tracking.distance > 0 && (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 rounded-lg text-[10px] font-bold text-gray-700">
+                    <Ruler size={10} className="text-emerald-500" /> {fmtDist(tracking.distance)}
+                  </div>
+                )}
+                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 rounded-lg text-[10px] font-bold text-gray-700">
+                  <Camera size={10} className="text-blue-500" /> {photoMarkers.length} photo{photoMarkers.length !== 1 ? 's' : ''}
+                </div>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 rounded-lg text-[10px] font-bold text-gray-700">
+                  <MessageSquare size={10} className="text-amber-500" /> {observations.length} obs.
+                </div>
               </div>
             </div>
 
-            {/* Stats */}
-            <div className="flex gap-3 mb-6">
-              {coordinates.length > 0 && (
-                <div className="flex items-center gap-2 px-4 py-2.5 bg-white rounded-xl border border-gray-200/60">
-                  <Navigation size={14} className="text-blue-500" />
-                  <span className="text-xs font-bold text-gray-900">{coordinates.length} pts</span>
-                </div>
-              )}
-              {tracking.distance > 0 && (
-                <div className="flex items-center gap-2 px-4 py-2.5 bg-white rounded-xl border border-gray-200/60">
-                  <Ruler size={14} className="text-emerald-500" />
-                  <span className="text-xs font-bold text-gray-900">{fmtDist(tracking.distance)}</span>
-                </div>
-              )}
-              <div className="flex items-center gap-2 px-4 py-2.5 bg-white rounded-xl border border-gray-200/60">
-                <Camera size={14} className="text-blue-500" />
-                <span className="text-xs font-bold text-gray-900">{photoMarkers.length} photo{photoMarkers.length !== 1 ? 's' : ''}</span>
-              </div>
-              <div className="flex items-center gap-2 px-4 py-2.5 bg-white rounded-xl border border-gray-200/60">
-                <MessageSquare size={14} className="text-amber-500" />
-                <span className="text-xs font-bold text-gray-900">{observations.length} obs.</span>
-              </div>
-            </div>
-
-            {/* Carte */}
-            {(coordinates.length > 0 || photoMarkers.length > 0) && (
-              <div className="bg-white rounded-2xl border border-gray-200/60 overflow-hidden mb-6" style={{ height: '400px' }}>
-                <Suspense fallback={<div className="flex items-center justify-center h-full text-gray-400">Chargement carte…</div>}>
-                  <GpsMapView coordinates={coordinates} photoMarkers={photoMarkers} obsMarkers={[]} height="100%" />
-                </Suspense>
-              </div>
-            )}
-
-            {/* Observations */}
-            <h3 className="text-sm font-bold text-gray-900 mb-3">Observations ({observations.length})</h3>
-            <div className="space-y-3">
+            {/* Observations scrollables */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-3">
               {observations.map(obs => {
                 const images = obs.images || [];
                 return (
@@ -168,7 +194,7 @@ export default function SiteVisitsView({ companyId }) {
                           const hasGps = typeof img === 'object' && img.lat != null;
                           return (
                             <div key={idx} className="flex flex-col items-center">
-                              <img src={imgSrc} alt="" className="w-24 h-24 object-cover rounded-lg border border-gray-200" loading="lazy" />
+                              <img src={imgSrc} alt="" className="w-20 h-20 object-cover rounded-lg border border-gray-200" loading="lazy" />
                               {hasGps && (
                                 <a href={`https://www.google.com/maps?q=${img.lat},${img.lng}`} target="_blank" rel="noreferrer"
                                   className="text-[9px] italic text-blue-500 hover:underline mt-0.5">Localisation</a>
@@ -182,11 +208,58 @@ export default function SiteVisitsView({ companyId }) {
                   </div>
                 );
               })}
-              {observations.length === 0 && <p className="text-sm text-gray-400">Aucune observation</p>}
+              {observations.length === 0 && <p className="text-sm text-gray-400 text-center py-8">Aucune observation</p>}
             </div>
           </div>
-        )}
-      </div>
+
+          {/* ── Droite : carte satellite ── */}
+          <div className="w-1/2 flex flex-col min-h-0">
+            {hasMap ? (
+              <>
+                <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 shrink-0">
+                  <span className="text-xs font-bold text-gray-900">Carte terrain</span>
+                  <button onClick={() => setFullscreenMap(true)}
+                    className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 transition active:scale-[0.95]" title="Plein écran">
+                    <Maximize2 size={14} className="text-gray-600" />
+                  </button>
+                </div>
+                <div className="flex-1 min-h-0">
+                  <Suspense fallback={<div className="flex items-center justify-center h-full text-gray-400">Chargement carte…</div>}>
+                    <GpsMapView coordinates={coordinates} photoMarkers={photoMarkers} obsMarkers={[]} height="100%" />
+                  </Suspense>
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
+                <MapPin size={40} className="mb-3 opacity-30" />
+                <p className="text-xs">Aucune donnée terrain</p>
+                <p className="text-[10px] text-gray-300 mt-1">Utilisez le mobile pour enregistrer un tracé GPS</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Carte plein écran ── */}
+      {fullscreenMap && hasMap && (
+        <div className="fixed inset-0 z-50 bg-white flex flex-col">
+          <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200/60 shrink-0 bg-white/80 backdrop-blur-xl">
+            <span className="text-sm font-bold text-gray-900">{fullVisit?.nom || 'Carte terrain'}</span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-gray-400">{coordinates.length} pts · {photoMarkers.length} photos</span>
+              <button onClick={() => setFullscreenMap(false)}
+                className="p-2 rounded-xl bg-gray-100 hover:bg-gray-200 transition active:scale-[0.95]">
+                <X size={18} className="text-gray-600" />
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 min-h-0">
+            <Suspense fallback={<div className="flex items-center justify-center h-full text-gray-400">Chargement…</div>}>
+              <GpsMapView coordinates={coordinates} photoMarkers={photoMarkers} obsMarkers={[]} height="100%" />
+            </Suspense>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
