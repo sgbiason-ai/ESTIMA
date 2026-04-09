@@ -269,8 +269,8 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
         )}
       </div>
 
-      {/* ── Carte ── */}
-      {hasTrack && (
+      {/* ── Carte (miniature ou plein écran) ── */}
+      {hasTrack && !fullscreenMap && (
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
             <span className="text-[13px] font-bold text-gray-900">Carte</span>
@@ -303,8 +303,7 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
         </div>
       )}
 
-      {/* ── Carte plein écran ── */}
-      {fullscreenMap && (
+      {hasTrack && fullscreenMap && (
         <div className="fixed inset-0 z-50 bg-white flex flex-col">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 shrink-0 bg-white/80 backdrop-blur-xl">
             <span className="text-[15px] font-bold text-gray-900">Carte terrain</span>
