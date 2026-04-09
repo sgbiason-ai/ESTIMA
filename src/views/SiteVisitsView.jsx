@@ -17,7 +17,9 @@ export default function SiteVisitsView({ companyId }) {
   const [fullVisit, setFullVisit] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [fullscreenMap, setFullscreenMap] = useState(false);
-  const [highlightedObs, setHighlightedObs] = useState(null); // numéro de l'observation sélectionnée
+  const [highlightedObs, setHighlightedObs] = useState(null);
+  const [splitPct, setSplitPct] = useState(50); // % du panneau gauche
+  const [draggingSplit, setDraggingSplit] = useState(false);
 
   const fetchVisits = useCallback(async () => {
     if (!companyId) return;
@@ -159,10 +161,19 @@ export default function SiteVisitsView({ companyId }) {
       )}
 
       {!detailLoading && fullVisit && (
-        <div className="flex-1 flex min-h-0">
+        <div className="flex-1 flex min-h-0 relative"
+          onMouseMove={draggingSplit ? (e) => {
+            const container = e.currentTarget;
+            const rect = container.getBoundingClientRect();
+            const pct = ((e.clientX - rect.left) / rect.width) * 100;
+            setSplitPct(Math.max(25, Math.min(75, pct)));
+          } : undefined}
+          onMouseUp={() => setDraggingSplit(false)}
+          onMouseLeave={() => setDraggingSplit(false)}
+        >
 
           {/* ── Gauche : infos + observations ── */}
-          <div className="w-1/2 flex flex-col border-r border-gray-200/60 overflow-hidden">
+          <div className="flex flex-col border-r border-gray-200/60 overflow-hidden" style={{ width: `${splitPct}%` }}>
             {/* Header */}
             <div className="px-5 py-4 border-b border-gray-200/60 shrink-0">
               <div className="flex items-start justify-between">
@@ -250,8 +261,16 @@ export default function SiteVisitsView({ companyId }) {
             </div>
           </div>
 
+          {/* ── Divider draggable ── */}
+          <div
+            className={`w-1.5 shrink-0 cursor-col-resize group flex items-center justify-center hover:bg-blue-100 transition-colors ${draggingSplit ? 'bg-blue-200' : 'bg-gray-100'}`}
+            onMouseDown={() => setDraggingSplit(true)}
+          >
+            <div className={`w-0.5 h-8 rounded-full transition-colors ${draggingSplit ? 'bg-blue-500' : 'bg-gray-300 group-hover:bg-blue-400'}`} />
+          </div>
+
           {/* ── Droite : carte satellite ── */}
-          <div className="w-1/2 flex flex-col min-h-0">
+          <div className="flex flex-col min-h-0" style={{ width: `${100 - splitPct}%` }}>
             {hasMap && !fullscreenMap ? (
               <>
                 <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 shrink-0">
