@@ -198,9 +198,9 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
   const cfg = TILE_LAYERS[activeLayer];
 
   return (
-    <div style={{ height, width: '100%' }}>
+    <div style={{ height, width: '100%', position: 'relative' }}>
       {/* Carte */}
-      <div style={{ flex: 1, borderRadius: '16px', overflow: 'hidden', minHeight: 0, position: 'relative' }}>
+      <div style={{ width: '100%', height: '100%', borderRadius: '16px', overflow: 'hidden', position: 'relative' }}>
         <MapContainer
           center={defaultCenter}
           zoom={17}
