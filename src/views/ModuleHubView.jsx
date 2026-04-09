@@ -118,7 +118,7 @@ function BentoCard({ mod, theme, accessible, onSelect, mounted, delay }) {
       onClick={() => accessible && onSelect(mod.id)}
       disabled={!accessible}
       className={`
-        group relative flex flex-col flex-1 text-left rounded-[24px] border p-[clamp(0.625rem,1.2vh,1.5rem)] transition-all duration-500 ease-out
+        group relative flex flex-col text-left rounded-[24px] border p-[clamp(0.625rem,1.2vh,1.5rem)] transition-all duration-500 ease-out
         ${theme.card}
         ${accessible ? `${theme.cardHover} cursor-pointer` : 'opacity-50 cursor-not-allowed'}
         ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}
@@ -237,8 +237,8 @@ export default function ModuleHubView({ isAdmin, userEmail, onSelectModule, onLo
       </header>
 
       {/* ── Main content ───────────────────────────────────────────────── */}
-      <main className="relative z-10 flex-1 min-h-0 flex flex-col">
-        <div className="flex flex-col flex-1 min-h-0 max-w-[1360px] w-full mx-auto px-8 lg:px-12 py-[clamp(0.75rem,1.5vh,1.5rem)]">
+      <main className="relative z-10 flex-1 min-h-0 overflow-y-auto">
+        <div className="flex flex-col max-w-[1360px] w-full mx-auto px-8 lg:px-12 py-[clamp(0.75rem,1.5vh,1.5rem)]">
 
           {/* Hero */}
           <div className={`shrink-0 mb-[clamp(0.5rem,1vh,1.5rem)] transition-all duration-700 ease-out ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
@@ -255,14 +255,14 @@ export default function ModuleHubView({ isAdmin, userEmail, onSelectModule, onLo
           </div>
 
           {/* Bento Grid — 3 columns, cards stacked vertically */}
-          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-[clamp(0.5rem,0.8vh,1.25rem)]">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-[clamp(0.5rem,0.8vh,1.25rem)]">
             {rows.map((rowNum) => {
               const colModules = visibleModules.filter(m => m.row === rowNum);
               if (colModules.length === 0) return null;
               const ColIcon = ROW_LABELS[rowNum].icon;
 
               return (
-                <div key={rowNum} className="flex flex-col min-h-0">
+                <div key={rowNum} className="flex flex-col">
                   {/* Column label */}
                   <div className={`flex items-center gap-2 mb-[clamp(0.25rem,0.4vh,0.75rem)] shrink-0 transition-all duration-700 ease-out ${mounted ? 'opacity-100' : 'opacity-0'}`}
                     style={{ transitionDelay: `${100 + rowNum * 80}ms` }}>
@@ -272,7 +272,7 @@ export default function ModuleHubView({ isAdmin, userEmail, onSelectModule, onLo
                     </span>
                   </div>
                   {/* Cards stacked */}
-                  <div className="flex-1 min-h-0 flex flex-col gap-[clamp(0.375rem,0.6vh,1rem)]">
+                  <div className="flex flex-col gap-[clamp(0.375rem,0.6vh,1rem)]">
                     {colModules.map((mod, idx) => (
                       <BentoCard
                         key={mod.id}
