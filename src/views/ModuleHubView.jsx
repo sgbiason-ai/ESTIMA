@@ -118,7 +118,7 @@ function BentoCard({ mod, theme, accessible, onSelect, mounted, delay }) {
       onClick={() => accessible && onSelect(mod.id)}
       disabled={!accessible}
       className={`
-        group relative flex flex-col flex-1 text-left rounded-[24px] border p-6 transition-all duration-500 ease-out
+        group relative flex flex-col flex-1 text-left rounded-[24px] border p-[clamp(0.625rem,1.2vh,1.5rem)] transition-all duration-500 ease-out
         ${theme.card}
         ${accessible ? `${theme.cardHover} cursor-pointer` : 'opacity-50 cursor-not-allowed'}
         ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}
@@ -126,17 +126,17 @@ function BentoCard({ mod, theme, accessible, onSelect, mounted, delay }) {
       style={{ transitionDelay: `${delay}ms` }}
     >
       {/* Header: icon + badge */}
-      <div className="flex items-start justify-between mb-4">
-        <div className={`p-3 rounded-2xl ${theme.iconBg} transition-transform duration-200 ${accessible ? 'group-hover:scale-110' : ''}`}>
+      <div className="flex items-start justify-between mb-[clamp(0.25rem,0.5vh,1rem)]">
+        <div className={`p-[clamp(0.375rem,0.6vh,0.75rem)] rounded-xl ${theme.iconBg} transition-transform duration-200 ${accessible ? 'group-hover:scale-110' : ''}`}>
           <Icon size={24} className={accessible ? theme.iconColor : 'text-gray-400'} strokeWidth={1.5} />
         </div>
         {!accessible ? (
-          <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gray-200/50 text-gray-400">
+          <span className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-gray-200/50 text-gray-400">
             <Lock size={10} />
             <span className="text-[9px] font-semibold uppercase tracking-wide">Verrouillé</span>
           </span>
         ) : mod.tag ? (
-          <span className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider ${theme.badge}`}>
+          <span className={`px-2 py-0.5 rounded-lg text-[10px] font-semibold uppercase tracking-wider ${theme.badge}`}>
             {mod.tag}
           </span>
         ) : null}
@@ -153,7 +153,7 @@ function BentoCard({ mod, theme, accessible, onSelect, mounted, delay }) {
       </div>
 
       {/* Footer */}
-      <div className="mt-4 flex items-center justify-between">
+      <div className="mt-[clamp(0.25rem,0.5vh,1rem)] flex items-center justify-between">
         <span className={`text-[11px] font-medium ${theme.status}`}>
           {accessible ? theme.statusLabel : 'Accès restreint'}
         </span>
@@ -208,7 +208,7 @@ export default function ModuleHubView({ isAdmin, userEmail, onSelectModule, onLo
       style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif' }}>
 
       {/* ── Top bar ────────────────────────────────────────────────────── */}
-      <header className="relative z-10 flex items-center justify-between px-8 lg:px-12 py-3 shrink-0 bg-white/70 backdrop-blur-2xl border-b border-gray-200/50">
+      <header className="relative z-10 flex items-center justify-between px-8 lg:px-12 py-[clamp(0.375rem,0.5vh,0.75rem)] shrink-0 bg-white/70 backdrop-blur-2xl border-b border-gray-200/50">
         <div className="flex items-center gap-3">
           <span className="text-lg font-semibold tracking-tight text-gray-900" style={{ fontFamily: '"SF Pro Display", Georgia, serif' }}>
             Estima Suite
@@ -238,24 +238,24 @@ export default function ModuleHubView({ isAdmin, userEmail, onSelectModule, onLo
 
       {/* ── Main content ───────────────────────────────────────────────── */}
       <main className="relative z-10 flex-1 min-h-0 flex flex-col">
-        <div className="flex flex-col flex-1 min-h-0 max-w-[1360px] w-full mx-auto px-8 lg:px-12 py-6">
+        <div className="flex flex-col flex-1 min-h-0 max-w-[1360px] w-full mx-auto px-8 lg:px-12 py-[clamp(0.75rem,1.5vh,1.5rem)]">
 
           {/* Hero */}
-          <div className={`shrink-0 mb-6 transition-all duration-700 ease-out ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-            <h1 className="text-4xl md:text-5xl lg:text-[3.25rem] font-semibold text-gray-900 tracking-tight leading-tight"
+          <div className={`shrink-0 mb-[clamp(0.5rem,1vh,1.5rem)] transition-all duration-700 ease-out ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+            <h1 className="text-4xl md:text-5xl lg:text-[clamp(1.75rem,3.5vh,3.25rem)] font-semibold text-gray-900 tracking-tight leading-tight"
               style={{ fontFamily: '"SF Pro Display", Georgia, -apple-system, serif' }}>
               {greeting},{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-500 via-cyan-500 to-teal-400">
                 {displayName}
               </span>.
             </h1>
-            <p className="text-lg text-gray-400 mt-2 font-light">
+            <p className="text-[clamp(0.8rem,1.2vw,1.125rem)] text-gray-400 mt-[clamp(0.125rem,0.3vh,0.5rem)] font-light">
               Sélectionnez un module pour commencer.
             </p>
           </div>
 
           {/* Bento Grid — 3 columns, cards stacked vertically */}
-          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-[clamp(0.5rem,0.8vh,1.25rem)]">
             {rows.map((rowNum) => {
               const colModules = visibleModules.filter(m => m.row === rowNum);
               if (colModules.length === 0) return null;
@@ -264,7 +264,7 @@ export default function ModuleHubView({ isAdmin, userEmail, onSelectModule, onLo
               return (
                 <div key={rowNum} className="flex flex-col min-h-0">
                   {/* Column label */}
-                  <div className={`flex items-center gap-2 mb-3 shrink-0 transition-all duration-700 ease-out ${mounted ? 'opacity-100' : 'opacity-0'}`}
+                  <div className={`flex items-center gap-2 mb-[clamp(0.25rem,0.4vh,0.75rem)] shrink-0 transition-all duration-700 ease-out ${mounted ? 'opacity-100' : 'opacity-0'}`}
                     style={{ transitionDelay: `${100 + rowNum * 80}ms` }}>
                     <ColIcon size={14} className={rowNum === 1 ? 'text-gray-400' : rowNum === 2 ? 'text-amber-500/70' : 'text-violet-500/70'} strokeWidth={1.5} />
                     <span className={`text-xs font-medium uppercase tracking-widest ${rowNum === 1 ? 'text-gray-400' : rowNum === 2 ? 'text-amber-600/50' : 'text-violet-600/50'}`}>
@@ -272,7 +272,7 @@ export default function ModuleHubView({ isAdmin, userEmail, onSelectModule, onLo
                     </span>
                   </div>
                   {/* Cards stacked */}
-                  <div className="flex-1 min-h-0 flex flex-col gap-4">
+                  <div className="flex-1 min-h-0 flex flex-col gap-[clamp(0.375rem,0.6vh,1rem)]">
                     {colModules.map((mod, idx) => (
                       <BentoCard
                         key={mod.id}
@@ -293,7 +293,7 @@ export default function ModuleHubView({ isAdmin, userEmail, onSelectModule, onLo
       </main>
 
       {/* ── Footer ─────────────────────────────────────────────────────── */}
-      <footer className="relative z-10 flex items-center justify-center gap-4 px-8 py-2 shrink-0 bg-transparent">
+      <footer className="relative z-10 flex items-center justify-center gap-4 px-8 py-[clamp(0.25rem,0.3vh,0.5rem)] shrink-0 bg-transparent">
         <div className="flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
           <span className="text-[10px] font-medium text-gray-400">Opérationnel</span>
