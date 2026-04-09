@@ -110,6 +110,7 @@ export default function CrcTerrainView({ meeting, observationsByCategory }) {
             photoMarkers={photoMarkers}
             obsMarkers={obsMarkers}
             height="100%"
+            showMeasure
           />
         </Suspense>
       </div>

@@ -112,8 +112,75 @@ function DynamicTileLayer({ layerKey }) {
   return null;
 }
 
-export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMarkers = [], height = '100%', highlightedObs = null, onSelectObs = null }) {
+// ─── Outil de mesure ────────────────────────────────────────────────────────
+
+function MeasureTool({ active, points, onAddPoint, onReset }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!active) return;
+    const handleClick = (e) => onAddPoint([e.latlng.lat, e.latlng.lng]);
+    map.on('click', handleClick);
+    map.getContainer().style.cursor = 'crosshair';
+    return () => {
+      map.off('click', handleClick);
+      map.getContainer().style.cursor = '';
+    };
+  }, [map, active, onAddPoint]);
+
+  if (!active || points.length === 0) return null;
+
+  const haversine = (a, b) => {
+    const R = 6371000;
+    const toRad = (x) => (x * Math.PI) / 180;
+    const dLat = toRad(b[0] - a[0]);
+    const dLng = toRad(b[1] - a[1]);
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a[0])) * Math.cos(toRad(b[0])) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  };
+
+  let totalDist = 0;
+  for (let i = 1; i < points.length; i++) totalDist += haversine(points[i - 1], points[i]);
+  const fmtDist = (m) => m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(2)} km`;
+
+  return (
+    <>
+      {/* Ligne de mesure */}
+      <Polyline positions={points} pathOptions={{ color: '#f97316', weight: 3, dashArray: '8 6', opacity: 0.9 }} />
+
+      {/* Points de mesure */}
+      {points.map((p, i) => {
+        let segDist = '';
+        if (i > 0) segDist = fmtDist(haversine(points[i - 1], p));
+        return (
+          <Marker key={`measure-${i}`} position={p} icon={L.divIcon({
+            className: '',
+            html: `<div style="width:10px;height:10px;border-radius:50%;background:#f97316;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.4)"></div>`,
+            iconSize: [10, 10], iconAnchor: [5, 5],
+          })}>
+            {segDist && <Popup><span style={{ fontSize: 11, fontWeight: 700 }}>{segDist}</span></Popup>}
+          </Marker>
+        );
+      })}
+
+      {/* Label total au dernier point */}
+      {points.length > 1 && (
+        <Marker position={points[points.length - 1]} icon={L.divIcon({
+          className: '',
+          html: `<div style="position:relative;top:-28px;left:8px;background:#f97316;color:white;font-size:11px;font-weight:800;padding:2px 8px;border-radius:6px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.3);font-family:system-ui">${fmtDist(totalDist)}</div>`,
+          iconSize: [0, 0], iconAnchor: [0, 0],
+        })} />
+      )}
+    </>
+  );
+}
+
+// ─── Composant principal ────────────────────────────────────────────────────
+
+export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMarkers = [], height = '100%', highlightedObs = null, onSelectObs = null, showMeasure = false }) {
   const [activeLayer, setActiveLayer] = useState('satellite');
+  const [measuring, setMeasuring] = useState(false);
+  const [measurePoints, setMeasurePoints] = useState([]);
 
   const positions = coordinates.map(c => [c.lat, c.lng]);
 
@@ -144,6 +211,9 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
           <TileLayer url={cfg.url} maxZoom={cfg.maxZoom} />
           <DynamicTileLayer layerKey={activeLayer} />
           <InvalidateSize />
+          <MeasureTool active={measuring} points={measurePoints}
+            onAddPoint={(p) => setMeasurePoints(prev => [...prev, p])}
+            onReset={() => setMeasurePoints([])} />
 
           {bounds && <FitBounds bounds={bounds} />}
 
@@ -196,6 +266,37 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
             );
           })}
         </MapContainer>
+
+        {/* Bouton mesurer — en haut à droite */}
+        {showMeasure && (
+          <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 1000, display: 'flex', gap: 4 }}>
+            <button
+              onClick={() => { setMeasuring(!measuring); if (measuring) setMeasurePoints([]); }}
+              style={{
+                padding: '6px 12px', borderRadius: 10, fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer',
+                background: measuring ? '#f97316' : 'rgba(255,255,255,0.9)', backdropFilter: 'blur(8px)',
+                color: measuring ? '#fff' : '#6b7280', boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                display: 'flex', alignItems: 'center', gap: 4, transition: 'all 0.15s',
+              }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z" />
+                <path d="m14.5 12.5 2-2" /><path d="m11.5 9.5 2-2" /><path d="m8.5 6.5 2-2" /><path d="m17.5 15.5 2-2" />
+              </svg>
+              {measuring ? 'Arrêter' : 'Mesurer'}
+            </button>
+            {measuring && measurePoints.length > 0 && (
+              <button
+                onClick={() => setMeasurePoints([])}
+                style={{
+                  padding: '6px 10px', borderRadius: 10, fontSize: 11, fontWeight: 600, border: 'none', cursor: 'pointer',
+                  background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(8px)', color: '#ef4444',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                }}>
+                Effacer
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Sélecteur de fond de carte — superposé en bas de la carte */}
         <div style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', zIndex: 1000, display: 'flex', gap: 4, background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(8px)', padding: '4px', borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>

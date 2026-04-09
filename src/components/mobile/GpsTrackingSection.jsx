@@ -329,6 +329,7 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
                 photoMarkers={photoMarkers}
                 obsMarkers={obsMarkers}
                 height="100%"
+                showMeasure
               />
             </Suspense>
           </div>

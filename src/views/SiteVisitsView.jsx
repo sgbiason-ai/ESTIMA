@@ -282,7 +282,7 @@ export default function SiteVisitsView({ companyId }) {
                 </div>
                 <div className="flex-1 min-h-0">
                   <Suspense fallback={<div className="flex items-center justify-center h-full text-gray-400">Chargement carte…</div>}>
-                    <GpsMapView coordinates={coordinates} photoMarkers={photoMarkers} obsMarkers={obsMarkers} height="100%" highlightedObs={highlightedObs} onSelectObs={setHighlightedObs} />
+                    <GpsMapView coordinates={coordinates} photoMarkers={photoMarkers} obsMarkers={obsMarkers} height="100%" highlightedObs={highlightedObs} onSelectObs={setHighlightedObs} showMeasure />
                   </Suspense>
                 </div>
               </>
@@ -317,7 +317,7 @@ export default function SiteVisitsView({ companyId }) {
           </div>
           <div className="flex-1 min-h-0">
             <Suspense fallback={<div className="flex items-center justify-center h-full text-gray-400">Chargement…</div>}>
-              <GpsMapView coordinates={coordinates} photoMarkers={photoMarkers} obsMarkers={obsMarkers} height="100%" highlightedObs={highlightedObs} onSelectObs={setHighlightedObs} />
+              <GpsMapView coordinates={coordinates} photoMarkers={photoMarkers} obsMarkers={obsMarkers} height="100%" highlightedObs={highlightedObs} onSelectObs={setHighlightedObs} showMeasure />
             </Suspense>
           </div>
         </div>
