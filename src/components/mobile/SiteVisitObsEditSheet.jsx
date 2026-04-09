@@ -28,19 +28,14 @@ export default function SiteVisitObsEditSheet({ obs, onUpdate, onDelete, onClose
   };
 
   return (
-    <>
-      <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed inset-x-0 bottom-0 z-50 flex flex-col bg-white border-t border-gray-200 rounded-t-3xl overflow-hidden shadow-2xl max-h-[85vh]">
+    <div className="fixed inset-0 z-50 flex flex-col bg-white">
 
-        {/* Handle + header */}
-        <div className="flex flex-col items-center pt-3 pb-2 px-4 shrink-0">
-          <div className="w-10 h-1 rounded-full bg-gray-300 mb-3" />
-          <div className="flex items-center justify-between w-full">
-            <button onClick={onClose} className="text-[13px] font-medium text-gray-500">Annuler</button>
-            <span className="text-[14px] font-bold text-gray-900">Observation</span>
-            <button onClick={handleSave} className="text-[13px] font-bold text-blue-600">Enregistrer</button>
-          </div>
-        </div>
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200/60 bg-white/80 backdrop-blur-xl shrink-0">
+        <button onClick={onClose} className="text-[13px] font-medium text-gray-500">Annuler</button>
+        <span className="text-[14px] font-bold text-gray-900">Observation</span>
+        <button onClick={handleSave} className="text-[13px] font-bold text-blue-600">Enregistrer</button>
+      </div>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-4 pb-6">
@@ -91,7 +86,6 @@ export default function SiteVisitObsEditSheet({ obs, onUpdate, onDelete, onClose
             Supprimer cette observation
           </button>
         </div>
-      </div>
-    </>
+    </div>
   );
 }
