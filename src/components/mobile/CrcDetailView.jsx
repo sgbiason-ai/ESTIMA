@@ -56,7 +56,8 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
   const [exporting, setExporting] = useState(null);
   const [editingObs, setEditingObs] = useState(null);
   const [viewingImage, setViewingImage] = useState(null);
-  const [swiperObsIdx, setSwiperObsIdx] = useState(null); // index dans allObs pour le swiper
+  const [swiperObsIdx, setSwiperObsIdx] = useState(null);
+  const [contextMenu, setContextMenu] = useState(null); // { meetingIdx, x, y } // index dans allObs pour le swiper
 
   const meeting = meetings[activeMeetingIdx] || null;
   const chantierName = config.chantierInfo?.nom || '';
@@ -219,14 +220,28 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
 
       {/* ── Chantier info — supprimé, le nom est déjà dans le header parent ── */}
 
-      {/* ── Meeting tabs (scroll horizontal) ───────────────────────────── */}
-      <div className={`flex gap-1.5 px-4 overflow-x-auto scrollbar-none ${isLandscape ? 'py-1' : 'py-2'}`}>
+      {/* ── Meeting tabs (scroll horizontal, long-press → menu contextuel) ── */}
+      <div className={`relative flex gap-1.5 px-4 overflow-x-auto scrollbar-none ${isLandscape ? 'py-1' : 'py-2'}`}>
         {meetings.map((m, idx) => {
           const isActive = idx === activeMeetingIdx;
+          let pressTimer = null;
           return (
-            <button key={m.id || idx} onClick={() => handleSelectMeeting(idx)}
+            <button key={m.id || idx}
+              onClick={() => { if (!contextMenu) handleSelectMeeting(idx); }}
+              onTouchStart={(e) => {
+                const touch = e.touches[0];
+                pressTimer = setTimeout(() => {
+                  setContextMenu({ meetingIdx: idx, x: touch.clientX, y: touch.clientY });
+                }, 500);
+              }}
+              onTouchEnd={() => clearTimeout(pressTimer)}
+              onTouchMove={() => clearTimeout(pressTimer)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setContextMenu({ meetingIdx: idx, x: e.clientX, y: e.clientY });
+              }}
               className={`
-                shrink-0 px-3 py-1.5 rounded-xl text-[13px] font-bold transition border
+                shrink-0 px-3 py-1.5 rounded-xl text-[13px] font-bold transition border select-none
                 ${isActive
                   ? 'bg-gray-900 text-white border-gray-900 shadow-sm'
                   : 'bg-white text-gray-600 border-gray-200'
@@ -237,6 +252,67 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
           );
         })}
       </div>
+
+      {/* ── Menu contextuel (Dupliquer / Supprimer) ── */}
+      {contextMenu && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setContextMenu(null)} />
+          <div
+            className="fixed z-50 bg-white rounded-2xl shadow-2xl border border-gray-200 py-1 w-48 overflow-hidden"
+            style={{ top: contextMenu.y + 8, left: Math.min(contextMenu.x, window.innerWidth - 200) }}
+          >
+            {canEdit && (
+              <button
+                onClick={() => {
+                  const m = meetings[contextMenu.meetingIdx];
+                  if (m) {
+                    // Sélectionner le meeting puis dupliquer
+                    handleSelectMeeting(contextMenu.meetingIdx);
+                    const nextDate = (() => {
+                      if (!m.date) return '';
+                      try { const d = new Date(m.date + 'T00:00:00'); d.setDate(d.getDate() + 7); return d.toISOString().split('T')[0]; }
+                      catch { return ''; }
+                    })();
+                    manager.duplicateMeeting(nextDate);
+                    onToast?.(`CR n°${m.number} dupliqué`);
+                  }
+                  setContextMenu(null);
+                }}
+                className="flex items-center gap-3 w-full px-4 py-3 text-left text-[13px] font-medium text-gray-900 hover:bg-gray-50 active:bg-gray-100 transition"
+              >
+                <Icon name="file" size={16} color="#3b82f6" />
+                Dupliquer ce CR
+              </button>
+            )}
+            {canEdit && (
+              <button
+                onClick={async () => {
+                  const m = meetings[contextMenu.meetingIdx];
+                  setContextMenu(null);
+                  if (m) {
+                    const { confirm } = await import('../../utils/globalUI');
+                    const ok = await confirm(`Supprimer le CR n°${m.number} ?`, { danger: true });
+                    if (ok) {
+                      manager.deleteMeeting(m.id);
+                      onToast?.(`CR n°${m.number} supprimé`);
+                    }
+                  }
+                }}
+                className="flex items-center gap-3 w-full px-4 py-3 text-left text-[13px] font-medium text-red-500 hover:bg-red-50 active:bg-red-100 transition"
+              >
+                <Icon name="trash" size={16} color="#ef4444" />
+                Supprimer ce CR
+              </button>
+            )}
+            <button
+              onClick={() => setContextMenu(null)}
+              className="flex items-center gap-3 w-full px-4 py-2.5 text-left text-[12px] font-medium text-gray-400 hover:bg-gray-50 transition border-t border-gray-100"
+            >
+              Annuler
+            </button>
+          </div>
+        </>
+      )}
 
       {/* ── Meeting header ─────────────────────────────────────────────── */}
       {meeting && (
