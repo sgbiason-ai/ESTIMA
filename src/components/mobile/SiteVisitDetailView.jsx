@@ -22,12 +22,29 @@ function SectionTab({ label, active, onClick }) {
   );
 }
 
-function ObsCard({ obs, number, onTap, onViewImage }) {
+function ObsCard({ obs, number, onTap, onDelete, onViewImage }) {
   const text = stripHtml(obs.text || '');
   const images = obs.images || [];
+  const [swipeX, setSwipeX] = useState(0);
+  const [touchStart, setTouchStart] = useState(null);
+  const showDelete = swipeX < -60;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-3 active:bg-gray-50 cursor-pointer" onClick={() => onTap(obs)}>
+    <div className="relative overflow-hidden rounded-xl">
+      {/* Bouton supprimer (révélé par swipe gauche) */}
+      <div className="absolute right-0 top-0 bottom-0 w-20 bg-red-500 flex items-center justify-center rounded-r-xl"
+        onClick={() => onDelete?.(obs.id)}>
+        <Icon name="trash" size={18} color="#fff" />
+      </div>
+
+      <div
+        className="relative bg-white border border-gray-200 p-3 active:bg-gray-50 cursor-pointer rounded-xl"
+        style={{ transform: `translateX(${Math.min(0, Math.max(-80, swipeX))}px)`, transition: touchStart ? 'none' : 'transform 0.25s ease' }}
+        onClick={() => { if (Math.abs(swipeX) < 10) onTap(obs); else setSwipeX(0); }}
+        onTouchStart={e => setTouchStart(e.touches[0].clientX)}
+        onTouchMove={e => { if (touchStart != null) setSwipeX(e.touches[0].clientX - touchStart); }}
+        onTouchEnd={() => { setTouchStart(null); if (swipeX > -60) setSwipeX(0); }}
+      >
       <div className="flex items-start gap-2.5">
         <span className="shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-[11px] font-bold flex items-center justify-center mt-0.5">{number}</span>
         <div className="flex-1 min-w-0">
@@ -67,6 +84,7 @@ function ObsCard({ obs, number, onTap, onViewImage }) {
       )}
       {obs.date && <div className="text-[10px] text-gray-400 mt-2">{dateFr(obs.date)}</div>}
         </div>
+      </div>
       </div>
     </div>
   );
@@ -226,7 +244,7 @@ export default function SiteVisitDetailView({ visit, onSave, onToast, isLandscap
         {activeSection === 'observations' && (
           <div className="space-y-2">
             {observations.map((obs, idx) => (
-              <ObsCard key={obs.id} obs={obs} number={idx + 1} onTap={setEditingObs} onViewImage={setViewingImage} />
+              <ObsCard key={obs.id} obs={obs} number={idx + 1} onTap={setEditingObs} onDelete={deleteObservation} onViewImage={setViewingImage} />
             ))}
 
             <button onClick={addObservation}
