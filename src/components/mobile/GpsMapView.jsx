@@ -56,6 +56,42 @@ const spreadOverlapping = (markers, minDist = 0.00008) => {
   return result;
 };
 
+// ─── Lissage Catmull-Rom (courbe naturelle entre les points GPS) ────────────
+
+function smoothPath(points, tension = 0.5, segments = 8) {
+  if (points.length < 3) return points;
+  const result = [];
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[Math.max(i - 1, 0)];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[Math.min(i + 2, points.length - 1)];
+
+    for (let t = 0; t < segments; t++) {
+      const s = t / segments;
+      const s2 = s * s;
+      const s3 = s2 * s;
+
+      const lat = 0.5 * (
+        (2 * p1[0]) +
+        (-p0[0] + p2[0]) * s * tension +
+        (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * s2 * tension +
+        (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * s3 * tension
+      );
+      const lng = 0.5 * (
+        (2 * p1[1]) +
+        (-p0[1] + p2[1]) * s * tension +
+        (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * s2 * tension +
+        (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * s3 * tension
+      );
+      result.push([lat, lng]);
+    }
+  }
+  result.push(points[points.length - 1]);
+  return result;
+}
+
 // ─── Fonds de carte ────────────────────────────────────────────────────────
 
 const TILE_LAYERS = {
@@ -219,7 +255,7 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
 
           {/* Tracé GPS */}
           {positions.length > 1 && (
-            <Polyline positions={positions} pathOptions={{ color: '#3b82f6', weight: 4, opacity: 0.9 }} />
+            <Polyline positions={smoothPath(positions)} pathOptions={{ color: '#3b82f6', weight: 4, opacity: 0.9 }} />
           )}
 
           {/* Point de départ */}
