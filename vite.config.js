@@ -83,12 +83,12 @@ export default defineConfig({
             },
           },
           {
-            // Cache tuiles satellite ESRI (usage terrain)
-            urlPattern: /^https:\/\/.*\.arcgisonline\.com\/.*/i,
+            // Cache tuiles cartes (satellite ESRI, plan OSM, cadastre)
+            urlPattern: /^https:\/\/(.*\.arcgisonline\.com|.*\.tile\.openstreetmap\.org|data\.geopf\.fr)\/.*/i,
             handler: 'CacheFirst',
             options: {
-              cacheName: 'esri-tiles-cache',
-              expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheName: 'map-tiles-cache',
+              expiration: { maxEntries: 1000, maxAgeSeconds: 60 * 60 * 24 * 30 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },
