@@ -76,6 +76,17 @@ const TILE_LAYERS = {
   },
 };
 
+// Recalcule la taille de la carte quand le conteneur change (split resize)
+function InvalidateSize() {
+  const map = useMap();
+  useEffect(() => {
+    const observer = new ResizeObserver(() => map.invalidateSize());
+    observer.observe(map.getContainer());
+    return () => observer.disconnect();
+  }, [map]);
+  return null;
+}
+
 // Composant qui recentre la carte
 function FitBounds({ bounds }) {
   const map = useMap();
@@ -132,6 +143,7 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
         >
           <TileLayer url={cfg.url} maxZoom={cfg.maxZoom} />
           <DynamicTileLayer layerKey={activeLayer} />
+          <InvalidateSize />
 
           {bounds && <FitBounds bounds={bounds} />}
 
