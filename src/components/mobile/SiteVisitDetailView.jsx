@@ -241,7 +241,17 @@ export default function SiteVisitDetailView({ visit, onSave, onToast, isLandscap
       {/* ── Content ── */}
       <div className="flex-1 overflow-y-auto px-4 pb-6">
 
-        {activeSection === 'observations' && (
+        {/* Éditeur plein zone si une obs est en édition */}
+        {editingObs ? (
+          <SiteVisitObsEditSheet
+            obs={editingObs}
+            onUpdate={updateObservation}
+            onDelete={deleteObservation}
+            onClose={() => setEditingObs(null)}
+            onViewImage={setViewingImage}
+            inline
+          />
+        ) : activeSection === 'observations' && (
           <div className="space-y-2">
             {observations.map((obs, idx) => (
               <ObsCard key={obs.id} obs={obs} number={idx + 1} onTap={setEditingObs} onDelete={deleteObservation} onViewImage={setViewingImage} />
@@ -262,8 +272,8 @@ export default function SiteVisitDetailView({ visit, onSave, onToast, isLandscap
           </div>
         )}
 
-        {/* Terrain toujours monté (GPS en arrière-plan), masqué si pas actif */}
-        <div style={{ display: activeSection === 'terrain' ? 'block' : 'none' }}>
+        {/* Terrain toujours monté (GPS en arrière-plan), masqué si pas actif ou si éditeur ouvert */}
+        <div style={{ display: activeSection === 'terrain' && !editingObs ? 'block' : 'none' }}>
           <GpsTrackingSection
             meeting={fakeMeeting}
             manager={manager}
@@ -277,15 +287,7 @@ export default function SiteVisitDetailView({ visit, onSave, onToast, isLandscap
       {/* ── Modals ── */}
       {viewingImage && <ImageViewerModal src={viewingImage} onClose={() => setViewingImage(null)} />}
 
-      {editingObs && (
-        <SiteVisitObsEditSheet
-          obs={editingObs}
-          onUpdate={updateObservation}
-          onDelete={deleteObservation}
-          onClose={() => setEditingObs(null)}
-          onViewImage={setViewingImage}
-        />
-      )}
+      {/* Éditeur maintenant inline dans le content ci-dessus */}
     </div>
   );
 }

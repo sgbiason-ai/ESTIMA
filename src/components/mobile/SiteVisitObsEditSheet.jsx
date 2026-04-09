@@ -5,7 +5,7 @@ import React, { useState, useRef } from 'react';
 import Icon from './Icon';
 import { compressImage } from '../../utils/imageCompressor';
 
-export default function SiteVisitObsEditSheet({ obs, onUpdate, onDelete, onClose, onViewImage }) {
+export default function SiteVisitObsEditSheet({ obs, onUpdate, onDelete, onClose, onViewImage, inline = false }) {
   const [text, setText] = useState(obs.text || '');
   const [images, setImages] = useState(obs.images || []);
   const fileRef = useRef(null);
@@ -28,7 +28,7 @@ export default function SiteVisitObsEditSheet({ obs, onUpdate, onDelete, onClose
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-white">
+    <div className={inline ? "flex flex-col h-full" : "fixed inset-0 z-50 flex flex-col bg-white"}>
 
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200/60 bg-white/80 backdrop-blur-xl shrink-0">
