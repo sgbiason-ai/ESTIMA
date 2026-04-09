@@ -164,12 +164,16 @@ export default function MobileApp({ user, companyId, onLogout }) {
     }
   }, [createVisit, visitsRefetch]);
 
-  const goBack = useCallback(() => {
+  const goBack = useCallback(async () => {
     if (subView) { setSubView(null); }
     else if (selectedProject) {
       setSelectedProject(null);
       setFullProject(null);
     } else if (selectedChantier) {
+      // Confirmation avant de quitter un CR en cours
+      const { confirm } = await import('../../utils/globalUI');
+      const ok = await confirm('Quitter le compte rendu ? Les modifications sont sauvegardées automatiquement.', { title: 'Retour' });
+      if (!ok) return;
       setSelectedChantier(null);
       setFullChantier(null);
     } else if (selectedMoeDevis) {
@@ -179,12 +183,16 @@ export default function MobileApp({ user, companyId, onLogout }) {
       setSelectedFiche(null);
       setFullFiche(null);
     } else if (selectedVisit) {
+      // Confirmation avant de quitter une visite en cours
+      const { confirm } = await import('../../utils/globalUI');
+      const ok = await confirm('Quitter la visite ? Les modifications sont sauvegardées automatiquement.', { title: 'Retour' });
+      if (!ok) return;
       setSelectedVisit(null);
       setFullVisit(null);
     } else if (activeModule) {
       setActiveModule(null);
     }
-  }, [subView, selectedProject, selectedChantier, selectedMoeDevis, selectedFiche, activeModule]);
+  }, [subView, selectedProject, selectedChantier, selectedMoeDevis, selectedFiche, selectedVisit, activeModule]);
 
   const triggerToast = useCallback((msg) => {
     setToast(msg);
