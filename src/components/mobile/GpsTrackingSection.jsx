@@ -4,6 +4,7 @@
 import React, { useState, useCallback, useRef, useEffect, Suspense, lazy, useMemo } from 'react';
 import Icon from './Icon';
 import { stripHtml } from '../../utils/formatObsText';
+import { Maximize2, X } from 'lucide-react';
 
 const GpsMapView = lazy(() => import('./GpsMapView'));
 
@@ -49,6 +50,7 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
   const tracking = meeting?.gpsTracking || { coordinates: [], startTime: null, endTime: null };
   const [isRecording, setIsRecording] = useState(false);
   const [liveCoords, setLiveCoords] = useState(tracking.coordinates || []);
+  const [fullscreenMap, setFullscreenMap] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [lastAccuracy, setLastAccuracy] = useState(null);
   const watchIdRef = useRef(null);
@@ -267,14 +269,23 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
         )}
       </div>
 
-      {/* ── Carte satellite ── */}
+      {/* ── Carte ── */}
       {hasTrack && (
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-            <span className="text-[13px] font-bold text-gray-900">Vue satellite</span>
-            <span className="text-[11px] text-gray-400">
-              {photoMarkers.length} photo{photoMarkers.length !== 1 ? 's' : ''} · {coords.length} pts
-            </span>
+            <span className="text-[13px] font-bold text-gray-900">Carte</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-gray-400">
+                {photoMarkers.length} photo{photoMarkers.length !== 1 ? 's' : ''} · {coords.length} pts
+              </span>
+              <button
+                onClick={() => setFullscreenMap(true)}
+                className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 active:scale-[0.95] transition"
+                title="Plein écran"
+              >
+                <Maximize2 size={14} className="text-gray-600" />
+              </button>
+            </div>
           </div>
           <Suspense fallback={
             <div className="flex items-center justify-center py-16 text-gray-400">
@@ -289,6 +300,41 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
               height="50vh"
             />
           </Suspense>
+        </div>
+      )}
+
+      {/* ── Carte plein écran ── */}
+      {fullscreenMap && (
+        <div className="fixed inset-0 z-50 bg-white flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 shrink-0 bg-white/80 backdrop-blur-xl">
+            <span className="text-[15px] font-bold text-gray-900">Carte terrain</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-gray-400">
+                {photoMarkers.length} photo{photoMarkers.length !== 1 ? 's' : ''} · {coords.length} pts
+              </span>
+              <button
+                onClick={() => setFullscreenMap(false)}
+                className="p-2 rounded-xl bg-gray-100 hover:bg-gray-200 active:scale-[0.95] transition"
+              >
+                <X size={18} className="text-gray-600" />
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 min-h-0">
+            <Suspense fallback={
+              <div className="flex items-center justify-center h-full text-gray-400">
+                <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mr-2" />
+                Chargement…
+              </div>
+            }>
+              <GpsMapView
+                coordinates={coords}
+                photoMarkers={photoMarkers}
+                obsMarkers={obsMarkers}
+                height="100%"
+              />
+            </Suspense>
+          </div>
         </div>
       )}
 
