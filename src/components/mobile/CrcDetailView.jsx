@@ -413,14 +413,15 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
             onSetDiffusion={canEdit ? manager.setDiffusion : undefined}
           />
         )}
-        {activeSection === 'terrain' && meeting && (
+        {/* Terrain toujours monté (GPS en arrière-plan), masqué si pas actif */}
+        <div style={{ display: activeSection === 'terrain' && meeting ? 'block' : 'none' }}>
           <GpsTrackingSection
             meeting={meeting}
             manager={canEdit ? manager : null}
             obsByCategory={obsByCategory}
             onToast={onToast}
           />
-        )}
+        </div>
       </div>
 
       {/* ── Image viewer modal ── */}

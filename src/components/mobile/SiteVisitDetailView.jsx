@@ -222,14 +222,15 @@ export default function SiteVisitDetailView({ visit, onSave, onToast, isLandscap
           </div>
         )}
 
-        {activeSection === 'terrain' && (
+        {/* Terrain toujours monté (GPS en arrière-plan), masqué si pas actif */}
+        <div style={{ display: activeSection === 'terrain' ? 'block' : 'none' }}>
           <GpsTrackingSection
             meeting={fakeMeeting}
             manager={manager}
             obsByCategory={{}}
             onToast={onToast}
           />
-        )}
+        </div>
       </div>
 
       {/* ── Modals ── */}
