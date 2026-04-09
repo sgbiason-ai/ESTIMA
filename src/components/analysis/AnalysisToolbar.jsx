@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import {
   FileSpreadsheet, FileText, Plus, Upload, Trash2, History, CheckCircle2, BarChart3,
   Calculator, Settings2, Thermometer, AlertTriangle, EyeOff, Layers, ChevronDown,
-  FileDown, Database
+  FileDown, Database, Save, Download, FileUp
 } from 'lucide-react';
 
 import { RibbonGroup, RibbonBtnLarge, RibbonBtnSmall } from '../common/RibbonParts';
@@ -29,10 +29,12 @@ const AnalysisToolbar = ({
   scoringConfig, setScoringConfig,
   analysisMode, setAnalysisMode,
   onAddManualCompany, onImportOffer, onClearAll, onUndoObservatory, canUndoObservatory, onExportPDF, onExportExcel,
-  onPushAveragesToBpu, averagesHorsOABCount = 0
+  onPushAveragesToBpu, averagesHorsOABCount = 0, onManualSave, companiesCount = 0,
+  onExportJson, onImportJson
 }) => {
   const [showScoringSettings, setShowScoringSettings] = useState(false);
   const fileInputRef = useRef(null);
+  const jsonInputRef = useRef(null);
 
   return (
     <div className="font-[system-ui,'Segoe_UI',sans-serif] select-none relative">
@@ -164,6 +166,7 @@ const AnalysisToolbar = ({
             <RibbonBtnSmall icon={Plus} label="Ajouter" onClick={onAddManualCompany} accent="text-emerald-500" title="Ajouter une entreprise" />
           </div>
           <div className="flex flex-col gap-[3px] justify-center">
+            <RibbonBtnSmall icon={Save} label="Sauvegarder" onClick={onManualSave} accent="text-blue-500" title="Sauvegarder les offres dans le projet" disabled={companiesCount === 0} />
             {canUndoObservatory && (
               <RibbonBtnSmall icon={History} label="Annuler" onClick={onUndoObservatory} accent="text-slate-500" title="Annuler la dernière action" />
             )}
@@ -187,6 +190,11 @@ const AnalysisToolbar = ({
             accent="text-red-500"
             title="Exporter en PDF"
           />
+          <div className="flex flex-col gap-[3px] justify-center">
+            <RibbonBtnSmall icon={Download} label="Export JSON" onClick={onExportJson} accent="text-amber-600" title="Exporter analyse en JSON (sauvegarde)" disabled={companiesCount === 0} />
+            <RibbonBtnSmall icon={FileUp} label="Import JSON" onClick={() => jsonInputRef.current?.click()} accent="text-amber-600" title="Restaurer analyse depuis un fichier JSON" />
+            <input type="file" ref={jsonInputRef} accept=".json" onChange={onImportJson} className="hidden" />
+          </div>
         </RibbonGroup>
       </div>
 

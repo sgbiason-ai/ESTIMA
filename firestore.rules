@@ -93,6 +93,11 @@ service cloud.firestore {
         match /archives/{archiveId} {
           allow read, write: if isCompanyMember(companyId);
         }
+
+        // Analyse des prix (RAO) — document dédié
+        match /analysis/{docId} {
+          allow read, write: if isCompanyMember(companyId);
+        }
       }
 
       match /bpu/{itemId} {

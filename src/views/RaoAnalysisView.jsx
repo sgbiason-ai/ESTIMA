@@ -45,6 +45,7 @@ export default function RaoAnalysisView({ user, companyId, onBackToHub }) {
       <div className="flex-1 overflow-hidden">
         <PriceAnalysisView
           project={project}
+          companyId={companyId}
           setProject={setProject}
           bpuConfig={{ numberingMode: 'auto' }}
           clientPercent={10}

@@ -1,7 +1,8 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
-import { Trash2, ChevronRight, AlertTriangle, Info } from 'lucide-react';
+import { Trash2, ChevronRight, AlertTriangle, Info, HelpCircle } from 'lucide-react';
 import { formatPrice, normalizeUnitSymbol } from '../../utils/helpers';
 import { COMPANY_STYLES } from '../../utils/analysisConstants';
+import OabDetailModal from './OabDetailModal';
 
 // --- SOUS-COMPOSANT : Cellule de Prix ---
 const PriceCell = ({ value, onChange, style, isAnomaly, threshold }) => {
@@ -131,6 +132,8 @@ const AnalysisTable = ({
 
   // 2. Calcul du Seuil OAB GLOBAL (sur le total)
   const globalOABThreshold = useMemo(() => calculateOABThreshold(totalsList), [totalsList]);
+
+  const [oabDetailCompanyId, setOabDetailCompanyId] = useState(null);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full">
@@ -335,6 +338,15 @@ const AnalysisTable = ({
                        <div className="flex items-center justify-end gap-1">
                           {isGlobalOAB && <AlertTriangle size={12} className="text-white animate-pulse" />}
                           {formatPrice(total)}
+                          {analysisMode === 'oab' && total > 0 && (
+                            <button
+                              onClick={() => setOabDetailCompanyId(company.id)}
+                              className={`ml-0.5 p-0.5 rounded hover:bg-white/20 transition-colors ${isGlobalOAB ? 'text-white' : 'text-white/50 hover:text-white'}`}
+                              title="Détail du calcul OAB"
+                            >
+                              <HelpCircle size={12} />
+                            </button>
+                          )}
                         </div>
                     </td>
                     <td className={`px-0.5 py-2 text-center border-r border-slate-800 bg-slate-900`}>{renderDelta(total, stats.totalEstimation)}</td>
@@ -377,6 +389,15 @@ const AnalysisTable = ({
           </tfoot>
         </table>
       </div>
+
+      {oabDetailCompanyId && (
+        <OabDetailModal
+          companies={companies}
+          companiesTotals={stats.companiesTotals}
+          targetCompanyId={oabDetailCompanyId}
+          onClose={() => setOabDetailCompanyId(null)}
+        />
+      )}
     </div>
   );
 };

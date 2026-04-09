@@ -8,7 +8,7 @@ import RaoView from './RaoView';
 // MAGIE : On importe le moteur de calcul du projet !
 import { useProjectCalculations } from '../hooks/useProjectCalculations';
 
-const PriceAnalysisView = ({ project, setProject, bpuConfig, clientPercent, masterBranding = null, bpu = [], updateBpuItem = null }) => {
+const PriceAnalysisView = ({ project, companyId, setProject, bpuConfig, clientPercent, masterBranding = null, bpu = [], updateBpuItem = null }) => {
   // --- ÉTATS ---
   const [activeMainTab, setActiveMainTab] = useState('analyse');
   const [activeTrancheId, setActiveTrancheId] = useState('global');
@@ -37,7 +37,7 @@ const PriceAnalysisView = ({ project, setProject, bpuConfig, clientPercent, mast
     bpuConfig,
     activeTrancheId,
     clientQtyMaps,
-    setProject  // ← persistance Firebase des offres
+    companyId
   );
 
   // --- EXPORTS ---
@@ -134,6 +134,10 @@ const PriceAnalysisView = ({ project, setProject, bpuConfig, clientPercent, mast
         lastSaved={analysis.lastSaved}
         onPushAveragesToBpu={() => analysis.handlePushAveragesToBpu(bpu, updateBpuItem)}
         averagesHorsOABCount={Object.keys(analysis.averagesHorsOAB || {}).length}
+        onManualSave={analysis.handleManualSave}
+        companiesCount={analysis.companies?.length || 0}
+        onExportJson={analysis.handleExportJson}
+        onImportJson={analysis.handleImportJson}
       />
 
       <div className="flex-1 overflow-auto p-4 relative">

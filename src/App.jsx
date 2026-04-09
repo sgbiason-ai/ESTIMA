@@ -531,6 +531,7 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub }) {
             {activeTab === 'price_analysis' && (
               <PriceAnalysisView
                 project={project}
+                companyId={companyId}
                 setProject={setProject}
                 bpuConfig={bpuConfig}
                 clientPercent={clientPercent}

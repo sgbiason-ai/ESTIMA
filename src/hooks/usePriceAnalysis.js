@@ -1,5 +1,7 @@
 // src/hooks/usePriceAnalysis.js
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db as fireDb } from '../firebase';
 import { useDialog } from '../contexts/DialogContext';
 import { useToast } from '../contexts/ToastContext';
 
@@ -21,8 +23,7 @@ const safeStorage = {
   remove: (key) => { try { localStorage.removeItem(key); } catch {} },
 };
 
-// AJOUT DE clientQtyMaps EN PARAMÈTRE
-const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', clientQtyMaps = {}) => {
+const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', clientQtyMaps = {}, companyId = null) => {
   const { confirm, prompt } = useDialog();
   const toast = useToast();
 
@@ -38,15 +39,108 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
 
   const [history, setHistory] = useState([]);
   const [lastSaved, setLastSaved] = useState(null);
+  const [scoringConfig, setScoringConfig] = useState({ maxScore: 40, mode: 'f1' });
+  const [firestoreLoaded, setFirestoreLoaded] = useState(false);
+  // Stocke le projectId pour lequel Firestore a été chargé (pas un boolean, un ID)
+  const loadedForProjectRef = useRef(null);
 
-  const [scoringConfig, setScoringConfig] = useState(project?.scoringConfig || { maxScore: 40, mode: 'f1' });
+  // ─── Identifiants stables pour le path Firestore ───────────────────────
+  const projectId = project?.id || null;
 
-  // ─── AUTO-SAVE ────────────────────────────────────────────────────────────
+  // ─── CHARGEMENT depuis Firestore (une seule fois par projectId) ────────
   useEffect(() => {
-    if (!STORAGE_KEY) return;
-    safeStorage.set(STORAGE_KEY, JSON.stringify(companies));
-    setLastSaved(new Date());
-  }, [companies, STORAGE_KEY]);
+    if (!projectId || !companyId) return;
+    if (loadedForProjectRef.current === projectId) return; // déjà chargé pour ce projet
+    loadedForProjectRef.current = projectId;
+
+    const docRef = doc(fireDb, 'companies', companyId, 'projects', projectId, 'analysis', 'data');
+    getDoc(docRef).then(snap => {
+      if (snap.exists()) {
+        const data = snap.data();
+        console.log('[Analysis] ✅ Chargé depuis Firestore:', data.companies?.length, 'entreprises');
+        if (data.companies?.length > 0) setCompanies(data.companies);
+        if (data.scoringConfig) setScoringConfig(data.scoringConfig);
+      } else {
+        console.log('[Analysis] Aucune donnée Firestore pour ce projet');
+      }
+      setFirestoreLoaded(true);
+    }).catch(e => {
+      console.error('[Analysis] Erreur chargement Firestore:', e);
+      setFirestoreLoaded(true);
+    });
+  }, [projectId, companyId]);
+
+  // ─── Refs stables pour le debounce ─────────────────────────────────────
+  const companiesRef = useRef(companies);
+  useEffect(() => { companiesRef.current = companies; }, [companies]);
+  const scoringRef = useRef(scoringConfig);
+  useEffect(() => { scoringRef.current = scoringConfig; }, [scoringConfig]);
+  const projectIdRef = useRef(projectId);
+  useEffect(() => { projectIdRef.current = projectId; }, [projectId]);
+  const companyIdRef = useRef(companyId);
+  useEffect(() => { companyIdRef.current = companyId; }, [companyId]);
+
+  // ─── SAUVEGARDE directe dans le document dédié ─────────────────────────
+  const saveAnalysis = useCallback(() => {
+    const pid = projectIdRef.current;
+    const cid = companyIdRef.current;
+    if (!pid || !cid) return;
+    const docRef = doc(fireDb, 'companies', cid, 'projects', pid, 'analysis', 'data');
+    const payload = {
+      companies: companiesRef.current,
+      scoringConfig: scoringRef.current,
+      lastSaved: new Date().toISOString(),
+    };
+    console.log('[Analysis] Sauvegarde Firestore...', payload.companies.length, 'entreprises');
+    setDoc(docRef, payload)
+      .then(() => { console.log('[Analysis] ✅ Sauvegardé'); setLastSaved(new Date()); })
+      .catch(e => console.error('[Analysis] ❌ Erreur sauvegarde:', e));
+    if (STORAGE_KEY) safeStorage.set(STORAGE_KEY, JSON.stringify(companiesRef.current));
+  }, [STORAGE_KEY]); // Aucune dep instable — tout lu via refs
+
+  // ─── AUTO-SAVE debounced (800ms) quand companies ou scoringConfig changent ─
+  // userHasChanged : ne sauvegarde que quand l'UTILISATEUR modifie, pas le chargement initial
+  const saveTimerRef = useRef(null);
+  const userHasChanged = useRef(false);
+  useEffect(() => {
+    if (!firestoreLoaded) return;
+    // Premier passage après chargement Firestore = skip (c'est le sync initial)
+    if (!userHasChanged.current) { userHasChanged.current = true; return; }
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(saveAnalysis, 800);
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  }, [companies, scoringConfig, firestoreLoaded, saveAnalysis]);
+
+  // ─── EXPORT JSON ──────────────────────────────────────────────────────────
+  const handleExportJson = useCallback(() => {
+    const data = { companies, scoringConfig, exportedAt: new Date().toISOString(), projectName: project?.name };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `RAO_${(project?.name || 'export').replace(/[^a-z0-9_-]/gi, '_')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Export JSON téléchargé.');
+  }, [companies, scoringConfig, project?.name, toast]);
+
+  // ─── IMPORT JSON ──────────────────────────────────────────────────────────
+  const handleImportJson = useCallback(async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (data.companies) setCompanies(data.companies);
+      if (data.scoringConfig) setScoringConfig(data.scoringConfig);
+      toast.success(`RAO restauré : ${data.companies?.length || 0} entreprise(s)`);
+    } catch (e) {
+      toast.error('Fichier JSON invalide.');
+      console.error('[Analysis] Import JSON error:', e);
+    } finally {
+      event.target.value = null;
+    }
+  }, [toast]);
 
   // ─── DONNÉES PAR CHAPITRE ─────────────────────────────────────────────────
   const chaptersData = useMemo(() => {
@@ -202,47 +296,88 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
       const arrayBuffer = await file.arrayBuffer();
       await workbook.xlsx.load(arrayBuffer);
 
-      let worksheet = null;
+      // Collecter TOUS les onglets valides (tranches multiples)
+      const validSheets = [];
       workbook.eachSheet((ws) => {
-        if (worksheet) return;
         const headerRow = ws.getRow(5);
         const col2 = headerRow.getCell(2);
         const col2Val = (col2.value ?? col2.text ?? '').toString().trim().toUpperCase();
-        if (col2Val === 'DÉSIGNATION' || col2Val === 'DESIGNATION') worksheet = ws;
+        if (col2Val === 'DÉSIGNATION' || col2Val === 'DESIGNATION') validSheets.push(ws);
       });
-      if (!worksheet) worksheet = workbook.getWorksheet('GLOBAL') || workbook.getWorksheet(2) || workbook.getWorksheet(1);
+      if (validSheets.length === 0) {
+        const fallback = workbook.getWorksheet('GLOBAL') || workbook.getWorksheet(2) || workbook.getWorksheet(1);
+        if (fallback) validSheets.push(fallback);
+      }
 
       const importedOffers = {};
+      // Map désignation exacte → itemId
       const projectItemsMap = new Map();
       chaptersData.forEach(chap => {
         chap.items.forEach(item => {
           if (item.designation) projectItemsMap.set(item.designation.trim().toUpperCase(), item.id);
         });
       });
+      // Map ref (P.01, P.02...) → itemId pour fallback si désignation modifiée
+      const projectRefMap = new Map();
+      if (project?.chapters) {
+        let counter = 1;
+        const traverse = (items) => {
+          if (!items) return;
+          items.forEach(item => {
+            if (item.type === 'item') {
+              const ref = bpuConfig?.numberingMode === 'manual' && item.bpuNum
+                ? String(item.bpuNum).trim().toUpperCase()
+                : `P.${String(counter).padStart(2, '0')}`;
+              if (!projectRefMap.has(ref)) projectRefMap.set(ref, item.id);
+              counter++;
+            }
+            if (item.children?.length > 0) traverse(item.children);
+          });
+        };
+        project.chapters.forEach(chap => { if (chap.children) traverse(chap.children); });
+      }
 
       let totalRows = 0;
       let skippedRows = 0;
       let unmatchedRows = 0;
       let invalidPriceRows = 0;
+      let refMatchedRows = 0;
 
-      worksheet.eachRow((row, rowNumber) => {
-        if (rowNumber <= 5) return;
-        totalRows++;
-        const cell2 = row.getCell(2);
-        const rawDesig = cell2.value ?? cell2.text ?? '';
-        const designation = (typeof rawDesig === 'string' ? rawDesig : String(rawDesig ?? '')).trim().toUpperCase();
+      for (const ws of validSheets) {
+        ws.eachRow((row, rowNumber) => {
+          if (rowNumber <= 5) return;
+          totalRows++;
+          const cell2 = row.getCell(2);
+          const rawDesig = cell2.value ?? cell2.text ?? '';
+          const designation = (typeof rawDesig === 'string' ? rawDesig : String(rawDesig ?? '')).trim().toUpperCase();
 
-        if (!designation) { skippedRows++; return; }
-        if (!projectItemsMap.has(designation)) { unmatchedRows++; return; }
+          if (!designation) { skippedRows++; return; }
 
-        const cell5 = row.getCell(5);
-        let val = cell5.value;
-        if (val !== null && typeof val === 'object' && 'result' in val) val = val.result;
-        const price = Number(val ?? 0);
-        if (!isFinite(price)) { invalidPriceRows++; return; }
+          // Match par désignation exacte, sinon fallback par référence (col 1)
+          let itemId = projectItemsMap.get(designation);
+          if (!itemId) {
+            const rawRef = (row.getCell(1).value ?? '').toString().trim().toUpperCase();
+            if (rawRef && projectRefMap.has(rawRef)) {
+              itemId = projectRefMap.get(rawRef);
+              refMatchedRows++;
+            } else {
+              unmatchedRows++;
+              return;
+            }
+          }
 
-        importedOffers[projectItemsMap.get(designation)] = price;
-      });
+          const cell5 = row.getCell(5);
+          let val = cell5.value;
+          if (val !== null && typeof val === 'object' && 'result' in val) val = val.result;
+          const price = Number(val ?? 0);
+          if (!isFinite(price)) { invalidPriceRows++; return; }
+
+          // Garder le premier prix non-nul trouvé (évite d'écraser avec 0)
+          if (!(itemId in importedOffers) || (importedOffers[itemId] === 0 && price !== 0)) {
+            importedOffers[itemId] = price;
+          }
+        });
+      }
 
       const matchCount = Object.keys(importedOffers).length;
       if (matchCount === 0) {
@@ -259,8 +394,10 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
       const warnings = [];
       if (unmatchedRows > 0) warnings.push(`${unmatchedRows} non trouvé(s)`);
       if (invalidPriceRows > 0) warnings.push(`${invalidPriceRows} prix invalide(s)`);
+      if (refMatchedRows > 0) warnings.push(`${refMatchedRows} par n° réf.`);
       const detail = warnings.length > 0 ? ` (${warnings.join(', ')})` : '';
-      toast.success(`${matchCount}/${totalRows} offre(s) importée(s) pour "${companyName}".${detail}`);
+      const sheetsInfo = validSheets.length > 1 ? ` (${validSheets.length} onglets lus)` : '';
+      toast.success(`${matchCount}/${totalRows} offre(s) importée(s) pour "${companyName}".${detail}${sheetsInfo}`);
     } catch (error) {
       console.error("Erreur lecture fichier Excel:", error);
       toast.error("Impossible de lire le fichier. Vérifiez le format Excel.");
@@ -363,13 +500,19 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
     }
   }, [averagesHorsOAB, confirm, toast]);
 
+  const handleManualSave = useCallback(() => {
+    saveAnalysis();
+    toast.success(`${companies.length} entreprise(s) sauvegardée(s).`);
+  }, [companies, saveAnalysis, toast]);
+
   return {
     chaptersData, companies, stats, scoringConfig, setScoringConfig,
     canUndoObservatory: history.length > 0, lastSaved,
     handleAddManualCompany, handleImportExcel, updateCompanyOffer,
     renameCompany, removeCompany, handleClearAll,
     handleSaveToObservatory, handleUndoObservatory,
-    averagesHorsOAB, handlePushAveragesToBpu,
+    averagesHorsOAB, handlePushAveragesToBpu, handleManualSave,
+    handleExportJson, handleImportJson,
   };
 };
 

@@ -334,6 +334,8 @@ export default function MobileApp({ user, companyId, onLogout }) {
     if (activeModule === 'doc_admin') return 'Documents Admin';
     if (activeModule === 'site_visits') return 'Visites de Site';
     if (activeModule === 'exports') return 'Exports Rapides';
+    if (activeModule === 'rao' && selectedProject) return selectedProject.name;
+    if (activeModule === 'rao') return 'Analyse des Offres';
     return null;
   }, [subView, selectedProject, selectedChantier, fullChantier, selectedFiche, selectedMoeDevis, selectedVisit, fullVisit, activeModule]);
 
@@ -449,7 +451,7 @@ export default function MobileApp({ user, companyId, onLogout }) {
           />
         )}
         {subView === 'rao' && fullProject && (
-          <RAOView project={fullProject} refMap={calcHook.refMap} />
+          <RAOView project={fullProject} companyId={companyId} calcHook={calcHook} />
         )}
         {subView === 'exports' && (
           <ExportsView onExport={handleExport} />
@@ -538,6 +540,30 @@ export default function MobileApp({ user, companyId, onLogout }) {
             </div>
           ) : fullVisit ? (
             <SiteVisitDetailView visit={fullVisit} onSave={saveVisit} onToast={triggerToast} isLandscape={isLandscape} />
+          ) : null
+        )}
+
+        {/* Module RAO — liste projets puis analyse */}
+        {activeModule === 'rao' && !selectedProject && (
+          <ProjectsList
+            projects={projects}
+            folders={folders}
+            loading={projectsLoading}
+            search={searchTerm}
+            onSearch={setSearchTerm}
+            onSelect={handleSelectProject}
+            onRefresh={refetch}
+            isLandscape={isLandscape}
+          />
+        )}
+        {activeModule === 'rao' && selectedProject && (
+          projectLoading ? (
+            <div className="flex items-center justify-center py-20 gap-2 text-gray-500">
+              <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              <span className="text-sm">Chargement…</span>
+            </div>
+          ) : fullProject ? (
+            <RAOView project={fullProject} companyId={companyId} calcHook={calcHook} />
           ) : null
         )}
 

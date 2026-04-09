@@ -8,12 +8,12 @@ import ChangelogModal from '../ChangelogModal';
 // ─── MODULES MOBILES ───────────────────────────────────────────────────────
 
 const MOBILE_MODULES = [
-  { id: 'projects',  label: 'Mes Projets',         description: 'Consultation des devis, DQE et analyses',      icon: 'folder',    tag: 'Core',   row: 1 },
-  { id: 'crc',       label: 'Comptes Rendus',      description: 'Consultation des CR de chantier',              icon: 'clipboard', tag: 'CRC',    row: 1 },
-  { id: 'moe',       label: 'Devis MOE',           description: 'Honoraires maîtrise d\'œuvre',                 icon: 'euro',      tag: 'MOE',    row: 2 },
-  { id: 'doc_admin', label: 'Documents Admin',      description: 'Fiches marché et documents EXE',              icon: 'file',      tag: 'EXE',    row: 2 },
-  { id: 'site_visits', label: 'Visites de Site',      description: 'Notes terrain avec photos et GPS',             icon: 'chart',     tag: 'Terrain', row: 1 },
-  { id: 'exports',   label: 'Exports Rapides',      description: 'PDF, Excel — télécharger ou partager',        icon: 'download',  tag: 'Export', row: 3 },
+  { id: 'projects',    label: 'Mes Projets',         description: 'Devis, DQE et analyses',          icon: 'folder',    tag: 'Core',    row: 1 },
+  { id: 'rao',         label: 'Analyse Offres',      description: 'Comparatif prix et classement',   icon: 'chart',     tag: 'RAO',     row: 1 },
+  { id: 'crc',         label: 'Comptes Rendus',      description: 'CR de chantier',                  icon: 'clipboard', tag: 'CRC',     row: 2 },
+  { id: 'site_visits', label: 'Visites de Site',     description: 'Notes terrain, photos et GPS',    icon: 'camera',    tag: 'Terrain', row: 2 },
+  { id: 'moe',         label: 'Devis MOE',           description: 'Honoraires maîtrise d\'œuvre',    icon: 'euro',      tag: 'MOE',     row: 3 },
+  { id: 'doc_admin',   label: 'Documents Admin',     description: 'Fiches marché et docs EXE',       icon: 'file',      tag: 'EXE',     row: 3 },
 ];
 
 // ─── THÈMES PAR ROW ───────────────────────────────────────────────────────
@@ -94,8 +94,8 @@ export default function MobileHubView({ userEmail, onSelectModule, onLogout, isL
       </div>
 
       {/* ── Cards ──────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
-        <div className={isLandscape ? 'grid grid-cols-2 gap-3' : 'flex flex-col gap-3'}>
+      <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col">
+        <div className="grid grid-cols-2 gap-2.5 flex-1">
           {MOBILE_MODULES.map((mod, idx) => {
             const theme = ROW_THEMES[mod.row];
             return (
@@ -103,8 +103,8 @@ export default function MobileHubView({ userEmail, onSelectModule, onLogout, isL
                 key={mod.id}
                 onClick={() => onSelectModule(mod.id)}
                 className={`
-                  relative flex items-center gap-4 w-full p-5 rounded-[20px]
-                  border text-left transition-all duration-300 active:scale-[0.97]
+                  relative flex flex-col items-center justify-center gap-3 w-full rounded-[20px]
+                  border text-center transition-all duration-300 active:scale-[0.97]
                   ${theme.card}
                 `}
                 style={{
@@ -113,26 +113,23 @@ export default function MobileHubView({ userEmail, onSelectModule, onLogout, isL
                   transform: mounted ? 'translateY(0)' : 'translateY(10px)',
                 }}
               >
+                {/* Tag */}
+                {mod.tag && (
+                  <span className={`absolute top-3 right-3 px-1.5 py-0.5 rounded-md text-[8px] font-bold uppercase tracking-wider border ${theme.badge}`}>
+                    {mod.tag}
+                  </span>
+                )}
+
                 {/* Icon */}
-                <div className={`w-12 h-12 rounded-2xl ${theme.iconBg} flex items-center justify-center shrink-0`}>
-                  <Icon name={mod.icon} size={22} color={theme.iconColor} />
+                <div className={`w-14 h-14 rounded-2xl ${theme.iconBg} flex items-center justify-center`}>
+                  <Icon name={mod.icon} size={26} color={theme.iconColor} />
                 </div>
 
                 {/* Text */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className={`text-[15px] font-semibold ${theme.title}`}>{mod.label}</span>
-                    {mod.tag && (
-                      <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider border ${theme.badge}`}>
-                        {mod.tag}
-                      </span>
-                    )}
-                  </div>
-                  <p className={`text-[13px] leading-snug ${theme.desc}`}>{mod.description}</p>
+                <div>
+                  <span className={`text-[15px] font-semibold block ${theme.title}`}>{mod.label}</span>
+                  <p className={`text-[11px] leading-snug mt-0.5 ${theme.desc}`}>{mod.description}</p>
                 </div>
-
-                {/* Chevron */}
-                <Icon name="chevron" size={14} color={mod.row === 1 ? '#d1d5db' : mod.row === 2 ? '#92400e50' : '#7c3aed50'} />
               </button>
             );
           })}
