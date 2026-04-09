@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import Icon from './Icon';
 import { dateFr } from './formatters';
-import { confirm } from '../../utils/globalUI';
+// globalUI chargé dynamiquement pour le code-splitting
 
 export default function SiteVisitListView({ visits, loading, onSelect, onCreate, onDelete, onRefresh, isLandscape }) {
   const [contextMenu, setContextMenu] = useState(null);
@@ -89,6 +89,7 @@ export default function SiteVisitListView({ visits, loading, onSelect, onCreate,
               onClick={async () => {
                 const v = contextMenu.visit;
                 setContextMenu(null);
+                const { confirm } = await import('../../utils/globalUI');
                 const ok = await confirm(`Supprimer "${v.nom || 'Visite sans nom'}" ?`, { danger: true });
                 if (ok) onDelete?.(v.id);
               }}
