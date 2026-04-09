@@ -136,6 +136,11 @@ service cloud.firestore {
         allow read, write: if isCompanyMember(companyId);
       }
 
+      // Visites de site
+      match /site_visits/{visitId} {
+        allow read, write: if isCompanyMember(companyId);
+      }
+
       // Présence en temps réel
       match /presence/{presenceId} {
         allow read: if isCompanyMember(companyId);

@@ -60,6 +60,7 @@ const MODULES = [
   { id: 'devis_moe', label: 'Devis MOE', description: "Proposition d'honoraires de maîtrise d'œuvre VRD", icon: Receipt, access: 'admin_only', tag: 'Finance', row: 2 },
   { id: 'crc', label: 'Compte Rendu Chantier', description: 'Suivi de chantier et comptes rendus de réunion', icon: ClipboardList, access: 'admin_or_unlocked', tag: 'Terrain', row: 2 },
   { id: 'doc_admin', label: 'Documents Administratifs', description: 'Génération des documents administratifs de marché', icon: FileStack, access: 'admin_or_unlocked', tag: 'Admin', row: 2 },
+  { id: 'site_visits', label: 'Visites de Site', description: 'Documentation terrain avec photos et GPS', icon: MapPin, access: 'all', tag: 'Terrain', row: 2 },
   // Row 3 — Paramètres & Compte (amethyst glass)
   { id: 'branding', label: 'Identité & Charte Graphique', description: 'Logo, couleurs, typographie et informations de contact', icon: Palette, access: 'all', tag: 'Branding', row: 3 },
   { id: 'rgpd', label: 'Mon Compte & Données', description: 'RGPD — Portabilité des données et droit à l\'effacement', icon: Shield, access: 'all', tag: 'RGPD', row: 3 },

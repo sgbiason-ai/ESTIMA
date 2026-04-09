@@ -38,8 +38,11 @@ import MoeListView     from './MoeListView';
 import MoeDetailView   from './MoeDetailView';
 import DocAdminListView   from './DocAdminListView';
 import DocAdminDetailView from './DocAdminDetailView';
+import SiteVisitListView    from './SiteVisitListView';
+import SiteVisitDetailView  from './SiteVisitDetailView';
 import { useMobileCrc }       from '../../hooks/useMobileCrc';
 import { useMobileDevisMoe } from '../../hooks/useMobileDevisMoe';
+import { useMobileSiteVisits } from '../../hooks/useMobileSiteVisits';
 import { useCrrManager }     from '../../hooks/useCrrManager';
 import { useOrientation }   from '../../hooks/useOrientation';
 
@@ -52,6 +55,7 @@ export default function MobileApp({ user, companyId, onLogout }) {
   const { chantiers: crcChantiers, isLoading: crcLoading, refetch: crcRefetch, loadChantier, saveChantier } = useMobileCrc(user, companyId);
   const { devisList: moeDevisList, isLoading: moeLoading, refetch: moeRefetch, loadDevis: loadMoeDevis } = useMobileDevisMoe(user, companyId);
   const { fiches: adminFiches, isLoading: adminLoading, refetch: adminRefetch, loadFiche } = useMobileFichesMarche(user, companyId);
+  const { visits: siteVisits, isLoading: visitsLoading, refetch: visitsRefetch, loadVisit, saveVisit, createVisit, deleteVisit } = useMobileSiteVisits(user, companyId);
   const dbHook = useDatabase(user, companyId);
   const resources = useAppResources(user, companyId);
 
@@ -65,6 +69,9 @@ export default function MobileApp({ user, companyId, onLogout }) {
   const [selectedChantier, setSelectedChantier] = useState(null);
   const [fullChantier, setFullChantier]       = useState(null);
   const [chantierLoading, setChantierLoading] = useState(false);
+  const [selectedVisit, setSelectedVisit]     = useState(null);
+  const [fullVisit, setFullVisit]             = useState(null);
+  const [visitLoading, setVisitLoading]       = useState(false);
   const [selectedMoeDevis, setSelectedMoeDevis] = useState(null);
   const [fullMoeDevis, setFullMoeDevis]       = useState(null);
   const [moeDevisLoading, setMoeDevisLoading] = useState(false);
@@ -140,6 +147,23 @@ export default function MobileApp({ user, companyId, onLogout }) {
     setFicheLoading(false);
   }, [loadFiche]);
 
+  const handleSelectVisit = useCallback(async (v) => {
+    setSelectedVisit(v);
+    setVisitLoading(true);
+    const data = await loadVisit(v.id);
+    setFullVisit(data);
+    setVisitLoading(false);
+  }, [loadVisit]);
+
+  const handleCreateVisit = useCallback(async () => {
+    const visit = await createVisit();
+    if (visit) {
+      setSelectedVisit(visit);
+      setFullVisit(visit);
+      visitsRefetch();
+    }
+  }, [createVisit, visitsRefetch]);
+
   const goBack = useCallback(() => {
     if (subView) { setSubView(null); }
     else if (selectedProject) {
@@ -154,6 +178,9 @@ export default function MobileApp({ user, companyId, onLogout }) {
     } else if (selectedFiche) {
       setSelectedFiche(null);
       setFullFiche(null);
+    } else if (selectedVisit) {
+      setSelectedVisit(null);
+      setFullVisit(null);
     } else if (activeModule) {
       setActiveModule(null);
     }
@@ -292,13 +319,15 @@ export default function MobileApp({ user, companyId, onLogout }) {
     }
     if (selectedMoeDevis) return selectedMoeDevis.nom;
     if (selectedFiche) return selectedFiche.nom;
+    if (selectedVisit) return fullVisit?.nom || 'Visite de Site';
     if (activeModule === 'projects') return 'Mes Projets';
     if (activeModule === 'crc') return 'Comptes Rendus';
     if (activeModule === 'moe') return 'Devis MOE';
     if (activeModule === 'doc_admin') return 'Documents Admin';
+    if (activeModule === 'site_visits') return 'Visites de Site';
     if (activeModule === 'exports') return 'Exports Rapides';
     return null;
-  }, [subView, selectedProject, selectedChantier, fullChantier, selectedFiche, selectedMoeDevis, activeModule]);
+  }, [subView, selectedProject, selectedChantier, fullChantier, selectedFiche, selectedMoeDevis, selectedVisit, fullVisit, activeModule]);
 
   // ── Sélection module depuis le hub ──
   const handleSelectModule = useCallback((moduleId) => {
@@ -311,6 +340,8 @@ export default function MobileApp({ user, companyId, onLogout }) {
     setFullMoeDevis(null);
     setSelectedFiche(null);
     setFullFiche(null);
+    setSelectedVisit(null);
+    setFullVisit(null);
     setSubView(null);
     setSearchTerm('');
   }, []);
@@ -476,6 +507,28 @@ export default function MobileApp({ user, companyId, onLogout }) {
             </div>
           ) : fullFiche ? (
             <DocAdminDetailView fiche={fullFiche} branding={resources.masterBranding} onToast={triggerToast} isLandscape={isLandscape} />
+          ) : null
+        )}
+
+        {/* Module Visites de Site — liste */}
+        {activeModule === 'site_visits' && !selectedVisit && (
+          <SiteVisitListView
+            visits={siteVisits}
+            loading={visitsLoading}
+            onSelect={handleSelectVisit}
+            onCreate={handleCreateVisit}
+            onRefresh={visitsRefetch}
+            isLandscape={isLandscape}
+          />
+        )}
+        {activeModule === 'site_visits' && selectedVisit && (
+          visitLoading ? (
+            <div className="flex items-center justify-center py-20 gap-2 text-gray-500">
+              <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              <span className="text-sm">Chargement…</span>
+            </div>
+          ) : fullVisit ? (
+            <SiteVisitDetailView visit={fullVisit} onSave={saveVisit} onToast={triggerToast} isLandscape={isLandscape} />
           ) : null
         )}
 

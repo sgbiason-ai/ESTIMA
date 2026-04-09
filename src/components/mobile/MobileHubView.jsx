@@ -12,6 +12,7 @@ const MOBILE_MODULES = [
   { id: 'crc',       label: 'Comptes Rendus',      description: 'Consultation des CR de chantier',              icon: 'clipboard', tag: 'CRC',    row: 1 },
   { id: 'moe',       label: 'Devis MOE',           description: 'Honoraires maîtrise d\'œuvre',                 icon: 'euro',      tag: 'MOE',    row: 2 },
   { id: 'doc_admin', label: 'Documents Admin',      description: 'Fiches marché et documents EXE',              icon: 'file',      tag: 'EXE',    row: 2 },
+  { id: 'site_visits', label: 'Visites de Site',      description: 'Notes terrain avec photos et GPS',             icon: 'chart',     tag: 'Terrain', row: 1 },
   { id: 'exports',   label: 'Exports Rapides',      description: 'PDF, Excel — télécharger ou partager',        icon: 'download',  tag: 'Export', row: 3 },
 ];
 
