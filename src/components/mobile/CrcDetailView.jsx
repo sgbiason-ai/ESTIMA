@@ -9,7 +9,7 @@ import Icon from './Icon';
 import { dateFr } from './formatters';
 import { OBSERVATION_STATUSES, PRESENCE_OPTIONS, MEETING_TYPES, GROUP_COLORS, getGroupColor } from '../../data/crrData';
 import { normalizeObsText, stripHtml } from '../../utils/formatObsText';
-import { setShareMode, canNativeShare } from '../../utils/fileSaver';
+// fileSaver non utilisé — export PDF direct par téléchargement
 // exportHelpers chargé dynamiquement pour le code-splitting
 import ImageViewerModal from './ImageViewerModal';
 
@@ -69,25 +69,37 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
     }
   }, [manager, meetings]);
 
-  const handleExportPdf = useCallback(async (share = false) => {
+  const handleExportPdf = useCallback(async () => {
     if (!meeting) return;
-    const key = share ? 'pdf-share' : 'pdf';
-    setExporting(key);
+    setExporting('pdf');
     try {
-      if (share) setShareMode(true);
       const [{ generatePdfCrr }, { buildExportFilename }] = await Promise.all([
         import('../../utils/pdfCrrGenerator'),
         import('../../utils/exportHelpers'),
       ]);
       const exportCfg = (manager?.crrConfig || config).chantierInfo || {};
       const filename = buildExportFilename(exportCfg.exportPattern, { number: meeting.number, projectName: chantierName, date: meeting.date, ext: 'pdf' });
-      await generatePdfCrr(meeting, manager?.crrConfig || config, chantierName, branding || {}, { filename });
-      onToast?.(`CR n°${meeting.number} ${share ? 'partagé' : 'exporté'}`);
+
+      // Générer le PDF en blob puis télécharger
+      const pdfData = await generatePdfCrr(meeting, manager?.crrConfig || config, chantierName, branding || {}, { returnBlob: true, filename });
+      if (pdfData?.blob) {
+        const url = URL.createObjectURL(pdfData.blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        // Fallback : génération directe (ouvre le PDF)
+        await generatePdfCrr(meeting, manager?.crrConfig || config, chantierName, branding || {}, { filename });
+      }
+      onToast?.(`CR n°${meeting.number} téléchargé`);
     } catch (err) {
       console.error('[CrcDetailView] Export PDF:', err);
       onToast?.('Erreur export PDF');
     } finally {
-      setShareMode(false);
       setExporting(null);
     }
   }, [meeting, config, chantierName, branding, onToast, manager]);
@@ -244,24 +256,15 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
             </div>
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-gray-700 mr-1">{dateFr(meeting.date)}</span>
-              <button onClick={() => handleExportPdf(false)} disabled={!!exporting}
+              <button onClick={handleExportPdf} disabled={!!exporting}
                 className={`w-8 h-8 rounded-lg border flex items-center justify-center transition ${
-                  exporting ? 'bg-white border-gray-100 opacity-40' : 'bg-red-500/10 border-red-500/20 active:bg-red-500/30'
-                }`}>
+                  exporting === 'pdf' ? 'bg-white border-gray-100 opacity-40' : 'bg-red-500/10 border-red-500/20 active:bg-red-500/30'
+                }`}
+                title="Télécharger le PDF">
                 {exporting === 'pdf'
                   ? <div className="w-3.5 h-3.5 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
                   : <Icon name="download" size={14} color="#ef4444" />}
               </button>
-              {canNativeShare() && (
-                <button onClick={() => handleExportPdf(true)} disabled={!!exporting}
-                  className={`w-8 h-8 rounded-lg border flex items-center justify-center transition ${
-                    exporting ? 'bg-white border-gray-100 opacity-40' : 'bg-white border-gray-200 active:bg-white'
-                  }`}>
-                  {exporting === 'pdf-share'
-                    ? <div className="w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-                    : <Icon name="share" size={14} color="#64748b" />}
-                </button>
-              )}
               {canEdit && (
                 <button onClick={handleSendMail} disabled={!!exporting}
                   className={`w-8 h-8 rounded-lg border flex items-center justify-center transition ${
