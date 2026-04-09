@@ -211,12 +211,61 @@ function MeasureTool({ active, points, onAddPoint, onReset }) {
   );
 }
 
+// ─── Route entre 2 observations (OSRM) ─────────────────────────────────────
+
+function RouteOverlay({ from, to }) {
+  const [routeCoords, setRouteCoords] = useState([]);
+  const [routeDist, setRouteDist] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!from || !to) { setRouteCoords([]); setRouteDist(null); return; }
+    let cancelled = false;
+    setLoading(true);
+    fetch(`https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`)
+      .then(r => r.json())
+      .then(data => {
+        if (cancelled) return;
+        const route = data.routes?.[0];
+        if (route) {
+          setRouteCoords(route.geometry.coordinates.map(c => [c[1], c[0]]));
+          setRouteDist(route.distance);
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [from, to]);
+
+  const fmtDist = (m) => m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(2)} km`;
+
+  if (routeCoords.length === 0) return null;
+
+  const mid = routeCoords[Math.floor(routeCoords.length / 2)];
+
+  return (
+    <>
+      <Polyline positions={routeCoords} pathOptions={{ color: '#22c55e', weight: 5, opacity: 0.8 }} />
+      {routeDist != null && mid && (
+        <Marker position={mid} icon={L.divIcon({
+          className: '',
+          html: `<div style="position:relative;top:-24px;left:-30px;background:#22c55e;color:white;font-size:12px;font-weight:800;padding:3px 10px;border-radius:8px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.3);font-family:system-ui">🛣️ ${fmtDist(routeDist)}</div>`,
+          iconSize: [0, 0], iconAnchor: [0, 0],
+        })} />
+      )}
+    </>
+  );
+}
+
 // ─── Composant principal ────────────────────────────────────────────────────
 
 export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMarkers = [], height = '100%', highlightedObs = null, onSelectObs = null, showMeasure = false }) {
   const [activeLayer, setActiveLayer] = useState('satellite');
   const [measuring, setMeasuring] = useState(false);
   const [measurePoints, setMeasurePoints] = useState([]);
+  const [routeMode, setRouteMode] = useState(false);
+  const [routeFrom, setRouteFrom] = useState(null); // [lat, lng]
+  const [routeTo, setRouteTo] = useState(null);
 
   const positions = coordinates.map(c => [c.lat, c.lng]);
 
@@ -284,13 +333,26 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
             </Marker>
           ))}
 
+          {/* Route entre 2 observations */}
+          <RouteOverlay from={routeFrom} to={routeTo} />
+
           {/* Marqueurs observations (numérotés, anti-chevauchement, cliquables) */}
           {spreadOverlapping(obsMarkers).map((o, i) => {
             const isHighlighted = highlightedObs === o.number;
+            const isRoutePoint = routeFrom && o.lat === routeFrom[0] && o.lng === routeFrom[1]
+              || routeTo && o.lat === routeTo[0] && o.lng === routeTo[1];
             return (
               <Marker key={`obs-${i}`} position={[o.lat, o.lng]}
-                icon={o.number ? createNumberIcon(o.number, isHighlighted) : createIcon('#f59e0b', 14)}
-                eventHandlers={{ click: () => onSelectObs?.(isHighlighted ? null : o.number) }}>
+                icon={o.number ? createNumberIcon(o.number, isHighlighted || isRoutePoint) : createIcon('#f59e0b', 14)}
+                eventHandlers={{ click: () => {
+                  if (routeMode) {
+                    if (!routeFrom) { setRouteFrom([o.lat, o.lng]); }
+                    else if (!routeTo) { setRouteTo([o.lat, o.lng]); }
+                    else { setRouteFrom([o.lat, o.lng]); setRouteTo(null); }
+                  } else {
+                    onSelectObs?.(isHighlighted ? null : o.number);
+                  }
+                } }}>
                 <Popup>
                   <div style={{ maxWidth: 200, fontSize: 11 }}>
                     {o.number && <div style={{ fontWeight: 800, color: isHighlighted ? '#f97316' : '#2563eb', marginBottom: 2 }}>Observation n°{o.number}</div>}
@@ -303,11 +365,12 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
           })}
         </MapContainer>
 
-        {/* Bouton mesurer — en haut à droite */}
+        {/* Boutons outils — en haut à droite */}
         {showMeasure && (
           <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 1000, display: 'flex', gap: 4 }}>
+            {/* Mesurer */}
             <button
-              onClick={() => { setMeasuring(!measuring); if (measuring) setMeasurePoints([]); }}
+              onClick={() => { setMeasuring(!measuring); if (measuring) setMeasurePoints([]); setRouteMode(false); setRouteFrom(null); setRouteTo(null); }}
               style={{
                 padding: '6px 12px', borderRadius: 10, fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer',
                 background: measuring ? '#f97316' : 'rgba(255,255,255,0.9)', backdropFilter: 'blur(8px)',
@@ -320,9 +383,23 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
               </svg>
               {measuring ? 'Arrêter' : 'Mesurer'}
             </button>
-            {measuring && measurePoints.length > 0 && (
+
+            {/* Distance route */}
+            <button
+              onClick={() => { setRouteMode(!routeMode); if (routeMode) { setRouteFrom(null); setRouteTo(null); } setMeasuring(false); setMeasurePoints([]); }}
+              style={{
+                padding: '6px 12px', borderRadius: 10, fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer',
+                background: routeMode ? '#22c55e' : 'rgba(255,255,255,0.9)', backdropFilter: 'blur(8px)',
+                color: routeMode ? '#fff' : '#6b7280', boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                display: 'flex', alignItems: 'center', gap: 4, transition: 'all 0.15s',
+              }}>
+              🛣️ {routeMode ? (routeFrom && !routeTo ? 'Cliquez obs B' : routeTo ? 'Recliquez pour refaire' : 'Cliquez obs A') : 'Route'}
+            </button>
+
+            {/* Effacer */}
+            {(measuring && measurePoints.length > 0) || (routeFrom || routeTo) ? (
               <button
-                onClick={() => setMeasurePoints([])}
+                onClick={() => { setMeasurePoints([]); setRouteFrom(null); setRouteTo(null); }}
                 style={{
                   padding: '6px 10px', borderRadius: 10, fontSize: 11, fontWeight: 600, border: 'none', cursor: 'pointer',
                   background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(8px)', color: '#ef4444',
@@ -330,7 +407,7 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
                 }}>
                 Effacer
               </button>
-            )}
+            ) : null}
           </div>
         )}
 
