@@ -78,7 +78,7 @@ export default function CrcTerrainView({ meeting, observationsByCategory }) {
         {tracking.distance > 0 && (
           <div className="flex items-center gap-2 px-4 py-2.5 bg-white rounded-xl border border-gray-200/60">
             <Ruler size={14} className="text-emerald-500" />
-            <span className="text-xs font-bold text-gray-900">{fmtDistance(tracking.distance)}</span>
+            <span className="text-xs font-bold text-gray-900">{fmtDistance(tracking.distance)} <span className="text-[8px] text-gray-400 font-normal">±{Math.max(5, Math.round(tracking.distance * 0.07))}m</span></span>
           </div>
         )}
         {duration > 0 && (

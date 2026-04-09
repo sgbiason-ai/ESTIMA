@@ -231,7 +231,7 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
               <div className="text-[10px] text-gray-500 font-medium">Points</div>
             </div>
             <div className="flex-1 bg-gray-50 rounded-xl p-3 text-center">
-              <div className="text-lg font-bold text-gray-900">{fmtDistance(distance)}</div>
+              <div className="text-lg font-bold text-gray-900">{fmtDistance(distance)} <span className="text-[9px] text-gray-400 font-medium">±{Math.max(5, Math.round(distance * 0.07))}m</span></div>
               <div className="text-[10px] text-gray-500 font-medium">Distance</div>
             </div>
             <div className="flex-1 bg-gray-50 rounded-xl p-3 text-center">

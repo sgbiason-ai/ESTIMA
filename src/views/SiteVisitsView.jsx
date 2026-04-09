@@ -206,7 +206,7 @@ export default function SiteVisitsView({ companyId }) {
                 )}
                 {tracking.distance > 0 && (
                   <div className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 rounded-lg text-[10px] font-bold text-gray-700">
-                    <Ruler size={10} className="text-emerald-500" /> {fmtDist(tracking.distance)}
+                    <Ruler size={10} className="text-emerald-500" /> {fmtDist(tracking.distance)} <span className="text-[8px] text-gray-400 font-normal">±{Math.max(5, Math.round(tracking.distance * 0.07))}m</span>
                   </div>
                 )}
                 <div className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 rounded-lg text-[10px] font-bold text-gray-700">

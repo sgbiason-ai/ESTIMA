@@ -203,7 +203,7 @@ function MeasureTool({ active, points, onAddPoint, onReset }) {
       {points.length > 1 && (
         <Marker position={points[points.length - 1]} icon={L.divIcon({
           className: '',
-          html: `<div style="position:relative;top:-28px;left:8px;background:#f97316;color:white;font-size:11px;font-weight:800;padding:2px 8px;border-radius:6px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.3);font-family:system-ui">${fmtDist(totalDist)}</div>`,
+          html: `<div style="position:relative;top:-28px;left:8px;background:#f97316;color:white;font-size:11px;font-weight:800;padding:2px 8px;border-radius:6px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.3);font-family:system-ui">${fmtDist(totalDist)} <span style="opacity:0.7;font-weight:500;font-size:9px">±${Math.max(5, points.length * 3)}m</span></div>`,
           iconSize: [0, 0], iconAnchor: [0, 0],
         })} />
       )}
@@ -249,7 +249,7 @@ function RouteOverlay({ from, to }) {
       {routeDist != null && mid && (
         <Marker position={mid} icon={L.divIcon({
           className: '',
-          html: `<div style="position:relative;top:-24px;left:-30px;background:#22c55e;color:white;font-size:12px;font-weight:800;padding:3px 10px;border-radius:8px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.3);font-family:system-ui">🛣️ ${fmtDist(routeDist)}</div>`,
+          html: `<div style="position:relative;top:-24px;left:-30px;background:#22c55e;color:white;font-size:12px;font-weight:800;padding:3px 10px;border-radius:8px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.3);font-family:system-ui">🛣️ ${fmtDist(routeDist)} <span style="opacity:0.7;font-weight:500;font-size:9px">±5m</span></div>`,
           iconSize: [0, 0], iconAnchor: [0, 0],
         })} />
       )}
