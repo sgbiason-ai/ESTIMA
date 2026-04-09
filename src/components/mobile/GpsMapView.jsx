@@ -26,13 +26,17 @@ const startIcon = createIcon('#22c55e', 16);
 const endIcon = createIcon('#ef4444', 16);
 const photoIcon = createIcon('#3b82f6', 14);
 
-// Icône numérotée pour les observations
-const createNumberIcon = (number) => L.divIcon({
-  className: '',
-  html: `<div style="width:24px;height:24px;border-radius:50%;background:#2563eb;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:800;font-family:system-ui">${number}</div>`,
-  iconSize: [24, 24],
-  iconAnchor: [12, 12],
-});
+// Icône numérotée pour les observations (bleu par défaut, orange si highlight)
+const createNumberIcon = (number, highlighted = false) => {
+  const bg = highlighted ? '#f97316' : '#2563eb';
+  const size = highlighted ? 30 : 24;
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${bg};border:${highlighted ? '3px' : '2px'} solid white;box-shadow:0 ${highlighted ? '2px 8px' : '1px 4px'} rgba(0,0,0,${highlighted ? '0.5' : '0.4'});display:flex;align-items:center;justify-content:center;color:white;font-size:${highlighted ? '13' : '11'}px;font-weight:800;font-family:system-ui;transition:all 0.2s;cursor:pointer">${number}</div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+};
 
 // Anti-chevauchement : décaler les points proches
 const spreadOverlapping = (markers, minDist = 0.00008) => {
@@ -97,7 +101,7 @@ function DynamicTileLayer({ layerKey }) {
   return null;
 }
 
-export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMarkers = [], height = '100%' }) {
+export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMarkers = [], height = '100%', highlightedObs = null, onSelectObs = null }) {
   const [activeLayer, setActiveLayer] = useState('satellite');
 
   const positions = coordinates.map(c => [c.lat, c.lng]);
@@ -162,18 +166,23 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
             </Marker>
           ))}
 
-          {/* Marqueurs observations (numérotés, anti-chevauchement) */}
-          {spreadOverlapping(obsMarkers).map((o, i) => (
-            <Marker key={`obs-${i}`} position={[o.lat, o.lng]} icon={o.number ? createNumberIcon(o.number) : createIcon('#f59e0b', 14)}>
-              <Popup>
-                <div style={{ maxWidth: 200, fontSize: 11 }}>
-                  {o.number && <div style={{ fontWeight: 800, color: '#2563eb', marginBottom: 2 }}>Observation n°{o.number}</div>}
-                  {o.category && <div style={{ fontWeight: 700, marginBottom: 2 }}>{o.category}</div>}
-                  <div style={{ color: '#6b7280' }}>{o.text}</div>
-                </div>
-              </Popup>
-            </Marker>
-          ))}
+          {/* Marqueurs observations (numérotés, anti-chevauchement, cliquables) */}
+          {spreadOverlapping(obsMarkers).map((o, i) => {
+            const isHighlighted = highlightedObs === o.number;
+            return (
+              <Marker key={`obs-${i}`} position={[o.lat, o.lng]}
+                icon={o.number ? createNumberIcon(o.number, isHighlighted) : createIcon('#f59e0b', 14)}
+                eventHandlers={{ click: () => onSelectObs?.(isHighlighted ? null : o.number) }}>
+                <Popup>
+                  <div style={{ maxWidth: 200, fontSize: 11 }}>
+                    {o.number && <div style={{ fontWeight: 800, color: isHighlighted ? '#f97316' : '#2563eb', marginBottom: 2 }}>Observation n°{o.number}</div>}
+                    {o.category && <div style={{ fontWeight: 700, marginBottom: 2 }}>{o.category}</div>}
+                    <div style={{ color: '#6b7280' }}>{o.text}</div>
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })}
         </MapContainer>
       </div>
 

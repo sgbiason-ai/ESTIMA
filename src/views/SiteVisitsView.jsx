@@ -17,6 +17,7 @@ export default function SiteVisitsView({ companyId }) {
   const [fullVisit, setFullVisit] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [fullscreenMap, setFullscreenMap] = useState(false);
+  const [highlightedObs, setHighlightedObs] = useState(null); // numéro de l'observation sélectionnée
 
   const fetchVisits = useCallback(async () => {
     if (!companyId) return;
@@ -96,6 +97,14 @@ export default function SiteVisitsView({ companyId }) {
   }, [observations, coordinates]);
 
   const hasMap = coordinates.length > 0 || photoMarkers.length > 0 || obsMarkers.length > 0;
+
+  // Scroll vers l'observation quand on clique sur une pastille carte
+  useEffect(() => {
+    if (highlightedObs) {
+      const el = document.getElementById(`obs-${highlightedObs}`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [highlightedObs]);
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
   const fmtDist = (m) => m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(2)} km`;
 
@@ -202,10 +211,16 @@ export default function SiteVisitsView({ companyId }) {
             <div className="flex-1 overflow-y-auto p-5 space-y-3">
               {observations.map((obs, idx) => {
                 const images = obs.images || [];
+                const obsNum = idx + 1;
+                const isHighlighted = highlightedObs === obsNum;
                 return (
-                  <div key={obs.id} className="bg-white rounded-xl border border-gray-200/60 p-4">
+                  <div key={obs.id} id={`obs-${obsNum}`}
+                    className={`rounded-xl border p-4 transition-all duration-200 ${isHighlighted ? 'bg-orange-50 border-orange-300 ring-2 ring-orange-200' : 'bg-white border-gray-200/60'}`}>
                     <div className="flex items-start gap-3">
-                      <span className="shrink-0 w-7 h-7 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">{idx + 1}</span>
+                      <button onClick={() => setHighlightedObs(isHighlighted ? null : obsNum)}
+                        className={`shrink-0 w-7 h-7 rounded-full text-white text-xs font-bold flex items-center justify-center transition-all cursor-pointer hover:scale-110 ${isHighlighted ? 'bg-orange-500' : 'bg-blue-600'}`}>
+                        {obsNum}
+                      </button>
                       <div className="flex-1 min-w-0">
                     {obs.text && <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{stripHtml(obs.text)}</p>}
                     {images.length > 0 && (
@@ -248,7 +263,7 @@ export default function SiteVisitsView({ companyId }) {
                 </div>
                 <div className="flex-1 min-h-0">
                   <Suspense fallback={<div className="flex items-center justify-center h-full text-gray-400">Chargement carte…</div>}>
-                    <GpsMapView coordinates={coordinates} photoMarkers={photoMarkers} obsMarkers={obsMarkers} height="100%" />
+                    <GpsMapView coordinates={coordinates} photoMarkers={photoMarkers} obsMarkers={obsMarkers} height="100%" highlightedObs={highlightedObs} onSelectObs={setHighlightedObs} />
                   </Suspense>
                 </div>
               </>
@@ -283,7 +298,7 @@ export default function SiteVisitsView({ companyId }) {
           </div>
           <div className="flex-1 min-h-0">
             <Suspense fallback={<div className="flex items-center justify-center h-full text-gray-400">Chargement…</div>}>
-              <GpsMapView coordinates={coordinates} photoMarkers={photoMarkers} obsMarkers={obsMarkers} height="100%" />
+              <GpsMapView coordinates={coordinates} photoMarkers={photoMarkers} obsMarkers={obsMarkers} height="100%" highlightedObs={highlightedObs} onSelectObs={setHighlightedObs} />
             </Suspense>
           </div>
         </div>
