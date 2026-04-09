@@ -1,11 +1,13 @@
 // src/components/mobile/SiteVisitListView.jsx
 // Liste des visites de site — écran de sélection mobile.
 
-import React from 'react';
+import React, { useState } from 'react';
 import Icon from './Icon';
 import { dateFr } from './formatters';
+import { confirm } from '../../utils/globalUI';
 
-export default function SiteVisitListView({ visits, loading, onSelect, onCreate, onRefresh, isLandscape }) {
+export default function SiteVisitListView({ visits, loading, onSelect, onCreate, onDelete, onRefresh, isLandscape }) {
+  const [contextMenu, setContextMenu] = useState(null);
   return (
     <div className="pb-2">
       <div className="flex gap-2 px-4 pt-3 pb-2 mb-1">
@@ -42,9 +44,19 @@ export default function SiteVisitListView({ visits, loading, onSelect, onCreate,
 
       {!loading && visits.length > 0 && (
         <div className={isLandscape ? 'grid grid-cols-2 gap-2 px-4' : 'contents'}>
-          {visits.map(v => (
-            <button key={v.id} onClick={() => onSelect(v)}
-              className={`block p-4 bg-white rounded-xl border border-gray-200 text-left transition hover:shadow-md active:scale-[0.98] ${isLandscape ? '' : 'w-[calc(100%-2rem)] mx-4 mb-2'}`}>
+          {visits.map(v => {
+            let pressTimer = null;
+            return (
+            <button key={v.id}
+              onClick={() => { if (!contextMenu) onSelect(v); }}
+              onTouchStart={(e) => {
+                const touch = e.touches[0];
+                pressTimer = setTimeout(() => setContextMenu({ visit: v, x: touch.clientX, y: touch.clientY }), 500);
+              }}
+              onTouchEnd={() => clearTimeout(pressTimer)}
+              onTouchMove={() => clearTimeout(pressTimer)}
+              onContextMenu={(e) => { e.preventDefault(); setContextMenu({ visit: v, x: e.clientX, y: e.clientY }); }}
+              className={`block p-4 bg-white rounded-xl border border-gray-200 text-left transition hover:shadow-md active:scale-[0.98] select-none ${isLandscape ? '' : 'w-[calc(100%-2rem)] mx-4 mb-2'}`}>
               <div className="flex items-start gap-3">
                 <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0 mt-0.5">
                   <Icon name="chart" size={18} color="#059669" />
@@ -62,8 +74,35 @@ export default function SiteVisitListView({ visits, loading, onSelect, onCreate,
                 </div>
               </div>
             </button>
-          ))}
+            );
+          })}
         </div>
+      )}
+
+      {/* Menu contextuel (appui long) */}
+      {contextMenu && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setContextMenu(null)} />
+          <div className="fixed z-50 bg-white rounded-2xl shadow-2xl border border-gray-200 py-1 w-48 overflow-hidden"
+            style={{ top: contextMenu.y + 8, left: Math.min(contextMenu.x, window.innerWidth - 200) }}>
+            <button
+              onClick={async () => {
+                const v = contextMenu.visit;
+                setContextMenu(null);
+                const ok = await confirm(`Supprimer "${v.nom || 'Visite sans nom'}" ?`, { danger: true });
+                if (ok) onDelete?.(v.id);
+              }}
+              className="flex items-center gap-3 w-full px-4 py-3 text-left text-[13px] font-medium text-red-500 hover:bg-red-50 active:bg-red-100 transition"
+            >
+              <Icon name="trash" size={16} color="#ef4444" />
+              Supprimer cette visite
+            </button>
+            <button onClick={() => setContextMenu(null)}
+              className="flex items-center gap-3 w-full px-4 py-2.5 text-left text-[12px] font-medium text-gray-400 hover:bg-gray-50 transition border-t border-gray-100">
+              Annuler
+            </button>
+          </div>
+        </>
       )}
 
       {!loading && visits.length === 0 && (

@@ -517,6 +517,7 @@ export default function MobileApp({ user, companyId, onLogout }) {
             loading={visitsLoading}
             onSelect={handleSelectVisit}
             onCreate={handleCreateVisit}
+            onDelete={deleteVisit}
             onRefresh={visitsRefetch}
             isLandscape={isLandscape}
           />

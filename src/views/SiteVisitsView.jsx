@@ -214,7 +214,7 @@ export default function SiteVisitsView({ companyId }) {
 
           {/* ── Droite : carte satellite ── */}
           <div className="w-1/2 flex flex-col min-h-0">
-            {hasMap ? (
+            {hasMap && !fullscreenMap ? (
               <>
                 <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 shrink-0">
                   <span className="text-xs font-bold text-gray-900">Carte terrain</span>
@@ -229,11 +229,16 @@ export default function SiteVisitsView({ companyId }) {
                   </Suspense>
                 </div>
               </>
-            ) : (
+            ) : !hasMap ? (
               <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
                 <MapPin size={40} className="mb-3 opacity-30" />
                 <p className="text-xs">Aucune donnée terrain</p>
                 <p className="text-[10px] text-gray-300 mt-1">Utilisez le mobile pour enregistrer un tracé GPS</p>
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center text-gray-300">
+                <Maximize2 size={32} className="mb-2 opacity-30" />
+                <p className="text-xs">Carte en plein écran</p>
               </div>
             )}
           </div>
