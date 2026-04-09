@@ -131,9 +131,9 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
   const cfg = TILE_LAYERS[activeLayer];
 
   return (
-    <div style={{ height, width: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height, width: '100%' }}>
       {/* Carte */}
-      <div style={{ flex: 1, borderRadius: '16px', overflow: 'hidden', minHeight: 0 }}>
+      <div style={{ flex: 1, borderRadius: '16px', overflow: 'hidden', minHeight: 0, position: 'relative' }}>
         <MapContainer
           center={defaultCenter}
           zoom={17}
@@ -196,29 +196,29 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
             );
           })}
         </MapContainer>
-      </div>
 
-      {/* Sélecteur de fond de carte — chips */}
-      <div style={{ display: 'flex', gap: 6, padding: '8px 0 0', justifyContent: 'center' }}>
-        {Object.entries(TILE_LAYERS).map(([key, layer]) => (
-          <button
-            key={key}
-            onClick={() => setActiveLayer(key)}
-            style={{
-              padding: '6px 14px',
-              borderRadius: 10,
-              fontSize: 12,
-              fontWeight: 600,
-              border: activeLayer === key ? '2px solid #1f2937' : '1px solid #e5e7eb',
-              background: activeLayer === key ? '#1f2937' : '#fff',
-              color: activeLayer === key ? '#fff' : '#6b7280',
-              cursor: 'pointer',
-              transition: 'all 0.15s',
-            }}
-          >
-            {layer.label}
-          </button>
-        ))}
+        {/* Sélecteur de fond de carte — superposé en bas de la carte */}
+        <div style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', zIndex: 1000, display: 'flex', gap: 4, background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(8px)', padding: '4px', borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
+          {Object.entries(TILE_LAYERS).map(([key, layer]) => (
+            <button
+              key={key}
+              onClick={() => setActiveLayer(key)}
+              style={{
+                padding: '5px 12px',
+                borderRadius: 8,
+                fontSize: 11,
+                fontWeight: 600,
+                border: 'none',
+                background: activeLayer === key ? '#1f2937' : 'transparent',
+                color: activeLayer === key ? '#fff' : '#6b7280',
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+              }}
+            >
+              {layer.label}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
