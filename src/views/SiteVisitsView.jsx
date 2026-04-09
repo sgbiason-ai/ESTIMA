@@ -77,7 +77,25 @@ export default function SiteVisitsView({ companyId }) {
     return markers;
   }, [observations]);
 
-  const hasMap = coordinates.length > 0 || photoMarkers.length > 0;
+  // Marqueurs observations numérotés (position = première photo géolocalisée)
+  const obsMarkers = useMemo(() => {
+    return observations.map((obs, idx) => {
+      let lat = null, lng = null;
+      for (const img of (obs.images || [])) {
+        if (typeof img === 'object' && img.lat != null) { lat = img.lat; lng = img.lng; break; }
+      }
+      // Fallback : position dans le tracé GPS proportionnelle à l'index
+      if (lat == null && coordinates.length > 0) {
+        const pos = Math.min(Math.floor((idx / Math.max(observations.length, 1)) * coordinates.length), coordinates.length - 1);
+        lat = coordinates[pos].lat;
+        lng = coordinates[pos].lng;
+      }
+      if (lat == null) return null;
+      return { lat, lng, number: idx + 1, text: stripHtml(obs.text || '').slice(0, 100) };
+    }).filter(Boolean);
+  }, [observations, coordinates]);
+
+  const hasMap = coordinates.length > 0 || photoMarkers.length > 0 || obsMarkers.length > 0;
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
   const fmtDist = (m) => m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(2)} km`;
 
@@ -182,10 +200,13 @@ export default function SiteVisitsView({ companyId }) {
 
             {/* Observations scrollables */}
             <div className="flex-1 overflow-y-auto p-5 space-y-3">
-              {observations.map(obs => {
+              {observations.map((obs, idx) => {
                 const images = obs.images || [];
                 return (
                   <div key={obs.id} className="bg-white rounded-xl border border-gray-200/60 p-4">
+                    <div className="flex items-start gap-3">
+                      <span className="shrink-0 w-7 h-7 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">{idx + 1}</span>
+                      <div className="flex-1 min-w-0">
                     {obs.text && <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{stripHtml(obs.text)}</p>}
                     {images.length > 0 && (
                       <div className="flex flex-wrap gap-2 mt-3">
@@ -205,6 +226,8 @@ export default function SiteVisitsView({ companyId }) {
                       </div>
                     )}
                     {obs.date && <div className="text-[10px] text-gray-400 mt-2">{fmtDate(obs.date)}</div>}
+                      </div>
+                    </div>
                   </div>
                 );
               })}
@@ -225,7 +248,7 @@ export default function SiteVisitsView({ companyId }) {
                 </div>
                 <div className="flex-1 min-h-0">
                   <Suspense fallback={<div className="flex items-center justify-center h-full text-gray-400">Chargement carte…</div>}>
-                    <GpsMapView coordinates={coordinates} photoMarkers={photoMarkers} obsMarkers={[]} height="100%" />
+                    <GpsMapView coordinates={coordinates} photoMarkers={photoMarkers} obsMarkers={obsMarkers} height="100%" />
                   </Suspense>
                 </div>
               </>
@@ -260,7 +283,7 @@ export default function SiteVisitsView({ companyId }) {
           </div>
           <div className="flex-1 min-h-0">
             <Suspense fallback={<div className="flex items-center justify-center h-full text-gray-400">Chargement…</div>}>
-              <GpsMapView coordinates={coordinates} photoMarkers={photoMarkers} obsMarkers={[]} height="100%" />
+              <GpsMapView coordinates={coordinates} photoMarkers={photoMarkers} obsMarkers={obsMarkers} height="100%" />
             </Suspense>
           </div>
         </div>

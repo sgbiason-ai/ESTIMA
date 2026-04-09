@@ -46,7 +46,7 @@ const accuracyColor = (acc) => {
 
 // ─── Composant principal ───────────────────────────────────────────────────
 
-export default function GpsTrackingSection({ meeting, manager, obsByCategory, onToast }) {
+export default function GpsTrackingSection({ meeting, manager, obsByCategory, onToast, externalObsMarkers }) {
   const tracking = meeting?.gpsTracking || { coordinates: [], startTime: null, endTime: null };
   const [isRecording, setIsRecording] = useState(false);
   const [liveCoords, setLiveCoords] = useState(tracking.coordinates || []);
@@ -76,16 +76,14 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
     return markers;
   }, [meeting?.observations]);
 
-  // ── Observations (approximées sur le tracé si pas de GPS propre) ──
+  // ── Observations — utiliser externalObsMarkers si fourni ──
   const obsMarkers = useMemo(() => {
+    if (externalObsMarkers) return externalObsMarkers;
     const markers = [];
     Object.entries(obsByCategory || {}).forEach(([cat, obs]) => {
       obs.forEach(o => {
-        // Trouver la position la plus proche dans le tracé par timestamp
-        const obsTime = o.date ? new Date(o.date + 'T12:00:00').getTime() : null;
         const coords = liveCoords.length > 0 ? liveCoords : (tracking.coordinates || []);
         if (coords.length > 0) {
-          // Prendre le milieu du tracé comme approximation
           const mid = coords[Math.floor(coords.length / 2)];
           if (mid) markers.push({ lat: mid.lat, lng: mid.lng, category: cat, text: stripHtml(o.text || '').slice(0, 100) });
         }

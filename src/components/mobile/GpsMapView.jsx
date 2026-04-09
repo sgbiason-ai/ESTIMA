@@ -25,7 +25,32 @@ const createIcon = (color, size = 12) => L.divIcon({
 const startIcon = createIcon('#22c55e', 16);
 const endIcon = createIcon('#ef4444', 16);
 const photoIcon = createIcon('#3b82f6', 14);
-const obsIcon = createIcon('#f59e0b', 14);
+
+// Icône numérotée pour les observations
+const createNumberIcon = (number) => L.divIcon({
+  className: '',
+  html: `<div style="width:24px;height:24px;border-radius:50%;background:#2563eb;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:800;font-family:system-ui">${number}</div>`,
+  iconSize: [24, 24],
+  iconAnchor: [12, 12],
+});
+
+// Anti-chevauchement : décaler les points proches
+const spreadOverlapping = (markers, minDist = 0.00008) => {
+  const result = markers.map(m => ({ ...m }));
+  for (let i = 0; i < result.length; i++) {
+    for (let j = i + 1; j < result.length; j++) {
+      const dx = result[j].lng - result[i].lng;
+      const dy = result[j].lat - result[i].lat;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < minDist) {
+        const angle = (j * 2.2) + i; // angle unique par paire
+        result[j].lat += Math.sin(angle) * minDist;
+        result[j].lng += Math.cos(angle) * minDist;
+      }
+    }
+  }
+  return result;
+};
 
 // ─── Fonds de carte ────────────────────────────────────────────────────────
 
@@ -137,12 +162,13 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
             </Marker>
           ))}
 
-          {/* Marqueurs observations */}
-          {obsMarkers.map((o, i) => (
-            <Marker key={`obs-${i}`} position={[o.lat, o.lng]} icon={obsIcon}>
+          {/* Marqueurs observations (numérotés, anti-chevauchement) */}
+          {spreadOverlapping(obsMarkers).map((o, i) => (
+            <Marker key={`obs-${i}`} position={[o.lat, o.lng]} icon={o.number ? createNumberIcon(o.number) : createIcon('#f59e0b', 14)}>
               <Popup>
                 <div style={{ maxWidth: 200, fontSize: 11 }}>
-                  <div style={{ fontWeight: 700, marginBottom: 2 }}>{o.category}</div>
+                  {o.number && <div style={{ fontWeight: 800, color: '#2563eb', marginBottom: 2 }}>Observation n°{o.number}</div>}
+                  {o.category && <div style={{ fontWeight: 700, marginBottom: 2 }}>{o.category}</div>}
                   <div style={{ color: '#6b7280' }}>{o.text}</div>
                 </div>
               </Popup>

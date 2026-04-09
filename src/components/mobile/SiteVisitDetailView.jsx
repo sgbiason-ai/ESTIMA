@@ -22,12 +22,15 @@ function SectionTab({ label, active, onClick }) {
   );
 }
 
-function ObsCard({ obs, onTap, onViewImage }) {
+function ObsCard({ obs, number, onTap, onViewImage }) {
   const text = stripHtml(obs.text || '');
   const images = obs.images || [];
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-3 active:bg-gray-50 cursor-pointer" onClick={() => onTap(obs)}>
+      <div className="flex items-start gap-2.5">
+        <span className="shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-[11px] font-bold flex items-center justify-center mt-0.5">{number}</span>
+        <div className="flex-1 min-w-0">
       {text && (
         <p className="text-[13px] text-gray-700 leading-relaxed line-clamp-4 whitespace-pre-line">{text}</p>
       )}
@@ -63,6 +66,8 @@ function ObsCard({ obs, onTap, onViewImage }) {
         </div>
       )}
       {obs.date && <div className="text-[10px] text-gray-400 mt-2">{dateFr(obs.date)}</div>}
+        </div>
+      </div>
     </div>
   );
 }
@@ -153,6 +158,23 @@ export default function SiteVisitDetailView({ visit, onSave, onToast, isLandscap
     gpsTracking: localVisit.gpsTracking || { coordinates: [], startTime: null, endTime: null, distance: 0 },
   }), [localVisit]);
 
+  // ObsMarkers numérotés pour la carte
+  const obsMarkersForMap = useMemo(() => {
+    const coords = localVisit.gpsTracking?.coordinates || [];
+    return observations.map((obs, idx) => {
+      let lat = null, lng = null;
+      for (const img of (obs.images || [])) {
+        if (typeof img === 'object' && img.lat != null) { lat = img.lat; lng = img.lng; break; }
+      }
+      if (lat == null && coords.length > 0) {
+        const pos = Math.min(Math.floor((idx / Math.max(observations.length, 1)) * coords.length), coords.length - 1);
+        lat = coords[pos]?.lat; lng = coords[pos]?.lng;
+      }
+      if (lat == null) return null;
+      return { lat, lng, number: idx + 1, text: stripHtml(obs.text || '').slice(0, 80) };
+    }).filter(Boolean);
+  }, [observations, localVisit.gpsTracking]);
+
   return (
     <div className="flex flex-col h-full">
 
@@ -203,8 +225,8 @@ export default function SiteVisitDetailView({ visit, onSave, onToast, isLandscap
 
         {activeSection === 'observations' && (
           <div className="space-y-2">
-            {observations.map(obs => (
-              <ObsCard key={obs.id} obs={obs} onTap={setEditingObs} onViewImage={setViewingImage} />
+            {observations.map((obs, idx) => (
+              <ObsCard key={obs.id} obs={obs} number={idx + 1} onTap={setEditingObs} onViewImage={setViewingImage} />
             ))}
 
             <button onClick={addObservation}
@@ -229,6 +251,7 @@ export default function SiteVisitDetailView({ visit, onSave, onToast, isLandscap
             manager={manager}
             obsByCategory={{}}
             onToast={onToast}
+            externalObsMarkers={obsMarkersForMap}
           />
         </div>
       </div>
