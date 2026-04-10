@@ -103,6 +103,7 @@ const PriceAnalysisView = ({ project, companyId, setProject, bpuConfig, clientPe
         <RaoView
           project={project}
           setProject={setProject}
+          companyId={companyId}
           analysisCompanies={analysis.companies || []}
           analysisStats={analysis.stats}
           scoringConfig={analysis.scoringConfig}

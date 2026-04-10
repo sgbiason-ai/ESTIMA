@@ -1,5 +1,5 @@
 // src/components/rao/RaoUI.jsx
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 
 export const TabBtn = ({ id, active, onClick, icon: Icon, label, count }) => (
   <button
@@ -44,16 +44,23 @@ export const Input = ({ value, onChange, placeholder, className = '', type = 'te
   />
 );
 
-export const Textarea = ({ value, onChange, placeholder, rows = 4, className = '' }) => (
-  <textarea
-    value={value || ''}
-    onChange={e => onChange(e.target.value)}
-    placeholder={placeholder}
-    rows={rows}
-    className={`w-full px-4 py-3 text-sm border rounded-2xl focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all shadow-sm resize-y leading-relaxed ${
-      value ? 'bg-white border-slate-300 text-slate-800 font-medium' : 'bg-slate-50 border-slate-200 text-slate-800 placeholder:text-slate-400'} ${className}`}
-  />
-);
+export const Textarea = ({ value, onChange, placeholder, rows = 1, className = '' }) => {
+  const ref = useRef(null);
+  const resize = () => { if (!ref.current) return; ref.current.style.height = 'auto'; ref.current.style.height = ref.current.scrollHeight + 'px'; };
+  useEffect(resize, [value]);
+  return (
+    <textarea
+      ref={ref}
+      value={value || ''}
+      onChange={e => { onChange(e.target.value); resize(); }}
+      onFocus={resize}
+      placeholder={placeholder}
+      rows={rows}
+      className={`w-full px-4 py-3 text-sm border rounded-2xl focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all shadow-sm resize-none overflow-hidden leading-relaxed ${
+        value ? 'bg-white border-slate-300 text-slate-800 font-medium' : 'bg-slate-50 border-slate-200 text-slate-800 placeholder:text-slate-400'} ${className}`}
+    />
+  );
+};
 
 export const OuiNonToggle = ({ value, onChange }) => (
   <div className="flex gap-1 bg-slate-100 p-1 rounded-xl ring-1 ring-slate-200/50 shadow-inner">

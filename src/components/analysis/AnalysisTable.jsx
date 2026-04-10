@@ -97,6 +97,21 @@ const AnalysisTable = ({
     DESIGNATION: '260px', UNIT: '35px', QTY: '55px', EST_PU: '85px', EST_TOTAL: '95px', PU: '85px', TOTAL: '95px', PERCENT: '45px'
   };
 
+  // Positions sticky pour les colonnes figées (estimation MOE)
+  const STICKY = {
+    DESIG:     { position: 'sticky', left: 0, zIndex: 10 },
+    UNIT:      { position: 'sticky', left: 260, zIndex: 10 },
+    QTY:       { position: 'sticky', left: 295, zIndex: 10 },
+    EST_PU:    { position: 'sticky', left: 350, zIndex: 10 },
+    EST_TOTAL: { position: 'sticky', left: 435, zIndex: 10 },
+    // Colonnes avec z-index plus élevé pour le header/footer
+    H_DESIG:     { position: 'sticky', left: 0, zIndex: 30 },
+    H_UNIT:      { position: 'sticky', left: 260, zIndex: 30 },
+    H_QTY:       { position: 'sticky', left: 295, zIndex: 30 },
+    H_EST_PU:    { position: 'sticky', left: 350, zIndex: 30 },
+    H_EST_TOTAL: { position: 'sticky', left: 435, zIndex: 30 },
+  };
+
   const refMap = useMemo(() => {
     const map = new Map();
     let counter = 1;
@@ -156,10 +171,10 @@ const AnalysisTable = ({
 
           <thead className="sticky top-0 z-20 shadow-md">
             <tr className="bg-slate-900 text-white">
-              <th className="px-2 py-1 text-[11px] font-bold uppercase border-r border-slate-700 align-middle tracking-tight" rowSpan={2}>Désignation</th>
-              <th className="px-1 py-1 text-[10px] font-bold uppercase border-r border-slate-700 text-center align-middle" rowSpan={2}>U</th>
-              <th className="px-1 py-1 text-[10px] font-bold uppercase border-r border-slate-700 text-center align-middle" rowSpan={2}>Qté</th>
-              <th className="px-1 py-1 text-[10px] font-bold uppercase border-r border-slate-700 bg-slate-800 text-center align-middle" colSpan={2}>Estimation</th>
+              <th style={STICKY.H_DESIG} className="px-2 py-1 text-[11px] font-bold uppercase border-r border-slate-700 align-middle tracking-tight bg-slate-900" rowSpan={2}>Désignation</th>
+              <th style={STICKY.H_UNIT} className="px-1 py-1 text-[10px] font-bold uppercase border-r border-slate-700 text-center align-middle bg-slate-900" rowSpan={2}>U</th>
+              <th style={STICKY.H_QTY} className="px-1 py-1 text-[10px] font-bold uppercase border-r border-slate-700 text-center align-middle bg-slate-900" rowSpan={2}>Qté</th>
+              <th style={STICKY.H_EST_PU} className="px-1 py-1 text-[10px] font-bold uppercase border-r border-slate-700 bg-slate-800 text-center align-middle" colSpan={2}>Estimation</th>
               {companies.map((company, index) => {
                 const style = COMPANY_STYLES[index % COMPANY_STYLES.length];
                 return (
@@ -173,8 +188,8 @@ const AnalysisTable = ({
               })}
             </tr>
             <tr className="bg-slate-800 text-slate-300 border-b border-slate-600">
-              <th className="py-1 px-1 text-[9px] font-semibold border-r border-slate-700 text-center uppercase text-slate-400">P.U.</th>
-              <th className="py-1 px-1 text-[9px] font-semibold border-r border-slate-700 text-center uppercase text-white bg-slate-700/50">Total</th>
+              <th style={STICKY.H_EST_PU} className="py-1 px-1 text-[9px] font-semibold border-r border-slate-700 text-center uppercase text-slate-400 bg-slate-800">P.U.</th>
+              <th style={STICKY.H_EST_TOTAL} className="py-1 px-1 text-[9px] font-semibold border-r border-slate-700 text-center uppercase text-white bg-slate-700/50">Total</th>
               {companies.map((company, index) => {
                 const style = COMPANY_STYLES[index % COMPANY_STYLES.length];
                 return (
@@ -200,12 +215,15 @@ const AnalysisTable = ({
               return (
                 <React.Fragment key={chapter.id}>
                   <tr className="bg-slate-50 border-y border-slate-200">
-                    <td colSpan={5 + (companies.length * 3)} className="px-2 py-1.5">
+                    <td colSpan={5} style={STICKY.DESIG} className="px-2 py-1.5 bg-slate-50">
                       <div className="flex items-center gap-2">
                         <ChevronRight size={14} className="text-slate-500" />
                         <span className="text-[11px] font-bold uppercase text-slate-800 truncate">{chapter.title}</span>
                       </div>
                     </td>
+                    {companies.map((_, ci) => (
+                      <td key={ci} colSpan={3} className="bg-slate-50" />
+                    ))}
                   </tr>
 
                   {chapter.items.map((item) => {
@@ -214,15 +232,15 @@ const AnalysisTable = ({
 
                     return (
                       <tr key={item.id} className="hover:bg-slate-100 transition-colors group">
-                        <td className="px-2 py-1 border-r border-slate-100 align-middle">
+                        <td style={STICKY.DESIG} className="px-2 py-1 border-r border-slate-100 align-middle bg-white">
                           <div className="flex items-center gap-1.5 overflow-hidden">
                             <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1 rounded border border-slate-200 shrink-0 tabular-nums">{refMap.get(item.id)}</span>
                             <span className="text-[11px] font-semibold text-slate-700 uppercase truncate" title={item.designation}>{item.designation}</span>
                           </div>
                         </td>
-                        <td className="px-1 py-1 text-center border-r border-slate-100 text-[10px] font-semibold text-slate-500">{normalizeUnitSymbol(item.unit)}</td>
-                        <td className="px-1 py-1 text-center border-r border-slate-100 text-[11px] font-medium text-slate-800 bg-slate-50/50 tabular-nums">{item.activeQty}</td>
-                        <td className="px-1 py-1 text-right border-r border-slate-100 align-middle">
+                        <td style={STICKY.UNIT} className="px-1 py-1 text-center border-r border-slate-100 text-[10px] font-semibold text-slate-500 bg-white">{normalizeUnitSymbol(item.unit)}</td>
+                        <td style={STICKY.QTY} className="px-1 py-1 text-center border-r border-slate-100 text-[11px] font-medium text-slate-800 bg-slate-50 tabular-nums">{item.activeQty}</td>
+                        <td style={STICKY.EST_PU} className="px-1 py-1 text-right border-r border-slate-100 align-middle bg-white">
                           <div className="text-[11px] text-slate-500 tabular-nums tracking-tight font-medium">{formatPrice(item.price)}</div>
                           {averagesHorsOAB[item.id] && (
                             <div className="text-[9px] font-bold text-violet-600 tabular-nums mt-0.5" title={`Moyenne hors OAB (${averagesHorsOAB[item.id].count}/${averagesHorsOAB[item.id].total} offres)`}>
@@ -230,7 +248,7 @@ const AnalysisTable = ({
                             </div>
                           )}
                         </td>
-                        <td className="px-1 py-1 text-right border-r border-slate-200 text-[11px] font-bold text-slate-700 bg-slate-50/50 tabular-nums tracking-tight">{formatPrice(item.price * item.activeQty)}</td>
+                        <td style={STICKY.EST_TOTAL} className="px-1 py-1 text-right border-r border-slate-200 text-[11px] font-bold text-slate-700 bg-slate-50 tabular-nums tracking-tight shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">{formatPrice(item.price * item.activeQty)}</td>
                         
                         {companies.map((company, index) => {
                           const style = COMPANY_STYLES[index % COMPANY_STYLES.length];
@@ -273,8 +291,8 @@ const AnalysisTable = ({
                   })}
                   
                   <tr className="bg-slate-100 border-t border-slate-200 border-b">
-                    <td colSpan={4} className="px-2 py-1 text-right text-[10px] font-bold uppercase text-slate-500 tracking-tight border-r border-slate-200">Total {chapter.title}</td>
-                    <td className="px-1 py-1 text-right border-r border-slate-200 text-[11px] font-black text-slate-700 bg-slate-200/50 tabular-nums">{formatPrice(chapEstTotal)}</td>
+                    <td colSpan={4} style={STICKY.DESIG} className="px-2 py-1 text-right text-[10px] font-bold uppercase text-slate-500 tracking-tight border-r border-slate-200 bg-slate-100">Total {chapter.title}</td>
+                    <td style={STICKY.EST_TOTAL} className="px-1 py-1 text-right border-r border-slate-200 text-[11px] font-black text-slate-700 bg-slate-200/50 tabular-nums shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">{formatPrice(chapEstTotal)}</td>
                     {companies.map((company, index) => {
                       const style = COMPANY_STYLES[index % COMPANY_STYLES.length];
                       const chapCompTotal = chapter.items.reduce((acc, item) => acc + (item.activeQty * (company.offers[item.id] || 0)), 0);
@@ -312,7 +330,7 @@ const AnalysisTable = ({
           {/* --- PIED DE TABLEAU --- */}
           <tfoot className="sticky bottom-0 z-20 shadow-[0_-4px_10px_-1px_rgba(0,0,0,0.15)]">
             <tr className="bg-slate-900 text-white">
-              <td colSpan={4} className="px-2 py-2 text-right text-[11px] font-black uppercase border-r border-slate-700">
+              <td colSpan={4} style={STICKY.H_DESIG} className="px-2 py-2 text-right text-[11px] font-black uppercase border-r border-slate-700 bg-slate-900">
                 <div className="flex items-center justify-end gap-2">
                   <span>Total Général HT</span>
                   {/* AFFICHAGE DU SEUIL OAB GLOBAL */}
@@ -324,7 +342,7 @@ const AnalysisTable = ({
                   )}
                 </div>
               </td>
-              <td className="px-1 py-2 text-right border-r border-slate-700 text-xs font-black bg-slate-800 text-white tabular-nums">{formatPrice(stats.totalEstimation)}</td>
+              <td style={STICKY.H_EST_TOTAL} className="px-1 py-2 text-right border-r border-slate-700 text-xs font-black bg-slate-800 text-white tabular-nums shadow-[2px_0_4px_-2px_rgba(0,0,0,0.3)]">{formatPrice(stats.totalEstimation)}</td>
               {companies.map((company, index) => {
                 const total = stats.companiesTotals[company.id] || 0;
                 const style = COMPANY_STYLES[index % COMPANY_STYLES.length];
@@ -356,7 +374,7 @@ const AnalysisTable = ({
             </tr>
 
             <tr className="bg-amber-100 text-amber-900 border-t-2 border-slate-900">
-              <td colSpan={4} className="px-2 py-2 text-right border-r border-amber-200">
+              <td colSpan={4} style={STICKY.H_DESIG} className="px-2 py-2 text-right border-r border-amber-200 bg-amber-100">
                 <div className="flex flex-col items-end">
                   <span className="text-[11px] font-black uppercase tracking-tight">Note Prix / {scoringConfig?.maxScore || 40}</span>
                   <div className="flex items-center gap-2 text-[9px] font-mono text-amber-700 mt-0.5 opacity-80">
@@ -366,7 +384,7 @@ const AnalysisTable = ({
                   </div>
                 </div>
               </td>
-              <td className="px-1 py-2 bg-amber-200 border-r border-amber-300"></td>
+              <td style={STICKY.H_EST_TOTAL} className="px-1 py-2 bg-amber-200 border-r border-amber-300 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]"></td>
               
               {companies.map((company) => {
                 const score = stats.companyScores ? stats.companyScores[company.id] : 0;

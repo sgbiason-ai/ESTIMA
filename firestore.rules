@@ -94,8 +94,13 @@ service cloud.firestore {
           allow read, write: if isCompanyMember(companyId);
         }
 
-        // Analyse des prix (RAO) — document dédié
+        // Analyse des prix — document dédié
         match /analysis/{docId} {
+          allow read, write: if isCompanyMember(companyId);
+        }
+
+        // Rapport d'analyse des offres — document dédié
+        match /rao/{docId} {
           allow read, write: if isCompanyMember(companyId);
         }
       }

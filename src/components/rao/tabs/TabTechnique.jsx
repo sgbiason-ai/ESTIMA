@@ -1,8 +1,15 @@
 // src/components/rao/tabs/TabTechnique.jsx
-import React, { useState } from 'react';
-import { Brain, ChevronDown, Target, CheckCircle2, XCircle, MessageSquare, AlertCircle } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Brain, ChevronDown, MessageSquare, AlertCircle } from 'lucide-react';
 import { ScoreBadge } from '../RaoUI';
 import { COMPANY_UI_COLORS, FORMULA_LABELS_CONSULT } from '../RaoConstants';
+
+const AutoTextarea = ({ value, onChange, className, placeholder, rows }) => {
+  const ref = useRef(null);
+  const resize = () => { if (!ref.current) return; ref.current.style.height = 'auto'; ref.current.style.height = ref.current.scrollHeight + 'px'; };
+  useEffect(resize, [value]);
+  return <textarea ref={ref} value={value} onChange={e => { onChange(e); resize(); }} onFocus={resize} rows={rows || 1} className={`resize-none overflow-hidden ${className}`} placeholder={placeholder} />;
+};
 
 const TabTechnique = ({ 
   companyNames, companiesData, criteria, updateTechnical, 
@@ -21,6 +28,16 @@ const TabTechnique = ({
         const isOpen = openCompany === name;
 
         const totalTechScore = nonAuto.reduce((sum, crit) => {
+          const hasSubs = (crit.subCriteria || []).length > 0;
+          if (hasSubs) {
+            // Somme pondérée des sous-critères
+            return sum + crit.subCriteria.reduce((s, sc) => {
+              const sd = tech[sc.id] || {};
+              const sNote = Number(sd.note || 0);
+              const sMax = Number(sd.noteMax || 5);
+              return s + (sMax > 0 ? (sNote / sMax) * (Number(sc.weight) || 0) : 0);
+            }, 0);
+          }
           const d = tech[crit.id] || {};
           const note = Number(d.note || 0);
           const noteMax = Number(d.noteMax || 5);
@@ -129,12 +146,26 @@ const TabTechnique = ({
 
                   {nonAuto.map((crit, idx) => {
                     const d = tech[crit.id] || {};
+                    const hasSubs = (crit.subCriteria || []).length > 0;
+
+                    // Sans sous-critères : note directe
                     const note = Number(d.note || 0);
                     const noteMax = Number(d.noteMax || 5);
+
+                    // Avec sous-critères : note = somme pondérée des sous-critères
+                    const subScores = hasSubs ? crit.subCriteria.map(sc => {
+                      const sd = tech[sc.id] || {};
+                      const sNote = Number(sd.note || 0);
+                      const sMax = Number(sd.noteMax || 5);
+                      return { ...sc, note: sNote, noteMax: sMax, pts: sMax > 0 ? (sNote / sMax) * (Number(sc.weight) || 0) : 0 };
+                    }) : [];
+                    const subTotalPts = subScores.reduce((s, sc) => s + sc.pts, 0);
 
                     return (
                       <div key={crit.id} className="group/item relative">
                         <div className="flex flex-col bg-white border border-slate-200 rounded-[24px] overflow-hidden transition-all hover:border-slate-300 hover:shadow-lg">
+
+                          {/* ── Header critère ── */}
                           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 px-6 py-5 bg-slate-50/80 border-b border-slate-100">
                             <div className="flex items-center gap-4">
                               <span className="flex items-center justify-center w-8 h-8 rounded-xl bg-slate-800 text-white text-xs font-black shadow-inner">
@@ -142,81 +173,104 @@ const TabTechnique = ({
                               </span>
                               <div>
                                 <h4 className="font-extrabold text-slate-800 text-lg tracking-tight">{crit.label}</h4>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Pondération globale : {crit.weight}%</p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Pondération : {crit.weight}%</p>
                               </div>
                             </div>
-                            
-                            <div className="flex items-center gap-4 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
-                              <div className="flex flex-col items-center px-4 border-r border-slate-100">
-                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Barème local</span>
-                                <input
-                                  type="number" step={0.5} min={1} max={100}
-                                  value={noteMax}
-                                  onChange={e => updateTechnical(name, crit.id, 'noteMax', Number(e.target.value))}
-                                  className="w-16 bg-slate-50 border border-slate-200 rounded-lg py-1 text-center font-bold text-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                                />
+
+                            {hasSubs ? (
+                              /* Note calculée (somme sous-critères) */
+                              <div className="flex items-center gap-3 bg-blue-50 px-4 py-2 rounded-2xl border border-blue-200">
+                                <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest">Score critère</span>
+                                <span className="text-xl font-black text-blue-700">{subTotalPts.toFixed(2)}<span className="text-sm text-blue-400 font-normal"> /{crit.weight}</span></span>
                               </div>
-                              <div className="flex flex-col items-center px-2">
-                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Note attribuée</span>
-                                <input
-                                  type="number" step={0.5} min={0} max={noteMax}
-                                  value={note}
-                                  onChange={e => updateTechnical(name, crit.id, 'note', Number(e.target.value))}
-                                  className="w-20 bg-emerald-50 border border-emerald-200 rounded-lg py-1 text-center font-black text-emerald-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all shadow-inner"
-                                />
+                            ) : (
+                              /* Saisie directe */
+                              <div className="flex items-center gap-4 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
+                                <div className="flex flex-col items-center px-4 border-r border-slate-100">
+                                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Barème</span>
+                                  <input
+                                    type="number" step={0.5} min={1} max={100}
+                                    value={noteMax}
+                                    onChange={e => updateTechnical(name, crit.id, 'noteMax', Number(e.target.value))}
+                                    className="w-16 bg-slate-50 border border-slate-200 rounded-lg py-1 text-center font-bold text-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                                  />
+                                </div>
+                                <div className="flex flex-col items-center px-2">
+                                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Note</span>
+                                  <input
+                                    type="number" step={0.5} min={0} max={noteMax}
+                                    value={note}
+                                    onChange={e => updateTechnical(name, crit.id, 'note', Number(e.target.value))}
+                                    className="w-20 bg-emerald-50 border border-emerald-200 rounded-lg py-1 text-center font-black text-emerald-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all shadow-inner"
+                                  />
+                                </div>
+                                <div className="pl-2">
+                                  <ScoreBadge note={note} max={noteMax} weight={crit.weight} />
+                                </div>
                               </div>
-                              <div className="pl-2">
-                                <ScoreBadge note={note} max={noteMax} weight={crit.weight} />
-                              </div>
-                            </div>
+                            )}
                           </div>
 
-                          <div className="p-8">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                          <div className="p-6 space-y-4">
+                            {/* ── Sous-critères avec saisie note + synthèse ── */}
+                            {hasSubs && (
                               <div className="space-y-3">
-                                <div className="flex items-center gap-2 px-1">
-                                  <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-sm">
-                                    <CheckCircle2 size={14} />
-                                  </div>
-                                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest text-emerald-700">Points Forts / Conformité</span>
-                                </div>
-                                <textarea
-                                  value={d.pros || ''}
-                                  onChange={e => updateTechnical(name, crit.id, 'pros', e.target.value)}
-                                  placeholder="Listez les avantages techniques..."
-                                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-sm min-h-[140px] focus:bg-white focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-300 outline-none transition-all resize-none leading-relaxed text-slate-700 shadow-inner"
-                                />
+                                {subScores.map((sc, si) => {
+                                  const sd = tech[sc.id] || {};
+                                  return (
+                                    <div key={sc.id} className="bg-blue-50/40 border border-blue-100 rounded-2xl p-4 space-y-3">
+                                      {/* Header sous-critère : numéro + label + note */}
+                                      <div className="flex items-center gap-3">
+                                        <span className="text-xs font-black text-blue-600 bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-lg shrink-0">
+                                          {idx + 2}.{si + 1}
+                                        </span>
+                                        <span className="flex-1 text-sm font-bold text-slate-700">{sc.label || `Sous-critère ${idx + 2}.${si + 1}`}</span>
+                                        <span className="text-[9px] font-bold text-blue-500 uppercase shrink-0">Poids : {sc.weight || 0}%</span>
+                                        <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-xl border border-blue-200 shrink-0">
+                                          <input
+                                            type="number" step={0.5} min={0} max={sc.noteMax}
+                                            value={sc.note}
+                                            onChange={e => updateTechnical(name, sc.id, 'note', Number(e.target.value))}
+                                            className="w-12 bg-emerald-50 border border-emerald-200 rounded-lg py-0.5 text-center text-xs font-black text-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none"
+                                          />
+                                          <span className="text-[10px] text-slate-400 font-bold">/</span>
+                                          <input
+                                            type="number" step={0.5} min={1} max={100}
+                                            value={sc.noteMax}
+                                            onChange={e => updateTechnical(name, sc.id, 'noteMax', Number(e.target.value))}
+                                            className="w-12 bg-slate-50 border border-slate-200 rounded-lg py-0.5 text-center text-xs font-bold text-slate-600 focus:ring-1 focus:ring-emerald-500 outline-none"
+                                          />
+                                          <span className="text-[10px] font-black text-blue-600 ml-1">{sc.pts.toFixed(1)}pts</span>
+                                        </div>
+                                      </div>
+                                      {/* Synthèse sous-critère */}
+                                      <AutoTextarea
+                                        value={sd.text || ''}
+                                        onChange={e => updateTechnical(name, sc.id, 'text', e.target.value)}
+                                        placeholder={`Synthèse pour ${sc.label || 'ce sous-critère'}…`}
+                                        className="w-full bg-white border border-blue-100 rounded-xl px-4 py-3 text-xs font-medium text-slate-600 leading-relaxed focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all min-h-[40px]"
+                                        rows={1}
+                                      />
+                                    </div>
+                                  );
+                                })}
                               </div>
+                            )}
 
-                              <div className="space-y-3">
-                                <div className="flex items-center gap-2 px-1">
-                                  <div className="w-6 h-6 rounded-full bg-red-100 text-red-600 flex items-center justify-center shadow-sm">
-                                    <XCircle size={14} />
-                                  </div>
-                                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest text-red-700">Points Faibles / Réserves</span>
-                                </div>
-                                <textarea
-                                  value={d.cons || ''}
-                                  onChange={e => updateTechnical(name, crit.id, 'cons', e.target.value)}
-                                  placeholder="Listez les manques ou risques..."
-                                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-sm min-h-[140px] focus:bg-white focus:ring-4 focus:ring-red-500/10 focus:border-red-300 outline-none transition-all resize-none leading-relaxed text-slate-700 shadow-inner"
-                                />
-                              </div>
-                            </div>
-
-                            <div className="mt-8 pt-6 border-t border-slate-100">
-                              <div className="flex items-center justify-between mb-4 px-1">
+                            {/* ── Synthèse globale du critère ── */}
+                            <div className={hasSubs ? 'pt-3 border-t border-slate-100' : ''}>
+                              <div className="flex items-center justify-between mb-3 px-1">
                                 <label className="flex items-center gap-2 text-xs font-black text-slate-800 uppercase tracking-widest">
-                                  <MessageSquare size={16} className="text-blue-500" /> Synthèse globale pour le rapport
+                                  <MessageSquare size={16} className="text-blue-500" /> Synthèse {hasSubs ? 'du critère' : 'pour le rapport'}
                                 </label>
-                                <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold tracking-widest uppercase">Visible dans le PDF</span>
+                                <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold tracking-widest uppercase">PDF</span>
                               </div>
-                              <textarea
+                              <AutoTextarea
                                 value={d.text || ''}
                                 onChange={e => updateTechnical(name, crit.id, 'text', e.target.value)}
-                                placeholder="Rédigez ici la conclusion de votre analyse technique pour ce critère..."
-                                className="w-full bg-white border-2 border-slate-100 rounded-2xl p-6 text-sm font-medium text-slate-700 leading-relaxed shadow-sm focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all min-h-[120px]"
-                                rows={4}
+                                placeholder="Conclusion de l'analyse technique pour ce critère..."
+                                className="w-full bg-white border-2 border-slate-100 rounded-2xl p-5 text-sm font-medium text-slate-700 leading-relaxed shadow-sm focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all min-h-[40px]"
+                                rows={1}
                               />
                             </div>
                           </div>

@@ -102,13 +102,46 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
     const newId = `c${Date.now()}`;
     updateRao(r => ({
       criteria: [...(r.criteria || DEFAULT_CRITERIA), {
-        id: newId, label: 'Nouveau critère', weight: 0, auto: false, description: '',
+        id: newId, label: 'Nouveau critère', weight: 0, auto: false, description: '', subCriteria: [],
       }],
     }));
   };
 
   const removeCriterion = (id) => {
     updateRao(r => ({ criteria: (r.criteria || DEFAULT_CRITERIA).filter(c => c.id !== id) }));
+  };
+
+  const addSubCriterion = (parentId) => {
+    updateRao(r => ({
+      criteria: (r.criteria || DEFAULT_CRITERIA).map(c => {
+        if (c.id !== parentId) return c;
+        const subs = c.subCriteria || [];
+        return { ...c, subCriteria: [...subs, { id: `sc${Date.now()}`, label: '', description: '' }] };
+      }),
+    }));
+  };
+
+  const removeSubCriterion = (parentId, subId) => {
+    updateRao(r => ({
+      criteria: (r.criteria || DEFAULT_CRITERIA).map(c => {
+        if (c.id !== parentId) return c;
+        const newSubs = (c.subCriteria || []).filter(sc => sc.id !== subId);
+        const totalWeight = newSubs.reduce((s, sc) => s + (Number(sc.weight) || 0), 0);
+        return { ...c, subCriteria: newSubs, weight: newSubs.length > 0 ? totalWeight : c.weight };
+      }),
+    }));
+  };
+
+  const updateSubCriterion = (parentId, subId, field, value) => {
+    updateRao(r => ({
+      criteria: (r.criteria || DEFAULT_CRITERIA).map(c => {
+        if (c.id !== parentId) return c;
+        const newSubs = (c.subCriteria || []).map(sc => sc.id === subId ? { ...sc, [field]: value } : sc);
+        // Recalcule le weight parent = somme des sous-critères
+        const totalWeight = newSubs.reduce((s, sc) => s + (Number(sc.weight) || 0), 0);
+        return { ...c, subCriteria: newSubs, weight: totalWeight };
+      }),
+    }));
   };
 
   // ── ADMIN ─────────────────────────────────────────────────────────────────
@@ -239,29 +272,62 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
   const computeScores = () => {
     const autoCrit = criteria.find(c => c.auto);
     const priceWeight = autoCrit?.weight || 60;
-    const maxScoreAnalysis = scoringConfig?.maxScore || 40; // points max dans l'analyse financière
+    const N = Number(scoringConfig?.maxScore || 40);
+    const mode = scoringConfig?.mode || 'f1';
+
+    // Stats effectives (avec PSE si applicables)
+    const effectiveStats = raoAnalysisStats || analysisStats;
+    const companiesTotals = effectiveStats?.companiesTotals || {};
+
+    // Recalcul Pmin/Pmax/Pmoy depuis les totaux effectifs
+    const validTotals = analysisCompanies.map(c => companiesTotals[c.id] || 0).filter(t => t > 0);
+    const Pmin = validTotals.length ? Math.min(...validTotals) : 0;
+    const Pmax = validTotals.length ? Math.max(...validTotals) : 0;
+    const Pmoy = validTotals.length ? validTotals.reduce((a, b) => a + b, 0) / validTotals.length : 0;
 
     const scores = {};
     analysisCompanies.forEach((company) => {
       const name = company.name;
+      const price = companiesTotals[company.id] || 0;
 
-      // Score prix : on rebase le score de l'analyse financière sur le poids RAO
-      // Ex : si analyse donne 38.5/40 et poids RAO = 60 → 38.5/40 * 60 = 57.75
-      const rawPriceScore = analysisStats?.companyScores?.[company.id] ?? null;
-      const priceScore = rawPriceScore !== null
-        ? (rawPriceScore / maxScoreAnalysis) * priceWeight
-        : 0;
-
-      // Prix HT total depuis l'analyse
-      const price = analysisStats?.companiesTotals?.[company.id] || 0;
+      // Score prix : calculé directement avec la formule, puis rebasé sur le poids RAO
+      let rawScore = 0;
+      if (price > 0 && Pmin > 0) {
+        switch (mode) {
+          case 'f1': rawScore = N * (Pmin / price); break;
+          case 'f2': rawScore = N * Math.pow(Pmin / price, 2); break;
+          case 'f3': rawScore = N * Math.pow(Pmin / price, 3); break;
+          case 'f4': rawScore = N * (1 - (price - Pmin) / Pmin); break;
+          case 'f5': rawScore = N * (1 - (price - Pmin) / Pmoy); break;
+          case 'f6': rawScore = price <= Pmoy ? N * Math.sqrt(Pmin / price) : N * Math.pow(Pmin / price, 2); break;
+          case 'f7': rawScore = Pmax === Pmin ? N : N * (1 - (price - Pmin) / (Pmax - Pmin)); break;
+          case 'f8': rawScore = (N * Pmoy) / (Pmoy + price); break;
+          case 'f9': rawScore = N * ((2 * Pmin) / (Pmin + price)); break;
+          default:   rawScore = N * (Pmin / price);
+        }
+      }
+      const clampedScore = Math.max(0, Math.min(N, rawScore));
+      const priceScore = (clampedScore / N) * priceWeight;
 
       // Scores techniques (notes saisies dans le RAO)
       const techScores = {};
+      const techData = rao.companies?.[name]?.technical || {};
       criteria.filter(c => !c.auto).forEach(crit => {
-        const d = (rao.companies?.[name]?.technical || {})[crit.id] || {};
-        const note = Number(d.note || 0);
-        const noteMax = Number(d.noteMax || 5);
-        techScores[crit.id] = noteMax > 0 ? (note / noteMax) * crit.weight : 0;
+        const hasSubs = (crit.subCriteria || []).length > 0;
+        if (hasSubs) {
+          // Somme pondérée des sous-critères
+          techScores[crit.id] = crit.subCriteria.reduce((sum, sc) => {
+            const sd = techData[sc.id] || {};
+            const sNote = Number(sd.note || 0);
+            const sMax = Number(sd.noteMax || 5);
+            return sum + (sMax > 0 ? (sNote / sMax) * (Number(sc.weight) || 0) : 0);
+          }, 0);
+        } else {
+          const d = techData[crit.id] || {};
+          const note = Number(d.note || 0);
+          const noteMax = Number(d.noteMax || 5);
+          techScores[crit.id] = noteMax > 0 ? (note / noteMax) * crit.weight : 0;
+        }
       });
 
       const totalScore = priceScore + Object.values(techScores).reduce((a, b) => a + b, 0);
@@ -282,6 +348,7 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
     rao,
     consultation, updateConsultation,
     criteria, updateCriteria, addCriterion, removeCriterion,
+    addSubCriterion, removeSubCriterion, updateSubCriterion,
     updateAdminPiece, updateAdminField,
     updateTechnical,
     updateNegotiation,

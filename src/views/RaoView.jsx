@@ -1,9 +1,11 @@
 // src/views/RaoView.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   FileText, CheckSquare, Brain, MessageSquare, BarChart2, AlertCircle,
-  FileDown, Loader2, Users
+  FileDown, Loader2, Users, Save, CheckCircle2
 } from 'lucide-react';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db as fireDb } from '../firebase';
 import { useRao } from '../hooks/useRao';
 import { toast } from '../utils/globalUI';
 
@@ -24,12 +26,13 @@ const TABS = [
 
 import { RibbonGroup, RibbonBtnLarge } from '../components/common/RibbonParts';
 
-const RaoView = ({ 
-  project, 
-  setProject, 
-  analysisCompanies = [], 
-  analysisStats = null, 
-  scoringConfig = null, 
+const RaoView = ({
+  project,
+  setProject,
+  companyId,
+  analysisCompanies = [],
+  analysisStats = null,
+  scoringConfig = null,
   masterBranding = null,
   chaptersData = [],
   bpuRefMap = new Map(),
@@ -39,8 +42,37 @@ const RaoView = ({
 }) => {
   const [activeTab, setActiveTab] = useState('consultation');
   const [isExporting, setIsExporting] = useState(false);
+  const [lastSaved, setLastSaved] = useState(null);
 
   const rao = useRao(project, setProject, analysisCompanies, analysisStats, scoringConfig, tranches);
+
+  // ─── Persistance Firestore dédiée : projects/{id}/rao/data ────────────
+  const projectId = project?.id;
+
+  // Chargement Firestore au montage (une seule fois)
+  const loadedForRef = useRef(null);
+  useEffect(() => {
+    if (!projectId || !companyId) return;
+    if (loadedForRef.current === projectId) return;
+    loadedForRef.current = projectId;
+    const docRef = doc(fireDb, 'companies', companyId, 'projects', projectId, 'rao', 'data');
+    getDoc(docRef).then(snap => {
+      if (snap.exists() && snap.data().rao) {
+        setProject(prev => ({ ...prev, rao: snap.data().rao }));
+      }
+    }).catch(e => console.error('[RAO] Erreur chargement:', e));
+  }, [projectId, companyId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sauvegarde manuelle uniquement (pas d'auto-save)
+  const saveRaoToFirestore = useCallback(() => {
+    if (!projectId || !companyId) return;
+    const docRef = doc(fireDb, 'companies', companyId, 'projects', projectId, 'rao', 'data');
+    const payload = { rao: project?.rao || {}, lastSaved: new Date().toISOString() };
+    setDoc(docRef, payload)
+      .then(() => { setLastSaved(new Date()); toast.success('Rapport RAO sauvegardé.'); })
+      .catch(e => { console.error('[RAO] Erreur sauvegarde:', e); toast.error('Erreur de sauvegarde.'); });
+  }, [projectId, companyId, project?.rao]);
+
   const ranking = rao.getRanking();
   const companyNames = analysisCompanies.map(c => c.name);
 
@@ -139,6 +171,17 @@ const RaoView = ({
           {/* Spacer */}
           <div className="flex-1 min-w-[16px]" />
 
+          {/* Sauvegarde */}
+          <RibbonGroup label="Sauvegarde">
+            <RibbonBtnLarge
+              icon={lastSaved ? CheckCircle2 : Save}
+              label={lastSaved ? 'Sauvegardé' : 'Sauvegarder'}
+              onClick={saveRaoToFirestore}
+              accent={lastSaved ? 'text-emerald-500' : 'text-blue-500'}
+              title="Sauvegarder le rapport dans Firestore"
+            />
+          </RibbonGroup>
+
           {/* Export */}
           <RibbonGroup label="Export" noBorder>
             <RibbonBtnLarge
@@ -156,7 +199,7 @@ const RaoView = ({
       <div className="flex-1 overflow-y-auto p-6 relative">
         <div>
           {activeTab === 'consultation' && (
-            <TabConsultation consultation={rao.consultation} updateConsultation={rao.updateConsultation} criteria={rao.criteria} updateCriteria={rao.updateCriteria} addCriterion={rao.addCriterion} removeCriterion={rao.removeCriterion} scoringConfig={scoringConfig} hasTranches={rao.hasTranches} tranches={rao.tranches} raoTrancheId={rao.raoTrancheId} setRaoTrancheId={rao.setRaoTrancheId} />
+            <TabConsultation consultation={rao.consultation} updateConsultation={rao.updateConsultation} criteria={rao.criteria} updateCriteria={rao.updateCriteria} addCriterion={rao.addCriterion} removeCriterion={rao.removeCriterion} addSubCriterion={rao.addSubCriterion} removeSubCriterion={rao.removeSubCriterion} updateSubCriterion={rao.updateSubCriterion} scoringConfig={scoringConfig} hasTranches={rao.hasTranches} tranches={rao.tranches} raoTrancheId={rao.raoTrancheId} setRaoTrancheId={rao.setRaoTrancheId} />
           )}
           {activeTab === 'admin' && (
             <TabAdministrative companyNames={companyNames} companiesData={project?.rao?.companies || {}} updateAdminPiece={rao.updateAdminPiece} updateAdminField={rao.updateAdminField} />
