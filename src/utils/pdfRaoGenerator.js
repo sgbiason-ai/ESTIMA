@@ -1,24 +1,35 @@
 // src/utils/pdfRaoGenerator.js
 // Génère le PDF du Rapport d'Analyse des Offres (RAO)
 // INCLUT l'Analyse Financière (Synthèse A4 + Détails A3) avec codes couleurs par entreprise
+// Style : Vert Papyrus — typographie H1 14pt / H2 12pt / body 9pt — marges 15mm
 
 import { DEFAULT_CRITERIA, DEFAULT_ADMIN_PIECES, DEFAULT_OFFER_PIECES } from '../hooks/useRao';
 import { normalizeUnitSymbol } from './helpers';
+import { loadImage, formatNumberFr, cleanText } from './pdf/pdfSharedHelpers';
+import { buildTheme as _buildTheme } from './pdf/buildTheme';
 
-// ─── THÈME ET HELPERS ────────────────────────────────────────────────────────
-const DEFAULT_THEME = {
-  primary:   [40, 110, 85],
-  secondary: [245, 250, 248],
-  accent:    [50, 180, 130],
-  text:      [40, 40, 40],
-  lightText: [100, 116, 139],
-  borders:   [220, 235, 230],
-  white:     [255, 255, 255],
-  yes:       [40, 167, 69],
-  no:        [220, 53, 69],
+// ─── COULEUR PRIMAIRE RAO : VERT PAPYRUS ────────────────────────────────────
+const VERT_PAPYRUS = [45, 138, 78];   // #2d8a4e
+const VERT_CLAIR   = [232, 245, 233]; // fond léger
+const VERT_FONCE   = [30, 100, 55];   // texte foncé
+
+const RAO_OVERRIDES = {
+  primary: VERT_PAPYRUS,
+  accent:  VERT_PAPYRUS,
+  yes: [40, 167, 69],
+  no:  [220, 53, 69],
+};
+const RAO_DEFAULTS = {
+  tableAlt: [245, 250, 247],
 };
 
-// Les mêmes couleurs que dans l'Analyse Financière
+const buildTheme = (branding) => {
+  const base = _buildTheme(branding, RAO_OVERRIDES, RAO_DEFAULTS);
+  // Forcer la couleur primaire RAO vert papyrus (indépendant du branding)
+  return { ...base, primary: VERT_PAPYRUS, accent: VERT_PAPYRUS };
+};
+
+// Couleurs entreprises
 const COMPANY_COLORS = [
   { header: [30, 58, 138],  body: [239, 246, 255], text: [30, 58, 138] },
   { header: [6, 78, 59],    body: [236, 253, 245], text: [6, 78, 59] },
@@ -27,53 +38,17 @@ const COMPANY_COLORS = [
   { header: [131, 24, 67],  body: [255, 241, 242], text: [131, 24, 67] },
   { header: [22, 78, 99],   body: [236, 254, 255], text: [22, 78, 99] },
 ];
-
 const getCompanyStyle = (index) => COMPANY_COLORS[index % COMPANY_COLORS.length];
 
-const hexToRgbArray = (hex) => {
-  if (!hex || typeof hex !== 'string') return null;
-  const clean = hex.replace('#', '');
-  if (clean.length !== 6) return null;
-  return [
-    parseInt(clean.substring(0, 2), 16),
-    parseInt(clean.substring(2, 4), 16),
-    parseInt(clean.substring(4, 6), 16),
-  ];
-};
-
-const buildTheme = (branding) => {
-  if (!branding?.colors) return { ...DEFAULT_THEME, tableAlt: [245, 250, 247] };
-
-  const primary   = hexToRgbArray(branding.colors.primary)   || DEFAULT_THEME.primary;
-  const secondary = hexToRgbArray(branding.colors.secondary) || DEFAULT_THEME.accent;
-  const text      = hexToRgbArray(branding.colors.text)      || DEFAULT_THEME.text;
-  const lightText = hexToRgbArray(branding.colors.subtle)    || DEFAULT_THEME.lightText;
-
-  const lighten = (c) => Math.round(c + (255 - c) * 0.96); 
-  const tableAlt = primary.map(lighten);
-  const borders = primary.map(c => Math.round(c + (255 - c) * 0.80));
-
-  return {
-    primary, accent: secondary, text, lightText, borders, tableAlt,
-    secondary: tableAlt, 
-    white: DEFAULT_THEME.white, yes: DEFAULT_THEME.yes, no: DEFAULT_THEME.no,
-  };
-};
-
-const fmt = (n) => typeof n === 'number'
-  ? n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/[\s\u202F\u00A0]/g, ' ')
-  : (n || '—');
-
-const fmtScore = (n) => typeof n === 'number' ? n.toFixed(2) : '—';
-
-const formatNumberFr = (value) => {
-  if (value === undefined || value === null || value === '' || isNaN(Number(value))) return '-';
-  const num = Number(value);
-  const fixed = num.toFixed(2);
+// ─── HELPERS FORMATAGE ──────────────────────────────────────────────────────
+const fmt = (n) => {
+  if (typeof n !== 'number') return n || '—';
+  const fixed = n.toFixed(2);
   const parts = fixed.split('.');
   parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   return parts.join(',');
 };
+const fmtScore = (n) => typeof n === 'number' ? n.toFixed(2) : '—';
 
 const calculateOABThreshold = (values) => {
   const validValues = values.filter(v => v > 0);
@@ -99,20 +74,34 @@ const getHeatmapStyle = (value, reference) => {
   return null;
 };
 
-const cleanText = (str) => typeof str === 'string' ? str.replace(/[\r\n]+/g, ' ').trim() : '';
-
-const loadLogoFromSource = (source) => {
-  return new Promise((resolve) => {
-    if (!source) return resolve(null);
-    const img = new Image();
-    img.src = source;
-    if (!source.startsWith('data:')) img.crossOrigin = 'Anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = () => resolve(null);
-  });
+// ─── HELPERS VISUELS ────────────────────────────────────────────────────────
+// Barre de score CARRÉE (pas arrondie)
+const drawScoreBar = (doc, x, y, w, h, score, maxScore, color) => {
+  if (maxScore <= 0) return;
+  const pct = Math.min(1, Math.max(0, score / maxScore));
+  // Fond gris
+  doc.setFillColor(235, 235, 240);
+  doc.rect(x, y, w, h, 'F');
+  // Barre colorée
+  if (pct > 0.01) {
+    doc.setFillColor(...color);
+    doc.rect(x, y, Math.max(2, w * pct), h, 'F');
+  }
+  // Texte centré dans la barre
+  const fs = h > 5 ? 7 : 5.5;
+  doc.setFontSize(fs);
+  doc.setFont('Helvetica', 'bold');
+  const textY = y + h / 2 + fs * 0.13;
+  const textX = pct > 0.15 ? x + (w * pct) / 2 : x + w * pct + 4;
+  doc.setTextColor(pct > 0.4 ? 255 : 60, pct > 0.4 ? 255 : 60, pct > 0.4 ? 255 : 60);
+  doc.text(fmtScore(score), textX, textY, { align: 'center' });
+  doc.setTextColor(0, 0, 0);
 };
 
-// ─── PAGE DE GARDE ──────────────────────────────────────────────────────────
+// ─── CONSTANTES LAYOUT ─────────────────────────────────────────────────────
+const M = 15; // marge standard 15mm
+
+// ─── PAGE DE GARDE (inchangée, utilise THEME) ──────────────────────────────
 const drawCoverPage = (doc, project, consultation, logoMoe, logoClient, today, branding, THEME) => {
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
@@ -238,7 +227,7 @@ const drawCoverPage = (doc, project, consultation, logoMoe, logoClient, today, b
   doc.setFontSize(8); doc.setTextColor(...THEME.lightText); doc.setFont("Helvetica", "bold");
   doc.text("DATE LIMITE REMISE", col1X, b2CurrentY);
   doc.setFontSize(10); doc.setTextColor(...THEME.text); doc.setFont("Helvetica", "normal");
-  
+
   let remiseStr = '—';
   if (consultation?.dateRemise) {
       try {
@@ -327,57 +316,63 @@ const drawCoverPage = (doc, project, consultation, logoMoe, logoClient, today, b
   }
 };
 
-// ── EN-TÊTES ET PIEDS DE PAGES ─────────────────────────────────────────────
+// ── EN-TÊTE : bande verte pleine + titre blanc ────────────────────────────
 const drawHeader = (doc, title, consultation, project, THEME, logoMoe) => {
   const W = doc.internal.pageSize.getWidth();
-  
+
+  // Bande latérale verte
   doc.setFillColor(...THEME.primary);
   doc.rect(0, 0, 6, doc.internal.pageSize.getHeight(), 'F');
 
+  // Bandeau header : fond vert plein avec texte blanc
+  doc.setFillColor(...THEME.primary);
+  doc.rect(0, 0, W, 22, 'F');
+
   if (logoMoe) {
-    const maxW = 35; const maxH = 15;
+    const maxW = 30; const maxH = 12;
     const ratio = logoMoe.width / logoMoe.height;
     let w = maxW; let h = w / ratio;
     if (h > maxH) { h = maxH; w = h * ratio; }
-    doc.addImage(logoMoe, 'JPEG', W - 15 - w, 8, w, h);
+    doc.addImage(logoMoe, 'JPEG', W - M - w, 5, w, h);
   }
 
-  doc.setTextColor(...THEME.text);
+  doc.setTextColor(255, 255, 255);
   doc.setFont('Helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.text(title.toUpperCase(), 15, 14);
-  
-  doc.setTextColor(...THEME.lightText);
-  doc.setFontSize(8);
-  doc.text((consultation?.objet || project?.name || '').toUpperCase(), 15, 20);
+  doc.setFontSize(12); // H2
+  doc.text(title.toUpperCase(), M, 10);
 
-  doc.setDrawColor(...THEME.borders);
-  doc.setLineWidth(0.5);
-  doc.line(15, 25, W - 15, 25);
+  doc.setFont('Helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.text((consultation?.objet || project?.name || '').toUpperCase(), M, 17);
 };
 
+// ── PIED DE PAGE : Réf + Date + Page ──────────────────────────────────────
 const drawFooter = (doc, pageNum, consultation, project, THEME) => {
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
-  doc.setDrawColor(...THEME.borders);
-  doc.setLineWidth(0.3);
-  doc.line(15, H - 15, W - 15, H - 15);
+  doc.setDrawColor(...THEME.primary);
+  doc.setLineWidth(0.4);
+  doc.line(M, H - 15, W - M, H - 15);
   doc.setFontSize(7);
   doc.setFont('Helvetica', 'normal');
   doc.setTextColor(...THEME.lightText);
-  doc.text(consultation?.ref || project?.code || '', 15, H - 8);
-  doc.text(`Page ${pageNum}`, W - 15, H - 8, { align: 'right' });
+  doc.text(consultation?.ref || project?.code || '', M, H - 9);
+  const today = new Date().toLocaleDateString('fr-FR');
+  doc.text(`Édité le ${today}`, W / 2, H - 9, { align: 'center' });
+  doc.text(`Page ${pageNum}`, W - M, H - 9, { align: 'right' });
 };
 
-// ── TITRE DE SECTION (A été modifié pour accepter une couleur dynamique) ──
+// ── TITRE DE SECTION : fond vert plein + texte blanc ──────────────────────
 const sectionTitle = (doc, text, y, colorArr) => {
-  doc.setFillColor(...colorArr);
-  doc.rect(15, y - 4, 3, 8, 'F');
+  const W = doc.internal.pageSize.getWidth();
+  doc.setFillColor(...(colorArr || VERT_PAPYRUS));
+  doc.rect(M, y - 4, W - 2 * M, 10, 'F');
   doc.setFont('Helvetica', 'bold');
   doc.setFontSize(11);
-  doc.setTextColor(...colorArr);
-  doc.text(text, 22, y + 2);
-  return y + 10;
+  doc.setTextColor(255, 255, 255);
+  doc.text(text, M + 4, y + 3);
+  doc.setTextColor(0, 0, 0);
+  return y + 14;
 };
 
 // ── GÉNÉRATION PRINCIPALE DU RAO ───────────────────────────────────────────
@@ -391,70 +386,86 @@ export const generateRaoPDF = async (optionsParams) => {
   const { default: autoTable } = await import('jspdf-autotable');
 
   const THEME = buildTheme(branding);
-  
-  const logoMoe = await loadLogoFromSource(branding?.logo || '/logo.jpg'); 
-  const logoClient = await loadLogoFromSource(project?.clientLogo);
+
+  const logoMoe = await loadImage(branding?.logo || '/logo.jpg');
+  const logoClient = await loadImage(project?.clientLogo);
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const companiesData = rao.companies || {};
   const companyNames = analysisCompanies.map(c => c.name);
   const today = new Date().toLocaleDateString('fr-FR');
+  const W = doc.internal.pageSize.getWidth();
   let pageNum = 1;
+
+  // Tracking des sections pour le sommaire (on enregistre la page de début)
+  const tocEntries = [];
 
   const addPage = (sectionTitle_, format = 'a4', orientation = 'portrait') => {
     doc.addPage(format, orientation);
     pageNum++;
     drawHeader(doc, sectionTitle_, consultation, project, THEME, logoMoe);
     drawFooter(doc, pageNum, consultation, project, THEME);
-    return format === 'a3' ? 28 : 35;
+    return 30; // espace après header standardisé
   };
 
   // ── PAGE 1 : COUVERTURE ──
   drawCoverPage(doc, project, consultation, logoMoe, logoClient, today, branding, THEME);
 
-  // ── PAGE 2 : OBJET + CRITÈRES ──
+  // ── PAGE 2 : SOMMAIRE ──
+  // On insère une page placeholder pour le sommaire — on la remplira à la fin
+  const sommairePage = pageNum + 1;
+  doc.addPage('a4', 'portrait');
+  pageNum++;
+  drawHeader(doc, 'Sommaire', consultation, project, THEME, logoMoe);
+  drawFooter(doc, pageNum, consultation, project, THEME);
+  // On garde la référence de cette page pour la remplir plus tard
+  const sommairePageIndex = doc.internal.getNumberOfPages();
+
+  // ── PAGE 3 : OBJET + CRITÈRES ──
   let y = addPage('Critères de notation', 'a4', 'portrait');
+  tocEntries.push({ label: '1. Objet de la consultation', page: pageNum });
   y = sectionTitle(doc, '1  Objet de la consultation', y, THEME.primary);
 
   doc.setFont('Helvetica', 'bold');
-  doc.setFontSize(10);
+  doc.setFontSize(9); // body
   doc.setTextColor(...THEME.text);
-  doc.text('Objet des travaux', 15, y + 4);
-  y += 10;
-  doc.setFont('Helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(...THEME.lightText);
-  const W = doc.internal.pageSize.getWidth();
-  const objLines = doc.splitTextToSize(consultation?.objet || project?.name || '—', W - 30);
-  doc.text(objLines, 15, y);
-  y += objLines.length * 5 + 4;
-
-  doc.setFont('Helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(...THEME.text);
-  doc.text('Lieu d\'exécution :', 15, y);
-  doc.setFont('Helvetica', 'normal');
-  doc.setTextColor(...THEME.lightText);
-  doc.text(consultation?.lieu || '—', 60, y);
+  doc.text('Objet des travaux', M, y + 2);
   y += 6;
+  doc.setFont('Helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(...THEME.lightText);
+  const objLines = doc.splitTextToSize(consultation?.objet || project?.name || '—', W - 2 * M);
+  doc.text(objLines, M, y);
+  y += objLines.length * 4.5 + 4;
+
+  doc.setFont('Helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(...THEME.text);
+  doc.text('Lieu d\'exécution :', M, y);
+  doc.setFont('Helvetica', 'normal');
+  doc.setTextColor(...THEME.lightText);
+  doc.text(consultation?.lieu || '—', 55, y);
+  y += 5;
 
   doc.setFont('Helvetica', 'bold');
   doc.setTextColor(...THEME.text);
-  doc.text('Procédure :', 15, y);
+  doc.text('Procédure :', M, y);
   doc.setFont('Helvetica', 'normal');
   doc.setTextColor(...THEME.lightText);
-  doc.text(consultation?.procedure || '—', 60, y);
-  y += 14;
+  doc.text(consultation?.procedure || '—', 55, y);
+  y += 10;
 
+  // Section 2 : Remise des dossiers
+  tocEntries.push({ label: '2. Remise des dossiers de réponse', page: pageNum });
   y = sectionTitle(doc, '2  Remise des dossiers de réponse', y, THEME.primary);
   doc.setFont('Helvetica', 'normal');
   doc.setFontSize(9);
   doc.setTextColor(...THEME.lightText);
-  doc.text('Date et heure limites de réception des offres :', 15, y + 4);
+  doc.text('Date et heure limites de réception des offres :', M, y + 2);
   doc.setFont('Helvetica', 'bold');
   doc.setFontSize(10);
   doc.setTextColor(...THEME.text);
-  
+
   let remiseStr = '—';
   if (consultation?.dateRemise) {
       try {
@@ -464,140 +475,176 @@ export const generateRaoPDF = async (optionsParams) => {
           if (consultation.timeRemise) remiseStr += ` à ${consultation.timeRemise}`;
       } catch(e) {}
   }
-  doc.text(remiseStr, W / 2, y + 12, { align: 'center' });
-  y += 22;
+  doc.text(remiseStr, W / 2, y + 10, { align: 'center' });
+  y += 18;
 
   if (consultation?.dateNego) {
+    tocEntries.push({ label: '3. Phase de Négociations', page: pageNum });
     y = sectionTitle(doc, '3  Phase de Négociations', y, THEME.primary);
     doc.setFont('Helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(...THEME.lightText);
-    doc.text('Date et heure limites de réception des offres après négociation :', 15, y + 4);
+    doc.text('Date et heure limites de réception des offres après négociation :', M, y + 2);
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(...THEME.text);
-    doc.text(consultation.dateNego, W / 2, y + 12, { align: 'center' });
-    y += 22;
+    doc.text(consultation.dateNego, W / 2, y + 10, { align: 'center' });
+    y += 18;
   }
 
+  // Section 4 : Critères de notation
+  tocEntries.push({ label: '4. Rappel des critères de notation', page: pageNum });
   y = sectionTitle(doc, '4  Rappel des critères de notation', y, THEME.primary);
+  const criteriaBody = [];
+  criteria.forEach((c, i) => {
+    const hasSubs = (c.subCriteria || []).length > 0;
+    const weight = c.auto ? (scoringConfig?.maxScore || c.weight) : (hasSubs ? c.subCriteria.reduce((s, sc) => s + (Number(sc.weight) || 0), 0) : c.weight);
+    criteriaBody.push([
+      { content: `Critère ${i + 1}`, styles: { fontStyle: 'bold' } },
+      { content: c.label + (!hasSubs && c.description ? '\n' + c.description : ''), styles: { fontStyle: 'bold' } },
+      { content: weight + '%', styles: { fontStyle: 'bold' } },
+    ]);
+    if (hasSubs) {
+      c.subCriteria.forEach((sc, si) => {
+        criteriaBody.push([
+          { content: `  ${i + 1}.${si + 1}`, styles: { textColor: [100, 100, 100] } },
+          { content: sc.label + (sc.description ? '\n' + sc.description : ''), styles: { textColor: [80, 80, 80], fontSize: 7 } },
+          { content: (sc.weight || 0) + '%', styles: { textColor: [100, 100, 100] } },
+        ]);
+      });
+    }
+  });
   autoTable(doc, {
     startY: y,
     head: [['Critère', 'Intitulé', 'Pondération']],
-    body: criteria.map((c, i) => [
-      `Critère ${i + 1}`,
-      c.label + (c.description ? '\n' + c.description : ''),
-      c.weight + '%',
-    ]),
-    styles: { font: 'Helvetica', fontSize: 8, cellPadding: 4 },
-    headStyles: { fillColor: THEME.primary, textColor: THEME.white, fontStyle: 'bold' },
+    body: criteriaBody,
+    styles: { font: 'Helvetica', fontSize: 8, cellPadding: 3 },
+    headStyles: { fillColor: THEME.primary, textColor: [255, 255, 255], fontStyle: 'bold' },
     columnStyles: { 0: { cellWidth: 22 }, 2: { cellWidth: 22, halign: 'center' } },
     alternateRowStyles: { fillColor: THEME.tableAlt },
-    margin: { left: 15, right: 15 },
+    margin: { left: M, right: M },
     didDrawPage: () => drawFooter(doc, pageNum, consultation, project, THEME),
   });
-  y = doc.lastAutoTable.finalY + 14;
+  y = doc.lastAutoTable.finalY + 10;
 
   // ── PAGE : RÉPONSES REÇUES ──
   y = addPage('Réponses reçues', 'a4', 'portrait');
+  tocEntries.push({ label: '5. Réponses reçues', page: pageNum });
   y = sectionTitle(doc, '5  Réponses reçues', y, THEME.primary);
+
+  // Calculer la position X alignée pour toutes les pastilles (après le nom le plus long)
+  doc.setFont('Helvetica', 'bold');
+  doc.setFontSize(9);
+  const maxNameW = Math.max(...companyNames.map(n => doc.getTextWidth(`-  ${n}`)));
+  const pastilleAlignX = 25 + maxNameW + 6;
+
   companyNames.forEach((name, idx) => {
     const cStyle = getCompanyStyle(idx);
+    const admin = companiesData[name]?.admin || {};
+    const concl = admin.conclusion || 'reguliere';
+    const conclLabels = { reguliere: 'RÉGULIÈRE', irreguliere: 'IRRÉGULIÈRE', inacceptable: 'INACCEPTABLE', inappropriee: 'INAPPROPRIÉE' };
+    const conclColors = { reguliere: THEME.yes, irreguliere: [255, 140, 0], inacceptable: THEME.no, inappropriee: THEME.no };
+
     doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(...cStyle.header); // Couleur de l'entreprise
+    doc.setFontSize(9);
+    doc.setTextColor(...cStyle.header);
     doc.text(`-  ${name}`, 25, y + 4);
+
+    // Pastille conclusion — alignée verticalement
+    const conclText = conclLabels[concl] || 'RÉGULIÈRE';
+    const conclW = doc.getTextWidth(conclText) + 6;
+    doc.setFillColor(...(conclColors[concl] || THEME.yes));
+    doc.roundedRect(pastilleAlignX, y, conclW, 6, 1.5, 1.5, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(6);
+    doc.text(conclText, pastilleAlignX + conclW / 2, y + 4.2, { align: 'center' });
+
+    // Membres groupement
+    if (admin.isGroupement && admin.groupementMembers?.length > 0) {
+      y += 7;
+      admin.groupementMembers.forEach(m => {
+        doc.setFont('Helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(...THEME.lightText);
+        doc.text(`     ${m.role || 'Cotraitant'} : ${m.name || '—'}`, 30, y + 3);
+        y += 5;
+      });
+    }
     y += 8;
   });
 
-  // ── ANALYSE ADMINISTRATIVE ──
-  companyNames.forEach((name, idx) => {
-    const cStyle = getCompanyStyle(idx);
-    y = addPage(`Analyse administrative — ${name}`, 'a4', 'portrait');
-    y = sectionTitle(doc, `ENTREPRISE : ${name}`, y, cStyle.header); // Titre couleur entreprise
+  // ── ANALYSE ADMINISTRATIVE — Tableau comparatif unique ──
+  {
+    y = addPage('Analyse administrative', 'a4', 'portrait');
+    tocEntries.push({ label: '6. Analyse administrative', page: pageNum });
+    y = sectionTitle(doc, '6  ANALYSE ADMINISTRATIVE — PIÈCES DE CANDIDATURE', y, THEME.primary);
 
-    const admin = companiesData[name]?.admin || {};
-    const pieces = admin.pieces || {};
+    const conclLabelsA = { reguliere: 'RÉGULIÈRE', irreguliere: 'IRRÉGULIÈRE', inacceptable: 'INACCEPTABLE', inappropriee: 'INAPPROPRIÉE' };
+    const conclColorsA = { reguliere: THEME.yes, irreguliere: [255, 140, 0], inacceptable: THEME.no, inappropriee: THEME.no };
 
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(...cStyle.header);
-    doc.text('PIÈCES ADMINISTRATIVES', 15, y + 4);
-    y += 10;
+    const adminHead = ['Pièce', ...companyNames];
+    const colW = Math.max(14, Math.min(22, (W - 2 * M - 55) / companyNames.length));
+
+    const adminBody = [];
+    adminBody.push([{ content: 'PIÈCES ADMINISTRATIVES', colSpan: adminHead.length, styles: { fillColor: THEME.primary, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7 } }]);
+    DEFAULT_ADMIN_PIECES.forEach(p => {
+      adminBody.push([p.label, ...companyNames.map(name => {
+        const pieces = companiesData[name]?.admin?.pieces || {};
+        return pieces[p.id] === false ? 'NON' : 'OUI';
+      })]);
+    });
+    adminBody.push([{ content: 'OFFRE DE L\'ENTREPRISE', colSpan: adminHead.length, styles: { fillColor: THEME.primary, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7 } }]);
+    DEFAULT_OFFER_PIECES.forEach(p => {
+      adminBody.push([p.label, ...companyNames.map(name => {
+        const pieces = companiesData[name]?.admin?.pieces || {};
+        return pieces[p.id] === false ? 'NON' : 'OUI';
+      })]);
+    });
+    // Ligne conclusion
+    adminBody.push([{ content: 'CONCLUSION', styles: { fontStyle: 'bold' } }, ...companyNames.map(name => {
+      const concl = companiesData[name]?.admin?.conclusion || 'reguliere';
+      return conclLabelsA[concl] || 'RÉGULIÈRE';
+    })]);
+
+    const compColStyles = {};
+    companyNames.forEach((_, ci) => { compColStyles[ci + 1] = { cellWidth: colW, halign: 'center', fontSize: 7 }; });
+
     autoTable(doc, {
       startY: y,
-      head: [['Pièce', 'Fourni']],
-      body: DEFAULT_ADMIN_PIECES.map(p => [p.label, pieces[p.id] === false ? 'NON' : 'OUI']),
-      styles: { font: 'Helvetica', fontSize: 7.5, cellPadding: 3 },
-      headStyles: { fillColor: cStyle.header, textColor: THEME.white }, // En-tête couleur entreprise
-      columnStyles: { 1: { cellWidth: 18, halign: 'center' } },
+      head: [adminHead],
+      body: adminBody,
+      styles: { font: 'Helvetica', fontSize: 7, cellPadding: 2.5 },
+      headStyles: { fillColor: THEME.primary, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 6.5 },
+      columnStyles: { 0: { cellWidth: 60, fontSize: 7 }, ...compColStyles },
+      alternateRowStyles: { fillColor: THEME.tableAlt },
       didParseCell: (data) => {
-        if (data.column.index === 1) {
-          data.cell.styles.textColor = data.cell.raw === 'NON' ? THEME.no : THEME.yes;
-          data.cell.styles.fontStyle = 'bold';
+        if (data.section === 'body' && data.column.index > 0) {
+          if (data.cell.raw === 'OUI') { data.cell.styles.textColor = THEME.yes; data.cell.styles.fontStyle = 'bold'; }
+          else if (data.cell.raw === 'NON') { data.cell.styles.textColor = THEME.no; data.cell.styles.fontStyle = 'bold'; }
+          const conclVals = Object.values(conclLabelsA);
+          if (conclVals.includes(data.cell.raw)) {
+            const conclKey = Object.keys(conclLabelsA).find(k => conclLabelsA[k] === data.cell.raw) || 'reguliere';
+            data.cell.styles.textColor = conclColorsA[conclKey] || THEME.yes;
+            data.cell.styles.fontStyle = 'bold';
+            data.cell.styles.fontSize = 6;
+          }
+        }
+        if (data.section === 'head' && data.column.index > 0) {
+          const cStyle = getCompanyStyle(data.column.index - 1);
+          data.cell.styles.fillColor = cStyle.header;
         }
       },
-      margin: { left: 15, right: 15 },
+      margin: { left: M, right: M },
       didDrawPage: () => drawFooter(doc, pageNum, consultation, project, THEME),
     });
     y = doc.lastAutoTable.finalY + 6;
-
-    if (admin.obsAdmin) {
-      doc.setFont('Helvetica', 'italic');
-      doc.setFontSize(8);
-      doc.setTextColor(...THEME.lightText);
-      const obsLines = doc.splitTextToSize(`Observations : ${admin.obsAdmin}`, W - 30);
-      doc.text(obsLines, 15, y);
-      y += obsLines.length * 4.5 + 4;
-    }
-
-    const concl = admin.conclusion || 'reguliere';
-    const conclLabels = { reguliere: 'OFFRE RÉGULIÈRE', irreguliere: 'OFFRE IRRÉGULIÈRE', inacceptable: 'OFFRE INACCEPTABLE', inappropriee: 'OFFRE INAPPROPRIÉE' };
-    const conclColors = { reguliere: THEME.yes, irreguliere: THEME.no, inacceptable: THEME.no, inappropriee: THEME.no };
-    doc.setFillColor(...(conclColors[concl] || THEME.yes));
-    doc.roundedRect(15, y, 80, 10, 2, 2, 'F');
-    doc.setTextColor(...THEME.white);
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.text(conclLabels[concl] || concl.toUpperCase(), 55, y + 7, { align: 'center' });
-    y += 16;
-
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(...cStyle.header);
-    doc.text('OFFRE DE L\'ENTREPRISE', 15, y);
-    y += 6;
-    autoTable(doc, {
-      startY: y,
-      head: [['Pièce', 'Fourni']],
-      body: DEFAULT_OFFER_PIECES.map(p => [p.label, pieces[p.id] === false ? 'NON' : 'OUI']),
-      styles: { font: 'Helvetica', fontSize: 7.5, cellPadding: 3 },
-      headStyles: { fillColor: cStyle.header, textColor: THEME.white }, // En-tête couleur entreprise
-      columnStyles: { 1: { cellWidth: 18, halign: 'center' } },
-      didParseCell: (data) => {
-        if (data.column.index === 1) {
-          data.cell.styles.textColor = data.cell.raw === 'NON' ? THEME.no : THEME.yes;
-          data.cell.styles.fontStyle = 'bold';
-        }
-      },
-      margin: { left: 15, right: 15 },
-      didDrawPage: () => drawFooter(doc, pageNum, consultation, project, THEME),
-    });
-    y = doc.lastAutoTable.finalY + 6;
-
-    if (admin.obsOffre) {
-      doc.setFont('Helvetica', 'italic');
-      doc.setFontSize(8);
-      doc.setTextColor(...THEME.lightText);
-      const obsLines = doc.splitTextToSize(`Observations : ${admin.obsOffre}`, W - 30);
-      doc.text(obsLines, 15, y);
-    }
-  });
+  }
 
   // ── ANALYSE FINANCIÈRE ──
   if (analysisStats && analysisCompanies.length > 0) {
     y = addPage('Analyse financière — Synthèse', 'a4', 'portrait');
-    y = sectionTitle(doc, `SYNTHÈSE DE L'ANALYSE FINANCIÈRE`, y, THEME.primary);
+    tocEntries.push({ label: '7. Synthèse de l\'analyse financière', page: pageNum });
+    y = sectionTitle(doc, `7  SYNTHÈSE DE L'ANALYSE FINANCIÈRE`, y, THEME.primary);
 
     const maxScore = Number(scoringConfig?.maxScore || 40);
     const grandTotalBase = analysisStats.totalEstimation || 0;
@@ -611,34 +658,57 @@ export const generateRaoPDF = async (optionsParams) => {
     summaryData.sort((a, b) => b.score - a.score);
 
     const summaryBody = summaryData.map((d, index) => {
-      // Retrouver l'index d'origine pour la couleur
       const origIdx = analysisCompanies.findIndex(c => c.name === d.name);
       const cStyle = getCompanyStyle(origIdx !== -1 ? origIdx : 0);
+      const ttc = d.total * 1.2;
       return [
         { content: `${index + 1}${index === 0 ? 'er' : 'ème'}`, styles: { fontStyle: 'bold', halign: 'center' } },
-        { content: d.name, styles: { textColor: cStyle.header, fontStyle: 'bold' } }, // Nom de l'entreprise coloré
+        { content: d.name, styles: { textColor: cStyle.header, fontStyle: 'bold' } },
         { content: formatNumberFr(d.total) + ' €', styles: { fontStyle: 'bold', halign: 'right' } },
+        { content: formatNumberFr(ttc) + ' €', styles: { halign: 'right' } },
         { content: (d.deviation > 0 ? '+' : '') + d.deviation.toFixed(2) + '%', styles: { textColor: d.deviation > 0 ? [200, 0, 0] : [0, 150, 0], halign: 'center' } },
         { content: d.score.toFixed(2) + ` / ${maxScore}`, styles: { fontStyle: 'bold', halign: 'center' } }
       ];
     });
 
     autoTable(doc, {
-      startY: y + 4,
-      head: [['Rang', 'Entreprise', 'Montant HT', 'Écart / Estim.', 'Note Finale']],
+      startY: y + 2,
+      head: [['Rang', 'Entreprise', 'Montant HT', 'Montant TTC', 'Écart / Estim.', 'Note Finale']],
       body: summaryBody,
       theme: 'striped',
       headStyles: { fillColor: THEME.primary, textColor: [255, 255, 255], fontStyle: 'bold' },
       styles: { font: 'Helvetica', fontSize: 9, cellPadding: 3 },
-      columnStyles: { 0: { cellWidth: 20 }, 2: { cellWidth: 40 }, 4: { cellWidth: 30 } },
+      columnStyles: { 0: { cellWidth: 16 }, 2: { cellWidth: 35 }, 3: { cellWidth: 35 }, 5: { cellWidth: 28 } },
       didDrawPage: () => drawFooter(doc, pageNum, consultation, project, THEME),
     });
+    y = doc.lastAutoTable.finalY + 8;
+
+    // Barres visuelles des montants
+    const maxTotal = Math.max(...summaryData.map(d => d.total));
+    const barW = W - 80;
+    summaryData.forEach((d) => {
+      if (y > 270) { y = addPage('Analyse financière — Synthèse', 'a4', 'portrait'); }
+      const origIdx = analysisCompanies.findIndex(c => c.name === d.name);
+      const cStyle = getCompanyStyle(origIdx !== -1 ? origIdx : 0);
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(7);
+      doc.setTextColor(...cStyle.header);
+      const bHf = 6;
+      doc.text(d.name, M, y + bHf / 2 + 1);
+      drawScoreBar(doc, 55, y, barW, bHf, d.total, maxTotal, cStyle.header);
+      doc.setTextColor(...THEME.lightText);
+      doc.setFontSize(6);
+      doc.text(fmt(d.total) + ' €', 55 + barW + 2, y + bHf / 2 + 1);
+      y += 9;
+    });
+    y += 6;
 
     if (chaptersData && chaptersData.length > 0) {
       y = addPage('Analyse financière — Détail des Prix Unitaires', 'a3', 'landscape');
+      tocEntries.push({ label: '8. Détail des prix unitaires (A3)', page: pageNum });
       doc.setFontSize(14); doc.setTextColor(...THEME.primary); doc.setFont("Helvetica", "bold");
-      doc.text("DÉTAIL DES PRIX UNITAIRES (Format A3)", 15, y);
-      
+      doc.text("DÉTAIL DES PRIX UNITAIRES (Format A3)", M, y);
+
       if (analysisMode === 'oab' || analysisMode === 'heatmap') {
          doc.setFontSize(8); doc.setTextColor(0); doc.setFont("Helvetica", "normal");
          if (analysisMode === 'oab') {
@@ -716,8 +786,7 @@ export const generateRaoPDF = async (optionsParams) => {
         {
           const chapEstTotal = chapter.items.reduce((acc, i) => acc + (i.activeQty * i.price), 0);
           const isPSE = chapter.isOption;
-          // Style : gris-bleu pour base, amber pour PSE/variante
-          const bgColor  = isPSE ? [254, 243, 199] : [226, 232, 240]; // amber-100 / slate-200
+          const bgColor  = isPSE ? [254, 243, 199] : [226, 232, 240];
           const prefix   = isPSE ? 'PSE — ' : 'TOTAL ';
           const chapTotalRow = [
             { content: `${prefix}${chapter.title.toUpperCase()}`, colSpan: 4, styles: { fontStyle: 'bold', halign: 'right', fillColor: bgColor } },
@@ -746,10 +815,9 @@ export const generateRaoPDF = async (optionsParams) => {
       });
       tableBody.push(totalRow);
 
-      // ── Lignes PSE par chapitre (sous-total individuel) ─────────────────────
+      // PSE par chapitre
       const optionChaps = chaptersData.filter(c => c.isOption);
       if (optionChaps.length > 0) {
-        // Séparateur
         tableBody.push([{ content: '', colSpan: 6 + (analysisCompanies.length * 3), styles: { cellPadding: 1, fillColor: [255, 255, 255] } }]);
 
         let pse_estTotal = 0;
@@ -776,7 +844,6 @@ export const generateRaoPDF = async (optionsParams) => {
           tableBody.push(pseRow);
         });
 
-        // ── Ligne TOTAL BASE + PSE (toutes options)
         const totalWithPse_est = grandTotalBase + pse_estTotal;
         const totalPseRow = [
           { content: 'TOTAL BASE + PSE (TOUTES OPTIONS)', colSpan: 4, styles: { fontStyle: 'bold', halign: 'right', fillColor: [245, 208, 254], textColor: [88, 28, 135] } },
@@ -815,78 +882,161 @@ export const generateRaoPDF = async (optionsParams) => {
     }
   }
 
-  // ── ANALYSE TECHNIQUE ──
-  companyNames.forEach((name, idx) => {
-    const cStyle = getCompanyStyle(idx);
-    const tech = companiesData[name]?.technical || {};
+  // ── ANALYSE TECHNIQUE — Regroupé par critère ──
+  {
     const nonAutoCriteria = criteria.filter(c => !c.auto);
-    if (nonAutoCriteria.length === 0) return;
+    if (nonAutoCriteria.length > 0) {
+      y = addPage('Analyse technique', 'a4', 'portrait');
+      tocEntries.push({ label: '9. Analyse technique', page: pageNum });
 
-    y = addPage(`Analyse technique — ${name}`, 'a4', 'portrait');
-    y = sectionTitle(doc, `ANALYSE TECHNIQUE — ${name}`, y, cStyle.header); // Titre coloré !
+      nonAutoCriteria.forEach((crit, critIdx) => {
+        if (y > 297 - 70) { y = addPage('Analyse technique', 'a4', 'portrait'); }
+        const hasSubs = (crit.subCriteria || []).length > 0;
 
-    let noteTotal = 0;
-    nonAutoCriteria.forEach((crit) => {
-      if (y > 297 - 60) { y = addPage(`Analyse technique — ${name}`, 'a4', 'portrait'); }
+        // Header critère — fond vert avec poids
+        y = sectionTitle(doc, `${crit.label}  (${crit.weight}%)`, y, THEME.primary);
 
-      const d = tech[crit.id] || {};
-      const note = Number(d.note || 0);
-      const noteMax = Number(d.noteMax || 5);
-      const notePond = noteMax > 0 ? (note / noteMax) * crit.weight : 0;
-      noteTotal += notePond;
+        if (hasSubs) {
+          crit.subCriteria.forEach((sc, si) => {
+            if (y > 297 - 60) { y = addPage('Analyse technique', 'a4', 'portrait'); }
+            doc.setFont('Helvetica', 'bold');
+            doc.setFontSize(9);
+            doc.setTextColor(...VERT_FONCE);
+            doc.text(`${critIdx + 2}.${si + 1}  ${sc.label || 'Sous-critère'}  (${sc.weight || 0}%)`, M + 3, y + 3);
+            y += 7;
 
-      doc.setFillColor(...cStyle.body); // Fond coloré clair
-      doc.rect(15, y, W - 30, 9, 'F');
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.setTextColor(...cStyle.header); // Texte coloré foncé
-      doc.text(`${crit.label}`, 18, y + 6);
-      doc.setTextColor(...THEME.text);
-      doc.text(`Note /20`, W - 15, y + 6, { align: 'right' });
-      y += 14;
+            companyNames.forEach((name, ci) => {
+              if (y > 297 - 25) { y = addPage('Analyse technique', 'a4', 'portrait'); }
+              const cStyle = getCompanyStyle(ci);
+              const tech = companiesData[name]?.technical || {};
+              const sd = tech[sc.id] || {};
+              const sNote = Number(sd.note || 0);
+              const sMax = Number(sd.noteMax || 5);
+              const sPond = sMax > 0 ? (sNote / sMax) * (Number(sc.weight) || 0) : 0;
 
-      if (d.text) {
-        doc.setFont('Helvetica', 'normal');
-        doc.setFontSize(8);
-        doc.setTextColor(...THEME.lightText);
-        const lines = doc.splitTextToSize(d.text, W - 30);
-        const maxLines = Math.floor((297 - y - 35) / 4.5);
-        const visibleLines = lines.slice(0, maxLines);
-        doc.text(visibleLines, 15, y);
-        y += visibleLines.length * 4.5 + 4;
-        if (lines.length > maxLines) {
-          const remainLines = lines.slice(maxLines);
-          y = addPage(`Analyse technique — ${name}`, 'a4', 'portrait');
-          doc.setFont('Helvetica', 'normal');
-          doc.setFontSize(8);
-          doc.setTextColor(...THEME.lightText);
-          doc.text(remainLines, 15, y);
-          y += remainLines.length * 4.5 + 4;
+              doc.setFont('Helvetica', 'bold');
+              doc.setFontSize(7);
+              doc.setTextColor(...cStyle.header);
+              const bH = 5;
+              doc.text(name, M + 5, y + bH / 2 + 1);
+              drawScoreBar(doc, 68, y, W - 110, bH, sPond, sc.weight || 1, cStyle.header);
+              doc.setTextColor(...THEME.text);
+              doc.setFontSize(6.5);
+              doc.text(`${sNote}/${sMax} = ${fmtScore(sPond)}`, W - M, y + bH / 2 + 1, { align: 'right' });
+              y += bH + 4;
+
+              if (sd.text) {
+                doc.setFont('Helvetica', 'normal');
+                doc.setFontSize(7.5);
+                doc.setTextColor(...THEME.lightText);
+                const lines = doc.splitTextToSize(sd.text, W - 2 * M - 10);
+                let remaining = [...lines];
+                while (remaining.length > 0) {
+                  const maxL = Math.floor((297 - y - 20) / 3.8);
+                  if (maxL <= 0) { y = addPage('Analyse technique', 'a4', 'portrait'); doc.setFont('Helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...THEME.lightText); continue; }
+                  const batch = remaining.splice(0, maxL);
+                  doc.text(batch, M + 10, y);
+                  y += batch.length * 3.8 + 2;
+                }
+                y += 2;
+              }
+            });
+            y += 6;
+          });
+        } else {
+          companyNames.forEach((name, ci) => {
+            if (y > 297 - 25) { y = addPage('Analyse technique', 'a4', 'portrait'); }
+            const cStyle = getCompanyStyle(ci);
+            const tech = companiesData[name]?.technical || {};
+            const d = tech[crit.id] || {};
+            const note = Number(d.note || 0);
+            const noteMax = Number(d.noteMax || 5);
+            const notePond = noteMax > 0 ? (note / noteMax) * crit.weight : 0;
+
+            doc.setFont('Helvetica', 'bold');
+            doc.setFontSize(7);
+            doc.setTextColor(...cStyle.header);
+            const bH2 = 5;
+            doc.text(name, M, y + bH2 / 2 + 1);
+            drawScoreBar(doc, 68, y, W - 110, bH2, notePond, crit.weight, cStyle.header);
+            doc.setTextColor(...THEME.text);
+            doc.setFontSize(6.5);
+            doc.text(`${note}/${noteMax} = ${fmtScore(notePond)}`, W - M, y + bH2 / 2 + 1, { align: 'right' });
+            y += bH2 + 4;
+
+            if (d.text) {
+              doc.setFont('Helvetica', 'normal');
+              doc.setFontSize(7.5);
+              doc.setTextColor(...THEME.lightText);
+              const lines = doc.splitTextToSize(d.text, W - 2 * M - 5);
+              let remaining = [...lines];
+              while (remaining.length > 0) {
+                const maxL = Math.floor((297 - y - 20) / 3.8);
+                if (maxL <= 0) { y = addPage('Analyse technique', 'a4', 'portrait'); doc.setFont('Helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...THEME.lightText); continue; }
+                const batch = remaining.splice(0, maxL);
+                doc.text(batch, M + 5, y);
+                y += batch.length * 3.8 + 2;
+              }
+              y += 2;
+            }
+          });
         }
-      }
+        y += 6;
+      });
 
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.setTextColor(...THEME.text);
-      doc.text(`La note retenue est de ${note}/${noteMax} soit pondérée :`, 15, y);
-      y += 6;
-      doc.setFillColor(...cStyle.header); // Bouton de note coloré !
-      doc.roundedRect(W - 50, y - 5, 35, 10, 2, 2, 'F');
-      doc.setTextColor(...THEME.white);
-      doc.setFontSize(11);
-      doc.text(fmtScore(notePond), W - 32.5, y + 2, { align: 'center' });
-      y += 14;
-    });
+      // Tableau récap des notes techniques
+      if (y > 297 - 50) { y = addPage('Analyse technique', 'a4', 'portrait'); }
+      y = sectionTitle(doc, 'Récapitulatif des notes techniques', y, THEME.primary);
+      const techRecapCols = [];
+      nonAutoCriteria.forEach(crit => {
+        const hasSubs = (crit.subCriteria || []).length > 0;
+        if (hasSubs) {
+          crit.subCriteria.forEach((sc) => {
+            techRecapCols.push({ id: sc.id, label: `${sc.label || 'SC'}`, weight: sc.weight || 0, parentId: crit.id, isSub: true });
+          });
+        } else {
+          techRecapCols.push({ id: crit.id, label: crit.label, weight: crit.weight, isSub: false });
+        }
+      });
 
-    doc.setFillColor(...cStyle.header); // Total coloré !
-    doc.rect(15, y, W - 30, 10, 'F');
-    doc.setTextColor(...THEME.white);
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.text('NOTE TECHNIQUE ATTRIBUÉE À L\'ENTREPRISE', 18, y + 7);
-    doc.text(fmtScore(noteTotal), W - 18, y + 7, { align: 'right' });
-    y += 18;
-  });
+      const techRecapHead = ['Entreprise', ...techRecapCols.map(c => {
+        const short = c.label.length > 14 ? c.label.slice(0, 13) + '...' : c.label;
+        return `${short}\n(${c.weight}%)`;
+      }), 'Total'];
+
+      const techRecapBody = companyNames.map((name) => {
+        const tech = companiesData[name]?.technical || {};
+        let total = 0;
+        const notes = techRecapCols.map(col => {
+          const d = tech[col.id] || {};
+          const n = Number(d.note || 0);
+          const m = Number(d.noteMax || 5);
+          const score = m > 0 ? (n / m) * col.weight : 0;
+          total += score;
+          return fmtScore(score);
+        });
+        return [name, ...notes, { content: fmtScore(total), styles: { fontStyle: 'bold' } }];
+      });
+
+      autoTable(doc, {
+        startY: y,
+        head: [techRecapHead],
+        body: techRecapBody,
+        styles: { font: 'Helvetica', fontSize: 6.5, cellPadding: 2, halign: 'center', valign: 'middle' },
+        headStyles: { fillColor: THEME.primary, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 5.5 },
+        columnStyles: { 0: { halign: 'left', fontStyle: 'bold', cellWidth: 35 }, [techRecapHead.length - 1]: { fontStyle: 'bold', fillColor: VERT_CLAIR } },
+        didParseCell: (data) => {
+          if (data.section === 'body' && data.column.index === 0) {
+            const cStyle = getCompanyStyle(data.row.index);
+            data.cell.styles.textColor = cStyle.header;
+          }
+        },
+        margin: { left: M, right: M },
+        didDrawPage: () => drawFooter(doc, pageNum, consultation, project, THEME),
+      });
+      y = doc.lastAutoTable.finalY + 10;
+    }
+  }
 
   // ── NÉGOCIATION ──
   companyNames.forEach((name, idx) => {
@@ -895,54 +1045,74 @@ export const generateRaoPDF = async (optionsParams) => {
     if (!nego.questions && !nego.responses) return;
 
     y = addPage(`Négociation — ${name}`, 'a4', 'portrait');
-    y = sectionTitle(doc, `NÉGOCIATION — ${name}`, y, cStyle.header); // Titre coloré !
+    if (!tocEntries.find(e => e.label.startsWith('10.'))) {
+      tocEntries.push({ label: '10. Négociations', page: pageNum });
+    }
+    y = sectionTitle(doc, `NÉGOCIATION — ${name}`, y, cStyle.header);
 
     if (nego.questions) {
       doc.setFont('Helvetica', 'bold');
       doc.setFontSize(9);
-      doc.setTextColor(...cStyle.header); // Surtitre coloré !
-      doc.text('Dans le cadre des négociations, nous avons questionné l\'entreprise sur les points suivants :', 15, y);
-      y += 8;
+      doc.setTextColor(...cStyle.header);
+      doc.text('Dans le cadre des négociations, nous avons questionné l\'entreprise sur les points suivants :', M, y);
+      y += 6;
       doc.setFont('Helvetica', 'normal');
-      doc.setFontSize(8);
+      doc.setFontSize(9);
       doc.setTextColor(...THEME.lightText);
-      const qLines = doc.splitTextToSize(nego.questions, W - 30);
-      doc.text(qLines, 15, y);
-      y += qLines.length * 4.5 + 10;
+      const qLines = doc.splitTextToSize(nego.questions, W - 2 * M);
+      let qRemaining = [...qLines];
+      while (qRemaining.length > 0) {
+        const maxL = Math.floor((297 - y - 20) / 4.5);
+        if (maxL <= 0) { y = addPage(`Négociation — ${name}`, 'a4', 'portrait'); doc.setFont('Helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...THEME.lightText); continue; }
+        const batch = qRemaining.splice(0, maxL);
+        doc.text(batch, M, y);
+        y += batch.length * 4.5 + 2;
+      }
+      y += 6;
     }
 
     if (nego.responses) {
+      if (y > 260) { y = addPage(`Négociation — ${name}`, 'a4', 'portrait'); }
       doc.setFont('Helvetica', 'bold');
       doc.setFontSize(9);
-      doc.setTextColor(...cStyle.header); // Surtitre coloré !
-      doc.text('RÉPONSES DE L\'ENTREPRISE', 15, y);
-      y += 8;
+      doc.setTextColor(...cStyle.header);
+      doc.text('RÉPONSES DE L\'ENTREPRISE', M, y);
+      y += 6;
       doc.setFont('Helvetica', 'normal');
-      doc.setFontSize(8);
+      doc.setFontSize(9);
       doc.setTextColor(...THEME.lightText);
-      const rLines = doc.splitTextToSize(nego.responses, W - 30);
-      doc.text(rLines, 15, y);
+      const rLines = doc.splitTextToSize(nego.responses, W - 2 * M);
+      let rRemaining = [...rLines];
+      while (rRemaining.length > 0) {
+        const maxL = Math.floor((297 - y - 20) / 4.5);
+        if (maxL <= 0) { y = addPage(`Négociation — ${name}`, 'a4', 'portrait'); doc.setFont('Helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...THEME.lightText); continue; }
+        const batch = rRemaining.splice(0, maxL);
+        doc.text(batch, M, y);
+        y += batch.length * 4.5 + 2;
+      }
     }
   });
 
   // ── RÉCAPITULATIF FINAL ──
   y = addPage('Récapitulatif général', 'a4', 'portrait');
-  y = sectionTitle(doc, 'RÉCAPITULATIF GÉNÉRAL APRÈS NÉGOCIATION', y, THEME.primary);
+  tocEntries.push({ label: '11. Récapitulatif général', page: pageNum });
+  y = sectionTitle(doc, 'RÉCAPITULATIF GÉNÉRAL', y, THEME.primary);
 
   const priceC = criteria.find(c => c.auto) || criteria[0];
   const techCs = criteria.filter(c => !c.auto);
 
+  const maxScorePrice = Number(scoringConfig?.maxScore || 50);
   const headCols = [
-    'Entreprise', 
-    ...techCs.map(c => c.label.length > 25 ? c.label.slice(0, 25) + '…' : c.label), 
-    `C1 Prix\n/${priceC?.weight || 60} pts`, 
-    'Prix HT', 
-    'Total\n/100', 
+    'Entreprise',
+    ...techCs.map(c => c.label.length > 25 ? c.label.slice(0, 25) + '...' : c.label),
+    `C1 Prix\n/${maxScorePrice} pts`,
+    'Prix HT',
+    'Total\n/100',
     'Rang'
   ];
 
   const bodyRows = ranking.map((r) => [
-    r.rank === 1 ? `${r.name.toUpperCase()}\n(Mieux-disant)` : r.name.toUpperCase(),
+    r.name.toUpperCase(),
     ...techCs.map(c => fmtScore(r.techScores?.[c.id] || 0)),
     fmtScore(r.priceScore || 0),
     fmt(r.price) + ' €',
@@ -951,23 +1121,22 @@ export const generateRaoPDF = async (optionsParams) => {
   ]);
 
   autoTable(doc, {
-    startY: y + 4,
+    startY: y + 2,
     head: [headCols],
     body: bodyRows,
     styles: { font: 'Helvetica', fontSize: 8, cellPadding: 4, halign: 'center', valign: 'middle' },
-    headStyles: { fillColor: THEME.primary, textColor: THEME.white, fontStyle: 'bold', halign: 'center' },
-    columnStyles: { 
+    headStyles: { fillColor: THEME.primary, textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
+    columnStyles: {
       0: { halign: 'left', fontStyle: 'bold', minCellWidth: 35 },
-      [headCols.length - 3]: { halign: 'right', minCellWidth: 26 }, 
-      [headCols.length - 2]: { fontStyle: 'bold', textColor: THEME.primary, fontSize: 9 }, 
+      [headCols.length - 3]: { halign: 'right', minCellWidth: 26 },
+      [headCols.length - 2]: { fontStyle: 'bold', textColor: THEME.primary, fontSize: 9 },
       [headCols.length - 1]: { fontStyle: 'bold', fontSize: 10 }
     },
     alternateRowStyles: { fillColor: THEME.tableAlt },
     didParseCell: (data) => {
       if (data.section === 'body') {
         const rank = parseInt(bodyRows[data.row.index][headCols.length - 1], 10);
-        
-        // Retrouver la couleur de l'entreprise pour son nom
+
         const rName = ranking[data.row.index].name;
         const originalIdx = analysisCompanies.findIndex(c => c.name === rName);
         const cStyle = getCompanyStyle(originalIdx !== -1 ? originalIdx : 0);
@@ -977,7 +1146,7 @@ export const generateRaoPDF = async (optionsParams) => {
         }
 
         if (rank === 1) {
-          data.cell.styles.fillColor = [235, 248, 240];
+          data.cell.styles.fillColor = VERT_CLAIR;
         }
         if (data.column.index === headCols.length - 1) {
           if (rank === 1) {
@@ -993,23 +1162,149 @@ export const generateRaoPDF = async (optionsParams) => {
         }
       }
     },
-    margin: { left: 15, right: 15 },
+    margin: { left: M, right: M },
     didDrawPage: () => drawFooter(doc, pageNum, consultation, project, THEME),
   });
-  y = doc.lastAutoTable.finalY + 12;
+  y = doc.lastAutoTable.finalY + 10;
 
+  // ── Barres empilées (prix + technique) ──
+  if (y < 297 - 60) {
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...VERT_FONCE);
+    doc.text('VISUALISATION DES SCORES', M, y + 3);
+    y += 8;
+    const barMaxW = W - 80;
+    ranking.forEach((r) => {
+      if (y > 280) return;
+      const origIdx = analysisCompanies.findIndex(c => c.name === r.name);
+      const cStyle = getCompanyStyle(origIdx !== -1 ? origIdx : 0);
+      const techTotal = Object.values(r.techScores || {}).reduce((a, b) => a + b, 0);
+      const priceW = barMaxW * (r.priceScore || 0) / 100;
+      const techW = barMaxW * techTotal / 100;
+
+      const barH = 6;
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(6.5);
+      doc.setTextColor(...cStyle.header);
+      doc.text(r.name, M, y + barH / 2 + 6.5 * 0.13);
+
+      // Fond gris
+      doc.setFillColor(235, 235, 240);
+      doc.rect(55, y, barMaxW, barH, 'F');
+      // Barre prix (vert papyrus)
+      if (priceW > 2) {
+        doc.setFillColor(...VERT_PAPYRUS);
+        doc.rect(55, y, priceW, barH, 'F');
+        if (priceW > 12) {
+          doc.setFont('Helvetica', 'bold'); doc.setFontSize(5.5); doc.setTextColor(255, 255, 255);
+          doc.text(fmtScore(r.priceScore || 0), 55 + priceW / 2, y + barH / 2 + 0.8, { align: 'center' });
+        }
+      }
+      // Barre technique (bleu)
+      if (techW > 2) {
+        doc.setFillColor(59, 130, 246);
+        doc.rect(55 + priceW, y, techW, barH, 'F');
+        if (techW > 12) {
+          doc.setFont('Helvetica', 'bold'); doc.setFontSize(5.5); doc.setTextColor(255, 255, 255);
+          doc.text(fmtScore(techTotal), 55 + priceW + techW / 2, y + barH / 2 + 0.8, { align: 'center' });
+        }
+      }
+      // Total à droite
+      doc.setTextColor(...THEME.text);
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(6.5);
+      doc.text(fmtScore(r.totalScore), 55 + barMaxW + 2, y + barH / 2 + 0.8);
+      y += 8;
+    });
+    // Légende
+    doc.setFillColor(...VERT_PAPYRUS); doc.rect(55, y, 4, 3, 'F');
+    doc.setFillColor(59, 130, 246); doc.rect(65, y, 4, 3, 'F');
+    doc.setFont('Helvetica', 'normal'); doc.setFontSize(5.5); doc.setTextColor(...THEME.lightText);
+    doc.text('Prix', 60, y + 2.5); doc.text('Technique', 70, y + 2.5);
+    y += 10;
+  }
+
+  // ── Avertissement OAB si applicable ──
+  const allTotals = ranking.map(r => r.price).filter(p => p > 0);
+  const oabThreshold = calculateOABThreshold(allTotals);
+  const oabCompanies = ranking.filter(r => r.price > 0 && r.price < oabThreshold);
+  if (oabCompanies.length > 0) {
+    if (y > 260) { y = addPage('Récapitulatif général', 'a4', 'portrait'); }
+    doc.setFillColor(255, 237, 213);
+    doc.roundedRect(M, y, W - 2 * M, 22, 3, 3, 'F');
+    doc.setDrawColor(245, 158, 11);
+    doc.roundedRect(M, y, W - 2 * M, 22, 3, 3, 'S');
+    doc.setTextColor(180, 83, 9);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text('OFFRE(S) ANORMALEMENT BASSE(S) DÉTECTÉE(S)', W / 2, y + 6, { align: 'center' });
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(120, 53, 15);
+    const oabNames = oabCompanies.map(r => r.name).join(', ');
+    doc.text(`${oabNames} — Seuil OAB : ${fmt(oabThreshold)} € HT (méthode Double Moyenne)`, W / 2, y + 12, { align: 'center' });
+    doc.text('Conformément aux articles L2152-5 et R2152-3 du CCP, le pouvoir adjudicateur doit demander des précisions', W / 2, y + 17, { align: 'center' });
+    doc.text('sur le prix proposé avant tout rejet éventuel de l\'offre (CE, 1er mars 2012, n°354159).', W / 2, y + 21, { align: 'center' });
+    y += 28;
+  }
+
+  // ── Recommandation conforme CCP ──
   const winner = ranking[0];
   if (winner) {
+    if (y > 265) { y = addPage('Récapitulatif général', 'a4', 'portrait'); }
     doc.setFillColor(...THEME.primary);
-    doc.roundedRect(15, y, W - 30, 16, 3, 3, 'F');
-    doc.setTextColor(...THEME.white);
+    doc.roundedRect(M, y, W - 2 * M, 22, 3, 3, 'F');
+    doc.setTextColor(255, 255, 255);
     doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.text(`RECOMMANDATION : L'entreprise ${winner.name.toUpperCase()} est classée 1ère (Mieux-disante).`, W / 2, y + 6, { align: 'center' });
+    doc.setFontSize(10);
+    doc.text(`Au regard des critères d'attribution définis dans les documents de consultation,`, W / 2, y + 6, { align: 'center' });
+    doc.text(`l'offre de l'entreprise ${winner.name.toUpperCase()} est l'offre économiquement la plus avantageuse.`, W / 2, y + 12, { align: 'center' });
     doc.setFont('Helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.text(`Score final : ${fmtScore(winner.totalScore)} / 100  —  Montant de l'offre : ${fmt(winner.price)} € HT`, W / 2, y + 12, { align: 'center' });
+    doc.setFontSize(8);
+    doc.text(`Score : ${fmtScore(winner.totalScore)} / 100  —  Montant : ${fmt(winner.price)} € HT  —  ${fmt(winner.price * 1.2)} € TTC`, W / 2, y + 18, { align: 'center' });
   }
+
+  // ── REMPLIR LE SOMMAIRE (page 2) ──
+  doc.setPage(sommairePageIndex);
+  let tocY = 30;
+  // Titre H1
+  doc.setFont('Helvetica', 'bold');
+  doc.setFontSize(14); // H1
+  doc.setTextColor(...VERT_PAPYRUS);
+  doc.text('SOMMAIRE', M, tocY);
+  tocY += 4;
+  // Ligne décorative
+  doc.setDrawColor(...VERT_PAPYRUS);
+  doc.setLineWidth(1);
+  doc.line(M, tocY, M + 30, tocY);
+  tocY += 10;
+
+  tocEntries.forEach((entry) => {
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(...THEME.text);
+    doc.text(entry.label, M + 2, tocY);
+    // Points de conduite
+    const labelW = doc.getTextWidth(entry.label);
+    const pageStr = `${entry.page}`;
+    const pageW = doc.getTextWidth(pageStr);
+    const dotsStart = M + 2 + labelW + 2;
+    const dotsEnd = W - M - pageW - 2;
+    doc.setTextColor(...THEME.lightText);
+    doc.setFontSize(8);
+    let dotX = dotsStart;
+    while (dotX < dotsEnd) {
+      doc.text('.', dotX, tocY);
+      dotX += 2;
+    }
+    // Numéro de page
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...VERT_PAPYRUS);
+    doc.text(pageStr, W - M, tocY, { align: 'right' });
+    tocY += 8;
+  });
 
   const safeName = (consultation?.objet || project?.name || 'RAO').replace(/[^a-zA-Z0-9]/g, '_').slice(0, 40);
   doc.save(`RAO_${safeName}_${new Date().toISOString().slice(0, 10)}.pdf`);
