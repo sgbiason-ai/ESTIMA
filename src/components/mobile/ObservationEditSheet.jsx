@@ -47,20 +47,27 @@ export default function ObservationEditSheet({
 
   // ── Speech-to-text ──
   const { isListening, transcript, interimTranscript, isSupported: micSupported, error: micError, start: startMic, stop: stopMic } = useSpeechToText();
+  // Texte existant avant le début de la dictée (pour ne pas l'écraser)
+  const textBeforeDictRef = useRef('');
 
-  // Quand la transcription finale arrive, l'ajouter au texte
+  // Quand la transcription évolue, mettre à jour le champ texte
   useEffect(() => {
     if (transcript && textRef.current) {
-      const current = textRef.current.innerHTML || '';
-      const separator = current && !current.endsWith(' ') && !current.endsWith('<br>') ? ' ' : '';
-      textRef.current.innerHTML = current + separator + transcript;
+      const before = textBeforeDictRef.current;
+      const separator = before && !before.endsWith(' ') && !before.endsWith('<br>') ? ' ' : '';
+      textRef.current.innerHTML = before + separator + transcript;
       if (onUpdate && obs) onUpdate(obs.id, { text: textRef.current.innerHTML });
     }
   }, [transcript]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleMic = useCallback(async () => {
-    if (isListening) stopMic();
-    else await startMic();
+    if (isListening) {
+      stopMic();
+    } else {
+      // Sauvegarder le texte actuel avant de commencer la dictée
+      textBeforeDictRef.current = textRef.current?.innerHTML || '';
+      await startMic();
+    }
   }, [isListening, startMic, stopMic]);
 
   // ── Handlers ──

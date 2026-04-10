@@ -13,21 +13,26 @@ export default function SiteVisitObsEditSheet({ obs, onUpdate, onDelete, onClose
 
   // ── Speech-to-text ──
   const { isListening, transcript, interimTranscript, isSupported: micSupported, error: micError, start: startMic, stop: stopMic } = useSpeechToText();
+  // Texte existant avant le début de la dictée
+  const textBeforeDictRef = useRef('');
 
-  // Quand la transcription finale arrive, l'ajouter au texte
+  // Quand la transcription évolue, mettre à jour le champ texte
   useEffect(() => {
     if (transcript) {
-      setText(prev => {
-        const separator = prev && !prev.endsWith(' ') && !prev.endsWith('\n') ? ' ' : '';
-        return prev + separator + transcript;
-      });
+      const before = textBeforeDictRef.current;
+      const separator = before && !before.endsWith(' ') && !before.endsWith('\n') ? ' ' : '';
+      setText(before + separator + transcript);
     }
   }, [transcript]);
 
   const toggleMic = useCallback(async () => {
-    if (isListening) stopMic();
-    else await startMic();
-  }, [isListening, startMic, stopMic]);
+    if (isListening) {
+      stopMic();
+    } else {
+      textBeforeDictRef.current = text;
+      await startMic();
+    }
+  }, [isListening, startMic, stopMic, text]);
 
   const handleSave = () => {
     onUpdate(obs.id, { text, images });

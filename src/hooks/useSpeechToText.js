@@ -2,6 +2,12 @@
 //
 // Hook de reconnaissance vocale → texte français.
 // Utilise l'API Web Speech (native Chrome Android / Safari).
+//
+// Logique de résultats :
+// - event.results[] contient TOUS les segments depuis le début
+// - Chaque segment passe de isFinal=false (interim) à isFinal=true (final)
+// - On accumule uniquement les segments finalisés dans `transcript`
+// - On affiche le segment en cours (non finalisé) dans `interimTranscript`
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 
@@ -9,40 +15,31 @@ const SpeechRecognitionClass = typeof window !== 'undefined'
   ? (window.SpeechRecognition || window.webkitSpeechRecognition)
   : null;
 
-// Détection iOS standalone (PWA home screen)
 const isIOSStandalone = typeof window !== 'undefined'
   && ('standalone' in window.navigator)
   && window.navigator.standalone === true;
 
-/**
- * Vérifie l'état de la permission micro via Permissions API.
- * Retourne 'granted', 'denied', ou 'prompt'.
- */
 const checkMicPermission = async () => {
   try {
     if (navigator.permissions?.query) {
       const result = await navigator.permissions.query({ name: 'microphone' });
-      return result.state; // 'granted' | 'denied' | 'prompt'
+      return result.state;
     }
   } catch {}
-  return 'prompt'; // Par défaut, on suppose que c'est possible
+  return 'prompt';
 };
 
-/**
- * @param {Object} options
- * @param {string} options.lang - Langue (défaut: 'fr-FR')
- * @returns {{ isListening, transcript, interimTranscript, isSupported, error, start, stop }}
- */
 export const useSpeechToText = ({ lang = 'fr-FR' } = {}) => {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
   const [error, setError] = useState(null);
   const recognitionRef = useRef(null);
+  // Index du prochain segment non encore traité comme final
+  const finalIndexRef = useRef(0);
 
   const isSupported = !!SpeechRecognitionClass && !isIOSStandalone;
 
-  // Nettoyage à la destruction
   useEffect(() => {
     return () => {
       if (recognitionRef.current) {
@@ -62,16 +59,14 @@ export const useSpeechToText = ({ lang = 'fr-FR' } = {}) => {
       return;
     }
 
-    // Vérifier la permission micro AVANT de lancer
     const permState = await checkMicPermission();
     if (permState === 'denied') {
-      setError('Micro bloqué. Appuyez sur le cadenas 🔒 dans la barre d\'adresse → Autorisations → Micro → Autoriser, puis réessayez.');
+      setError('Micro bloqué. Appuyez sur le cadenas 🔒 → Autorisations → Micro → Autoriser.');
       return;
     }
 
     setError(null);
 
-    // Arrêter l'instance précédente
     if (recognitionRef.current) {
       try { recognitionRef.current.abort(); } catch {}
     }
@@ -82,36 +77,47 @@ export const useSpeechToText = ({ lang = 'fr-FR' } = {}) => {
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
 
+    // Texte final accumulé au fur et à mesure des segments finalisés
+    let accumulated = '';
+    finalIndexRef.current = 0;
+
     recognition.onstart = () => {
       setIsListening(true);
       setError(null);
     };
 
     recognition.onresult = (event) => {
-      let finalText = '';
-      let interimText = '';
+      // Parcourir les résultats : les finalisés s'accumulent, l'interim est le dernier non-final
+      let newFinals = '';
+      let interim = '';
 
-      for (let i = 0; i < event.results.length; i++) {
+      for (let i = finalIndexRef.current; i < event.results.length; i++) {
         const r = event.results[i];
         if (r.isFinal) {
-          finalText += r[0].transcript;
+          // Ce segment est finalisé → l'ajouter au texte accumulé
+          newFinals += r[0].transcript;
+          finalIndexRef.current = i + 1;
         } else {
-          interimText += r[0].transcript;
+          // Segment en cours de dictée (interim) → juste l'afficher
+          interim = r[0].transcript;
         }
       }
 
-      if (finalText) setTranscript(finalText);
-      setInterimTranscript(interimText);
+      if (newFinals) {
+        accumulated += (accumulated ? ' ' : '') + newFinals.trim();
+        setTranscript(accumulated);
+      }
+      setInterimTranscript(interim);
     };
 
     recognition.onerror = (event) => {
       const messages = {
-        'not-allowed':           'Micro bloqué. Appuyez sur le cadenas 🔒 → Autorisations → Micro → Autoriser.',
-        'service-not-allowed':   'Micro bloqué. Appuyez sur le cadenas 🔒 → Autorisations → Micro → Autoriser.',
-        'audio-capture':         'Impossible de capturer l\'audio. Fermez les autres apps qui utilisent le micro.',
-        'network':               'Erreur réseau — la dictée vocale nécessite internet.',
-        'no-speech':             null,
-        'aborted':               null,
+        'not-allowed':         'Micro bloqué. Appuyez sur le cadenas 🔒 → Autorisations → Micro → Autoriser.',
+        'service-not-allowed': 'Micro bloqué. Appuyez sur le cadenas 🔒 → Autorisations → Micro → Autoriser.',
+        'audio-capture':       'Impossible de capturer l\'audio. Fermez les autres apps qui utilisent le micro.',
+        'network':             'Erreur réseau — la dictée vocale nécessite internet.',
+        'no-speech':           null,
+        'aborted':             null,
       };
       const msg = messages[event.error] ?? `Erreur : ${event.error}`;
       if (msg) {
