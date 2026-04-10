@@ -2,9 +2,22 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.2.0';
+export const APP_VERSION = '2.3.0';
 
 export const CHANGELOG = [
+  {
+    version: '2.3.0',
+    date: '2026-04-10',
+    title: 'PDF RAO refonte visuelle + Mobile RAO complet',
+    highlights: [
+      'PDF RAO : refonte visuelle Vert Papyrus avec sommaire, en-têtes pleine largeur, barres de score',
+      'PDF RAO : observations complètes non tronquées, pastilles alignées',
+      'Vue mobile RAO complète 5 onglets (Récap, Admin, Technique, Détail, Infos)',
+      'Badge RAO sur les cartes projets mobile',
+      'Hub mobile : tuile "Mes Projets & RAO" fusionnée pleine largeur',
+      'Photos terrain : affichage miniature instantané (cache GPS partagé, compression optimisée)',
+    ],
+  },
   {
     version: '2.2.0',
     date: '2026-04-08',
