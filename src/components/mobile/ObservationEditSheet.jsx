@@ -3,11 +3,10 @@
 // Bottom sheet pour éditer une observation CRC sur mobile.
 // contentEditable pour le texte, capture caméra + galerie pour les images.
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import Icon from './Icon';
 import { compressImage } from '../../utils/imageCompressor';
 import { useOrientation } from '../../hooks/useOrientation';
-import { useSpeechToText } from '../../hooks/useSpeechToText';
 
 // ─── STATUS CONFIG ─────────────────────────────────────────────────────────
 const STATUSES = [
@@ -44,31 +43,6 @@ export default function ObservationEditSheet({
   const textRef = useRef(null);
 
   const images = obs?.images || [];
-
-  // ── Speech-to-text ──
-  const { isListening, transcript, interimTranscript, isSupported: micSupported, error: micError, start: startMic, stop: stopMic } = useSpeechToText();
-  // Texte existant avant le début de la dictée (pour ne pas l'écraser)
-  const textBeforeDictRef = useRef('');
-
-  // Quand la transcription évolue, mettre à jour le champ texte
-  useEffect(() => {
-    if (transcript && textRef.current) {
-      const before = textBeforeDictRef.current;
-      const separator = before && !before.endsWith(' ') && !before.endsWith('<br>') ? ' ' : '';
-      textRef.current.innerHTML = before + separator + transcript;
-      if (onUpdate && obs) onUpdate(obs.id, { text: textRef.current.innerHTML });
-    }
-  }, [transcript]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const toggleMic = useCallback(async () => {
-    if (isListening) {
-      stopMic();
-    } else {
-      // Sauvegarder le texte actuel avant de commencer la dictée
-      textBeforeDictRef.current = textRef.current?.innerHTML || '';
-      await startMic();
-    }
-  }, [isListening, startMic, stopMic]);
 
   // ── Handlers ──
   const update = useCallback((patch) => {
@@ -170,7 +144,7 @@ export default function ObservationEditSheet({
             </Field>
           </div>
 
-          {/* Text (contentEditable) + Voice */}
+          {/* Text (contentEditable) */}
           <Field label="Observation">
             <div
               ref={textRef}
@@ -181,38 +155,6 @@ export default function ObservationEditSheet({
               dangerouslySetInnerHTML={{ __html: obs.text || '' }}
             />
 
-            {/* Indicateur d'écoute */}
-            {isListening && (
-              <div className="flex items-center gap-2 px-3 py-2 mt-1 rounded-lg bg-red-50 border border-red-200">
-                <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
-                <span className="text-[13px] font-medium text-red-700">
-                  {interimTranscript ? interimTranscript + '…' : 'Parlez maintenant…'}
-                </span>
-              </div>
-            )}
-
-            {/* Erreur micro */}
-            {micError && (
-              <div className="px-3 py-2 mt-1 rounded-lg bg-amber-50 border border-amber-200 text-[12px] text-amber-700">
-                {micError}
-              </div>
-            )}
-
-            {/* Bouton dictée vocale */}
-            {micSupported && (
-              <button
-                onClick={toggleMic}
-                type="button"
-                className={`flex items-center justify-center gap-2 w-full mt-2 py-3 rounded-xl text-xs font-semibold transition active:scale-[0.98] ${
-                  isListening
-                    ? 'bg-red-500 text-white shadow-lg'
-                    : 'bg-violet-50 border border-violet-200 text-violet-600'
-                }`}
-              >
-                <Icon name={isListening ? 'stop' : 'mic'} size={16} color={isListening ? '#fff' : '#7c3aed'} />
-                {isListening ? 'Arrêter la dictée' : 'Dictée vocale'}
-              </button>
-            )}
           </Field>
 
           {/* Action by + Deadline */}
