@@ -37,7 +37,8 @@ const PriceAnalysisView = ({ project, companyId, setProject, bpuConfig, clientPe
     bpuConfig,
     activeTrancheId,
     clientQtyMaps,
-    companyId
+    companyId,
+    setProject
   );
 
   // --- EXPORTS ---

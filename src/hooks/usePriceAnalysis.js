@@ -23,7 +23,7 @@ const safeStorage = {
   remove: (key) => { try { localStorage.removeItem(key); } catch {} },
 };
 
-const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', clientQtyMaps = {}, companyId = null) => {
+const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', clientQtyMaps = {}, companyId = null, setProject = null) => {
   const { confirm, prompt } = useDialog();
   const toast = useToast();
 
@@ -113,7 +113,13 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
 
   // ─── EXPORT JSON ──────────────────────────────────────────────────────────
   const handleExportJson = useCallback(() => {
-    const data = { companies, scoringConfig, exportedAt: new Date().toISOString(), projectName: project?.name };
+    const data = {
+      companies,
+      scoringConfig,
+      rao: project?.rao || {},
+      exportedAt: new Date().toISOString(),
+      projectName: project?.name,
+    };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -122,7 +128,7 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
     a.click();
     URL.revokeObjectURL(url);
     toast.success('Export JSON téléchargé.');
-  }, [companies, scoringConfig, project?.name, toast]);
+  }, [companies, scoringConfig, project?.rao, project?.name, toast]);
 
   // ─── IMPORT JSON ──────────────────────────────────────────────────────────
   const handleImportJson = useCallback(async (event) => {
@@ -133,14 +139,19 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
       const data = JSON.parse(text);
       if (data.companies) setCompanies(data.companies);
       if (data.scoringConfig) setScoringConfig(data.scoringConfig);
-      toast.success(`RAO restauré : ${data.companies?.length || 0} entreprise(s)`);
+      if (data.rao && setProject) {
+        setProject(prev => ({ ...prev, rao: { ...(prev?.rao || {}), ...data.rao } }));
+      }
+      const parts = [`${data.companies?.length || 0} entreprise(s)`];
+      if (data.rao) parts.push('analyse technique');
+      toast.success(`RAO restauré : ${parts.join(' + ')}`);
     } catch (e) {
       toast.error('Fichier JSON invalide.');
       console.error('[Analysis] Import JSON error:', e);
     } finally {
       event.target.value = null;
     }
-  }, [toast]);
+  }, [toast, setProject]);
 
   // ─── DONNÉES PAR CHAPITRE ─────────────────────────────────────────────────
   const chaptersData = useMemo(() => {
