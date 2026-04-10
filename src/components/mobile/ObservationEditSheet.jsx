@@ -46,7 +46,7 @@ export default function ObservationEditSheet({
   const images = obs?.images || [];
 
   // ── Speech-to-text ──
-  const { isListening, transcript, interimTranscript, isSupported: micSupported, start: startMic, stop: stopMic } = useSpeechToText();
+  const { isListening, transcript, interimTranscript, isSupported: micSupported, error: micError, start: startMic, stop: stopMic } = useSpeechToText();
 
   // Quand la transcription finale arrive, l'ajouter au texte
   useEffect(() => {
@@ -58,11 +58,11 @@ export default function ObservationEditSheet({
     }
   }, [transcript]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const toggleMic = useCallback(() => {
+  const toggleMic = useCallback(async () => {
     if (isListening) {
       stopMic();
     } else {
-      startMic();
+      await startMic();
     }
   }, [isListening, startMic, stopMic]);
 
@@ -177,10 +177,20 @@ export default function ObservationEditSheet({
               dangerouslySetInnerHTML={{ __html: obs.text || '' }}
             />
 
-            {/* Transcription en cours (interim) */}
-            {isListening && interimTranscript && (
-              <div className="px-3 py-2 mt-1 rounded-lg bg-blue-50 border border-blue-200 text-[13px] text-blue-700 italic">
-                {interimTranscript}…
+            {/* Indicateur d'écoute */}
+            {isListening && (
+              <div className="flex items-center gap-2 px-3 py-2 mt-1 rounded-lg bg-red-50 border border-red-200">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-[13px] font-medium text-red-700">
+                  {interimTranscript ? interimTranscript + '…' : 'Parlez maintenant…'}
+                </span>
+              </div>
+            )}
+
+            {/* Erreur micro */}
+            {micError && (
+              <div className="px-3 py-2 mt-1 rounded-lg bg-amber-50 border border-amber-200 text-[12px] text-amber-700">
+                {micError}
               </div>
             )}
 
@@ -188,14 +198,15 @@ export default function ObservationEditSheet({
             {micSupported && (
               <button
                 onClick={toggleMic}
+                type="button"
                 className={`flex items-center justify-center gap-2 w-full mt-2 py-3 rounded-xl text-xs font-semibold transition active:scale-[0.98] ${
                   isListening
-                    ? 'bg-red-500 text-white animate-pulse shadow-lg'
+                    ? 'bg-red-500 text-white shadow-lg'
                     : 'bg-violet-50 border border-violet-200 text-violet-600'
                 }`}
               >
                 <Icon name={isListening ? 'stop' : 'mic'} size={16} color={isListening ? '#fff' : '#7c3aed'} />
-                {isListening ? 'Arrêter la dictée…' : 'Dictée vocale'}
+                {isListening ? 'Arrêter la dictée' : 'Dictée vocale'}
               </button>
             )}
           </Field>
