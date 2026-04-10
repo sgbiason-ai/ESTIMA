@@ -37,7 +37,7 @@ export const useMobileProjects = (user, companyId) => {
             updatedBy: data.updatedBy || '',
             tranches:  data.tranches || [],
             hasPSE:    !!data.hasPSE,
-            hasRao:    !!(data.rao && (data.rao.criteria?.length > 0 || Object.keys(data.rao.companies || {}).length > 0)),
+            hasRao:    false, // sera mis à jour après vérification subcollection
             folderId:  data.folderId || null,
             chaptersCount: (data.chapters || []).length,
             itemsCount:    countItems(data.chapters || []),
@@ -53,6 +53,25 @@ export const useMobileProjects = (user, companyId) => {
 
       setProjects(list);
       setFolders(folderList);
+
+      // Vérifier en arrière-plan quels projets ont des données RAO (subcollection rao/data)
+      // On fait ça après le rendu initial pour ne pas bloquer l'affichage
+      const raoChecks = list.map(async (p) => {
+        try {
+          const raoRef = doc(db, 'companies', companyId, 'projects', p.id, 'rao', 'data');
+          const raoSnap = await getDoc(raoRef);
+          return { id: p.id, hasRao: raoSnap.exists() };
+        } catch {
+          return { id: p.id, hasRao: false };
+        }
+      });
+      const raoResults = await Promise.all(raoChecks);
+      const raoMap = {};
+      raoResults.forEach(r => { raoMap[r.id] = r.hasRao; });
+
+      // Mettre à jour les projets avec le flag RAO
+      setProjects(prev => prev.map(p => ({ ...p, hasRao: !!raoMap[p.id] })));
+
     } catch (e) {
       console.error('[Mobile] Erreur chargement projets:', e);
       setError('Impossible de charger les projets.');
