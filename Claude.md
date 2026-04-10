@@ -1,6 +1,6 @@
 # Claude.md – EstimaVRD Workflow & Agents
 
-**V2.0** | Avril 2026 | Samuel & Claude | Économe tokens
+**V2.3** | Avril 2026 | Samuel & Claude | Économe tokens
 
 ---
 
@@ -18,7 +18,7 @@
 ## 2. Stack & Architecture
 
 ```
-Frontend:    React 18 + Vite | Tailwind (dark, emerald accents)
+Frontend:    React 18 + Vite | Tailwind (fond clair Apple-style)
 Backend:     Firebase (Auth, Firestore, Hosting)
 Exports:     jsPDF, ExcelJS, html2canvas
 Monitoring:  Sentry + ErrorBoundary
@@ -28,6 +28,91 @@ Code Split:  Dynamic (jsPDF, ExcelJS, html2canvas)
 ```
 
 **Patterns clés**: Modular views (`src/views/{module}/`), custom hooks Firestore, audit via `history/` subcoll, multi-tenant isolation, branding centralisé (`masterBranding`), typo PDF fixe (H1 14pt, H2 12pt, H3 11pt, body 10pt).
+
+---
+
+## 2a. Design System — Apple-style Light
+
+### Philosophie
+Minimalisme Apple : fond clair, beaucoup de blanc, ombres douces, coins très arrondis, typographie SF Pro. Pas de dark mode, pas de glow, pas de neon.
+
+### Palette globale
+
+| Élément | Valeur |
+|---------|--------|
+| **Fond page** | `bg-[#f5f5f7]` (gris Apple) |
+| **Cartes** | `bg-white` ou gradient pastel léger (`from-{color}-50 to-white`) |
+| **Bordures** | `border-gray-200/60` (subtiles) |
+| **Texte principal** | `text-gray-900` |
+| **Texte secondaire** | `text-gray-400` / `text-gray-500` |
+| **Accent principal** | Gradient `from-blue-600 to-indigo-600` (greeting, liens) |
+| **Accent teal** | `from-teal-500 via-cyan-500 to-teal-400` (nom utilisateur hub) |
+| **Succès** | `text-emerald-600`, `bg-emerald-50` |
+| **Danger** | `text-red-500`, `hover:bg-red-50` |
+| **Font** | `-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif` |
+
+### Composants récurrents
+
+| Composant | Style Tailwind |
+|-----------|---------------|
+| **Header/Toolbar** | `bg-white/80 backdrop-blur-xl border-b border-gray-200/60` |
+| **Carte Bento** | `rounded-[20px]` ou `rounded-2xl`, `border`, `p-5`, `hover:shadow-lg hover:-translate-y-0.5` |
+| **Badge/Tag** | `px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase` |
+| **Bouton pill** | `rounded-xl`, `hover:bg-gray-100` |
+| **Segmented control** | `bg-gray-100 p-0.5 rounded-xl` → enfant actif `bg-white shadow-sm` |
+| **Input** | `bg-gray-100 border-gray-200/60 rounded-xl focus:border-blue-400 focus:ring-2 focus:ring-blue-100` |
+| **Footer** | `text-[10px] text-gray-400`, centré, `bg-transparent` ou `bg-white/60` |
+| **Modal** | `rounded-3xl shadow-2xl max-w-lg`, overlay `bg-black/20 backdrop-blur-sm` |
+
+### Couleurs par thème (Hub Bento Box)
+
+Le hub utilise 3 rangées de cartes avec des traitements visuels différents :
+
+| Rangée | Usage | Style carte |
+|--------|-------|-------------|
+| **Row 1** | Projet & Estimation | Cartes blanches, icônes grises, badges gris-argent |
+| **Row 2** | Outils & Administration | Cartes dark copper (`from-amber-950/90`), icônes amber, badges cuivrés |
+| **Row 3** | Paramètres & Compte | Cartes dark amethyst (`from-violet-950/90`), icônes violet, badges violets |
+
+### Couleurs par dossier (Gestion de Projets)
+
+Palette rotative définie dans `src/views/projectManager/folderColors.js` :
+- 6 couleurs : **blue, amber, violet, emerald, rose, cyan**
+- Chaque dossier reçoit une couleur par index (rotation)
+- Les tuiles projets héritent de la couleur de leur dossier (fond, bordure, bande latérale, badge)
+- Projets sans dossier → couleur neutre grise
+- Classes bien tranchées : `bg-{color}-50`, `border-{color}-300`, bande `w-1.5 bg-{color}-500`
+
+### Règles de design
+
+1. **Jamais de dark mode** sauf sur les cartes Row 2/3 du hub (copper/amethyst glass)
+2. **Coins arrondis** : `rounded-2xl` minimum pour les cartes, `rounded-xl` pour boutons/inputs
+3. **Ombres** : uniquement au hover (`hover:shadow-lg`), jamais au repos (sauf header blur)
+4. **Hover** : `hover:-translate-y-0.5` sur les cartes, `active:scale-[0.97]` sur mobile
+5. **Transitions** : `duration-200` pour les interactions, `duration-700` pour les animations d'entrée
+6. **Icônes** : Lucide React, `strokeWidth={1.5}`, taille 16-22px selon contexte
+7. **Espacement** : `gap-4` entre cartes, `px-6 py-5` padding intérieur cartes
+8. **Pas de glow/neon/drop-shadow coloré** sur le design light
+
+### EstimaMobileStyle — Variante mobile haute lisibilité
+
+Le mobile hérite d'EstimaStyle avec des ajustements pour l'usage extérieur (chantier, plein soleil) :
+
+| Règle | Détail |
+|-------|--------|
+| **Contraste fort** | Texte principal `text-gray-900`, secondaire `text-gray-700` minimum (jamais `gray-300/400`) |
+| **Fond** | `bg-[#f5f5f7]` global, cartes `bg-white border-gray-200` (bordures bien visibles) |
+| **Header** | `bg-white/70 backdrop-blur-xl border-gray-200/50`, texte `text-gray-900` |
+| **Onglets actifs** | `bg-gray-900 text-white shadow-sm rounded-xl` (noir, impossible à rater) |
+| **Onglets inactifs** | `bg-gray-100 text-gray-600` (gris moyen, pas clair) |
+| **Container onglets** | `bg-gray-100 rounded-2xl p-1` (segmented control Apple) |
+| **Icônes fonctionnelles** | Fond opaque (`bg-blue-50`, `bg-amber-50`, `bg-rose-100`), pas de `/10` |
+| **Prix et montants** | `text-gray-900 font-bold` ou `text-blue-600 font-bold` |
+| **Badges** | Fond opaque (`bg-indigo-100 text-indigo-700`), pas de transparence |
+| **Toast** | `bg-gray-900 text-white rounded-2xl` |
+| **Prose (HTML)** | Texte `#6b7280`, strong `#374151`, titres `#111827`, bordures `#e5e7eb` |
+
+**Fichiers** : `src/components/mobile/` (21 fichiers), styles partagés dans `MobileStyles.jsx`
 
 ---
 
@@ -54,6 +139,10 @@ projects/                           # Collection projets
     ├── branding (doc)              # masterBranding custom
     ├── bpu/                        # Subcollection BPU
     │   └── {bpuId} (doc)
+    ├── analysis/                   # Subcollection Analyse Prix (RAO)
+    │   └── data (doc)              # {companies, scoringConfig, lastSaved}
+    ├── rao/                        # Subcollection Rapport RAO
+    │   └── data (doc)              # {rao: {consultation, criteria, companies...}, lastSaved}
     ├── crc/                        # Subcollection CRC (WIP)
     │   └── {crcId} (doc)
     │       └── history/ (subcoll)  # Audit trail
@@ -120,11 +209,12 @@ VITE_APP_VERSION=2.0.0
 |--------|--------|------|----------|-------|
 | **Estimation** | Prod | Devis projet VRD | Firestore docs | JSON save/open |
 | **BPU Manager** | Prod | Gestion BPU + prix | Firestore subcoll | Exporte Excel, PDF |
+| **RAO & Analyse** | Prod | Analyse offres + rapport | Firestore subcoll dédiées | `analysis/data` + `rao/data` |
 | **CCTP/RC** | Prod | Marché + RC export | PDF generators | `pdfCctpRcGenerator.js` |
 | **Branding** | Prod | Identité visuelle | `masterBranding` | Modal 4-onglets |
 | **Compte Rendu Chantier** | WIP | Observations chantier | CRC collection | Carry-forward incomplètes |
 | **Document Admin** | WIP | Docs administratives | Admin-docs collection | Templates, role-restricted |
-| **PWA Mobile** | Prod | App mobile offline | Service Worker | Partage natif `shareInterceptor.js` |
+| **PWA Mobile** | Prod | App mobile offline | Service Worker | 7 modules dont RAO |
 
 ---
 
@@ -211,12 +301,26 @@ Time-box: 45 min.
 - [ ] Imports résolus (Vite)
 - [ ] Firestore rules OK (multi-tenant)
 - [ ] Branding utilisé (fonts, colors depuis config)
-- [ ] Components mémoïzés si listes
+- [ ] Components mémoïzés si listesfirebase deploy
 - [ ] ErrorBoundary sur vues critiques
 - [ ] Pas de `console.log()`, secrets
 - [ ] Build OK (0 warnings)
 - [ ] Desktop + mobile responsive
 - [ ] Git messages français clairs
+- [ ] **Changelog mis à jour** (`src/data/changelog.js`) — voir règle ci-dessous
+
+### Règle Changelog Automatique
+
+**Quand mettre à jour ?** → Si l'utilisateur peut **voir ou ressentir** la différence.
+- ✅ Nouvelle feature, refonte visuelle, correction de bug visible, nouveau module
+- ❌ Refactor interne, fix typo code, ajustement CSS mineur, nettoyage imports, MAJ dépendances
+
+**Comment ?** Claude DOIT :
+1. **Bumper `APP_VERSION`** dans `src/data/changelog.js` (patch pour fix, minor pour feature)
+2. **Ajouter le highlight** en une ligne concise dans `highlights[]` de l'entrée courante
+3. **Ne pas créer de nouvelle entrée** si la version est déjà en cours — enrichir l'existante
+
+**Fichier** : `src/data/changelog.js`
 
 ---
 
@@ -224,7 +328,13 @@ Time-box: 45 min.
 
 ```
 src/views/{module}/           # Modular = views/bpu/, views/projectManager/, etc.
+src/views/RaoView.jsx         # Rapport RAO (5 onglets, sauvegarde Firestore manuelle)
 src/components/               # Partagés: Branding, ErrorBoundary, etc.
+src/components/analysis/      # Analyse financière: Table, Toolbar, OabDetailModal
+src/components/rao/           # RAO: RaoUI, RaoConstants, tabs/ (Consultation, Admin, Technique, Négo, Récap)
+src/components/mobile/        # Mobile: 7 modules dont RAOView (4 onglets consultation)
+src/hooks/usePriceAnalysis.js # Analyse prix — Firestore dédié (analysis/data), auto-save debounced
+src/hooks/useRao.js           # RAO — critères, sous-critères, groupements, notation technique
 src/utils/pdf/               # PDF generators (jsPDF)
 src/utils/hooks/             # Custom Firestore hooks
 src/App.jsx                  # Sidebar nav + routing
@@ -254,12 +364,17 @@ src/App.jsx                  # Sidebar nav + routing
 
 ## 12. Backlog Actif
 
+- [x] RAO: Sauvegarde Firestore dédiée (analysis/data + rao/data)
+- [x] RAO: Import Excel multi-onglets + fallback ref
+- [x] RAO: Sous-critères avec pondération hiérarchique
+- [x] RAO: Groupement d'entreprises (admin par membre)
+- [x] RAO: OAB détail (modale calcul Double Moyenne)
+- [x] RAO: Vue mobile 4 onglets + module hub
+- [x] RAO: Volets figés analyse financière (sticky left)
+- [ ] RAO: Export PDF avec sous-critères et groupements
 - [ ] CRC: form → Firestore → PDF complet
 - [ ] Admin-docs: templates éditables + role check
-- [ ] Intégration CRC/Admin-docs Sidebar
-- [ ] Vitest CRC business logic
-- [ ] Dynamic split Admin-docs
-- [ ] Firestore rules CRC/Admin-docs
+- [ ] Vitest RAO/CRC business logic
 - [ ] Lighthouse audit + optimisation
 
 ---
@@ -397,6 +512,11 @@ MOI: Code rules + tests
 | **Persistance Firestore ?** | Définis subcollection, custom hook `useMonFeature()`, gestion erreur + Sentry |
 | **Branding system ?** | Importe `masterBranding`, accède `branding.fonts.h1`, PDF generators déjà intégrés |
 | **Multi-tenant ?** | Firestore rules vérifient ownership, pas de cross-tenant queries |
+| **Données RAO ?** | Document dédié `projects/{id}/analysis/data` (auto-save) + `projects/{id}/rao/data` (save manuel bouton) |
+| **Import Excel RAO ?** | Multi-onglets (tranches), fallback par n° ref (P.01...), `usePriceAnalysis.js` |
+| **Sous-critères RAO ?** | `criteria[].subCriteria[]` avec `{id, label, description, weight}`, pondération parent = Σ |
+| **Groupement entreprises ?** | `admin.isGroupement` + `admin.groupementMembers[]` par entreprise, pièces admin par membre |
+| **Vue mobile RAO ?** | `src/components/mobile/RAOView.jsx` — charge depuis Firestore dédié, 4 onglets |
 
 ---
 
@@ -404,7 +524,9 @@ MOI: Code rules + tests
 
 | V | Date | Changes |
 |---|------|---------|
-| 2.1 | Avril 2026 | **Travail Préparatoire Silencieux** (@analyze, @refactor-proposal, @audit, @doc-gen, @test-gen) |
+| 2.3 | Avril 2026 | **Module RAO complet** : sauvegarde Firestore dédiée, sous-critères, groupements, OAB détail, volets figés, vue mobile RAO 4 onglets, hub mobile 2x3, import Excel multi-onglets + fallback ref, export/import JSON |
+| 2.2 | Avril 2026 | **Changelog intégré** + règle auto-update CLAUDE.md |
+| 2.1 | Avril 2026 | **Refonte visuelle** Bento Box Apple, météo, couleurs dossiers, design light |
 | 2.0+ | Avril 2026 | Auto-amélioration cycle + Refactoring Proactif |
 | 2.0 | Avril 2026 | Couverture complète EstimaVRD, agents, économe tokens |
 | 1.0 | Avril 2026 | Initial (CRC + Admin-docs) |

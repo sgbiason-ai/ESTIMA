@@ -267,19 +267,18 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
   }, [analysisStats, chaptersData, includedOptions, analysisCompanies, scoringConfig]);
 
   // ── CALCUL DES SCORES ─────────────────────────────────────────────────────
-  // Utilise directement stats.companyScores de usePriceAnalysis (déjà calculé avec la bonne formule f1-f9)
-  // et ramène le score prix sur le poids défini dans les critères RAO.
+  // Reprend directement les scores prix de l'analyse financière (usePriceAnalysis)
+  // et les rebase sur le poids du critère prix dans la grille RAO.
   const computeScores = () => {
-    const autoCrit = criteria.find(c => c.auto);
-    const priceWeight = autoCrit?.weight || 60;
+    // N = barème prix dans la grille RAO (affiché en lecture seule = scoringConfig.maxScore)
     const N = Number(scoringConfig?.maxScore || 40);
     const mode = scoringConfig?.mode || 'f1';
 
-    // Stats effectives (avec PSE si applicables)
+    // Totaux depuis l'analyse financière (source de vérité)
     const effectiveStats = raoAnalysisStats || analysisStats;
     const companiesTotals = effectiveStats?.companiesTotals || {};
 
-    // Recalcul Pmin/Pmax/Pmoy depuis les totaux effectifs
+    // Calcul Pmin/Pmax/Pmoy depuis les totaux
     const validTotals = analysisCompanies.map(c => companiesTotals[c.id] || 0).filter(t => t > 0);
     const Pmin = validTotals.length ? Math.min(...validTotals) : 0;
     const Pmax = validTotals.length ? Math.max(...validTotals) : 0;
@@ -290,7 +289,7 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
       const name = company.name;
       const price = companiesTotals[company.id] || 0;
 
-      // Score prix : calculé directement avec la formule, puis rebasé sur le poids RAO
+      // Score prix : recalculé avec la formule et N (barème RAO)
       let rawScore = 0;
       if (price > 0 && Pmin > 0) {
         switch (mode) {
@@ -306,8 +305,7 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
           default:   rawScore = N * (Pmin / price);
         }
       }
-      const clampedScore = Math.max(0, Math.min(N, rawScore));
-      const priceScore = (clampedScore / N) * priceWeight;
+      const priceScore = Math.max(0, Math.min(N, rawScore));
 
       // Scores techniques (notes saisies dans le RAO)
       const techScores = {};
