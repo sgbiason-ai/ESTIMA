@@ -112,11 +112,20 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
   }, [companies, scoringConfig, firestoreLoaded, saveAnalysis]);
 
   // ─── EXPORT JSON ──────────────────────────────────────────────────────────
-  const handleExportJson = useCallback(() => {
+  const handleExportJson = useCallback(async () => {
+    // Charger les données RAO depuis Firestore si pas encore en mémoire
+    let raoData = project?.rao || {};
+    if (Object.keys(raoData).length === 0 && project?.id && companyId) {
+      try {
+        const docRef = doc(fireDb, 'companies', companyId, 'projects', project.id, 'rao', 'data');
+        const snap = await getDoc(docRef);
+        if (snap.exists() && snap.data().rao) raoData = snap.data().rao;
+      } catch (e) { console.warn('[Analysis] RAO fetch for export:', e); }
+    }
     const data = {
       companies,
       scoringConfig,
-      rao: project?.rao || {},
+      rao: raoData,
       exportedAt: new Date().toISOString(),
       projectName: project?.name,
     };
@@ -128,7 +137,7 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
     a.click();
     URL.revokeObjectURL(url);
     toast.success('Export JSON téléchargé.');
-  }, [companies, scoringConfig, project?.rao, project?.name, toast]);
+  }, [companies, scoringConfig, project?.rao, project?.id, project?.name, companyId, toast]);
 
   // ─── IMPORT JSON ──────────────────────────────────────────────────────────
   const handleImportJson = useCallback(async (event) => {
