@@ -84,13 +84,21 @@ export const useMobileProjects = (user, companyId) => {
     fetchProjects();
   }, [fetchProjects]);
 
-  // Charge un projet complet par son ID
+  // Charge un projet complet par son ID (+ subcollections analysis & rao)
   const loadProject = useCallback(async (projectId) => {
     if (!companyId) return null;
     try {
       const snap = await getDoc(doc(db, 'companies', companyId, 'projects', projectId));
-      if (snap.exists()) return snap.data();
-      return null;
+      if (!snap.exists()) return null;
+      const data = snap.data();
+      // Charger analysis/data et rao/data en parallèle
+      const [analysisSnap, raoSnap] = await Promise.all([
+        getDoc(doc(db, 'companies', companyId, 'projects', projectId, 'analysis', 'data')).catch(() => null),
+        getDoc(doc(db, 'companies', companyId, 'projects', projectId, 'rao', 'data')).catch(() => null),
+      ]);
+      if (analysisSnap?.exists()) data.analysis = analysisSnap.data();
+      if (raoSnap?.exists() && raoSnap.data().rao) data.rao = raoSnap.data().rao;
+      return data;
     } catch (e) {
       console.error('[Mobile] Erreur chargement projet:', e);
       return null;
