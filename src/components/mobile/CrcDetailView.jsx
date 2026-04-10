@@ -566,7 +566,7 @@ function ObservationCard({ obs, contactName, canEdit, onEdit, onTap, onViewImage
 
   return (
     <div
-      className="px-3 py-2.5 border-t border-gray-100 active:bg-gray-50 cursor-pointer"
+      className="px-3 py-2.5 border-t border-gray-100 bg-white active:bg-gray-50 cursor-pointer"
       onClick={() => onTap?.()}
     >
       {/* Status + emitter */}

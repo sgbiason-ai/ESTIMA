@@ -1,7 +1,7 @@
 // src/components/mobile/SiteVisitDetailView.jsx
 // Vue détail d'une visite de site — observations + terrain.
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import Icon from './Icon';
 import { dateFr } from './formatters';
 import { stripHtml } from '../../utils/formatObsText';
@@ -26,8 +26,9 @@ function ObsCard({ obs, number, onTap, onDelete, onViewImage }) {
   const text = stripHtml(obs.text || '');
   const images = obs.images || [];
   const [swipeX, setSwipeX] = useState(0);
-  const [touchStart, setTouchStart] = useState(null);
-  const showDelete = swipeX < -60;
+  const touchStartRef = useRef(null);
+  const swipeRef = useRef(0);
+  const wasTapRef = useRef(true);
 
   return (
     <div className="relative overflow-hidden rounded-xl">
@@ -38,12 +39,12 @@ function ObsCard({ obs, number, onTap, onDelete, onViewImage }) {
       </div>
 
       <div
-        className="relative bg-white border border-gray-200 p-3 active:bg-gray-50 cursor-pointer rounded-xl"
-        style={{ transform: `translateX(${Math.min(0, Math.max(-80, swipeX))}px)`, transition: touchStart ? 'none' : 'transform 0.25s ease' }}
-        onClick={() => { if (Math.abs(swipeX) < 10) onTap(obs); else setSwipeX(0); }}
-        onTouchStart={e => setTouchStart(e.touches[0].clientX)}
-        onTouchMove={e => { if (touchStart != null) setSwipeX(e.touches[0].clientX - touchStart); }}
-        onTouchEnd={() => { setTouchStart(null); if (swipeX > -60) setSwipeX(0); }}
+        className="relative w-full bg-white border border-gray-200 p-3 active:bg-gray-50 cursor-pointer rounded-xl"
+        style={{ transform: `translateX(${Math.min(0, Math.max(-80, swipeX))}px)`, transition: touchStartRef.current != null ? 'none' : 'transform 0.25s ease' }}
+        onClick={() => { if (wasTapRef.current) onTap(obs); else { swipeRef.current = 0; setSwipeX(0); } wasTapRef.current = true; }}
+        onTouchStart={e => { touchStartRef.current = e.touches[0].clientX; swipeRef.current = 0; wasTapRef.current = true; }}
+        onTouchMove={e => { if (touchStartRef.current != null) { const dx = e.touches[0].clientX - touchStartRef.current; swipeRef.current = dx; setSwipeX(dx); } }}
+        onTouchEnd={() => { wasTapRef.current = Math.abs(swipeRef.current) < 15; touchStartRef.current = null; if (swipeRef.current > -60) { swipeRef.current = 0; setSwipeX(0); } }}
       >
       <div className="flex items-start gap-2.5">
         <span className="shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-[11px] font-bold flex items-center justify-center mt-0.5">{number}</span>
@@ -52,7 +53,7 @@ function ObsCard({ obs, number, onTap, onDelete, onViewImage }) {
         <p className="text-[13px] text-gray-700 leading-relaxed line-clamp-4 whitespace-pre-line">{text}</p>
       )}
       {!text && images.length === 0 && (
-        <p className="text-[13px] text-gray-400 italic">Observation vide — appuyez pour éditer</p>
+        <p className="text-[13px] text-gray-500 italic">Observation vide — appuyez pour éditer</p>
       )}
       {images.length > 0 && (
         <div className="flex gap-1.5 mt-2" onClick={e => e.stopPropagation()}>
@@ -82,7 +83,7 @@ function ObsCard({ obs, number, onTap, onDelete, onViewImage }) {
           )}
         </div>
       )}
-      {obs.date && <div className="text-[10px] text-gray-400 mt-2">{dateFr(obs.date)}</div>}
+      {obs.date && <div className="text-[10px] text-gray-500 mt-2">{dateFr(obs.date)}</div>}
         </div>
       </div>
       </div>
