@@ -8,8 +8,7 @@ import ChangelogModal from '../ChangelogModal';
 // ─── MODULES MOBILES ───────────────────────────────────────────────────────
 
 const MOBILE_MODULES = [
-  { id: 'projects',    label: 'Mes Projets',         description: 'Devis, DQE et analyses',          icon: 'folder',    tag: 'Core',    row: 1 },
-  { id: 'rao',         label: 'Analyse Offres',      description: 'Comparatif prix et classement',   icon: 'chart',     tag: 'RAO',     row: 1 },
+  { id: 'projects',    label: 'Mes Projets & RAO',   description: 'Devis, DQE et analyse des offres', icon: 'folder',    tag: 'Core',    row: 1, wide: true },
   { id: 'crc',         label: 'Comptes Rendus',      description: 'CR de chantier',                  icon: 'clipboard', tag: 'CRC',     row: 2 },
   { id: 'site_visits', label: 'Visites de Site',     description: 'Notes terrain, photos et GPS',    icon: 'camera',    tag: 'Terrain', row: 2 },
   { id: 'moe',         label: 'Devis MOE',           description: 'Honoraires maîtrise d\'œuvre',    icon: 'euro',      tag: 'MOE',     row: 3 },
@@ -98,13 +97,15 @@ export default function MobileHubView({ userEmail, onSelectModule, onLogout, isL
         <div className="grid grid-cols-2 gap-2.5 flex-1">
           {MOBILE_MODULES.map((mod, idx) => {
             const theme = ROW_THEMES[mod.row];
+            const isWide = !!mod.wide;
             return (
               <button
                 key={mod.id}
                 onClick={() => onSelectModule(mod.id)}
                 className={`
-                  relative flex flex-col items-center justify-center gap-3 w-full rounded-[20px]
-                  border text-center transition-all duration-300 active:scale-[0.97]
+                  relative w-full rounded-[20px]
+                  border transition-all duration-300 active:scale-[0.97]
+                  ${isWide ? 'col-span-2 flex flex-row items-center gap-4 px-5 py-4' : 'flex flex-col items-center justify-center gap-3 text-center'}
                   ${theme.card}
                 `}
                 style={{
@@ -121,15 +122,20 @@ export default function MobileHubView({ userEmail, onSelectModule, onLogout, isL
                 )}
 
                 {/* Icon */}
-                <div className={`w-14 h-14 rounded-2xl ${theme.iconBg} flex items-center justify-center`}>
-                  <Icon name={mod.icon} size={26} color={theme.iconColor} />
+                <div className={`${isWide ? 'w-12 h-12' : 'w-14 h-14'} rounded-2xl ${theme.iconBg} flex items-center justify-center shrink-0`}>
+                  <Icon name={mod.icon} size={isWide ? 24 : 26} color={theme.iconColor} />
                 </div>
 
                 {/* Text */}
-                <div>
-                  <span className={`text-[15px] font-semibold block ${theme.title}`}>{mod.label}</span>
+                <div className={isWide ? 'text-left flex-1' : ''}>
+                  <span className={`${isWide ? 'text-[16px]' : 'text-[15px]'} font-semibold block ${theme.title}`}>{mod.label}</span>
                   <p className={`text-[11px] leading-snug mt-0.5 ${theme.desc}`}>{mod.description}</p>
                 </div>
+
+                {/* Chevron pour wide */}
+                {isWide && (
+                  <Icon name="chevron" size={16} color="#9ca3af" />
+                )}
               </button>
             );
           })}
