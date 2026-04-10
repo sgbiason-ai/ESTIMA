@@ -3,10 +3,11 @@
 // Bottom sheet pour éditer une observation CRC sur mobile.
 // contentEditable pour le texte, capture caméra + galerie pour les images.
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import Icon from './Icon';
 import { compressImage } from '../../utils/imageCompressor';
 import { useOrientation } from '../../hooks/useOrientation';
+import { useSpeechToText } from '../../hooks/useSpeechToText';
 
 // ─── STATUS CONFIG ─────────────────────────────────────────────────────────
 const STATUSES = [
@@ -43,6 +44,27 @@ export default function ObservationEditSheet({
   const textRef = useRef(null);
 
   const images = obs?.images || [];
+
+  // ── Speech-to-text ──
+  const { isListening, transcript, interimTranscript, isSupported: micSupported, start: startMic, stop: stopMic } = useSpeechToText();
+
+  // Quand la transcription finale arrive, l'ajouter au texte
+  useEffect(() => {
+    if (transcript && textRef.current) {
+      const current = textRef.current.innerHTML || '';
+      const separator = current && !current.endsWith(' ') && !current.endsWith('<br>') ? ' ' : '';
+      textRef.current.innerHTML = current + separator + transcript;
+      if (onUpdate && obs) onUpdate(obs.id, { text: textRef.current.innerHTML });
+    }
+  }, [transcript]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggleMic = useCallback(() => {
+    if (isListening) {
+      stopMic();
+    } else {
+      startMic();
+    }
+  }, [isListening, startMic, stopMic]);
 
   // ── Handlers ──
   const update = useCallback((patch) => {
@@ -144,7 +166,7 @@ export default function ObservationEditSheet({
             </Field>
           </div>
 
-          {/* Text (contentEditable) */}
+          {/* Text (contentEditable) + Voice */}
           <Field label="Observation">
             <div
               ref={textRef}
@@ -154,6 +176,28 @@ export default function ObservationEditSheet({
               className="min-h-[100px] px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-gray-900 leading-relaxed focus:outline-none focus:border-emerald-500/40"
               dangerouslySetInnerHTML={{ __html: obs.text || '' }}
             />
+
+            {/* Transcription en cours (interim) */}
+            {isListening && interimTranscript && (
+              <div className="px-3 py-2 mt-1 rounded-lg bg-blue-50 border border-blue-200 text-[13px] text-blue-700 italic">
+                {interimTranscript}…
+              </div>
+            )}
+
+            {/* Bouton dictée vocale */}
+            {micSupported && (
+              <button
+                onClick={toggleMic}
+                className={`flex items-center justify-center gap-2 w-full mt-2 py-3 rounded-xl text-xs font-semibold transition active:scale-[0.98] ${
+                  isListening
+                    ? 'bg-red-500 text-white animate-pulse shadow-lg'
+                    : 'bg-violet-50 border border-violet-200 text-violet-600'
+                }`}
+              >
+                <Icon name={isListening ? 'stop' : 'mic'} size={16} color={isListening ? '#fff' : '#7c3aed'} />
+                {isListening ? 'Arrêter la dictée…' : 'Dictée vocale'}
+              </button>
+            )}
           </Field>
 
           {/* Action by + Deadline */}

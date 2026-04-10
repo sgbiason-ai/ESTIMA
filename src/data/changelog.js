@@ -16,6 +16,7 @@ export const CHANGELOG = [
       'Badge RAO sur les cartes projets mobile',
       'Hub mobile : tuile "Mes Projets & RAO" fusionnée pleine largeur',
       'Photos terrain : affichage miniature instantané (cache GPS partagé, compression optimisée)',
+      'Dictée vocale française sur les observations CRC et Visites de site',
     ],
   },
   {

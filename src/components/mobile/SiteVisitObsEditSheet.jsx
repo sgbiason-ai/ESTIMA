@@ -1,14 +1,33 @@
 // src/components/mobile/SiteVisitObsEditSheet.jsx
 // Éditeur d'observation simplifié pour les visites de site.
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Icon from './Icon';
 import { compressImage } from '../../utils/imageCompressor';
+import { useSpeechToText } from '../../hooks/useSpeechToText';
 
 export default function SiteVisitObsEditSheet({ obs, onUpdate, onDelete, onClose, onViewImage, inline = false }) {
   const [text, setText] = useState(obs.text || '');
   const [images, setImages] = useState(obs.images || []);
   const fileRef = useRef(null);
+
+  // ── Speech-to-text ──
+  const { isListening, transcript, interimTranscript, isSupported: micSupported, start: startMic, stop: stopMic } = useSpeechToText();
+
+  // Quand la transcription finale arrive, l'ajouter au texte
+  useEffect(() => {
+    if (transcript) {
+      setText(prev => {
+        const separator = prev && !prev.endsWith(' ') && !prev.endsWith('\n') ? ' ' : '';
+        return prev + separator + transcript;
+      });
+    }
+  }, [transcript]);
+
+  const toggleMic = useCallback(() => {
+    if (isListening) stopMic();
+    else startMic();
+  }, [isListening, startMic, stopMic]);
 
   const handleSave = () => {
     onUpdate(obs.id, { text, images });
@@ -46,6 +65,29 @@ export default function SiteVisitObsEditSheet({ obs, onUpdate, onDelete, onClose
             placeholder="Décrivez votre observation…"
             className="w-full min-h-[120px] p-3 bg-gray-50 border border-gray-200 rounded-xl text-[14px] text-gray-800 placeholder-gray-400 resize-none focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 mt-3"
           />
+
+          {/* Transcription en cours (interim) */}
+          {isListening && interimTranscript && (
+            <div className="px-3 py-2 mt-1 rounded-lg bg-blue-50 border border-blue-200 text-[13px] text-blue-700 italic">
+              {interimTranscript}…
+            </div>
+          )}
+
+          {/* Bouton dictée vocale */}
+          {micSupported && (
+            <button
+              onClick={toggleMic}
+              type="button"
+              className={`flex items-center justify-center gap-2 w-full mt-2 py-3 rounded-xl text-[13px] font-semibold transition active:scale-[0.98] ${
+                isListening
+                  ? 'bg-red-500 text-white animate-pulse shadow-lg'
+                  : 'bg-violet-50 border border-violet-200 text-violet-600'
+              }`}
+            >
+              <Icon name={isListening ? 'stop' : 'mic'} size={16} color={isListening ? '#fff' : '#7c3aed'} />
+              {isListening ? 'Arrêter la dictée…' : 'Dictée vocale'}
+            </button>
+          )}
 
           {/* Photos */}
           {images.length > 0 && (
