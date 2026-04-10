@@ -24,9 +24,9 @@ export default function SiteVisitObsEditSheet({ obs, onUpdate, onDelete, onClose
     }
   }, [transcript]);
 
-  const toggleMic = useCallback(async () => {
+  const toggleMic = useCallback(() => {
     if (isListening) stopMic();
-    else await startMic();
+    else startMic();
   }, [isListening, startMic, stopMic]);
 
   const handleSave = () => {
