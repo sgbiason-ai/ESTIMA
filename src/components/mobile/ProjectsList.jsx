@@ -136,6 +136,9 @@ export default function ProjectsList({ projects, folders, loading, search, onSea
                 <span>{p.tranches.length} tr.</span>
               </>
             )}
+            {p.hasRao && (
+              <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-[9px] font-black rounded-md uppercase tracking-wide">RAO</span>
+            )}
             <span className="ml-auto text-xs text-gray-300">{dateFr(p.lastSaved)}</span>
             <Icon name="chevron" size={14} color="#d1d5db" />
           </div>

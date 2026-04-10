@@ -37,6 +37,7 @@ export const useMobileProjects = (user, companyId) => {
             updatedBy: data.updatedBy || '',
             tranches:  data.tranches || [],
             hasPSE:    !!data.hasPSE,
+            hasRao:    !!(data.rao && (data.rao.criteria?.length > 0 || Object.keys(data.rao.companies || {}).length > 0)),
             folderId:  data.folderId || null,
             chaptersCount: (data.chapters || []).length,
             itemsCount:    countItems(data.chapters || []),
