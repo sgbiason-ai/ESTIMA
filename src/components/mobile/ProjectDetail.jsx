@@ -9,13 +9,14 @@ export default function ProjectDetail({ project, calcHook, onNavigate, onExport,
   const nbTranches  = (project.tranches || []).length;
   const nbChapters  = (project.chapters || []).length;
   const nbItems     = flattenItems(project.chapters).length;
-  const hasRAO      = project.analysis && project.analysis.companies && project.analysis.companies.length > 0;
+  const analysisCompanies = project.analysis?.companies || [];
+  const hasRAO      = analysisCompanies.length > 0 || (project.rao && Object.keys(project.rao).length > 0);
 
   const menuItems = [
     { key: 'dqe', icon: 'euro', label: 'DQE par Tranche', desc: 'Détail quantitatif estimatif' },
     { key: 'bpu', icon: 'list', label: 'Bordereau des Prix', desc: `${nbItems} articles avec descriptions` },
     { key: 'tranches', icon: 'grid', label: 'Récap. par Tranche', desc: `${nbTranches || 1} tranche${nbTranches > 1 ? 's' : ''} · ${nbChapters} chapitres` },
-    ...(hasRAO ? [{ key: 'rao', icon: 'chart', label: 'Analyse des Offres', desc: `${project.analysis.companies.length} entreprises` }] : []),
+    ...(hasRAO ? [{ key: 'rao', icon: 'chart', label: 'Analyse des Offres', desc: `${analysisCompanies.length} entreprise${analysisCompanies.length !== 1 ? 's' : ''}` }] : []),
     { key: 'exports', icon: 'download', label: 'Exports', desc: 'PDF, Excel, partage' },
   ];
 
