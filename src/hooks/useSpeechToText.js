@@ -1,8 +1,7 @@
 // src/hooks/useSpeechToText.js
 //
 // Hook de reconnaissance vocale → texte français.
-// Utilise l'API Web Speech (native Chrome / Safari).
-// SpeechRecognition gère ses propres permissions micro — pas besoin de getUserMedia.
+// Utilise l'API Web Speech (native Chrome Android / Safari).
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 
@@ -10,10 +9,24 @@ const SpeechRecognitionClass = typeof window !== 'undefined'
   ? (window.SpeechRecognition || window.webkitSpeechRecognition)
   : null;
 
-// Détection iOS standalone (PWA home screen) — Web Speech API non supporté
+// Détection iOS standalone (PWA home screen)
 const isIOSStandalone = typeof window !== 'undefined'
   && ('standalone' in window.navigator)
   && window.navigator.standalone === true;
+
+/**
+ * Vérifie l'état de la permission micro via Permissions API.
+ * Retourne 'granted', 'denied', ou 'prompt'.
+ */
+const checkMicPermission = async () => {
+  try {
+    if (navigator.permissions?.query) {
+      const result = await navigator.permissions.query({ name: 'microphone' });
+      return result.state; // 'granted' | 'denied' | 'prompt'
+    }
+  } catch {}
+  return 'prompt'; // Par défaut, on suppose que c'est possible
+};
 
 /**
  * @param {Object} options
@@ -27,7 +40,6 @@ export const useSpeechToText = ({ lang = 'fr-FR' } = {}) => {
   const [error, setError] = useState(null);
   const recognitionRef = useRef(null);
 
-  // Support réel : l'API existe ET on n'est pas en iOS standalone (non supporté)
   const isSupported = !!SpeechRecognitionClass && !isIOSStandalone;
 
   // Nettoyage à la destruction
@@ -40,13 +52,20 @@ export const useSpeechToText = ({ lang = 'fr-FR' } = {}) => {
     };
   }, []);
 
-  const start = useCallback(() => {
+  const start = useCallback(async () => {
     if (!SpeechRecognitionClass) {
-      setError('Reconnaissance vocale non supportée par ce navigateur');
+      setError('Reconnaissance vocale non supportée par ce navigateur.');
       return;
     }
     if (isIOSStandalone) {
       setError('Dictée vocale non disponible en mode app. Ouvrez dans Safari.');
+      return;
+    }
+
+    // Vérifier la permission micro AVANT de lancer
+    const permState = await checkMicPermission();
+    if (permState === 'denied') {
+      setError('Micro bloqué. Appuyez sur le cadenas 🔒 dans la barre d\'adresse → Autorisations → Micro → Autoriser, puis réessayez.');
       return;
     }
 
@@ -87,12 +106,12 @@ export const useSpeechToText = ({ lang = 'fr-FR' } = {}) => {
 
     recognition.onerror = (event) => {
       const messages = {
-        'not-allowed':           'Micro bloqué. Allez dans Réglages du site → Autoriser le micro.',
-        'service-not-allowed':   'Micro bloqué. Allez dans Réglages du site → Autoriser le micro.',
-        'audio-capture':         'Impossible de capturer l\'audio. Vérifiez qu\'aucune autre app utilise le micro.',
-        'network':               'Erreur réseau — la reconnaissance vocale nécessite une connexion internet.',
-        'no-speech':             null, // Bénin
-        'aborted':               null, // Bénin
+        'not-allowed':           'Micro bloqué. Appuyez sur le cadenas 🔒 → Autorisations → Micro → Autoriser.',
+        'service-not-allowed':   'Micro bloqué. Appuyez sur le cadenas 🔒 → Autorisations → Micro → Autoriser.',
+        'audio-capture':         'Impossible de capturer l\'audio. Fermez les autres apps qui utilisent le micro.',
+        'network':               'Erreur réseau — la dictée vocale nécessite internet.',
+        'no-speech':             null,
+        'aborted':               null,
       };
       const msg = messages[event.error] ?? `Erreur : ${event.error}`;
       if (msg) {

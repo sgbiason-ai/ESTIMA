@@ -58,9 +58,9 @@ export default function ObservationEditSheet({
     }
   }, [transcript]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const toggleMic = useCallback(() => {
+  const toggleMic = useCallback(async () => {
     if (isListening) stopMic();
-    else startMic();
+    else await startMic();
   }, [isListening, startMic, stopMic]);
 
   // ── Handlers ──
