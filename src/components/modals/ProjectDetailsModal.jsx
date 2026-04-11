@@ -4,7 +4,7 @@ import {
   Ruler, Briefcase, Clock, Hash, CheckCircle2,
   Hourglass, Navigation, Move, AlertTriangle, Upload, Trash2, ImageIcon,
   FileText, Globe2, ShieldAlert, Layers, PenLine, ToggleLeft, ToggleRight,
-  Eye, RefreshCw, Link
+  Eye, RefreshCw, Link, Plus
 } from 'lucide-react';
 import { buildCoverPageCanvas } from '../../utils/coverPageCanvas';
 
@@ -157,6 +157,7 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
     showSignatures: true,
     signatories: ['', '', '', ''],
     sharepointUrl: '',
+    sharepointPlans: [],
   });
 
   const modalRef = useRef(null);
@@ -242,6 +243,7 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
         showSignatures: project.showSignatures !== false,
         signatories: project.signatories || ['', '', '', ''],
         sharepointUrl: project.sharepointUrl || '',
+        sharepointPlans: project.sharepointPlans || [],
       });
     }
     wasOpenRef.current = isOpen;
@@ -258,7 +260,7 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
     const errs = {};
     if (!data.name || data.name.trim().length < 3) errs.name = "Minimum 3 caractères.";
     if (!data.client || data.client.trim().length < 3) errs.client = "Minimum 3 caractères.";
-    if (!data.code || !/^\d{2}-\d{3,4}$/.test(data.code.trim())) errs.code = "Format requis : AA-XXXX (ex: 26-0001).";
+    if (data.code && !/^\d{2}-\d{3,4}$/.test(data.code.trim())) errs.code = "Format requis : AA-XXXX (ex: 26-0001).";
     if (data.clientZip && !/^\d{5}$/.test(data.clientZip.trim())) errs.clientZip = "Doit contenir 5 chiffres.";
     const specialCharRegex = /[<>{}\[\]$|\\^~]/;
     ['clientCity', 'location', 'clientAddress', 'moe'].forEach(field => {
@@ -499,36 +501,75 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
 
           {/* SHAREPOINT — DOSSIER PLANS */}
           <div className="mt-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-            <h3 className="text-xs font-black text-blue-600 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-3 mb-4">
-              <Link size={12}/> Dossier Plans (SharePoint)
-            </h3>
-            <ModernInput
-              label="URL complète du dossier SharePoint"
-              name="sharepointUrl"
-              value={formData.sharepointUrl}
-              onChange={handleChange}
-              icon={Link}
-              placeholder="https://company.sharepoint.com/sites/Projet/Documents/Plans"
-            />
-            <p className="text-[10px] text-blue-400 mt-1 ml-1">
-              Dans SharePoint, clic droit sur le dossier → « Copier le lien » puis collez ici.
-            </p>
-            {formData.sharepointUrl && (
-              <a
-                href={formData.sharepointUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2 mt-3 px-4 py-2.5 rounded-xl bg-blue-600 text-white text-[12px] font-bold hover:bg-blue-700 transition active:scale-[0.97]"
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <h3 className="text-xs font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
+                <Link size={12}/> Plans (SharePoint)
+              </h3>
+              <button
+                type="button"
+                onClick={() => setFormData(prev => ({
+                  ...prev,
+                  sharepointPlans: [...(prev.sharepointPlans || []), { name: '', url: 'https://papyrusbe.sharepoint.com/sites/Papyrus1/' }],
+                }))}
+                className="flex items-center gap-1.5 text-[11px] font-bold text-blue-600 hover:text-blue-700 px-2.5 py-1.5 rounded-lg hover:bg-blue-50 transition-all"
               >
-                <Globe2 size={14} />
-                Ouvrir le dossier SharePoint
-              </a>
+                <Plus size={12} /> Ajouter un dossier
+              </button>
+            </div>
+            <p className="text-[10px] text-gray-400 mb-3">
+              Ajoutez un lien par phase de rendu (AVP, PRO, DCE, EXE...). Clic droit sur le dossier SharePoint → « Copier le lien ».
+            </p>
+
+            {(formData.sharepointPlans || []).length === 0 && (
+              <p className="text-[11px] text-gray-300 italic text-center py-4">Aucun dossier de plans configuré.</p>
             )}
-            {!formData.sharepointUrl && (
-              <p className="text-[10px] text-gray-400 mt-1.5 ml-1">
-                Ce lien sera accessible depuis le menu « Plans » en vue mobile.
-              </p>
-            )}
+
+            <div className="space-y-2">
+              {(formData.sharepointPlans || []).map((plan, idx) => (
+                <div key={idx} className="flex items-start gap-2 p-3 bg-gray-50 rounded-xl border border-gray-200/60">
+                  <div className="flex-1 space-y-2">
+                    <input
+                      type="text"
+                      value={plan.name}
+                      onChange={e => {
+                        const updated = [...formData.sharepointPlans];
+                        updated[idx] = { ...updated[idx], name: e.target.value };
+                        setFormData(prev => ({ ...prev, sharepointPlans: updated }));
+                      }}
+                      placeholder="Nom (ex: Plans DCE, Plans EXE...)"
+                      className="w-full px-2.5 py-1.5 text-[12px] font-semibold border border-gray-200/60 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 text-gray-800"
+                    />
+                    <input
+                      type="url"
+                      value={plan.url}
+                      onChange={e => {
+                        const updated = [...formData.sharepointPlans];
+                        updated[idx] = { ...updated[idx], url: e.target.value };
+                        setFormData(prev => ({ ...prev, sharepointPlans: updated }));
+                      }}
+                      placeholder="https://papyrusbe.sharepoint.com/sites/Papyrus1/..."
+                      className="w-full px-2.5 py-1.5 text-[11px] border border-gray-200/60 rounded-lg focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 text-gray-600"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1 shrink-0">
+                    {plan.url && (
+                      <a href={plan.url} target="_blank" rel="noreferrer"
+                        className="p-1.5 rounded-lg text-blue-500 hover:bg-blue-50 transition-colors" title="Ouvrir">
+                        <Globe2 size={13} />
+                      </a>
+                    )}
+                    <button type="button"
+                      onClick={() => setFormData(prev => ({
+                        ...prev,
+                        sharepointPlans: prev.sharepointPlans.filter((_, i) => i !== idx),
+                      }))}
+                      className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors" title="Supprimer">
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* LIGNE 3 — CASES SIGNATURE */}

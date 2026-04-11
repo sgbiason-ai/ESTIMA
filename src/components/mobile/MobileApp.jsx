@@ -32,6 +32,7 @@ import DQEView         from './DQEView';
 import TranchesView    from './TranchesView';
 import RAOView         from './RAOView';
 import ExportsView     from './ExportsView';
+import PlansListView   from './PlansListView';
 import CrcListView     from './CrcListView';
 import CrcDetailView   from './CrcDetailView';
 import MoeListView     from './MoeListView';
@@ -320,6 +321,7 @@ export default function MobileApp({ user, companyId, onLogout }) {
     if (subView === 'dqe') return 'DQE par Tranche';
     if (subView === 'tranches') return 'Récap. par Tranche';
     if (subView === 'rao') return 'Analyse des Offres';
+    if (subView === 'plans') return 'Plans';
     if (subView === 'exports') return 'Exports';
     if (selectedProject) return selectedProject.name;
     if (selectedChantier) {
@@ -453,6 +455,9 @@ export default function MobileApp({ user, companyId, onLogout }) {
         )}
         {subView === 'rao' && fullProject && (
           <RAOView project={fullProject} companyId={companyId} calcHook={calcHook} />
+        )}
+        {subView === 'plans' && fullProject && (
+          <PlansListView project={fullProject} />
         )}
         {subView === 'exports' && (
           <ExportsView onExport={handleExport} />

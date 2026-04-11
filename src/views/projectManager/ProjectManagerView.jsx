@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { HelpCircle, PlusCircle, Clock, Cloud, RefreshCw, Trash2, ArrowUpDown, Search, LayoutGrid, List } from 'lucide-react';
 import { buildFolderColorMap } from './folderColors';
 import { confirm } from '../../utils/globalUI';
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 
 import { usePresenceReader }     from '../../hooks/usePresence';
@@ -93,12 +93,11 @@ const ProjectManagerView = ({
   const handleSaveDetails = useCallback(async (details) => {
     if (!detailsProject || !companyId) return;
     try {
-      const { doc, setDoc } = await import('firebase/firestore');
-      const { db } = await import('../../firebase');
+      // Nettoyer les undefined (Firestore les rejette)
+      const clean = JSON.parse(JSON.stringify(details));
       const ref = doc(db, 'companies', companyId, 'projects', detailsProject.id);
-      await setDoc(ref, details, { merge: true });
-      // Met à jour la liste locale
-      cloud.setCloudProjects(prev => prev.map(p => p.id === detailsProject.id ? { ...p, ...details } : p));
+      await setDoc(ref, clean, { merge: true });
+      cloud.setCloudProjects(prev => prev.map(p => p.id === detailsProject.id ? { ...p, ...clean } : p));
       setDetailsProject(null);
     } catch (e) {
       console.error('[ProjectManager] Erreur sauvegarde fiche:', e);
