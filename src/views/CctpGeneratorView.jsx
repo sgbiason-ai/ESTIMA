@@ -7,6 +7,8 @@ import FavoritesPanel from '../components/common/FavoritesPanel';
 import { useCctpManager } from '../hooks/useCctpManager';
 import { useFavorites } from '../hooks/useFavorites';
 import { Star } from 'lucide-react';
+import HelpPanel from '../components/help/HelpPanel';
+import HelpButton from '../components/help/HelpButton';
 
 const CctpGeneratorView = ({ 
   project, masterCctp, onSaveMasterCctp, masterBranding, 
@@ -15,6 +17,7 @@ const CctpGeneratorView = ({
 }) => {
   
   const [isFavoritesPanelOpen, setIsFavoritesPanelOpen] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   const manager = useCctpManager({
     project, masterCctp, onSaveMasterCctp, masterBranding, onUpdateProject, onSaveProject
@@ -53,7 +56,9 @@ const CctpGeneratorView = ({
 
   return (
     <div className="flex h-full w-full bg-[#f8fafc] overflow-hidden">
-      
+
+      <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="cctp" />
+
       <CctpSidebar 
         searchQuery={manager.searchQuery}
         setSearchQuery={manager.setSearchQuery}
@@ -103,6 +108,11 @@ const CctpGeneratorView = ({
         onSave={manager.handleSaveNode} 
         availableVariables={manager.variables} 
       />
+
+      {/* ── Bouton flottant Aide ── */}
+      <div className="fixed bottom-6 right-28 z-30">
+        <HelpButton onClick={() => setShowHelp(true)} />
+      </div>
 
       {/* ── Bouton flottant Favoris ── */}
       <button

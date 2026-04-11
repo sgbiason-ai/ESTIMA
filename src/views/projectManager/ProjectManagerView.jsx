@@ -10,7 +10,7 @@ import { usePmLocalHistory }     from './hooks/usePmLocalHistory';
 import { usePmCloudProjects }    from './hooks/usePmCloudProjects';
 import { usePmFolders }          from './hooks/usePmFolders';
 
-import HelpPanel         from './HelpPanel';
+import HelpPanel         from '../../components/help/HelpPanel';
 import MoveFolderModal   from './MoveFolderModal';
 import PmLeftColumn      from './PmLeftColumn';
 import PmFolderSidebar   from './PmFolderSidebar';
@@ -112,7 +112,7 @@ const ProjectManagerView = ({
     <div className="h-screen w-full bg-[#f5f5f7] overflow-hidden flex flex-col text-gray-900 select-none"
       style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif' }}>
 
-      {showHelp && <HelpPanel onClose={() => setShowHelp(false)} />}
+      <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="projectManager" />
       <ProjectDetailsModal
         isOpen={!!detailsProject}
         onClose={() => setDetailsProject(null)}

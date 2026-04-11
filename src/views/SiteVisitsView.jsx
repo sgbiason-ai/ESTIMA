@@ -7,10 +7,12 @@ import { db } from '../firebase';
 import { MapPin, RefreshCw, Camera, MessageSquare, Navigation, Ruler, Trash2, FileDown, Maximize2, X } from 'lucide-react';
 import { stripHtml } from '../utils/formatObsText';
 import { confirm } from '../utils/globalUI';
+import HelpPanel from '../components/help/HelpPanel';
+import HelpButton from '../components/help/HelpButton';
 
 const GpsMapView = lazy(() => import('../components/mobile/GpsMapView'));
 
-export default function SiteVisitsView({ companyId }) {
+export default function SiteVisitsView({ companyId, masterBranding }) {
   const [visits, setVisits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
@@ -20,6 +22,7 @@ export default function SiteVisitsView({ companyId }) {
   const [highlightedObs, setHighlightedObs] = useState(null);
   const [splitPct, setSplitPct] = useState(50); // % du panneau gauche
   const [draggingSplit, setDraggingSplit] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   const fetchVisits = useCallback(async () => {
     if (!companyId) return;
@@ -58,13 +61,17 @@ export default function SiteVisitsView({ companyId }) {
     } catch (e) { console.error('Erreur suppression:', e); }
   }, [companyId, selectedId]);
 
+  const [exporting, setExporting] = useState(false);
+
   const handleExportPdf = useCallback(async () => {
     if (!fullVisit) return;
+    setExporting(true);
     try {
       const { generateSiteVisitPdf } = await import('../utils/pdfSiteVisitGenerator');
-      await generateSiteVisitPdf(fullVisit);
+      await generateSiteVisitPdf(fullVisit, { branding: masterBranding });
     } catch (e) { console.error('Erreur export PDF:', e); }
-  }, [fullVisit]);
+    setExporting(false);
+  }, [fullVisit, masterBranding]);
 
   const tracking = fullVisit?.gpsTracking || {};
   const coordinates = tracking.coordinates || [];
@@ -113,13 +120,18 @@ export default function SiteVisitsView({ companyId }) {
   return (
     <div className="flex h-full bg-[#f5f5f7]" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
 
+      <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="siteVisits" />
+
       {/* ── Sidebar liste ── */}
       <div className="w-64 shrink-0 border-r border-gray-200/60 bg-white/80 backdrop-blur-xl flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200/60 shrink-0">
           <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Visites</span>
-          <button onClick={fetchVisits} className="p-1 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition">
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          </button>
+          <div className="flex items-center gap-1">
+            <HelpButton onClick={() => setShowHelp(true)} />
+            <button onClick={fetchVisits} className="p-1 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition">
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            </button>
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto py-2 px-2">
           {loading && <div className="text-center py-8 text-gray-400 text-xs">Chargement…</div>}
@@ -186,9 +198,9 @@ export default function SiteVisitsView({ companyId }) {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <button onClick={handleExportPdf}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white rounded-xl text-xs font-medium hover:bg-gray-800 transition active:scale-[0.97]">
-                    <FileDown size={13} /> PDF
+                  <button onClick={handleExportPdf} disabled={exporting}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition active:scale-[0.97] ${exporting ? 'bg-gray-400 text-gray-200 cursor-wait' : 'bg-gray-900 text-white hover:bg-gray-800'}`}>
+                    <FileDown size={13} className={exporting ? 'animate-pulse' : ''} /> {exporting ? 'Export...' : 'PDF'}
                   </button>
                   <button onClick={() => handleDelete(fullVisit.id, fullVisit.nom)}
                     className="p-1.5 rounded-xl text-gray-300 hover:text-red-500 hover:bg-red-50 transition">

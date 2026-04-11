@@ -192,22 +192,7 @@ export default function App() {
 
   // Module : Visites de Site (lecture desktop)
   if (activeModule === 'site_visits') {
-    return (
-      <div className="flex flex-col h-screen bg-[#f5f5f7] text-gray-900 overflow-hidden"
-        style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
-        <header className="flex items-center gap-4 px-6 py-3 border-b border-gray-200/60 shrink-0 bg-white/80 backdrop-blur-xl">
-          <button onClick={handleBackToHub}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all">
-            <span className="text-[10px] font-bold uppercase tracking-widest">← Hub</span>
-          </button>
-          <div className="h-5 w-px bg-gray-200/60" />
-          <h1 className="font-bold text-lg text-gray-900 tracking-tight">Visites de Site</h1>
-        </header>
-        <div className="flex-1 overflow-hidden">
-          <SiteVisitsView companyId={companyId} />
-        </div>
-      </div>
-    );
+    return <SiteVisitsModule user={user} companyId={companyId} onBackToHub={handleBackToHub} />;
   }
 
   // Module : Administration
@@ -634,6 +619,27 @@ function BrandingModule({ user, companyId, onBackToHub }) {
           onSaveMasterBranding={resources.handleSaveMasterBranding}
           project={null}
         />
+      </div>
+    </div>
+  );
+}
+
+// ─── MODULE VISITES DE SITE (autonome, hors ESTIMA) ─────────────────────────
+function SiteVisitsModule({ user, companyId, onBackToHub }) {
+  const resources = useAppResources(user, companyId);
+  return (
+    <div className="flex flex-col h-screen bg-[#f5f5f7] text-gray-900 overflow-hidden"
+      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
+      <header className="flex items-center gap-4 px-6 py-3 border-b border-gray-200/60 shrink-0 bg-white/80 backdrop-blur-xl">
+        <button onClick={onBackToHub}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all">
+          <span className="text-[10px] font-bold uppercase tracking-widest">← Hub</span>
+        </button>
+        <div className="h-5 w-px bg-gray-200/60" />
+        <h1 className="font-bold text-lg text-gray-900 tracking-tight">Visites de Site</h1>
+      </header>
+      <div className="flex-1 overflow-hidden">
+        <SiteVisitsView companyId={companyId} masterBranding={resources.masterBranding} />
       </div>
     </div>
   );

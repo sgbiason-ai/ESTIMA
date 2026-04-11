@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import { APP_VERSION } from '../data/changelog';
 import ChangelogModal from '../components/ChangelogModal';
+import HelpPanel from '../components/help/HelpPanel';
+import HelpButton from '../components/help/HelpButton';
 
 // ─── WIDGET MÉTÉO ──────────────────────────────────────────────────────────
 
@@ -181,6 +183,7 @@ const ROW_LABELS = {
 export default function ModuleHubView({ isAdmin, userEmail, onSelectModule, onLogout }) {
   const [mounted, setMounted] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
   const canAccess = (mod) => {
@@ -207,6 +210,8 @@ export default function ModuleHubView({ isAdmin, userEmail, onSelectModule, onLo
     <div className="flex flex-col h-screen w-full bg-[#f5f5f7] text-gray-900 overflow-hidden selection:bg-blue-200"
       style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif' }}>
 
+      <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="moduleHub" />
+
       {/* ── Top bar ────────────────────────────────────────────────────── */}
       <header className="relative z-10 flex items-center justify-between px-8 lg:px-12 py-[clamp(0.375rem,0.5vh,0.75rem)] shrink-0 bg-white/70 backdrop-blur-2xl border-b border-gray-200/50">
         <div className="flex items-center gap-3">
@@ -226,6 +231,7 @@ export default function ModuleHubView({ isAdmin, userEmail, onSelectModule, onLo
             </div>
             <span className="text-sm font-medium text-gray-700 hidden md:block">{displayName}</span>
           </div>
+          <HelpButton onClick={() => setShowHelp(true)} />
           <button
             onClick={onLogout}
             className="flex items-center justify-center w-8 h-8 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all duration-200"

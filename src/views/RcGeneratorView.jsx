@@ -7,6 +7,8 @@ import FavoritesPanel from '../components/common/FavoritesPanel';
 import { useRcManager } from '../hooks/useRcManager';
 import { useFavorites } from '../hooks/useFavorites';
 import { Star } from 'lucide-react';
+import HelpPanel from '../components/help/HelpPanel';
+import HelpButton from '../components/help/HelpButton';
 
 const RcGeneratorView = ({ 
   project, masterRc, onSaveMasterRc, masterBranding, 
@@ -15,6 +17,7 @@ const RcGeneratorView = ({
 }) => {
   
   const [isFavoritesPanelOpen, setIsFavoritesPanelOpen] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   const manager = useRcManager({
     project, masterRc, onSaveMasterRc, masterBranding, onUpdateProject, onSaveProject
@@ -52,7 +55,9 @@ const RcGeneratorView = ({
 
   return (
     <div className="flex h-full w-full bg-[#f8fafc] overflow-hidden">
-      
+
+      <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="rc" />
+
       <RcSidebar 
         searchQuery={manager.searchQuery}
         setSearchQuery={manager.setSearchQuery}
@@ -101,6 +106,11 @@ const RcGeneratorView = ({
         onSave={manager.handleSaveNode} 
         availableVariables={manager.variables} 
       />
+
+      {/* ── Bouton flottant Aide ── */}
+      <div className="fixed bottom-6 right-28 z-30">
+        <HelpButton onClick={() => setShowHelp(true)} />
+      </div>
 
       {/* ── Bouton flottant Favoris ── */}
       <button

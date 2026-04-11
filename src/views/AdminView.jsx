@@ -13,7 +13,7 @@ import {
 import { confirm } from '../utils/globalUI';
 
 import DeleteCompanyModal from './admin/DeleteCompanyModal';
-import HelpPanel from './admin/HelpPanel';
+import HelpPanel from '../components/help/HelpPanel';
 import FirebaseSimulatorModal from './admin/FirebaseSimulatorModal';
 import FirebaseStatsPanel from './admin/FirebaseStatsPanel';
 
@@ -149,7 +149,7 @@ const AdminView = ({ currentUserEmail }) => {
           onCancel={() => setCompanyToDelete(null)}
         />
       )}
-      {showHelp && <HelpPanel onClose={() => setShowHelp(false)} />}
+      <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="admin" />
       {showSimulator && <FirebaseSimulatorModal companies={companies} onClose={() => setShowSimulator(false)} />}
 
       {/* En-tête */}

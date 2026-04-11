@@ -2,6 +2,8 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { confirm } from '../utils/globalUI';
 import { hexToRgbString, lightenHex } from '../utils/colorHelpers';
+import HelpPanel from '../components/help/HelpPanel';
+import HelpButton from '../components/help/HelpButton';
 
 // ─── SCHÉMA PAR DÉFAUT ────────────────────────────────────────────────────────
 export const DEFAULT_BRANDING = {
@@ -535,6 +537,7 @@ const BrandingView = ({
   const [activeTab, setActiveTab]         = useState('identity');
   const [activeDocType, setActiveDocType] = useState('estimation');
   const [saveStatus, setSaveStatus]       = useState('idle'); // idle | saving | saved
+  const [showHelp, setShowHelp]           = useState(false);
   const fileInputRef = useRef(null);
   const isDirty = useRef(false);
 
@@ -592,17 +595,22 @@ const BrandingView = ({
     <div className="flex h-full w-full bg-[#f5f5f7] overflow-hidden"
       style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
 
+      <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="branding" />
+
       {/* ── PANNEAU GAUCHE : ÉDITEUR ── */}
       <div className="w-80 flex-shrink-0 flex flex-col bg-white/80 backdrop-blur-xl border-r border-gray-200/60 overflow-hidden">
 
         {/* Header */}
-        <div className="px-5 py-4 border-b border-gray-200/60 flex-shrink-0">
-          <h2 className="text-sm font-bold text-gray-900 tracking-tight">
-            Charte graphique
-          </h2>
-          <p className="text-xs text-gray-400 mt-0.5">
-            Appliquée à tous les documents exportés
-          </p>
+        <div className="px-5 py-4 border-b border-gray-200/60 flex-shrink-0 flex items-start justify-between">
+          <div>
+            <h2 className="text-sm font-bold text-gray-900 tracking-tight">
+              Charte graphique
+            </h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Appliquée à tous les documents exportés
+            </p>
+          </div>
+          <HelpButton onClick={() => setShowHelp(true)} />
         </div>
 
         {/* Onglets — segmented control Apple */}

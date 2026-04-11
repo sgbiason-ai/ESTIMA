@@ -1,6 +1,7 @@
 import React from 'react';
 import { FileDown, FileText, Loader2, ArrowUpDown, ZoomIn, ZoomOut, RefreshCw } from 'lucide-react';
 import { RibbonGroup, RibbonBtnLarge, RibbonBtnSmall, RibbonContainer, RibbonHeader, RibbonSpacer } from '../../components/common/RibbonParts';
+import HelpButton from '../../components/help/HelpButton';
 
 const ZOOM_STEPS = [0.5, 0.6, 0.75, 0.85, 1, 1.25, 1.5, 1.75, 2];
 
@@ -23,6 +24,7 @@ const BpuToolbar = ({
   audit,
   showAudit,
   onToggleAudit,
+  onShowHelp,
 }) => (
   <div className="font-[system-ui,'Segoe_UI',sans-serif] select-none sticky top-0 z-50 print:hidden">
 
@@ -116,6 +118,11 @@ const BpuToolbar = ({
           accent="text-red-500"
         />
       </RibbonGroup>
+
+      {/* ── Aide ── */}
+      <div className="flex items-center px-3">
+        <HelpButton onClick={onShowHelp} variant="ribbon" />
+      </div>
 
     </RibbonContainer>
   </div>

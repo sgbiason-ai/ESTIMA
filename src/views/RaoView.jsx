@@ -25,6 +25,8 @@ const TABS = [
 ];
 
 import { RibbonGroup, RibbonBtnLarge } from '../components/common/RibbonParts';
+import HelpPanel from '../components/help/HelpPanel';
+import HelpButton from '../components/help/HelpButton';
 
 const RaoView = ({
   project,
@@ -43,6 +45,7 @@ const RaoView = ({
   const [activeTab, setActiveTab] = useState('consultation');
   const [isExporting, setIsExporting] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
+  const [showHelp, setShowHelp] = useState(false);
 
   const rao = useRao(project, setProject, analysisCompanies, analysisStats, scoringConfig, tranches);
 
@@ -113,6 +116,8 @@ const RaoView = ({
 
   return (
     <div className="flex flex-col h-full bg-[#f8fafc] overflow-hidden">
+
+      <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="rao" />
 
       {/* ═══════ RIBBON RAO ═══════ */}
       <header className="shrink-0 font-[system-ui,'Segoe_UI',sans-serif] select-none z-10">
@@ -193,6 +198,11 @@ const RaoView = ({
               title="Exporter le rapport en PDF"
             />
           </RibbonGroup>
+
+          {/* Aide */}
+          <div className="flex items-center px-3">
+            <HelpButton onClick={() => setShowHelp(true)} variant="ribbon" />
+          </div>
         </div>
       </header>
 

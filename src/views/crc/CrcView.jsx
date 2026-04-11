@@ -30,7 +30,7 @@ import CrrParticipants from '../../components/crr/CrrParticipants';
 import CrrObservations from '../../components/crr/CrrObservations';
 import CrrPreview from '../../components/crr/CrrPreview';
 import UnifiedParticipantsModal from '../../components/crr/UnifiedParticipantsModal';
-import CrcHelpPanel from '../../components/crr/CrcHelpPanel';
+import HelpPanel from '../../components/help/HelpPanel';
 import CrcGuidedTour from '../../components/crr/CrcGuidedTour';
 import { toast, confirm } from '../../utils/globalUI';
 
@@ -695,12 +695,19 @@ export default function CrcView({ onBackToHub, user, companyId }) {
         participantGroups={manager.activeParticipantGroups}
       />
 
-      {showHelpPanel && (
-        <CrcHelpPanel
-          onClose={() => setShowHelpPanel(false)}
-          onStartTour={() => setShowGuidedTour(true)}
-        />
-      )}
+      <HelpPanel
+        isOpen={showHelpPanel}
+        onClose={() => setShowHelpPanel(false)}
+        moduleId="crc"
+        headerActions={
+          <button
+            onClick={() => { setShowHelpPanel(false); setShowGuidedTour(true); }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-100 text-blue-700 text-xs font-bold hover:bg-blue-200 transition-colors"
+          >
+            Tour guide
+          </button>
+        }
+      />
 
       {showGuidedTour && (
         <CrcGuidedTour onClose={() => setShowGuidedTour(false)} />

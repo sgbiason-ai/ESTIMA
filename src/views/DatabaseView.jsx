@@ -12,6 +12,7 @@ import { formatPrice, cleanText, normalizeUnitSymbol } from '../utils/helpers';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useToast } from '../contexts/ToastContext';
 import { useDialog } from '../contexts/DialogContext';
+import HelpPanel from '../components/help/HelpPanel';
 
 const DatabaseView = ({ 
   filteredBpu,      
@@ -304,37 +305,7 @@ const DatabaseView = ({
           reader.readAsText(file);
       }} className="hidden" accept=".json" />
       
-      {showHelp && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                <div className="p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><HelpCircle size={24} /></div>
-                        <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Guide du Catalogue</h2>
-                    </div>
-                    <button onClick={() => setShowHelp(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400"><X size={20} /></button>
-                </div>
-                <div className="p-8 space-y-8">
-                    <section>
-                        <h3 className="text-sm font-black text-blue-600 uppercase mb-3 flex items-center gap-2">1. Cloud vs Local</h3>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-100">
-                                <div className="flex items-center gap-2 mb-2"><Cloud size={16} className="text-emerald-600" /><span className="font-bold text-xs uppercase">Mode Cloud (Émeraude)</span></div>
-                                <p className="text-[11px] text-slate-600 leading-relaxed">C'est votre base officielle. Toutes les modifications sont synchronisées sur le serveur et visibles par l'équipe.</p>
-                            </div>
-                            <div className="p-4 rounded-xl bg-amber-50 border border-amber-100">
-                                <div className="flex items-center gap-2 mb-2"><Monitor size={16} className="text-amber-600" /><span className="font-bold text-xs uppercase">Mode Local (Ambre)</span></div>
-                                <p className="text-[11px] text-slate-600 leading-relaxed">Activez-le en important un JSON. Idéal pour travailler sur un catalogue spécifique sans modifier la base commune.</p>
-                            </div>
-                        </div>
-                    </section>
-                </div>
-                <div className="p-6 bg-slate-50 border-t border-slate-100 text-center">
-                    <button onClick={() => setShowHelp(false)} className="px-8 py-2 bg-slate-900 text-white text-xs font-black uppercase rounded-lg hover:bg-slate-800 transition-all">J'ai compris</button>
-                </div>
-            </div>
-        </div>
-      )}
+      <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="database" />
 
       <DragDropContext onDragEnd={handleDragEnd}>
           <div className="w-80 bg-white border-r border-slate-200 flex flex-col shrink-0 z-30">

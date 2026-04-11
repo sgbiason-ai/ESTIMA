@@ -9,6 +9,8 @@ import BpuCoverPage  from './BpuCoverPage';
 import BpuToolbar    from './BpuToolbar';
 import BpuPageView   from './BpuPageView';
 import BpuAuditPanel from './BpuAuditPanel';
+import HelpPanel from '../../components/help/HelpPanel';
+import HelpButton from '../../components/help/HelpButton';
 
 // Pas d'imports directs de logique ici : tout est délégué aux hooks et sous-composants.
 
@@ -24,6 +26,7 @@ const BpuExportView = ({
 }) => {
   const [logoError, setLogoError] = useState(false);
   const [zoom, setZoom]           = useState(1);
+  const [showHelp, setShowHelp]   = useState(false);
   const measureRef = useRef(null);
   const today      = new Date().toLocaleDateString('fr-FR');
 
@@ -61,6 +64,9 @@ const BpuExportView = ({
 
   return (
     <div className="flex flex-col bg-slate-200 h-screen w-full relative font-sans text-slate-900 overflow-hidden">
+
+      <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="bpu" />
+
       {/* Div cachée pour la mesure des hauteurs HTML (utilisée par useBpuPagination) */}
       <div
         ref={measureRef}
@@ -100,6 +106,7 @@ const BpuExportView = ({
         audit={audit}
         showAudit={showAudit}
         onToggleAudit={() => { refreshAudit(); setShowAudit(v => !v); }}
+        onShowHelp={() => setShowHelp(true)}
       />
 
       {/* Zone principale : pages A4 + sidebar audit */}

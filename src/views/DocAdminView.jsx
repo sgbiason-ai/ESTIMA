@@ -9,6 +9,8 @@ import {
 import { useFichesMarche } from '../hooks/useFichesMarche';
 import { useDialog } from '../contexts/DialogContext';
 import { useToast } from '../contexts/ToastContext';
+import HelpPanel from '../components/help/HelpPanel';
+import HelpButton from '../components/help/HelpButton';
 import FicheForm from '../components/docAdmin/FicheForm';
 import Exe1Form from '../components/docAdmin/Exe1Form';
 import ExeReceptionForm from '../components/docAdmin/ExeReceptionForm';
@@ -121,6 +123,7 @@ export default function DocAdminView({ onBackToHub, user, companyId }) {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   const dateFinRevisee = useMemo(() => getDateFinRevisee(selectedFiche), [selectedFiche]);
 
@@ -574,6 +577,8 @@ export default function DocAdminView({ onBackToHub, user, companyId }) {
   return (
     <div className="flex flex-col h-screen bg-gray-100 text-gray-700 overflow-hidden relative">
 
+      <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="docAdmin" />
+
       {/* Fond décoratif */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/4 left-1/3 w-[500px] h-[500px] bg-purple-500/5 rounded-full blur-[120px]" />
@@ -600,6 +605,8 @@ export default function DocAdminView({ onBackToHub, user, companyId }) {
             <p className="text-[10px] text-gray-500">Fiches Marché & Documents EXE</p>
           </div>
         </div>
+
+        <HelpButton onClick={() => setShowHelp(true)} />
       </header>
 
       {/* Corps principal : sidebar liste + contenu */}

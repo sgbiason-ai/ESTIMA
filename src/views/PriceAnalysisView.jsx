@@ -4,6 +4,8 @@ import usePriceAnalysis from '../hooks/usePriceAnalysis';
 import AnalysisToolbar from '../components/analysis/AnalysisToolbar';
 import AnalysisTable from '../components/analysis/AnalysisTable';
 import RaoView from './RaoView';
+import HelpPanel from '../components/help/HelpPanel';
+import HelpButton from '../components/help/HelpButton';
 
 // MAGIE : On importe le moteur de calcul du projet !
 import { useProjectCalculations } from '../hooks/useProjectCalculations';
@@ -13,6 +15,7 @@ const PriceAnalysisView = ({ project, companyId, setProject, bpuConfig, clientPe
   const [activeMainTab, setActiveMainTab] = useState('analyse');
   const [activeTrancheId, setActiveTrancheId] = useState('global');
   const [analysisMode, setAnalysisMode] = useState('none'); // 'none', 'heatmap' ou 'oab'
+  const [showHelp, setShowHelp] = useState(false);
   
   const tranches = project?.tranches || [];
   const hasTranches = tranches.length > 0;
@@ -80,8 +83,12 @@ const PriceAnalysisView = ({ project, companyId, setProject, bpuConfig, clientPe
 
   return (
     <div className="flex-1 flex flex-col h-full bg-slate-50 overflow-hidden">
+
+      <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="priceAnalysis" />
+
       {/* ── ONGLETS PRINCIPAUX ── */}
       <div className="shrink-0 flex items-center gap-1 px-4 pt-3 bg-white border-b border-slate-100">
+        <HelpButton onClick={() => setShowHelp(true)} />
         {[
           { id: 'analyse', label: '📊 Analyse financière' },
           { id: 'rao',     label: "📋 Rapport d'analyse (RAO)" },

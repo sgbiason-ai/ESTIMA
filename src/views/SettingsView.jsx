@@ -7,6 +7,7 @@ import {
   HelpCircle, Info, AlertCircle, FileJson, ArrowRight, Save,
   MousePointer2
 } from 'lucide-react';
+import HelpPanel from '../components/help/HelpPanel';
 
 const SettingsView = ({
   units,
@@ -293,64 +294,7 @@ const SettingsView = ({
               </button>
             </div>
 
-            {/* GUIDE D'AIDE */}
-            {showHelp && (
-              <div className="mb-8 p-6 bg-blue-50 border border-blue-100 rounded-xl animate-in fade-in slide-in-from-top-2 duration-300">
-                <div className="flex items-start gap-4">
-                    <div className="flex-1 space-y-4 text-[11px] leading-relaxed text-slate-600">
-                        <h4 className="flex items-center gap-2 text-blue-800 font-black text-xs uppercase">
-                            <Info size={16} /> 1. Format des Colonnes (Excel)
-                        </h4>
-                        <p>Votre fichier Excel (.xlsx) doit respecter strictement l'ordre suivant (1ère ligne = en-têtes ignorés) :</p>
-                        
-                        <div className="overflow-x-auto shadow-sm rounded-lg">
-                            <table className="w-full border-collapse bg-white overflow-hidden border border-blue-200 text-left">
-                            <thead>
-                                <tr className="bg-blue-600 text-white font-bold uppercase text-[9px]">
-                                <th className="p-2 border-r border-blue-500 w-16">Col A</th>
-                                <th className="p-2 border-r border-blue-500">Col B</th>
-                                <th className="p-2 border-r border-blue-500">Col C</th>
-                                <th className="p-2 border-r border-blue-500 w-24">Col D</th>
-                                <th className="p-2 border-blue-500 w-24">Col E</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr className="text-slate-700 font-bold text-[10px] bg-blue-50/50">
-                                <td className="p-2 border-r border-blue-100">Numéro</td>
-                                <td className="p-2 border-r border-blue-100">Désignation</td>
-                                <td className="p-2 border-r border-blue-100">Description (CCTP)</td>
-                                <td className="p-2 border-r border-blue-100">Unité</td>
-                                <td className="p-2 border-blue-100">Prix U.</td>
-                                </tr>
-                                <tr className="text-slate-500 font-mono italic text-[10px]">
-                                <td className="p-2 border-r border-slate-100">1.10</td>
-                                <td className="p-2 border-r border-slate-100">Fouille en rigole</td>
-                                <td className="p-2 border-r border-slate-100">Exécution de fouilles...</td>
-                                <td className="p-2 border-r border-slate-100">m3</td>
-                                <td className="p-2 border-slate-100">45.00</td>
-                                </tr>
-                            </tbody>
-                            </table>
-                        </div>
-                        <p className="italic text-slate-500">* La colonne A (Numéro) est utilisée comme ID technique et comme numéro d'affichage si le "Mode Manuel" est activé.</p>
-                    </div>
-
-                    <div className="w-px bg-blue-200 self-stretch mx-2"></div>
-
-                    <div className="w-1/3 space-y-4 text-[11px] leading-relaxed text-slate-600">
-                         <h4 className="flex items-center gap-2 text-blue-800 font-black text-xs uppercase">
-                            <FileJson size={16} /> 2. Convertisseur JSON
-                        </h4>
-                        <p>Utilisez le bouton blanc <strong>"Convertir XLS en JSON"</strong> pour transformer votre Excel en fichier compatible.</p>
-                        <ul className="list-disc pl-4 space-y-1">
-                            <li><strong>Nettoyage :</strong> Supprime les lignes vides.</li>
-                            <li><strong>Mapping :</strong> Si des unités inconnues (ex: "Mètre Linéaire") sont détectées, une fenêtre s'ouvrira pour vous demander de les relier aux unités officielles (ex: "ml").</li>
-                            <li><strong>Téléchargement :</strong> Génère un fichier <code>.json</code> prêt à être importé dans l'application ou en mode local.</li>
-                        </ul>
-                    </div>
-                </div>
-              </div>
-            )}
+            <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="settings" />
             
             <div className="bg-slate-50 p-6 rounded-xl border border-dashed border-slate-200 flex flex-col items-center text-center space-y-4">
               <div className="flex gap-2 items-center text-[10px] font-bold text-slate-500 uppercase">

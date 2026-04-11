@@ -1,12 +1,15 @@
 // src/views/RaoAnalysisView.jsx
-import React from 'react';
+import React, { useState } from 'react';
 import { ArrowLeft, BarChart3 } from 'lucide-react';
 import { useDatabase } from '../hooks/useDatabase';
 import { useProjectManager } from '../hooks/useProjectManager';
 import { useAppResources } from '../hooks/useAppResources';
 import PriceAnalysisView from './PriceAnalysisView';
+import HelpPanel from '../components/help/HelpPanel';
+import HelpButton from '../components/help/HelpButton';
 
 export default function RaoAnalysisView({ user, companyId, onBackToHub }) {
+  const [showHelp, setShowHelp] = useState(false);
   const db = useDatabase(user, companyId);
   const {
     project, setProject,
@@ -20,6 +23,8 @@ export default function RaoAnalysisView({ user, companyId, onBackToHub }) {
 
   return (
     <div className="flex flex-col h-screen bg-[#040a0e] text-slate-300 overflow-hidden">
+
+      <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="raoAnalysis" />
 
       {/* Header avec bouton retour */}
       <header className="flex items-center gap-4 px-6 py-3 border-b border-white/5 shrink-0">
@@ -38,6 +43,10 @@ export default function RaoAnalysisView({ user, companyId, onBackToHub }) {
             <BarChart3 size={20} className="text-blue-400" />
           </div>
           <h1 className="font-black text-lg text-white tracking-tight">RAO & Analyse des Prix</h1>
+        </div>
+
+        <div className="ml-auto">
+          <HelpButton onClick={() => setShowHelp(true)} />
         </div>
       </header>
 
