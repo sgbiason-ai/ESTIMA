@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
-  X, FileSignature, MapPin, Calendar, Building2, 
-  Ruler, Briefcase, Clock, Hash, CheckCircle2, 
+  X, FileSignature, MapPin, Calendar, Building2,
+  Ruler, Briefcase, Clock, Hash, CheckCircle2,
   Hourglass, Navigation, Move, AlertTriangle, Upload, Trash2, ImageIcon,
   FileText, Globe2, ShieldAlert, Layers, PenLine, ToggleLeft, ToggleRight,
-  Eye, RefreshCw
+  Eye, RefreshCw, Link
 } from 'lucide-react';
 import { buildCoverPageCanvas } from '../../utils/coverPageCanvas';
 
@@ -156,6 +156,7 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
     clientLogo: null, projectDescription: '', hasPSE: 'ne comporte pas', department: '',
     showSignatures: true,
     signatories: ['', '', '', ''],
+    sharepointUrl: '',
   });
 
   const modalRef = useRef(null);
@@ -240,6 +241,7 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
         department: project.department || '',
         showSignatures: project.showSignatures !== false,
         signatories: project.signatories || ['', '', '', ''],
+        sharepointUrl: project.sharepointUrl || '',
       });
     }
     wasOpenRef.current = isOpen;
@@ -493,6 +495,40 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
               </div>
             </div>
 
+          </div>
+
+          {/* SHAREPOINT — DOSSIER PLANS */}
+          <div className="mt-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <h3 className="text-xs font-black text-blue-600 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-3 mb-4">
+              <Link size={12}/> Dossier Plans (SharePoint)
+            </h3>
+            <ModernInput
+              label="URL complète du dossier SharePoint"
+              name="sharepointUrl"
+              value={formData.sharepointUrl}
+              onChange={handleChange}
+              icon={Link}
+              placeholder="https://company.sharepoint.com/sites/Projet/Documents/Plans"
+            />
+            <p className="text-[10px] text-blue-400 mt-1 ml-1">
+              Dans SharePoint, clic droit sur le dossier → « Copier le lien » puis collez ici.
+            </p>
+            {formData.sharepointUrl && (
+              <a
+                href={formData.sharepointUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 mt-3 px-4 py-2.5 rounded-xl bg-blue-600 text-white text-[12px] font-bold hover:bg-blue-700 transition active:scale-[0.97]"
+              >
+                <Globe2 size={14} />
+                Ouvrir le dossier SharePoint
+              </a>
+            )}
+            {!formData.sharepointUrl && (
+              <p className="text-[10px] text-gray-400 mt-1.5 ml-1">
+                Ce lien sera accessible depuis le menu « Plans » en vue mobile.
+              </p>
+            )}
           </div>
 
           {/* LIGNE 3 — CASES SIGNATURE */}

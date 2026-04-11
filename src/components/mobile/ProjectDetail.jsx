@@ -17,6 +17,7 @@ export default function ProjectDetail({ project, calcHook, onNavigate, onExport,
     { key: 'bpu', icon: 'list', label: 'Bordereau des Prix', desc: `${nbItems} articles avec descriptions` },
     { key: 'tranches', icon: 'grid', label: 'Récap. par Tranche', desc: `${nbTranches || 1} tranche${nbTranches > 1 ? 's' : ''} · ${nbChapters} chapitres` },
     ...(hasRAO ? [{ key: 'rao', icon: 'chart', label: 'Analyse des Offres', desc: `${analysisCompanies.length} entreprise${analysisCompanies.length !== 1 ? 's' : ''}` }] : []),
+    ...(project.sharepointUrl ? [{ key: 'plans', icon: 'map', label: 'Plans', desc: 'Ouvrir le dossier SharePoint' }] : []),
     { key: 'exports', icon: 'download', label: 'Exports', desc: 'PDF, Excel, partage' },
   ];
 
@@ -55,7 +56,7 @@ export default function ProjectDetail({ project, calcHook, onNavigate, onExport,
       {/* Menu */}
       <div className={`px-4 ${isLandscape ? 'grid grid-cols-2 gap-2' : ''}`}>
         {menuItems.map(item => (
-          <button key={item.key} onClick={() => onNavigate(item.key)}
+          <button key={item.key} onClick={() => item.key === 'plans' ? window.open(project.sharepointUrl, '_blank') : onNavigate(item.key)}
             className="flex items-center gap-3 w-full py-3.5 border-b border-gray-100 text-left transition hover:bg-gray-50 active:bg-gray-100 active:scale-[0.98]">
             <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
               <Icon name={item.icon} size={20} color="#2563eb" />

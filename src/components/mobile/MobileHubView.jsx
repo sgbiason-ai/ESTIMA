@@ -13,6 +13,7 @@ const MOBILE_MODULES = [
   { id: 'site_visits', label: 'Visites de Site',     description: 'Notes terrain, photos et GPS',    icon: 'camera',    tag: 'Terrain', row: 2 },
   { id: 'moe',         label: 'Devis MOE',           description: 'Honoraires maîtrise d\'œuvre',    icon: 'euro',      tag: 'MOE',     row: 3 },
   { id: 'doc_admin',   label: 'Documents Admin',     description: 'Fiches marché et docs EXE',       icon: 'file',      tag: 'EXE',     row: 3 },
+  { id: 'pdf_reader',  label: 'Lecteur PDF',         description: 'Visualiser plans et documents',   icon: 'file',      tag: 'Outil',   row: 2, wide: true },
 ];
 
 // ─── THÈMES PAR ROW ───────────────────────────────────────────────────────

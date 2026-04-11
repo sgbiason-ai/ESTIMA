@@ -40,6 +40,7 @@ import DocAdminListView   from './DocAdminListView';
 import DocAdminDetailView from './DocAdminDetailView';
 import SiteVisitListView    from './SiteVisitListView';
 import SiteVisitDetailView  from './SiteVisitDetailView';
+import PdfReaderView        from './PdfReaderView';
 import { useMobileCrc }       from '../../hooks/useMobileCrc';
 import { useMobileDevisMoe } from '../../hooks/useMobileDevisMoe';
 import { useMobileSiteVisits } from '../../hooks/useMobileSiteVisits';
@@ -333,6 +334,7 @@ export default function MobileApp({ user, companyId, onLogout }) {
     if (activeModule === 'moe') return 'Devis MOE';
     if (activeModule === 'doc_admin') return 'Documents Admin';
     if (activeModule === 'site_visits') return 'Visites de Site';
+    if (activeModule === 'pdf_reader') return 'Lecteur PDF';
     if (activeModule === 'exports') return 'Exports Rapides';
     if (activeModule === 'rao') return 'Mes Projets & RAO';
     return null;
@@ -543,6 +545,11 @@ export default function MobileApp({ user, companyId, onLogout }) {
         )}
 
         {/* Module RAO supprimé — intégré dans Mes Projets (subView === 'rao') */}
+
+        {/* Module Lecteur PDF */}
+        {activeModule === 'pdf_reader' && (
+          <PdfReaderView onToast={triggerToast} />
+        )}
 
         {/* Module Exports rapides (depuis le hub, sans projet) */}
         {activeModule === 'exports' && !selectedProject && (
