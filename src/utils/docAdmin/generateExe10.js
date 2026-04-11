@@ -2,6 +2,7 @@
 // Génération EXE10 — Avenant
 // Conforme au formulaire officiel (DAJ - mise à jour 01/04/2019)
 import { saveAs } from 'file-saver';
+import { formatDateLocale } from '../dateHelpers';
 
 const loadMarianneImage = async () => {
   try {
@@ -21,14 +22,7 @@ const loadMarianneImage = async () => {
 
 const dots = (n = 40) => '.'.repeat(n);
 const blankDate = '___________________';
-const formatDate = (s) => {
-  if (!s) return blankDate;
-  try {
-    const d = new Date(s);
-    if (isNaN(d.getTime())) return blankDate;
-    return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  } catch { return blankDate; }
-};
+const formatDate = (s) => formatDateLocale(s, { fallback: blankDate });
 
 const formatMontant = (v) => {
   if (v === undefined || v === null || v === '') return dots(20);

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Calendar, Clock, Building, HardHat, FileText, CheckCircle, AlertCircle, CloudSnow, Loader, Pause, Play, Euro, Activity, Flag } from 'lucide-react';
+import { formatDateLocale } from '../../utils/dateHelpers';
 
 // ─── Utilitaire de calcul de date ───────────────────────────────────────────
 const calculateEndDate = (startDateStr, duration, unit) => {
@@ -64,11 +65,7 @@ const calculateArretDays = (osList) => {
   return { totalArretDays, periodes, events };
 };
 
-const formatDate = (dateInput) => {
-  if (!dateInput) return '—';
-  const d = new Date(dateInput);
-  return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: '2-digit' });
-};
+const formatDate = (dateInput) => formatDateLocale(dateInput, { format: 'medium', fallback: '\u2014' });
 
 // ─── Composant Frise Chronologique ──────────────────────────────────────────
 const Timeline = ({ dates, arretEvents, arretPeriodes }) => {

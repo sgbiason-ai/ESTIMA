@@ -20,52 +20,11 @@ const px  = (mm) => mm * S;
 // jsPDF setFontSize est en pt : 1 pt = 0.352778 mm
 const ptpx = (pt) => pt * S * 0.352778;
 
+import { loadImage as sharedLoadImage } from './pdf/pdfSharedHelpers';
+import { buildTheme } from './pdf/buildTheme';
+
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 const rgb = ([r, g, b]) => `rgb(${r},${g},${b})`;
-
-const hexToRgbArray = (hex) => {
-  if (!hex || typeof hex !== 'string') return null;
-  const clean = hex.replace('#', '');
-  if (clean.length !== 6) return null;
-  return [
-    parseInt(clean.substring(0, 2), 16),
-    parseInt(clean.substring(2, 4), 16),
-    parseInt(clean.substring(4, 6), 16),
-  ];
-};
-
-// Clone de buildTheme (pdfGenerator.js)
-const DEFAULT_THEME = {
-  primary:   [40, 110, 85],
-  chapterBg: [200, 245, 225],
-  secondary: [245, 250, 248],
-  accent:    [50, 180, 130],
-  pse:       [180, 83, 9],
-  text:      [40, 40, 40],
-  lightText: [100, 116, 139],
-  borders:   [220, 235, 230],
-};
-
-const buildTheme = (branding) => {
-  if (!branding?.colors) return DEFAULT_THEME;
-  const primary   = hexToRgbArray(branding.colors.primary)   || DEFAULT_THEME.primary;
-  const secondary = hexToRgbArray(branding.colors.secondary) || DEFAULT_THEME.accent;
-  const textColor = hexToRgbArray(branding.colors.text)      || DEFAULT_THEME.text;
-  const subtle    = hexToRgbArray(branding.colors.subtle)    || DEFAULT_THEME.lightText;
-  const lighten   = (c) => Math.round(c + (255 - c) * 0.85);
-  const lighten96 = (c) => Math.round(c + (255 - c) * 0.96);
-  const lighten80 = (c) => Math.round(c + (255 - c) * 0.80);
-  return {
-    primary,
-    chapterBg:  primary.map(lighten),
-    secondary:  primary.map(lighten96),
-    accent:     secondary,
-    pse:        DEFAULT_THEME.pse,
-    text:       textColor,
-    lightText:  subtle,
-    borders:    primary.map(lighten80),
-  };
-};
 
 // Equivalent de jsPDF.splitTextToSize
 // ctx doit avoir la bonne police active avant l'appel
@@ -101,15 +60,7 @@ const roundedRect = (ctx, x, y, w, h, r) => {
   ctx.closePath();
 };
 
-const loadImage = (src) =>
-  new Promise((resolve) => {
-    if (!src) return resolve(null);
-    const img = new Image();
-    img.onload  = () => resolve(img);
-    img.onerror = () => resolve(null);
-    if (!src.startsWith('data:')) img.crossOrigin = 'Anonymous';
-    img.src = src;
-  });
+const loadImage = sharedLoadImage;
 
 // ─── RENDU PRINCIPAL ──────────────────────────────────────────────────────────
 /**

@@ -2,10 +2,9 @@
 // Module partagé pour générer l'annexe des réserves (PDF + DOCX)
 // Utilisé par EXE4, EXE5, EXE6
 
-const formatDate = (s) => {
-  if (!s) return '';
-  try { return new Date(s).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }); } catch { return s; }
-};
+import { formatDateLocale } from '../dateHelpers';
+
+const formatDate = (s) => formatDateLocale(s);
 
 /**
  * Charge une image et retourne ses dimensions

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FileText, FileSpreadsheet, X, Check, Eye, Download, ArrowLeft, Loader2, ZoomIn, ZoomOut, RotateCw } from 'lucide-react';
+import { toast } from '../../utils/globalUI';
 
 // Étape 1 : Options d'export
 const OptionsStep = ({ isPdf, type, hasTranches, tranches, includeCover, setIncludeCover, includeSummary, setIncludeSummary, includePM, setIncludePM, selectedExports, handleToggleExport, onClose, onGenerate, isGenerating }) => {
@@ -280,6 +281,9 @@ const ExportModal = ({
           setPreviewData(result);
           setStep('preview');
         }
+      } catch (err) {
+        console.error('Erreur prévisualisation PDF:', err);
+        toast?.('Erreur lors de la génération du PDF — voir console', 'error');
       } finally {
         setIsGenerating(false);
       }

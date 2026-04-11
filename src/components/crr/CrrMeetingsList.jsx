@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Plus, Trash2, FileText, ChevronRight, Calendar, Hash, Settings, X, GripVertical, Building2 } from 'lucide-react';
 import { MEETING_TYPES } from '../../data/crrData';
 import { confirm } from '../../utils/globalUI';
+import { formatDateFr } from '../../utils/dateHelpers';
 
 const CrrMeetingsList = ({
   meetings,
@@ -16,11 +17,7 @@ const CrrMeetingsList = ({
   onManageInfoChantier,
   saveStatus,
 }) => {
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '';
-    const [y, m, d] = dateStr.split('-');
-    return `${d}/${m}/${y}`;
-  };
+  const formatDate = formatDateFr;
 
   const getMeetingLabel = (meeting) => {
     const typeObj = MEETING_TYPES.find((t) => t.value === meeting.type);

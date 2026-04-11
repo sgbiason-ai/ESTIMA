@@ -6,55 +6,27 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { DEFAULT_BRANDING } from '../data/branding';
+import { loadImage, sanitizeFilename } from './pdf/pdfSharedHelpers';
+import { buildTheme as _buildTheme } from './pdf/buildTheme';
 
 // ─── COULEURS ────────────────────────────────────────────────────────────────
+// CCTP/RC utilise des defaults bleu et chapterBg à facteur 0.88 (= tableBg central).
 
-const hexToRgb = (hex) => {
-  if (!hex || typeof hex !== 'string') return null;
-  const c = hex.replace('#', '');
-  if (c.length !== 6) return null;
-  return [parseInt(c.slice(0,2),16), parseInt(c.slice(2,4),16), parseInt(c.slice(4,6),16)];
+const CCTP_DEFAULTS = {
+  primary:   [37, 99, 235],
+  accent:    [99, 102, 241],
+  text:      [30, 41, 59],
+  secondary: [241, 245, 249],
+  chapterBg: [219, 234, 254],
+  borders:   [203, 213, 225],
 };
 
 const buildTheme = (branding) => {
-  if (!branding?.colors) return {
-    primary:[37,99,235], accent:[99,102,241], secondary:[241,245,249],
-    chapterBg:[219,234,254], text:[30,41,59], lightText:[100,116,139], borders:[203,213,225],
-  };
-  const p  = hexToRgb(branding.colors.primary)   || [37,99,235];
-  const a  = hexToRgb(branding.colors.secondary)  || [99,102,241];
-  const t  = hexToRgb(branding.colors.text)        || [30,41,59];
-  const lt = hexToRgb(branding.colors.subtle)      || [100,116,139];
-  const lx = (c,f=0.85) => Math.round(c+(255-c)*f);
-  return {
-    primary:p, accent:a,
-    secondary:  p.map(c=>lx(c,0.96)),
-    chapterBg:  p.map(c=>lx(c,0.88)),
-    text:t, lightText:lt,
-    borders:    p.map(c=>lx(c,0.80)),
-  };
+  const theme = _buildTheme(branding, {}, CCTP_DEFAULTS);
+  // CCTP chapterBg = facteur 0.88 (identique à tableBg)
+  if (branding?.colors) theme.chapterBg = theme.tableBg;
+  return theme;
 };
-
-const sanitizeFilename = (name) => {
-  if (!name || typeof name !== 'string') return 'Document';
-  return name
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") 
-    .replace(/[^a-zA-Z0-9]/g, '_') 
-    .replace(/_+/g, '_') 
-    .replace(/^_|_$/g, '') 
-    .substring(0, 40); 
-};
-
-// ─── IMAGE ───────────────────────────────────────────────────────────────────
-
-const loadImage = (url) => new Promise(resolve => {
-  if (!url) return resolve(null);
-  const img = new Image();
-  img.crossOrigin = 'Anonymous';
-  img.onload  = () => resolve(img);
-  img.onerror = () => resolve(null);
-  img.src = url;
-});
 
 // ─── VARIABLES ───────────────────────────────────────────────────────────────
 

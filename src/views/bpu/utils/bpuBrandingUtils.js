@@ -1,22 +1,12 @@
 // ── HELPERS COULEURS ──────────────────────────────────────────────────────────
+// hexToRgb et lighten centralisés dans colorHelpers.js
+// Re-exports pour compatibilité avec les imports existants
+import { hexToRgbString, lightenHex } from '../../../utils/colorHelpers';
 
-export const hexToRgb = (hex) => {
-  if (!hex) return "40, 110, 85";
-  const r = parseInt(hex.slice(1, 3), 16) || 40;
-  const g = parseInt(hex.slice(3, 5), 16) || 110;
-  const b = parseInt(hex.slice(5, 7), 16) || 85;
-  return `${r}, ${g}, ${b}`;
-};
+export const hexToRgb = hexToRgbString;
+export const lighten = lightenHex;
 
 export const hexToDocxColor = (hex) => (hex ? hex.replace('#', '') : "286E55");
-
-export const lighten = (hex, amount = 0.9) => {
-  if (!hex) return 'rgb(240, 245, 243)';
-  const r = parseInt(hex.slice(1, 3), 16) || 0;
-  const g = parseInt(hex.slice(3, 5), 16) || 0;
-  const b = parseInt(hex.slice(5, 7), 16) || 0;
-  return `rgb(${Math.round(r + (255 - r) * amount)}, ${Math.round(g + (255 - g) * amount)}, ${Math.round(b + (255 - b) * amount)})`;
-};
 
 // ── RÉSOLUTION DU BRANDING DEPUIS masterBranding ──────────────────────────────
 // Centralisé ici pour que tous les fichiers utilisent le même objet normalisé.

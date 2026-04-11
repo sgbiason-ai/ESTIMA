@@ -14,7 +14,7 @@ export const PHASES_LOI_MOP = [
   { id: 'avp',  code: 'AVP',  label: 'Avant-Projet',                                      actif: true  },
   { id: 'pro',  code: 'PRO',  label: 'Projet',                                             actif: true  },
   { id: 'act',  code: 'ACT',  label: "Assistance à la passation des marchés de travaux",   actif: true  },
-  { id: 'visa', code: 'VISA', label: "Visa des études d'exécution",                        actif: false },
+  { id: 'visa', code: 'VISA', label: "Visa des études d'exécution",                        actif: true  },
   { id: 'det',  code: 'DET',  label: "Direction de l'exécution des travaux",               actif: true  },
   { id: 'aor',  code: 'AOR',  label: 'Assistance aux opérations de réception',             actif: true  },
   { id: 'opc',  code: 'OPC',  label: 'Ordonnancement, Pilotage et Coordination',           actif: false },
@@ -30,9 +30,11 @@ const DEFAULT_CATEGORIES = [
 export const getCategoriesForAssignee = (draft, assigneeKey) =>
   draft.categoriesParMembre?.[assigneeKey] || draft.categories || DEFAULT_CATEGORIES;
 
-/** Construit la map complète { mandataire: [...cats], cotId: [...cats] } */
+/** Construit la map complète { mandataire: [...cats], cotId: [...cats] } ou { mandataire: [...], notreEntreprise: [...] } */
 export const buildCategoriesMap = (draft) => {
-  const keys = ['mandataire', ...(draft.cotraitants || []).map(c => c.id)];
+  const keys = draft.moeType === 'cotraitant'
+    ? ['mandataire', 'notreEntreprise']
+    : ['mandataire', ...(draft.cotraitants || []).map(c => c.id)];
   return Object.fromEntries(keys.map(k => [k, getCategoriesForAssignee(draft, k)]));
 };
 
@@ -106,6 +108,19 @@ export const createEmptyLot = (numero, phases, categories) => ({
   ...buildLotPhases(phases, categories),
 });
 
+// ─── Numérotation automatique D26-001 ────────────────────────────────────────
+export const getNextNumero = (devisList) => {
+  const yy = String(new Date().getFullYear() % 100).padStart(2, '0');
+  const prefix = `D${yy}-`;
+  const existing = devisList
+    .map(d => d.numero)
+    .filter(n => n && n.startsWith(prefix))
+    .map(n => parseInt(n.slice(prefix.length), 10))
+    .filter(n => !isNaN(n));
+  const next = existing.length > 0 ? Math.max(...existing) + 1 : 1;
+  return `${prefix}${String(next).padStart(3, '0')}`;
+};
+
 // ─── Modèle vide d'un devis ──────────────────────────────────────────────────
 export const createEmptyDevis = () => {
   const phases = PHASES_LOI_MOP.map(p => ({ ...p }));
@@ -173,6 +188,7 @@ export const useDevisMoe = (user, companyId) => {
     try {
       const d = createEmptyDevis();
       d.nom = nom;
+      d.numero = getNextNumero(devisList);
       await setDoc(dref(companyId, d.id), d);
       setSelectedId(d.id);
       toast.success('Devis créé');
@@ -192,7 +208,7 @@ export const useDevisMoe = (user, companyId) => {
     const src = devisList.find(d => d.id === id);
     if (!src) return null;
     try {
-      const copy = { ...JSON.parse(JSON.stringify(src)), id: generateId(), nom: `${src.nom} (copie)`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+      const copy = { ...JSON.parse(JSON.stringify(src)), id: generateId(), nom: `${src.nom} (copie)`, numero: getNextNumero(devisList), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
       await setDoc(dref(companyId, copy.id), copy);
       setSelectedId(copy.id);
       toast.success('Devis dupliqué');

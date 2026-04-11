@@ -3,12 +3,10 @@
 // Conforme au formulaire officiel (DAJ - mise à jour 01/04/2019)
 import { saveAs } from 'file-saver';
 import { generateAnnexeReservesPdf, generateAnnexeReservesDocx } from './annexeReserves.js';
+import { formatDateLocale } from '../dateHelpers';
 
 const dots = (n = 40) => '.'.repeat(n);
-const formatDate = (s) => {
-  if (!s) return dots(20);
-  try { return new Date(s).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }); } catch { return s; }
-};
+const formatDate = (s) => formatDateLocale(s, { fallback: dots(20) });
 
 const CHK = '☒';
 const UNCHK = '☐';

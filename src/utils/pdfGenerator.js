@@ -25,96 +25,8 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { cleanText, formatPrice, getItemRefMap, normalizeUnitSymbol } from './helpers';
 import { saveFileWithPicker, FILE_TYPES, PICKER_IDS } from './fileSaver';
-
-// ─── THÈME PAR DÉFAUT ─────────────────────────────────────────────────────────
-// Utilisé si aucun branding n'est passé en paramètre.
-const DEFAULT_THEME = {
-  primary:   [40, 110, 85],
-  chapterBg: [200, 245, 225],
-  secondary: [245, 250, 248],
-  accent:    [50, 180, 130],
-  pse:       [180, 83, 9],
-  text:      [40, 40, 40],
-  lightText: [100, 116, 139],
-  borders:   [220, 235, 230],
-};
-
-// ─── [NOUVEAU] CONVERSION HEX → RGB ──────────────────────────────────────────
-// jsPDF ne comprend pas les codes hexadécimaux.
-// Ex : hexToRgbArray('#286E55') → [40, 110, 85]
-const hexToRgbArray = (hex) => {
-  if (!hex || typeof hex !== 'string') return null;
-  const clean = hex.replace('#', '');
-  if (clean.length !== 6) return null;
-  return [
-    parseInt(clean.substring(0, 2), 16),
-    parseInt(clean.substring(2, 4), 16),
-    parseInt(clean.substring(4, 6), 16),
-  ];
-};
-
-// ─── [NOUVEAU] CONSTRUCTION DU THÈME DEPUIS LE BRANDING ──────────────────────
-// Si branding.colors est renseigné, on génère un thème cohérent depuis ses
-// couleurs. Sinon on retourne le DEFAULT_THEME inchangé.
-const buildTheme = (branding) => {
-  if (!branding?.colors) return DEFAULT_THEME;
-
-  const primary   = hexToRgbArray(branding.colors.primary)   || DEFAULT_THEME.primary;
-  const secondary = hexToRgbArray(branding.colors.secondary) || DEFAULT_THEME.accent;
-  const textColor = hexToRgbArray(branding.colors.text)      || DEFAULT_THEME.text;
-  const subtle    = hexToRgbArray(branding.colors.subtle)    || DEFAULT_THEME.lightText;
-
-  // On génère une version très claire de la couleur primaire pour les fonds
-  // en éclaircissant ses composantes (mixage avec blanc à 85%)
-  const lighten = (c) => Math.round(c + (255 - c) * 0.85);
-  const chapterBg = primary.map(lighten);
-
-  // Version très claire pour les fonds de lignes alternées
-  const secondaryBg = primary.map(c => Math.round(c + (255 - c) * 0.96));
-
-  // Bordures légèrement teintées
-  const borders = primary.map(c => Math.round(c + (255 - c) * 0.80));
-
-  return {
-    primary,
-    chapterBg,
-    secondary: secondaryBg,
-    accent:    secondary,
-    pse:       DEFAULT_THEME.pse,   // Orange PSE : on garde toujours la valeur par défaut
-    text:      textColor,
-    lightText: subtle,
-    borders,
-  };
-};
-
-const sanitizeFilename = (name) => {
-  if (!name || typeof name !== 'string') return 'Document';
-  return name
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") 
-    .replace(/[^a-zA-Z0-9]/g, '_') 
-    .replace(/_+/g, '_') 
-    .replace(/^_|_$/g, '') 
-    .substring(0, 40); 
-};
-
-// ─── CHARGEMENT IMAGE ─────────────────────────────────────────────────────────
-
-const loadImage = (url) => {
-  return new Promise((resolve) => {
-    if (!url) return resolve(null);
-    const img = new Image();
-    img.src = url;
-    if (!url.startsWith('data:')) img.crossOrigin = 'Anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = () => resolve(null);
-  });
-};
-
-const loadLogoFromSource = async (source) => {
-  if (!source) return null;
-  if (source.startsWith('data:')) return loadImage(source);
-  return loadImage(source);
-};
+import { loadImage, sanitizeFilename } from './pdf/pdfSharedHelpers';
+import { buildTheme } from './pdf/buildTheme';
 
 const cleanFormat = (num) => {
   if (num === undefined || num === null || num === '' || isNaN(num)) return "0,00";
@@ -406,7 +318,7 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
 
   // Chargement des logos
   const moeLogoSource = branding?.logo || '/logo.jpg';
-  const logoMoe = await loadLogoFromSource(moeLogoSource);
+  const logoMoe = await loadImage(moeLogoSource);
   const logoClient = project.clientLogo ? await loadImage(project.clientLogo) : null;
 
   const phaseLabel = (project.phase || 'PROJET').toUpperCase();

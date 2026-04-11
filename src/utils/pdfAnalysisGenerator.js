@@ -25,48 +25,17 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { cleanText, normalizeUnitSymbol } from './helpers';
+import { sanitizeFilename, formatNumberFr } from './pdf/pdfSharedHelpers';
+import { buildTheme as _buildTheme } from './pdf/buildTheme';
 
-// ─── THÈME PAR DÉFAUT ─────────────────────────────────────────────────────────
-const DEFAULT_THEME = {
+// ─── CONSTRUCTION DU THÈME DEPUIS LE BRANDING ───────────────────────────────
+// Analyse utilise des defaults vert foncé différents du thème principal.
+const ANALYSIS_DEFAULTS = {
   primary:   [6, 95, 70],
   accent:    [16, 185, 129],
-  lightText: [100, 116, 139],
 };
 
-// ─── [NOUVEAU] CONVERSION HEX → RGB ──────────────────────────────────────────
-const hexToRgbArray = (hex) => {
-  if (!hex || typeof hex !== 'string') return null;
-  const clean = hex.replace('#', '');
-  if (clean.length !== 6) return null;
-  return [
-    parseInt(clean.substring(0, 2), 16),
-    parseInt(clean.substring(2, 4), 16),
-    parseInt(clean.substring(4, 6), 16),
-  ];
-};
-
-// ─── [NOUVEAU] CONSTRUCTION DU THÈME DEPUIS LE BRANDING ──────────────────────
-const buildTheme = (branding) => {
-  if (!branding?.colors) return DEFAULT_THEME;
-  const primary   = hexToRgbArray(branding.colors.primary)   || DEFAULT_THEME.primary;
-  const secondary = hexToRgbArray(branding.colors.secondary) || DEFAULT_THEME.accent;
-  const subtle    = hexToRgbArray(branding.colors.subtle)    || DEFAULT_THEME.lightText;
-  return {
-    primary,
-    accent:    secondary,
-    lightText: subtle,
-  };
-};
-
-const sanitizeFilename = (name) => {
-  if (!name || typeof name !== 'string') return 'Document';
-  return name
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") 
-    .replace(/[^a-zA-Z0-9]/g, '_') 
-    .replace(/_+/g, '_') 
-    .replace(/^_|_$/g, '') 
-    .substring(0, 40); 
-};
+const buildTheme = (branding) => _buildTheme(branding, {}, ANALYSIS_DEFAULTS);
 
 // ─── COULEURS PAR ENTREPRISE ─────────────────────────────────────────────────
 const COMPANY_COLORS = [
@@ -91,15 +60,6 @@ const SCORING_FORMULAS = {
 };
 
 const getCompanyStyle = (index) => COMPANY_COLORS[index % COMPANY_COLORS.length];
-
-const formatNumberFr = (value) => {
-  if (value === undefined || value === null || value === '' || isNaN(Number(value))) return '-';
-  const num = Number(value);
-  const fixed = num.toFixed(2);
-  const parts = fixed.split('.');
-  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-  return parts.join(',');
-};
 
 const calculateOABThreshold = (values) => {
   const validValues = values.filter(v => v > 0);

@@ -46,8 +46,9 @@ export const isNestedTemps = (temps, categoryIds) => {
   return !categoryIds.includes(keys[0]);
 };
 
-/** Retourne les clés assignee : ['mandataire', ...cotraitantIds] */
+/** Retourne les clés assignee : ['mandataire', ...cotraitantIds] ou ['mandataire', 'notreEntreprise'] en mode cotraitant */
 export const getAssigneeKeys = (draft) => {
+  if (draft.moeType === 'cotraitant') return ['mandataire', 'notreEntreprise'];
   const keys = ['mandataire'];
   (draft.cotraitants || []).forEach(c => keys.push(c.id));
   return keys;
@@ -150,6 +151,7 @@ export const grandHoursByAssignee = (taches, categoriesOrMap, assigneeKeys) => {
 
 export const getAssigneeName = (key, draft) => {
   if (key === 'mandataire') return draft.mandataire?.nom || 'Mandataire';
+  if (key === 'notreEntreprise') return draft.notreEntreprise?.nom || 'Notre entreprise';
   const cot = (draft.cotraitants || []).find(c => c.id === key);
   return cot?.nom || 'Co-traitant';
 };
