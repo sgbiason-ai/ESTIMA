@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cloud, Folder, Clock, RefreshCw, CloudOff, Trash2, RotateCcw } from 'lucide-react';
+import { Cloud, Folder, Clock, RefreshCw, CloudOff, Trash2, RotateCcw, Info, ClipboardList, BarChart3 } from 'lucide-react';
 import { NEUTRAL_COLOR } from './folderColors';
 
 const PmProjectGrid = ({
@@ -8,7 +8,7 @@ const PmProjectGrid = ({
   selectedFolderId, setSelectedFolderId,
   project, folders, folderColorMap = {},
   presenceByProject, deletingId,
-  onLoadProject, onDeleteProject, onMoveProject, onRestoreSnapshot,
+  onLoadProject, onDeleteProject, onMoveProject, onRestoreSnapshot, onInfoProject, linkedCrcMap = {}, raoProjectIds = new Set(), onNavigateModule,
 }) => {
 
   // ── Empty states (Apple-style) ───────────────────────────────────────────
@@ -98,6 +98,16 @@ const PmProjectGrid = ({
                   <div className="flex items-center gap-2 mt-0.5">
                     {proj.location && <span className="text-[11px] text-gray-400 truncate">📍 {proj.location}</span>}
                     {projFolder && <span className="flex items-center gap-1 text-[11px] text-gray-400"><Folder size={10} /> {projFolder.name}</span>}
+                    {raoProjectIds.has(proj.id) && (
+                      <button onClick={e => { e.stopPropagation(); onNavigateModule?.('rao_analysis'); }} className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-600 border border-blue-200/60 hover:bg-blue-100 transition-colors cursor-pointer" title="Ouvrir l'analyse des offres">
+                        <BarChart3 size={10} /> RAO
+                      </button>
+                    )}
+                    {linkedCrcMap[proj.id] && (
+                      <button onClick={e => { e.stopPropagation(); onNavigateModule?.('crc'); }} className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-200/60 hover:bg-emerald-100 transition-colors cursor-pointer" title={`Ouvrir CR : ${linkedCrcMap[proj.id].join(', ')}`}>
+                        <ClipboardList size={10} /> {linkedCrcMap[proj.id].length} CR
+                      </button>
+                    )}
                   </div>
                 </div>
                 {isActive && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${fc.badge}`}>Actif</span>}
@@ -118,6 +128,7 @@ const PmProjectGrid = ({
                 <span className="text-gray-300">{timeStr}</span>
               </div>
               <div className="flex items-center justify-end gap-1">
+                <button onClick={e => { e.stopPropagation(); onInfoProject?.(proj); }} className="p-1 rounded-lg text-gray-300 hover:text-indigo-500 hover:bg-indigo-50 transition-colors opacity-0 group-hover:opacity-100" title="Fiche projet"><Info size={13} /></button>
                 <button onClick={e => { e.stopPropagation(); onMoveProject(proj); }} className="p-1 rounded-lg text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-colors opacity-0 group-hover:opacity-100" title="Déplacer"><Folder size={13} /></button>
                 <button onClick={e => onDeleteProject(proj, e)} disabled={deletingId === proj.id} className="p-1 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100" title="Supprimer">
                   {deletingId === proj.id ? <RefreshCw size={13} className="animate-spin" /> : <Trash2 size={13} />}
@@ -171,8 +182,18 @@ const PmProjectGrid = ({
             <div className="flex items-center gap-1.5 mb-2 h-[20px] flex-wrap overflow-hidden">
               {proj.code && <span className="flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-lg bg-gray-100 text-gray-600 border border-gray-200/60">N° {proj.code}</span>}
               {proj.location && <span className="text-[11px] text-gray-400 flex items-center gap-1">📍 {proj.location}</span>}
+              {raoProjectIds.has(proj.id) && (
+                <button onClick={e => { e.stopPropagation(); onNavigateModule?.('rao_analysis'); }} className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-lg bg-blue-50 text-blue-600 border border-blue-200/60 hover:bg-blue-100 transition-colors cursor-pointer" title="Ouvrir l'analyse des offres">
+                  <BarChart3 size={10} /> RAO
+                </button>
+              )}
+              {linkedCrcMap[proj.id] && (
+                <button onClick={e => { e.stopPropagation(); onNavigateModule?.('crc'); }} className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200/60 hover:bg-emerald-100 transition-colors cursor-pointer" title={`Ouvrir CR : ${linkedCrcMap[proj.id].join(', ')}`}>
+                  <ClipboardList size={10} /> {linkedCrcMap[proj.id].length} CR
+                </button>
+              )}
               {projFolder && <span className={`flex items-center gap-1 text-xs ml-auto ${fc.accent}`}><Folder size={10} /> {projFolder.name}</span>}
-              {!proj.code && !proj.location && !projFolder && <span className="text-xs text-gray-300 italic">Aucune info complémentaire</span>}
+              {!proj.code && !proj.location && !projFolder && !linkedCrcMap[proj.id] && !raoProjectIds.has(proj.id) && <span className="text-xs text-gray-300 italic">Aucune info complémentaire</span>}
             </div>
 
             {/* Save history */}
@@ -220,6 +241,7 @@ const PmProjectGrid = ({
                   <span className="w-1 h-1 rounded-full bg-gray-200" />
                   <span><strong>{elemCount}</strong> el.</span>
                 </div>
+                <button onClick={e => { e.stopPropagation(); onInfoProject?.(proj); }} className="p-1 rounded-lg text-gray-300 hover:text-indigo-500 hover:bg-indigo-50 transition-colors opacity-0 group-hover:opacity-100" title="Fiche projet"><Info size={13} /></button>
                 <button onClick={e => { e.stopPropagation(); onMoveProject(proj); }} className="p-1 rounded-lg text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-colors opacity-0 group-hover:opacity-100" title="Déplacer"><Folder size={13} /></button>
                 <button onClick={e => onDeleteProject(proj, e)} disabled={deletingId === proj.id} className="p-1 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100" title="Supprimer">
                   {deletingId === proj.id ? <RefreshCw size={13} className="animate-spin" /> : <Trash2 size={13} />}

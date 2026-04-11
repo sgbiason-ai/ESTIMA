@@ -127,6 +127,7 @@ export default function App() {
         user={user}
         companyId={companyId}
         onBackToHub={handleBackToHub}
+        onNavigateModule={setActiveModule}
         onOpenEstima={(project) => {
           // Ouvrir ESTIMA VRD directement avec ce projet
           setActiveModule('estima');
@@ -243,7 +244,7 @@ export default function App() {
 }
 
 // ─── MODULE GESTION DE PROJETS (autonome, hors ESTIMA) ──────────────────────
-function ProjectManagerModule({ user, companyId, onBackToHub, onOpenEstima }) {
+function ProjectManagerModule({ user, companyId, onBackToHub, onOpenEstima, onNavigateModule }) {
   const { project, setProject, handleSaveProject, resetProject } = useProjectManager(user, companyId);
   const resources = useAppResources(user, companyId);
   const [bpuConfig, setBpuConfig] = useState({ numberingMode: 'auto' });
@@ -274,6 +275,7 @@ function ProjectManagerModule({ user, companyId, onBackToHub, onOpenEstima }) {
           setClientPercent={setClientPercent}
           companyId={companyId}
           currentUserUid={user?.uid}
+          onNavigateModule={onNavigateModule}
         />
       </div>
     </div>

@@ -1,9 +1,10 @@
 // src/views/crc/CrcChantierDropdown.jsx — EstimaStyle (fixed dropdown)
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Trash2, FolderOpen, ChevronDown } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Trash2, FolderOpen, ChevronDown } from 'lucide-react';
 import { confirm } from '../../utils/globalUI';
 
-export default function CrcChantierDropdown({ chantiers, activeId, onSelect, onCreate, onDelete }) {
+export default function CrcChantierDropdown({ chantiers, activeId, onSelect, onDelete }) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef(null);
   const [pos, setPos] = useState({ top: 0, left: 0 });
@@ -35,21 +36,15 @@ export default function CrcChantierDropdown({ chantiers, activeId, onSelect, onC
         <ChevronDown size={12} className="text-gray-400 shrink-0" />
       </button>
 
-      {open && (
+      {open && createPortal(
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
           <div
-            className="fixed w-80 bg-white border border-gray-200 rounded-2xl shadow-2xl z-50 max-h-72 overflow-y-auto"
-            style={{ top: pos.top, left: pos.left }}
+            className="fixed w-80 rounded-2xl shadow-2xl z-[9999] max-h-72 overflow-y-auto border border-gray-200"
+            style={{ top: pos.top, left: pos.left, backgroundColor: '#fff' }}
           >
-            <button
-              onClick={() => { onCreate(); setOpen(false); }}
-              className="w-full text-left px-4 py-2.5 text-sm text-blue-600 hover:bg-blue-50 transition-colors border-b border-gray-100 flex items-center gap-2 font-medium"
-            >
-              <Plus size={14} /> Nouveau chantier
-            </button>
             {chantiers.length === 0 && (
-              <div className="px-4 py-3 text-xs text-gray-400">Aucun chantier.</div>
+              <div className="px-4 py-3 text-xs text-gray-400" style={{ backgroundColor: '#fff' }}>Aucun chantier.</div>
             )}
             {chantiers.map((c) => {
               const cnom = c.crrConfig?.chantierInfo?.nom || 'Sans nom';
@@ -58,9 +53,10 @@ export default function CrcChantierDropdown({ chantiers, activeId, onSelect, onC
                 <button
                   key={c.id}
                   onClick={() => { onSelect(c); setOpen(false); }}
-                  className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0 group flex items-center justify-between ${
-                    c.id === activeId ? 'bg-blue-50 text-blue-700' : 'text-gray-600'
+                  className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-100 transition-colors border-b border-gray-100 last:border-0 group flex items-center justify-between ${
+                    c.id === activeId ? 'text-blue-700 font-semibold' : 'text-gray-700'
                   }`}
+                  style={{ backgroundColor: c.id === activeId ? '#eff6ff' : '#fff' }}
                 >
                   <div className="min-w-0">
                     <div className="font-medium truncate">{cnom}</div>
@@ -76,7 +72,8 @@ export default function CrcChantierDropdown({ chantiers, activeId, onSelect, onC
               );
             })}
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   );

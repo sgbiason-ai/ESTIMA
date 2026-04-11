@@ -13,6 +13,16 @@ import {
 import { doc, getDoc, setDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { DEFAULT_BRANDING } from '../../data/branding';
+import CrcLinkProjectModal from './CrcLinkProjectModal';
+
+// Mapping projet → chantierInfo CRC
+const mapProjectToChantierInfo = (proj) => ({
+  nom: proj.name || '',
+  lieu: proj.location || '',
+  dureePreparation: proj.prepPeriod || '',
+  dureeChantier: proj.duration || '',
+  communeLogo: proj.clientLogo || null,
+});
 
 import { useCrrManager } from '../../hooks/useCrrManager';
 import CrrHeader from '../../components/crr/CrrHeader';
@@ -64,7 +74,26 @@ export default function CrcView({ onBackToHub, user, companyId }) {
         if (libSnap.exists()) setParticipantLibrary(libSnap.data().contacts || []);
         const lastId = localStorage.getItem(`crr_active_chantier__${companyId}`);
         const target = docs.find((d) => d.id === lastId) || docs[0];
-        if (target) setCrrDoc(target);
+        if (target) {
+          // Sync projet lié si nécessaire
+          if (target.linkedProjectId) {
+            try {
+              const projSnap = await getDoc(doc(db, 'companies', companyId, 'projects', target.linkedProjectId));
+              if (projSnap.exists()) {
+                const mapped = mapProjectToChantierInfo(projSnap.data());
+                const merged = { ...target.crrConfig?.chantierInfo, ...mapped };
+                const synced = { ...target, crrConfig: { ...target.crrConfig, chantierInfo: merged } };
+                await setDoc(doc(db, 'companies', companyId, 'crr', target.id), synced, { merge: true });
+                setCrrDoc(synced);
+                setChantiers(prev => prev.map(c => c.id === target.id ? synced : c));
+              } else {
+                setCrrDoc(target);
+              }
+            } catch { setCrrDoc(target); }
+          } else {
+            setCrrDoc(target);
+          }
+        }
       } catch (e) {
         console.error('Erreur chargement CRR:', e);
       } finally {
@@ -90,15 +119,26 @@ export default function CrcView({ onBackToHub, user, companyId }) {
     [companyId, user]
   );
 
-  const handleCreateChantier = useCallback(async () => {
+  const [showLinkModal, setShowLinkModal] = useState(false);
+
+  const handleCreateChantier = useCallback(() => {
+    setShowLinkModal(true);
+  }, []);
+
+  const handleLinkChoice = useCallback(async (linkedProject) => {
+    setShowLinkModal(false);
     const newId = `crr_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    const chantierInfo = linkedProject
+      ? { ...mapProjectToChantierInfo(linkedProject), dateDebut: '', dateFin: '' }
+      : { nom: '', lieu: '', dureePreparation: '', dureeChantier: '', dateDebut: '', dateFin: '' };
     const newDoc = {
       id: newId,
+      ...(linkedProject ? { linkedProjectId: linkedProject.id } : {}),
       crrConfig: {
         participantGroups: [],
         categories: [],
         legalText: '',
-        chantierInfo: { nom: '', lieu: '', dureePreparation: '', dureeChantier: '', dateDebut: '', dateFin: '' },
+        chantierInfo,
       },
       crrMeetings: [],
       createdAt: new Date().toISOString(),
@@ -119,10 +159,28 @@ export default function CrcView({ onBackToHub, user, companyId }) {
     }
   }, [companyId, crrDoc, chantiers]);
 
-  const handleSelectChantier = (c) => {
-    setCrrDoc(c);
+  const handleSelectChantier = useCallback(async (c) => {
+    let docToSet = c;
+    // Sync auto si lié à un projet
+    if (c.linkedProjectId && companyId) {
+      try {
+        const projSnap = await getDoc(doc(db, 'companies', companyId, 'projects', c.linkedProjectId));
+        if (projSnap.exists()) {
+          const mapped = mapProjectToChantierInfo(projSnap.data());
+          const currentInfo = c.crrConfig?.chantierInfo || {};
+          const mergedInfo = { ...currentInfo, ...mapped };
+          docToSet = { ...c, crrConfig: { ...c.crrConfig, chantierInfo: mergedInfo } };
+          // Persister la sync
+          await setDoc(doc(db, 'companies', companyId, 'crr', c.id), docToSet, { merge: true });
+          setChantiers(prev => prev.map(ch => ch.id === c.id ? docToSet : ch));
+        }
+      } catch (e) {
+        console.warn('[CRC] Sync projet lié échouée:', e);
+      }
+    }
+    setCrrDoc(docToSet);
     localStorage.setItem(`crr_active_chantier__${companyId}`, c.id);
-  };
+  }, [companyId]);
 
   const manager = useCrrManager({
     project: crrDoc,
@@ -359,11 +417,11 @@ export default function CrcView({ onBackToHub, user, companyId }) {
 
           {/* ── GROUPE : CHANTIER ── */}
           <RibbonGroup label="Chantier" dataTour="chantier">
+            <RibbonButton icon={Plus} label="Nouvelle affaire" onClick={handleCreateChantier} variant="primary" title="Créer un nouveau chantier" />
             <CrcChantierDropdown
               chantiers={chantiers}
               activeId={crrDoc?.id}
               onSelect={handleSelectChantier}
-              onCreate={handleCreateChantier}
               onDelete={handleDeleteChantier}
             />
           </RibbonGroup>
@@ -527,12 +585,20 @@ export default function CrcView({ onBackToHub, user, companyId }) {
         onSaveLibrary={handleSaveLibrary}
       />
 
+      <CrcLinkProjectModal
+        isOpen={showLinkModal}
+        onClose={() => setShowLinkModal(false)}
+        onSelect={handleLinkChoice}
+        companyId={companyId}
+      />
+
       <CrcInfoChantierModal
         isOpen={showInfoChantierModal}
         onClose={() => setShowInfoChantierModal(false)}
         chantierInfo={manager.crrConfig.chantierInfo}
         updateChantierInfo={manager.updateChantierInfo}
         exportDirKey={`${companyId}_${crrDoc?.id || 'default'}`}
+        linkedProjectId={crrDoc?.linkedProjectId}
       />
 
       {/* Input file hidden pour import .crcestima */}

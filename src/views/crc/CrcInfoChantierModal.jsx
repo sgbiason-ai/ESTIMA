@@ -1,7 +1,7 @@
 // src/views/crc/CrcInfoChantierModal.jsx
 // Modal d'informations du chantier CRC
 import React, { useRef } from 'react';
-import { X, MapPin, Calendar, Clock, Building2, Download, FolderOpen, HardDrive, FileSignature, ImagePlus, Trash2 } from 'lucide-react';
+import { X, MapPin, Calendar, Clock, Building2, Download, FolderOpen, HardDrive, FileSignature, ImagePlus, Trash2, Link2 } from 'lucide-react';
 
 const ChantierField = ({ label, icon: Icon, field, type = 'text', placeholder, chantierInfo, updateChantierInfo }) => (
   <div>
@@ -19,7 +19,7 @@ const ChantierField = ({ label, icon: Icon, field, type = 'text', placeholder, c
   </div>
 );
 
-export default function CrcInfoChantierModal({ isOpen, onClose, chantierInfo, updateChantierInfo, exportDirKey }) {
+export default function CrcInfoChantierModal({ isOpen, onClose, chantierInfo, updateChantierInfo, exportDirKey, linkedProjectId }) {
   const logoInputRef = useRef(null);
 
   if (!isOpen) return null;
@@ -63,6 +63,14 @@ export default function CrcInfoChantierModal({ isOpen, onClose, chantierInfo, up
         </div>
 
         <div className="p-6 space-y-4">
+          {linkedProjectId && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 border border-indigo-200/60 rounded-xl">
+              <Link2 size={13} className="text-indigo-500 shrink-0" />
+              <span className="text-[11px] font-medium text-indigo-600">
+                Lié au projet — synchronisation automatique
+              </span>
+            </div>
+          )}
           <ChantierField label="Nom du chantier" icon={Building2} field="nom" placeholder="Ex: AMENAGEMENT TRAVERSE ST ALBY" chantierInfo={chantierInfo} updateChantierInfo={updateChantierInfo} />
           <ChantierField label="Lieu" icon={MapPin} field="lieu" placeholder="Ex: Commune d'Aiguefonde (81)" chantierInfo={chantierInfo} updateChantierInfo={updateChantierInfo} />
 

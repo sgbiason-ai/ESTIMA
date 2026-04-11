@@ -1,7 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { HelpCircle, PlusCircle, Clock, Cloud, RefreshCw, Trash2, ArrowUpDown, Search, LayoutGrid, List } from 'lucide-react';
 import { buildFolderColorMap } from './folderColors';
 import { confirm } from '../../utils/globalUI';
+import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { db } from '../../firebase';
 
 import { usePresenceReader }     from '../../hooks/usePresence';
 import { usePmLocalHistory }     from './hooks/usePmLocalHistory';
@@ -13,18 +15,42 @@ import MoveFolderModal   from './MoveFolderModal';
 import PmLeftColumn      from './PmLeftColumn';
 import PmFolderSidebar   from './PmFolderSidebar';
 import PmProjectGrid     from './PmProjectGrid';
+import ProjectDetailsModal from '../../components/modals/ProjectDetailsModal';
 import PmLocalHistory    from './PmLocalHistory';
 
 const ProjectManagerView = ({
   project, setProject, resetProject, onSaveProject,
   bpuConfig, clientPercent, setBpuConfig, setClientPercent,
-  companyId, currentUserUid,
+  companyId, currentUserUid, onNavigateModule,
 }) => {
   const [historyTab, setHistoryTab] = useState('cloud');
   const [showHelp,   setShowHelp]   = useState(false);
   const [sortBy,     setSortBy]     = useState('date');
   const [search,     setSearch]     = useState('');
   const [viewMode,   setViewMode]   = useState('grid');
+  const [detailsProject, setDetailsProject] = useState(null);
+  const [linkedCrcMap, setLinkedCrcMap] = useState({});
+  const [raoProjectIds, setRaoProjectIds] = useState(new Set());
+
+  // Charger les CRC liés + projets avec RAO
+  useEffect(() => {
+    if (!companyId) return;
+    // CRC liés
+    getDocs(collection(db, 'companies', companyId, 'crr'))
+      .then(snap => {
+        const map = {};
+        snap.forEach(d => {
+          const data = d.data();
+          if (data.linkedProjectId) {
+            const nom = data.crrConfig?.chantierInfo?.nom || 'CR';
+            if (!map[data.linkedProjectId]) map[data.linkedProjectId] = [];
+            map[data.linkedProjectId].push(nom);
+          }
+        });
+        setLinkedCrcMap(map);
+      })
+      .catch(() => {});
+  }, [companyId]);
 
   const local = usePmLocalHistory({ project, setProject, bpuConfig, clientPercent, setBpuConfig, setClientPercent, companyId });
   const cloud = usePmCloudProjects({
@@ -34,6 +60,22 @@ const ProjectManagerView = ({
   });
   const fm = usePmFolders({ companyId, cloudProjects: cloud.cloudProjects, setCloudProjects: cloud.setCloudProjects, project, setProject });
   const { presenceByProject } = usePresenceReader({ companyId, currentUserId: currentUserUid });
+
+  // RAO : checker les subcollections analysis/data pour chaque projet
+  useEffect(() => {
+    if (!companyId || cloud.cloudProjects.length === 0) return;
+    const checkRao = async () => {
+      const ids = new Set();
+      await Promise.all(cloud.cloudProjects.map(async (proj) => {
+        try {
+          const snap = await getDoc(doc(db, 'companies', companyId, 'projects', proj.id, 'analysis', 'data'));
+          if (snap.exists() && snap.data()?.companies?.length > 0) ids.add(proj.id);
+        } catch { /* ignore */ }
+      }));
+      setRaoProjectIds(ids);
+    };
+    checkRao();
+  }, [companyId, cloud.cloudProjects]);
 
   const removeAccents = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const sortedProjects = [...fm.filteredProjects]
@@ -47,6 +89,22 @@ const ProjectManagerView = ({
 
   const folderColorMap = useMemo(() => buildFolderColorMap(fm.folders), [fm.folders]);
 
+  // ── Fiche projet (info modale) ──
+  const handleSaveDetails = useCallback(async (details) => {
+    if (!detailsProject || !companyId) return;
+    try {
+      const { doc, setDoc } = await import('firebase/firestore');
+      const { db } = await import('../../firebase');
+      const ref = doc(db, 'companies', companyId, 'projects', detailsProject.id);
+      await setDoc(ref, details, { merge: true });
+      // Met à jour la liste locale
+      cloud.setCloudProjects(prev => prev.map(p => p.id === detailsProject.id ? { ...p, ...details } : p));
+      setDetailsProject(null);
+    } catch (e) {
+      console.error('[ProjectManager] Erreur sauvegarde fiche:', e);
+    }
+  }, [detailsProject, companyId, cloud]);
+
   const chapCount = (project?.chapters || []).length;
   const itemCount = (project?.chapters || []).reduce((acc, c) => acc + (c.children || c.items || c.rows || []).length, 0);
   const lastSaved = project?.lastSaved ? new Date(project.lastSaved).toLocaleString('fr-FR') : null;
@@ -56,6 +114,12 @@ const ProjectManagerView = ({
       style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif' }}>
 
       {showHelp && <HelpPanel onClose={() => setShowHelp(false)} />}
+      <ProjectDetailsModal
+        isOpen={!!detailsProject}
+        onClose={() => setDetailsProject(null)}
+        project={detailsProject || {}}
+        onSave={handleSaveDetails}
+      />
       {fm.movingProject && (
         <MoveFolderModal
           project={fm.movingProject}
@@ -234,6 +298,10 @@ const ProjectManagerView = ({
                   onDeleteProject={cloud.handleDeleteCloudProject}
                   onMoveProject={fm.setMovingProject}
                   onRestoreSnapshot={cloud.handleRestoreSnapshot}
+                  onInfoProject={setDetailsProject}
+                  linkedCrcMap={linkedCrcMap}
+                  raoProjectIds={raoProjectIds}
+                  onNavigateModule={onNavigateModule}
                 />
               </div>
             </div>

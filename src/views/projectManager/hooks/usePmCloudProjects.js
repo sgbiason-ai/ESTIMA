@@ -120,12 +120,26 @@ export const usePmCloudProjects = ({
       })();
 
       const saveHistory = [now, ...prevHistory].slice(0, 3);
-      localStorage.setItem(historyKey, JSON.stringify(saveHistory));
+      try { localStorage.setItem(historyKey, JSON.stringify(saveHistory)); } catch { /* quota */ }
 
       // Snapshot complet sans priceAnalysisData (déjà stocké séparément)
+      // Try-catch : si localStorage est plein, on continue la sauvegarde cloud
       const snapshot = { savedAt: now, project: { ...project, priceAnalysisData: undefined } };
+      const snapshotSize = new Blob([JSON.stringify(snapshot)]).size;
       const snapshots = [snapshot, ...prevSnapshots].slice(0, 3);
-      localStorage.setItem(snapshotsKey, JSON.stringify(snapshots));
+      try {
+        localStorage.setItem(snapshotsKey, JSON.stringify(snapshots));
+      } catch {
+        const usedKB = Object.keys(localStorage).reduce((t, k) => t + ((localStorage.getItem(k) || '').length * 2), 0) / 1024;
+        console.warn(`[LocalStorage] Quota dépassé — snapshot: ${(snapshotSize / 1024).toFixed(0)} KB, localStorage utilisé: ${usedKB.toFixed(0)} KB`);
+        // Top 5 clés les plus lourdes
+        const sizes = Object.keys(localStorage).map(k => ({ key: k, kb: ((localStorage.getItem(k) || '').length * 2 / 1024).toFixed(0) }))
+          .sort((a, b) => b.kb - a.kb).slice(0, 5);
+        console.table(sizes);
+        // Fallback : 1 seul snapshot
+        try { localStorage.setItem(snapshotsKey, JSON.stringify([snapshot])); }
+        catch { localStorage.removeItem(snapshotsKey); }
+      }
 
       const updatedProject = {
         ...project,
