@@ -9,7 +9,7 @@ import ChangelogModal from '../ChangelogModal';
 
 const MOBILE_MODULES = [
   { id: 'projects',    label: 'Projets & RAO',    description: 'Devis, DQE et analyse des offres', icon: 'folder',    tag: 'Core',    row: 1 },
-  { id: 'pdf_reader',  label: 'Lecteur PDF',      description: 'Visualiser plans et documents',    icon: 'file',      tag: 'Outil',   row: 1 },
+  { id: 'pdf_reader',  label: 'Serveur Papyrus',  description: 'Plans, documents et fichiers PDF', icon: 'file',      tag: 'Cloud',   row: 1 },
   { id: 'site_visits', label: 'Visites de Site',  description: 'Notes terrain, photos et GPS',     icon: 'camera',    tag: 'Terrain', row: 2 },
   { id: 'crc',         label: 'Comptes Rendus',   description: 'CR de chantier',                   icon: 'clipboard', tag: 'CRC',     row: 2 },
   { id: 'moe',         label: 'Devis MOE',        description: 'Honoraires maîtrise d\'œuvre',     icon: 'euro',      tag: 'MOE',     row: 3 },

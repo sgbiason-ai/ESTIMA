@@ -38,6 +38,8 @@ export const useMobileProjects = (user, companyId) => {
             tranches:  data.tranches || [],
             hasPSE:    !!data.hasPSE,
             hasRao:    false, // sera mis à jour après vérification subcollection
+            hasCrc:    false,
+            crcCount:  0,
             folderId:  data.folderId || null,
             chaptersCount: (data.chapters || []).length,
             itemsCount:    countItems(data.chapters || []),
@@ -54,7 +56,7 @@ export const useMobileProjects = (user, companyId) => {
       setProjects(list);
       setFolders(folderList);
 
-      // Vérifier en arrière-plan quels projets ont des données RAO (subcollection rao/data)
+      // Vérifier en arrière-plan quels projets ont des données RAO et CRC
       // On fait ça après le rendu initial pour ne pas bloquer l'affichage
       const raoChecks = list.map(async (p) => {
         try {
@@ -65,12 +67,30 @@ export const useMobileProjects = (user, companyId) => {
           return { id: p.id, hasRao: false };
         }
       });
+
+      // CRC liés (collection crr avec linkedProjectId)
+      let crcMap = {};
+      try {
+        const crcSnap = await getDocs(collection(db, 'companies', companyId, 'crr'));
+        crcSnap.forEach(d => {
+          const data = d.data();
+          if (data.linkedProjectId) {
+            crcMap[data.linkedProjectId] = (crcMap[data.linkedProjectId] || 0) + 1;
+          }
+        });
+      } catch { /* ignore */ }
+
       const raoResults = await Promise.all(raoChecks);
       const raoMap = {};
       raoResults.forEach(r => { raoMap[r.id] = r.hasRao; });
 
-      // Mettre à jour les projets avec le flag RAO
-      setProjects(prev => prev.map(p => ({ ...p, hasRao: !!raoMap[p.id] })));
+      // Mettre à jour les projets avec les flags RAO et CRC
+      setProjects(prev => prev.map(p => ({
+        ...p,
+        hasRao: !!raoMap[p.id],
+        hasCrc: !!crcMap[p.id],
+        crcCount: crcMap[p.id] || 0,
+      })));
 
     } catch (e) {
       console.error('[Mobile] Erreur chargement projets:', e);

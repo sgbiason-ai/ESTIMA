@@ -2,8 +2,10 @@ import React, { useMemo, useState } from 'react';
 import Icon from './Icon';
 import { dateFr } from './formatters';
 
-export default function ProjectsList({ projects, folders, loading, search, onSearch, onSelect, onRefresh, isLandscape }) {
+export default function ProjectsList({ projects, folders, loading, search, onSearch, onSelect, onSelectAndNavigate, onRefresh, isLandscape }) {
   const [currentFolderId, setCurrentFolderId] = useState(null);
+  const [showAll, setShowAll] = useState(false);
+  const [filter, setFilter] = useState(null); // null | 'rao' | 'crc'
 
   const subFolders = useMemo(() =>
     (folders || []).filter(f => (f.parentId || null) === currentFolderId),
@@ -11,9 +13,14 @@ export default function ProjectsList({ projects, folders, loading, search, onSea
 
   const currentProjects = useMemo(() => {
     const term = search.toLowerCase();
-    if (term) return projects.filter(p => p.name.toLowerCase().includes(term) || (p.client || '').toLowerCase().includes(term));
-    return projects.filter(p => (p.folderId || null) === currentFolderId);
-  }, [projects, search, currentFolderId]);
+    let list;
+    if (term) list = projects.filter(p => p.name.toLowerCase().includes(term) || (p.client || '').toLowerCase().includes(term));
+    else if (showAll) list = projects;
+    else list = projects.filter(p => (p.folderId || null) === currentFolderId);
+    if (filter === 'rao') return list.filter(p => p.hasRao);
+    if (filter === 'crc') return list.filter(p => p.hasCrc);
+    return list;
+  }, [projects, search, currentFolderId, showAll, filter]);
 
   const countInFolder = (folderId) => {
     const directCount = projects.filter(p => p.folderId === folderId).length;
@@ -35,8 +42,10 @@ export default function ProjectsList({ projects, folders, loading, search, onSea
 
   return (
     <div className="pb-2">
+      {/* Sticky: Search + Stats */}
+      <div className="sticky top-0 z-10 bg-[#f5f5f7]/90 backdrop-blur-xl pb-2">
       {/* Search */}
-      <div className="flex items-center gap-2 mx-4 mt-3 mb-2 px-3.5 py-2.5 bg-white rounded-xl border border-gray-200/60">
+      <div className="flex items-center gap-2 mx-4 mt-3 mb-2 px-3.5 py-2.5 bg-white rounded-xl border border-gray-200">
         <Icon name="search" size={18} color="#9ca3af" />
         <input
           type="text" placeholder="Rechercher un projet…"
@@ -45,36 +54,64 @@ export default function ProjectsList({ projects, folders, loading, search, onSea
         />
       </div>
 
-      {/* Stats */}
-      <div className="flex gap-2 px-4 py-1 mb-2">
-        <div className="flex-1 bg-white rounded-xl p-3 border border-gray-200/60 text-center">
-          <div className="text-xl font-bold text-gray-900">{projects.length}</div>
-          <div className="text-[13px] text-gray-400 font-medium">Projets</div>
+      {/* Stats + actions */}
+      <div className="flex items-center gap-2 px-4 py-1">
+        {/* Infos projets */}
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <span className="text-[14px] font-bold text-gray-900">{projects.length} projets</span>
+          {projects.filter(p => p.hasRao).length > 0 && (
+            <button
+              onClick={() => setFilter(prev => prev === 'rao' ? null : 'rao')}
+              className={`px-1.5 py-0.5 text-[9px] font-bold rounded-md border transition active:scale-[0.95] ${
+                filter === 'rao'
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-blue-50 text-blue-600 border-blue-200/60'
+              }`}
+            >{projects.filter(p => p.hasRao).length} RAO</button>
+          )}
+          {projects.filter(p => p.hasCrc).length > 0 && (
+            <button
+              onClick={() => setFilter(prev => prev === 'crc' ? null : 'crc')}
+              className={`px-1.5 py-0.5 text-[9px] font-bold rounded-md border transition active:scale-[0.95] ${
+                filter === 'crc'
+                  ? 'bg-emerald-600 text-white border-emerald-600'
+                  : 'bg-emerald-50 text-emerald-600 border-emerald-200/60'
+              }`}
+            >{projects.filter(p => p.hasCrc).length} CR</button>
+          )}
         </div>
-        <div className="flex-1 bg-white rounded-xl p-3 border border-gray-200/60 text-center">
-          <div className="text-xl font-bold text-gray-900">
-            {projects.filter(p => p.tranches.length > 0).length}
-          </div>
-          <div className="text-[13px] text-gray-400 font-medium">Multi-tranches</div>
-        </div>
-        <button onClick={onRefresh} className="bg-white rounded-xl p-3 border border-gray-200/60 flex items-center justify-center hover:bg-gray-50 transition active:scale-[0.97]">
-          <Icon name="refresh" size={18} color="#3b82f6" />
+        {/* Toggle tout voir */}
+        <button
+          onClick={() => { setShowAll(prev => !prev); setCurrentFolderId(null); }}
+          className={`px-3 py-2 rounded-xl text-[13px] font-semibold transition active:scale-[0.97] shrink-0 ${
+            showAll
+              ? 'bg-gray-900 text-white'
+              : 'bg-white border border-gray-200 text-blue-600'
+          }`}
+        >
+          {showAll ? '✕ Dossiers' : 'Tout voir'}
         </button>
+        {/* Refresh */}
+        <button onClick={onRefresh} className="w-9 h-9 rounded-xl bg-white border border-gray-200 flex items-center justify-center active:scale-[0.97] transition shrink-0">
+          <Icon name="refresh" size={16} color="#3b82f6" />
+        </button>
+      </div>
       </div>
 
       {/* Breadcrumb */}
-      {!search && currentFolderId !== null && (
-        <div className="flex items-center gap-1 px-4 mb-2 overflow-x-auto">
-          <button onClick={() => setCurrentFolderId(null)} className="text-xs font-medium text-blue-500 whitespace-nowrap shrink-0">
+      {!search && !showAll && currentFolderId !== null && (
+        <div className="flex items-center gap-1.5 px-4 mb-3 overflow-x-auto">
+          <button onClick={() => setCurrentFolderId(null)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-gray-200 text-[14px] font-semibold text-blue-600 whitespace-nowrap shrink-0 active:bg-gray-50 transition">
+            <Icon name="back" size={14} color="#2563eb" />
             Racine
           </button>
           {breadcrumb.map((f, i) => (
             <React.Fragment key={f.id}>
-              <span className="text-gray-300 text-xs shrink-0">/</span>
+              <Icon name="chevron" size={12} color="#9ca3af" />
               {i < breadcrumb.length - 1 ? (
-                <button onClick={() => setCurrentFolderId(f.id)} className="text-xs font-medium text-blue-500 whitespace-nowrap shrink-0">{f.name}</button>
+                <button onClick={() => setCurrentFolderId(f.id)} className="px-3 py-2 rounded-xl bg-white border border-gray-200 text-[14px] font-semibold text-blue-600 whitespace-nowrap shrink-0 active:bg-gray-50 transition">{f.name}</button>
               ) : (
-                <span className="text-xs font-medium text-gray-700 whitespace-nowrap shrink-0">{f.name}</span>
+                <span className="px-3 py-2 rounded-xl bg-gray-900 text-white text-[14px] font-semibold whitespace-nowrap shrink-0">{f.name}</span>
               )}
             </React.Fragment>
           ))}
@@ -90,7 +127,7 @@ export default function ProjectsList({ projects, folders, loading, search, onSea
       )}
 
       {/* Folders */}
-      {!loading && !search && subFolders.map(folder => {
+      {!loading && !search && !showAll && subFolders.map(folder => {
         const count = countInFolder(folder.id);
         return (
           <button key={folder.id}
@@ -110,7 +147,7 @@ export default function ProjectsList({ projects, folders, loading, search, onSea
         );
       })}
 
-      {!loading && !search && subFolders.length > 0 && currentProjects.length > 0 && (
+      {!loading && !search && !showAll && subFolders.length > 0 && currentProjects.length > 0 && (
         <div className="h-px bg-gray-200/60 mx-6 my-2" />
       )}
 
@@ -137,7 +174,16 @@ export default function ProjectsList({ projects, folders, loading, search, onSea
               </>
             )}
             {p.hasRao && (
-              <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-[9px] font-black rounded-md uppercase tracking-wide">RAO</span>
+              <button
+                onClick={(e) => { e.stopPropagation(); onSelectAndNavigate?.(p, 'rao'); }}
+                className="px-1.5 py-0.5 bg-blue-50 text-blue-600 border border-blue-200/60 text-[9px] font-black rounded-md uppercase tracking-wide active:bg-blue-100 transition"
+              >RAO</button>
+            )}
+            {p.hasCrc && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onSelectAndNavigate?.(p, 'crc'); }}
+                className="px-1.5 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-200/60 text-[9px] font-black rounded-md uppercase tracking-wide active:bg-emerald-100 transition"
+              >{p.crcCount} CR</button>
             )}
             <span className="ml-auto text-xs text-gray-300">{dateFr(p.lastSaved)}</span>
             <Icon name="chevron" size={14} color="#d1d5db" />

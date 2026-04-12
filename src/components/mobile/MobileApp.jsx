@@ -133,6 +133,35 @@ export default function MobileApp({ user, companyId, onLogout }) {
     setChantierLoading(false);
   }, [loadChantier]);
 
+  // Ouvre un projet puis navigue directement vers un sous-module (rao) ou module (crc)
+  const handleSelectProjectAndNavigate = useCallback(async (proj, target) => {
+    if (target === 'rao') {
+      // RAO = sous-vue du projet
+      setSelectedProject(proj);
+      setSubView('rao');
+      setProjectLoading(true);
+      const data = await loadProject(proj.id);
+      setFullProject(data);
+      setProjectLoading(false);
+    } else if (target === 'crc') {
+      // CRC = module séparé, on cherche le(s) chantier(s) lié(s) au projet
+      setActiveModule('crc');
+      setSelectedProject(null);
+      setFullProject(null);
+      setSubView(null);
+      // Trouver les chantiers liés à ce projet
+      const linked = crcChantiers.filter(ch => ch.linkedProjectId === proj.id);
+      if (linked.length === 1) {
+        // Un seul CRC lié → ouvrir directement
+        handleSelectChantier(linked[0]);
+      } else {
+        // Plusieurs ou aucun → afficher la liste CRC
+        setSelectedChantier(null);
+        setFullChantier(null);
+      }
+    }
+  }, [loadProject, crcChantiers, handleSelectChantier]);
+
   const handleSelectMoeDevis = useCallback(async (d) => {
     setSelectedMoeDevis(d);
     setMoeDevisLoading(true);
@@ -410,6 +439,7 @@ export default function MobileApp({ user, companyId, onLogout }) {
             search={searchTerm}
             onSearch={setSearchTerm}
             onSelect={handleSelectProject}
+            onSelectAndNavigate={handleSelectProjectAndNavigate}
             onRefresh={refetch}
             isLandscape={isLandscape}
           />
@@ -423,8 +453,10 @@ export default function MobileApp({ user, companyId, onLogout }) {
           ) : fullProject ? (
             <ProjectDetail
               project={fullProject}
+              projectMeta={selectedProject}
               calcHook={calcHook}
               onNavigate={setSubView}
+              onNavigateModule={handleSelectProjectAndNavigate}
               onExport={handleExport}
               isLandscape={isLandscape}
             />

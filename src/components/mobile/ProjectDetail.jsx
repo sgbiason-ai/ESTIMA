@@ -3,7 +3,7 @@ import Icon from './Icon';
 import { fmt, fmtShort, dateFr } from './formatters';
 import { flattenItems } from './helpers';
 
-export default function ProjectDetail({ project, calcHook, onNavigate, onExport, isLandscape }) {
+export default function ProjectDetail({ project, projectMeta, calcHook, onNavigate, onNavigateModule, onExport, isLandscape }) {
   const totalClient = calcHook.projectStats?.client?.base + calcHook.projectStats?.client?.option || 0;
   const totalStudy  = calcHook.projectStats?.study?.base + calcHook.projectStats?.study?.option || 0;
   const nbTranches  = (project.tranches || []).length;
@@ -18,6 +18,7 @@ export default function ProjectDetail({ project, calcHook, onNavigate, onExport,
     { key: 'tranches', icon: 'grid', label: 'Récap. par Tranche', desc: `${nbTranches || 1} tranche${nbTranches > 1 ? 's' : ''} · ${nbChapters} chapitres` },
     ...(hasRAO ? [{ key: 'rao', icon: 'chart', label: 'Analyse des Offres', desc: `${analysisCompanies.length} entreprise${analysisCompanies.length !== 1 ? 's' : ''}` }] : []),
     ...((project.sharepointPlans?.length > 0 || project.sharepointUrl) ? [{ key: 'plans', icon: 'map', label: 'Plans', desc: `${project.sharepointPlans?.length || 1} dossier${(project.sharepointPlans?.length || 1) > 1 ? 's' : ''} SharePoint` }] : []),
+    ...(projectMeta?.hasCrc ? [{ key: 'crc', icon: 'clipboard', label: 'Comptes Rendus', desc: `${projectMeta.crcCount} CR lié${projectMeta.crcCount > 1 ? 's' : ''} à cette affaire` }] : []),
     { key: 'exports', icon: 'download', label: 'Exports', desc: 'PDF, Excel, partage' },
   ];
 
@@ -56,10 +57,10 @@ export default function ProjectDetail({ project, calcHook, onNavigate, onExport,
       {/* Menu */}
       <div className={`px-4 ${isLandscape ? 'grid grid-cols-2 gap-2' : ''}`}>
         {menuItems.map(item => (
-          <button key={item.key} onClick={() => onNavigate(item.key)}
+          <button key={item.key} onClick={() => item.key === 'crc' ? onNavigateModule?.(projectMeta, 'crc') : onNavigate(item.key)}
             className="flex items-center gap-3 w-full py-3.5 border-b border-gray-100 text-left transition hover:bg-gray-50 active:bg-gray-100 active:scale-[0.98]">
-            <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
-              <Icon name={item.icon} size={20} color="#2563eb" />
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${item.key === 'crc' ? 'bg-emerald-50' : 'bg-blue-50'}`}>
+              <Icon name={item.icon} size={20} color={item.key === 'crc' ? '#059669' : '#2563eb'} />
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-[15px] font-bold text-gray-900">{item.label}</div>
