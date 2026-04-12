@@ -6,6 +6,7 @@ import Icon from './Icon';
 
 const RECENT_KEY = 'estima_pdf_recent';
 const MAX_RECENT = 5;
+const DEFAULT_SHAREPOINT_URL = 'https://papyrusbe.sharepoint.com/:f:/s/Papyrus1/IgCJGPDa78XofbqubIcIBY2TAXZ0Ph8WNW8G5H2-Mj0SVWs?e=9CDM3b';
 
 function getRecentUrls() {
   try {
@@ -21,7 +22,6 @@ function addRecentUrl(url, name) {
 
 export default function PdfReaderView({ onToast }) {
   const [pdfSrc, setPdfSrc] = useState(null);
-  const [urlInput, setUrlInput] = useState('');
   const [recentUrls, setRecentUrls] = useState(getRecentUrls);
   const fileRef = useRef(null);
   const blobRef = useRef(null);
@@ -33,7 +33,6 @@ export default function PdfReaderView({ onToast }) {
     setPdfSrc(url.trim());
     addRecentUrl(url.trim());
     setRecentUrls(getRecentUrls());
-    setUrlInput('');
   }, []);
 
   const openFile = useCallback((e) => {
@@ -61,7 +60,7 @@ export default function PdfReaderView({ onToast }) {
     return (
       <div className="flex flex-col h-full bg-white">
         {/* Toolbar */}
-        <div className="flex items-center justify-between px-4 py-2.5 bg-white/80 backdrop-blur-xl border-b border-gray-200/60 shrink-0">
+        <div className="flex items-center justify-between px-4 py-2.5 bg-white/70 backdrop-blur-xl border-b border-gray-200/50 shrink-0">
           <button onClick={handleClose}
             className="flex items-center gap-1.5 text-[13px] font-medium text-blue-600 active:opacity-60">
             <Icon name="back" size={16} color="#2563eb" />
@@ -85,32 +84,23 @@ export default function PdfReaderView({ onToast }) {
 
   // ── Mode sélection ──
   return (
-    <div className="px-4 py-3">
+    <div className="px-4 py-3 bg-[#f5f5f7] min-h-full">
       <input ref={fileRef} type="file" accept=".pdf,application/pdf" className="hidden" onChange={openFile} />
 
-      {/* URL input */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-3">
-        <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 block">
-          Ouvrir depuis une URL
-        </label>
-        <div className="flex gap-2">
-          <input
-            type="url"
-            value={urlInput}
-            onChange={e => setUrlInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && openUrl(urlInput)}
-            placeholder="https://..."
-            className="flex-1 p-3 bg-gray-50 border border-gray-200 rounded-xl text-[14px] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-          />
-          <button
-            onClick={() => openUrl(urlInput)}
-            disabled={!urlInput.trim()}
-            className="px-4 py-3 rounded-xl bg-blue-600 text-white font-bold text-[13px] disabled:opacity-30 active:scale-[0.97] transition shrink-0"
-          >
-            OK
-          </button>
+      {/* SharePoint — lien par défaut */}
+      <button
+        onClick={() => window.open(DEFAULT_SHAREPOINT_URL, '_blank')}
+        className="w-full flex items-center gap-3 bg-white rounded-2xl border border-gray-200 p-4 mb-3 active:bg-gray-50 transition"
+      >
+        <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+          <Icon name="folder" size={20} color="#2563eb" />
         </div>
-      </div>
+        <div className="text-left flex-1">
+          <div className="text-[15px] font-bold text-gray-900">SharePoint PROD</div>
+          <div className="text-xs text-gray-700 mt-0.5">Accéder aux plans et documents partagés</div>
+        </div>
+        <Icon name="chevron" size={16} color="#9ca3af" />
+      </button>
 
       {/* Fichier local */}
       <button
@@ -122,16 +112,16 @@ export default function PdfReaderView({ onToast }) {
         </div>
         <div className="text-left flex-1">
           <div className="text-[15px] font-bold text-gray-900">Fichier local</div>
-          <div className="text-xs text-gray-500 mt-0.5">Sélectionner un PDF depuis votre appareil</div>
+          <div className="text-xs text-gray-700 mt-0.5">Sélectionner un PDF depuis votre appareil</div>
         </div>
-        <Icon name="chevron" size={16} color="#d1d5db" />
+        <Icon name="chevron" size={16} color="#9ca3af" />
       </button>
 
       {/* Récents */}
       {recentUrls.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-200 p-4">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Récents</span>
+            <span className="text-[11px] font-bold text-gray-700 uppercase tracking-wider">Récents</span>
             <button onClick={clearRecent} className="text-[11px] text-red-500 font-medium active:opacity-60">
               Effacer
             </button>
@@ -147,9 +137,9 @@ export default function PdfReaderView({ onToast }) {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-[14px] font-semibold text-gray-900 truncate">{item.name}</div>
-                <div className="text-[11px] text-gray-400 truncate">{item.url}</div>
+                <div className="text-[11px] text-gray-600 truncate">{item.url}</div>
               </div>
-              <Icon name="chevron" size={14} color="#d1d5db" />
+              <Icon name="chevron" size={14} color="#9ca3af" />
             </button>
           ))}
         </div>
@@ -161,8 +151,8 @@ export default function PdfReaderView({ onToast }) {
           <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-3">
             <Icon name="file" size={24} color="#9ca3af" />
           </div>
-          <p className="text-sm text-gray-400 max-w-[240px] leading-relaxed">
-            Collez une URL ou sélectionnez un fichier PDF pour le visualiser.
+          <p className="text-sm text-gray-600 max-w-[240px] leading-relaxed">
+            Ouvrez SharePoint ou sélectionnez un fichier PDF local.
           </p>
         </div>
       )}

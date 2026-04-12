@@ -8,40 +8,43 @@ import ChangelogModal from '../ChangelogModal';
 // ─── MODULES MOBILES ───────────────────────────────────────────────────────
 
 const MOBILE_MODULES = [
-  { id: 'projects',    label: 'Mes Projets & RAO',   description: 'Devis, DQE et analyse des offres', icon: 'folder',    tag: 'Core',    row: 1, wide: true },
-  { id: 'crc',         label: 'Comptes Rendus',      description: 'CR de chantier',                  icon: 'clipboard', tag: 'CRC',     row: 2 },
-  { id: 'site_visits', label: 'Visites de Site',     description: 'Notes terrain, photos et GPS',    icon: 'camera',    tag: 'Terrain', row: 2 },
-  { id: 'moe',         label: 'Devis MOE',           description: 'Honoraires maîtrise d\'œuvre',    icon: 'euro',      tag: 'MOE',     row: 3 },
-  { id: 'doc_admin',   label: 'Documents Admin',     description: 'Fiches marché et docs EXE',       icon: 'file',      tag: 'EXE',     row: 3 },
-  { id: 'pdf_reader',  label: 'Lecteur PDF',         description: 'Visualiser plans et documents',   icon: 'file',      tag: 'Outil',   row: 2, wide: true },
+  { id: 'projects',    label: 'Projets & RAO',    description: 'Devis, DQE et analyse des offres', icon: 'folder',    tag: 'Core',    row: 1 },
+  { id: 'pdf_reader',  label: 'Lecteur PDF',      description: 'Visualiser plans et documents',    icon: 'file',      tag: 'Outil',   row: 1 },
+  { id: 'site_visits', label: 'Visites de Site',  description: 'Notes terrain, photos et GPS',     icon: 'camera',    tag: 'Terrain', row: 2 },
+  { id: 'crc',         label: 'Comptes Rendus',   description: 'CR de chantier',                   icon: 'clipboard', tag: 'CRC',     row: 2 },
+  { id: 'moe',         label: 'Devis MOE',        description: 'Honoraires maîtrise d\'œuvre',     icon: 'euro',      tag: 'MOE',     row: 3 },
+  { id: 'doc_admin',   label: 'Documents Admin',  description: 'Fiches marché et docs EXE',        icon: 'file',      tag: 'EXE',     row: 3 },
 ];
 
 // ─── THÈMES PAR ROW ───────────────────────────────────────────────────────
 
 const ROW_THEMES = {
   1: {
-    card: 'bg-white border-gray-200/70',
-    iconBg: 'bg-gray-50',
-    iconColor: '#374151',
+    card: 'bg-white border-gray-200',
+    iconBg: 'bg-blue-50',
+    iconColor: '#2563eb',
     title: 'text-gray-900',
-    desc: 'text-gray-500',
-    badge: 'bg-gray-100 text-gray-500 border-gray-200/60',
+    desc: 'text-gray-700',
+    badge: 'bg-gray-100 text-gray-700 border-gray-200',
+    status: 'text-gray-600',
   },
   2: {
     card: 'bg-gradient-to-br from-amber-950/90 via-stone-900/95 to-stone-950/90 border-amber-700/30',
     iconBg: 'bg-amber-800/40',
     iconColor: '#fbbf24',
     title: 'text-amber-50',
-    desc: 'text-amber-200/60',
+    desc: 'text-amber-200/70',
     badge: 'bg-amber-800/40 text-amber-300/80 border-amber-600/30',
+    status: 'text-amber-400/60',
   },
   3: {
     card: 'bg-gradient-to-br from-violet-950/90 via-purple-950/95 to-slate-950/90 border-violet-700/30',
     iconBg: 'bg-violet-800/40',
     iconColor: '#a78bfa',
     title: 'text-violet-50',
-    desc: 'text-violet-200/60',
+    desc: 'text-violet-200/70',
     badge: 'bg-violet-800/40 text-violet-300/80 border-violet-600/30',
+    status: 'text-violet-400/60',
   },
 };
 
@@ -88,7 +91,7 @@ export default function MobileHubView({ userEmail, onSelectModule, onLogout, isL
             {displayName}
           </span>.
         </h1>
-        <p className="text-[15px] text-gray-400 mt-1 font-light">
+        <p className="text-[15px] text-gray-600 mt-1 font-light">
           Sélectionnez un module pour commencer.
         </p>
       </div>
@@ -98,15 +101,14 @@ export default function MobileHubView({ userEmail, onSelectModule, onLogout, isL
         <div className="grid grid-cols-2 gap-2.5 flex-1">
           {MOBILE_MODULES.map((mod, idx) => {
             const theme = ROW_THEMES[mod.row];
-            const isWide = !!mod.wide;
             return (
               <button
                 key={mod.id}
                 onClick={() => onSelectModule(mod.id)}
                 className={`
-                  relative w-full rounded-[20px]
-                  border transition-all duration-300 active:scale-[0.97]
-                  ${isWide ? 'col-span-2 flex flex-row items-center gap-4 px-5 py-4' : 'flex flex-col items-center justify-center gap-3 text-center'}
+                  relative w-full rounded-[20px] border p-4
+                  flex flex-col text-left
+                  transition-all duration-300 active:scale-[0.97]
                   ${theme.card}
                 `}
                 style={{
@@ -115,28 +117,29 @@ export default function MobileHubView({ userEmail, onSelectModule, onLogout, isL
                   transform: mounted ? 'translateY(0)' : 'translateY(10px)',
                 }}
               >
-                {/* Tag */}
-                {mod.tag && (
-                  <span className={`absolute top-3 right-3 px-1.5 py-0.5 rounded-md text-[8px] font-bold uppercase tracking-wider border ${theme.badge}`}>
-                    {mod.tag}
-                  </span>
-                )}
-
-                {/* Icon */}
-                <div className={`${isWide ? 'w-12 h-12' : 'w-14 h-14'} rounded-2xl ${theme.iconBg} flex items-center justify-center shrink-0`}>
-                  <Icon name={mod.icon} size={isWide ? 24 : 26} color={theme.iconColor} />
+                {/* Header: icon + badge */}
+                <div className="flex items-start justify-between mb-2">
+                  <div className={`w-10 h-10 rounded-xl ${theme.iconBg} flex items-center justify-center shrink-0`}>
+                    <Icon name={mod.icon} size={20} color={theme.iconColor} />
+                  </div>
+                  {mod.tag && (
+                    <span className={`px-1.5 py-0.5 rounded-md text-[8px] font-bold uppercase tracking-wider border ${theme.badge}`}>
+                      {mod.tag}
+                    </span>
+                  )}
                 </div>
 
-                {/* Text */}
-                <div className={isWide ? 'text-left flex-1' : ''}>
-                  <span className={`${isWide ? 'text-[16px]' : 'text-[15px]'} font-semibold block ${theme.title}`}>{mod.label}</span>
-                  <p className={`text-[11px] leading-snug mt-0.5 ${theme.desc}`}>{mod.description}</p>
+                {/* Title + description */}
+                <div className="flex-1">
+                  <span className={`text-[14px] font-semibold block leading-tight ${theme.title}`}>{mod.label}</span>
+                  <p className={`text-[11px] leading-snug mt-1 ${theme.desc}`}>{mod.description}</p>
                 </div>
 
-                {/* Chevron pour wide */}
-                {isWide && (
-                  <Icon name="chevron" size={16} color="#9ca3af" />
-                )}
+                {/* Footer status */}
+                <div className="mt-2 flex items-center justify-between">
+                  <span className={`text-[10px] font-medium ${theme.status}`}>Prêt</span>
+                  <Icon name="chevron" size={12} color="#9ca3af" />
+                </div>
               </button>
             );
           })}
@@ -148,10 +151,10 @@ export default function MobileHubView({ userEmail, onSelectModule, onLogout, isL
           style={{ transitionDelay: '350ms' }}
         >
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-          <span className="text-[10px] text-gray-400 font-medium">
+          <span className="text-[10px] text-gray-600 font-medium">
             Opérationnel · v{APP_VERSION}
           </span>
-          <span className="text-[10px] text-gray-300">·</span>
+          <span className="text-[10px] text-gray-400">·</span>
           <button
             onClick={() => setShowChangelog(true)}
             className="text-[10px] font-medium text-blue-500"
