@@ -16,58 +16,33 @@ import { toast } from '../../../utils/globalUI';
 // ── 1. MODÈLE GLOBAL PAR DÉFAUT (AVEC TOUTES LES VARIABLES) ──────────────────
 
 const DEFAULT_TEMPLATE = `
-<div style="font-family: Helvetica, Arial, sans-serif; font-size: 11pt; line-height: 1.5; color: #000000;">
-  <p style="text-align: right; margin-bottom: 40px;">{{VILLE}}, le {{DATE_EMISSION}}</p>
-
-  <p style="margin-bottom: 30px;">
-    <strong>DESTINATAIRE :</strong><br/>
-    {{NOM_ENTREPRISE}}
-  </p>
-
-  <p style="margin-bottom: 20px;">
-    <strong>AFFAIRE :</strong> {{CODE_AFFAIRE}} - {{OBJET_MARCHE}}<br/>
-    <strong>MAÎTRISE D'OUVRAGE :</strong> {{CLIENT}}<br/>
-    <strong>OBJET :</strong> {{LOT}} - Négociation avec les candidats
-  </p>
-
-  <p style="margin-bottom: 15px;">Monsieur,</p>
-
-  <p style="margin-bottom: 15px; text-align: justify;">
-    Dans le cadre de la consultation (Phase {{PHASE}}) relative au marché de travaux situé à {{LIEU}}, votre entreprise a présenté une offre pour le {{LOT}}, laquelle a fait l'objet d'une analyse sous la supervision de la Maîtrise d'Œuvre ({{MOE}}).
-  </p>
-
-  <p style="margin-bottom: 15px; text-align: justify;">
-    Afin de permettre au pouvoir adjudicateur de vérifier la cohérence économique de votre offre, et sans préjuger de la conformité de votre proposition, nous vous remercions de bien vouloir nous transmettre l'ensemble des sous-détails de prix détaillés.
-  </p>
-
-  <p style="margin-bottom: 15px; text-align: justify;">
-    Ces sous-détails de prix devront permettre d'identifier une décomposition complète et explicite, comprenant notamment :
-  </p>
-
-  <ul style="margin-bottom: 15px; text-align: justify;">
-    <li>L'ensemble des fournitures demandées (matériaux, produits, équipements) ;</li>
-    <li>La main-d'œuvre mobilisée (catégories, temps unitaires et coûts) ;</li>
-    <li>Les moyens matériels et engins utilisés ;</li>
-    <li>Les autres composantes du prix (frais généraux et marge).</li>
-  </ul>
-
-  {{QUESTIONS}}
-
-  <p style="margin-bottom: 15px; margin-top: 15px; text-align: justify;">
-    Par ailleurs, le pouvoir adjudicateur a décidé d'engager une phase de négociation portant sur les aspects financiers de votre offre. Dans ce cadre, nous vous invitons à bien vouloir réexaminer le montant de votre proposition et à nous faire parvenir une offre financière révisée, intégrant une remise sur le prix initial.
-  </p>
-
-  <p style="margin-bottom: 20px; text-align: justify;">
-    <strong>Les éléments demandés devront être transmis sur la plateforme au plus tard le {{DATE_LIMITE}}.</strong>
-  </p>
-
-  <p style="margin-bottom: 40px;">
-    Nous vous prions d'agréer, Monsieur, l'expression de nos salutations distinguées.
-  </p>
-
-  <p style="text-align: right;">
-    <strong>{{SIGNATAIRE}}</strong>
-  </p>
+<div style="font-family: 'Aptos Light', 'Segoe UI', Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.5; color: #000;">
+<p style="text-align:right; margin:0 0 14px 0;">{{VILLE}}, le {{DATE_EMISSION}}</p>
+<div style="display:flex; gap:8px; margin-bottom:6px;">
+<div style="flex:55; border:1px solid #000;">
+<div style="border-bottom:1px solid #000; text-align:center; padding:4px 6px; font-size:10pt;">DESTINATAIRE :</div>
+<div style="padding:8px 6px; font-size:10pt; min-height:60px;"><strong>{{NOM_ENTREPRISE}}</strong><br/>{{ADRESSE_ENTREPRISE}}</div>
+</div>
+<div style="flex:45; border:1px solid #000;">
+<div style="border-bottom:1px solid #000; text-align:center; padding:4px 6px; font-size:10pt;">EXP\u00c9DITEUR :</div>
+<div style="padding:8px 6px; font-size:10pt; min-height:60px;"><strong>{{CLIENT}}</strong><br/>{{ADRESSE_EXPEDITEUR}}</div>
+</div>
+</div>
+<p style="margin:6px 0 2px 0;"><strong>OBJET :</strong>  <strong>{{OBJET_MARCHE}}</strong></p>
+<p style="margin:0 0 6px 0;"><strong>N\u00e9gociation avec les candidats</strong></p>
+<div style="border:1px solid #000; padding:10px 12px;">
+<p style="margin:0 0 10px 0;">Monsieur,</p>
+<p style="margin:0 0 10px 0; text-align:justify;">Dans le cadre de la consultation relative au march\u00e9 de travaux {{OBJET_MARCHE}} \u00e0 {{LIEU}}, votre entreprise a pr\u00e9sent\u00e9 une offre, laquelle a fait l\u2019objet d\u2019une analyse conform\u00e9ment aux crit\u00e8res et modalit\u00e9s d\u00e9finis au r\u00e8glement de consultation.</p>
+<p style="margin:0 0 10px 0; text-align:justify;">Afin de permettre au pouvoir adjudicateur de v\u00e9rifier la coh\u00e9rence \u00e9conomique de votre offre au regard des prestations pr\u00e9vues au march\u00e9, et sans pr\u00e9juger de la conformit\u00e9 ni du caract\u00e8re de votre proposition, nous vous remercions de bien vouloir nous confirmer les prix des prestations suivantes :</p>
+{{QUESTIONS}}
+<p style="margin:12px 0 10px 0; text-align:justify;">Par ailleurs, conform\u00e9ment aux r\u00e8gles applicables aux march\u00e9s pass\u00e9s selon une <strong>proc\u00e9dure adapt\u00e9e</strong>, le pouvoir adjudicateur a d\u00e9cid\u00e9 d\u2019engager une <strong>phase de n\u00e9gociation portant sur les aspects financiers</strong> de votre offre.</p>
+<p style="margin:0 0 10px 0; text-align:justify;">Dans ce cadre, nous vous invitons \u00e0 bien vouloir <strong>r\u00e9examiner le montant de votre proposition financi\u00e8re</strong> et \u00e0 nous faire parvenir, le cas \u00e9ch\u00e9ant, une <strong>offre financi\u00e8re r\u00e9vis\u00e9e</strong>, int\u00e9grant une <strong>remise sur le prix initialement propos\u00e9</strong>, tout en maintenant le niveau de prestations et les dispositions techniques d\u00e9crites dans votre m\u00e9moire technique.</p>
+<p style="margin:0 0 10px 0; text-align:justify;">Cette phase de n\u00e9gociation a pour objet de permettre l\u2019optimisation de l\u2019\u00e9conomie g\u00e9n\u00e9rale du march\u00e9, sans modification des caract\u00e9ristiques essentielles du lot ni des exigences du dossier de consultation.</p>
+<p style="margin:0 0 10px 0; text-align:justify;">Les \u00e9l\u00e9ments demand\u00e9s devront \u00eatre transmis <strong>sur la plateforme</strong> au plus tard le <strong><span style="background:#FF0;padding:1px 4px;">{{DATE_LIMITE}}</span></strong>, et seront int\u00e9gr\u00e9s \u00e0 l\u2019analyse des offres avant toute d\u00e9cision d\u2019attribution.</p>
+<p style="margin:0 0 10px 0; text-align:justify;">Nous vous prions d\u2019agr\u00e9er, Monsieur, l\u2019expression de nos salutations distingu\u00e9es.</p>
+<p style="margin:20px 0 16px 0; padding-left:55%;">{{SIGNATAIRE}}</p>
+</div>
+<p style="margin:8px 0 0 0; font-size:9pt;">NOMBRE DE PAGES (y compris celle-ci) : 1</p>
 </div>
 `;
 
@@ -80,9 +55,50 @@ const applyTemplate = (templateHtml, companyName, questions, letterConfig, consu
     ? new Date(letterConfig.deadline).toLocaleString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     : '[Date limite]';
   const signatory = letterConfig.signatoryName || '[Nom du signataire]';
+  const adresseEntreprise = letterConfig.adresseEntreprise || '';
+  const adresseExpediteur = letterConfig.adresseExpediteur || '';
 
+  // Formater les questions en HTML structuré
   const formattedQuestions = questions
-    ? `<br/><p><strong>De plus, nous souhaiterions obtenir des précisions sur les points suivants :</strong></p><p>${questions.replace(/\n/g, '<br/>')}</p>`
+    ? (() => {
+        const lines = questions.split('\n').filter(l => l.trim());
+        let html = '';
+        let inList = false;
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+
+          // Titre de section (➡️ SUSPICION... ou ➡️ PRIX PARAISSANT...)
+          if (trimmed.startsWith('➡️') || trimmed.match(/^(SUSPICION|PRIX PARAISSANT)/)) {
+            if (inList) { html += '</ul>'; inList = false; }
+            const title = trimmed.replace(/^➡️\s*/, '');
+            html += `<p style="margin:10px 0 4px 0; text-align:justify;"><strong>${title}</strong></p>`;
+          }
+          // Ligne de prix (- Prix n°... ou Prix n°...)
+          else if (trimmed.match(/^-?\s*Prix\s+n°/)) {
+            if (!inList) { html += '<ul style="margin:4px 0; padding-left:24px; text-align:justify;">'; inList = true; }
+            const cleaned = trimmed.replace(/^-\s*/, '');
+            html += `<li style="margin-bottom:3px;">${cleaned}</li>`;
+          }
+          // Sous-item avec tiret (- Le mode opératoire...)
+          else if (trimmed.startsWith('- ')) {
+            if (!inList) { html += '<ul style="margin:4px 0; padding-left:24px; text-align:justify;">'; inList = true; }
+            html += `<li style="margin-bottom:3px;">${trimmed.substring(2)}</li>`;
+          }
+          // Texte de paragraphe (articles concernés, explicatif...)
+          else if (trimmed.startsWith('Articles concernés')) {
+            if (inList) { html += '</ul>'; inList = false; }
+            html += `<p style="margin:6px 0 2px 0; text-align:justify;"><strong>${trimmed}</strong></p>`;
+          }
+          // Paragraphe normal
+          else {
+            if (inList) { html += '</ul>'; inList = false; }
+            html += `<p style="margin:0 0 4px 0; text-align:justify;">${trimmed}</p>`;
+          }
+        }
+        if (inList) html += '</ul>';
+        return html;
+      })()
     : '';
 
   return templateHtml
@@ -98,16 +114,20 @@ const applyTemplate = (templateHtml, companyName, questions, letterConfig, consu
     .replace(/{{PHASE}}/g, consultation?.phase || '[Phase]')
     .replace(/{{QUESTIONS}}/g, formattedQuestions)
     .replace(/{{DATE_LIMITE}}/g, deadline)
-    .replace(/{{SIGNATAIRE}}/g, signatory);
+    .replace(/{{SIGNATAIRE}}/g, signatory)
+    .replace(/{{ADRESSE_ENTREPRISE}}/g, adresseEntreprise.replace(/\n/g, '<br/>'))
+    .replace(/{{ADRESSE_EXPEDITEUR}}/g, adresseExpediteur.replace(/\n/g, '<br/>'));
 };
 
 // ── 3. MODALE D'ÉDITION WYSIWYG (PLEIN ÉCRAN & VARIABLES) ─────────────────────
 
 const AVAILABLE_VARIABLES = [
   { label: 'Nom Entreprise', tag: '{{NOM_ENTREPRISE}}' },
+  { label: 'Adresse Entreprise', tag: '{{ADRESSE_ENTREPRISE}}' },
   { label: 'Objet du projet', tag: '{{OBJET_MARCHE}}' },
   { label: 'Code Affaire', tag: '{{CODE_AFFAIRE}}' },
   { label: 'Client / MOA', tag: '{{CLIENT}}' },
+  { label: 'Adresse Expéditeur', tag: '{{ADRESSE_EXPEDITEUR}}' },
   { label: 'Maître d\'Œuvre', tag: '{{MOE}}' },
   { label: 'Lieu d\'exécution', tag: '{{LIEU}}' },
   { label: 'Phase', tag: '{{PHASE}}' },
@@ -119,7 +139,7 @@ const AVAILABLE_VARIABLES = [
   { label: 'Signataire', tag: '{{SIGNATAIRE}}' },
 ];
 
-const LetterEditorModal = ({ isOpen, onClose, mode, initialHtml, companyName, onSaveTemplate }) => {
+const LetterEditorModal = ({ isOpen, onClose, mode, initialHtml, companyName, onSaveTemplate, onDownloadJsPDF }) => {
   const [editorHtml, setEditorHtml] = useState(initialHtml);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [copiedVar, setCopiedVar] = useState(null);
@@ -136,20 +156,10 @@ const LetterEditorModal = ({ isOpen, onClose, mode, initialHtml, companyName, on
   const isTemplateMode = mode === 'template';
 
   const handleDownloadPDF = async () => {
-    const { default: html2pdf } = await import('html2pdf.js');
-    const element = document.createElement('div');
-    element.innerHTML = `<div style="padding: 20mm 15mm; background-color: white;">${editorHtml}</div>`;
-
-    const opt = {
-      margin:       0,
-      filename:     `Courrier_Negociation_${companyName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
-      image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true },
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
-
-    html2pdf().set(opt).from(element).save();
-    onClose();
+    if (onDownloadJsPDF) {
+      await onDownloadJsPDF();
+      onClose();
+    }
   };
 
   const handleSaveGlobalTemplate = () => {
@@ -314,6 +324,8 @@ const TabNegociation = ({
     deadline: '',
     signatoryName: consultation.client || '',
     city: consultation.lieu || '',
+    adresseEntreprise: '',
+    adresseExpediteur: '',
   });
   const [anomalyThresholds, setAnomalyThresholds] = useState({ ecart: 15, impact: 1 });
   const [showThresholdSettings, setShowThresholdSettings] = useState(false);
@@ -381,10 +393,10 @@ const TabNegociation = ({
 
         if (Math.abs(diffRatio) > (anomalyThresholds.ecart / 100) && impactRatio > (anomalyThresholds.impact / 100)) {
           const diffPercent  = Math.abs(Math.round(diffRatio * 100));
-          const puFormatted  = companyPU.toLocaleString('fr-FR', { minimumFractionDigits: 2 });
+          const puFormatted  = companyPU.toLocaleString('fr-FR', { minimumFractionDigits: 2 }).replace(/[\u202F\u00A0\u2009]/g, ' ');
           const refLabel     = bpuRefMap?.get?.(item.id) || item.bpuNum || item.ref || '—';
           const label        = item.designation || item.name || '';
-          const itemText = `- Prix n°${refLabel} — ${label} : PU proposé de ${puFormatted} €.`;
+          const itemText = `- Prix n°${refLabel} — ${label} : PU proposé de ${puFormatted} € HT.`;
 
           if (diffRatio > 0) highPrices.push(itemText);
           else               lowPrices.push(itemText);
@@ -421,9 +433,7 @@ const TabNegociation = ({
     }
 
     if (finalAdditions.length > 0) {
-      const currentQuestions = companiesData[companyName]?.negotiation?.questions || '';
-      const spacer = currentQuestions ? '\n\n' : '';
-      updateNegotiation(companyName, 'questions', currentQuestions + spacer + finalAdditions.join('\n\n'));
+      updateNegotiation(companyName, 'questions', finalAdditions.join('\n\n'));
     } else {
       toast.info(`Aucun prix atypique détecté (seuils : écart > ${anomalyThresholds.ecart}% de la moyenne ET impact > ${anomalyThresholds.impact}% de l'offre totale).`);
     }
@@ -457,6 +467,15 @@ const TabNegociation = ({
             initialHtml={editorData.html}
             companyName={editorData.companyName}
             onSaveTemplate={(newHtml) => setMasterTemplate(newHtml)}
+            onDownloadJsPDF={async () => {
+              const { generateNegoLetterPDF } = await import('../../../utils/pdf/pdfNegoLetterGenerator');
+              await generateNegoLetterPDF({
+                companyName: editorData.companyName,
+                questions: companiesData[editorData.companyName]?.negotiation?.questions || '',
+                letterConfig,
+                consultation,
+              });
+            }}
           />
 
           {/* ── Bloc config global ── */}
@@ -508,6 +527,32 @@ const TabNegociation = ({
                   <input
                     type="text" value={letterConfig.signatoryName} onChange={e => updateConfig('signatoryName', e.target.value)} placeholder="Ex: Fabrice Marcuzzo, Maire"
                     className="w-full bg-slate-800/50 border border-white/20 rounded-xl px-4 py-3 text-sm text-white font-semibold placeholder:text-slate-400 focus:outline-none focus:bg-slate-800 focus:ring-2 focus:ring-emerald-500/80 transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Ligne 2 : Adresses */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-300">
+                    <MapPin size={14} /> Adresse expéditeur (Client/MOA)
+                  </label>
+                  <textarea
+                    value={letterConfig.adresseExpediteur} onChange={e => updateConfig('adresseExpediteur', e.target.value)}
+                    placeholder={"Ex:\nPlace Georges Tournier\nBP 545\n81209 MAZAMET CEDEX"}
+                    rows={3}
+                    className="w-full bg-slate-800/50 border border-white/20 rounded-xl px-4 py-3 text-sm text-white font-semibold placeholder:text-slate-400 focus:outline-none focus:bg-slate-800 focus:ring-2 focus:ring-emerald-500/80 transition-all resize-none"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-300">
+                    <MapPin size={14} /> Adresse entreprise (optionnel)
+                  </label>
+                  <textarea
+                    value={letterConfig.adresseEntreprise} onChange={e => updateConfig('adresseEntreprise', e.target.value)}
+                    placeholder={"Renseignée automatiquement par entreprise\nsi laissé vide"}
+                    rows={3}
+                    className="w-full bg-slate-800/50 border border-white/20 rounded-xl px-4 py-3 text-sm text-white font-semibold placeholder:text-slate-400 focus:outline-none focus:bg-slate-800 focus:ring-2 focus:ring-emerald-500/80 transition-all resize-none"
                   />
                 </div>
               </div>

@@ -67,9 +67,9 @@ const fileToImage = (file) =>
  * Le _placeholder est un dataURL très léger (200px) pour affichage immédiat.
  * La src finale (800px) est la version haute qualité.
  */
-export const compressImage = async (file, maxW = 800, quality = 0.7) => {
-  // Lancer GPS en parallèle dès le début (partagé entre les photos)
-  const gpsPromise = getSharedGps();
+export const compressImage = async (file, maxW = 800, quality = 0.7, { withGps = true } = {}) => {
+  // Lancer GPS en parallèle uniquement pour les photos prises à la caméra
+  const gpsPromise = withGps ? getSharedGps() : Promise.resolve(null);
 
   const img = await fileToImage(file);
 
@@ -88,8 +88,8 @@ export const compressImage = async (file, maxW = 800, quality = 0.7) => {
  * @param {Function} onPlaceholder - callback(placeholderResult) appelé immédiatement
  * @param {Function} onFinal - callback(finalResult) appelé quand la compression est finie
  */
-export const compressImageProgressive = async (file, onPlaceholder, onFinal) => {
-  const gpsPromise = getSharedGps();
+export const compressImageProgressive = async (file, onPlaceholder, onFinal, { withGps = true } = {}) => {
+  const gpsPromise = withGps ? getSharedGps() : Promise.resolve(null);
 
   const img = await fileToImage(file);
 

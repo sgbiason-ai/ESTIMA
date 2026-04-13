@@ -49,10 +49,10 @@ export default function ObservationEditSheet({
     if (onUpdate && obs) onUpdate(obs.id, patch);
   }, [onUpdate, obs]);
 
-  const handleImageFiles = useCallback(async (files) => {
+  const handleImageFiles = useCallback(async (files, { withGps = true } = {}) => {
     if (!files || files.length === 0) return;
     const fileList = Array.from(files);
-    const compressed = await Promise.all(fileList.map((f) => compressImage(f)));
+    const compressed = await Promise.all(fileList.map((f) => compressImage(f, 800, 0.7, { withGps })));
     update({ images: [...images, ...compressed] });
   }, [images, update]);
 
@@ -234,7 +234,7 @@ export default function ObservationEditSheet({
               accept="image/*"
               capture="environment"
               className="hidden"
-              onChange={(e) => { handleImageFiles(e.target.files); e.target.value = ''; }}
+              onChange={(e) => { handleImageFiles(e.target.files, { withGps: true }); e.target.value = ''; }}
             />
             <input
               ref={galleryRef}
@@ -242,7 +242,7 @@ export default function ObservationEditSheet({
               accept="image/*"
               multiple
               className="hidden"
-              onChange={(e) => { handleImageFiles(e.target.files); e.target.value = ''; }}
+              onChange={(e) => { handleImageFiles(e.target.files, { withGps: false }); e.target.value = ''; }}
             />
           </Field>
 

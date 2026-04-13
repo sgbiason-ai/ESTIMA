@@ -1,5 +1,6 @@
 // src/components/crr/CrrObservations.jsx
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import {
   Plus, Trash2, ChevronDown, ChevronRight,
   MinusCircle, Circle, Loader, CheckCircle2, Calendar, User, MessageSquare,
@@ -33,17 +34,42 @@ const GroupBadge = ({ name, colorIndex, onRemove }) => {
 const GroupPicker = ({ value, onChange, groups, placeholder, className = '' }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
+  const btnRef = useRef(null);
+  const [dropPos, setDropPos] = useState({ top: 0, left: 0 });
 
   // value = "MOE, Entreprises" → Set {"MOE", "Entreprises"}
   const selected = new Set((value || '').split(',').map((s) => s.trim()).filter(Boolean));
 
   // Map nom groupe → index pour couleur stable
   const groupIndexMap = {};
-  groups.forEach((g, i) => { groupIndexMap[g.name] = i; });
+  const validNames = new Set();
+  groups.forEach((g, i) => { groupIndexMap[g.name] = i; validNames.add(g.name); });
+
+  // Séparer pastilles valides et orphelines (groupe supprimé)
+  const orphanNames = [...selected].filter((n) => !validNames.has(n));
+
+  // Supprimer une pastille orpheline
+  const removeOrphan = (name, e) => {
+    e.stopPropagation();
+    const next = new Set(selected);
+    next.delete(name);
+    onChange([...next].join(', '));
+  };
+
+  // Calculer la position du dropdown en fixed par rapport au bouton
+  const openDropdown = () => {
+    if (btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setDropPos({ top: rect.bottom + 4, left: rect.left });
+    }
+    setOpen((v) => !v);
+  };
 
   React.useEffect(() => {
     if (!open) return;
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
@@ -59,23 +85,38 @@ const GroupPicker = ({ value, onChange, groups, placeholder, className = '' }) =
     <div ref={ref} className={`relative ${className}`}>
       {/* Zone cliquable : pastilles ou placeholder */}
       <button
+        ref={btnRef}
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={openDropdown}
         className={`w-full min-h-[28px] flex flex-wrap items-center gap-1 px-1.5 py-0.5 border border-slate-200 rounded bg-slate-50 transition-all
           ${open ? 'ring-1 ring-emerald-400 border-emerald-400' : 'hover:border-slate-300'}`}
       >
         {selected.size > 0 ? (
-          [...selected].map((name) => (
-            <GroupBadge key={name} name={name} colorIndex={groupIndexMap[name] ?? 0} />
-          ))
+          [...selected].map((name) => {
+            const isOrphan = orphanNames.includes(name);
+            return isOrphan ? (
+              <span key={name} className="inline-flex items-center rounded-full border font-bold leading-none whitespace-nowrap text-[9px] px-1.5 py-0.5 gap-1 bg-red-50 text-red-400 border-red-200 line-through">
+                {name}
+                <button onClick={(e) => removeOrphan(name, e)} className="hover:text-red-600 -mr-0.5" title="Supprimer (groupe inexistant)">
+                  <X size={8} />
+                </button>
+              </span>
+            ) : (
+              <GroupBadge key={name} name={name} colorIndex={groupIndexMap[name] ?? 0} />
+            );
+          })
         ) : (
           <span className="text-[10px] text-slate-400 w-full text-center">{placeholder}</span>
         )}
       </button>
 
-      {/* Dropdown */}
-      {open && (
-        <div className="absolute z-50 mt-1 left-0 w-52 bg-white border border-slate-200 rounded-lg shadow-xl py-1">
+      {/* Dropdown rendu en fixed pour échapper au overflow-hidden du parent */}
+      {open && ReactDOM.createPortal(
+        <div
+          className="w-52 bg-white border border-slate-200 rounded-lg shadow-2xl py-1"
+          style={{ position: 'fixed', top: dropPos.top, left: dropPos.left, zIndex: 99999 }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
           {groups.map((group, idx) => {
             const isSelected = selected.has(group.name);
             const c = getGroupColor(idx);
@@ -97,7 +138,8 @@ const GroupPicker = ({ value, onChange, groups, placeholder, className = '' }) =
               </button>
             );
           })}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

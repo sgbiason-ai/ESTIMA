@@ -34,10 +34,18 @@ const CrrHeader = ({
 
             {/* Numero */}
             <div className="flex items-center gap-2">
+              <Hash size={16} className="text-white/70" />
               <span className="text-white/70 text-sm">n°</span>
-              <span className="bg-white/20 backdrop-blur rounded-lg px-4 py-1.5 text-2xl font-black border border-white/30">
-                {meeting.number}
-              </span>
+              <input
+                type="number"
+                min="1"
+                value={meeting.number}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10);
+                  if (v > 0) updateMeetingField('number', v);
+                }}
+                className="bg-white/20 backdrop-blur rounded-lg px-3 py-1.5 text-2xl font-black border border-white/30 text-white text-center w-20 focus:outline-none focus:ring-2 focus:ring-white/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
             </div>
           </div>
 

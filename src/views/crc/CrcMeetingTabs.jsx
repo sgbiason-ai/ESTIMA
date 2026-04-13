@@ -1,8 +1,8 @@
 // src/views/crc/CrcMeetingTabs.jsx — EstimaStyle
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Save } from 'lucide-react';
 
-export default function CrcMeetingTabs({ meetings, activeMeetingId, setActiveMeetingId, saveStatus }) {
+export default function CrcMeetingTabs({ meetings, activeMeetingId, setActiveMeetingId, saveStatus, onForceSave }) {
   const scrollRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
@@ -77,10 +77,20 @@ export default function CrcMeetingTabs({ meetings, activeMeetingId, setActiveMee
         </button>
       )}
 
-      <div className="flex items-center gap-1.5 px-3 shrink-0 border-l border-gray-200/60 ml-1">
+      <button
+        onClick={onForceSave}
+        disabled={saveStatus === 'saved' || saveStatus === 'saving'}
+        title={saveStatus === 'saved' ? 'Tout est sauvegardé' : 'Sauvegarder maintenant'}
+        className={`flex items-center gap-1.5 px-3 py-1 shrink-0 border-l border-gray-200/60 ml-1 transition-all rounded-lg ${
+          saveStatus === 'waiting' || saveStatus === 'error'
+            ? 'hover:bg-emerald-50 cursor-pointer active:scale-[0.95]'
+            : 'cursor-default'
+        }`}
+      >
+        <Save size={12} className={saveStatus === 'saving' ? 'text-blue-500 animate-pulse' : saveStatus === 'waiting' ? 'text-amber-500' : saveStatus === 'error' ? 'text-red-500' : 'text-emerald-500'} />
         <div className={`w-1.5 h-1.5 rounded-full ${si.dot}`} />
         <span className="text-[10px] text-gray-400 font-medium">{si.label}</span>
-      </div>
+      </button>
     </div>
   );
 }

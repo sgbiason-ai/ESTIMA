@@ -520,6 +520,7 @@ export default function CrcView({ onBackToHub, user, companyId }) {
             activeMeetingId={manager.activeMeetingId}
             setActiveMeetingId={manager.setActiveMeetingId}
             saveStatus={manager.saveStatus}
+            onForceSave={manager.forceSave}
           />
           </div>
 
