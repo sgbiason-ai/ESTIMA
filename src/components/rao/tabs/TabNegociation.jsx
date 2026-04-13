@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import {
   MessageSquare, CheckCircle2, FileOutput, Copy,
   Calendar, User, MapPin, Edit3, X, Save, Settings, Maximize, Minimize,
-  Wand2
+  Wand2, SlidersHorizontal, Info
 } from 'lucide-react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
@@ -304,7 +304,8 @@ const TabNegociation = ({
   onSelectCompany,
   analysisCompanies = [],
   chaptersData = [],
-  analysisStats = null
+  analysisStats = null,
+  bpuRefMap = new Map()
 }) => {
   const [masterTemplate, setMasterTemplate] = useState(DEFAULT_TEMPLATE);
   const [editorData, setEditorData] = useState({ isOpen: false, mode: 'company', html: '', companyName: '' });
@@ -314,6 +315,8 @@ const TabNegociation = ({
     signatoryName: consultation.client || '',
     city: consultation.lieu || '',
   });
+  const [anomalyThresholds, setAnomalyThresholds] = useState({ ecart: 15, impact: 1 });
+  const [showThresholdSettings, setShowThresholdSettings] = useState(false);
 
   const updateConfig = (key, value) => setLetterConfig(prev => ({ ...prev, [key]: value }));
 
@@ -376,12 +379,12 @@ const TabNegociation = ({
         const diffRatio  = (companyPU - averagePU) / averagePU;
         const impactRatio = lineTotal / companyGrandTotal;
 
-        if (Math.abs(diffRatio) > 0.25 && impactRatio > 0.02) {
+        if (Math.abs(diffRatio) > (anomalyThresholds.ecart / 100) && impactRatio > (anomalyThresholds.impact / 100)) {
           const diffPercent  = Math.abs(Math.round(diffRatio * 100));
           const puFormatted  = companyPU.toLocaleString('fr-FR', { minimumFractionDigits: 2 });
-          const refLabel     = item.bpuNum || item.ref || '';
-          const label        = item.designation || item.name || item.id;
-          const itemText = `- Article ${refLabel} "${label}" : PU de ${puFormatted} € (${diffPercent}% ${diffRatio > 0 ? 'au-dessus' : 'en dessous'} de la moyenne de ${averagePU.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €).`;
+          const refLabel     = bpuRefMap?.get?.(item.id) || item.bpuNum || item.ref || '—';
+          const label        = item.designation || item.name || '';
+          const itemText = `- Prix n°${refLabel} — ${label} : PU proposé de ${puFormatted} €.`;
 
           if (diffRatio > 0) highPrices.push(itemText);
           else               lowPrices.push(itemText);
@@ -393,16 +396,26 @@ const TabNegociation = ({
 
     if (lowPrices.length > 0) {
       finalAdditions.push(
-        "➡️ SUSPICION DE PRIX ANORMALEMENT BAS (OAB) :\n" +
-        "Les prix suivants paraissent anormalement bas par rapport à l'estimation moyenne de la consultation et ont une forte incidence sur le montant global de votre offre. Afin de nous assurer de la viabilité économique de votre proposition, nous vous demandons de bien vouloir justifier ces montants (fourniture du sous-détail complet, méthode d'exécution, conditions d'achat...) :\n" +
+        "➡️ SUSPICION DE PRIX ANORMALEMENT BAS (art. L.2152-6 et R.2152-3 du Code de la commande publique) :\n" +
+        "Conformément aux articles L.2152-6 et R.2152-3 du Code de la commande publique, l'acheteur a l'obligation de détecter les offres qui paraissent anormalement basses et d'exiger des justifications avant tout rejet éventuel.\n" +
+        "Les prix unitaires suivants paraissent anormalement bas au regard de l'estimation du maître d'œuvre et ont une incidence significative sur le montant global de votre proposition. Nous vous demandons de bien vouloir fournir, pour chacun de ces prix, les justifications prévues à l'article R.2152-3, notamment :\n" +
+        "- Le mode opératoire et les procédés de construction retenus ;\n" +
+        "- Les conditions exceptionnellement favorables dont vous disposez (approvisionnement, moyens propres, etc.) ;\n" +
+        "- Les sous-détails de prix complets (fournitures, main-d'œuvre, matériel, frais généraux et marge).\n\n" +
+        "À défaut de justifications satisfaisantes, l'acheteur pourra rejeter votre offre comme anormalement basse en application de l'article L.2152-6.\n\n" +
+        "Articles concernés :\n" +
         lowPrices.join('\n')
       );
     }
 
     if (highPrices.length > 0) {
       finalAdditions.push(
-        "➡️ PRIX PARAISSANT EXCESSIFS :\n" +
-        "Les prix suivants se situent nettement au-dessus de la moyenne constatée et pèsent lourdement sur votre proposition globale. Nous vous invitons à vérifier s'il ne s'agit pas d'une erreur matérielle de chiffrage et, le cas échéant, à reconsidérer ces montants dans le cadre de la négociation :\n" +
+        "➡️ PRIX PARAISSANT EXCESSIFS (art. R.2152-3 du Code de la commande publique) :\n" +
+        "Les prix unitaires suivants se situent nettement au-dessus de l'estimation du maître d'œuvre et pèsent significativement sur le montant global de votre proposition. Conformément à l'article R.2152-3, nous vous invitons à :\n" +
+        "- Vérifier qu'il ne s'agit pas d'une erreur matérielle de chiffrage ;\n" +
+        "- Fournir les sous-détails de prix justifiant ces montants ;\n" +
+        "- Le cas échéant, dans le cadre de la négociation, reconsidérer ces prix afin d'améliorer la compétitivité de votre offre.\n\n" +
+        "Articles concernés :\n" +
         highPrices.join('\n')
       );
     }
@@ -412,7 +425,7 @@ const TabNegociation = ({
       const spacer = currentQuestions ? '\n\n' : '';
       updateNegotiation(companyName, 'questions', currentQuestions + spacer + finalAdditions.join('\n\n'));
     } else {
-      toast.info("Aucun prix n'a été détecté comme atypique (avec un écart de 25% ET une influence de plus de 2% sur l'offre totale).");
+      toast.info(`Aucun prix atypique détecté (seuils : écart > ${anomalyThresholds.ecart}% de la moyenne ET impact > ${anomalyThresholds.impact}% de l'offre totale).`);
     }
   };
 
@@ -519,28 +532,106 @@ const TabNegociation = ({
 
             {/* Colonne 1 : Saisie Questions & Génération */}
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
-              <div className="p-6 flex-1 flex flex-col">
+              <div className="p-6 flex flex-col">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
                   <h4 className="text-base font-black uppercase tracking-widest text-slate-900 flex items-center gap-2">
                     <MessageSquare size={20} className="text-blue-600" /> Questions spécifiques
                   </h4>
 
-                  <button
-                    onClick={() => generateAnomaliesText(name)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all shadow-sm active:scale-95"
-                    title="Détecter les prix atypiques (hauts et bas) qui influencent fortement l'offre"
-                  >
-                    <Wand2 size={14} />
-                    Prix atypiques
-                  </button>
+                  <div className="flex items-center gap-1.5 relative">
+                    <button
+                      onClick={() => generateAnomaliesText(name)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all shadow-sm active:scale-95"
+                      title="Détecter les prix atypiques (hauts et bas) qui influencent fortement l'offre"
+                    >
+                      <Wand2 size={14} />
+                      Prix atypiques
+                    </button>
+                    <button
+                      onClick={() => setShowThresholdSettings(!showThresholdSettings)}
+                      className={`p-1.5 rounded-lg border transition-all ${showThresholdSettings ? 'bg-indigo-100 border-indigo-300 text-indigo-700' : 'bg-white border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-200'}`}
+                      title="Réglages des seuils de détection"
+                    >
+                      <SlidersHorizontal size={14} />
+                    </button>
+
+                    {/* Popover réglages */}
+                    {showThresholdSettings && (
+                      <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 p-5 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h5 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                            <SlidersHorizontal size={16} className="text-indigo-500" />
+                            Seuils de détection
+                          </h5>
+                          <button onClick={() => setShowThresholdSettings(false)} className="p-1 text-slate-400 hover:text-slate-600 rounded">
+                            <X size={14} />
+                          </button>
+                        </div>
+
+                        <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3">
+                          <div className="flex items-start gap-2">
+                            <Info size={14} className="text-indigo-500 mt-0.5 shrink-0" />
+                            <p className="text-[11px] text-indigo-700 leading-relaxed">
+                              Un prix est signalé comme <strong>atypique</strong> si les <strong>2 conditions</strong> sont remplies simultanément :
+                              le PU s'écarte de plus de <strong>{anomalyThresholds.ecart}%</strong> de la moyenne des offres,
+                              ET le montant de la ligne représente plus de <strong>{anomalyThresholds.impact}%</strong> du total HT de l'entreprise.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <label className="text-xs font-bold text-slate-700">Écart par rapport à la moyenne</label>
+                              <span className="text-xs font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg">{anomalyThresholds.ecart}%</span>
+                            </div>
+                            <input
+                              type="range" min={5} max={50} step={1}
+                              value={anomalyThresholds.ecart}
+                              onChange={e => setAnomalyThresholds(prev => ({ ...prev, ecart: Number(e.target.value) }))}
+                              className="w-full h-1.5 bg-slate-200 rounded-full appearance-none cursor-pointer accent-indigo-500"
+                            />
+                            <div className="flex justify-between text-[9px] text-slate-400 mt-0.5">
+                              <span>5% (sensible)</span>
+                              <span>50% (tolérant)</span>
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <label className="text-xs font-bold text-slate-700">Impact sur l'offre totale</label>
+                              <span className="text-xs font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg">{anomalyThresholds.impact}%</span>
+                            </div>
+                            <input
+                              type="range" min={0.25} max={5} step={0.25}
+                              value={anomalyThresholds.impact}
+                              onChange={e => setAnomalyThresholds(prev => ({ ...prev, impact: Number(e.target.value) }))}
+                              className="w-full h-1.5 bg-slate-200 rounded-full appearance-none cursor-pointer accent-indigo-500"
+                            />
+                            <div className="flex justify-between text-[9px] text-slate-400 mt-0.5">
+                              <span>0.25% (sensible)</span>
+                              <span>5% (tolérant)</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => { setAnomalyThresholds({ ecart: 15, impact: 1 }); }}
+                          className="w-full text-[11px] font-bold text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 py-1.5 rounded-lg transition-colors"
+                        >
+                          Réinitialiser (15% / 1%)
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <Textarea
                   value={nego.questions}
                   onChange={v => updateNegotiation(name, 'questions', v)}
                   placeholder="Listez ici les questions spécifiques à cette entreprise.&#10;Ex:&#10;- Pouvez-vous justifier le PU du bordereau n°4 ?&#10;- Votre variante est irrecevable..."
-                  rows={8}
-                  className="flex-1 bg-white border-slate-300 shadow-sm rounded-2xl text-slate-900 font-medium text-[15px] leading-relaxed placeholder:text-slate-400 focus:ring-blue-500/20"
+                  rows={4}
+                  className="bg-white border-slate-300 shadow-sm rounded-2xl text-slate-900 font-medium text-[15px] leading-relaxed placeholder:text-slate-400 focus:ring-blue-500/20 min-h-[120px]"
                 />
               </div>
 
@@ -568,8 +659,8 @@ const TabNegociation = ({
                 value={nego.responses}
                 onChange={v => updateNegotiation(name, 'responses', v)}
                 placeholder="Consignez ici les retours de l'entreprise après l'envoi du courrier."
-                rows={8}
-                className="flex-1 bg-white border-slate-300 shadow-sm rounded-2xl text-slate-900 font-medium text-[15px] leading-relaxed placeholder:text-slate-400 focus:ring-emerald-500/20"
+                rows={4}
+                className="bg-white border-slate-300 shadow-sm rounded-2xl text-slate-900 font-medium text-[15px] leading-relaxed placeholder:text-slate-400 focus:ring-emerald-500/20 min-h-[120px]"
               />
             </div>
 

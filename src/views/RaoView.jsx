@@ -233,6 +233,10 @@ const RaoView = ({
               consultation={rao.consultation}
               selectedCompany={selectedCompany}
               onSelectCompany={setSelectedCompany}
+              analysisCompanies={analysisCompanies}
+              chaptersData={chaptersData}
+              analysisStats={rao.raoAnalysisStats}
+              bpuRefMap={bpuRefMap}
             />
           )}
           {activeTab === 'recap' && (
