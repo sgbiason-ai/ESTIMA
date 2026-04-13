@@ -24,9 +24,10 @@ const sanitizeFilename = (name) => {
   if (!name || typeof name !== 'string') return 'Document';
   return name
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9]/g, '_')
+    .replace(/\s+/g, '_')
+    .replace(/[^a-zA-Z0-9_\-]/g, '')
     .replace(/_+/g, '_').replace(/^_|_$/g, '')
-    .substring(0, 40);
+    .substring(0, 60);
 };
 
 const statusLabel = (s) =>

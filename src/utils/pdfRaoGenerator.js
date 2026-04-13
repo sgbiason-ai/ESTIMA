@@ -573,7 +573,7 @@ export const generateRaoPDF = async (optionsParams) => {
     y += 8;
   });
 
-  // ── ANALYSE ADMINISTRATIVE — Tableau comparatif unique ──
+  // ── ANALYSE ADMINISTRATIVE — Tableau comparatif avec colonnes subdivisées pour groupements ──
   {
     y = addPage('Analyse administrative', 'a4', 'portrait');
     tocEntries.push({ label: '6. Analyse administrative', page: pageNum });
@@ -582,56 +582,145 @@ export const generateRaoPDF = async (optionsParams) => {
     const conclLabelsA = { reguliere: 'RÉGULIÈRE', irreguliere: 'IRRÉGULIÈRE', inacceptable: 'INACCEPTABLE', inappropriee: 'INAPPROPRIÉE' };
     const conclColorsA = { reguliere: THEME.yes, irreguliere: [255, 140, 0], inacceptable: THEME.no, inappropriee: THEME.no };
 
-    const adminHead = ['Pièce', ...companyNames];
-    const colW = Math.max(14, Math.min(22, (W - 2 * M - 55) / companyNames.length));
+    // Utiliser les pièces custom si définies
+    const pdfAdminPieces = rao.adminPieces || DEFAULT_ADMIN_PIECES;
+    const pdfOfferPieces = rao.offerPieces || DEFAULT_OFFER_PIECES;
 
+    // Construire les colonnes avec subdivision pour groupements
+    // subColumns = [{ companyName, memberKey, memberLabel, companyIndex }]
+    const subColumns = [];
+    companyNames.forEach((name, ci) => {
+      const admin = companiesData[name]?.admin || {};
+      if (admin.isGroupement && admin.groupementMembers?.length > 0) {
+        admin.groupementMembers.forEach(m => {
+          subColumns.push({ companyName: name, memberKey: m.id, memberLabel: m.name || 'Sans nom', role: m.role || 'Cotraitant', companyIndex: ci });
+        });
+      } else {
+        subColumns.push({ companyName: name, memberKey: '_self', memberLabel: name, role: null, companyIndex: ci });
+      }
+    });
+
+    const totalCols = 1 + subColumns.length; // Pièce + sub-columns
+    const colW = Math.max(10, Math.min(20, (W - 2 * M - 50) / subColumns.length));
+
+    // Header row 1 : company names spanning their members
+    const headRow1 = ['Pièce'];
+    const headRow1Spans = []; // track spans for merging
+    let colIdx = 1;
+    companyNames.forEach((name, ci) => {
+      const admin = companiesData[name]?.admin || {};
+      const memberCount = (admin.isGroupement && admin.groupementMembers?.length > 0) ? admin.groupementMembers.length : 1;
+      headRow1.push({ content: name, colSpan: memberCount, styles: { fillColor: getCompanyStyle(ci).header, halign: 'center' } });
+      headRow1Spans.push({ start: colIdx, span: memberCount, ci });
+      colIdx += memberCount;
+    });
+
+    // Header row 2 : member names / roles (only if at least one groupement)
+    const hasAnyGroupement = companyNames.some(n => {
+      const a = companiesData[n]?.admin || {};
+      return a.isGroupement && a.groupementMembers?.length > 0;
+    });
+
+    const headRows = [headRow1];
+    if (hasAnyGroupement) {
+      const headRow2 = [''];
+      subColumns.forEach(sc => {
+        headRow2.push(sc.role ? `${sc.role}\n${sc.memberLabel}` : sc.memberLabel);
+      });
+      headRows.push(headRow2);
+    }
+
+    // Body rows
     const adminBody = [];
-    adminBody.push([{ content: 'PIÈCES ADMINISTRATIVES', colSpan: adminHead.length, styles: { fillColor: THEME.primary, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7 } }]);
-    DEFAULT_ADMIN_PIECES.forEach(p => {
-      adminBody.push([p.label, ...companyNames.map(name => {
-        const pieces = companiesData[name]?.admin?.pieces || {};
-        return pieces[p.id] === false ? 'NON' : 'OUI';
+
+    // Section: Pièces administratives (par membre)
+    adminBody.push([{ content: 'PIÈCES ADMINISTRATIVES', colSpan: totalCols, styles: { fillColor: THEME.primary, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7 } }]);
+    pdfAdminPieces.forEach(p => {
+      adminBody.push([p.label, ...subColumns.map(sc => {
+        const pieces = companiesData[sc.companyName]?.admin?.pieces || {};
+        const pieceKey = sc.memberKey === '_self' ? p.id : `${sc.memberKey}_${p.id}`;
+        return pieces[pieceKey] === false ? 'NON' : pieces[pieceKey] === true ? 'OUI' : '—';
       })]);
     });
-    adminBody.push([{ content: 'OFFRE DE L\'ENTREPRISE', colSpan: adminHead.length, styles: { fillColor: THEME.primary, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7 } }]);
-    DEFAULT_OFFER_PIECES.forEach(p => {
-      adminBody.push([p.label, ...companyNames.map(name => {
-        const pieces = companiesData[name]?.admin?.pieces || {};
-        return pieces[p.id] === false ? 'NON' : 'OUI';
-      })]);
+
+    // Section: Offre de l'entreprise (une seule colonne par entreprise, span si groupement)
+    adminBody.push([{ content: 'OFFRE DE L\'ENTREPRISE', colSpan: totalCols, styles: { fillColor: THEME.primary, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7 } }]);
+    pdfOfferPieces.forEach(p => {
+      const row = [p.label];
+      companyNames.forEach(name => {
+        const admin = companiesData[name]?.admin || {};
+        const pieces = admin.pieces || {};
+        const val = pieces[p.id] === false ? 'NON' : pieces[p.id] === true ? 'OUI' : '—';
+        const memberCount = (admin.isGroupement && admin.groupementMembers?.length > 0) ? admin.groupementMembers.length : 1;
+        row.push(memberCount > 1 ? { content: val, colSpan: memberCount, styles: { halign: 'center' } } : val);
+      });
+      adminBody.push(row);
     });
-    // Ligne conclusion
-    adminBody.push([{ content: 'CONCLUSION', styles: { fontStyle: 'bold' } }, ...companyNames.map(name => {
-      const concl = companiesData[name]?.admin?.conclusion || 'reguliere';
-      return conclLabelsA[concl] || 'RÉGULIÈRE';
-    })]);
+
+    // Ligne conclusion (span si groupement)
+    const conclRow = [{ content: 'CONCLUSION', styles: { fontStyle: 'bold' } }];
+    companyNames.forEach(name => {
+      const admin = companiesData[name]?.admin || {};
+      const concl = admin.conclusion || 'reguliere';
+      const label = conclLabelsA[concl] || 'RÉGULIÈRE';
+      const memberCount = (admin.isGroupement && admin.groupementMembers?.length > 0) ? admin.groupementMembers.length : 1;
+      conclRow.push(memberCount > 1 ? { content: label, colSpan: memberCount, styles: { halign: 'center' } } : label);
+    });
+    adminBody.push(conclRow);
+
+    // Observations admin (si saisies)
+    const hasObs = companyNames.some(n => companiesData[n]?.admin?.obsAdmin || companiesData[n]?.admin?.obsOffre);
+    if (hasObs) {
+      adminBody.push([{ content: 'OBSERVATIONS', colSpan: totalCols, styles: { fillColor: THEME.primary, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7 } }]);
+      const obsRow = [{ content: 'Observations', styles: { fontStyle: 'bold' } }];
+      companyNames.forEach(name => {
+        const admin = companiesData[name]?.admin || {};
+        const obs = [admin.obsAdmin, admin.obsOffre].filter(Boolean).join(' / ') || '—';
+        const memberCount = (admin.isGroupement && admin.groupementMembers?.length > 0) ? admin.groupementMembers.length : 1;
+        obsRow.push(memberCount > 1 ? { content: obs, colSpan: memberCount, styles: { halign: 'center', fontSize: 6 } } : { content: obs, styles: { halign: 'center', fontSize: 6 } });
+      });
+      adminBody.push(obsRow);
+    }
 
     const compColStyles = {};
-    companyNames.forEach((_, ci) => { compColStyles[ci + 1] = { cellWidth: colW, halign: 'center', fontSize: 7 }; });
+    subColumns.forEach((_, i) => { compColStyles[i + 1] = { cellWidth: colW, halign: 'center', fontSize: 6.5 }; });
 
     autoTable(doc, {
       startY: y,
-      head: [adminHead],
+      head: headRows,
       body: adminBody,
-      styles: { font: 'Helvetica', fontSize: 7, cellPadding: 2.5 },
-      headStyles: { fillColor: THEME.primary, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 6.5 },
-      columnStyles: { 0: { cellWidth: 60, fontSize: 7 }, ...compColStyles },
+      styles: { font: 'Helvetica', fontSize: 6.5, cellPadding: 2 },
+      headStyles: { fillColor: THEME.primary, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 6 },
+      columnStyles: { 0: { cellWidth: 50, fontSize: 6.5 }, ...compColStyles },
       alternateRowStyles: { fillColor: THEME.tableAlt },
       didParseCell: (data) => {
         if (data.section === 'body' && data.column.index > 0) {
-          if (data.cell.raw === 'OUI') { data.cell.styles.textColor = THEME.yes; data.cell.styles.fontStyle = 'bold'; }
-          else if (data.cell.raw === 'NON') { data.cell.styles.textColor = THEME.no; data.cell.styles.fontStyle = 'bold'; }
+          // Extraire le texte brut (gère les cellules simples ET celles avec colSpan/objet)
+          const cellText = typeof data.cell.raw === 'object' && data.cell.raw !== null ? data.cell.raw.content : data.cell.raw;
+          if (cellText === 'OUI') { data.cell.styles.textColor = THEME.yes; data.cell.styles.fontStyle = 'bold'; }
+          else if (cellText === 'NON') { data.cell.styles.textColor = THEME.no; data.cell.styles.fontStyle = 'bold'; }
+          else if (cellText === '—') { data.cell.styles.textColor = [180, 180, 180]; }
           const conclVals = Object.values(conclLabelsA);
-          if (conclVals.includes(data.cell.raw)) {
-            const conclKey = Object.keys(conclLabelsA).find(k => conclLabelsA[k] === data.cell.raw) || 'reguliere';
+          if (conclVals.includes(cellText)) {
+            const conclKey = Object.keys(conclLabelsA).find(k => conclLabelsA[k] === cellText) || 'reguliere';
             data.cell.styles.textColor = conclColorsA[conclKey] || THEME.yes;
             data.cell.styles.fontStyle = 'bold';
             data.cell.styles.fontSize = 6;
           }
         }
-        if (data.section === 'head' && data.column.index > 0) {
-          const cStyle = getCompanyStyle(data.column.index - 1);
-          data.cell.styles.fillColor = cStyle.header;
+        if (data.section === 'head' && data.row.index === 0 && data.column.index > 0) {
+          // Company color on first header row
+          const sc = subColumns[data.column.index - 1];
+          if (sc) data.cell.styles.fillColor = getCompanyStyle(sc.companyIndex).header;
+        }
+        if (data.section === 'head' && data.row.index === 1 && data.column.index > 0) {
+          // Member sub-header: lighter shade
+          const sc = subColumns[data.column.index - 1];
+          if (sc) {
+            const c = getCompanyStyle(sc.companyIndex).header;
+            data.cell.styles.fillColor = [Math.min(255, c[0] + 40), Math.min(255, c[1] + 40), Math.min(255, c[2] + 40)];
+            data.cell.styles.fontSize = 5.5;
+          }
         }
       },
       margin: { left: M, right: M },
@@ -703,182 +792,219 @@ export const generateRaoPDF = async (optionsParams) => {
     });
     y += 6;
 
+    // ── DÉTAIL DES PRIX UNITAIRES — Un tableau A3 par tranche ──
     if (chaptersData && chaptersData.length > 0) {
-      y = addPage('Analyse financière — Détail des Prix Unitaires', 'a3', 'landscape');
-      tocEntries.push({ label: '8. Détail des prix unitaires (A3)', page: pageNum });
-      doc.setFontSize(14); doc.setTextColor(...THEME.primary); doc.setFont("Helvetica", "bold");
-      doc.text("DÉTAIL DES PRIX UNITAIRES (Format A3)", M, y);
 
-      if (analysisMode === 'oab' || analysisMode === 'heatmap') {
-         doc.setFontSize(8); doc.setTextColor(0); doc.setFont("Helvetica", "normal");
-         if (analysisMode === 'oab') {
-           doc.setFillColor(255, 237, 213); doc.rect(80, y - 3, 4, 4, 'F');
-           doc.text("Prix bas suspecté (OAB)", 86, y);
-         } else if (analysisMode === 'heatmap') {
-           doc.setFillColor(248, 113, 113); doc.rect(80, y - 3, 4, 4, 'F'); doc.text("> +50%", 86, y);
-           doc.setFillColor(52, 211, 153); doc.rect(100, y - 3, 4, 4, 'F'); doc.text("< -50%", 106, y);
-         }
-      }
-      y += 6;
-
-      const tableBody = [];
-      const mainHeaders = [
-        { content: 'N°', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
-        { content: 'Désignation', rowSpan: 2, styles: { halign: 'left', valign: 'middle', cellWidth: 60 } },
-        { content: 'U', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
-        { content: 'Qté', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
-        { content: 'Estimation', colSpan: 2, styles: { halign: 'center', fillColor: [240, 240, 255] } }
-      ];
-      const subHeaders = [
-        { content: 'P.U.', styles: { halign: 'right', fillColor: [240, 240, 255], fontStyle: 'bold' } },
-        { content: 'Total', styles: { halign: 'right', fillColor: [240, 240, 255], fontStyle: 'bold' } }
-      ];
-      const columnStyles = {};
-
-      analysisCompanies.forEach((company, idx) => {
-        const style = getCompanyStyle(idx);
-        mainHeaders.push({ content: company.name, colSpan: 3, styles: { halign: 'center', fillColor: style.header, fontStyle: 'bold', textColor: [255, 255, 255] } });
-        subHeaders.push({ content: 'P.U.', styles: { halign: 'right', fillColor: style.body, textColor: style.text } });
-        subHeaders.push({ content: 'Total', styles: { halign: 'right', fillColor: style.body, textColor: style.text } });
-        subHeaders.push({ content: '%', styles: { halign: 'center', fillColor: style.body, textColor: style.text } });
-        const startCol = 6 + (idx * 3);
-        columnStyles[startCol] = { fillColor: style.body };
-        columnStyles[startCol + 1] = { fillColor: style.body };
-        columnStyles[startCol + 2] = { fillColor: style.body };
-      });
-
-      chaptersData.forEach(chapter => {
-        tableBody.push([{ content: chapter.title.toUpperCase(), colSpan: 6 + (analysisCompanies.length * 3), styles: { fillColor: [220, 220, 225], fontStyle: 'bold', textColor: [50, 50, 60] } }]);
-        chapter.items.forEach((item) => {
-          const qty = item.activeQty;
-          const estTotal = item.price * qty;
-          const row = [
-            { content: bpuRefMap?.get?.(item.id) || (item.bpuNum || '-') },
-            { content: cleanText(item.designation) },
-            { content: normalizeUnitSymbol(item.unit) },
-            { content: qty },
-            { content: formatNumberFr(item.price) },
-            { content: formatNumberFr(estTotal), styles: { fontStyle: 'bold' } }
-          ];
-          const itemPrices = analysisCompanies.map(c => Number(c.offers?.[item.id] || 0));
-          const lineOabThreshold = analysisMode === 'oab' ? calculateOABThreshold(itemPrices) : 0;
-
-          analysisCompanies.forEach((company) => {
-            const priceVal = company.offers?.[item.id];
-            const price = (priceVal !== undefined && priceVal !== null && priceVal !== "") ? Number(priceVal) : null;
-            const hasPrice = price !== null;
-            const total = hasPrice ? price * qty : 0;
-            const deviation = (hasPrice && item.price > 0) ? ((price - item.price) / item.price) * 100 : 0;
-            let cellStyle = {};
-            if (analysisMode === 'oab' && hasPrice && price > 0 && price < lineOabThreshold) {
-              cellStyle = { fillColor: [255, 237, 213], textColor: [180, 83, 9], fontStyle: 'bold' };
-            } else if (analysisMode === 'heatmap' && hasPrice && item.price > 0) {
-              const hs = getHeatmapStyle(price, item.price);
-              if (hs) cellStyle = { fillColor: hs.fill, textColor: hs.text, fontStyle: 'bold' };
-            }
-            row.push({ content: hasPrice ? formatNumberFr(price) : '-', styles: { halign: 'right', ...cellStyle } });
-            row.push({ content: hasPrice ? formatNumberFr(total) : '-', styles: { halign: 'right' } });
-            row.push({ content: hasPrice ? (deviation > 0 ? '+' : '') + deviation.toFixed(0) + '%' : '-', styles: { halign: 'center', textColor: deviation > 0 ? [220, 38, 38] : [21, 128, 61], fontSize: 6 } });
-          });
-          tableBody.push(row);
+      // Helper : construit chaptersData pour une tranche donnée
+      const buildTrancheChapters = (trancheId) => {
+        return (project?.chapters || []).map(chapter => {
+          const items = [];
+          const extract = (nodes) => {
+            nodes.forEach(node => {
+              if (node.type === 'item') {
+                const rawQty = trancheId ? node.quantities?.[trancheId] : node.qty;
+                const activeQty = Number(rawQty) || 0;
+                items.push({ ...node, activeQty });
+              } else if (node.children) extract(node.children);
+            });
+          };
+          extract(chapter.children || []);
+          return { id: chapter.id, title: chapter.title, isOption: chapter.isOption, items };
         });
+      };
 
-        {
-          const chapEstTotal = chapter.items.reduce((acc, i) => acc + (i.activeQty * i.price), 0);
-          const isPSE = chapter.isOption;
-          const bgColor  = isPSE ? [254, 243, 199] : [226, 232, 240];
-          const prefix   = isPSE ? 'PSE — ' : 'TOTAL ';
-          const chapTotalRow = [
-            { content: `${prefix}${chapter.title.toUpperCase()}`, colSpan: 4, styles: { fontStyle: 'bold', halign: 'right', fillColor: bgColor } },
-            { content: '', colSpan: 1, styles: { fillColor: bgColor } },
-            { content: formatNumberFr(chapEstTotal), styles: { fontStyle: 'bold', halign: 'right', fillColor: bgColor } }
-          ];
-          analysisCompanies.forEach(company => {
-            const totalChap = chapter.items.reduce((acc, i) => { const p = Number(company.offers?.[i.id] || 0); return acc + (i.activeQty * p); }, 0);
-            const deviation = chapEstTotal > 0 ? ((totalChap - chapEstTotal) / chapEstTotal) * 100 : 0;
-            chapTotalRow.push({ content: '', styles: { fillColor: bgColor } });
-            chapTotalRow.push({ content: formatNumberFr(totalChap), styles: { fontStyle: 'bold', halign: 'right', fillColor: bgColor } });
-            chapTotalRow.push({ content: (deviation > 0 ? '+' : '') + deviation.toFixed(1) + '%', styles: { halign: 'center', fontSize: 7, fontStyle: 'bold', textColor: deviation > 0 ? [220, 38, 38] : [21, 128, 61], fillColor: bgColor } });
-          });
-          tableBody.push(chapTotalRow);
-          tableBody.push([{ content: '', colSpan: 6 + (analysisCompanies.length * 3), styles: { cellPadding: 1, fillColor: [255, 255, 255] } }]);
+      // Déterminer les tranches à afficher
+      const hasTr = tranches && tranches.length > 0;
+      const trancheList = hasTr
+        ? tranches.map(t => ({ id: t.id, name: t.name || t.id, chapters: buildTrancheChapters(t.id) }))
+        : [{ id: 'global', name: 'Global', chapters: chaptersData }];
+
+      let tocAdded = false;
+
+      trancheList.forEach((tranche, trancheIdx) => {
+        const trLabel = hasTr ? tranche.name : 'Détail des Prix Unitaires';
+        y = addPage(`Analyse financière — ${trLabel}`, 'a3', 'landscape');
+        if (!tocAdded) {
+          tocEntries.push({ label: '8. Détail des prix unitaires (A3)', page: pageNum });
+          tocAdded = true;
         }
-      });
 
-      const totalRow = [{ content: 'TOTAL GÉNÉRAL HT', colSpan: 4, styles: { fontStyle: 'bold', halign: 'right' } }, { content: '-', styles: { halign: 'center' } }, { content: formatNumberFr(grandTotalBase), styles: { fontStyle: 'bold', halign: 'right', fillColor: [209, 250, 229] } }];
-      analysisCompanies.forEach(company => {
-        const total = analysisStats.companiesTotals[company.id] || 0;
-        const deviation = grandTotalBase > 0 ? ((total - grandTotalBase) / grandTotalBase) * 100 : 0;
-        totalRow.push({ content: '-', styles: { halign: 'center' } });
-        totalRow.push({ content: formatNumberFr(total), styles: { fontStyle: 'bold', halign: 'right', fillColor: [224, 231, 255] } });
-        totalRow.push({ content: (deviation > 0 ? '+' : '') + deviation.toFixed(2) + '%', styles: { halign: 'center', fontStyle: 'bold' } });
-      });
-      tableBody.push(totalRow);
+        doc.setFontSize(14); doc.setTextColor(...THEME.primary); doc.setFont("Helvetica", "bold");
+        const title = hasTr ? `DÉTAIL DES PRIX UNITAIRES — ${tranche.name.toUpperCase()}` : "DÉTAIL DES PRIX UNITAIRES";
+        doc.text(title, M, y);
 
-      // PSE par chapitre
-      const optionChaps = chaptersData.filter(c => c.isOption);
-      if (optionChaps.length > 0) {
-        tableBody.push([{ content: '', colSpan: 6 + (analysisCompanies.length * 3), styles: { cellPadding: 1, fillColor: [255, 255, 255] } }]);
-
-        let pse_estTotal = 0;
-        const pse_coTotals = {};
-        analysisCompanies.forEach(c => { pse_coTotals[c.id] = 0; });
-
-        optionChaps.forEach(chapter => {
-          const chapEstTotal = chapter.items.reduce((acc, i) => acc + (i.activeQty * i.price), 0);
-          pse_estTotal += chapEstTotal;
-
-          const pseRow = [
-            { content: `OPTION — ${chapter.title.toUpperCase()}`, colSpan: 4, styles: { fontStyle: 'italic', halign: 'right', textColor: [146, 64, 14], fillColor: [255, 251, 235] } },
-            { content: '', styles: { fillColor: [255, 251, 235] } },
-            { content: formatNumberFr(chapEstTotal), styles: { fontStyle: 'bold', halign: 'right', fillColor: [255, 251, 235] } }
-          ];
-          analysisCompanies.forEach(company => {
-            const totalChap = chapter.items.reduce((acc, i) => { const p = Number(company.offers?.[i.id] || 0); return acc + (i.activeQty * p); }, 0);
-            pse_coTotals[company.id] += totalChap;
-            const deviation = chapEstTotal > 0 ? ((totalChap - chapEstTotal) / chapEstTotal) * 100 : 0;
-            pseRow.push({ content: '', styles: { fillColor: [255, 251, 235] } });
-            pseRow.push({ content: totalChap > 0 ? formatNumberFr(totalChap) : '-', styles: { fontStyle: 'bold', halign: 'right', fillColor: [255, 251, 235] } });
-            pseRow.push({ content: totalChap > 0 ? (deviation > 0 ? '+' : '') + deviation.toFixed(1) + '%' : '-', styles: { halign: 'center', fontSize: 7, textColor: deviation > 0 ? [220, 38, 38] : [21, 128, 61], fillColor: [255, 251, 235] } });
-          });
-          tableBody.push(pseRow);
-        });
-
-        const totalWithPse_est = grandTotalBase + pse_estTotal;
-        const totalPseRow = [
-          { content: 'TOTAL BASE + PSE (TOUTES OPTIONS)', colSpan: 4, styles: { fontStyle: 'bold', halign: 'right', fillColor: [245, 208, 254], textColor: [88, 28, 135] } },
-          { content: '', styles: { fillColor: [245, 208, 254] } },
-          { content: formatNumberFr(totalWithPse_est), styles: { fontStyle: 'bold', halign: 'right', fillColor: [245, 208, 254] } }
-        ];
-        analysisCompanies.forEach(company => {
-          const baseTotal = analysisStats.companiesTotals[company.id] || 0;
-          const totalWithPse = baseTotal + (pse_coTotals[company.id] || 0);
-          const deviation = totalWithPse_est > 0 ? ((totalWithPse - totalWithPse_est) / totalWithPse_est) * 100 : 0;
-          totalPseRow.push({ content: '', styles: { fillColor: [245, 208, 254] } });
-          totalPseRow.push({ content: formatNumberFr(totalWithPse), styles: { fontStyle: 'bold', halign: 'right', fillColor: [245, 208, 254], textColor: [88, 28, 135] } });
-          totalPseRow.push({ content: (deviation > 0 ? '+' : '') + deviation.toFixed(2) + '%', styles: { halign: 'center', fontStyle: 'bold', textColor: deviation > 0 ? [220, 38, 38] : [21, 128, 61], fillColor: [245, 208, 254] } });
-        });
-        tableBody.push(totalPseRow);
-      }
-
-      autoTable(doc, {
-        startY: y,
-        head: [mainHeaders, subHeaders],
-        body: tableBody,
-        theme: 'grid',
-        styles: { font: 'Helvetica', fontSize: 7, cellPadding: 1.5, lineColor: [220, 220, 220], lineWidth: 0.1 },
-        headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], lineWidth: 0.1, lineColor: [180, 180, 180] },
-        columnStyles,
-        didDrawCell: (data) => {
-          if (data.column.index >= 6 && (data.column.index - 6) % 3 === 0 && data.section === 'body') {
-            const d = data.doc;
-            d.setDrawColor(100, 100, 100); d.setLineWidth(0.3);
-            d.line(data.cell.x, data.cell.y, data.cell.x, data.cell.y + data.cell.height);
+        if (analysisMode === 'oab' || analysisMode === 'heatmap') {
+          doc.setFontSize(8); doc.setTextColor(0); doc.setFont("Helvetica", "normal");
+          if (analysisMode === 'oab') {
+            doc.setFillColor(255, 237, 213); doc.rect(80, y - 3, 4, 4, 'F');
+            doc.text("Prix bas suspecté (OAB)", 86, y);
+          } else if (analysisMode === 'heatmap') {
+            doc.setFillColor(248, 113, 113); doc.rect(80, y - 3, 4, 4, 'F'); doc.text("> +50%", 86, y);
+            doc.setFillColor(52, 211, 153); doc.rect(100, y - 3, 4, 4, 'F'); doc.text("< -50%", 106, y);
           }
-        },
-        margin: { left: 10, right: 10 },
-        didDrawPage: () => drawFooter(doc, pageNum, consultation, project, THEME),
-      });
+        }
+        y += 6;
+
+        const trChapters = tranche.chapters;
+
+        // Calcul totaux pour cette tranche
+        let trEstTotal = 0;
+        const trCompanyTotals = {};
+        analysisCompanies.forEach(c => { trCompanyTotals[c.id] = 0; });
+        trChapters.forEach(chap => {
+          if (chap.isOption) return;
+          chap.items.forEach(item => {
+            trEstTotal += item.activeQty * (item.price || 0);
+            analysisCompanies.forEach(c => {
+              trCompanyTotals[c.id] += item.activeQty * Number(c.offers?.[item.id] ?? 0);
+            });
+          });
+        });
+
+        const tableBody = [];
+        const mainHeaders = [
+          { content: 'N°', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
+          { content: 'Désignation', rowSpan: 2, styles: { halign: 'left', valign: 'middle', cellWidth: 60 } },
+          { content: 'U', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
+          { content: 'Qté', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
+          { content: 'Estimation', colSpan: 2, styles: { halign: 'center', fillColor: [240, 240, 255] } }
+        ];
+        const subHeaders = [
+          { content: 'P.U.', styles: { halign: 'right', fillColor: [240, 240, 255], fontStyle: 'bold' } },
+          { content: 'Total', styles: { halign: 'right', fillColor: [240, 240, 255], fontStyle: 'bold' } }
+        ];
+        const columnStyles = {};
+
+        analysisCompanies.forEach((company, idx) => {
+          const style = getCompanyStyle(idx);
+          mainHeaders.push({ content: company.name, colSpan: 3, styles: { halign: 'center', fillColor: style.header, fontStyle: 'bold', textColor: [255, 255, 255] } });
+          subHeaders.push({ content: 'P.U.', styles: { halign: 'right', fillColor: style.body, textColor: style.text } });
+          subHeaders.push({ content: 'Total', styles: { halign: 'right', fillColor: style.body, textColor: style.text } });
+          subHeaders.push({ content: '%', styles: { halign: 'center', fillColor: style.body, textColor: style.text } });
+          const startCol = 6 + (idx * 3);
+          columnStyles[startCol] = { fillColor: style.body };
+          columnStyles[startCol + 1] = { fillColor: style.body };
+          columnStyles[startCol + 2] = { fillColor: style.body };
+        });
+
+        trChapters.forEach(chapter => {
+          // Filtrer les articles avec quantité > 0 pour cette tranche
+          const activeItems = chapter.items.filter(i => i.activeQty > 0);
+          if (activeItems.length === 0) return;
+
+          tableBody.push([{ content: chapter.title.toUpperCase(), colSpan: 6 + (analysisCompanies.length * 3), styles: { fillColor: [220, 220, 225], fontStyle: 'bold', textColor: [50, 50, 60] } }]);
+          activeItems.forEach((item) => {
+            const qty = item.activeQty;
+            const estTotal = item.price * qty;
+            const row = [
+              { content: bpuRefMap?.get?.(item.id) || (item.bpuNum || '-') },
+              { content: cleanText(item.designation) },
+              { content: normalizeUnitSymbol(item.unit) },
+              { content: qty },
+              { content: formatNumberFr(item.price) },
+              { content: formatNumberFr(estTotal), styles: { fontStyle: 'bold' } }
+            ];
+            const itemPrices = analysisCompanies.map(c => Number(c.offers?.[item.id] || 0));
+            const lineOabThreshold = analysisMode === 'oab' ? calculateOABThreshold(itemPrices) : 0;
+
+            analysisCompanies.forEach((company) => {
+              const priceVal = company.offers?.[item.id];
+              const price = (priceVal !== undefined && priceVal !== null && priceVal !== "") ? Number(priceVal) : null;
+              const hasPrice = price !== null;
+              const total = hasPrice ? price * qty : 0;
+              const deviation = (hasPrice && item.price > 0) ? ((price - item.price) / item.price) * 100 : 0;
+              let cellStyle = {};
+              if (analysisMode === 'oab' && hasPrice && price > 0 && price < lineOabThreshold) {
+                cellStyle = { fillColor: [255, 237, 213], textColor: [180, 83, 9], fontStyle: 'bold' };
+              } else if (analysisMode === 'heatmap' && hasPrice && item.price > 0) {
+                const hs = getHeatmapStyle(price, item.price);
+                if (hs) cellStyle = { fillColor: hs.fill, textColor: hs.text, fontStyle: 'bold' };
+              }
+              row.push({ content: hasPrice ? formatNumberFr(price) : '-', styles: { halign: 'right', ...cellStyle } });
+              row.push({ content: hasPrice ? formatNumberFr(total) : '-', styles: { halign: 'right' } });
+              row.push({ content: hasPrice ? (deviation > 0 ? '+' : '') + deviation.toFixed(0) + '%' : '-', styles: { halign: 'center', textColor: deviation > 0 ? [220, 38, 38] : [21, 128, 61], fontSize: 6 } });
+            });
+            tableBody.push(row);
+          });
+
+          {
+            const chapEstTotal = activeItems.reduce((acc, i) => acc + (i.activeQty * i.price), 0);
+            const isPSE = chapter.isOption;
+            const bgColor  = isPSE ? [254, 243, 199] : [226, 232, 240];
+            const prefix   = isPSE ? 'PSE — ' : 'TOTAL ';
+            const chapTotalRow = [
+              { content: `${prefix}${chapter.title.toUpperCase()}`, colSpan: 4, styles: { fontStyle: 'bold', halign: 'right', fillColor: bgColor } },
+              { content: '', colSpan: 1, styles: { fillColor: bgColor } },
+              { content: formatNumberFr(chapEstTotal), styles: { fontStyle: 'bold', halign: 'right', fillColor: bgColor } }
+            ];
+            analysisCompanies.forEach(company => {
+              const totalChap = activeItems.reduce((acc, i) => { const p = Number(company.offers?.[i.id] || 0); return acc + (i.activeQty * p); }, 0);
+              const deviation = chapEstTotal > 0 ? ((totalChap - chapEstTotal) / chapEstTotal) * 100 : 0;
+              chapTotalRow.push({ content: '', styles: { fillColor: bgColor } });
+              chapTotalRow.push({ content: formatNumberFr(totalChap), styles: { fontStyle: 'bold', halign: 'right', fillColor: bgColor } });
+              chapTotalRow.push({ content: (deviation > 0 ? '+' : '') + deviation.toFixed(1) + '%', styles: { halign: 'center', fontSize: 7, fontStyle: 'bold', textColor: deviation > 0 ? [220, 38, 38] : [21, 128, 61], fillColor: bgColor } });
+            });
+            tableBody.push(chapTotalRow);
+            tableBody.push([{ content: '', colSpan: 6 + (analysisCompanies.length * 3), styles: { cellPadding: 1, fillColor: [255, 255, 255] } }]);
+          }
+        });
+
+        // Total HT tranche
+        const colSpanTotal = 6 + (analysisCompanies.length * 3);
+        const totalRow = [{ content: `TOTAL ${hasTr ? tranche.name.toUpperCase() : 'GÉNÉRAL'} HT`, colSpan: 4, styles: { fontStyle: 'bold', halign: 'right' } }, { content: '-', styles: { halign: 'center' } }, { content: formatNumberFr(trEstTotal), styles: { fontStyle: 'bold', halign: 'right', fillColor: [209, 250, 229] } }];
+        analysisCompanies.forEach(company => {
+          const total = trCompanyTotals[company.id] || 0;
+          const deviation = trEstTotal > 0 ? ((total - trEstTotal) / trEstTotal) * 100 : 0;
+          totalRow.push({ content: '-', styles: { halign: 'center' } });
+          totalRow.push({ content: formatNumberFr(total), styles: { fontStyle: 'bold', halign: 'right', fillColor: [224, 231, 255] } });
+          totalRow.push({ content: (deviation > 0 ? '+' : '') + deviation.toFixed(2) + '%', styles: { halign: 'center', fontStyle: 'bold' } });
+        });
+        tableBody.push(totalRow);
+
+        // TVA 20%
+        const tvaRate = 0.20;
+        const tvaEstTotal = trEstTotal * tvaRate;
+        const tvaRow = [{ content: 'TVA (20%)', colSpan: 4, styles: { fontStyle: 'bold', halign: 'right', fillColor: [245, 245, 250] } }, { content: '', styles: { fillColor: [245, 245, 250] } }, { content: formatNumberFr(tvaEstTotal), styles: { fontStyle: 'bold', halign: 'right', fillColor: [245, 245, 250] } }];
+        analysisCompanies.forEach(company => {
+          const total = trCompanyTotals[company.id] || 0;
+          const tva = total * tvaRate;
+          tvaRow.push({ content: '', styles: { fillColor: [245, 245, 250] } });
+          tvaRow.push({ content: formatNumberFr(tva), styles: { fontStyle: 'normal', halign: 'right', fillColor: [245, 245, 250] } });
+          tvaRow.push({ content: '', styles: { fillColor: [245, 245, 250] } });
+        });
+        tableBody.push(tvaRow);
+
+        // Total TTC
+        const ttcEstTotal = trEstTotal + tvaEstTotal;
+        const ttcRow = [{ content: `TOTAL ${hasTr ? tranche.name.toUpperCase() : 'GÉNÉRAL'} TTC`, colSpan: 4, styles: { fontStyle: 'bold', halign: 'right', fillColor: [209, 250, 229] } }, { content: '', styles: { fillColor: [209, 250, 229] } }, { content: formatNumberFr(ttcEstTotal), styles: { fontStyle: 'bold', halign: 'right', fillColor: [209, 250, 229] } }];
+        analysisCompanies.forEach(company => {
+          const total = trCompanyTotals[company.id] || 0;
+          const ttc = total * (1 + tvaRate);
+          ttcRow.push({ content: '', styles: { fillColor: [209, 250, 229] } });
+          ttcRow.push({ content: formatNumberFr(ttc), styles: { fontStyle: 'bold', halign: 'right', fillColor: [209, 250, 229] } });
+          ttcRow.push({ content: '', styles: { fillColor: [209, 250, 229] } });
+        });
+        tableBody.push(ttcRow);
+
+        autoTable(doc, {
+          startY: y,
+          head: [mainHeaders, subHeaders],
+          body: tableBody,
+          theme: 'grid',
+          styles: { font: 'Helvetica', fontSize: 7, cellPadding: 1.5, lineColor: [220, 220, 220], lineWidth: 0.1 },
+          headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], lineWidth: 0.1, lineColor: [180, 180, 180] },
+          columnStyles,
+          didDrawCell: (data) => {
+            if (data.column.index >= 6 && (data.column.index - 6) % 3 === 0 && data.section === 'body') {
+              const d = data.doc;
+              d.setDrawColor(100, 100, 100); d.setLineWidth(0.3);
+              d.line(data.cell.x, data.cell.y, data.cell.x, data.cell.y + data.cell.height);
+            }
+          },
+          margin: { left: 10, right: 10 },
+          didDrawPage: () => drawFooter(doc, pageNum, consultation, project, THEME),
+        });
+      }); // fin boucle tranches
     }
   }
 
@@ -1306,6 +1432,6 @@ export const generateRaoPDF = async (optionsParams) => {
     tocY += 8;
   });
 
-  const safeName = (consultation?.objet || project?.name || 'RAO').replace(/[^a-zA-Z0-9]/g, '_').slice(0, 40);
+  const safeName = (consultation?.objet || project?.name || 'RAO').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_\-]/g, '').replace(/_+/g, '_').replace(/^_|_$/g, '').slice(0, 60);
   doc.save(`RAO_${safeName}_${new Date().toISOString().slice(0, 10)}.pdf`);
 };

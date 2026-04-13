@@ -43,6 +43,7 @@ const RaoView = ({
   analysisMode = 'standard'
 }) => {
   const [activeTab, setActiveTab] = useState('consultation');
+  const [selectedCompany, setSelectedCompany] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
@@ -78,6 +79,13 @@ const RaoView = ({
 
   const ranking = rao.getRanking();
   const companyNames = analysisCompanies.map(c => c.name);
+
+  // Sync selectedCompany avec la liste des entreprises
+  useEffect(() => {
+    if (companyNames.length > 0 && (!selectedCompany || !companyNames.includes(selectedCompany))) {
+      setSelectedCompany(companyNames[0]);
+    }
+  }, [companyNames.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleExportPDF = async () => {
     setIsExporting(true);
@@ -206,23 +214,25 @@ const RaoView = ({
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-6 relative">
-        <div>
+      <div className={`flex-1 relative ${activeTab === 'admin' || activeTab === 'technique' || activeTab === 'negociation' ? 'overflow-hidden' : 'overflow-y-auto p-6'}`}>
+        <div className={activeTab === 'admin' || activeTab === 'technique' || activeTab === 'negociation' ? 'h-full' : ''}>
           {activeTab === 'consultation' && (
             <TabConsultation consultation={rao.consultation} updateConsultation={rao.updateConsultation} criteria={rao.criteria} updateCriteria={rao.updateCriteria} addCriterion={rao.addCriterion} removeCriterion={rao.removeCriterion} addSubCriterion={rao.addSubCriterion} removeSubCriterion={rao.removeSubCriterion} updateSubCriterion={rao.updateSubCriterion} scoringConfig={scoringConfig} hasTranches={rao.hasTranches} tranches={rao.tranches} raoTrancheId={rao.raoTrancheId} setRaoTrancheId={rao.setRaoTrancheId} />
           )}
           {activeTab === 'admin' && (
-            <TabAdministrative companyNames={companyNames} companiesData={project?.rao?.companies || {}} updateAdminPiece={rao.updateAdminPiece} updateAdminField={rao.updateAdminField} />
+            <TabAdministrative companyNames={companyNames} companiesData={project?.rao?.companies || {}} updateAdminPiece={rao.updateAdminPiece} updateAdminField={rao.updateAdminField} selectedCompany={selectedCompany} onSelectCompany={setSelectedCompany} adminPieces={rao.adminPieces} offerPieces={rao.offerPieces} setAdminPieces={rao.setAdminPieces} setOfferPieces={rao.setOfferPieces} />
           )}
           {activeTab === 'technique' && (
-            <TabTechnique companyNames={companyNames} companiesData={project?.rao?.companies || {}} criteria={rao.criteria} updateTechnical={rao.updateTechnical} analysisStats={rao.raoAnalysisStats} scoringConfig={scoringConfig} analysisCompanies={analysisCompanies} />
+            <TabTechnique companyNames={companyNames} companiesData={project?.rao?.companies || {}} criteria={rao.criteria} updateTechnical={rao.updateTechnical} analysisStats={rao.raoAnalysisStats} scoringConfig={scoringConfig} analysisCompanies={analysisCompanies} selectedCompany={selectedCompany} onSelectCompany={setSelectedCompany} />
           )}
           {activeTab === 'negociation' && (
-            <TabNegociation 
-              companyNames={companyNames} 
-              companiesData={project?.rao?.companies || {}} 
+            <TabNegociation
+              companyNames={companyNames}
+              companiesData={project?.rao?.companies || {}}
               updateNegotiation={rao.updateNegotiation}
-              consultation={rao.consultation} /* <--- LA LIGNE MAGIQUE EST ICI */
+              consultation={rao.consultation}
+              selectedCompany={selectedCompany}
+              onSelectCompany={setSelectedCompany}
             />
           )}
           {activeTab === 'recap' && (

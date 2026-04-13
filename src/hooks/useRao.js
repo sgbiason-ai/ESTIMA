@@ -169,6 +169,13 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
   const updateAdminField = (companyName, field, value) =>
     patchCompany(companyName, 'admin', { [field]: value });
 
+  // ── PIÈCES ADMIN / OFFRE (custom, partagées entre toutes les entreprises) ─
+  const adminPieces = rao.adminPieces || DEFAULT_ADMIN_PIECES;
+  const offerPieces = rao.offerPieces || DEFAULT_OFFER_PIECES;
+
+  const setAdminPieces = useCallback((pieces) => updateRao({ adminPieces: pieces }), [updateRao]);
+  const setOfferPieces = useCallback((pieces) => updateRao({ offerPieces: pieces }), [updateRao]);
+
   // ── TECHNIQUE ─────────────────────────────────────────────────────────────
   const updateTechnical = (companyName, criterionId, field, value) => {
     setProject(prev => {
@@ -348,6 +355,7 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
     criteria, updateCriteria, addCriterion, removeCriterion,
     addSubCriterion, removeSubCriterion, updateSubCriterion,
     updateAdminPiece, updateAdminField,
+    adminPieces, offerPieces, setAdminPieces, setOfferPieces,
     updateTechnical,
     updateNegotiation,
     computeScores, getRanking,

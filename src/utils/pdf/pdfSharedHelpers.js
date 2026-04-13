@@ -53,14 +53,15 @@ export const formatDateLong = (dateStr) => {
   } catch { return formatDateFr(dateStr); }
 };
 
-/** Nettoie un nom de fichier (retire accents, caracteres speciaux). */
+/** Nettoie un nom de fichier (retire accents, garde espaces comme _, caracteres speciaux retirés). */
 export const sanitizeFilename = (name) => {
   if (!name || typeof name !== 'string') return 'Document';
   return name
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9]/g, '_')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // é→e, è→e, à→a, etc.
+    .replace(/\s+/g, '_')                               // espaces → _
+    .replace(/[^a-zA-Z0-9_\-]/g, '')                    // retire les caractères spéciaux
     .replace(/_+/g, '_').replace(/^_|_$/g, '')
-    .substring(0, 40);
+    .substring(0, 60);
 };
 
 /** Retire les retours a la ligne et trim. */
