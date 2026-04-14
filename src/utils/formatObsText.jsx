@@ -32,7 +32,7 @@ const hasHtml = (text) => /<\/?[a-z][\s\S]*>/i.test(text);
 export const parseObsHtml = (html) => {
   if (!html) return [];
   const normalized = normalizeObsText(html);
-  if (!hasHtml(normalized)) return [{ text: normalized, bold: false, underline: false, highlight: false }];
+  if (!hasHtml(normalized)) return [{ text: normalized, bold: false, underline: false, highlight: false, indent: 0 }];
 
   const div = document.createElement('div');
   div.innerHTML = normalized;
@@ -63,7 +63,20 @@ export const parseObsHtml = (html) => {
       }
     }
 
+    // <li> = saut de ligne + puce avec retrait
+    if (tag === 'li') {
+      if (segments.length > 0) {
+        const last = segments[segments.length - 1];
+        if (last && !last.text.endsWith('\n')) {
+          segments.push({ text: '\n', ...styles });
+        }
+      }
+      segments.push({ text: '• ', ...styles, bullet: true });
+    }
+
     const newStyles = { ...styles };
+    // Contenu d'un <li> hérite indent pour retrait des lignes wrappées
+    if (tag === 'li') newStyles.indent = (styles.indent || 0) + 1;
     if (tag === 'b' || tag === 'strong') newStyles.bold = true;
     if (tag === 'u') newStyles.underline = true;
     if (tag === 'mark' || (tag === 'span' && node.style.backgroundColor)) newStyles.highlight = true;
@@ -73,13 +86,13 @@ export const parseObsHtml = (html) => {
     }
   };
 
-  walk(div, { bold: false, underline: false, highlight: false });
+  walk(div, { bold: false, underline: false, highlight: false, indent: 0 });
   return segments;
 };
 
 // ── Rendu React securise (pour CrrPreview) ───────────────────────────────────
 
-const ALLOWED_TAGS = ['b', 'strong', 'u', 'mark', 'span', 'br', 'div'];
+const ALLOWED_TAGS = ['b', 'strong', 'u', 'mark', 'span', 'br', 'div', 'ul', 'ol', 'li'];
 
 const sanitizeHtml = (html) => {
   if (!html) return '';
@@ -95,7 +108,11 @@ export const renderFormattedText = (text) => {
   if (!text) return null;
   const safe = sanitizeHtml(text);
   if (!hasHtml(safe)) return text;
-  return <span dangerouslySetInnerHTML={{ __html: safe }} />;
+  // Ajouter styles inline pour les listes (Tailwind reset les list-style)
+  const withListStyles = safe
+    .replace(/<ul>/gi, '<ul style="list-style-type:disc;padding-left:1.2em;margin:2px 0">')
+    .replace(/<ol>/gi, '<ol style="list-style-type:decimal;padding-left:1.2em;margin:2px 0">');
+  return <span dangerouslySetInnerHTML={{ __html: withListStyles }} />;
 };
 
 // ── Texte brut sans balises (pour calcul dimensions PDF) ─────────────────────
@@ -107,6 +124,7 @@ export const stripHtml = (html) => {
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/div>\s*<div[^>]*>/gi, '\n')
     .replace(/<\/p>\s*<p[^>]*>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '\n• ')
     .replace(/<[^>]*>/g, '');
   // Décoder les entités HTML (&nbsp; &amp; &lt; &gt; &quot; &#xxx;)
   const el = typeof document !== 'undefined' && document.createElement('textarea');
@@ -120,5 +138,18 @@ export const obsTextToHtml = (text) => {
   if (!text) return '';
   const normalized = normalizeObsText(text);
   // Convertir <mark> en span avec background pour compatibilite Word
-  return normalized.replace(/<mark>/g, '<span style="background:#fde68a;padding:0 2px">').replace(/<\/mark>/g, '</span>');
+  return normalized
+    .replace(/<mark>/g, '<span style="background:#fde68a;padding:0 2px">')
+    .replace(/<\/mark>/g, '</span>')
+    // Listes : puce explicite, compact, pas de <p> (Word ajoute des marges aux <p>)
+    .replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gi, (_match, content) =>
+      content.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi,
+        '<div style="margin:0">&#x2022; $1</div>'))
+    .replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gi, (_match, content) => {
+      let idx = 0;
+      return content.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, (_m, inner) => {
+        idx++;
+        return `<div style="margin:0">${idx}. ${inner}</div>`;
+      });
+    });
 };

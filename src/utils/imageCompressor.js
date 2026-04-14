@@ -17,6 +17,98 @@ const getCurrentGps = () =>
     );
   });
 
+// ── Extraction GPS depuis EXIF JPEG (sans dépendance externe) ─────────────
+const extractExifGps = (file) =>
+  new Promise((resolve) => {
+    if (!file || !file.type?.startsWith('image/jpeg')) { resolve(null); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const view = new DataView(reader.result);
+        // Vérifier signature JPEG
+        if (view.getUint16(0) !== 0xFFD8) { resolve(null); return; }
+        let offset = 2;
+        while (offset < view.byteLength - 1) {
+          const marker = view.getUint16(offset);
+          if (marker === 0xFFE1) { // APP1 = EXIF
+            const exifGps = parseExifGps(view, offset + 4);
+            resolve(exifGps);
+            return;
+          }
+          if ((marker & 0xFF00) !== 0xFF00) break;
+          offset += 2 + view.getUint16(offset + 2);
+        }
+        resolve(null);
+      } catch { resolve(null); }
+    };
+    reader.onerror = () => resolve(null);
+    // Lire seulement les premiers 128 Ko (suffisant pour EXIF)
+    reader.readAsArrayBuffer(file.slice(0, 131072));
+  });
+
+const parseExifGps = (view, exifStart) => {
+  try {
+    // Vérifier "Exif\0\0"
+    const exifHeader = String.fromCharCode(
+      view.getUint8(exifStart), view.getUint8(exifStart + 1),
+      view.getUint8(exifStart + 2), view.getUint8(exifStart + 3)
+    );
+    if (exifHeader !== 'Exif') return null;
+
+    const tiffStart = exifStart + 6;
+    const bigEndian = view.getUint16(tiffStart) === 0x4D4D;
+    const g16 = (o) => view.getUint16(tiffStart + o, !bigEndian);
+    const g32 = (o) => view.getUint32(tiffStart + o, !bigEndian);
+
+    // Chercher IFD0 → tag 0x8825 (GPS IFD pointer)
+    let ifdOffset = g32(4);
+    const ifdCount = g16(ifdOffset);
+    let gpsIfdOffset = null;
+
+    for (let i = 0; i < ifdCount; i++) {
+      const entryOffset = ifdOffset + 2 + i * 12;
+      if (g16(entryOffset) === 0x8825) {
+        gpsIfdOffset = g32(entryOffset + 8);
+        break;
+      }
+    }
+    if (gpsIfdOffset === null) return null;
+
+    // Parser les tags GPS
+    const gpsCount = g16(gpsIfdOffset);
+    const gpsTags = {};
+    for (let i = 0; i < gpsCount; i++) {
+      const entry = gpsIfdOffset + 2 + i * 12;
+      const tag = g16(entry);
+      const type = g16(entry + 2);
+      const count = g32(entry + 4);
+      const valOffset = g32(entry + 8);
+
+      if (type === 2 && count <= 2) {
+        // ASCII (LatRef / LngRef)
+        gpsTags[tag] = String.fromCharCode(view.getUint8(tiffStart + entry + 8));
+      } else if (type === 5 && count === 3) {
+        // 3 RATIONAL = degrés, minutes, secondes
+        const rats = [];
+        for (let r = 0; r < 3; r++) {
+          const num = g32(valOffset + r * 8);
+          const den = g32(valOffset + r * 8 + 4);
+          rats.push(den ? num / den : 0);
+        }
+        gpsTags[tag] = rats[0] + rats[1] / 60 + rats[2] / 3600;
+      }
+    }
+
+    // Tags: 1=LatRef, 2=Lat, 3=LngRef, 4=Lng
+    if (gpsTags[2] != null && gpsTags[4] != null) {
+      const lat = gpsTags[1] === 'S' ? -gpsTags[2] : gpsTags[2];
+      const lng = gpsTags[3] === 'W' ? -gpsTags[4] : gpsTags[4];
+      if (lat !== 0 || lng !== 0) return { lat, lng };
+    }
+    return null;
+  } catch { return null; }
+};
+
 // ── Cache GPS : on lance une seule requête partagée par toutes les photos ──
 let _gpsCache = null;
 let _gpsCacheTime = 0;
@@ -68,14 +160,17 @@ const fileToImage = (file) =>
  * La src finale (800px) est la version haute qualité.
  */
 export const compressImage = async (file, maxW = 800, quality = 0.7, { withGps = true } = {}) => {
-  // Lancer GPS en parallèle uniquement pour les photos prises à la caméra
-  const gpsPromise = withGps ? getSharedGps() : Promise.resolve(null);
+  // 1. Toujours tenter l'extraction EXIF (gratuit, pas de permission)
+  const exifPromise = extractExifGps(file);
+  // 2. GPS navigateur uniquement si capture fraîche (caméra)
+  const browserGpsPromise = withGps ? getSharedGps() : Promise.resolve(null);
 
   const img = await fileToImage(file);
-
-  // Compression finale directe (pas de placeholder séparé)
   const src = resizeToCanvas(img, maxW, quality);
-  const gps = await gpsPromise;
+
+  // Priorité EXIF > GPS navigateur
+  const exifGps = await exifPromise;
+  const gps = exifGps || (await browserGpsPromise);
   return gps ? { src, lat: gps.lat, lng: gps.lng } : src;
 };
 
@@ -89,18 +184,19 @@ export const compressImage = async (file, maxW = 800, quality = 0.7, { withGps =
  * @param {Function} onFinal - callback(finalResult) appelé quand la compression est finie
  */
 export const compressImageProgressive = async (file, onPlaceholder, onFinal, { withGps = true } = {}) => {
-  const gpsPromise = withGps ? getSharedGps() : Promise.resolve(null);
+  const exifPromise = extractExifGps(file);
+  const browserGpsPromise = withGps ? getSharedGps() : Promise.resolve(null);
 
   const img = await fileToImage(file);
 
   // Phase 1 : miniature instantanée (très rapide)
   const thumbSrc = resizeToCanvas(img, 200, 0.3);
-  // On envoie le placeholder immédiatement sans attendre le GPS
   if (onPlaceholder) onPlaceholder(thumbSrc);
 
-  // Phase 2 : compression finale + GPS
+  // Phase 2 : compression finale + GPS (priorité EXIF)
   const src = resizeToCanvas(img, 800, 0.7);
-  const gps = await gpsPromise;
+  const exifGps = await exifPromise;
+  const gps = exifGps || (await browserGpsPromise);
   const result = gps ? { src, lat: gps.lat, lng: gps.lng } : src;
   if (onFinal) onFinal(result);
   return result;

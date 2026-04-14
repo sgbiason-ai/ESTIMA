@@ -4,7 +4,7 @@ import ReactDOM from 'react-dom';
 import {
   Plus, Trash2, ChevronDown, ChevronRight,
   MinusCircle, Circle, Loader, CheckCircle2, Calendar, User, MessageSquare,
-  ImagePlus, X, Bold, Underline, Highlighter, GripVertical,
+  ImagePlus, X, Bold, Underline, Highlighter, List, GripVertical,
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { OBSERVATION_STATUSES, getGroupColor, abbreviateGroup } from '../../data/crrData';
@@ -234,6 +234,7 @@ const ObservationRow = ({ obs, onUpdate, onDelete, meetingDate, participantGroup
       if (e.key === 'b') { e.preventDefault(); execFormat('bold'); }
       else if (e.key === 'u') { e.preventDefault(); execFormat('underline'); }
       else if (e.key === 'h') { e.preventDefault(); handleHighlight(); }
+      else if (e.key === 'l') { e.preventDefault(); execFormat('insertUnorderedList'); }
     }
   }, [execFormat, handleHighlight]);
 
@@ -243,7 +244,12 @@ const ObservationRow = ({ obs, onUpdate, onDelete, meetingDate, participantGroup
   const handleAddImages = async (e) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
-    const compressed = await Promise.all(files.map((f) => compressImage(f)));
+    // GPS uniquement si photo prise a l'instant (camera) : fichier < 10s
+    // Les photos importees depuis le disque ont un lastModified ancien → pas de GPS
+    const compressed = await Promise.all(files.map((f) => {
+      const isFreshCapture = (Date.now() - f.lastModified) < 10000;
+      return compressImage(f, 800, 0.7, { withGps: isFreshCapture });
+    }));
     onUpdate(obs.id, { images: [...images, ...compressed] });
     if (fileRef.current) fileRef.current.value = '';
   };
@@ -303,6 +309,10 @@ const ObservationRow = ({ obs, onUpdate, onDelete, meetingDate, participantGroup
               <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={handleHighlight} title="Fluo (Ctrl+H)"
                 className="p-0.5 rounded hover:bg-amber-50 text-slate-400 hover:text-amber-500 transition-colors">
                 <Highlighter size={13} strokeWidth={2.5} />
+              </button>
+              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat('insertUnorderedList')} title="Liste à puces (Ctrl+L)"
+                className="p-0.5 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors">
+                <List size={13} strokeWidth={2.5} />
               </button>
             </div>
             {/* Editeur WYSIWYG */}

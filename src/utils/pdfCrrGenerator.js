@@ -658,8 +658,15 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
         obsRowMeta.push({ obs, type: 'images', imgs });
       }
 
-      // Estimer la hauteur de cette observation (texte ~10mm + images)
-      const textH = Math.max(10, Math.ceil(plainText.length / 60) * 3.5 + 6);
+      // Mesurer la hauteur réelle du texte via jsPDF splitTextToSize
+      doc.setFont(fontB, 'normal');
+      doc.setFontSize(6.5);
+      const obsColUsable = OBS_COL_W - 3.5; // padding left+right
+      const splitLines = doc.splitTextToSize(plainText, obsColUsable);
+      // Hauteur de ligne jsPDF : fontSize(pt) / 72 * 25.4 * lineHeightFactor(1.15) ≈ 2.63mm
+      const lineH = (6.5 / 72) * 25.4 * 1.15;
+      // cellPadding top:2 + bottom:2 = 4mm + marge securite
+      const textH = Math.max(12, splitLines.length * lineH + 6);
       let imgH = 0;
       if (imgs.length === 1) {
         const cached = imageCache.get(imgs[0]);
@@ -691,6 +698,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
       startY: cursor.y,
       margin: { left: M.left, right: M.right, top: M.top, bottom: M.bottom },
       tableWidth: CW,
+      rowPageBreak: 'auto',
       head: isFirstObsTable && obsIdx === 0 ? OBS_HEAD : [],
       showHead: isFirstObsTable && obsIdx === 0 ? 'firstPage' : 'never',
       body: obsBody,
@@ -732,6 +740,55 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
             const needed = badgesHeight(maxBadges);
             data.cell.styles.minCellHeight = Math.max(data.cell.styles.minCellHeight || 0, needed);
           }
+        }
+
+        // Hauteur minimale pour texte formate (gras/puces = plus de lignes)
+        if (meta.type === 'text' && data.column.index === 2 && meta.rawText) {
+          try {
+            const segments = parseObsHtml(meta.rawText);
+            const hasFormatting = segments.some(s => s.bold || s.underline || s.highlight || s.indent || s.bullet);
+            if (hasFormatting) {
+              const colW = data.cell.width || OBS_COL_W;
+              const pad = data.cell.styles.cellPadding;
+              const padL = (typeof pad === 'object' ? pad.left : pad) || 2;
+              const padR = (typeof pad === 'object' ? pad.right : pad) || 1.5;
+              const maxW = colW - padL - padR;
+              const fontSize = data.cell.styles.fontSize || 6.5;
+              const fLineH = fontSize * 0.45;
+              doc.setFont(fontB, 'normal');
+              doc.setFontSize(fontSize);
+              const bulletIndent = doc.getTextWidth('• ');
+              let curX = 0;
+              let lineCount = 1;
+              let activeIndent = 0;
+              for (const seg of segments) {
+                doc.setFont(fontB, seg.bold ? 'bold' : 'normal');
+                doc.setFontSize(fontSize);
+                if (seg.bullet) {
+                  activeIndent = bulletIndent;
+                } else if (seg.indent > 0) {
+                  activeIndent = seg.indent * bulletIndent;
+                }
+                const lineMaxW = maxW - activeIndent;
+                const sLines = seg.text.split('\n');
+                for (let li = 0; li < sLines.length; li++) {
+                  if (li > 0) { curX = 0; lineCount++; }
+                  const words = sLines[li].split(/(\s+)/);
+                  for (const word of words) {
+                    if (!word) continue;
+                    const ww = doc.getTextWidth(word);
+                    if (curX + ww > lineMaxW && word.trim()) { curX = 0; lineCount++; }
+                    curX += ww;
+                  }
+                }
+                if (!seg.indent && !seg.bullet) activeIndent = 0;
+              }
+              const padT = (typeof pad === 'object' ? pad.top : pad) || 2;
+              const padB = (typeof pad === 'object' ? pad.bottom : pad) || 2;
+              const formattedH = lineCount * fLineH + padT + padB + fontSize * 0.3;
+              data.cell.styles.minCellHeight = Math.max(data.cell.styles.minCellHeight || 0, formattedH);
+            }
+          } catch { /* fallback : autoTable calcule seul */ }
         }
 
         // Fond colore selon statut (texte ET images)
@@ -871,7 +928,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
         if (meta.type === 'text' && data.column.index === 2 && meta.rawText) {
           try {
             const segments = parseObsHtml(meta.rawText);
-            const hasFormatting = segments.some(s => s.bold || s.underline || s.highlight);
+            const hasFormatting = segments.some(s => s.bold || s.underline || s.highlight || s.indent || s.bullet);
             if (hasFormatting) {
               // Effacer le texte brut dessine par autoTable
               const c = data.cell;
@@ -886,28 +943,52 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
               const maxW = c.width - padL - padR;
               const fontSize = c.styles.fontSize || 6.5;
               const lineH = fontSize * 0.45;
+              // Mesurer la largeur réelle de "• " pour aligner le retrait
+              doc.setFont(fontB, 'normal');
+              doc.setFontSize(fontSize);
+              const bulletIndent = doc.getTextWidth('• ');
               let curX = c.x + padL;
               let curY = c.y + padT + fontSize * 0.3;
               const txtColor = Array.isArray(c.styles.textColor) ? c.styles.textColor : THEME.text;
+              const cellBottom = c.y + c.height - 1;
+              let overflow = false;
+              let activeIndent = 0; // retrait actif pour lignes wrappées
 
               for (const seg of segments) {
+                if (overflow) break;
                 const style = seg.bold ? 'bold' : 'normal';
                 doc.setFont(fontB, style);
                 doc.setFontSize(fontSize);
                 doc.setTextColor(...txtColor);
 
+                // Mettre à jour le retrait actif
+                // bullet "• " → se place à gauche (pas d'indent), active le retrait pour la suite
+                // indent > 0 = contenu d'un <li> → wrapping indenté
+                if (seg.bullet) {
+                  // Le bullet s'aligne toujours à gauche
+                  activeIndent = bulletIndent;
+                  curX = c.x + padL;
+                } else if (seg.indent > 0) {
+                  activeIndent = seg.indent * bulletIndent;
+                }
+
+                // Largeur dispo pour cette ligne (réduite si indenté, sauf pour le bullet lui-même)
+                const segMaxW = seg.bullet ? maxW : maxW - activeIndent;
+
                 // Decouper le segment en lignes puis en mots pour le word-wrap
                 const lines = seg.text.split('\n');
                 for (let li = 0; li < lines.length; li++) {
-                  if (li > 0) { curX = c.x + padL; curY += lineH; }
+                  if (overflow) break;
+                  if (li > 0) { curX = c.x + padL + activeIndent; curY += lineH; }
+                  const lineMaxW = segMaxW;
                   const words = lines[li].split(/(\s+)/);
                   for (const word of words) {
                     const ww = doc.getTextWidth(word);
                     if (curX + ww > c.x + padL + maxW && word.trim()) {
-                      curX = c.x + padL;
+                      curX = c.x + padL + activeIndent;
                       curY += lineH;
                     }
-                    if (curY > c.y + c.height - 1) break;
+                    if (curY > cellBottom) { overflow = true; break; }
 
                     if (seg.highlight) {
                       doc.setFillColor(253, 230, 138); // amber-200
@@ -922,6 +1003,8 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
                     curX += ww;
                   }
                 }
+                // Quand on sort d'un segment non-indenté, reset le retrait
+                if (!seg.indent && !seg.bullet) activeIndent = 0;
               }
             }
           } catch { /* fallback: autoTable texte brut deja dessine */ }

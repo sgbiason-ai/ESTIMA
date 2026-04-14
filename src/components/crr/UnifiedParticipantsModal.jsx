@@ -165,7 +165,7 @@ const GroupTree = ({
                                 <input type="text" value={editData.name || ''} onChange={(e) => setEditData({ ...editData, name: e.target.value })}
                                   placeholder="NOM Prenom" autoFocus onKeyDown={(e) => e.key === 'Enter' && saveEditContact(group.id, contact.id)}
                                   className="text-[11px] px-1.5 py-0.5 border border-emerald-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 w-28 text-slate-800" />
-                                <input type="email" value={editData.email || ''} onChange={(e) => setEditData({ ...editData, email: e.target.value })}
+                                <input type="text" value={editData.email || ''} onChange={(e) => setEditData({ ...editData, email: e.target.value })}
                                   placeholder="email" onKeyDown={(e) => e.key === 'Enter' && saveEditContact(group.id, contact.id)}
                                   className="text-[11px] px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 w-32 text-slate-800" />
                                 <input type="tel" value={editData.phone || ''} onChange={(e) => {
@@ -477,7 +477,7 @@ const LibraryPanel = ({ contacts, onSave }) => {
                             placeholder="NOM Prenom" className="text-[11px] px-1.5 py-0.5 border border-violet-300 rounded focus:outline-none text-slate-800 w-full"
                             onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit()} />
                           <div className="flex flex-col gap-0.5">
-                            <input type="email" value={editData.email || ''} onChange={(e) => setEditData({ ...editData, email: e.target.value })}
+                            <input type="text" value={editData.email || ''} onChange={(e) => setEditData({ ...editData, email: e.target.value })}
                               placeholder="email" className="text-[11px] px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none text-slate-800 w-full"
                               onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit()} />
                             <input type="tel" value={editData.phone || ''} onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
