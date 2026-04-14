@@ -314,7 +314,6 @@ export const useCrrManager = ({
 
   const updateParticipantGroup = useCallback(
     (groupId, patch) => {
-      // Trouver l'ancien nom avant le renommage
       const oldGroup = activeParticipantGroups.find((g) => g.id === groupId);
       const oldName = oldGroup?.name;
       const newName = patch.name;
@@ -322,7 +321,9 @@ export const useCrrManager = ({
       const groups = activeParticipantGroups.map((g) =>
         g.id === groupId ? { ...g, ...patch } : g
       );
-      updateMeetingParticipantGroups(groups);
+
+      // Construire le patch complet en une seule mise à jour (évite stale closure)
+      const meetingPatch = { participantGroups: groups };
 
       // Si le nom a changé, propager dans emitter/actionBy des observations
       if (newName && oldName && newName !== oldName && activeMeeting) {
@@ -332,15 +333,16 @@ export const useCrrManager = ({
           const updated = names.map((n) => (n === oldName ? newName : n));
           return updated.join(', ');
         };
-        const obs = (activeMeeting.observations || []).map((o) => ({
+        meetingPatch.observations = (activeMeeting.observations || []).map((o) => ({
           ...o,
           emitter: replaceGroupName(o.emitter),
           actionBy: replaceGroupName(o.actionBy),
         }));
-        updateActiveMeeting({ observations: obs });
       }
+
+      updateActiveMeeting(meetingPatch);
     },
-    [activeParticipantGroups, updateMeetingParticipantGroups, activeMeeting, updateActiveMeeting]
+    [activeParticipantGroups, activeMeeting, updateActiveMeeting]
   );
 
   const deleteParticipantGroup = useCallback(
@@ -349,7 +351,9 @@ export const useCrrManager = ({
       const deletedName = deletedGroup?.name;
 
       const groups = activeParticipantGroups.filter((g) => g.id !== groupId);
-      updateMeetingParticipantGroups(groups);
+
+      // Construire le patch complet en une seule mise à jour (évite stale closure)
+      const meetingPatch = { participantGroups: groups };
 
       // Nettoyer les références dans emitter/actionBy des observations
       if (deletedName && activeMeeting) {
@@ -358,15 +362,16 @@ export const useCrrManager = ({
           const names = fieldValue.split(',').map((s) => s.trim()).filter((n) => n !== deletedName);
           return names.join(', ');
         };
-        const obs = (activeMeeting.observations || []).map((o) => ({
+        meetingPatch.observations = (activeMeeting.observations || []).map((o) => ({
           ...o,
           emitter: removeGroupName(o.emitter),
           actionBy: removeGroupName(o.actionBy),
         }));
-        updateActiveMeeting({ observations: obs });
       }
+
+      updateActiveMeeting(meetingPatch);
     },
-    [activeParticipantGroups, updateMeetingParticipantGroups, activeMeeting, updateActiveMeeting]
+    [activeParticipantGroups, activeMeeting, updateActiveMeeting]
   );
 
   const reorderParticipantGroups = useCallback(

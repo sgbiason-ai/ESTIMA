@@ -271,8 +271,9 @@ const LibraryPanel = ({ contacts, onSave }) => {
     setEditingId(null);
   };
 
-  const handleDelete = (id) => {
-    onSave(contacts.filter((c) => c.id !== id));
+  const handleDelete = async (id) => {
+    const ok = await confirm('Supprimer ce contact ?', { danger: true });
+    if (ok) onSave(contacts.filter((c) => c.id !== id));
   };
 
   const findCol = (row, ...candidates) => {
@@ -311,7 +312,7 @@ const LibraryPanel = ({ contacts, onSave }) => {
         const imported = data.map((row, i) => {
           if (usePositional) {
             const vals = firstRowKeys.map((k) => String(row[k] || ''));
-            return { id: `lib_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 4)}`, subLabel: vals[0] || '', name: vals[1] || '', phone: vals[2] || '', email: vals[3] || '' };
+            return { id: `lib_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 4)}`, subLabel: vals[0] || '', name: vals[1] || '', email: vals[2] || '', phone: vals[3] || '' };
           }
           return {
             id: `lib_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 4)}`,
