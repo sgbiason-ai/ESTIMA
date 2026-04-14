@@ -77,6 +77,28 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
     return markers;
   }, [meeting?.observations]);
 
+  // ── Segments mesurés (lignes + endpoints pour la carte) ──
+  const segmentLines = useMemo(() => {
+    return (meeting?.observations || [])
+      .filter(obs => obs.segmentFrom && obs.segmentTo)
+      .map((obs) => ({
+        from: [obs.segmentFrom.lat, obs.segmentFrom.lng],
+        to: [obs.segmentTo.lat, obs.segmentTo.lng],
+        distance: obs.segmentDistance,
+      }));
+  }, [meeting?.observations]);
+
+  const segmentEndpoints = useMemo(() => {
+    const pts = [];
+    (meeting?.observations || []).forEach((obs, idx) => {
+      if (obs.segmentFrom && obs.segmentTo) {
+        pts.push({ lat: obs.segmentFrom.lat, lng: obs.segmentFrom.lng, type: 'start', number: idx + 1 });
+        pts.push({ lat: obs.segmentTo.lat, lng: obs.segmentTo.lng, type: 'end', number: idx + 1 });
+      }
+    });
+    return pts;
+  }, [meeting?.observations]);
+
   // ── Observations — utiliser externalObsMarkers si fourni ──
   const obsMarkers = useMemo(() => {
     if (externalObsMarkers) return externalObsMarkers;
@@ -211,6 +233,7 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
   const distance = totalDistance(liveCoords);
   const hasTrack = liveCoords.length > 0;
   const coords = liveCoords;
+  const currentLivePosition = isRecording && liveCoords.length > 0 ? [liveCoords[liveCoords.length - 1].lat, liveCoords[liveCoords.length - 1].lng] : null;
 
   return (
     <div className="flex flex-col gap-4 pb-6">
@@ -306,6 +329,9 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
               coordinates={coords}
               photoMarkers={photoMarkers}
               obsMarkers={obsMarkers}
+              segmentEndpoints={segmentEndpoints}
+              segmentLines={segmentLines}
+              livePosition={currentLivePosition}
               height="50vh"
             />
           </Suspense>
@@ -339,6 +365,9 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
                 coordinates={coords}
                 photoMarkers={photoMarkers}
                 obsMarkers={obsMarkers}
+                segmentEndpoints={segmentEndpoints}
+                segmentLines={segmentLines}
+                livePosition={currentLivePosition}
                 height="100%"
                 showMeasure
               />

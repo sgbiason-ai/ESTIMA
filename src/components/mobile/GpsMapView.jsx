@@ -1,10 +1,11 @@
 // src/components/mobile/GpsMapView.jsx
 // Carte Leaflet multi-fonds (satellite, plan, cadastre) avec tracé GPS, photos et observations.
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { LocateFixed } from 'lucide-react';
 
 // Fix icônes Leaflet
 delete L.Icon.Default.prototype._getIconUrl;
@@ -55,6 +56,20 @@ const spreadOverlapping = (markers, minDist = 0.00008) => {
   }
   return result;
 };
+
+// ─── OSRM route fetch (segments épousant la route) ─────────────────────────
+
+async function fetchOsrmRoute(from, to) {
+  try {
+    const res = await fetch(
+      `https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`
+    );
+    const data = await res.json();
+    const route = data.routes?.[0];
+    if (!route) return null;
+    return route.geometry.coordinates.map(c => [c[1], c[0]]);
+  } catch { return null; }
+}
 
 // ─── Lissage Catmull-Rom (courbe naturelle entre les points GPS) ────────────
 
@@ -123,12 +138,14 @@ function InvalidateSize() {
   return null;
 }
 
-// Composant qui recentre la carte
+// FitBounds une seule fois (au premier rendu avec des données) — ne recentre plus ensuite
 function FitBounds({ bounds }) {
   const map = useMap();
+  const fittedRef = useRef(false);
   useEffect(() => {
-    if (bounds && bounds.isValid()) {
+    if (!fittedRef.current && bounds && bounds.isValid()) {
       map.fitBounds(bounds, { padding: [30, 30], maxZoom: 18 });
+      fittedRef.current = true;
     }
   }, [map, bounds]);
   return null;
@@ -145,6 +162,29 @@ function DynamicTileLayer({ layerKey }) {
     const cfg = TILE_LAYERS[layerKey];
     L.tileLayer(cfg.url, { maxZoom: cfg.maxZoom }).addTo(map);
   }, [map, layerKey]);
+  return null;
+}
+
+// Suit la position GPS et recentre la carte quand followMode est actif
+function FollowPosition({ position, follow }) {
+  const map = useMap();
+  useEffect(() => {
+    if (follow && position) {
+      map.setView(position, map.getZoom(), { animate: true, duration: 0.5 });
+    }
+  }, [map, follow, position?.[0], position?.[1]]);
+  return null;
+}
+
+// Detecte quand l'utilisateur interagit avec la carte (drag/zoom)
+function UserInteractionDetector({ onInteraction }) {
+  const map = useMap();
+  useEffect(() => {
+    const handler = () => onInteraction();
+    map.on('dragstart', handler);
+    map.on('zoomstart', handler);
+    return () => { map.off('dragstart', handler); map.off('zoomstart', handler); };
+  }, [map, onInteraction]);
   return null;
 }
 
@@ -259,13 +299,18 @@ function RouteOverlay({ from, to }) {
 
 // ─── Composant principal ────────────────────────────────────────────────────
 
-export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMarkers = [], height = '100%', highlightedObs = null, onSelectObs = null, showMeasure = false }) {
+export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMarkers = [], segmentEndpoints = [], segmentLines = [], livePosition = null, height = '100%', highlightedObs = null, onSelectObs = null, showMeasure = false }) {
   const [activeLayer, setActiveLayer] = useState('satellite');
   const [measuring, setMeasuring] = useState(false);
   const [measurePoints, setMeasurePoints] = useState([]);
   const [routeMode, setRouteMode] = useState(false);
   const [routeFrom, setRouteFrom] = useState(null); // [lat, lng]
   const [routeTo, setRouteTo] = useState(null);
+
+  // Follow mode : la carte suit la position GPS live (désactivé dès qu'on touche la carte)
+  const [followMode, setFollowMode] = useState(true);
+  const handleUserInteraction = useCallback(() => setFollowMode(false), []);
+  const handleRecenter = useCallback(() => setFollowMode(true), []);
 
   const positions = coordinates.map(c => [c.lat, c.lng]);
 
@@ -274,10 +319,27 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
       ...positions,
       ...photoMarkers.map(p => [p.lat, p.lng]),
       ...obsMarkers.map(o => [o.lat, o.lng]),
+      ...segmentEndpoints.map(p => [p.lat, p.lng]),
+      ...segmentLines.flatMap(s => [s.from, s.to]),
     ];
     if (allPoints.length === 0) return null;
     return L.latLngBounds(allPoints);
-  }, [positions, photoMarkers, obsMarkers]);
+  }, [positions, photoMarkers, obsMarkers, segmentEndpoints, segmentLines]);
+
+  // ── Cache routes OSRM pour les segments ──
+  const [segmentRoutes, setSegmentRoutes] = useState({});
+  const fetchedRef = useRef(new Set());
+
+  useEffect(() => {
+    segmentLines.forEach((seg, i) => {
+      const key = `${seg.from[0]},${seg.from[1]}-${seg.to[0]},${seg.to[1]}`;
+      if (fetchedRef.current.has(key)) return;
+      fetchedRef.current.add(key);
+      fetchOsrmRoute(seg.from, seg.to).then(coords => {
+        if (coords) setSegmentRoutes(prev => ({ ...prev, [key]: coords }));
+      });
+    });
+  }, [segmentLines]);
 
   const defaultCenter = positions.length > 0 ? positions[0] : [43.6, 2.0];
   const cfg = TILE_LAYERS[activeLayer];
@@ -296,6 +358,8 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
           <TileLayer url={cfg.url} maxZoom={cfg.maxZoom} />
           <DynamicTileLayer layerKey={activeLayer} />
           <InvalidateSize />
+          {livePosition && <FollowPosition position={livePosition} follow={followMode} />}
+          <UserInteractionDetector onInteraction={handleUserInteraction} />
           <MeasureTool active={measuring} points={measurePoints}
             onAddPoint={(p) => setMeasurePoints(prev => [...prev, p])}
             onReset={() => setMeasurePoints([])} />
@@ -304,8 +368,17 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
 
           {/* Tracé GPS */}
           {positions.length > 1 && (
-            <Polyline positions={smoothPath(positions)} pathOptions={{ color: '#3b82f6', weight: 4, opacity: 0.9 }} />
+            <Polyline positions={smoothPath(positions)} pathOptions={{ color: '#3b82f6', weight: 3, opacity: 0.7 }} />
           )}
+
+          {/* Segments mesurés (trait épais orange, route OSRM) */}
+          {segmentLines.map((seg, i) => {
+            const key = `${seg.from[0]},${seg.from[1]}-${seg.to[0]},${seg.to[1]}`;
+            const routeCoords = segmentRoutes[key];
+            return routeCoords
+              ? <Polyline key={`seg-line-${i}`} positions={routeCoords} pathOptions={{ color: '#f97316', weight: 6, opacity: 0.9 }} />
+              : <Polyline key={`seg-line-${i}`} positions={[seg.from, seg.to]} pathOptions={{ color: '#f97316', weight: 5, dashArray: '8 6', opacity: 0.8 }} />;
+          })}
 
           {/* Point de départ */}
           {positions.length > 0 && (
@@ -363,7 +436,35 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
               </Marker>
             );
           })}
+
+          {/* Marqueurs départ/arrivée des segments */}
+          {segmentEndpoints.map((pt, i) => (
+            <Marker key={`seg-ep-${i}`} position={[pt.lat, pt.lng]}
+              icon={createIcon(pt.type === 'start' ? '#22c55e' : '#ef4444', 10)}>
+              <Popup>
+                <span style={{ fontSize: 11, fontWeight: 700 }}>
+                  {pt.type === 'start' ? 'Départ' : 'Arrivée'} — Segment {pt.number}
+                </span>
+              </Popup>
+            </Marker>
+          ))}
         </MapContainer>
+
+        {/* Bouton recentrer — en bas à gauche */}
+        {livePosition && (
+          <button onClick={handleRecenter}
+            style={{
+              position: 'absolute', bottom: 56, left: 10, zIndex: 1000,
+              display: 'flex', alignItems: 'center', gap: 4,
+              padding: '8px 12px', borderRadius: 12, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer',
+              background: followMode ? '#3b82f6' : 'rgba(255,255,255,0.9)', backdropFilter: 'blur(8px)',
+              color: followMode ? '#fff' : '#6b7280', boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              transition: 'all 0.15s',
+            }}>
+            <LocateFixed size={14} />
+            {followMode ? 'Suivi actif' : 'Recentrer'}
+          </button>
+        )}
 
         {/* Boutons outils — en haut à droite */}
         {showMeasure && (

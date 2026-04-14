@@ -503,8 +503,8 @@ export default function TeslaModeView({ user, companyId, onExit }) {
             if (!seg.segmentFrom || !seg.segmentTo) return null;
             return (
               <React.Fragment key={seg.id}>
-                {route && <Polyline positions={route.coordinates} pathOptions={{ color: T.accent, weight: 5, opacity: 0.9 }} />}
-                {!route && <Polyline positions={[[seg.segmentFrom.lat, seg.segmentFrom.lng], [seg.segmentTo.lat, seg.segmentTo.lng]]} pathOptions={{ color: T.accent, weight: 3, dashArray: '8 6', opacity: 0.7 }} />}
+                {route && <Polyline positions={route.coordinates} pathOptions={{ color: '#f97316', weight: 6, opacity: 0.9 }} />}
+                {!route && <Polyline positions={[[seg.segmentFrom.lat, seg.segmentFrom.lng], [seg.segmentTo.lat, seg.segmentTo.lng]]} pathOptions={{ color: '#f97316', weight: 6, dashArray: '8 6', opacity: 0.8 }} />}
                 <Marker
                   position={route ? route.coordinates[Math.floor(route.coordinates.length / 2)] : [(seg.segmentFrom.lat + seg.segmentTo.lat) / 2, (seg.segmentFrom.lng + seg.segmentTo.lng) / 2]}
                   icon={createSegmentIcon(idx + 1)}
@@ -658,7 +658,14 @@ export default function TeslaModeView({ user, companyId, onExit }) {
               <p className="text-sm py-2" style={{ color: T.muted }}>Appuyez « Départ » pour marquer le début d'un segment</p>
             )}
             {segments.map((seg, idx) => (
-              <div key={seg.id} className="shrink-0 flex items-center gap-3 px-4 py-2.5 rounded-xl min-w-[280px]" style={{ background: T.bg, border: `1px solid ${T.border}` }}>
+              <div key={seg.id} className="shrink-0 flex items-center gap-3 px-4 py-2.5 rounded-xl min-w-[280px] cursor-pointer transition hover:brightness-110"
+                onClick={() => {
+                  if (!seg.segmentFrom || !seg.segmentTo || !mapRef.current) return;
+                  setFollowMode(false);
+                  const bounds = L.latLngBounds([[seg.segmentFrom.lat, seg.segmentFrom.lng], [seg.segmentTo.lat, seg.segmentTo.lng]]);
+                  mapRef.current.fitBounds(bounds, { padding: [80, 80], maxZoom: 18, animate: true, duration: 0.5 });
+                }}
+                style={{ background: T.bg, border: `1px solid ${T.border}` }}>
                 <div className="w-8 h-8 rounded-full text-sm font-bold flex items-center justify-center shrink-0" style={{ background: T.accent, color: '#fff' }}>
                   {idx + 1}
                 </div>

@@ -210,19 +210,45 @@ const fetchTileAsImg = async (url) => {
 
 // ─── GENERATION CARTE SATELLITE (Canvas natif + tuiles) ──────────────────────
 
+const fetchOsrmRoutePdf = async (from, to) => {
+  try {
+    const res = await fetch(
+      `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`
+    );
+    const data = await res.json();
+    const route = data.routes?.[0];
+    if (!route) return null;
+    return route.geometry.coordinates.map(c => ({ lat: c[1], lng: c[0] }));
+  } catch { return null; }
+};
+
 const buildMapCanvas = async (visit, THEME) => {
   const tracking = visit.gpsTracking || {};
   const coordinates = tracking.coordinates || [];
   const observations = visit.observations || [];
-  if (coordinates.length === 0) return null;
 
-  // Collecter tous les points (GPS + observations)
+  // Collecter les segments mesurés
+  const segments = observations.filter(obs => obs.segmentFrom && obs.segmentTo);
+
+  if (coordinates.length === 0 && segments.length === 0) return null;
+
+  // Collecter tous les points (GPS + observations + segments)
   const allPoints = coordinates.map(c => ({ lat: c.lat, lng: c.lng }));
+  segments.forEach(seg => {
+    allPoints.push({ lat: seg.segmentFrom.lat, lng: seg.segmentFrom.lng });
+    allPoints.push({ lat: seg.segmentTo.lat, lng: seg.segmentTo.lng });
+  });
   const obsPositions = [];
   observations.forEach((obs, idx) => {
     let lat = null, lng = null;
-    for (const img of (obs.images || [])) {
-      if (typeof img === 'object' && img.lat != null) { lat = img.lat; lng = img.lng; break; }
+    if (obs.segmentFrom && obs.segmentTo) {
+      lat = (obs.segmentFrom.lat + obs.segmentTo.lat) / 2;
+      lng = (obs.segmentFrom.lng + obs.segmentTo.lng) / 2;
+    }
+    if (lat == null) {
+      for (const img of (obs.images || [])) {
+        if (typeof img === 'object' && img.lat != null) { lat = img.lat; lng = img.lng; break; }
+      }
     }
     if (lat == null && coordinates.length > 0) {
       const pos = Math.min(Math.floor((idx / Math.max(observations.length, 1)) * coordinates.length), coordinates.length - 1);
@@ -330,6 +356,47 @@ const buildMapCanvas = async (visit, THEME) => {
     ctx.fillStyle = '#ef4444'; ctx.fill();
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke();
   }
+
+  // ── Segments mesurés (routes OSRM orange épaisses) ──
+  const segmentRoutes = await Promise.all(
+    segments.map(seg => fetchOsrmRoutePdf(seg.segmentFrom, seg.segmentTo))
+  );
+
+  segments.forEach((seg, i) => {
+    const route = segmentRoutes[i];
+    const points = route || [seg.segmentFrom, seg.segmentTo];
+
+    // Ombre
+    ctx.beginPath();
+    ctx.moveTo(toX(points[0].lng), toY(points[0].lat));
+    for (let j = 1; j < points.length; j++) ctx.lineTo(toX(points[j].lng), toY(points[j].lat));
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = 9;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    // Trait orange
+    ctx.beginPath();
+    ctx.moveTo(toX(points[0].lng), toY(points[0].lat));
+    for (let j = 1; j < points.length; j++) ctx.lineTo(toX(points[j].lng), toY(points[j].lat));
+    ctx.strokeStyle = '#f97316';
+    ctx.lineWidth = 6;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    // Points départ (vert) et arrivée (rouge) du segment
+    const sx = toX(seg.segmentFrom.lng), sy = toY(seg.segmentFrom.lat);
+    ctx.beginPath(); ctx.arc(sx, sy, 6, 0, Math.PI * 2);
+    ctx.fillStyle = '#22c55e'; ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+
+    const ex = toX(seg.segmentTo.lng), ey = toY(seg.segmentTo.lat);
+    ctx.beginPath(); ctx.arc(ex, ey, 6, 0, Math.PI * 2);
+    ctx.fillStyle = '#ef4444'; ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+  });
 
   // Marqueurs observations numerotes
   const primaryHex = THEME.primary;
@@ -460,7 +527,8 @@ const drawObservations = async (doc, visit, THEME) => {
     const textLines = text ? doc.splitTextToSize(text, CW - 20) : [];
     const textH = textLines.length * 4;
     const hasImages = images.length > 0;
-    const estimatedH = 16 + textH + (hasImages ? 85 : 0) + 10;
+    const hasSegment = obs.segmentFrom && obs.segmentTo;
+    const estimatedH = 16 + (hasSegment ? 15 : 0) + textH + (hasImages ? 85 : 0) + 10;
 
     // Saut de page si pas assez de place
     if (y + estimatedH > PH - M.bottom && !pageStarted) {
@@ -498,6 +566,50 @@ const drawObservations = async (doc, visit, THEME) => {
     }
 
     y += 11;
+
+    // ── Coordonnées segment ──
+    if (obs.segmentFrom && obs.segmentTo) {
+      const fmtC = (lat, lng) => `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      const fmtD = (m) => m == null ? '—' : m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(2)} km`;
+
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(8);
+
+      // Départ
+      doc.setFillColor(34, 197, 94);
+      doc.circle(M.left + 15, y - 0.5, 1.2, 'F');
+      doc.setTextColor(100, 100, 100);
+      doc.text('Départ ', M.left + 18, y);
+      const depCoord = fmtC(obs.segmentFrom.lat, obs.segmentFrom.lng);
+      doc.setTextColor(37, 99, 235);
+      const depUrl = `https://www.google.com/maps?q=${obs.segmentFrom.lat},${obs.segmentFrom.lng}`;
+      doc.textWithLink(depCoord, M.left + 30, y, { url: depUrl });
+      y += 4;
+
+      // Arrivée
+      doc.setFillColor(239, 68, 68);
+      doc.circle(M.left + 15, y - 0.5, 1.2, 'F');
+      doc.setTextColor(100, 100, 100);
+      doc.text('Arrivée ', M.left + 18, y);
+      const arrCoord = fmtC(obs.segmentTo.lat, obs.segmentTo.lng);
+      doc.setTextColor(37, 99, 235);
+      const arrUrl = `https://www.google.com/maps?q=${obs.segmentTo.lat},${obs.segmentTo.lng}`;
+      doc.textWithLink(arrCoord, M.left + 32, y, { url: arrUrl });
+      y += 4;
+
+      // Distance
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(29, 78, 216);
+      doc.text(fmtD(obs.segmentDistance), M.left + 18, y);
+      if (obs.segmentUncertainty != null) {
+        doc.setFont('Helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.setTextColor(160, 160, 160);
+        doc.text(` ±${Math.round(obs.segmentUncertainty)}m`, M.left + 18 + doc.getTextWidth(fmtD(obs.segmentDistance)) + 1, y);
+      }
+      y += 5;
+    }
 
     // ── Texte ──
     if (textLines.length > 0) {

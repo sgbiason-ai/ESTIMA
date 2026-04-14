@@ -9,6 +9,9 @@ import ImageViewerModal from './ImageViewerModal';
 import SiteVisitObsEditSheet from './SiteVisitObsEditSheet';
 import GpsTrackingSection from './GpsTrackingSection';
 
+const fmtCoord = (lat, lng) => `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+const fmtDist = (m) => m == null ? '—' : m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(2)} km`;
+
 // ─── Sous-composants ───────────────────────────────────────────────────────
 
 function SectionTab({ label, active, onClick }) {
@@ -49,10 +52,28 @@ function ObsCard({ obs, number, onTap, onDelete, onViewImage }) {
       <div className="flex items-start gap-2.5">
         <span className="shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-[11px] font-bold flex items-center justify-center mt-0.5">{number}</span>
         <div className="flex-1 min-w-0">
+      {obs.segmentFrom && obs.segmentTo && (
+        <div className="text-[11px] font-mono mb-1.5 space-y-0.5" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center gap-1">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+            <a href={`https://www.google.com/maps?q=${obs.segmentFrom.lat},${obs.segmentFrom.lng}`} target="_blank" rel="noreferrer"
+              className="text-blue-600 font-medium">{fmtCoord(obs.segmentFrom.lat, obs.segmentFrom.lng)}</a>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
+            <a href={`https://www.google.com/maps?q=${obs.segmentTo.lat},${obs.segmentTo.lng}`} target="_blank" rel="noreferrer"
+              className="text-blue-600 font-medium">{fmtCoord(obs.segmentTo.lat, obs.segmentTo.lng)}</a>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-blue-700 font-bold">{fmtDist(obs.segmentDistance)}</span>
+            {obs.segmentUncertainty != null && <span className="text-gray-400 text-[9px]">±{Math.round(obs.segmentUncertainty)}m</span>}
+          </div>
+        </div>
+      )}
       {text && (
         <p className="text-[13px] text-gray-700 leading-relaxed line-clamp-4 whitespace-pre-line">{text}</p>
       )}
-      {!text && images.length === 0 && (
+      {!text && !obs.segmentFrom && images.length === 0 && (
         <p className="text-[13px] text-gray-500 italic">Observation vide — appuyez pour éditer</p>
       )}
       {images.length > 0 && (

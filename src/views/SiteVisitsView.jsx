@@ -238,12 +238,19 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
     return markers;
   }, [observations]);
 
-  // Marqueurs observations numérotés (position = première photo géolocalisée)
+  // Marqueurs observations numérotés (position = segment ou première photo géolocalisée)
   const obsMarkers = useMemo(() => {
     return observations.map((obs, idx) => {
       let lat = null, lng = null;
-      for (const img of (obs.images || [])) {
-        if (typeof img === 'object' && img.lat != null) { lat = img.lat; lng = img.lng; break; }
+      // Priorité : milieu du segment si disponible
+      if (obs.segmentFrom && obs.segmentTo) {
+        lat = (obs.segmentFrom.lat + obs.segmentTo.lat) / 2;
+        lng = (obs.segmentFrom.lng + obs.segmentTo.lng) / 2;
+      }
+      if (lat == null) {
+        for (const img of (obs.images || [])) {
+          if (typeof img === 'object' && img.lat != null) { lat = img.lat; lng = img.lng; break; }
+        }
       }
       // Fallback : position dans le tracé GPS proportionnelle à l'index
       if (lat == null && coordinates.length > 0) {
@@ -256,7 +263,31 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
     }).filter(Boolean);
   }, [observations, coordinates]);
 
-  const hasMap = coordinates.length > 0 || photoMarkers.length > 0 || obsMarkers.length > 0;
+  // Marqueurs départ/arrivée des segments (points verts/rouges sur la carte)
+  const segmentEndpoints = useMemo(() => {
+    const pts = [];
+    observations.forEach((obs, idx) => {
+      if (obs.segmentFrom && obs.segmentTo) {
+        pts.push({ lat: obs.segmentFrom.lat, lng: obs.segmentFrom.lng, type: 'start', number: idx + 1 });
+        pts.push({ lat: obs.segmentTo.lat, lng: obs.segmentTo.lng, type: 'end', number: idx + 1 });
+      }
+    });
+    return pts;
+  }, [observations]);
+
+  // Lignes de segments (polylines départ→arrivée)
+  const segmentLines = useMemo(() => {
+    return observations
+      .filter(obs => obs.segmentFrom && obs.segmentTo)
+      .map((obs, idx) => ({
+        from: [obs.segmentFrom.lat, obs.segmentFrom.lng],
+        to: [obs.segmentTo.lat, obs.segmentTo.lng],
+        number: observations.indexOf(obs) + 1,
+        distance: obs.segmentDistance,
+      }));
+  }, [observations]);
+
+  const hasMap = coordinates.length > 0 || photoMarkers.length > 0 || obsMarkers.length > 0 || segmentLines.length > 0;
 
   // Scroll vers l'observation quand on clique sur une pastille carte
   useEffect(() => {
@@ -266,7 +297,8 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
     }
   }, [highlightedObs]);
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
-  const fmtDist = (m) => m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(2)} km`;
+  const fmtDist = (m) => m == null ? '—' : m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(2)} km`;
+  const fmtCoord = (lat, lng) => `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
 
   // PROVISOIRE — Mode Tesla plein écran
   if (teslaMode) {
@@ -435,6 +467,27 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
                         {obsNum}
                       </button>
                       <div className="flex-1 min-w-0">
+                    {obs.segmentFrom && obs.segmentTo && (
+                      <div className="text-xs font-mono mb-1.5 space-y-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                          <span className="text-gray-500">Départ</span>
+                          <a href={`https://www.google.com/maps?q=${obs.segmentFrom.lat},${obs.segmentFrom.lng}`} target="_blank" rel="noreferrer"
+                            className="text-blue-600 font-medium hover:underline">{fmtCoord(obs.segmentFrom.lat, obs.segmentFrom.lng)}</a>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="inline-block w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                          <span className="text-gray-500">Arrivée</span>
+                          <a href={`https://www.google.com/maps?q=${obs.segmentTo.lat},${obs.segmentTo.lng}`} target="_blank" rel="noreferrer"
+                            className="text-blue-600 font-medium hover:underline">{fmtCoord(obs.segmentTo.lat, obs.segmentTo.lng)}</a>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Ruler size={12} className="text-blue-500 shrink-0" />
+                          <span className="text-blue-700 font-bold">{fmtDist(obs.segmentDistance)}</span>
+                          {obs.segmentUncertainty != null && <span className="text-gray-400 text-[10px]">±{Math.round(obs.segmentUncertainty)}m</span>}
+                        </div>
+                      </div>
+                    )}
                     {obs.text && <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{stripHtml(obs.text)}</p>}
                     {images.length > 0 && (
                       <div className="flex flex-wrap gap-2 mt-3">
@@ -484,7 +537,7 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
                 </div>
                 <div className="flex-1 min-h-0">
                   <Suspense fallback={<div className="flex items-center justify-center h-full text-gray-400">Chargement carte…</div>}>
-                    <GpsMapView coordinates={coordinates} photoMarkers={photoMarkers} obsMarkers={obsMarkers} height="100%" highlightedObs={highlightedObs} onSelectObs={setHighlightedObs} showMeasure />
+                    <GpsMapView coordinates={coordinates} photoMarkers={photoMarkers} obsMarkers={obsMarkers} segmentEndpoints={segmentEndpoints} segmentLines={segmentLines} height="100%" highlightedObs={highlightedObs} onSelectObs={setHighlightedObs} showMeasure />
                   </Suspense>
                 </div>
               </>
@@ -519,7 +572,7 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
           </div>
           <div className="flex-1 min-h-0">
             <Suspense fallback={<div className="flex items-center justify-center h-full text-gray-400">Chargement…</div>}>
-              <GpsMapView coordinates={coordinates} photoMarkers={photoMarkers} obsMarkers={obsMarkers} height="100%" highlightedObs={highlightedObs} onSelectObs={setHighlightedObs} showMeasure />
+              <GpsMapView coordinates={coordinates} photoMarkers={photoMarkers} obsMarkers={obsMarkers} segmentEndpoints={segmentEndpoints} segmentLines={segmentLines} height="100%" highlightedObs={highlightedObs} onSelectObs={setHighlightedObs} showMeasure />
             </Suspense>
           </div>
         </div>
