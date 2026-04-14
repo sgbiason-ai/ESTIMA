@@ -1,18 +1,55 @@
 // src/views/SiteVisitsView.jsx
-// Vue desktop — sidebar liste | observations gauche | carte droite + plein écran + export + suppression.
+// Vue desktop — sidebar liste | observations gauche | carte droite + plein écran + export + suppression + GPS live.
 
-import React, { useState, useEffect, useCallback, useMemo, Suspense, lazy } from 'react';
-import { collection, getDocs, getDoc, doc, deleteDoc } from 'firebase/firestore';
+import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense, lazy } from 'react';
+import { collection, getDocs, getDoc, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { MapPin, RefreshCw, Camera, MessageSquare, Navigation, Ruler, Trash2, FileDown, Maximize2, X } from 'lucide-react';
+import { MapPin, RefreshCw, Camera, MessageSquare, Navigation, Ruler, Trash2, FileDown, Maximize2, X, Play, Square } from 'lucide-react';
 import { stripHtml } from '../utils/formatObsText';
 import { confirm } from '../utils/globalUI';
 import HelpPanel from '../components/help/HelpPanel';
+import { simplifyGpsTrace } from '../utils/gpsSimplify';
+import { auth } from '../firebase';
+
+// PROVISOIRE — Mode Tesla depuis le desktop
+const TeslaModeView = lazy(() => import('./TeslaModeView'));
 import HelpButton from '../components/help/HelpButton';
 
 const GpsMapView = lazy(() => import('../components/mobile/GpsMapView'));
 
-export default function SiteVisitsView({ companyId, masterBranding }) {
+// ─── GPS Helpers ──────────────────────────────────────────────────────────────
+const haversine = (a, b) => {
+  const R = 6371000;
+  const toRad = (x) => (x * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+};
+
+const totalDistance = (coords) => {
+  let d = 0;
+  for (let i = 1; i < coords.length; i++) d += haversine(coords[i - 1], coords[i]);
+  return d;
+};
+
+const accuracyColor = (acc) => {
+  if (acc <= 5) return '#22c55e';
+  if (acc <= 15) return '#f59e0b';
+  return '#ef4444';
+};
+
+const fmtDuration = (ms) => {
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  const h = Math.floor(m / 60);
+  if (h > 0) return `${h}h${String(m % 60).padStart(2, '0')}`;
+  return `${m}min ${String(s % 60).padStart(2, '0')}s`;
+};
+
+export default function SiteVisitsView({ companyId, masterBranding, onBackToHub }) {
+  // PROVISOIRE — bouton Mode Tesla
+  const [teslaMode, setTeslaMode] = useState(false);
   const [visits, setVisits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
@@ -63,6 +100,119 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
 
   const [exporting, setExporting] = useState(false);
 
+  // ── GPS tracking state ──
+  const [isRecording, setIsRecording] = useState(false);
+  const [liveCoords, setLiveCoords] = useState([]);
+  const [gpsElapsed, setGpsElapsed] = useState(0);
+  const [lastAccuracy, setLastAccuracy] = useState(null);
+  const watchIdRef = useRef(null);
+  const wakeLockRef = useRef(null);
+  const timerRef = useRef(null);
+  const startTimeRef = useRef(null);
+
+  // Sync liveCoords quand la visite change
+  useEffect(() => {
+    if (!isRecording) setLiveCoords(fullVisit?.gpsTracking?.coordinates || []);
+  }, [fullVisit?.id, fullVisit?.gpsTracking?.coordinates?.length, isRecording]);
+
+  const startGpsRecording = useCallback(() => {
+    if (!navigator.geolocation) { alert('Géolocalisation non disponible sur ce navigateur'); return; }
+    setIsRecording(true);
+    startTimeRef.current = Date.now();
+
+    // Wake lock
+    if ('wakeLock' in navigator) {
+      navigator.wakeLock.request('screen').then(wl => { wakeLockRef.current = wl; }).catch(() => {});
+    }
+
+    // Timer
+    timerRef.current = setInterval(() => {
+      setGpsElapsed(Date.now() - startTimeRef.current);
+    }, 1000);
+
+    // Sauvegarder startTime
+    if (fullVisit?.id) {
+      const ref = doc(db, 'companies', companyId, 'site_visits', fullVisit.id);
+      updateDoc(ref, {
+        'gpsTracking.startTime': new Date().toISOString(),
+      }).catch(() => {});
+    }
+
+    // GPS watch
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        const point = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          timestamp: new Date().toISOString(),
+          accuracy: Math.round(pos.coords.accuracy * 10) / 10,
+        };
+        setLastAccuracy(point.accuracy);
+        setLiveCoords(prev => {
+          // Filtre distance min 5m — ignorer si trop proche du dernier point
+          if (prev.length > 0) {
+            const last = prev[prev.length - 1];
+            const d = haversine(last, point);
+            if (d < 5) return prev;
+          }
+          const updated = [...prev, point];
+          // Sauvegarde périodique tous les 5 points
+          if (updated.length % 5 === 0 && fullVisit?.id) {
+            const ref = doc(db, 'companies', companyId, 'site_visits', fullVisit.id);
+            updateDoc(ref, {
+              'gpsTracking.coordinates': updated,
+              'gpsTracking.distance': Math.round(totalDistance(updated)),
+            }).catch(() => {});
+          }
+          return updated;
+        });
+      },
+      (err) => console.warn('GPS error:', err.message),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+    );
+  }, [companyId, fullVisit?.id]);
+
+  const stopGpsRecording = useCallback(async () => {
+    setIsRecording(false);
+    wakeLockRef.current?.release();
+    wakeLockRef.current = null;
+
+    if (watchIdRef.current != null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    // Simplification Douglas-Peucker (epsilon 5m) + sauvegarde finale
+    const simplified = simplifyGpsTrace(liveCoords, 5);
+    setLiveCoords(simplified);
+
+    if (fullVisit?.id) {
+      const ref = doc(db, 'companies', companyId, 'site_visits', fullVisit.id);
+      try {
+        await updateDoc(ref, {
+          'gpsTracking.endTime': new Date().toISOString(),
+          'gpsTracking.coordinates': simplified,
+          'gpsTracking.distance': Math.round(totalDistance(simplified)),
+        });
+        // Refresh la visite pour mettre à jour l'affichage
+        loadDetail(fullVisit.id);
+      } catch (e) { console.error('Erreur sauvegarde GPS:', e); }
+    }
+  }, [companyId, fullVisit?.id, liveCoords, loadDetail]);
+
+  // Cleanup au démontage
+  useEffect(() => {
+    return () => {
+      if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
+      wakeLockRef.current?.release();
+    };
+  }, []);
+
   const handleExportPdf = useCallback(async () => {
     if (!fullVisit) return;
     setExporting(true);
@@ -74,8 +224,9 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
   }, [fullVisit, masterBranding]);
 
   const tracking = fullVisit?.gpsTracking || {};
-  const coordinates = tracking.coordinates || [];
+  const coordinates = isRecording ? liveCoords : (tracking.coordinates || []);
   const observations = fullVisit?.observations || [];
+  const liveDistance = totalDistance(coordinates);
 
   const photoMarkers = useMemo(() => {
     const markers = [];
@@ -117,6 +268,15 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
   const fmtDist = (m) => m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(2)} km`;
 
+  // PROVISOIRE — Mode Tesla plein écran
+  if (teslaMode) {
+    return (
+      <Suspense fallback={<div className="flex h-full items-center justify-center text-gray-400">Chargement Mode Tesla…</div>}>
+        <TeslaModeView user={auth.currentUser} companyId={companyId} onExit={() => setTeslaMode(false)} />
+      </Suspense>
+    );
+  }
+
   return (
     <div className="flex h-full bg-[#f5f5f7]" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
 
@@ -127,6 +287,12 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200/60 shrink-0">
           <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Visites</span>
           <div className="flex items-center gap-1">
+            {/* PROVISOIRE — bouton Mode Tesla */}
+            <button onClick={() => setTeslaMode(true)}
+              className="px-2 py-1 rounded-lg text-[10px] font-bold bg-gray-900 text-white hover:bg-gray-700 transition"
+              title="Mode Tesla (carte plein écran + mesure segments)">
+              🚗 Tesla
+            </button>
             <HelpButton onClick={() => setShowHelp(true)} />
             <button onClick={fetchVisits} className="p-1 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition">
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
@@ -210,15 +376,15 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
               </div>
 
               {/* Stats */}
-              <div className="flex gap-2 mt-3">
+              <div className="flex items-center gap-2 mt-3 flex-wrap">
                 {coordinates.length > 0 && (
                   <div className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 rounded-lg text-[10px] font-bold text-gray-700">
                     <Navigation size={10} className="text-blue-500" /> {coordinates.length} pts
                   </div>
                 )}
-                {tracking.distance > 0 && (
+                {(liveDistance > 0 || tracking.distance > 0) && (
                   <div className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 rounded-lg text-[10px] font-bold text-gray-700">
-                    <Ruler size={10} className="text-emerald-500" /> {fmtDist(tracking.distance)} <span className="text-[8px] text-gray-400 font-normal">±{Math.max(5, Math.round(tracking.distance * 0.07))}m</span>
+                    <Ruler size={10} className="text-emerald-500" /> {fmtDist(isRecording ? liveDistance : tracking.distance)} <span className="text-[8px] text-gray-400 font-normal">±{Math.max(5, Math.round((isRecording ? liveDistance : tracking.distance) * 0.07))}m</span>
                   </div>
                 )}
                 <div className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 rounded-lg text-[10px] font-bold text-gray-700">
@@ -226,6 +392,30 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
                 </div>
                 <div className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 rounded-lg text-[10px] font-bold text-gray-700">
                   <MessageSquare size={10} className="text-amber-500" /> {observations.length} obs.
+                </div>
+
+                {/* GPS Recording */}
+                <div className="ml-auto flex items-center gap-2">
+                  {isRecording && lastAccuracy != null && (
+                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-gray-50">
+                      <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: accuracyColor(lastAccuracy) }} />
+                      <span className="text-[10px] font-bold" style={{ color: accuracyColor(lastAccuracy) }}>±{lastAccuracy}m</span>
+                    </div>
+                  )}
+                  {isRecording && (
+                    <span className="text-[10px] font-mono font-bold text-gray-600 tabular-nums">{fmtDuration(gpsElapsed)}</span>
+                  )}
+                  {isRecording ? (
+                    <button onClick={stopGpsRecording}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-red-500 text-white hover:bg-red-600 transition active:scale-[0.97] shadow-sm">
+                      <Square size={11} fill="white" /> Arrêter GPS
+                    </button>
+                  ) : (
+                    <button onClick={startGpsRecording}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition active:scale-[0.97] shadow-sm">
+                      <Play size={11} fill="white" /> Suivi GPS
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -302,7 +492,7 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
               <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
                 <MapPin size={40} className="mb-3 opacity-30" />
                 <p className="text-xs">Aucune donnée terrain</p>
-                <p className="text-[10px] text-gray-300 mt-1">Utilisez le mobile pour enregistrer un tracé GPS</p>
+                <p className="text-[10px] text-gray-300 mt-1">Cliquez « Suivi GPS » pour enregistrer un tracé</p>
               </div>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-gray-300">

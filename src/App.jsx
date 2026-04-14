@@ -10,6 +10,7 @@ import { useAppResources }  from './hooks/useAppResources';
 import { useAppModals }     from './hooks/useAppModals';
 import { usePresence }      from './hooks/usePresence';
 import { useIsMobile }      from './hooks/useIsMobile';
+import { useIsTesla }       from './hooks/useIsTesla';
 import { useProjectArchives } from './hooks/useProjectArchives';
 
 // ─── COMPOSANTS GLOBAUX ───────────────────────────────────────────────────────
@@ -39,6 +40,7 @@ import RaoAnalysisView      from './views/RaoAnalysisView';
 import CrcView              from './views/crc/CrcView';
 import DocAdminView         from './views/DocAdminView';
 import SiteVisitsView       from './views/SiteVisitsView';
+import TeslaModeView        from './views/TeslaModeView';
 import DevisMoeView         from './views/devisMoe/DevisMoeView';
 import AccountSection       from './components/settings/AccountSection';
 
@@ -52,8 +54,9 @@ const removeAccents = (str) =>
 // ─── APP ──────────────────────────────────────────────────────────────────────
 export default function App() {
 
-  // ── 0. Détection mobile ───────────────────────────────────────────────────
+  // ── 0. Détection mobile / Tesla ────────────────────────────────────────────
   const isMobile = useIsMobile(768);
+  const isTesla = useIsTesla();
 
   // ── 0b. Page légale (accessible sans auth) ────────────────────────────────
   const [showLegal, setShowLegal] = useState(false);
@@ -83,7 +86,7 @@ export default function App() {
 
   if (!companyId) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#f5f5f7] flex-col gap-4">
+      <div className="flex h-screen items-center justify-center flex-col gap-4" style={{ background: '#f5f5f7' }}>
         <div className="text-2xl font-bold text-gray-900">Compte non configuré</div>
         <p className="text-gray-500 text-sm max-w-sm text-center">
           Votre compte n'est pas encore associé à une entreprise.
@@ -91,7 +94,10 @@ export default function App() {
         </p>
         <button
           onClick={handleLogout}
-          className="mt-4 px-6 py-2 bg-red-50 hover:bg-red-100 text-red-500 rounded-xl text-sm font-medium transition-colors border border-red-200/60"
+          className="px-6 py-2 rounded-xl text-sm font-medium transition-colors"
+          style={isTesla
+            ? { background: '#1e2028', color: '#ef4444', border: '1px solid #38434d' }
+            : { background: '#fef2f2', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}
         >
           Se déconnecter
         </button>
@@ -190,8 +196,11 @@ export default function App() {
     );
   }
 
-  // Module : Visites de Site (lecture desktop)
+  // Module : Visites de Site (Tesla = mode carte plein écran, desktop = lecture classique)
   if (activeModule === 'site_visits') {
+    if (isTesla) {
+      return <TeslaModeView user={user} companyId={companyId} onExit={handleBackToHub} />;
+    }
     return <SiteVisitsModule user={user} companyId={companyId} onBackToHub={handleBackToHub} />;
   }
 

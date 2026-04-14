@@ -643,7 +643,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
 
     catObs.forEach((obs, obsIdx) => {
       let rawText = obs.text || '';
-      if (obs.originMeetingNumber) rawText += ` (Report CR n${obs.originMeetingNumber})`;
+      // Report CR nXX uniquement dans l'aperçu, pas dans le PDF
       const plainText = stripHtml(rawText);
       const imgs = (obs.images || []).map(e => typeof e === 'string' ? e : e.src).filter(u => imageCache.has(u));
 

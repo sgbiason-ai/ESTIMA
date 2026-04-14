@@ -3,6 +3,7 @@
 
 import React, { useState, useCallback, useRef, useEffect, Suspense, lazy, useMemo } from 'react';
 import Icon from './Icon';
+import { simplifyGpsTrace } from '../../utils/gpsSimplify';
 import { stripHtml } from '../../utils/formatObsText';
 import { Maximize2, X } from 'lucide-react';
 
@@ -142,6 +143,12 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
         };
         setLastAccuracy(point.accuracy);
         setLiveCoords(prev => {
+          // Filtre distance min 5m — ignorer si trop proche du dernier point
+          if (prev.length > 0) {
+            const last = prev[prev.length - 1];
+            const dist = haversine(last, point);
+            if (dist < 5) return prev;
+          }
           const updated = [...prev, point];
           // Sauvegarde périodique (tous les 5 points)
           if (updated.length % 5 === 0 && manager) {
@@ -175,17 +182,21 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
       timerRef.current = null;
     }
 
-    // Sauvegarde finale
+    // Simplification Douglas-Peucker (epsilon 5m) + sauvegarde finale
+    const rawCount = liveCoords.length;
+    const simplified = simplifyGpsTrace(liveCoords, 5);
+    setLiveCoords(simplified);
+
     if (manager) {
       manager.updateMeetingField('gpsTracking', {
         startTime: tracking.startTime,
         endTime: new Date().toISOString(),
-        coordinates: liveCoords,
-        distance: Math.round(totalDistance(liveCoords)),
+        coordinates: simplified,
+        distance: Math.round(totalDistance(simplified)),
       });
     }
 
-    onToast?.(`Tracé enregistré — ${liveCoords.length} points`);
+    onToast?.(`Tracé enregistré — ${simplified.length} pts (${rawCount - simplified.length} supprimés)`);
   }, [manager, tracking, liveCoords, onToast]);
 
   // Cleanup au démontage

@@ -1,9 +1,10 @@
 // src/firebase.js
 import { initializeApp } from "firebase/app";
-import { 
-  initializeFirestore, 
-  persistentLocalCache, 
-  persistentMultipleTabManager 
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  memoryLocalCache
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
@@ -20,11 +21,21 @@ const firebaseConfig = {
 
 // Initialisation
 const app = initializeApp(firebaseConfig);
-const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager()
-  })
-});
-export const auth = getAuth(app);
 
+// Détection navigateur Tesla ou contexte sans IndexedDB fiable
+// UA Tesla Model 3 : "Mozilla/5.0 (X11; Linux x86_64) ... Chrome/140 ... Safari/537.36" (pas de "Tesla" dedans)
+const ua = navigator.userAgent || '';
+const isTeslaBrowser = /Tesla/i.test(ua)
+  || new URLSearchParams(window.location.search).get('tesla') === '1'
+  || (/X11; Linux x86_64/.test(ua) && /Chrome\/\d/.test(ua)
+      && !/Ubuntu|Fedora|Debian|SUSE|Mint|Arch|CrOS|Android/.test(ua));
+
+// Firestore : mémoire pour Tesla (pas d'IndexedDB fiable), persistant sinon
+const db = initializeFirestore(app, {
+  localCache: isTeslaBrowser
+    ? memoryLocalCache()
+    : persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+});
+
+export const auth = getAuth(app);
 export { db };
