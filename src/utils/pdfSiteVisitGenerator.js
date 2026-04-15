@@ -500,6 +500,199 @@ const drawMapPage = async (doc, mapImage, visit, THEME) => {
   }
 };
 
+// ─── MINI-CARTE PAR OBSERVATION ──────────────────────────────────────────────
+
+const buildObsMiniMap = async (obs, visit, THEME, obsIdx) => {
+  const tracking = visit.gpsTracking || {};
+  const coordinates = tracking.coordinates || [];
+  const hasSeg = obs.segmentFrom && obs.segmentTo;
+
+  // Déterminer le centre et les points à afficher
+  let centerLat, centerLng;
+  const points = [];
+
+  if (hasSeg) {
+    points.push({ lat: obs.segmentFrom.lat, lng: obs.segmentFrom.lng });
+    points.push({ lat: obs.segmentTo.lat, lng: obs.segmentTo.lng });
+    centerLat = (obs.segmentFrom.lat + obs.segmentTo.lat) / 2;
+    centerLng = (obs.segmentFrom.lng + obs.segmentTo.lng) / 2;
+  } else {
+    // Chercher position depuis photos ou tracé
+    for (const img of (obs.images || [])) {
+      if (typeof img === 'object' && img.lat != null) { centerLat = img.lat; centerLng = img.lng; break; }
+    }
+    if (centerLat == null && coordinates.length > 0) {
+      const pos = Math.min(Math.floor((obsIdx / Math.max((visit.observations || []).length, 1)) * coordinates.length), coordinates.length - 1);
+      centerLat = coordinates[pos].lat;
+      centerLng = coordinates[pos].lng;
+    }
+    if (centerLat != null) points.push({ lat: centerLat, lng: centerLng });
+  }
+
+  if (points.length === 0) return null;
+
+  // Bounds avec marge
+  let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
+  points.forEach(p => { minLat = Math.min(minLat, p.lat); maxLat = Math.max(maxLat, p.lat); minLng = Math.min(minLng, p.lng); maxLng = Math.max(maxLng, p.lng); });
+
+  // Ajouter des points du tracé GPS proches pour contexte
+  const nearbyCoords = coordinates.filter(c => {
+    const dlat = Math.abs(c.lat - (minLat + maxLat) / 2);
+    const dlng = Math.abs(c.lng - (minLng + maxLng) / 2);
+    return dlat < 0.005 && dlng < 0.005;
+  });
+
+  nearbyCoords.forEach(c => { minLat = Math.min(minLat, c.lat); maxLat = Math.max(maxLat, c.lat); minLng = Math.min(minLng, c.lng); maxLng = Math.max(maxLng, c.lng); });
+
+  const padLat = Math.max((maxLat - minLat) * 0.25, 0.0005);
+  const padLng = Math.max((maxLng - minLng) * 0.25, 0.0005);
+  minLat -= padLat; maxLat += padLat; minLng -= padLng; maxLng += padLng;
+
+  // Trouver le zoom optimal — on cherche un carré en PIXELS, pas en degrés
+  let zoom = 18;
+  for (let z = 18; z >= 1; z--) {
+    const pxMinX = latLng2px(0, minLng, z).x;
+    const pxMaxX = latLng2px(0, maxLng, z).x;
+    const pxMinY = latLng2px(maxLat, 0, z).y;
+    const pxMaxY = latLng2px(minLat, 0, z).y;
+    const spanPx = Math.max(pxMaxX - pxMinX, pxMaxY - pxMinY, 128);
+    // Nombre de tuiles nécessaires pour couvrir le carré pixel
+    const tilesNeeded = Math.ceil(spanPx / 256) + 2; // +2 pour marges
+    if (tilesNeeded * tilesNeeded <= 16) { zoom = z; break; }
+  }
+
+  // Calculer le carré en pixels au zoom choisi
+  const pxMinX = latLng2px(0, minLng, zoom).x;
+  const pxMaxX = latLng2px(0, maxLng, zoom).x;
+  const pxMinY = latLng2px(maxLat, 0, zoom).y;
+  const pxMaxY = latLng2px(minLat, 0, zoom).y;
+  const cropSpan = Math.max(pxMaxX - pxMinX, pxMaxY - pxMinY, 128);
+  const centerPxX = (pxMinX + pxMaxX) / 2;
+  const centerPxY = (pxMinY + pxMaxY) / 2;
+  const half = cropSpan / 2;
+
+  // Tuiles nécessaires pour couvrir le carré pixel (avec marge)
+  const sqLeft = centerPxX - half;
+  const sqTop = centerPxY - half;
+  const sqRight = centerPxX + half;
+  const sqBottom = centerPxY + half;
+
+  const tileXmin = Math.floor(sqLeft / 256);
+  const tileXmax = Math.floor(sqRight / 256);
+  const tileYmin = Math.floor(sqTop / 256);
+  const tileYmax = Math.floor(sqBottom / 256);
+  const tilesW = (tileXmax - tileXmin + 1) * 256;
+  const tilesH = (tileYmax - tileYmin + 1) * 256;
+
+  const SIZE = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = tilesW;
+  canvas.height = tilesH;
+  const ctx = canvas.getContext('2d');
+
+  // Charger tuiles
+  const tilePromises = [];
+  for (let ty = tileYmin; ty <= tileYmax; ty++) {
+    for (let tx = tileXmin; tx <= tileXmax; tx++) {
+      const url = `https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`;
+      const dx = (tx - tileXmin) * 256;
+      const dy = (ty - tileYmin) * 256;
+      tilePromises.push(fetchTileAsImg(url).then(img => { if (img) ctx.drawImage(img, dx, dy, 256, 256); }));
+    }
+  }
+  await Promise.all(tilePromises);
+
+  // Origine du canvas tuiles en coordonnées monde
+  const worldOriginX = tileXmin * 256;
+  const worldOriginY = tileYmin * 256;
+  const toX = (lng) => latLng2px(0, lng, zoom).x - worldOriginX;
+  const toY = (lat) => latLng2px(lat, 0, zoom).y - worldOriginY;
+
+  // Crop carré — coordonnées dans le canvas tuiles
+  const cx = centerPxX - worldOriginX;
+  const cy = centerPxY - worldOriginY;
+
+  const crop = document.createElement('canvas');
+  crop.width = SIZE;
+  crop.height = SIZE;
+  const cctx = crop.getContext('2d');
+  cctx.drawImage(canvas, cx - half, cy - half, cropSpan, cropSpan, 0, 0, SIZE, SIZE);
+
+  // Fonctions de coordonnées dans le crop
+  const scale = SIZE / cropSpan;
+  const cToX = (lng) => (toX(lng) - (cx - half)) * scale;
+  const cToY = (lat) => (toY(lat) - (cy - half)) * scale;
+
+  // Dessiner le tracé GPS à proximité
+  if (nearbyCoords.length > 1) {
+    cctx.beginPath();
+    cctx.moveTo(cToX(nearbyCoords[0].lng), cToY(nearbyCoords[0].lat));
+    for (let i = 1; i < nearbyCoords.length; i++) cctx.lineTo(cToX(nearbyCoords[i].lng), cToY(nearbyCoords[i].lat));
+    cctx.strokeStyle = 'rgba(59,130,246,0.5)';
+    cctx.lineWidth = 3;
+    cctx.lineJoin = 'round';
+    cctx.lineCap = 'round';
+    cctx.stroke();
+  }
+
+  if (hasSeg) {
+    // Route OSRM
+    const route = await fetchOsrmRoutePdf(obs.segmentFrom, obs.segmentTo);
+    const pts = route || [obs.segmentFrom, obs.segmentTo];
+
+    // Ombre
+    cctx.beginPath();
+    cctx.moveTo(cToX(pts[0].lng), cToY(pts[0].lat));
+    for (let j = 1; j < pts.length; j++) cctx.lineTo(cToX(pts[j].lng), cToY(pts[j].lat));
+    cctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    cctx.lineWidth = 8;
+    cctx.lineJoin = 'round';
+    cctx.lineCap = 'round';
+    cctx.stroke();
+
+    // Trait orange
+    cctx.beginPath();
+    cctx.moveTo(cToX(pts[0].lng), cToY(pts[0].lat));
+    for (let j = 1; j < pts.length; j++) cctx.lineTo(cToX(pts[j].lng), cToY(pts[j].lat));
+    cctx.strokeStyle = '#f97316';
+    cctx.lineWidth = 5;
+    cctx.lineJoin = 'round';
+    cctx.lineCap = 'round';
+    cctx.stroke();
+
+    // Points départ/arrivée
+    const sx = cToX(obs.segmentFrom.lng), sy = cToY(obs.segmentFrom.lat);
+    cctx.beginPath(); cctx.arc(sx, sy, 8, 0, Math.PI * 2);
+    cctx.fillStyle = '#22c55e'; cctx.fill();
+    cctx.strokeStyle = '#fff'; cctx.lineWidth = 3; cctx.stroke();
+
+    const ex = cToX(obs.segmentTo.lng), ey = cToY(obs.segmentTo.lat);
+    cctx.beginPath(); cctx.arc(ex, ey, 8, 0, Math.PI * 2);
+    cctx.fillStyle = '#ef4444'; cctx.fill();
+    cctx.strokeStyle = '#fff'; cctx.lineWidth = 3; cctx.stroke();
+  } else {
+    // Marqueur simple
+    const ox = cToX(centerLng), oy = cToY(centerLat);
+    cctx.beginPath(); cctx.arc(ox + 1, oy + 1, 14, 0, Math.PI * 2);
+    cctx.fillStyle = 'rgba(0,0,0,0.3)'; cctx.fill();
+    cctx.beginPath(); cctx.arc(ox, oy, 13, 0, Math.PI * 2);
+    cctx.fillStyle = `rgb(${THEME.primary[0]},${THEME.primary[1]},${THEME.primary[2]})`; cctx.fill();
+    cctx.strokeStyle = '#fff'; cctx.lineWidth = 3; cctx.stroke();
+    cctx.fillStyle = '#fff';
+    cctx.font = 'bold 16px system-ui';
+    cctx.textAlign = 'center';
+    cctx.textBaseline = 'middle';
+    cctx.fillText(String(obsIdx + 1), ox, oy);
+  }
+
+  // Bordure arrondie
+  cctx.strokeStyle = 'rgba(255,255,255,0.6)';
+  cctx.lineWidth = 4;
+  cctx.strokeRect(2, 2, SIZE - 4, SIZE - 4);
+
+  return crop.toDataURL('image/jpeg', 0.85);
+};
+
 // ─── PAGES OBSERVATIONS ───────────────────────────────────────────────────────
 
 const drawObservations = async (doc, visit, THEME) => {
@@ -517,18 +710,31 @@ const drawObservations = async (doc, visit, THEME) => {
   doc.text('Observations', M.left, y);
   y += 10;
 
+  // Pré-générer toutes les mini-cartes en parallèle
+  const miniMaps = await Promise.all(
+    observations.map((obs, i) => buildObsMiniMap(obs, visit, THEME, i).catch(() => null))
+  );
+
   for (let i = 0; i < observations.length; i++) {
     const obs = observations[i];
     const obsNum = i + 1;
     const text = stripHtml(obs.text);
     const images = obs.images || [];
+    const miniMap = miniMaps[i];
+
+    // Dimensions mini-carte
+    const MAP_W = 55; // largeur mini-carte en mm
+    const MAP_H = 55;
+    const hasMap = !!miniMap;
+    const textColW = hasMap ? CW - MAP_W - 5 - 13 : CW - 13; // largeur texte réduite si carte
 
     // Estimer la hauteur nécessaire
-    const textLines = text ? doc.splitTextToSize(text, CW - 20) : [];
+    const textLines = text ? doc.splitTextToSize(text, textColW) : [];
     const textH = textLines.length * 4;
     const hasImages = images.length > 0;
     const hasSegment = obs.segmentFrom && obs.segmentTo;
-    const estimatedH = 16 + (hasSegment ? 15 : 0) + textH + (hasImages ? 85 : 0) + 10;
+    const leftH = 16 + (hasSegment ? 15 : 0) + textH + 6;
+    const estimatedH = Math.max(leftH, hasMap ? MAP_H + 10 : 0) + (hasImages ? 85 : 0) + 10;
 
     // Saut de page si pas assez de place
     if (y + estimatedH > PH - M.bottom && !pageStarted) {
@@ -538,9 +744,9 @@ const drawObservations = async (doc, visit, THEME) => {
     }
 
     pageStarted = false;
+    const obsStartY = y;
 
     // ── En-tete observation ──
-    // Pastille numérotée (utiliser roundedRect pour eviter deformation)
     const pillR = 3.5;
     const pillX = M.left + 1.5;
     const pillY = y - 0.5;
@@ -562,10 +768,22 @@ const drawObservations = async (doc, visit, THEME) => {
       doc.setFont('Helvetica', 'normal');
       doc.setFontSize(7);
       doc.setTextColor(...THEME.lightText);
-      doc.text(formatDateFr(obs.date), PW - M.right, y + 4.5, { align: 'right' });
+      const dateX = hasMap ? M.left + 13 + textColW : PW - M.right;
+      doc.text(formatDateFr(obs.date), dateX, y + 4.5, { align: 'right' });
     }
 
     y += 11;
+
+    // ── Mini-carte à droite ──
+    if (hasMap) {
+      const mapX = PW - M.right - MAP_W;
+      const mapY = obsStartY;
+      doc.setDrawColor(...THEME.borders);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(mapX - 0.5, mapY - 0.5, MAP_W + 1, MAP_H + 1, 2, 2, 'S');
+      doc.addImage(miniMap, 'JPEG', mapX, mapY, MAP_W, MAP_H);
+      doc.setLineWidth(0.2);
+    }
 
     // ── Coordonnées segment ──
     if (obs.segmentFrom && obs.segmentTo) {
@@ -620,6 +838,11 @@ const drawObservations = async (doc, visit, THEME) => {
       y += textH + 4;
     }
 
+    // S'assurer que y descend au moins en-dessous de la mini-carte
+    if (hasMap) {
+      y = Math.max(y, obsStartY + MAP_H + 4);
+    }
+
     // ── Images (grandes, cote a cote si 2+) ──
     if (hasImages) {
       const maxImgW = images.length === 1 ? CW - 13 : (CW - 13 - 4) / 2;
@@ -635,25 +858,22 @@ const drawObservations = async (doc, visit, THEME) => {
           if (!loaded) continue;
 
           const aspect = loaded.width / loaded.height;
-          let imgW = Math.min(maxImgW, loaded.width * 0.264); // px to mm approx
+          let imgW = Math.min(maxImgW, loaded.width * 0.264);
           let imgH = imgW / aspect;
           if (imgH > maxImgH) { imgH = maxImgH; imgW = imgH * aspect; }
           if (imgW > maxImgW) { imgW = maxImgW; imgH = imgW / aspect; }
 
-          // Verifier saut de page
           if (y + imgH + 5 > PH - M.bottom) {
             doc.addPage();
             y = 20;
             imgX = M.left + 13;
           }
 
-          // Cadre subtil
           doc.setDrawColor(...THEME.borders);
           doc.setLineWidth(0.2);
           doc.roundedRect(imgX - 0.5, y - 0.5, imgW + 1, imgH + 1, 1, 1, 'S');
           doc.addImage(imgSrc, 'JPEG', imgX, y, imgW, imgH);
 
-          // GPS link
           if (typeof imgData === 'object' && imgData.lat != null && imgData.lng != null) {
             doc.setFont('Helvetica', 'italic');
             doc.setFontSize(6);
@@ -662,7 +882,6 @@ const drawObservations = async (doc, visit, THEME) => {
             doc.textWithLink('GPS', imgX, y + imgH + 3, { url });
           }
 
-          // Placement : cote a cote ou en dessous
           if (images.length <= 2 && j === 0 && images.length > 1) {
             imgX += imgW + 4;
           } else {
@@ -672,7 +891,6 @@ const drawObservations = async (doc, visit, THEME) => {
         } catch { /* image non chargee */ }
       }
 
-      // Si on avait 2 images cote a cote, avancer le y
       if (images.length === 2) {
         y += maxImgH + 6;
       }
