@@ -233,7 +233,7 @@ const buildMapCanvas = async (visit, THEME) => {
   if (coordinates.length === 0 && segments.length === 0) return null;
 
   // Collecter tous les points (GPS + observations + segments)
-  const allPoints = coordinates.map(c => ({ lat: c.lat, lng: c.lng }));
+  const allPoints = coordinates.filter(c => !c.break).map(c => ({ lat: c.lat, lng: c.lng }));
   segments.forEach(seg => {
     allPoints.push({ lat: seg.segmentFrom.lat, lng: seg.segmentFrom.lng });
     allPoints.push({ lat: seg.segmentTo.lat, lng: seg.segmentTo.lng });
@@ -250,10 +250,13 @@ const buildMapCanvas = async (visit, THEME) => {
         if (typeof img === 'object' && img.lat != null) { lat = img.lat; lng = img.lng; break; }
       }
     }
-    if (lat == null && coordinates.length > 0) {
-      const pos = Math.min(Math.floor((idx / Math.max(observations.length, 1)) * coordinates.length), coordinates.length - 1);
-      lat = coordinates[pos].lat;
-      lng = coordinates[pos].lng;
+    if (lat == null) {
+      const realCoords = coordinates.filter(c => !c.break);
+      if (realCoords.length > 0) {
+        const pos = Math.min(Math.floor((idx / Math.max(observations.length, 1)) * realCoords.length), realCoords.length - 1);
+        lat = realCoords[pos].lat;
+        lng = realCoords[pos].lng;
+      }
     }
     if (lat != null) {
       allPoints.push({ lat, lng });
@@ -319,24 +322,23 @@ const buildMapCanvas = async (visit, THEME) => {
   const toX = (lng) => latLng2px(0, lng, zoom).x - worldOriginX;
   const toY = (lat) => latLng2px(lat, 0, zoom).y - worldOriginY;
 
-  // Dessiner le trace GPS
-  if (coordinates.length > 1) {
-    ctx.beginPath();
-    ctx.moveTo(toX(coordinates[0].lng), toY(coordinates[0].lat));
-    for (let i = 1; i < coordinates.length; i++) {
-      ctx.lineTo(toX(coordinates[i].lng), toY(coordinates[i].lat));
+  // Dessiner le trace GPS (segments séparés par les breaks)
+  const drawGpsSegments = (points, style, width) => {
+    let drawing = false;
+    for (let i = 0; i < points.length; i++) {
+      if (points[i].break) { if (drawing) { ctx.stroke(); drawing = false; } continue; }
+      if (!drawing) { ctx.beginPath(); ctx.moveTo(toX(points[i].lng), toY(points[i].lat)); drawing = true; }
+      else ctx.lineTo(toX(points[i].lng), toY(points[i].lat));
     }
-    ctx.strokeStyle = '#3b82f6';
-    ctx.lineWidth = 4;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    ctx.stroke();
+    if (drawing) ctx.stroke();
+  };
+  if (coordinates.length > 1) {
+    ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    drawGpsSegments(coordinates);
 
     // Ombre trace
-    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-    ctx.lineWidth = 6;
-    ctx.globalCompositeOperation = 'destination-over';
-    ctx.stroke();
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 6; ctx.globalCompositeOperation = 'destination-over';
+    drawGpsSegments(coordinates);
     ctx.globalCompositeOperation = 'source-over';
   }
 
@@ -537,6 +539,7 @@ const buildObsMiniMap = async (obs, visit, THEME, obsIdx) => {
 
   // Ajouter des points du tracé GPS proches pour contexte
   const nearbyCoords = coordinates.filter(c => {
+    if (c.break) return false;
     const dlat = Math.abs(c.lat - (minLat + maxLat) / 2);
     const dlng = Math.abs(c.lng - (minLng + maxLng) / 2);
     return dlat < 0.005 && dlng < 0.005;

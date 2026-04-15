@@ -1,5 +1,5 @@
 // src/views/BrandingView.jsx
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { confirm } from '../utils/globalUI';
 import { hexToRgbString, lightenHex } from '../utils/colorHelpers';
 import HelpPanel from '../components/help/HelpPanel';
@@ -540,6 +540,19 @@ const BrandingView = ({
   const [showHelp, setShowHelp]           = useState(false);
   const fileInputRef = useRef(null);
   const isDirty = useRef(false);
+
+  // Synchroniser quand masterBranding arrive de Firestore (chargement async)
+  useEffect(() => {
+    if (masterBranding && !isDirty.current) {
+      setBranding({
+        ...DEFAULT_BRANDING,
+        ...masterBranding,
+        colors: { ...DEFAULT_BRANDING.colors, ...(masterBranding?.colors || {}) },
+        fonts:  { ...DEFAULT_BRANDING.fonts,  ...(masterBranding?.fonts  || {}) },
+        sizes:  { ...DEFAULT_BRANDING.sizes,  ...(masterBranding?.sizes  || {}) },
+      });
+    }
+  }, [masterBranding]);
 
   // ── Mise à jour générique ──
   const update = useCallback((path, value) => {

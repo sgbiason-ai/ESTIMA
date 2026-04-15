@@ -373,27 +373,38 @@ const DatabaseView = ({
                         {[...categories].sort((a, b) => a.name.localeCompare(b.name, 'fr')).map((cat, index) => (
                             <Draggable key={cat.id} draggableId={cat.id} index={index} isDragDisabled={isLocalMode}>
                                 {(provided, snapshot) => (
-                                    <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps} 
-                                        onClick={() => setSelectedCatId(cat.id)}
-                                        className={`group flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all ${snapshot.isDragging ? 'shadow-xl bg-white scale-105 z-50 ring-2 ring-emerald-200' : ''} ${selectedCatId === cat.id ? (isLocalMode ? 'bg-amber-100 text-amber-900 font-bold' : 'bg-emerald-50 text-emerald-900 font-bold') : 'text-slate-600 hover:bg-slate-100'}`}
-                                    >
-                                        <Droppable droppableId={`folder-${cat.id}`} type="ITEM">
-                                            {(providedDrop, snapshotDrop) => (
-                                                <div ref={providedDrop.innerRef} {...providedDrop.droppableProps} className={`flex items-center gap-3 flex-1 min-w-0 ${snapshotDrop.isDraggingOver ? 'text-emerald-600 scale-105 transition-transform' : ''}`}>
-                                                    <div className="w-4 text-slate-300 group-hover:text-slate-400"><GripVertical size={14} /></div>
-                                                    {selectedCatId === cat.id ? <FolderOpen size={16} className={isLocalMode ? "text-amber-500" : "text-emerald-500"} /> : <Folder size={16} className={snapshotDrop.isDraggingOver ? "text-emerald-500 fill-emerald-100" : "text-slate-400"} />}
-                                                    <span className="text-xs truncate">{cat.name}</span>
-                                                    <span className="ml-auto text-[10px] text-slate-400 bg-slate-100 px-1.5 rounded-full">{fullBpu.filter(i => { const ids = (i.categoryIds || (i.categoryId ? [i.categoryId] : [])).map(String); return ids.includes(String(cat.id)); }).length}</span>
-                                                </div>
-                                            )}
-                                        </Droppable>
-                                        {selectedCatId === cat.id && (
-                                            <div className="flex items-center gap-1">
-                                                <button onClick={(e) => { e.stopPropagation(); const newName = prompt("Nouveau nom :", cat.name); if(newName) renameCategory(cat.id, newName); }} className="p-1 hover:bg-white rounded text-slate-400 hover:text-blue-500"><Edit2 size={12} /></button>
-                                                <button onClick={async (e) => { e.stopPropagation(); const ok = await confirm("Supprimer ce dossier ?", { danger: true }); if(ok) deleteCategory(cat.id); }} className="p-1 hover:bg-white rounded text-slate-400 hover:text-red-500"><Trash2 size={12} /></button>
+                                    <Droppable droppableId={`folder-${cat.id}`} type="ITEM">
+                                        {(providedDrop, snapshotDrop) => (
+                                            <div
+                                                ref={(el) => { provided.innerRef(el); providedDrop.innerRef(el); }}
+                                                {...provided.draggableProps} {...provided.dragHandleProps} {...providedDrop.droppableProps}
+                                                onClick={() => setSelectedCatId(cat.id)}
+                                                className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-150
+                                                    ${snapshot.isDragging ? 'shadow-xl bg-white scale-105 z-50 ring-2 ring-emerald-200' : ''}
+                                                    ${snapshotDrop.isDraggingOver ? 'bg-emerald-100 ring-2 ring-emerald-400 scale-[1.02] shadow-md' : ''}
+                                                    ${!snapshotDrop.isDraggingOver && selectedCatId === cat.id ? (isLocalMode ? 'bg-amber-100 text-amber-900 font-bold' : 'bg-emerald-50 text-emerald-900 font-bold') : ''}
+                                                    ${!snapshotDrop.isDraggingOver && selectedCatId !== cat.id ? 'text-slate-600 hover:bg-slate-100' : ''}`}
+                                            >
+                                                <div className="w-4 text-slate-300 group-hover:text-slate-400"><GripVertical size={14} /></div>
+                                                {snapshotDrop.isDraggingOver
+                                                    ? <FolderOpen size={16} className="text-emerald-600" />
+                                                    : selectedCatId === cat.id
+                                                        ? <FolderOpen size={16} className={isLocalMode ? "text-amber-500" : "text-emerald-500"} />
+                                                        : <Folder size={16} className="text-slate-400" />
+                                                }
+                                                <span className={`text-xs truncate ${snapshotDrop.isDraggingOver ? 'text-emerald-700 font-bold' : ''}`}>{cat.name}</span>
+                                                {snapshotDrop.isDraggingOver && <span className="ml-auto text-[9px] font-bold text-emerald-600 bg-emerald-200 px-1.5 py-0.5 rounded-full">{cat.name}</span>}
+                                                {!snapshotDrop.isDraggingOver && <span className="ml-auto text-[10px] text-slate-400 bg-slate-100 px-1.5 rounded-full">{fullBpu.filter(i => { const ids = (i.categoryIds || (i.categoryId ? [i.categoryId] : [])).map(String); return ids.includes(String(cat.id)); }).length}</span>}
+                                                {providedDrop.placeholder}
+                                                {selectedCatId === cat.id && !snapshotDrop.isDraggingOver && (
+                                                    <div className="flex items-center gap-1">
+                                                        <button onClick={(e) => { e.stopPropagation(); const newName = prompt("Nouveau nom :", cat.name); if(newName) renameCategory(cat.id, newName); }} className="p-1 hover:bg-white rounded text-slate-400 hover:text-blue-500"><Edit2 size={12} /></button>
+                                                        <button onClick={async (e) => { e.stopPropagation(); const ok = await confirm("Supprimer ce dossier ?", { danger: true }); if(ok) deleteCategory(cat.id); }} className="p-1 hover:bg-white rounded text-slate-400 hover:text-red-500"><Trash2 size={12} /></button>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
-                                    </div>
+                                    </Droppable>
                                 )}
                             </Draggable>
                         ))}
@@ -402,18 +413,26 @@ const DatabaseView = ({
                 )}
               </Droppable>
 
-              <div onClick={() => setSelectedCatId('uncategorized')} className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${selectedCatId === 'uncategorized' ? 'bg-slate-200 text-slate-800 font-bold' : 'text-slate-500 hover:bg-slate-100'}`}>
-                <div className="w-4"></div>
-                <Droppable droppableId="folder-uncategorized" type="ITEM">
-                    {(provided, snapshot) => (
-                        <div ref={provided.innerRef} {...provided.droppableProps} className="flex items-center gap-3 flex-1">
-                            <Folder size={16} className={snapshot.isDraggingOver ? "text-blue-500" : ""} />
-                            <span className="text-xs italic">Non classés</span>
-                        </div>
-                    )}
-                </Droppable>
-                <span className="ml-auto text-[10px] bg-slate-200 px-1.5 rounded-full">{fullBpu.filter(i => { const ids = i.categoryIds || (i.categoryId ? [i.categoryId] : []); return ids.length === 0; }).length}</span>
-              </div>
+              <Droppable droppableId="folder-uncategorized" type="ITEM">
+                {(provided, snapshot) => (
+                    <div ref={provided.innerRef} {...provided.droppableProps}
+                        onClick={() => setSelectedCatId('uncategorized')}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-150
+                            ${snapshot.isDraggingOver ? 'bg-blue-100 ring-2 ring-blue-400 scale-[1.02] shadow-md' : ''}
+                            ${!snapshot.isDraggingOver && selectedCatId === 'uncategorized' ? 'bg-slate-200 text-slate-800 font-bold' : ''}
+                            ${!snapshot.isDraggingOver && selectedCatId !== 'uncategorized' ? 'text-slate-500 hover:bg-slate-100' : ''}`}
+                    >
+                        <div className="w-4"></div>
+                        {snapshot.isDraggingOver ? <FolderOpen size={16} className="text-blue-600" /> : <Folder size={16} />}
+                        <span className={`text-xs italic ${snapshot.isDraggingOver ? 'text-blue-700 font-bold not-italic' : ''}`}>Non classés</span>
+                        {snapshot.isDraggingOver
+                            ? <span className="ml-auto text-[9px] font-bold text-blue-600 bg-blue-200 px-1.5 py-0.5 rounded-full">Non classés</span>
+                            : <span className="ml-auto text-[10px] bg-slate-200 px-1.5 rounded-full">{fullBpu.filter(i => { const ids = i.categoryIds || (i.categoryId ? [i.categoryId] : []); return ids.length === 0; }).length}</span>
+                        }
+                        {provided.placeholder}
+                    </div>
+                )}
+              </Droppable>
               <div onClick={() => setSelectedCatId('nodescription')} className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${selectedCatId === 'nodescription' ? 'bg-red-50 text-red-800 font-bold' : 'text-slate-500 hover:bg-slate-100'}`}><div className="w-4"></div><FileWarning size={16} /><span className="text-xs italic">Sans description</span><span className="ml-auto text-[10px] bg-red-100 text-red-600 px-1.5 rounded-full">{fullBpu.filter(i => !i.description || i.description.trim() === '' || i.description === '<p><br></p>').length}</span></div>
             </div>
           </div>

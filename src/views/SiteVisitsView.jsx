@@ -32,7 +32,9 @@ const haversine = (a, b) => {
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h));
 };
-const totalDistance = (coords) => { let d = 0; for (let i = 1; i < coords.length; i++) d += haversine(coords[i - 1], coords[i]); return d; };
+const totalDistance = (coords) => { let d = 0; for (let i = 1; i < coords.length; i++) { if (coords[i].break || coords[i - 1].break) continue; d += haversine(coords[i - 1], coords[i]); } return d; };
+// Découpe un tableau de coordonnées avec des {break:true} en segments continus
+const splitTraceSegments = (coords) => { const segs = []; let cur = []; for (const c of coords) { if (c.break) { if (cur.length > 1) segs.push(cur); cur = []; } else { cur.push([c.lat, c.lng]); } } if (cur.length > 1) segs.push(cur); return segs; };
 const accuracyColor = (acc) => acc <= 5 ? '#22c55e' : acc <= 15 ? '#f59e0b' : '#ef4444';
 const fmtDuration = (ms) => { const s = Math.floor(ms / 1000); const m = Math.floor(s / 60); const h = Math.floor(m / 60); return h > 0 ? `${h}h${String(m % 60).padStart(2, '0')}` : `${m}min ${String(s % 60).padStart(2, '0')}s`; };
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
@@ -441,12 +443,15 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
     const ref = doc(db, 'companies', companyId, 'site_visits', fullVisit.id);
     updateDoc(ref, { 'gpsTracking.startTime': new Date().toISOString() }).catch(() => {});
 
+    // Marquer une coupure si on reprend le suivi après un arrêt
+    const isResume = liveCoords.length > 0;
+    if (isResume) setLiveCoords(prev => [...prev, { break: true }]);
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
         const point = { lat: pos.coords.latitude, lng: pos.coords.longitude, timestamp: new Date().toISOString(), accuracy: Math.round(pos.coords.accuracy * 10) / 10 };
         setLastAccuracy(point.accuracy);
         setLiveCoords(prev => {
-          if (prev.length > 0 && haversine(prev[prev.length - 1], point) < 5) return prev;
+          if (prev.length > 0 && !prev[prev.length - 1].break && haversine(prev[prev.length - 1], point) < 5) return prev;
           const updated = [...prev, point];
           if (updated.length % 5 === 0) {
             const ref = doc(db, 'companies', companyId, 'site_visits', fullVisit.id);
@@ -466,7 +471,11 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
     wakeLockRef.current?.release(); wakeLockRef.current = null;
     if (watchIdRef.current != null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
-    const simplified = simplifyGpsTrace(liveCoords, 5);
+    // Simplifier chaque segment continu séparément (préserver les breaks)
+    const segments = []; let cur = [];
+    for (const c of liveCoords) { if (c.break) { if (cur.length) segments.push(cur); segments.push([c]); cur = []; } else { cur.push(c); } }
+    if (cur.length) segments.push(cur);
+    const simplified = segments.flatMap(seg => seg.length === 1 && seg[0].break ? seg : simplifyGpsTrace(seg, 5));
     setLiveCoords(simplified);
     if (fullVisit?.id) {
       const ref = doc(db, 'companies', companyId, 'site_visits', fullVisit.id);
@@ -499,7 +508,8 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
   const coordinates = isRecording ? liveCoords : (tracking.coordinates || []);
   const observations = fullVisit?.observations || [];
   const liveDistance = totalDistance(coordinates);
-  const gpsPositions = coordinates.map(c => [c.lat, c.lng]);
+  const gpsSegments = splitTraceSegments(coordinates);
+  const gpsPositions = coordinates.filter(c => !c.break).map(c => [c.lat, c.lng]);
   const currentGpsPosition = gpsPositions.length > 0 ? gpsPositions[gpsPositions.length - 1] : null;
 
   const photoMarkers = useMemo(() => {
@@ -610,8 +620,8 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
         </Marker>
       ))}
 
-      {/* Tracé GPS */}
-      {gpsPositions.length > 1 && <Polyline positions={gpsPositions} pathOptions={{ color: '#60a5fa', weight: 3, opacity: 0.7 }} />}
+      {/* Tracé GPS — segments séparés (pas de ligne entre arrêt et reprise) */}
+      {gpsSegments.map((seg, i) => <Polyline key={`gps-seg-${i}`} positions={seg} pathOptions={{ color: '#60a5fa', weight: 3, opacity: 0.7 }} />)}
       {gpsPositions.length > 0 && <Marker position={gpsPositions[0]} icon={startGpsIcon} />}
       {gpsPositions.length > 1 && <Marker position={gpsPositions[gpsPositions.length - 1]} icon={endGpsIcon} />}
 
