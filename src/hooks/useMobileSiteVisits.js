@@ -71,14 +71,24 @@ export const useMobileSiteVisits = (user, companyId) => {
       lastSaved: new Date().toISOString(),
       updatedBy: user?.email || '',
     };
-    await setDoc(doc(db, 'companies', companyId, 'site_visits', id), visit);
-    return visit;
+    try {
+      await setDoc(doc(db, 'companies', companyId, 'site_visits', id), visit);
+      return visit;
+    } catch (err) {
+      console.error('[SiteVisit] Erreur création:', err);
+      throw err;
+    }
   }, [companyId, user]);
 
   const deleteVisit = useCallback(async (visitId) => {
     if (!companyId) return;
-    await deleteDoc(doc(db, 'companies', companyId, 'site_visits', visitId));
-    setVisits(prev => prev.filter(v => v.id !== visitId));
+    try {
+      await deleteDoc(doc(db, 'companies', companyId, 'site_visits', visitId));
+      setVisits(prev => prev.filter(v => v.id !== visitId));
+    } catch (err) {
+      console.error('[SiteVisit] Erreur suppression:', err);
+      throw err;
+    }
   }, [companyId]);
 
   return { visits, isLoading, refetch: fetchVisits, loadVisit, saveVisit, createVisit, deleteVisit };

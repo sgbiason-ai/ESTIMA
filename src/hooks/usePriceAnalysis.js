@@ -80,8 +80,8 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
   const companyIdRef = useRef(companyId);
   useEffect(() => { companyIdRef.current = companyId; }, [companyId]);
 
-  // ─── SAUVEGARDE directe dans le document dédié ─────────────────────────
-  const saveAnalysis = useCallback(() => {
+  // ─── SAUVEGARDE directe dans le document dédié (avec retry) ─────────────
+  const saveAnalysis = useCallback(async () => {
     const pid = projectIdRef.current;
     const cid = companyIdRef.current;
     if (!pid || !cid) return;
@@ -91,12 +91,26 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
       scoringConfig: scoringRef.current,
       lastSaved: new Date().toISOString(),
     };
-    console.log('[Analysis] Sauvegarde Firestore...', payload.companies.length, 'entreprises');
-    setDoc(docRef, payload)
-      .then(() => { console.log('[Analysis] ✅ Sauvegardé'); setLastSaved(new Date()); })
-      .catch(e => console.error('[Analysis] ❌ Erreur sauvegarde:', e));
+    // Sauvegarder en localStorage immédiatement (brouillon)
     if (STORAGE_KEY) safeStorage.set(STORAGE_KEY, JSON.stringify(companiesRef.current));
-  }, [STORAGE_KEY]); // Aucune dep instable — tout lu via refs
+    // Retry avec backoff exponentiel (3 tentatives)
+    const maxRetries = 3;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        await setDoc(docRef, payload);
+        setLastSaved(new Date());
+        return; // Succès
+      } catch (e) {
+        console.warn(`[Analysis] Tentative ${attempt + 1}/${maxRetries + 1} échouée:`, e.message);
+        if (attempt < maxRetries) {
+          await new Promise(r => setTimeout(r, Math.min(1000 * Math.pow(2, attempt), 8000)));
+        } else {
+          console.error('[Analysis] ❌ Échec sauvegarde après retries:', e);
+          toast.error('Sauvegarde analyse impossible. Données conservées localement.');
+        }
+      }
+    }
+  }, [STORAGE_KEY, toast]); // Aucune dep instable — tout lu via refs
 
   // ─── AUTO-SAVE debounced (800ms) quand companies ou scoringConfig changent ─
   // userHasChanged : ne sauvegarde que quand l'UTILISATEUR modifie, pas le chargement initial
@@ -504,24 +518,35 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
     });
 
     let updated = 0;
+    const now = new Date().toISOString();
+    // Nom du projet pour traçabilité (passé en 3e argument optionnel)
     for (const [itemId, data] of entries) {
       const key = data.designation?.trim().toUpperCase();
       const bpuItem = bpuByDesignation.get(key);
       if (bpuItem) {
-        await updateBpuItem(bpuItem.id, { observedPrice: data.avg });
+        // Accumuler dans l'historique au lieu d'écraser
+        const history = [...(bpuItem.priceHistory || [])];
+        // Migrer l'ancien observedPrice s'il existe et qu'il n'y a pas encore d'historique
+        if (history.length === 0 && bpuItem.observedPrice && bpuItem.observedPrice !== data.avg) {
+          history.push({ price: bpuItem.observedPrice, date: bpuItem.updatedAt || now, count: 0 });
+        }
+        history.push({ price: data.avg, date: now, count: data.count, total: data.total });
+        // Moyenne de tout l'historique
+        const avgAll = Math.round(history.reduce((s, h) => s + h.price, 0) / history.length * 100) / 100;
+        await updateBpuItem(bpuItem.id, { observedPrice: avgAll, priceHistory: history });
         updated++;
       }
     }
 
     if (updated > 0) {
-      toast.success(`${updated} prix observé(s) mis à jour dans la base de prix.`);
+      toast.success(`${updated} prix observé(s) mis à jour dans la base de prix (historique conservé).`);
     } else {
       toast.warning("Aucune correspondance trouvée entre les articles analysés et la base de prix.");
     }
   }, [averagesHorsOAB, confirm, toast]);
 
-  const handleManualSave = useCallback(() => {
-    saveAnalysis();
+  const handleManualSave = useCallback(async () => {
+    await saveAnalysis();
     toast.success(`${companies.length} entreprise(s) sauvegardée(s).`);
   }, [companies, saveAnalysis, toast]);
 

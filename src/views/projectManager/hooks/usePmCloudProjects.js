@@ -164,7 +164,7 @@ export const usePmCloudProjects = ({
       setTimeout(() => setCloudSaved(false), 3000);
     } catch (e) {
       console.error('Erreur sauvegarde cloud :', e);
-      toast.error('Erreur lors de la sauvegarde sur le Cloud.');
+      toast.error('Sauvegarde Cloud impossible. Vos données locales sont intactes — réessayez dans quelques instants.');
     } finally {
       setCloudSaving(false);
     }

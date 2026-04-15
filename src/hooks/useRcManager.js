@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { parseDocxToTree } from '../utils/wordImporter';
 import { toast, confirm } from '../utils/globalUI';
+import { useRobustSave } from './useRobustSave';
 
 export const useRcManager = ({
   project,
@@ -101,34 +102,24 @@ export const useRcManager = ({
     }
   }, [selectedIds, expandedIds, project, onUpdateProject]);
 
-  // --- AUTOSAVE ---
-  const [saveStatus, setSaveStatus] = useState('saved'); 
-  const saveTimeoutRef = useRef(null);
-  const lastSavedProjectRef = useRef(JSON.stringify(project));
+  // --- AUTOSAVE (robuste : debounce + retry + brouillon localStorage) ---
+  const robustSave = useRobustSave({
+    saveFn: onSaveProject,
+    draftKey: project?.id ? `draft_rc_${project.id}` : null,
+    debounceMs: 2000,
+  });
 
+  const saveStatus = robustSave.saveStatus;
+
+  const lastSavedProjectRef = useRef(JSON.stringify(project));
   useEffect(() => {
     if (isInitializedRef.current !== project?.id) return;
 
     const currentProjectString = JSON.stringify(project);
     if (currentProjectString === lastSavedProjectRef.current) return;
-
-    setSaveStatus('waiting');
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-
-    saveTimeoutRef.current = setTimeout(async () => {
-      if (onSaveProject) {
-        setSaveStatus('saving');
-        try {
-          await onSaveProject(project);
-          setSaveStatus('saved');
-          lastSavedProjectRef.current = currentProjectString;
-        } catch (error) {
-          setSaveStatus('error');
-        }
-      }
-    }, 2000);
-    return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
-  }, [project, onSaveProject]);
+    lastSavedProjectRef.current = currentProjectString;
+    robustSave.triggerSave(project);
+  }, [project, robustSave]);
 
   const [activeNodeId, setActiveNodeId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');

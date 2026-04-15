@@ -107,14 +107,20 @@ export default function CrcView({ onBackToHub, user, companyId }) {
     async (data) => {
       if (!data || !companyId) return;
       const docId = data.id;
-      await setDoc(doc(db, 'companies', companyId, 'crr', docId), {
-        ...data,
-        lastSaved: new Date().toISOString(),
-        updatedBy: user?.email,
-      });
-      setChantiers((prev) =>
-        prev.map((c) => (c.id === docId ? { ...data, lastSaved: new Date().toISOString() } : c))
-      );
+      try {
+        await setDoc(doc(db, 'companies', companyId, 'crr', docId), {
+          ...data,
+          lastSaved: new Date().toISOString(),
+          updatedBy: user?.email,
+        });
+        setChantiers((prev) =>
+          prev.map((c) => (c.id === docId ? { ...data, lastSaved: new Date().toISOString() } : c))
+        );
+      } catch (err) {
+        console.error('[CRC] Erreur sauvegarde:', err);
+        toast.error('Impossible de sauvegarder le compte rendu.');
+        throw err;
+      }
     },
     [companyId, user]
   );
@@ -143,19 +149,29 @@ export default function CrcView({ onBackToHub, user, companyId }) {
       crrMeetings: [],
       createdAt: new Date().toISOString(),
     };
-    await setDoc(doc(db, 'companies', companyId, 'crr', newId), newDoc);
-    setChantiers((prev) => [...prev, newDoc]);
-    setCrrDoc(newDoc);
-    localStorage.setItem(`crr_active_chantier__${companyId}`, newId);
-    setShowInfoChantierModal(true);
+    try {
+      await setDoc(doc(db, 'companies', companyId, 'crr', newId), newDoc);
+      setChantiers((prev) => [...prev, newDoc]);
+      setCrrDoc(newDoc);
+      localStorage.setItem(`crr_active_chantier__${companyId}`, newId);
+      setShowInfoChantierModal(true);
+    } catch (err) {
+      console.error('[CRC] Erreur création chantier:', err);
+      toast.error('Impossible de créer le chantier.');
+    }
   }, [companyId]);
 
   const handleDeleteChantier = useCallback(async (chantierId) => {
-    await deleteDoc(doc(db, 'companies', companyId, 'crr', chantierId));
-    setChantiers((prev) => prev.filter((c) => c.id !== chantierId));
-    if (crrDoc?.id === chantierId) {
-      const remaining = chantiers.filter((c) => c.id !== chantierId);
-      setCrrDoc(remaining[0] || null);
+    try {
+      await deleteDoc(doc(db, 'companies', companyId, 'crr', chantierId));
+      setChantiers((prev) => prev.filter((c) => c.id !== chantierId));
+      if (crrDoc?.id === chantierId) {
+        const remaining = chantiers.filter((c) => c.id !== chantierId);
+        setCrrDoc(remaining[0] || null);
+      }
+    } catch (err) {
+      console.error('[CRC] Erreur suppression chantier:', err);
+      toast.error('Impossible de supprimer le chantier.');
     }
   }, [companyId, crrDoc, chantiers]);
 
@@ -206,7 +222,12 @@ export default function CrcView({ onBackToHub, user, companyId }) {
   const handleSaveLibrary = useCallback(async (contacts) => {
     setParticipantLibrary(contacts);
     if (companyId) {
-      await setDoc(doc(db, 'companies', companyId, 'resources', 'participantLibrary'), { contacts });
+      try {
+        await setDoc(doc(db, 'companies', companyId, 'resources', 'participantLibrary'), { contacts });
+      } catch (err) {
+        console.error('[CRC] Erreur sauvegarde bibliothèque:', err);
+        toast.error('Impossible de sauvegarder la bibliothèque de contacts.');
+      }
     }
   }, [companyId]);
 

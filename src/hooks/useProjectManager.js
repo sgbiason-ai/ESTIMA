@@ -83,17 +83,30 @@ export const useProjectManager = (user, companyId) => {
 
     const now = new Date().toISOString();
 
-    // Sauvegarde principale
-    try {
-    await setDoc(doc(db, 'companies', companyId, 'projects', projectId), {
-      ...projectToStore,
-      id: projectId,
-      lastSaved: now,
-      updatedBy: user.email,
-    });
-    } catch (e) {
-      console.error('[useProjectManager] Erreur sauvegarde projet:', e.message);
-      throw e;
+    // Sauvegarde principale avec retry (backoff exponentiel)
+    const maxRetries = 3;
+    let lastErr;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        await setDoc(doc(db, 'companies', companyId, 'projects', projectId), {
+          ...projectToStore,
+          id: projectId,
+          lastSaved: now,
+          updatedBy: user.email,
+        });
+        lastErr = null;
+        break;
+      } catch (e) {
+        lastErr = e;
+        console.warn(`[useProjectManager] Tentative ${attempt + 1}/${maxRetries + 1} échouée:`, e.message);
+        if (attempt < maxRetries) {
+          await new Promise(r => setTimeout(r, Math.min(1000 * Math.pow(2, attempt), 8000)));
+        }
+      }
+    }
+    if (lastErr) {
+      console.error('[useProjectManager] Échec sauvegarde après retries:', lastErr.message);
+      throw lastErr;
     }
 
     // ── Audit trail — snapshot léger dans history/

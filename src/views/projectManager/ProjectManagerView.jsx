@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { HelpCircle, PlusCircle, Clock, Cloud, RefreshCw, Trash2, ArrowUpDown, Search, LayoutGrid, List } from 'lucide-react';
 import { buildFolderColorMap } from './folderColors';
-import { confirm } from '../../utils/globalUI';
+import { toast, confirm } from '../../utils/globalUI';
 import { collection, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 
@@ -99,8 +99,10 @@ const ProjectManagerView = ({
       await setDoc(ref, clean, { merge: true });
       cloud.setCloudProjects(prev => prev.map(p => p.id === detailsProject.id ? { ...p, ...clean } : p));
       setDetailsProject(null);
+      toast.success('Fiche projet sauvegardée.');
     } catch (e) {
       console.error('[ProjectManager] Erreur sauvegarde fiche:', e);
+      toast.error('Impossible de sauvegarder la fiche projet.');
     }
   }, [detailsProject, companyId, cloud]);
 

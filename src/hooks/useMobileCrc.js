@@ -61,11 +61,16 @@ export const useMobileCrc = (user, companyId) => {
 
   const saveChantier = useCallback(async (chantierId, data) => {
     if (!companyId) return;
-    await setDoc(doc(db, 'companies', companyId, 'crr', chantierId), {
-      ...data,
-      lastSaved: new Date().toISOString(),
-      updatedBy: user?.email || '',
-    });
+    try {
+      await setDoc(doc(db, 'companies', companyId, 'crr', chantierId), {
+        ...data,
+        lastSaved: new Date().toISOString(),
+        updatedBy: user?.email || '',
+      });
+    } catch (err) {
+      console.error('[useMobileCrc] Erreur sauvegarde:', err);
+      throw err; // Relancer pour que useRobustSave gère le retry
+    }
   }, [companyId, user]);
 
   return { chantiers, isLoading, error, refetch: fetchChantiers, loadChantier, saveChantier };
