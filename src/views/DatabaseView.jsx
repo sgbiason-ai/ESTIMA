@@ -55,6 +55,7 @@ const DatabaseView = ({
   const { showToast } = useToast();
   // --- État pour la modale de modification du lien CCTP ---
   const [cctpLinkModal, setCctpLinkModal] = useState({ isOpen: false, item: null, refValue: '' });
+  const [priceHistoryItem, setPriceHistoryItem] = useState(null); // item pour modale historique prix
 
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [isShiftPressed, setIsShiftPressed] = useState(false);
@@ -370,7 +371,11 @@ const DatabaseView = ({
               <Droppable droppableId="categories-list" type="CATEGORY">
                 {(providedDropCat) => (
                     <div ref={providedDropCat.innerRef} {...providedDropCat.droppableProps}>
-                        {[...categories].sort((a, b) => a.name.localeCompare(b.name, 'fr')).map((cat, index) => (
+                        {(() => {
+                            const CAT_FALLBACK = ['#3b82f6','#f59e0b','#8b5cf6','#10b981','#f43f5e','#06b6d4','#ec4899','#84cc16','#f97316','#6366f1','#14b8a6','#e11d48'];
+                            return [...categories].sort((a, b) => a.name.localeCompare(b.name, 'fr')).map((cat, index) => {
+                            const catColor = cat.color || CAT_FALLBACK[index % CAT_FALLBACK.length];
+                            return (
                             <Draggable key={cat.id} draggableId={cat.id} index={index} isDragDisabled={isLocalMode}>
                                 {(provided, snapshot) => (
                                     <Droppable droppableId={`folder-${cat.id}`} type="ITEM">
@@ -379,22 +384,26 @@ const DatabaseView = ({
                                                 ref={(el) => { provided.innerRef(el); providedDrop.innerRef(el); }}
                                                 {...provided.draggableProps} {...provided.dragHandleProps} {...providedDrop.droppableProps}
                                                 onClick={() => setSelectedCatId(cat.id)}
-                                                className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-150
-                                                    ${snapshot.isDragging ? 'shadow-xl bg-white scale-105 z-50 ring-2 ring-emerald-200' : ''}
-                                                    ${snapshotDrop.isDraggingOver ? 'bg-emerald-100 ring-2 ring-emerald-400 scale-[1.02] shadow-md' : ''}
-                                                    ${!snapshotDrop.isDraggingOver && selectedCatId === cat.id ? (isLocalMode ? 'bg-amber-100 text-amber-900 font-bold' : 'bg-emerald-50 text-emerald-900 font-bold') : ''}
-                                                    ${!snapshotDrop.isDraggingOver && selectedCatId !== cat.id ? 'text-slate-600 hover:bg-slate-100' : ''}`}
+                                                className={`group flex items-center gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-all duration-150
+                                                    ${snapshot.isDragging ? 'shadow-xl scale-105 z-50' : ''}
+                                                    ${snapshotDrop.isDraggingOver ? 'scale-[1.03] shadow-lg ring-2' : ''}`}
+                                                style={{
+                                                    backgroundColor: snapshotDrop.isDraggingOver ? catColor + '30'
+                                                        : selectedCatId === cat.id ? catColor + '22'
+                                                        : catColor + '10',
+                                                    borderLeft: `4px solid ${selectedCatId === cat.id || snapshotDrop.isDraggingOver ? catColor : catColor + '80'}`,
+                                                    ...(snapshotDrop.isDraggingOver ? { ringColor: catColor, boxShadow: `0 4px 16px ${catColor}40` } : {})
+                                                }}
                                             >
-                                                <div className="w-4 text-slate-300 group-hover:text-slate-400"><GripVertical size={14} /></div>
-                                                {snapshotDrop.isDraggingOver
-                                                    ? <FolderOpen size={16} className="text-emerald-600" />
-                                                    : selectedCatId === cat.id
-                                                        ? <FolderOpen size={16} className={isLocalMode ? "text-amber-500" : "text-emerald-500"} />
-                                                        : <Folder size={16} className="text-slate-400" />
-                                                }
-                                                <span className={`text-xs truncate ${snapshotDrop.isDraggingOver ? 'text-emerald-700 font-bold' : ''}`}>{cat.name}</span>
-                                                {snapshotDrop.isDraggingOver && <span className="ml-auto text-[9px] font-bold text-emerald-600 bg-emerald-200 px-1.5 py-0.5 rounded-full">{cat.name}</span>}
-                                                {!snapshotDrop.isDraggingOver && <span className="ml-auto text-[10px] text-slate-400 bg-slate-100 px-1.5 rounded-full">{fullBpu.filter(i => { const ids = (i.categoryIds || (i.categoryId ? [i.categoryId] : [])).map(String); return ids.includes(String(cat.id)); }).length}</span>}
+                                                <div className="text-slate-300 group-hover:text-slate-400"><GripVertical size={13} /></div>
+                                                <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: catColor + '25' }}>
+                                                    {snapshotDrop.isDraggingOver || selectedCatId === cat.id
+                                                        ? <FolderOpen size={16} style={{ color: catColor }} />
+                                                        : <Folder size={16} style={{ color: catColor }} />
+                                                    }
+                                                </div>
+                                                <span className="text-[11px] truncate font-bold" style={{ color: selectedCatId === cat.id || snapshotDrop.isDraggingOver ? catColor : '#334155' }}>{cat.name}</span>
+                                                <span className="ml-auto text-[10px] font-black min-w-[22px] h-[22px] flex items-center justify-center rounded-full shrink-0" style={{ color: '#fff', backgroundColor: catColor }}>{fullBpu.filter(i => { const ids = (i.categoryIds || (i.categoryId ? [i.categoryId] : [])).map(String); return ids.includes(String(cat.id)); }).length}</span>
                                                 {providedDrop.placeholder}
                                                 {selectedCatId === cat.id && !snapshotDrop.isDraggingOver && (
                                                     <div className="flex items-center gap-1">
@@ -407,7 +416,9 @@ const DatabaseView = ({
                                     </Droppable>
                                 )}
                             </Draggable>
-                        ))}
+                            );
+                        });
+                        })()}
                         {providedDropCat.placeholder}
                     </div>
                 )}
@@ -613,20 +624,25 @@ const DatabaseView = ({
                                                             
                                                             {/* --- BADGES CATÉGORIE --- */}
                                                             {(() => {
+                                                                const CAT_FALLBACK = ['#3b82f6','#f59e0b','#8b5cf6','#10b981','#f43f5e','#06b6d4','#ec4899','#84cc16','#f97316','#6366f1','#14b8a6','#e11d48'];
                                                                 const itemCatIds = item.categoryIds || (item.categoryId ? [item.categoryId] : []);
                                                                 const itemCats = (categories || []).filter(c => itemCatIds.map(String).includes(String(c.id)));
-                                                                return itemCats.map(cat => (
-                                                                    <span
-                                                                        key={cat.id}
-                                                                        onClick={(e) => { e.stopPropagation(); setSelectedCatId(cat.id); }}
-                                                                        className="flex items-center gap-1 text-[9px] font-black px-1.5 py-0.5 rounded border uppercase tracking-widest cursor-pointer transition-colors"
-                                                                        style={{ color: cat.color || '#64748b', backgroundColor: (cat.color || '#64748b') + '15', borderColor: (cat.color || '#64748b') + '40' }}
-                                                                        title={`Filtrer par : ${cat.name}`}
-                                                                    >
-                                                                        <Folder size={9} />
-                                                                        {cat.name}
-                                                                    </span>
-                                                                ));
+                                                                return itemCats.map(cat => {
+                                                                    const catIdx = (categories || []).findIndex(c => c.id === cat.id);
+                                                                    const color = cat.color || CAT_FALLBACK[catIdx % CAT_FALLBACK.length] || '#64748b';
+                                                                    return (
+                                                                        <span
+                                                                            key={cat.id}
+                                                                            onClick={(e) => { e.stopPropagation(); setSelectedCatId(cat.id); }}
+                                                                            className="flex items-center gap-1 text-[9px] font-black px-1.5 py-0.5 rounded-lg border uppercase tracking-widest cursor-pointer transition-colors hover:opacity-80"
+                                                                            style={{ color, backgroundColor: color + '20', borderColor: color + '50' }}
+                                                                            title={`Filtrer par : ${cat.name}`}
+                                                                        >
+                                                                            <Folder size={9} />
+                                                                            {cat.name}
+                                                                        </span>
+                                                                    );
+                                                                });
                                                             })()}
 
                                                             {/* --- BADGE CCTP AJOUTÉ ICI --- */}
@@ -654,9 +670,14 @@ const DatabaseView = ({
                                                         <span className="block text-[8px] uppercase font-black text-slate-400 tracking-tighter">Prix Catalogue</span>
                                                         {item.observedPrice && (
                                                             <div className="flex items-center justify-end gap-1.5 mt-1">
-                                                                <span className="font-bold text-[10px] text-blue-600" title="Dernier prix réel du marché">
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); setPriceHistoryItem(item); }}
+                                                                    className="flex items-center gap-1 font-bold text-[10px] text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-1 py-0.5 rounded transition-colors cursor-pointer"
+                                                                    title={`Prix réel: ${formatPrice(item.observedPrice)} — Cliquez pour voir l'historique`}
+                                                                >
+                                                                    <History size={9} />
                                                                     Réel: {formatPrice(item.observedPrice)}
-                                                                </span>
+                                                                </button>
                                                                 {renderPriceTrend(item)}
                                                             </div>
                                                         )}
@@ -675,6 +696,82 @@ const DatabaseView = ({
             </div>
           </div>
       </DragDropContext>
+
+      {/* ── Modale historique des prix ── */}
+      {priceHistoryItem && (() => {
+        const history = priceHistoryItem.priceHistory || [];
+        const hasHistory = history.length > 0;
+        const fmtD = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+        return (
+          <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onClick={() => setPriceHistoryItem(null)}>
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden" onClick={e => e.stopPropagation()}>
+              {/* Header */}
+              <div className="px-5 py-4 border-b border-gray-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center"><History size={18} className="text-blue-600" /></div>
+                  <div>
+                    <h3 className="font-bold text-sm text-gray-900">Historique des prix</h3>
+                    <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wide truncate max-w-[280px]">{cleanText(priceHistoryItem.designation)}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Résumé */}
+              <div className="px-5 py-3 bg-gray-50 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-gray-400 uppercase font-bold">Prix catalogue</span>
+                  <span className="block text-sm font-black text-gray-900">{formatPrice(priceHistoryItem.price)}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] text-blue-500 uppercase font-bold">Moyenne observée</span>
+                  <span className="block text-sm font-black text-blue-600">{formatPrice(priceHistoryItem.observedPrice)}</span>
+                </div>
+                {priceHistoryItem.price > 0 && priceHistoryItem.observedPrice > 0 && (() => {
+                  const diff = ((priceHistoryItem.observedPrice - priceHistoryItem.price) / priceHistoryItem.price) * 100;
+                  return (
+                    <div className={`px-2 py-1 rounded-lg text-xs font-bold ${diff > 2 ? 'bg-red-50 text-red-600' : diff < -2 ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-500'}`}>
+                      {diff > 0 ? '+' : ''}{diff.toFixed(1)}%
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Liste historique */}
+              <div className="px-5 py-3 max-h-[300px] overflow-y-auto">
+                {!hasHistory ? (
+                  <div className="text-center py-6 text-gray-400">
+                    <BarChart2 size={24} className="mx-auto mb-2 opacity-30" />
+                    <p className="text-xs">Aucun historique disponible</p>
+                    <p className="text-[10px] text-gray-300 mt-1">Les prochaines remontées de prix seront enregistrées ici</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {[...history].reverse().map((h, i) => {
+                      const isLatest = i === 0;
+                      return (
+                        <div key={i} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border ${isLatest ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-100'}`}>
+                          <div className={`w-2 h-2 rounded-full shrink-0 ${isLatest ? 'bg-blue-500' : 'bg-gray-300'}`} />
+                          <div className="flex-1 min-w-0">
+                            <span className={`font-bold text-sm ${isLatest ? 'text-blue-700' : 'text-gray-800'}`}>{formatPrice(h.price)}</span>
+                            {h.count > 0 && <span className="text-[9px] text-gray-400 ml-2">({h.count} offre{h.count > 1 ? 's' : ''})</span>}
+                          </div>
+                          <span className="text-[10px] text-gray-400 shrink-0">{fmtD(h.date)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="px-5 py-3 border-t border-gray-100 flex justify-between items-center">
+                <span className="text-[10px] text-gray-400">{hasHistory ? `${history.length} remontée${history.length > 1 ? 's' : ''}` : ''}</span>
+                <button onClick={() => setPriceHistoryItem(null)} className="px-4 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-colors">Fermer</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

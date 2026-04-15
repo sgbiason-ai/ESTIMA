@@ -19,6 +19,20 @@ export const useDatabase = (user, companyId) => {
   const [bpu, setBpu]               = useState([]);
   const [categories, setCategories] = useState([]);
   const [units, setUnits]           = useState([]);
+
+  const CAT_COLORS = ['#3b82f6','#f59e0b','#8b5cf6','#10b981','#f43f5e','#06b6d4','#ec4899','#84cc16','#f97316','#6366f1','#14b8a6','#e11d48'];
+
+  // Assigner des couleurs aux catégories qui n'en ont pas et persister en base
+  const ensureCategoryColors = useCallback(async (cats) => {
+    const toFix = cats.filter(c => !c.color);
+    if (toFix.length === 0 || !companyId) return cats;
+    const updated = cats.map((c, i) => c.color ? c : { ...c, color: CAT_COLORS[i % CAT_COLORS.length] });
+    // Persister les couleurs en base
+    await Promise.all(
+      updated.filter((c, i) => !cats[i].color).map(c => setDoc(dref(companyId, 'categories', c.id), c))
+    ).catch(() => {});
+    return updated;
+  }, [companyId]);
   const [databaseVersion, setDatabaseVersion] = useState(0);
   const [isLoading, setIsLoading]   = useState(true);
   const [isBpuLoaded, setIsBpuLoaded] = useState(false);
@@ -40,13 +54,14 @@ export const useDatabase = (user, companyId) => {
         const catData = catSnap.docs.map(d => d.data());
         if (catData.length === 0) {
           const defaults = [
-            { id: 'cat1', name: 'TERRASSEMENT' },
-            { id: 'cat2', name: 'RÉSEAUX HUMIDES' },
+            { id: 'cat1', name: 'TERRASSEMENT', color: CAT_COLORS[0] },
+            { id: 'cat2', name: 'RÉSEAUX HUMIDES', color: CAT_COLORS[1] },
           ];
           await Promise.all(defaults.map(c => setDoc(dref(companyId, 'categories', c.id), c)));
           setCategories(defaults);
         } else {
-          setCategories(catData);
+          const withColors = await ensureCategoryColors(catData);
+          setCategories(withColors);
         }
 
         const unitSnap = await getDocs(col(companyId, 'units'));
@@ -103,7 +118,8 @@ export const useDatabase = (user, companyId) => {
         getDocs(col(companyId, 'units')),
       ]);
       setBpu(bpuSnap.docs.map(d => d.data()));
-      setCategories(catSnap.docs.map(d => d.data()));
+      const catData = catSnap.docs.map(d => d.data());
+      setCategories(await ensureCategoryColors(catData));
       setUnits(unitSnap.docs.map(d => d.data()));
       setIsBpuLoaded(true);
       setDatabaseVersion(v => v + 1);
@@ -179,7 +195,8 @@ export const useDatabase = (user, companyId) => {
 
   const addCategory = async (name) => {
     if (!companyId) return;
-    const newCat = { id: generateId(), name: name.toUpperCase() };
+    const colorIdx = categories.length % CAT_COLORS.length;
+    const newCat = { id: generateId(), name: name.toUpperCase(), color: CAT_COLORS[colorIdx] };
     const prevCategories = categories;
     setCategories(prev => [...prev, newCat]);
     try {
