@@ -47,6 +47,7 @@ import { useMobileDevisMoe } from '../../hooks/useMobileDevisMoe';
 import { useMobileSiteVisits } from '../../hooks/useMobileSiteVisits';
 import { useCrrManager }     from '../../hooks/useCrrManager';
 import { useOrientation }   from '../../hooks/useOrientation';
+import { useRobustSave, loadDraft, clearDraft } from '../../hooks/useRobustSave';
 
 // ─── MAIN MOBILE APP ────────────────────────────────────────────────────────
 export default function MobileApp({ user, companyId, onLogout }) {
@@ -81,6 +82,16 @@ export default function MobileApp({ user, companyId, onLogout }) {
   const [fullFiche, setFullFiche]             = useState(null);
   const [ficheLoading, setFicheLoading]       = useState(false);
   const [toast, setToast]                     = useState(null);
+
+  // ── Sauvegarde robuste pour visites de site ──
+  const robustSiteVisitSave = useRobustSave({
+    saveFn: useCallback(async (data) => {
+      if (!data?.id) return;
+      await saveVisit(data.id, data);
+    }, [saveVisit]),
+    draftKey: selectedVisit?.id ? `draft_sv_${selectedVisit.id}` : null,
+    debounceMs: 1500,
+  });
 
   // ── Hooks métier (activés quand un projet est chargé) ──
   const dummyUpdate = useCallback(() => {}, []);
@@ -129,7 +140,16 @@ export default function MobileApp({ user, companyId, onLogout }) {
     setSelectedChantier(ch);
     setChantierLoading(true);
     const data = await loadChantier(ch.id);
-    setFullChantier(data);
+    // Vérifier si un brouillon local plus récent existe (sauvegarde interrompue)
+    const draft = loadDraft(`draft_crr_${ch.id}`);
+    if (draft?.id && data?.lastSaved && draft.lastSaved > data.lastSaved) {
+      setFullChantier(draft);
+      setToast('Brouillon CRC local restauré');
+      setTimeout(() => setToast(null), 2400);
+    } else {
+      setFullChantier(data);
+      if (draft) clearDraft(`draft_crr_${ch.id}`);
+    }
     setChantierLoading(false);
   }, [loadChantier]);
 
@@ -182,7 +202,16 @@ export default function MobileApp({ user, companyId, onLogout }) {
     setSelectedVisit(v);
     setVisitLoading(true);
     const data = await loadVisit(v.id);
-    setFullVisit(data);
+    // Vérifier si un brouillon local plus récent existe (sauvegarde interrompue)
+    const draft = loadDraft(`draft_sv_${v.id}`);
+    if (draft?.lastSaved && data?.lastSaved && draft.lastSaved > data.lastSaved) {
+      setFullVisit(draft);
+      setToast('Brouillon local restauré');
+      setTimeout(() => setToast(null), 2400);
+    } else {
+      setFullVisit(data);
+      if (draft) clearDraft(`draft_sv_${v.id}`);
+    }
     setVisitLoading(false);
   }, [loadVisit]);
 
@@ -577,7 +606,7 @@ export default function MobileApp({ user, companyId, onLogout }) {
               <span className="text-sm">Chargement…</span>
             </div>
           ) : fullVisit ? (
-            <SiteVisitDetailView visit={fullVisit} onSave={saveVisit} onToast={triggerToast} isLandscape={isLandscape} />
+            <SiteVisitDetailView visit={fullVisit} onSave={(id, data) => robustSiteVisitSave.triggerSave(data)} saveStatus={robustSiteVisitSave.saveStatus} onToast={triggerToast} isLandscape={isLandscape} />
           ) : null
         )}
 

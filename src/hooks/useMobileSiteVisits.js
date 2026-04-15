@@ -45,11 +45,16 @@ export const useMobileSiteVisits = (user, companyId) => {
 
   const saveVisit = useCallback(async (visitId, data) => {
     if (!companyId) return;
-    await setDoc(doc(db, 'companies', companyId, 'site_visits', visitId), {
-      ...data,
-      lastSaved: new Date().toISOString(),
-      updatedBy: user?.email || '',
-    });
+    try {
+      await setDoc(doc(db, 'companies', companyId, 'site_visits', visitId), {
+        ...data,
+        lastSaved: new Date().toISOString(),
+        updatedBy: user?.email || '',
+      });
+    } catch (err) {
+      console.error('[SiteVisit] Erreur sauvegarde:', err);
+      throw err; // Relancer pour que useRobustSave gère le retry
+    }
   }, [companyId, user]);
 
   const createVisit = useCallback(async () => {

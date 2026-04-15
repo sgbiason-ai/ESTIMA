@@ -12,6 +12,7 @@ import {
   createEmptyObservation,
   generateCrrId,
 } from '../data/crrData';
+import { useRobustSave } from './useRobustSave';
 
 export const useCrrManager = ({
   project,
@@ -106,49 +107,24 @@ export const useCrrManager = ({
     [activeMeetingId, meetings, updateMeetings]
   );
 
-  // ── AUTOSAVE ──────────────────────────────────────────────────────────
+  // ── AUTOSAVE (robuste : debounce + retry + brouillon localStorage) ──
 
-  const [saveStatus, setSaveStatus] = useState('saved');
-  const saveTimeoutRef = useRef(null);
+  const robustSave = useRobustSave({
+    saveFn: onSaveProject,
+    draftKey: project?.id ? `draft_crr_${project.id}` : null,
+    debounceMs: 2000,
+  });
+
+  const saveStatus = robustSave.saveStatus;
+  const forceSave = robustSave.forceSave;
+
   const lastSavedRef = useRef(JSON.stringify(project));
-
   useEffect(() => {
     const currentStr = JSON.stringify(project);
     if (currentStr === lastSavedRef.current) return;
-
-    setSaveStatus('waiting');
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-
-    saveTimeoutRef.current = setTimeout(async () => {
-      if (onSaveProject) {
-        setSaveStatus('saving');
-        try {
-          await onSaveProject(project);
-          setSaveStatus('saved');
-          lastSavedRef.current = currentStr;
-        } catch {
-          setSaveStatus('error');
-        }
-      }
-    }, 2000);
-
-    return () => {
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    };
-  }, [project, onSaveProject]);
-
-  const forceSave = useCallback(async () => {
-    if (!onSaveProject || !project) return;
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    setSaveStatus('saving');
-    try {
-      await onSaveProject(project);
-      setSaveStatus('saved');
-      lastSavedRef.current = JSON.stringify(project);
-    } catch {
-      setSaveStatus('error');
-    }
-  }, [project, onSaveProject]);
+    lastSavedRef.current = currentStr;
+    robustSave.triggerSave(project);
+  }, [project, robustSave]);
 
   // ── ACTIONS REUNIONS ──────────────────────────────────────────────────
 

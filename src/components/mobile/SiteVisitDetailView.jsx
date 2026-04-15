@@ -8,6 +8,7 @@ import { stripHtml } from '../../utils/formatObsText';
 import ImageViewerModal from './ImageViewerModal';
 import SiteVisitObsEditSheet from './SiteVisitObsEditSheet';
 import GpsTrackingSection from './GpsTrackingSection';
+import SaveStatusDot from './SaveStatusDot';
 
 const fmtCoord = (lat, lng) => `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
 const fmtDist = (m) => m == null ? '—' : m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(2)} km`;
@@ -114,7 +115,7 @@ function ObsCard({ obs, number, onTap, onDelete, onViewImage }) {
 
 // ─── Composant principal ───────────────────────────────────────────────────
 
-export default function SiteVisitDetailView({ visit, onSave, onToast, isLandscape }) {
+export default function SiteVisitDetailView({ visit, onSave, saveStatus, onToast, isLandscape }) {
   const [activeSection, setActiveSection] = useState('observations');
   const [editingObs, setEditingObs] = useState(null);
   const [viewingImage, setViewingImage] = useState(null);
@@ -237,7 +238,10 @@ export default function SiteVisitDetailView({ visit, onSave, onToast, isLandscap
         ) : (
           <div className="flex items-center justify-between" onClick={() => setEditingInfo(true)}>
             <div className="flex-1 min-w-0">
-              <div className="text-[15px] font-bold text-gray-900 truncate">{localVisit.nom || 'Visite sans nom'}</div>
+              <div className="flex items-center gap-2">
+                <div className="text-[15px] font-bold text-gray-900 truncate">{localVisit.nom || 'Visite sans nom'}</div>
+                <SaveStatusDot status={saveStatus} />
+              </div>
               <div className="flex items-center gap-2 mt-0.5 text-[12px] text-gray-500">
                 {localVisit.lieu && <span>{localVisit.lieu}</span>}
                 {localVisit.client && (<><span className="text-gray-300">·</span><span>{localVisit.client}</span></>)}

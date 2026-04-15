@@ -12,6 +12,7 @@ import { normalizeObsText, stripHtml } from '../../utils/formatObsText';
 // fileSaver non utilisé — export PDF direct par téléchargement
 // exportHelpers chargé dynamiquement pour le code-splitting
 import ImageViewerModal from './ImageViewerModal';
+import SaveStatusDot from './SaveStatusDot';
 
 const ObservationEditSheet = lazy(() => import('./ObservationEditSheet'));
 import GpsTrackingSection from './GpsTrackingSection';
@@ -322,13 +323,7 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
               <span className="text-[13px] font-semibold text-amber-400">
                 {meetingTypeLabel(meeting.type)} n°{meeting.number}
               </span>
-              {canEdit && manager.saveStatus && (
-                <span className={`w-2 h-2 rounded-full shrink-0 ${
-                  manager.saveStatus === 'saved' ? 'bg-emerald-500' :
-                  manager.saveStatus === 'saving' || manager.saveStatus === 'waiting' ? 'bg-amber-500 animate-pulse' :
-                  'bg-red-500'
-                }`} title={manager.saveStatus} />
-              )}
+              {canEdit && <SaveStatusDot status={manager.saveStatus} />}
             </div>
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-gray-700 mr-1">{dateFr(meeting.date)}</span>
