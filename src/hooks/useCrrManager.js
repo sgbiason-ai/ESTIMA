@@ -109,22 +109,19 @@ export const useCrrManager = ({
 
   // ── AUTOSAVE (robuste : debounce + retry + brouillon localStorage) ──
 
-  const robustSave = useRobustSave({
+  const { saveStatus, triggerSave, forceSave } = useRobustSave({
     saveFn: onSaveProject,
     draftKey: project?.id ? `draft_crr_${project.id}` : null,
     debounceMs: 2000,
   });
-
-  const saveStatus = robustSave.saveStatus;
-  const forceSave = robustSave.forceSave;
 
   const lastSavedRef = useRef(JSON.stringify(project));
   useEffect(() => {
     const currentStr = JSON.stringify(project);
     if (currentStr === lastSavedRef.current) return;
     lastSavedRef.current = currentStr;
-    robustSave.triggerSave(project);
-  }, [project, robustSave]);
+    triggerSave(project);
+  }, [project, triggerSave]);
 
   // ── ACTIONS REUNIONS ──────────────────────────────────────────────────
 

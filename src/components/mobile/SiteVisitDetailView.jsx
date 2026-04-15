@@ -1,7 +1,7 @@
 // src/components/mobile/SiteVisitDetailView.jsx
 // Vue détail d'une visite de site — observations + terrain.
 
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import Icon from './Icon';
 import { dateFr } from './formatters';
 import { stripHtml } from '../../utils/formatObsText';
@@ -122,16 +122,24 @@ export default function SiteVisitDetailView({ visit, onSave, saveStatus, onToast
   const [editingInfo, setEditingInfo] = useState(false);
   const [localVisit, setLocalVisit] = useState(visit);
 
+  // ── Auto-save via useEffect (pas de side-effect dans les setState updaters) ──
+  const onSaveRef = useRef(onSave);
+  onSaveRef.current = onSave;
+  const isUserEdit = useRef(false);
+
+  useEffect(() => {
+    if (!isUserEdit.current) return;
+    isUserEdit.current = false;
+    onSaveRef.current(localVisit.id, localVisit);
+  }, [localVisit]);
+
   // ── Manager simplifié (imite l'interface de useCrrManager pour GpsTrackingSection) ──
   const manager = useMemo(() => ({
     updateMeetingField: (field, value) => {
-      setLocalVisit(prev => {
-        const updated = { ...prev, [field]: value };
-        onSave(updated.id, updated);
-        return updated;
-      });
+      isUserEdit.current = true;
+      setLocalVisit(prev => ({ ...prev, [field]: value }));
     },
-  }), [onSave]);
+  }), []);
 
   // ── Observations CRUD ──
   const addObservation = useCallback(() => {
@@ -141,43 +149,31 @@ export default function SiteVisitDetailView({ visit, onSave, saveStatus, onToast
       images: [],
       date: new Date().toISOString().split('T')[0],
     };
-    setLocalVisit(prev => {
-      const updated = { ...prev, observations: [...(prev.observations || []), newObs] };
-      onSave(updated.id, updated);
-      return updated;
-    });
+    isUserEdit.current = true;
+    setLocalVisit(prev => ({ ...prev, observations: [...(prev.observations || []), newObs] }));
     setEditingObs(newObs);
-  }, [onSave]);
+  }, []);
 
   const updateObservation = useCallback((obsId, patch) => {
-    setLocalVisit(prev => {
-      const updated = {
-        ...prev,
-        observations: (prev.observations || []).map(o => o.id === obsId ? { ...o, ...patch } : o),
-      };
-      onSave(updated.id, updated);
-      return updated;
-    });
-  }, [onSave]);
+    isUserEdit.current = true;
+    setLocalVisit(prev => ({
+      ...prev,
+      observations: (prev.observations || []).map(o => o.id === obsId ? { ...o, ...patch } : o),
+    }));
+  }, []);
 
   const deleteObservation = useCallback((obsId) => {
-    setLocalVisit(prev => {
-      const updated = {
-        ...prev,
-        observations: (prev.observations || []).filter(o => o.id !== obsId),
-      };
-      onSave(updated.id, updated);
-      return updated;
-    });
-  }, [onSave]);
+    isUserEdit.current = true;
+    setLocalVisit(prev => ({
+      ...prev,
+      observations: (prev.observations || []).filter(o => o.id !== obsId),
+    }));
+  }, []);
 
   const updateInfo = useCallback((patch) => {
-    setLocalVisit(prev => {
-      const updated = { ...prev, ...patch };
-      onSave(updated.id, updated);
-      return updated;
-    });
-  }, [onSave]);
+    isUserEdit.current = true;
+    setLocalVisit(prev => ({ ...prev, ...patch }));
+  }, []);
 
   const observations = localVisit.observations || [];
 

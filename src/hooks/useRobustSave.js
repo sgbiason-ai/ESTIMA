@@ -90,7 +90,12 @@ export function useRobustSave({ saveFn, draftKey, debounceMs = 1500, maxRetries 
 
     // Sauvegarder le brouillon en localStorage immédiatement
     if (draftKeyRef.current) {
-      safeStorage.set(draftKeyRef.current, JSON.stringify(data));
+      try {
+        safeStorage.set(draftKeyRef.current, JSON.stringify(data));
+      } catch (e) {
+        // JSON.stringify peut échouer si données trop volumineuses ou circulaires
+        console.warn('[RobustSave] Brouillon non sauvegardé:', e);
+      }
     }
 
     setSaveStatus('waiting');

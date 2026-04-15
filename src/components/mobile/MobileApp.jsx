@@ -84,14 +84,16 @@ export default function MobileApp({ user, companyId, onLogout }) {
   const [toast, setToast]                     = useState(null);
 
   // ── Sauvegarde robuste pour visites de site ──
-  const robustSiteVisitSave = useRobustSave({
-    saveFn: useCallback(async (data) => {
-      if (!data?.id) return;
-      await saveVisit(data.id, data);
-    }, [saveVisit]),
+  const siteVisitSaveFn = useCallback(async (data) => {
+    if (!data?.id) return;
+    await saveVisit(data.id, data);
+  }, [saveVisit]);
+  const { saveStatus: svSaveStatus, triggerSave: svTriggerSave } = useRobustSave({
+    saveFn: siteVisitSaveFn,
     draftKey: selectedVisit?.id ? `draft_sv_${selectedVisit.id}` : null,
     debounceMs: 1500,
   });
+  const handleSiteVisitSave = useCallback((id, data) => svTriggerSave(data), [svTriggerSave]);
 
   // ── Hooks métier (activés quand un projet est chargé) ──
   const dummyUpdate = useCallback(() => {}, []);
@@ -606,7 +608,7 @@ export default function MobileApp({ user, companyId, onLogout }) {
               <span className="text-sm">Chargement…</span>
             </div>
           ) : fullVisit ? (
-            <SiteVisitDetailView visit={fullVisit} onSave={(id, data) => robustSiteVisitSave.triggerSave(data)} saveStatus={robustSiteVisitSave.saveStatus} onToast={triggerToast} isLandscape={isLandscape} />
+            <SiteVisitDetailView visit={fullVisit} onSave={handleSiteVisitSave} saveStatus={svSaveStatus} onToast={triggerToast} isLandscape={isLandscape} />
           ) : null
         )}
 
