@@ -115,7 +115,7 @@ function ObsCard({ obs, number, onTap, onDelete, onViewImage }) {
 
 // ─── Composant principal ───────────────────────────────────────────────────
 
-export default function SiteVisitDetailView({ visit, onSave, saveStatus, onToast, isLandscape }) {
+export default function SiteVisitDetailView({ visit, onSave, saveStatus, onToast, isLandscape, branding }) {
   const [activeSection, setActiveSection] = useState('observations');
   const [editingObs, setEditingObs] = useState(null);
   const [viewingImage, setViewingImage] = useState(null);
@@ -181,13 +181,13 @@ export default function SiteVisitDetailView({ visit, onSave, saveStatus, onToast
   const handleExportPdf = useCallback(async () => {
     try {
       const { generateSiteVisitPdf } = await import('../../utils/pdfSiteVisitGenerator');
-      await generateSiteVisitPdf(localVisit);
+      await generateSiteVisitPdf(localVisit, { branding });
       onToast?.('PDF téléchargé');
     } catch (err) {
       console.error('Export PDF visite:', err);
       onToast?.('Erreur export PDF');
     }
-  }, [localVisit, onToast]);
+  }, [localVisit, onToast, branding]);
 
   // Fake meeting object pour GpsTrackingSection
   const fakeMeeting = useMemo(() => ({

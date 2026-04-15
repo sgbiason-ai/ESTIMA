@@ -593,11 +593,17 @@ const buildObsMiniMap = async (obs, visit, THEME, obsIdx) => {
   canvas.height = tilesH;
   const ctx = canvas.getContext('2d');
 
-  // Charger tuiles
+  // Fond gris clair (fallback si tuiles non chargees)
+  ctx.fillStyle = '#e8edf2';
+  ctx.fillRect(0, 0, tilesW, tilesH);
+
+  // Charger tuiles CARTO light (plus fiable que OSM pour le CORS)
   const tilePromises = [];
+  const tileServers = ['a', 'b', 'c'];
   for (let ty = tileYmin; ty <= tileYmax; ty++) {
     for (let tx = tileXmin; tx <= tileXmax; tx++) {
-      const url = `https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`;
+      const s = tileServers[(tx + ty) % 3];
+      const url = `https://${s}.basemaps.cartocdn.com/light_all/${zoom}/${tx}/${ty}.png`;
       const dx = (tx - tileXmin) * 256;
       const dy = (ty - tileYmin) * 256;
       tilePromises.push(fetchTileAsImg(url).then(img => { if (img) ctx.drawImage(img, dx, dy, 256, 256); }));
@@ -619,6 +625,9 @@ const buildObsMiniMap = async (obs, visit, THEME, obsIdx) => {
   crop.width = SIZE;
   crop.height = SIZE;
   const cctx = crop.getContext('2d');
+  // Fond gris clair pour les zones hors tuiles
+  cctx.fillStyle = '#e8edf2';
+  cctx.fillRect(0, 0, SIZE, SIZE);
   cctx.drawImage(canvas, cx - half, cy - half, cropSpan, cropSpan, 0, 0, SIZE, SIZE);
 
   // Fonctions de coordonnées dans le crop

@@ -608,7 +608,7 @@ export default function MobileApp({ user, companyId, onLogout }) {
               <span className="text-sm">Chargement…</span>
             </div>
           ) : fullVisit ? (
-            <SiteVisitDetailView visit={fullVisit} onSave={handleSiteVisitSave} saveStatus={svSaveStatus} onToast={triggerToast} isLandscape={isLandscape} />
+            <SiteVisitDetailView visit={fullVisit} onSave={handleSiteVisitSave} saveStatus={svSaveStatus} onToast={triggerToast} isLandscape={isLandscape} branding={resources.masterBranding} />
           ) : null
         )}
 
