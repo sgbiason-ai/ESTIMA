@@ -2,9 +2,26 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.3.0';
+export const APP_VERSION = '2.4.0';
 
 export const CHANGELOG = [
+  {
+    version: '2.4.0',
+    date: '2026-04-16',
+    title: 'Audit performance + sécurité renforcée',
+    highlights: [
+      'Chargement 4× plus rapide : code-splitting sur 18 modules (bundle 2 MB → 244 KB)',
+      'Splash screen instantané au démarrage (logo + spinner, 0 JS)',
+      'Correction de 2 failles XSS sur les observations CRC mobile',
+      'Protection admin renforcée (guard isAdmin + sanitisation HTML)',
+      'Moteur PDF partagé : cover page, signatures et footer centralisés',
+      'PDF RAO : section négociation retirée, sommaire renuméroté',
+      'Auto-save optimisé : plus de sérialisation inutile à chaque render',
+      'Firestore : tri côté serveur + limite 100 documents sur les listes',
+      'DNS prefetch Firebase pour connexion plus rapide',
+      'Nouveaux stress tests automatisés (16 scénarios, jusqu\'à 20 000 items)',
+    ],
+  },
   {
     version: '2.3.0',
     date: '2026-04-10',
