@@ -4,13 +4,38 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0a1929" />
+    <meta name="theme-color" content="#f5f5f7" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>EstimaVRD</title>
+    <!-- DNS prefetch pour accélérer les connexions Firebase -->
+    <link rel="dns-prefetch" href="https://firestore.googleapis.com" />
+    <link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com" />
+    <link rel="dns-prefetch" href="https://apis.google.com" />
+    <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin />
+    <style>
+      /* Splash screen HTML pur — affiché instantanément (0 JS) */
+      #splash{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif}
+      #splash .logo{width:48px;height:48px;margin-bottom:16px;background:#1e293b;border-radius:14px;display:flex;align-items:center;justify-content:center}
+      #splash .logo svg{width:26px;height:26px}
+      #splash .name{font-size:18px;font-weight:700;color:#1e293b;letter-spacing:-0.02em}
+      #splash .spin{width:24px;height:24px;margin-top:24px;border:3px solid #e2e8f0;border-top-color:#3b82f6;border-radius:50%;animation:sp .7s linear infinite}
+      @keyframes sp{to{transform:rotate(360deg)}}
+    </style>
   </head>
   <body>
+    <!-- Splash screen : visible immédiatement, masqué par React au mount -->
+    <div id="splash">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+        </svg>
+      </div>
+      <div class="name">Estima Suite</div>
+      <div class="spin"></div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

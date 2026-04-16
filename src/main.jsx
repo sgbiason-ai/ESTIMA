@@ -10,6 +10,9 @@ import './index.css';
 // Initialise Sentry avant le rendu (ne fait rien si DSN absent)
 initSentry();
 
+// Le splash screen HTML reste visible pendant le chargement auth.
+// Il sera masqué par App.jsx une fois l'auth résolu.
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ErrorBoundary>

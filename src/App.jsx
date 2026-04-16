@@ -79,6 +79,18 @@ export default function App() {
   // ── 1. Auth ─────────────────────────────────────────────────────────────────
   const { user, companyId, isAdmin, authLoading, handleLogout } = useAppAuth();
 
+  // ── Masquer le splash HTML une fois l'auth résolu ─────────────────────────
+  React.useEffect(() => {
+    if (!authLoading) {
+      const splash = document.getElementById('splash');
+      if (splash) {
+        splash.style.opacity = '0';
+        splash.style.transition = 'opacity 0.3s';
+        setTimeout(() => { splash.style.display = 'none'; }, 300);
+      }
+    }
+  }, [authLoading]);
+
   // ── Page légale (rendue avant les gardes d'auth) ──────────────────────────
   if (showLegal) {
     return <LegalView onBack={() => setShowLegal(false)} />;
@@ -87,11 +99,7 @@ export default function App() {
   // ── Gardes d'auth (communs mobile + desktop) ──────────────────────────────
 
   if (authLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-[#f5f5f7]">
-        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return null; // Le splash HTML est encore visible — pas besoin de doublon React
   }
 
   if (!user) return <LoginView onShowLegal={() => setShowLegal(true)} />;
