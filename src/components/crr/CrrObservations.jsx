@@ -4,7 +4,7 @@ import ReactDOM from 'react-dom';
 import {
   Plus, Trash2, ChevronDown, ChevronRight,
   MinusCircle, Circle, Loader, CheckCircle2, Calendar, User, MessageSquare,
-  ImagePlus, X, Bold, Underline, Highlighter, List, GripVertical,
+  ImagePlus, Camera, X, Bold, Underline, Highlighter, List, GripVertical,
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { OBSERVATION_STATUSES, getGroupColor, abbreviateGroup } from '../../data/crrData';
@@ -177,6 +177,7 @@ const StatusBadge = ({ status, onChange }) => {
 const ObservationRow = ({ obs, onUpdate, onDelete, meetingDate, participantGroups, dragHandleProps }) => {
   const [expanded, setExpanded] = useState(true);
   const fileRef = useRef(null);
+  const cameraRef = useRef(null);
   const editorRef = useRef(null);
   const lastHtmlRef = useRef('');
 
@@ -252,6 +253,7 @@ const ObservationRow = ({ obs, onUpdate, onDelete, meetingDate, participantGroup
     }));
     onUpdate(obs.id, { images: [...images, ...compressed] });
     if (fileRef.current) fileRef.current.value = '';
+    if (cameraRef.current) cameraRef.current.value = '';
   };
 
   const removeImage = (idx) => {
@@ -374,19 +376,37 @@ const ObservationRow = ({ obs, onUpdate, onDelete, meetingDate, participantGroup
               </div>
             )}
 
-            {/* Bouton ajout image */}
-            <button
-              onClick={() => fileRef.current?.click()}
-              className="self-start flex items-center gap-1 text-[10px] text-slate-400 hover:text-emerald-600 transition-colors"
-            >
-              <ImagePlus size={12} />
-              Photo
-            </button>
+            {/* Boutons ajout image : fichier + caméra (pour tablette/mobile) */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => fileRef.current?.click()}
+                className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-emerald-600 transition-colors"
+              >
+                <ImagePlus size={12} />
+                Photo
+              </button>
+              <button
+                onClick={() => cameraRef.current?.click()}
+                className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-emerald-600 transition-colors"
+                title="Prendre une photo avec l'appareil (tablette/mobile)"
+              >
+                <Camera size={12} />
+                Caméra
+              </button>
+            </div>
             <input
               ref={fileRef}
               type="file"
               accept="image/*"
               multiple
+              className="hidden"
+              onChange={handleAddImages}
+            />
+            <input
+              ref={cameraRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
               className="hidden"
               onChange={handleAddImages}
             />

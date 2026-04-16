@@ -11,8 +11,10 @@ import { db, auth } from '../firebase';
 import {
   MapPin, RefreshCw, Camera, MessageSquare, Navigation, Ruler, Trash2, FileDown,
   Maximize2, X, Play, Square, Flag, Check, Route, LocateFixed, Pencil, Plus, Info,
+  ImagePlus,
 } from 'lucide-react';
 import { stripHtml } from '../utils/formatObsText';
+import { compressImage } from '../utils/imageCompressor';
 import { confirm } from '../utils/globalUI';
 import HelpPanel from '../components/help/HelpPanel';
 import HelpButton from '../components/help/HelpButton';
@@ -203,14 +205,35 @@ function VisitInfoModal({ isOpen, onClose, visit, onSave }) {
 
 function ObsEditModal({ isOpen, onClose, obs, onSave }) {
   const [text, setText] = useState('');
+  const [images, setImages] = useState([]);
+  const fileRef = useRef(null);
+  const cameraRef = useRef(null);
+
   useEffect(() => {
-    if (isOpen && obs) setText(obs.text || '');
+    if (isOpen && obs) {
+      setText(obs.text || '');
+      setImages(obs.images || []);
+    }
   }, [isOpen, obs?.id]);
+
+  const handleAddImages = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    const compressed = await Promise.all(files.map(f => compressImage(f)));
+    setImages(prev => [...prev, ...compressed]);
+    if (fileRef.current) fileRef.current.value = '';
+    if (cameraRef.current) cameraRef.current.value = '';
+  };
+
+  const handleRemoveImage = (idx) => {
+    setImages(prev => prev.filter((_, i) => i !== idx));
+  };
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center" onMouseDown={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-[520px] max-h-[90vh] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl shadow-2xl w-[560px] max-h-[90vh] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200/60">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-xl bg-amber-50"><Pencil size={18} className="text-amber-600" /></div>
@@ -218,14 +241,49 @@ function ObsEditModal({ isOpen, onClose, obs, onSave }) {
           </div>
           <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-xl transition"><X size={16} className="text-gray-400" /></button>
         </div>
-        <div className="p-6">
+        <div className="p-6 space-y-4">
           <textarea value={text} onChange={(e) => setText(e.target.value)}
             className="w-full min-h-[120px] p-3 rounded-xl text-sm resize-y outline-none bg-gray-50 text-gray-900 border border-gray-200/60 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             placeholder="Note ou observation..." autoFocus />
+
+          {/* Photos */}
+          {images.length > 0 && (
+            <div className="grid grid-cols-4 gap-2">
+              {images.map((img, idx) => {
+                const imgSrc = typeof img === 'string' ? img : img.src;
+                return (
+                  <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-gray-200 group">
+                    <img src={imgSrc} alt="" className="w-full h-full object-cover" loading="lazy" />
+                    <button onClick={() => handleRemoveImage(idx)}
+                      className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-500/90 hover:bg-red-600 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
+                      <X size={12} className="text-white" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Ajouter photo : fichier + caméra */}
+          <div className="flex gap-2">
+            <button onClick={() => fileRef.current?.click()}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-medium text-gray-700 transition">
+              <ImagePlus size={16} />
+              Ajouter une image
+            </button>
+            <button onClick={() => cameraRef.current?.click()}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-50 hover:bg-blue-100 rounded-xl text-sm font-medium text-blue-700 transition"
+              title="Prendre une photo avec l'appareil (tablette/mobile)">
+              <Camera size={16} />
+              Prendre une photo
+            </button>
+          </div>
+          <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleAddImages} />
+          <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleAddImages} />
         </div>
         <div className="px-6 py-4 border-t border-gray-200/60 flex justify-end gap-2">
           <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-500 rounded-xl hover:bg-gray-100 transition">Annuler</button>
-          <button onClick={() => { onSave(text); onClose(); }} className="px-5 py-2 bg-gray-900 text-white text-sm font-medium rounded-xl hover:bg-gray-800 transition active:scale-[0.97]">Enregistrer</button>
+          <button onClick={() => { onSave(text, images); onClose(); }} className="px-5 py-2 bg-gray-900 text-white text-sm font-medium rounded-xl hover:bg-gray-800 transition active:scale-[0.97]">Enregistrer</button>
         </div>
       </div>
     </div>
@@ -332,10 +390,14 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
     showToast('Informations enregistrées');
   }, [fullVisit, saveVisit, refetch]);
 
-  // ── Save observation text ──
-  const handleSaveObsText = useCallback(async (newText) => {
+  // ── Save observation (text + images) ──
+  const handleSaveObsText = useCallback(async (newText, newImages) => {
     if (!fullVisit || !editingObs) return;
-    const updatedObs = (fullVisit.observations || []).map(o => o.id === editingObs.id ? { ...o, text: newText } : o);
+    const updatedObs = (fullVisit.observations || []).map(o =>
+      o.id === editingObs.id
+        ? { ...o, text: newText, ...(newImages !== undefined ? { images: newImages } : {}) }
+        : o
+    );
     const updated = { ...fullVisit, observations: updatedObs };
     setFullVisit(updated);
     await saveVisit(fullVisit.id, updated);

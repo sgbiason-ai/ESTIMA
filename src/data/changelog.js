@@ -2,9 +2,20 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.4.3';
+export const APP_VERSION = '2.4.4';
 
 export const CHANGELOG = [
+  {
+    version: '2.4.4',
+    date: '2026-04-16',
+    title: 'Caméra tablette sur CRC et Visites de Site (mode desktop)',
+    highlights: [
+      'CRC desktop : bouton "Caméra" pour prendre une photo depuis la tablette',
+      'Visites de Site desktop : upload d\'images + bouton caméra dans la modale d\'édition',
+      'Photos compressées automatiquement (imageCompressor)',
+      'Hub tablette portrait : sections empilées avec cartes en 2 colonnes internes',
+    ],
+  },
   {
     version: '2.4.3',
     date: '2026-04-16',
