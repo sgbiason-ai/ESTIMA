@@ -2,9 +2,19 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.4.2';
+export const APP_VERSION = '2.4.3';
 
 export const CHANGELOG = [
+  {
+    version: '2.4.3',
+    date: '2026-04-16',
+    title: 'Fix chevauchement hub desktop sur tablette portrait',
+    highlights: [
+      'Hub desktop responsive : 2 colonnes sur tablette (md), 3 sur desktop (lg)',
+      'Cartes à hauteur naturelle sous 1024px (fin des chevauchements en tablette portrait)',
+      'Page scrollable si contenu dépasse sur petit écran',
+    ],
+  },
   {
     version: '2.4.2',
     date: '2026-04-16',

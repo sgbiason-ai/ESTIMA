@@ -120,7 +120,7 @@ function BentoCard({ mod, theme, accessible, onSelect, mounted, delay }) {
       onClick={() => accessible && onSelect(mod.id)}
       disabled={!accessible}
       className={`
-        group relative flex flex-col flex-1 text-left rounded-[24px] border p-[clamp(0.625rem,1.2vh,1.5rem)] transition-all duration-500 ease-out
+        group relative flex flex-col lg:flex-1 text-left rounded-[24px] border p-[clamp(0.625rem,1.2vh,1.5rem)] transition-all duration-500 ease-out
         ${theme.card}
         ${accessible ? `${theme.cardHover} cursor-pointer` : 'opacity-50 cursor-not-allowed'}
         ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}
@@ -260,25 +260,25 @@ export default function ModuleHubView({ isAdmin, userEmail, onSelectModule, onLo
             </p>
           </div>
 
-          {/* Bento Grid — 3 columns, cards stacked vertically, fill available height */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-[clamp(0.5rem,0.8vh,1.25rem)] flex-1 min-h-0">
+          {/* Bento Grid — 3 cols lg, 2 cols md, 1 col mobile ; hauteurs naturelles sous lg */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[clamp(0.5rem,0.8vh,1.25rem)] lg:flex-1 lg:min-h-0">
             {rows.map((rowNum) => {
               const colModules = visibleModules.filter(m => m.row === rowNum);
               if (colModules.length === 0) return null;
               const ColIcon = ROW_LABELS[rowNum].icon;
 
               return (
-                <div key={rowNum} className="flex flex-col min-h-0">
+                <div key={rowNum} className="flex flex-col lg:min-h-0">
                   {/* Column label */}
-                  <div className={`flex items-center gap-2 mb-[clamp(0.25rem,0.4vh,0.75rem)] shrink-0 transition-all duration-700 ease-out ${mounted ? 'opacity-100' : 'opacity-0'}`}
+                  <div className={`flex items-center gap-2 mb-[clamp(0.25rem,0.4vh,0.75rem)] mt-3 lg:mt-0 shrink-0 transition-all duration-700 ease-out ${mounted ? 'opacity-100' : 'opacity-0'}`}
                     style={{ transitionDelay: `${100 + rowNum * 80}ms` }}>
                     <ColIcon size={14} className={rowNum === 1 ? 'text-gray-400' : rowNum === 2 ? 'text-amber-500/70' : 'text-violet-500/70'} strokeWidth={1.5} />
                     <span className={`text-xs font-medium uppercase tracking-widest ${rowNum === 1 ? 'text-gray-400' : rowNum === 2 ? 'text-amber-600/50' : 'text-violet-600/50'}`}>
                       {ROW_LABELS[rowNum].label}
                     </span>
                   </div>
-                  {/* Cards stacked — each card grows to fill available height */}
-                  <div className="flex flex-col gap-[clamp(0.375rem,0.6vh,1rem)] flex-1 min-h-0">
+                  {/* Cards stacked — height naturelle sous lg, remplit viewport en lg */}
+                  <div className="flex flex-col gap-[clamp(0.375rem,0.6vh,1rem)] lg:flex-1 lg:min-h-0">
                     {colModules.map((mod, idx) => (
                       <BentoCard
                         key={mod.id}
