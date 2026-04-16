@@ -49,6 +49,28 @@ import { useCrrManager }     from '../../hooks/useCrrManager';
 import { useOrientation }   from '../../hooks/useOrientation';
 import { useRobustSave, loadDraft, clearDraft } from '../../hooks/useRobustSave';
 
+// ─── SPLIT-VIEW HELPER (tablette paysage) ───────────────────────────────────
+const SplitView = ({ List, Detail, hasSelection, loading, emptyIcon = 'list', emptyLabel = 'Sélectionnez un élément à gauche' }) => (
+  <div className="flex h-full gap-3 px-3 py-3">
+    <div className="w-[360px] shrink-0 overflow-y-auto bg-white rounded-2xl border border-gray-200/60 shadow-sm">
+      {List}
+    </div>
+    <div className="flex-1 overflow-y-auto bg-white rounded-2xl border border-gray-200/60 shadow-sm">
+      {!hasSelection ? (
+        <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-3 p-10">
+          <Icon name={emptyIcon} size={48} color="#d1d5db" />
+          <p className="text-sm font-medium">{emptyLabel}</p>
+        </div>
+      ) : loading ? (
+        <div className="flex items-center justify-center py-20 gap-2 text-slate-500">
+          <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm">Chargement…</span>
+        </div>
+      ) : Detail}
+    </div>
+  </div>
+);
+
 // ─── MAIN MOBILE APP ────────────────────────────────────────────────────────
 export default function MobileApp({ user, companyId, onLogout, isTablet = false, onSwitchToDesktop = null }) {
   const { isLandscape } = useOrientation();
@@ -430,9 +452,10 @@ export default function MobileApp({ user, companyId, onLogout, isTablet = false,
 
   // Container adaptatif :
   //  - Phone  : max-w-md portrait / w-full landscape (inchangé)
-  //  - Tablet : max-w-md portrait / max-w-3xl landscape (≈ 768px centré)
+  //  - Tablet : max-w-2xl portrait (~672px) / max-w-6xl landscape (~1152px)
+  //    => plus de surface utile, supporte hub 2/3 cols et split-view
   const containerWidth = isTablet
-    ? (isLandscape ? 'max-w-3xl mx-auto' : 'max-w-md mx-auto')
+    ? (isLandscape ? 'max-w-6xl mx-auto' : 'max-w-2xl mx-auto')
     : (isLandscape ? 'w-full' : 'max-w-md mx-auto');
 
   return (
@@ -470,22 +493,63 @@ export default function MobileApp({ user, companyId, onLogout, isTablet = false,
           />
         )}
 
-        {/* Module Projets — liste */}
-        {activeModule === 'projects' && !selectedProject && (
-          <ProjectsList
-            projects={projects}
-            folders={folders}
-            loading={projectsLoading}
-            search={searchTerm}
-            onSearch={setSearchTerm}
-            onSelect={handleSelectProject}
-            onSelectAndNavigate={handleSelectProjectAndNavigate}
-            onRefresh={refetch}
-            isLandscape={isLandscape}
-          />
-        )}
-        {selectedProject && !subView && (
-          projectLoading ? (
+        {/* Module Projets — liste / détail (split-view sur tablette paysage) */}
+        {activeModule === 'projects' && !subView && (
+          isTablet && isLandscape ? (
+            // ── Split-view tablette paysage ──
+            <div className="flex h-full gap-3 px-3 py-3">
+              <div className="w-[360px] shrink-0 overflow-y-auto bg-white rounded-2xl border border-gray-200/60 shadow-sm">
+                <ProjectsList
+                  projects={projects}
+                  folders={folders}
+                  loading={projectsLoading}
+                  search={searchTerm}
+                  onSearch={setSearchTerm}
+                  onSelect={handleSelectProject}
+                  onSelectAndNavigate={handleSelectProjectAndNavigate}
+                  onRefresh={refetch}
+                  isLandscape={false}
+                  selectedId={selectedProject?.id}
+                />
+              </div>
+              <div className="flex-1 overflow-y-auto bg-white rounded-2xl border border-gray-200/60 shadow-sm">
+                {!selectedProject ? (
+                  <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-3 p-10">
+                    <Icon name="folder" size={48} color="#d1d5db" />
+                    <p className="text-sm font-medium">Sélectionnez un projet à gauche</p>
+                  </div>
+                ) : projectLoading ? (
+                  <div className="flex items-center justify-center py-20 gap-2 text-slate-500">
+                    <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-sm">Chargement…</span>
+                  </div>
+                ) : fullProject ? (
+                  <ProjectDetail
+                    project={fullProject}
+                    projectMeta={selectedProject}
+                    calcHook={calcHook}
+                    onNavigate={setSubView}
+                    onNavigateModule={handleSelectProjectAndNavigate}
+                    onExport={handleExport}
+                    isLandscape={isLandscape}
+                  />
+                ) : null}
+              </div>
+            </div>
+          ) : !selectedProject ? (
+            // ── Liste seule (phone ou portrait) ──
+            <ProjectsList
+              projects={projects}
+              folders={folders}
+              loading={projectsLoading}
+              search={searchTerm}
+              onSearch={setSearchTerm}
+              onSelect={handleSelectProject}
+              onSelectAndNavigate={handleSelectProjectAndNavigate}
+              onRefresh={refetch}
+              isLandscape={isLandscape}
+            />
+          ) : projectLoading ? (
             <div className="flex items-center justify-center py-20 gap-2 text-slate-500">
               <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
               <span className="text-sm">Chargement…</span>
@@ -535,18 +599,20 @@ export default function MobileApp({ user, companyId, onLogout, isTablet = false,
           <ExportsView onExport={handleExport} />
         )}
 
-        {/* Module CRC — liste chantiers */}
-        {activeModule === 'crc' && !selectedChantier && (
-          <CrcListView
-            chantiers={crcChantiers}
-            loading={crcLoading}
-            onSelect={handleSelectChantier}
-            onRefresh={crcRefetch}
-            isLandscape={isLandscape}
-          />
-        )}
-        {activeModule === 'crc' && selectedChantier && (
-          chantierLoading ? (
+        {/* Module CRC — split-view sur tablette paysage */}
+        {activeModule === 'crc' && (
+          isTablet && isLandscape ? (
+            <SplitView
+              List={<CrcListView chantiers={crcChantiers} loading={crcLoading} onSelect={handleSelectChantier} onRefresh={crcRefetch} isLandscape={false} />}
+              Detail={fullChantier && <CrcDetailView chantier={fullChantier} branding={resources.masterBranding} onToast={triggerToast} manager={crrManager} isLandscape={isLandscape} />}
+              hasSelection={!!selectedChantier}
+              loading={chantierLoading}
+              emptyIcon="clipboard"
+              emptyLabel="Sélectionnez un chantier à gauche"
+            />
+          ) : !selectedChantier ? (
+            <CrcListView chantiers={crcChantiers} loading={crcLoading} onSelect={handleSelectChantier} onRefresh={crcRefetch} isLandscape={isLandscape} />
+          ) : chantierLoading ? (
             <div className="flex items-center justify-center py-20 gap-2 text-slate-500">
               <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
               <span className="text-sm">Chargement…</span>
@@ -556,18 +622,20 @@ export default function MobileApp({ user, companyId, onLogout, isTablet = false,
           ) : null
         )}
 
-        {/* Module MOE — liste devis */}
-        {activeModule === 'moe' && !selectedMoeDevis && (
-          <MoeListView
-            devisList={moeDevisList}
-            loading={moeLoading}
-            onSelect={handleSelectMoeDevis}
-            onRefresh={moeRefetch}
-            isLandscape={isLandscape}
-          />
-        )}
-        {activeModule === 'moe' && selectedMoeDevis && (
-          moeDevisLoading ? (
+        {/* Module MOE — split-view sur tablette paysage */}
+        {activeModule === 'moe' && (
+          isTablet && isLandscape ? (
+            <SplitView
+              List={<MoeListView devisList={moeDevisList} loading={moeLoading} onSelect={handleSelectMoeDevis} onRefresh={moeRefetch} isLandscape={false} />}
+              Detail={fullMoeDevis && <MoeDetailView devis={fullMoeDevis} />}
+              hasSelection={!!selectedMoeDevis}
+              loading={moeDevisLoading}
+              emptyIcon="euro"
+              emptyLabel="Sélectionnez un devis MOE à gauche"
+            />
+          ) : !selectedMoeDevis ? (
+            <MoeListView devisList={moeDevisList} loading={moeLoading} onSelect={handleSelectMoeDevis} onRefresh={moeRefetch} isLandscape={isLandscape} />
+          ) : moeDevisLoading ? (
             <div className="flex items-center justify-center py-20 gap-2 text-slate-500">
               <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
               <span className="text-sm">Chargement…</span>
@@ -577,18 +645,20 @@ export default function MobileApp({ user, companyId, onLogout, isTablet = false,
           ) : null
         )}
 
-        {/* Module Documents Admin — liste fiches marché */}
-        {activeModule === 'doc_admin' && !selectedFiche && (
-          <DocAdminListView
-            fiches={adminFiches}
-            loading={adminLoading}
-            onSelect={handleSelectFiche}
-            onRefresh={adminRefetch}
-            isLandscape={isLandscape}
-          />
-        )}
-        {activeModule === 'doc_admin' && selectedFiche && (
-          ficheLoading ? (
+        {/* Module Documents Admin — split-view sur tablette paysage */}
+        {activeModule === 'doc_admin' && (
+          isTablet && isLandscape ? (
+            <SplitView
+              List={<DocAdminListView fiches={adminFiches} loading={adminLoading} onSelect={handleSelectFiche} onRefresh={adminRefetch} isLandscape={false} />}
+              Detail={fullFiche && <DocAdminDetailView fiche={fullFiche} branding={resources.masterBranding} onToast={triggerToast} isLandscape={isLandscape} />}
+              hasSelection={!!selectedFiche}
+              loading={ficheLoading}
+              emptyIcon="file"
+              emptyLabel="Sélectionnez une fiche à gauche"
+            />
+          ) : !selectedFiche ? (
+            <DocAdminListView fiches={adminFiches} loading={adminLoading} onSelect={handleSelectFiche} onRefresh={adminRefetch} isLandscape={isLandscape} />
+          ) : ficheLoading ? (
             <div className="flex items-center justify-center py-20 gap-2 text-slate-500">
               <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
               <span className="text-sm">Chargement…</span>
@@ -598,20 +668,20 @@ export default function MobileApp({ user, companyId, onLogout, isTablet = false,
           ) : null
         )}
 
-        {/* Module Visites de Site — liste */}
-        {activeModule === 'site_visits' && !selectedVisit && (
-          <SiteVisitListView
-            visits={siteVisits}
-            loading={visitsLoading}
-            onSelect={handleSelectVisit}
-            onCreate={handleCreateVisit}
-            onDelete={deleteVisit}
-            onRefresh={visitsRefetch}
-            isLandscape={isLandscape}
-          />
-        )}
-        {activeModule === 'site_visits' && selectedVisit && (
-          visitLoading ? (
+        {/* Module Visites de Site — split-view sur tablette paysage */}
+        {activeModule === 'site_visits' && (
+          isTablet && isLandscape ? (
+            <SplitView
+              List={<SiteVisitListView visits={siteVisits} loading={visitsLoading} onSelect={handleSelectVisit} onCreate={handleCreateVisit} onDelete={deleteVisit} onRefresh={visitsRefetch} isLandscape={false} />}
+              Detail={fullVisit && <SiteVisitDetailView visit={fullVisit} onSave={handleSiteVisitSave} saveStatus={svSaveStatus} onToast={triggerToast} isLandscape={isLandscape} branding={resources.masterBranding} />}
+              hasSelection={!!selectedVisit}
+              loading={visitLoading}
+              emptyIcon="camera"
+              emptyLabel="Sélectionnez une visite à gauche"
+            />
+          ) : !selectedVisit ? (
+            <SiteVisitListView visits={siteVisits} loading={visitsLoading} onSelect={handleSelectVisit} onCreate={handleCreateVisit} onDelete={deleteVisit} onRefresh={visitsRefetch} isLandscape={isLandscape} />
+          ) : visitLoading ? (
             <div className="flex items-center justify-center py-20 gap-2 text-gray-500">
               <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
               <span className="text-sm">Chargement…</span>

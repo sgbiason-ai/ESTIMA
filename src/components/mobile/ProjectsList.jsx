@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import Icon from './Icon';
 import { dateFr } from './formatters';
 
-export default function ProjectsList({ projects, folders, loading, search, onSearch, onSelect, onSelectAndNavigate, onRefresh, isLandscape }) {
+export default function ProjectsList({ projects, folders, loading, search, onSearch, onSelect, onSelectAndNavigate, onRefresh, isLandscape, selectedId = null }) {
   const [currentFolderId, setCurrentFolderId] = useState(null);
   const [showAll, setShowAll] = useState(false);
   const [filter, setFilter] = useState(null); // null | 'rao' | 'crc'
@@ -156,7 +156,11 @@ export default function ProjectsList({ projects, folders, loading, search, onSea
       <div className={isLandscape ? 'grid grid-cols-2 gap-2 px-4' : 'contents'}>
       {currentProjects.map((p) => (
         <button key={p.id} onClick={() => onSelect(p)}
-          className={`block p-4 bg-white rounded-xl border border-gray-200/60 text-left transition hover:shadow-md active:scale-[0.98] ${isLandscape ? '' : 'w-[calc(100%-2rem)] mx-4 mb-2'}`}>
+          className={`block p-4 rounded-xl border text-left transition hover:shadow-md active:scale-[0.98] ${
+            selectedId === p.id
+              ? 'bg-blue-50 border-blue-300 ring-2 ring-blue-200'
+              : 'bg-white border-gray-200/60'
+          } ${isLandscape ? '' : 'w-[calc(100%-2rem)] mx-4 mb-2'}`}>
           <div className="flex justify-between items-start">
             <div className="flex-1 min-w-0">
               <div className="text-[15px] font-semibold text-gray-900 leading-tight truncate">{p.name}</div>

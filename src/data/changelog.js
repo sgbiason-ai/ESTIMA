@@ -2,9 +2,20 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.4.1';
+export const APP_VERSION = '2.4.2';
 
 export const CHANGELOG = [
+  {
+    version: '2.4.2',
+    date: '2026-04-16',
+    title: 'Tablette : hub multi-colonnes + split-view listes',
+    highlights: [
+      'Hub mobile sur tablette : 2 colonnes en portrait, 3 colonnes en paysage',
+      'Container élargi sur tablette (672px portrait / 1152px paysage) pour moins d\'espace vide',
+      'Split-view liste + détail en paysage : Projets, CRC, MOE, Visites, Documents Admin',
+      'Surbrillance du projet sélectionné dans la liste split-view',
+    ],
+  },
   {
     version: '2.4.1',
     date: '2026-04-16',

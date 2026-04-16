@@ -108,7 +108,9 @@ export default function MobileHubView({ userEmail, onSelectModule, onLogout, isL
 
       {/* ── Cards ──────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col">
-        <div className="grid grid-cols-2 gap-2.5 flex-1">
+        <div className={`grid gap-2.5 flex-1 ${
+          isTablet && isLandscape ? 'grid-cols-3' : 'grid-cols-2'
+        }`}>
           {MOBILE_MODULES.map((mod, idx) => {
             const theme = ROW_THEMES[mod.row];
             return (
