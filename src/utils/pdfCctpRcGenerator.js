@@ -6,7 +6,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { DEFAULT_BRANDING } from '../data/branding';
-import { loadImage, sanitizeFilename } from './pdf/pdfSharedHelpers';
+import { loadImage, sanitizeFilename, loadLogos } from './pdf/pdfSharedHelpers';
 import { buildTheme as _buildTheme } from './pdf/buildTheme';
 
 // ─── COULEURS ────────────────────────────────────────────────────────────────
@@ -495,10 +495,7 @@ export const generatePdfCctpRc = async (
   const today    = new Date().toLocaleDateString('fr-FR');
   const doc      = new jsPDF({ unit:'mm', format:'a4' });
 
-  const [logoMoe, logoClient] = await Promise.all([
-    loadImage(branding?.logo || '/logo.jpg').catch(()=>null),
-    project.clientLogo ? loadImage(project.clientLogo).catch(()=>null) : Promise.resolve(null),
-  ]);
+  const { logoMoe, logoClient } = await loadLogos(branding, project);
 
   const ctx = {
     doc, project, logoMoe, docLabel, THEME, branding, today,

@@ -76,3 +76,296 @@ export const formatNumberFr = (value) => {
   parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   return parts.join(',');
 };
+
+// ─── LOGOS ─────────────────────────────────────────────────────────────────
+
+/** Charge le logo MOE + logo client en parallèle. Retourne { logoMoe, logoClient }. */
+export const loadLogos = async (branding, project) => {
+  const [logoMoe, logoClient] = await Promise.all([
+    loadImage(branding?.logo || '/logo.jpg').catch(() => null),
+    project?.clientLogo ? loadImage(project.clientLogo).catch(() => null) : Promise.resolve(null),
+  ]);
+  return { logoMoe, logoClient };
+};
+
+/**
+ * Rend un logo dans le doc jsPDF en respectant les dimensions max + ratio.
+ * Centré verticalement dans la zone maxH.
+ * @returns {{ w: number, h: number }} dimensions effectives
+ */
+export const renderLogo = (doc, logo, x, y, maxW, maxH) => {
+  if (!logo) return { w: 0, h: 0 };
+  const ratio = logo.width / logo.height;
+  let w = maxW; let h = w / ratio;
+  if (h > maxH) { h = maxH; w = h * ratio; }
+  const yPos = y + (maxH - h) / 2;
+  doc.addImage(logo, 'JPEG', x, yPos, w, h);
+  return { w, h };
+};
+
+// ─── ÉLÉMENTS VISUELS PARTAGÉS ────────────────────────────────────────────
+
+/**
+ * Dessine les 4 cases tampon/signature sur la page de garde.
+ * @param {object} doc - instance jsPDF
+ * @param {object} theme - objet THEME (primary, secondary, borders, lightText)
+ * @param {object} opts - { signatories: string[], zoneTop, zoneHeight, margin? }
+ */
+export const drawSignatureBoxes = (doc, theme, { signatories = [], zoneTop, zoneHeight, margin = 18 }) => {
+  const pageWidth = doc.internal.pageSize.width;
+  if (zoneHeight < 25) return;
+
+  const gap = 4;
+  const n = 4;
+  const boxW = (pageWidth - margin * 2 - gap * (n - 1)) / n;
+  const labelH = 8;
+  const defaults = ['Le Maître d\'Ouvrage', 'Le Maître d\'Œuvre', 'L\'Entreprise', 'Le Bureau de Contrôle'];
+
+  for (let i = 0; i < n; i++) {
+    const bx = margin + i * (boxW + gap);
+    const by = zoneTop;
+
+    // Fond + contour
+    doc.setFillColor(...theme.secondary);
+    doc.roundedRect(bx, by, boxW, zoneHeight, 2, 2, 'F');
+    doc.setDrawColor(...theme.primary);
+    doc.setLineWidth(0.4);
+    doc.roundedRect(bx, by, boxW, zoneHeight, 2, 2, 'S');
+
+    // Bandeau titre
+    doc.setFillColor(...theme.primary);
+    doc.roundedRect(bx, by, boxW, labelH, 2, 2, 'F');
+    doc.rect(bx, by + labelH / 2, boxW, labelH / 2, 'F');
+
+    const sigName = (signatories[i] || defaults[i]).trim();
+    doc.setFontSize(7); doc.setFont('Helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+    doc.text(sigName.toUpperCase(), bx + boxW / 2, by + labelH / 2 + 1.5, { align: 'center' });
+
+    // Ligne + label "Lu et approuvé"
+    const luY = by + zoneHeight - 10;
+    doc.setDrawColor(...theme.borders);
+    doc.setLineWidth(0.3);
+    doc.line(bx + 3, luY, bx + boxW - 3, luY);
+
+    doc.setFontSize(6); doc.setFont('Helvetica', 'normal'); doc.setTextColor(...theme.lightText);
+    doc.text('Lu et approuvé — Signature', bx + boxW / 2, by + zoneHeight - 4, { align: 'center' });
+  }
+};
+
+/**
+ * Dessine le pied de page MOE (infos société) ou fallback date simple.
+ * @param {object} doc - instance jsPDF
+ * @param {object} branding - objet branding (companyName, tagline, address, phone, email, website)
+ * @param {object} theme - objet THEME
+ * @param {string} today - date formatée
+ */
+export const drawMoeFooter = (doc, branding, theme, today) => {
+  const pageWidth = doc.internal.pageSize.width;
+  const pageHeight = doc.internal.pageSize.height;
+
+  if (branding?.companyName) {
+    const footerY = pageHeight - 20;
+
+    doc.setDrawColor(...theme.borders);
+    doc.setLineWidth(0.3);
+    doc.line(18, footerY - 8, pageWidth - 18, footerY - 8);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(...theme.primary);
+    doc.text(branding.companyName.toUpperCase(), 18, footerY - 3);
+
+    if (branding.tagline) {
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(6);
+      doc.setTextColor(...theme.lightText);
+      doc.text(branding.tagline, 18, footerY + 2);
+    }
+
+    const contactParts = [branding.address, branding.phone, branding.email, branding.website].filter(Boolean);
+    if (contactParts.length > 0) {
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(6);
+      doc.setTextColor(...theme.lightText);
+      doc.text(contactParts.join('  ·  '), pageWidth - 18, footerY - 3, { align: 'right' });
+    }
+
+    doc.setFontSize(6);
+    doc.text(`Édité le ${today}`, pageWidth - 18, footerY + 2, { align: 'right' });
+  } else {
+    doc.setFontSize(8);
+    doc.setTextColor(...theme.lightText);
+    doc.setFont('Helvetica', 'normal');
+    doc.text(`Édité le ${today}`, pageWidth - 18, pageHeight - 12, { align: 'right' });
+  }
+};
+
+/**
+ * Dessine la page de garde complète (bande gauche, logos, titre, infos projet,
+ * signatures, pied de page MOE).
+ *
+ * @param {object} doc - instance jsPDF
+ * @param {object} config - données de la page de garde
+ * @param {string} config.docType - label document ("ESTIMATION CONFIDENTIELLE DES TRAVAUX", etc.)
+ * @param {string} config.title - titre projet
+ * @param {string} [config.subtitle1] - sous-titre 1
+ * @param {string} [config.subtitle2] - sous-titre 2
+ * @param {string} config.phaseLabel - phase (DCE, PRO, etc.)
+ * @param {string} config.clientName
+ * @param {string} [config.clientStreet]
+ * @param {string} [config.clientCityZip]
+ * @param {string} config.locationRaw
+ * @param {string} config.codeAffaire
+ * @param {boolean} [config.showSignatures=true]
+ * @param {string[]} [config.signatories]
+ * @param {object} [config.branding]
+ * @param {string} config.today
+ * @param {Array<{rows: Array<{label: string, value: string, col?: number}>}>} [config.extraBlocks]
+ *   Blocs info supplémentaires (ex: RAO procédure/lot/dates). Chaque bloc est un roundedRect.
+ * @param {object} theme - objet THEME
+ * @param {{ logoMoe: HTMLImageElement|null, logoClient: HTMLImageElement|null }} logos
+ * @returns {{ blockEndY: number }} position Y après le dernier bloc, pour continuer le contenu
+ */
+export const drawCoverPage = (doc, config, theme, logos) => {
+  const pageWidth = doc.internal.pageSize.width;
+  const pageHeight = doc.internal.pageSize.height;
+  const {
+    docType, title: rawTitle, subtitle1 = '', subtitle2 = '',
+    phaseLabel, clientName, clientStreet = '', clientCityZip = '',
+    locationRaw, codeAffaire,
+    showSignatures = true, signatories = [],
+    branding, today,
+    extraBlocks = [],
+  } = config;
+  const { logoMoe, logoClient } = logos;
+
+  // Bande gauche primary
+  doc.setFillColor(...theme.primary);
+  doc.rect(0, 0, 6, pageHeight, 'F');
+
+  // Logos
+  if (logoMoe) renderLogo(doc, logoMoe, 18, 18, 45, 25);
+  if (logoClient) {
+    const maxW = 45; const maxH = 25;
+    const ratio = logoClient.width / logoClient.height;
+    let w = maxW; let h = w / ratio;
+    if (h > maxH) { h = maxH; w = h * ratio; }
+    renderLogo(doc, logoClient, pageWidth - 18 - w, 18, maxW, maxH);
+  }
+
+  // Type de document
+  doc.setFont('Helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(...theme.lightText);
+  doc.text(docType, pageWidth - 18, 52, { align: 'right' });
+  doc.setDrawColor(...theme.borders); doc.setLineWidth(0.5);
+  doc.line(pageWidth - 95, 57, pageWidth - 18, 57);
+
+  // Titre projet
+  doc.setFontSize(32);
+  doc.setTextColor(...theme.primary);
+  const title = (rawTitle || 'NOM DU PROJET').toUpperCase();
+  const splitTitle = doc.splitTextToSize(title, pageWidth - 40);
+  doc.text(splitTitle, 18, 100);
+
+  const titleHeight = splitTitle.length * 12;
+  doc.setDrawColor(...theme.accent);
+  doc.setLineWidth(1.5);
+  doc.line(18, 100 + titleHeight + 4, 60, 100 + titleHeight + 4);
+
+  // Sous-titres
+  let subtitleOffset = 0;
+  if (subtitle1) {
+    subtitleOffset += 10;
+    doc.setFontSize(13); doc.setFont('Helvetica', 'normal'); doc.setTextColor(...theme.lightText);
+    doc.text(subtitle1.toUpperCase(), 18, 100 + titleHeight + 4 + subtitleOffset);
+  }
+  if (subtitle2) {
+    subtitleOffset += 7;
+    doc.setFontSize(11); doc.setFont('Helvetica', 'normal'); doc.setTextColor(...theme.lightText);
+    doc.text(subtitle2.toUpperCase(), 18, 100 + titleHeight + 4 + subtitleOffset);
+  }
+
+  // Bloc 1 : infos MOA + phase/code
+  const blockY = 125 + titleHeight + subtitleOffset;
+  const blockH = 65;
+  doc.setFillColor(...theme.secondary);
+  doc.roundedRect(18, blockY, pageWidth - 36, blockH, 3, 3, 'F');
+
+  const col1X = 28;
+  const col2X = pageWidth / 2 + 10;
+  const startY = blockY + 15;
+
+  // Col 1 : MOA
+  doc.setFontSize(8); doc.setTextColor(...theme.lightText); doc.setFont('Helvetica', 'bold');
+  doc.text("MAÎTRE D'OUVRAGE", col1X, startY);
+  doc.setFontSize(11); doc.setTextColor(...theme.text);
+  const splitClient = doc.splitTextToSize(clientName.toUpperCase(), (pageWidth / 2) - 40);
+  doc.text(splitClient, col1X, startY + 6);
+  let currentY = startY + 6 + (splitClient.length * 5);
+  doc.setFontSize(9); doc.setTextColor(100, 116, 139); doc.setFont('Helvetica', 'normal');
+  if (clientStreet) {
+    const splitStreet = doc.splitTextToSize(clientStreet.toUpperCase(), (pageWidth / 2) - 40);
+    doc.text(splitStreet, col1X, currentY);
+    currentY += splitStreet.length * 5;
+  }
+  if (clientCityZip) {
+    const splitCityZip = doc.splitTextToSize(clientCityZip.toUpperCase(), (pageWidth / 2) - 40);
+    doc.text(splitCityZip, col1X, currentY);
+  }
+  currentY += 8;
+  doc.setFontSize(8); doc.setTextColor(...theme.lightText); doc.setFont('Helvetica', 'bold');
+  doc.text('LIEU DE RÉALISATION', col1X, currentY);
+  doc.setFontSize(11); doc.setTextColor(...theme.text);
+  const splitLoc = doc.splitTextToSize(locationRaw.toUpperCase(), (pageWidth / 2) - 40);
+  doc.text(splitLoc, col1X, currentY + 6);
+
+  // Col 2 : Phase + code
+  doc.setFontSize(8); doc.setTextColor(...theme.lightText); doc.setFont('Helvetica', 'bold');
+  doc.text('PHASE DU PROJET', col2X, startY);
+  doc.setFillColor(...theme.primary);
+  doc.roundedRect(col2X, startY + 3, 28, 6, 1.5, 1.5, 'F');
+  doc.setFontSize(9); doc.setTextColor(255, 255, 255); doc.setFont('Helvetica', 'bold');
+  doc.text(phaseLabel, col2X + 14, startY + 7.5, { align: 'center' });
+
+  const rightY = startY + 22;
+  doc.setFontSize(8); doc.setTextColor(...theme.lightText); doc.setFont('Helvetica', 'bold');
+  doc.text('RÉFÉRENCE PROJET (CODE AFFAIRE)', col2X, rightY);
+  doc.setFontSize(11); doc.setTextColor(...theme.text);
+  doc.text(codeAffaire.toUpperCase(), col2X, rightY + 6);
+
+  // Blocs supplémentaires (RAO: procédure, lot, dates)
+  let lastBlockEndY = blockY + blockH;
+  for (const block of extraBlocks) {
+    const bY = lastBlockEndY + 5;
+    const bH = block.height || 40;
+    doc.setFillColor(...theme.secondary);
+    doc.roundedRect(18, bY, pageWidth - 36, bH, 3, 3, 'F');
+
+    let rowY = bY + 12;
+    for (const row of (block.rows || [])) {
+      const colX = row.col === 2 ? col2X : col1X;
+      doc.setFontSize(8); doc.setTextColor(...theme.lightText); doc.setFont('Helvetica', 'bold');
+      doc.text(row.label, colX, rowY);
+      doc.setFontSize(10); doc.setTextColor(...theme.text); doc.setFont('Helvetica', 'normal');
+      const splitVal = doc.splitTextToSize(row.value || '—', (pageWidth / 2) - 40);
+      doc.text(splitVal, colX, rowY + 5);
+      if (row.newLine) rowY += row.newLine;
+    }
+    lastBlockEndY = bY + bH;
+  }
+
+  // Signatures
+  const footerTopY = branding?.companyName ? pageHeight - 28 : pageHeight - 20;
+  const sigZoneTop = lastBlockEndY + 6;
+  const sigZoneH = footerTopY - 6 - sigZoneTop;
+
+  if (showSignatures && sigZoneH > 25) {
+    drawSignatureBoxes(doc, theme, { signatories, zoneTop: sigZoneTop, zoneHeight: sigZoneH });
+  }
+
+  // Pied de page MOE
+  drawMoeFooter(doc, branding, theme, today);
+
+  return { blockEndY: lastBlockEndY };
+};

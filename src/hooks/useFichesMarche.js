@@ -3,7 +3,7 @@
 // Collection: companies/{companyId}/fichesMarche/{ficheId}
 
 import { useState, useEffect, useCallback } from 'react';
-import { collection, getDocs, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, deleteDoc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../firebase';
 import { generateId } from '../utils/helpers';
 import { useToast } from '../contexts/ToastContext';
@@ -97,11 +97,9 @@ export const useFichesMarche = (user, companyId) => {
     setIsLoading(true);
 
     const unsubscribe = onSnapshot(
-      col(companyId),
+      query(col(companyId), orderBy('createdAt', 'desc'), limit(100)),
       (snapshot) => {
         const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-        // Tri par date de création décroissante
-        data.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
         setFiches(data);
         setIsLoading(false);
       },

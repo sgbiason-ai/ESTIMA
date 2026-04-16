@@ -1,5 +1,5 @@
 // src/views/devisMoe/DevisMoeHonorairesTab.jsx
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Plus, Trash2, Search, Percent, Clock, ChevronRight, ChevronDown, CheckCircle2, Layers, AlertTriangle, Calculator, PanelLeftClose, PanelLeftOpen, PanelRightClose, BookOpen, GripVertical, Pencil, X } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { PHASES_LOI_MOP, createEmptyLot, TACHE_TEMPLATES, COTRAITANT_COLORS, MANDATAIRE_COLOR, getCategoriesForAssignee, buildCategoriesMap, createEmptyTache } from '../../hooks/useDevisMoe';
@@ -191,6 +191,14 @@ export default function DevisMoeHonorairesTab({ draft, onChange, templatesOpen, 
         };
         const removeTache = (id) => onChange({ ...draft, taches: taches.filter(t => t.id !== id) });
         const updateTacheLabel = (id, label) => onChange({ ...draft, taches: taches.map(t => t.id === id ? { ...t, label } : t) });
+
+        // Extracted handlers for .map() rows
+        const handleTacheLabelChange = (tacheId) => (e) => updateTacheLabel(tacheId, e.target.value);
+        const handleTacheTempsChange = (tacheId, catId, aKey) => (e) => {
+          const v = parseFloat(e.target.value);
+          updateTacheTemps(tacheId, catId, isNaN(v) ? '' : String(uniteTemps === 'j' ? v * H_PAR_JOUR : v), aKey);
+        };
+        const handleTemplateClick = (tplLabel) => () => { if (selectedPhaseId) addTache(selectedPhaseId, tplLabel); };
         const updateTacheTemps = (id, catId, val, assigneeKey = null) => {
           onChange({ ...draft, taches: taches.map(t => {
             if (t.id !== id) return t;
@@ -315,7 +323,7 @@ export default function DevisMoeHonorairesTab({ draft, onChange, templatesOpen, 
                             <Draggable key={`stpl-${idx}`} draggableId={`stpl-${idx}`} index={idx}>
                               {(dragProvided, dragSnapshot) => (
                                 <div ref={dragProvided.innerRef} {...dragProvided.draggableProps}
-                                  onClick={() => { if (selectedPhaseId) addTache(selectedPhaseId, tpl.label); }}
+                                  onClick={handleTemplateClick(tpl.label)}
                                   className={`group/tpl relative flex items-start p-2 bg-white border border-slate-200 rounded-lg shadow-sm cursor-default
                                     hover:border-emerald-400 hover:shadow-md hover:bg-emerald-50/30 transition-all duration-200 active:scale-[0.98] ${
                                     dragSnapshot.isDragging ? 'shadow-lg border-emerald-400 bg-emerald-50/30' : ''
@@ -571,7 +579,7 @@ export default function DevisMoeHonorairesTab({ draft, onChange, templatesOpen, 
                                                   {/* Désignation */}
                                                   <div className="flex-1 px-2 min-w-0">
                                                     <input className="w-full bg-transparent text-[11px] font-semibold text-slate-700 uppercase placeholder-slate-300 outline-none border-b border-transparent focus:border-emerald-300 transition-all"
-                                                      value={t.label} onChange={e => updateTacheLabel(t.id, e.target.value)} placeholder="Description de la tâche…" />
+                                                      value={t.label} onChange={handleTacheLabelChange(t.id)} placeholder="Description de la tâche…" />
                                                   </div>
                                                   {/* Heures par cat — groupées par assignee si mode groupement */}
                                                   {(assigneeKeys && assigneeKeys.length > 1 ? assigneeKeys : [null]).map((aKey, aIdx) => {
@@ -589,7 +597,7 @@ export default function DevisMoeHonorairesTab({ draft, onChange, templatesOpen, 
                                                             <div key={`${aKey || 'solo'}-${cat.id}`} className={`${catColW} px-0.5 shrink-0 ${color ? color.bg : ''}`}>
                                                               <input type="number" min="0" step="0.5"
                                                                 className={`w-full border rounded py-0.5 px-1 text-right text-xs font-mono font-bold outline-none transition-colors focus:border-emerald-500 focus:bg-white text-slate-700 tabular-nums ${color ? `bg-white/60 ${color.border}` : 'bg-slate-50 border-slate-200'}`}
-                                                                value={dv} onChange={e => { const v = parseFloat(e.target.value); updateTacheTemps(t.id, cat.id, isNaN(v) ? '' : String(uniteTemps === 'j' ? v * H_PAR_JOUR : v), aKey); }} placeholder="—" />
+                                                                value={dv} onChange={handleTacheTempsChange(t.id, cat.id, aKey)} placeholder="—" />
                                                             </div>
                                                           );
                                                         })}

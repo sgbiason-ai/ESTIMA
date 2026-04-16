@@ -12,7 +12,7 @@ import autoTable from 'jspdf-autotable';
 import { DEFAULT_BRANDING } from '../data/branding';
 import { MEETING_TYPES, GROUP_COLORS, abbreviateGroup } from '../data/crrData';
 import { parseObsHtml, stripHtml } from './formatObsText.jsx';
-import { lightenRgb, darkenRgb, loadImage, formatDateFr, formatDateLong, sanitizeFilename } from './pdf/pdfSharedHelpers';
+import { lightenRgb, darkenRgb, loadImage, formatDateFr, formatDateLong, sanitizeFilename, loadLogos } from './pdf/pdfSharedHelpers';
 import { buildTheme as _buildTheme } from './pdf/buildTheme';
 
 // ─── HELPERS ────────────────────────────────────────────────────────────────
@@ -186,7 +186,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
   const pdfProjectName = (projectName || 'PROJET').toUpperCase();
 
   // Logos
-  const logoMoe = await loadImage(branding?.logo || '/logo.jpg').catch(() => null);
+  const { logoMoe } = await loadLogos(branding, {});
   const logoCommune = crrConfig.chantierInfo?.communeLogo
     ? await loadImage(crrConfig.chantierInfo.communeLogo).catch(() => null)
     : null;

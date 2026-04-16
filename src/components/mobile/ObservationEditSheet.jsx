@@ -7,6 +7,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import Icon from './Icon';
 import { compressImage } from '../../utils/imageCompressor';
 import { useOrientation } from '../../hooks/useOrientation';
+import { sanitizeHtml } from '../../utils/helpers';
 
 // ─── STATUS CONFIG ─────────────────────────────────────────────────────────
 const STATUSES = [
@@ -152,7 +153,7 @@ export default function ObservationEditSheet({
               suppressContentEditableWarning
               onBlur={handleTextBlur}
               className="min-h-[100px] px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-gray-900 leading-relaxed focus:outline-none focus:border-emerald-500/40"
-              dangerouslySetInnerHTML={{ __html: obs.text || '' }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(obs.text || '') }}
             />
 
           </Field>

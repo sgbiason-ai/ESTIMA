@@ -3,7 +3,7 @@
 // Modale unifiee : arborescence participants (gauche) + bibliotheque (droite)
 // Drag & drop : biblio → groupes, contact entre groupes
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   X, Plus, Trash2, Check, Edit2, Edit3, ChevronDown, ChevronRight,
   Users, BookUser, Upload, Download, Info, UserPlus, GripVertical, Copy,
@@ -59,6 +59,24 @@ const GroupTree = ({
     setEditingContact(null);
   };
 
+  // Extracted handlers for .map() rows
+  const handleGroupNameChange = useCallback((groupId, e) => {
+    updateParticipantGroup(groupId, { name: e.target.value });
+  }, [updateParticipantGroup]);
+
+  const handleGroupSubLabelChange = useCallback((groupId, e) => {
+    updateParticipantGroup(groupId, { subLabel: e.target.value });
+  }, [updateParticipantGroup]);
+
+  const handleEditDataChange = useCallback((field, e) => {
+    setEditData((prev) => ({ ...prev, [field]: e.target.value }));
+  }, []);
+
+  const handlePhoneChange = useCallback((e) => {
+    const raw = e.target.value.replace(/\D/g, '').slice(0, 10);
+    setEditData((prev) => ({ ...prev, phone: raw.replace(/(\d{2})(?=\d)/g, '$1 ').trim() }));
+  }, []);
+
   const totalContacts = (participantGroups || []).reduce((n, g) => n + (g.contacts?.length || 0), 0);
 
   return (
@@ -107,13 +125,13 @@ const GroupTree = ({
                       <div className="flex items-center gap-1 flex-1" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="text" value={group.name}
-                          onChange={(e) => updateParticipantGroup(group.id, { name: e.target.value })}
+                          onChange={(e) => handleGroupNameChange(group.id, e)}
                           className="text-[11px] font-bold px-1.5 py-0.5 border border-emerald-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 w-28 text-slate-800"
                           autoFocus onKeyDown={(e) => e.key === 'Enter' && setEditingGroup(null)}
                         />
                         <input
                           type="text" value={group.subLabel || ''}
-                          onChange={(e) => updateParticipantGroup(group.id, { subLabel: e.target.value })}
+                          onChange={(e) => handleGroupSubLabelChange(group.id, e)}
                           placeholder="Sous-label..."
                           className="text-[11px] px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 w-36 text-slate-800"
                           onKeyDown={(e) => e.key === 'Enter' && setEditingGroup(null)}
@@ -162,16 +180,14 @@ const GroupTree = ({
 
                             {isEditingC ? (
                               <div className="flex items-center gap-1 flex-1 min-w-0">
-                                <input type="text" value={editData.name || ''} onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                                <input type="text" value={editData.name || ''} onChange={(e) => handleEditDataChange('name', e)}
                                   placeholder="NOM Prenom" autoFocus onKeyDown={(e) => e.key === 'Enter' && saveEditContact(group.id, contact.id)}
                                   className="text-[11px] px-1.5 py-0.5 border border-emerald-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 w-28 text-slate-800" />
-                                <input type="text" value={editData.email || ''} onChange={(e) => setEditData({ ...editData, email: e.target.value })}
+                                <input type="text" value={editData.email || ''} onChange={(e) => handleEditDataChange('email', e)}
                                   placeholder="email" onKeyDown={(e) => e.key === 'Enter' && saveEditContact(group.id, contact.id)}
                                   className="text-[11px] px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 w-32 text-slate-800" />
-                                <input type="tel" value={editData.phone || ''} onChange={(e) => {
-                                  const raw = e.target.value.replace(/\D/g, '').slice(0, 10);
-                                  setEditData({ ...editData, phone: raw.replace(/(\d{2})(?=\d)/g, '$1 ').trim() });
-                                }} placeholder="06 00 00 00 00" onKeyDown={(e) => e.key === 'Enter' && saveEditContact(group.id, contact.id)}
+                                <input type="tel" value={editData.phone || ''} onChange={handlePhoneChange}
+                                  placeholder="06 00 00 00 00" onKeyDown={(e) => e.key === 'Enter' && saveEditContact(group.id, contact.id)}
                                   className="text-[11px] px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 w-28 text-slate-800" />
                                 <button onClick={() => saveEditContact(group.id, contact.id)} className="p-0.5 text-emerald-600 hover:bg-emerald-100 rounded"><Check size={11} /></button>
                                 <button onClick={() => setEditingContact(null)} className="p-0.5 text-slate-400 hover:bg-slate-100 rounded"><X size={11} /></button>
@@ -185,6 +201,7 @@ const GroupTree = ({
                                   <button onClick={() => startEditContact(contact)} className="p-0.5 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded"><Edit2 size={10} /></button>
                                   <button onClick={() => handleDeleteContact(group.id, contact.id)} className="p-0.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded"><Trash2 size={10} /></button>
                                 </div>
+
                               </>
                             )}
                           </div>
@@ -368,6 +385,16 @@ const LibraryPanel = ({ contacts, onSave }) => {
     toast.success(`${contacts.length} contact(s) exporte(s).`);
   };
 
+  // Extracted handlers for .map() rows
+  const handleLibEditDataChange = useCallback((field, e) => {
+    setEditData((prev) => ({ ...prev, [field]: e.target.value }));
+  }, []);
+
+  const handleStartEditLibContact = useCallback((contact) => {
+    setEditingId(contact.id);
+    setEditData(contact);
+  }, []);
+
   const handleRemoveDuplicates = () => {
     const norm = (s) => (s || '').trim().toLowerCase();
     const seenEmails = new Set();
@@ -471,16 +498,16 @@ const LibraryPanel = ({ contacts, onSave }) => {
                     >
                       {isEditing ? (
                         <>
-                          <input type="text" value={editData.subLabel || ''} onChange={(e) => setEditData({ ...editData, subLabel: e.target.value })}
+                          <input type="text" value={editData.subLabel || ''} onChange={(e) => handleLibEditDataChange('subLabel', e)}
                             placeholder="Label" className="text-[11px] px-1.5 py-0.5 border border-violet-300 rounded focus:outline-none text-slate-800 w-full" autoFocus />
-                          <input type="text" value={editData.name || ''} onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                          <input type="text" value={editData.name || ''} onChange={(e) => handleLibEditDataChange('name', e)}
                             placeholder="NOM Prenom" className="text-[11px] px-1.5 py-0.5 border border-violet-300 rounded focus:outline-none text-slate-800 w-full"
                             onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit()} />
                           <div className="flex flex-col gap-0.5">
-                            <input type="text" value={editData.email || ''} onChange={(e) => setEditData({ ...editData, email: e.target.value })}
+                            <input type="text" value={editData.email || ''} onChange={(e) => handleLibEditDataChange('email', e)}
                               placeholder="email" className="text-[11px] px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none text-slate-800 w-full"
                               onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit()} />
-                            <input type="tel" value={editData.phone || ''} onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
+                            <input type="tel" value={editData.phone || ''} onChange={(e) => handleLibEditDataChange('phone', e)}
                               placeholder="telephone" className="text-[10px] px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none text-slate-800 w-full"
                               onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit()} />
                           </div>
@@ -498,7 +525,7 @@ const LibraryPanel = ({ contacts, onSave }) => {
                             {c.phone && <span className="text-[10px] text-slate-400">{c.phone}</span>}
                           </div>
                           <div className="flex items-center gap-0.5 opacity-0 group-hover/lib:opacity-100 transition-all">
-                            <button onClick={() => { setEditingId(c.id); setEditData(c); }} className="p-0.5 text-slate-300 hover:text-violet-600 hover:bg-violet-50 rounded"><Edit3 size={10} /></button>
+                            <button onClick={() => handleStartEditLibContact(c)} className="p-0.5 text-slate-300 hover:text-violet-600 hover:bg-violet-50 rounded"><Edit3 size={10} /></button>
                             <button onClick={() => handleDelete(c.id)} className="p-0.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded"><Trash2 size={10} /></button>
                           </div>
                         </>

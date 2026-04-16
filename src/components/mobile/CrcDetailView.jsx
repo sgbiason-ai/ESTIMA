@@ -9,6 +9,7 @@ import Icon from './Icon';
 import { dateFr } from './formatters';
 import { OBSERVATION_STATUSES, PRESENCE_OPTIONS, MEETING_TYPES, GROUP_COLORS, getGroupColor } from '../../data/crrData';
 import { normalizeObsText, stripHtml } from '../../utils/formatObsText';
+import { sanitizeHtml } from '../../utils/helpers';
 // fileSaver non utilisé — export PDF direct par téléchargement
 // exportHelpers chargé dynamiquement pour le code-splitting
 import ImageViewerModal from './ImageViewerModal';
@@ -657,7 +658,7 @@ function SwiperSlide({ obs, allContacts, onViewImage }) {
       </div>
 
       {text && (
-        <div className="prose-mobile mb-4" dangerouslySetInnerHTML={{ __html: normalizeObsText(text) }} />
+        <div className="prose-mobile mb-4" dangerouslySetInnerHTML={{ __html: sanitizeHtml(normalizeObsText(text)) }} />
       )}
 
       {images.length > 0 && (

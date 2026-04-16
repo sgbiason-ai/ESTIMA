@@ -97,10 +97,14 @@ const ALLOWED_TAGS = ['b', 'strong', 'u', 'mark', 'span', 'br', 'div', 'ul', 'ol
 const sanitizeHtml = (html) => {
   if (!html) return '';
   const normalized = normalizeObsText(html);
-  // Strip tout sauf les tags autorises
+  // Strip tout sauf les tags autorisés, ET supprimer les attributs (protection XSS)
   return normalized.replace(/<\/?([a-z][a-z0-9]*)\b[^>]*>/gi, (match, tag) => {
-    if (ALLOWED_TAGS.includes(tag.toLowerCase())) return match;
-    return '';
+    const tagLower = tag.toLowerCase();
+    if (!ALLOWED_TAGS.includes(tagLower)) return '';
+    // Reconstruire le tag SANS attributs (supprime onmouseover, onclick, style, etc.)
+    if (match.startsWith('</')) return `</${tagLower}>`;
+    const selfClose = match.endsWith('/>') ? ' /' : '';
+    return `<${tagLower}${selfClose}>`;
   });
 };
 

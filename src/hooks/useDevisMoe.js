@@ -1,6 +1,6 @@
 // src/hooks/useDevisMoe.js
 import { useState, useEffect, useCallback } from 'react';
-import { collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../firebase';
 import { generateId } from '../utils/helpers';
 import { useToast } from '../contexts/ToastContext';
@@ -168,9 +168,8 @@ export const useDevisMoe = (user, companyId) => {
   useEffect(() => {
     if (!user || !companyId) return;
     setIsLoading(true);
-    const unsub = onSnapshot(col(companyId), (snap) => {
+    const unsub = onSnapshot(query(col(companyId), orderBy('createdAt', 'desc'), limit(100)), (snap) => {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      data.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
       setDevisList(data);
       setIsLoading(false);
     }, (err) => {

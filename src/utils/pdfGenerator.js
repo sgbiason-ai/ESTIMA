@@ -1,31 +1,12 @@
 // src/utils/pdfGenerator.js
-//
-// ═══════════════════════════════════════════════════════════════════
-// CE QUI A CHANGÉ PAR RAPPORT À L'ORIGINAL :
-//
-//  1. `hexToRgbArray(hex)` — [NOUVEAU] convertit '#286E55' → [40, 110, 85]
-//     jsPDF exige des tableaux RGB, pas des codes hex.
-//
-//  2. `buildTheme(branding)` — [NOUVEAU] construit l'objet THEME
-//     depuis les couleurs du branding. Fallback sur THEME par défaut
-//     si aucun branding n'est passé.
-//
-//  3. `drawCoverPage` — reçoit `branding` en 7ème argument.
-//     Utilise les couleurs dynamiques du thème.
-//     Affiche les infos MOE (nom, adresse, tél, email, site)
-//     dans le pied de page si renseignées dans le branding.
-//
-//  4. `generateProfessionalPDF` — passe `branding` à `drawCoverPage`
-//     et reconstruit le THEME dynamique pour les en-têtes de tableaux.
-//
-// Tout le reste est IDENTIQUE à l'original.
-// ═══════════════════════════════════════════════════════════════════
+// Génère le PDF Estimation / DQE.
+// Cover page, signatures, footer MOE : fonctions partagées (pdfSharedHelpers).
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { cleanText, formatPrice, getItemRefMap, normalizeUnitSymbol } from './helpers';
 import { saveFileWithPicker, FILE_TYPES, PICKER_IDS } from './fileSaver';
-import { loadImage, sanitizeFilename } from './pdf/pdfSharedHelpers';
+import { sanitizeFilename, loadLogos, renderLogo, drawCoverPage as _drawCoverPage } from './pdf/pdfSharedHelpers';
 import { buildTheme } from './pdf/buildTheme';
 
 const cleanFormat = (num) => {
@@ -83,227 +64,28 @@ const collectData = (nodes, isParentOption, level, mode, projectRefMap, currentQ
 };
 
 // ─── PAGE DE GARDE ────────────────────────────────────────────────────────────
-// [MODIFIÉ] Reçoit `branding` en 7ème argument pour :
-//   - Appliquer les couleurs dynamiques (via THEME reconstruit)
-//   - Afficher les infos MOE dans le pied de page
+// Utilise drawCoverPage partagé depuis pdfSharedHelpers.js
 
 const drawCoverPage = (doc, project, logoMoe, logoClient, type, today, branding = null) => {
-  const pageWidth = doc.internal.pageSize.width;
-  const pageHeight = doc.internal.pageSize.height;
-
-  // [MODIFIÉ] On reconstruit le thème depuis le branding si disponible
   const THEME = buildTheme(branding);
+  const docType = type === 'DQE' ? 'DÉTAIL QUANTITATIF ET ESTIMATIF' : 'ESTIMATION CONFIDENTIELLE DES TRAVAUX';
 
-  const phaseLabel = (project.phase || 'DCE').toUpperCase();
-  const clientName = project.client || 'Non renseigné';
-  const clientStreet = project.clientAddress ? project.clientAddress.trim() : '';
-  const clientCityZip = [project.clientZip, project.clientCity].filter(Boolean).join(' ').trim();
-  const locationRaw = project.location || 'Non renseignée';
-  const codeAffaire = project.code || 'Non défini';
-  const subtitle1 = (project.subtitle1 || '').trim();
-  const subtitle2 = (project.subtitle2 || '').trim();
-  const showSignatures = project.showSignatures !== false;
-  const signatories = project.signatories || ['', '', '', ''];
-
-  // Bande de couleur gauche (couleur primaire du branding)
-  doc.setFillColor(...THEME.primary);
-  doc.rect(0, 0, 6, pageHeight, 'F');
-
-  // Logos
-  const renderLogo = (logoImage, isLeft) => {
-    if (!logoImage) return;
-    const maxW = 45; const maxH = 25;
-    const ratio = logoImage.width / logoImage.height;
-    let w = maxW; let h = w / ratio;
-    if (h > maxH) { h = maxH; w = h * ratio; }
-    const yPos = 18 + (maxH - h) / 2;
-    const xPos = isLeft ? 18 : pageWidth - 18 - w;
-    doc.addImage(logoImage, 'JPEG', xPos, yPos, w, h);
-  };
-
-  renderLogo(logoMoe, true);
-  renderLogo(logoClient, false);
-
-  // Type de document
-  doc.setFont("Helvetica", "bold");
-  doc.setFontSize(10);
-  doc.setTextColor(...THEME.lightText);
-  const docType = type === 'DQE' ? "DÉTAIL QUANTITATIF ET ESTIMATIF" : "ESTIMATION CONFIDENTIELLE DES TRAVAUX";
-  doc.text(docType, pageWidth - 18, 52, { align: 'right' });
-  doc.setDrawColor(...THEME.borders); doc.setLineWidth(0.5);
-  doc.line(pageWidth - 95, 57, pageWidth - 18, 57);
-
-  // Titre projet
-  doc.setFontSize(32);
-  doc.setTextColor(...THEME.primary);
-  const title = (project?.name || "NOM DU PROJET").toUpperCase();
-  const splitTitle = doc.splitTextToSize(title, pageWidth - 40);
-  doc.text(splitTitle, 18, 100);
-
-  const titleHeight = splitTitle.length * 12;
-  doc.setDrawColor(...THEME.accent);
-  doc.setLineWidth(1.5);
-  doc.line(18, 100 + titleHeight + 4, 60, 100 + titleHeight + 4);
-
-  // Sous-titres
-  let subtitleOffset = 0;
-  if (subtitle1) {
-    subtitleOffset += 10;
-    doc.setFontSize(13); doc.setFont("Helvetica", "normal"); doc.setTextColor(...THEME.lightText);
-    doc.text(subtitle1.toUpperCase(), 18, 100 + titleHeight + 4 + subtitleOffset);
-  }
-  if (subtitle2) {
-    subtitleOffset += 7;
-    doc.setFontSize(11); doc.setFont("Helvetica", "normal"); doc.setTextColor(...THEME.lightText);
-    doc.text(subtitle2.toUpperCase(), 18, 100 + titleHeight + 4 + subtitleOffset);
-  }
-
-  // Bloc infos projet
-  const blockY = 125 + titleHeight + subtitleOffset;
-  doc.setFillColor(...THEME.secondary);
-  doc.roundedRect(18, blockY, pageWidth - 36, 65, 3, 3, 'F');
-
-  const col1X = 28;
-  const col2X = pageWidth / 2 + 10;
-  let startY = blockY + 15;
-
-  // Colonne 1 : MOA & lieu
-  doc.setFontSize(8); doc.setTextColor(...THEME.lightText); doc.setFont("Helvetica", "bold");
-  doc.text("MAÎTRE D'OUVRAGE", col1X, startY);
-  doc.setFontSize(11); doc.setTextColor(...THEME.text);
-  const splitClient = doc.splitTextToSize(clientName.toUpperCase(), (pageWidth / 2) - 40);
-  doc.text(splitClient, col1X, startY + 6);
-  let currentY = startY + 6 + (splitClient.length * 5);
-  doc.setFontSize(9); doc.setTextColor(100, 116, 139); doc.setFont("Helvetica", "normal");
-  if (clientStreet) {
-    const splitStreet = doc.splitTextToSize(clientStreet.toUpperCase(), (pageWidth / 2) - 40);
-    doc.text(splitStreet, col1X, currentY);
-    currentY += (splitStreet.length * 5);
-  }
-  if (clientCityZip) {
-    const splitCityZip = doc.splitTextToSize(clientCityZip.toUpperCase(), (pageWidth / 2) - 40);
-    doc.text(splitCityZip, col1X, currentY);
-    currentY += (splitCityZip.length * 5);
-  }
-  currentY += 8;
-  doc.setFontSize(8); doc.setTextColor(...THEME.lightText); doc.setFont("Helvetica", "bold");
-  doc.text("LIEU DE RÉALISATION", col1X, currentY);
-  doc.setFontSize(11); doc.setTextColor(...THEME.text);
-  const splitLoc = doc.splitTextToSize(locationRaw.toUpperCase(), (pageWidth / 2) - 40);
-  doc.text(splitLoc, col1X, currentY + 6);
-
-  // Colonne 2 : Phase & code
-  doc.setFontSize(8); doc.setTextColor(...THEME.lightText); doc.setFont("Helvetica", "bold");
-  doc.text("PHASE DU PROJET", col2X, startY);
-  doc.setFillColor(...THEME.primary);
-  doc.roundedRect(col2X, startY + 3, 28, 6, 1.5, 1.5, 'F');
-  doc.setFontSize(9); doc.setTextColor(255, 255, 255); doc.setFont("Helvetica", "bold");
-  doc.text(phaseLabel, col2X + 14, startY + 7.5, { align: 'center' });
-
-  let rightY = startY + 22;
-  doc.setFontSize(8); doc.setTextColor(...THEME.lightText); doc.setFont("Helvetica", "bold");
-  doc.text("RÉFÉRENCE PROJET (CODE AFFAIRE)", col2X, rightY);
-  doc.setFontSize(11); doc.setTextColor(...THEME.text);
-  doc.text(codeAffaire.toUpperCase(), col2X, rightY + 6);
-
-  // ── Cases tampon / signature ─────────────────────────────────────────────
-  const footerTopY  = branding?.companyName ? pageHeight - 28 : pageHeight - 20;
-  const sigZoneTop  = blockY + 65 + 6;
-  const sigZoneH    = footerTopY - 6 - sigZoneTop;
-
-  if (showSignatures && sigZoneH > 25) {
-    const margin = 18;
-    const gap    = 4;
-    const n      = 4;
-    const boxW   = (pageWidth - margin * 2 - gap * (n - 1)) / n;
-    const labelH = 8;
-
-    for (let i = 0; i < n; i++) {
-      const bx = margin + i * (boxW + gap);
-      const by = sigZoneTop;
-
-      // Fond très léger
-      doc.setFillColor(...THEME.secondary);
-      doc.roundedRect(bx, by, boxW, sigZoneH, 2, 2, 'F');
-
-      // Contour
-      doc.setDrawColor(...THEME.primary);
-      doc.setLineWidth(0.4);
-      doc.roundedRect(bx, by, boxW, sigZoneH, 2, 2, 'S');
-
-      // Bandeau titre (fond primary)
-      doc.setFillColor(...THEME.primary);
-      doc.roundedRect(bx, by, boxW, labelH, 2, 2, 'F');
-      // Carré bas du bandeau (pour masquer les coins arrondis bas du bandeau)
-      doc.rect(bx, by + labelH / 2, boxW, labelH / 2, 'F');
-
-      // Nom signataire
-      const sigName = (signatories[i] || ['Le Maître d\'Ouvrage', 'Le Maître d\'Œuvre', 'L\'Entreprise', 'Le Bureau de Contrôle'][i]).trim();
-      doc.setFontSize(7); doc.setFont("Helvetica", "bold"); doc.setTextColor(255, 255, 255);
-      doc.text(sigName.toUpperCase(), bx + boxW / 2, by + labelH / 2 + 1.5, { align: 'center' });
-
-      // Ligne "Lu et approuvé" en bas
-      const luY = by + sigZoneH - 10;
-      doc.setDrawColor(...THEME.borders);
-      doc.setLineWidth(0.3);
-      doc.line(bx + 3, luY, bx + boxW - 3, luY);
-
-      doc.setFontSize(6); doc.setFont("Helvetica", "normal"); doc.setTextColor(...THEME.lightText);
-      doc.text('Lu et approuvé — Signature', bx + boxW / 2, by + sigZoneH - 4, { align: 'center' });
-    }
-  }
-
-  // ── [NOUVEAU] PIED DE PAGE MOE ──────────────────────────────────────────────
-  // Affiche les informations de la société MOE (depuis branding)
-  // si au moins le nom de société est renseigné.
-  if (branding?.companyName) {
-    const footerY = pageHeight - 20;
-
-    // Ligne de séparation fine
-    doc.setDrawColor(...THEME.borders);
-    doc.setLineWidth(0.3);
-    doc.line(18, footerY - 8, pageWidth - 18, footerY - 8);
-
-    // Nom société (gauche, gras, couleur primaire)
-    doc.setFont("Helvetica", "bold");
-    doc.setFontSize(7);
-    doc.setTextColor(...THEME.primary);
-    doc.text(branding.companyName.toUpperCase(), 18, footerY - 3);
-
-    // Tagline si présent
-    if (branding.tagline) {
-      doc.setFont("Helvetica", "normal");
-      doc.setFontSize(6);
-      doc.setTextColor(...THEME.lightText);
-      doc.text(branding.tagline, 18, footerY + 2);
-    }
-
-    // Infos de contact (droite) : adresse · tél · email · site
-    const contactParts = [
-      branding.address,
-      branding.phone,
-      branding.email,
-      branding.website,
-    ].filter(Boolean);
-
-    if (contactParts.length > 0) {
-      doc.setFont("Helvetica", "normal");
-      doc.setFontSize(6);
-      doc.setTextColor(...THEME.lightText);
-      doc.text(contactParts.join('  ·  '), pageWidth - 18, footerY - 3, { align: 'right' });
-    }
-
-    // Date (tout à droite en bas)
-    doc.setFontSize(6);
-    doc.text(`Édité le ${today}`, pageWidth - 18, footerY + 2, { align: 'right' });
-
-  } else {
-    // Comportement original si pas de branding : juste la date
-    doc.setFontSize(8);
-    doc.setTextColor(...THEME.lightText);
-    doc.setFont("Helvetica", "normal");
-    doc.text(`Édité le ${today}`, pageWidth - 18, pageHeight - 12, { align: 'right' });
-  }
+  _drawCoverPage(doc, {
+    docType,
+    title: project?.name,
+    subtitle1: (project.subtitle1 || '').trim(),
+    subtitle2: (project.subtitle2 || '').trim(),
+    phaseLabel: (project.phase || 'DCE').toUpperCase(),
+    clientName: project.client || 'Non renseigné',
+    clientStreet: project.clientAddress ? project.clientAddress.trim() : '',
+    clientCityZip: [project.clientZip, project.clientCity].filter(Boolean).join(' ').trim(),
+    locationRaw: project.location || 'Non renseignée',
+    codeAffaire: project.code || 'Non défini',
+    showSignatures: project.showSignatures !== false,
+    signatories: project.signatories || ['', '', '', ''],
+    branding,
+    today,
+  }, THEME, { logoMoe, logoClient });
 };
 
 // ─── FONCTION PRINCIPALE ──────────────────────────────────────────────────────
@@ -313,13 +95,10 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
   const doc = new jsPDF();
   const today = new Date().toLocaleDateString('fr-FR');
 
-  // [MODIFIÉ] Thème dynamique depuis le branding
   const THEME = buildTheme(branding);
 
-  // Chargement des logos
-  const moeLogoSource = branding?.logo || '/logo.jpg';
-  const logoMoe = await loadImage(moeLogoSource);
-  const logoClient = project.clientLogo ? await loadImage(project.clientLogo) : null;
+  // Chargement des logos (fonction partagée)
+  const { logoMoe, logoClient } = await loadLogos(branding, project);
 
   const phaseLabel = (project.phase || 'PROJET').toUpperCase();
   const isDQE = type === 'DQE';

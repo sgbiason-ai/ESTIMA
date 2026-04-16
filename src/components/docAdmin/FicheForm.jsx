@@ -351,6 +351,15 @@ export default function FicheForm({ fiche, onSave, isSaving }) {
     setHasChanges(true);
   }, []);
 
+  // Extracted handlers for .map() rows (lots)
+  const handleLotFieldChange = useCallback((index, field) => (e) => {
+    updateLot(index, field, e.target.value);
+  }, [updateLot]);
+
+  const handleLotMontantChange = useCallback((index) => (v) => {
+    updateLot(index, 'montantHT', v);
+  }, [updateLot]);
+
   // ── Gestion des groupes attributaires (1 entreprise → N lots) ────────────
   const addGroupeAttributaire = useCallback(() => {
     setForm((prev) => ({
@@ -666,20 +675,20 @@ export default function FicheForm({ fiche, onSave, isSaving }) {
                       <input
                         type="text"
                         value={lot.numero || ''}
-                        onChange={(e) => updateLot(idx, 'numero', e.target.value)}
+                        onChange={handleLotFieldChange(idx, 'numero')}
                         placeholder="N°"
                         className="w-16 px-2 py-1.5 rounded bg-white border border-gray-300 text-xs text-gray-800 placeholder-gray-400 focus:border-emerald-500 focus:outline-none"
                       />
                       <input
                         type="text"
                         value={lot.designation || ''}
-                        onChange={(e) => updateLot(idx, 'designation', e.target.value)}
+                        onChange={handleLotFieldChange(idx, 'designation')}
                         placeholder="Désignation du lot"
                         className="flex-1 px-2 py-1.5 rounded bg-white border border-gray-300 text-xs text-gray-800 placeholder-gray-400 focus:border-emerald-500 focus:outline-none"
                       />
                       <MontantInput
                         value={lot.montantHT}
-                        onChange={(v) => updateLot(idx, 'montantHT', v)}
+                        onChange={handleLotMontantChange(idx)}
                       />
                       <span className="text-[10px] text-gray-400 shrink-0">€ HT</span>
                       <button

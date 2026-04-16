@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import * as XLSX from 'xlsx';
+// XLSX chargé dynamiquement dans importFromExcel() pour éviter 425 KB au démarrage
 import { generateId } from '../utils/helpers';
 import { useDialog } from '../contexts/DialogContext';
 import { useToast } from '../contexts/ToastContext';
@@ -20,16 +20,44 @@ export const useDatabase = (user, companyId) => {
   const [categories, setCategories] = useState([]);
   const [units, setUnits]           = useState([]);
 
-  const CAT_COLORS = ['#3b82f6','#f59e0b','#8b5cf6','#10b981','#f43f5e','#06b6d4','#ec4899','#84cc16','#f97316','#6366f1','#14b8a6','#e11d48'];
+  // 16 couleurs bien distinctes (couvre 5-15 dossiers sans doublon)
+  const CAT_COLORS = [
+    '#3b82f6', // bleu
+    '#f59e0b', // ambre
+    '#8b5cf6', // violet
+    '#10b981', // émeraude
+    '#ef4444', // rouge
+    '#06b6d4', // cyan
+    '#ec4899', // rose
+    '#84cc16', // lime
+    '#f97316', // orange
+    '#6366f1', // indigo
+    '#14b8a6', // sarcelle
+    '#92400e', // brun
+    '#0ea5e9', // ciel
+    '#d946ef', // fuchsia
+    '#64748b', // ardoise
+    '#059669', // vert foncé
+  ];
+  const isValidHex = (c) => /^#[0-9a-fA-F]{6}$/.test(c);
 
-  // Assigner des couleurs aux catégories qui n'en ont pas et persister en base
+  // Assigner des couleurs uniques aux catégories qui n'en ont pas
   const ensureCategoryColors = useCallback(async (cats) => {
-    const toFix = cats.filter(c => !c.color);
+    const toFix = cats.filter(c => !c.color || !isValidHex(c.color));
     if (toFix.length === 0 || !companyId) return cats;
-    const updated = cats.map((c, i) => c.color ? c : { ...c, color: CAT_COLORS[i % CAT_COLORS.length] });
-    // Persister les couleurs en base
+    // Couleurs déjà prises
+    const usedColors = new Set(cats.filter(c => isValidHex(c.color)).map(c => c.color));
+    const available = CAT_COLORS.filter(c => !usedColors.has(c));
+    let idx = 0;
+    const updated = cats.map(c => {
+      if (c.color && isValidHex(c.color)) return c;
+      const color = idx < available.length ? available[idx] : CAT_COLORS[(usedColors.size + idx) % CAT_COLORS.length];
+      idx++;
+      return { ...c, color };
+    });
+    // Persister en base
     await Promise.all(
-      updated.filter((c, i) => !cats[i].color).map(c => setDoc(dref(companyId, 'categories', c.id), c))
+      updated.filter((c, i) => c.color !== cats[i].color).map(c => setDoc(dref(companyId, 'categories', c.id), c))
     ).catch(() => {});
     return updated;
   }, [companyId]);
@@ -313,6 +341,7 @@ export const useDatabase = (user, companyId) => {
     reader.onload = async (e) => {
       try {
         const data = new Uint8Array(e.target.result);
+        const XLSX = await import('xlsx');
         const workbook = XLSX.read(data, { type: 'array' });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });

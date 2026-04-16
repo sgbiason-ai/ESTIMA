@@ -1,5 +1,5 @@
 // src/components/crr/CrrParticipants.jsx
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { Plus, Trash2, UserPlus, ChevronDown, ChevronRight, Users, Check, X, Minus, Edit2, GripVertical } from 'lucide-react';
 import { PRESENCE_OPTIONS, getGroupColor, abbreviateGroup } from '../../data/crrData';
 import { confirm } from '../../utils/globalUI';
@@ -115,6 +115,21 @@ const CrrParticipants = ({
     const ok = await confirm('Supprimer ce contact ?', { danger: true });
     if (ok) deleteContact(gid, cid);
   };
+
+  // Extracted handlers for .map() rows
+  const handleContactFieldChange = useCallback((groupId, contactId, field) => (e) => {
+    updateContact(groupId, contactId, { [field]: e.target.value });
+  }, [updateContact]);
+
+  const handleContactPhoneChange = useCallback((groupId, contactId) => (e) => {
+    const raw = e.target.value.replace(/\D/g, '').slice(0, 10);
+    const formatted = raw.replace(/(\d{2})(?=\d)/g, '$1 ').trim();
+    updateContact(groupId, contactId, { phone: formatted });
+  }, [updateContact]);
+
+  const handleContactCprChange = useCallback((groupId, contactId) => (v) => {
+    updateContact(groupId, contactId, { cpr: v });
+  }, [updateContact]);
 
   if (!meeting) return null;
 
@@ -305,9 +320,7 @@ const CrrParticipants = ({
                       <input
                         type="text"
                         value={contact.subLabel || ''}
-                        onChange={(e) =>
-                          updateContact(group.id, contact.id, { subLabel: e.target.value })
-                        }
+                        onChange={handleContactFieldChange(group.id, contact.id, 'subLabel')}
                         placeholder="Label"
                         spellCheck
                         lang="fr"
@@ -322,9 +335,7 @@ const CrrParticipants = ({
                       <input
                         type="text"
                         value={contact.name}
-                        onChange={(e) =>
-                          updateContact(group.id, contact.id, { name: e.target.value })
-                        }
+                        onChange={handleContactFieldChange(group.id, contact.id, 'name')}
                         placeholder="NOM Prenom"
                         spellCheck
                         lang="fr"
@@ -340,21 +351,14 @@ const CrrParticipants = ({
                         <input
                           type="email"
                           value={contact.email}
-                          onChange={(e) =>
-                            updateContact(group.id, contact.id, { email: e.target.value })
-                          }
+                          onChange={handleContactFieldChange(group.id, contact.id, 'email')}
                           placeholder="email@exemple.fr"
                           className="text-xs px-2 py-1 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 text-slate-800"
                         />
                         <input
                           type="tel"
                           value={contact.phone || ''}
-                          onChange={(e) => {
-                            // Formatage automatique 00 00 00 00 00
-                            const raw = e.target.value.replace(/\D/g, '').slice(0, 10);
-                            const formatted = raw.replace(/(\d{2})(?=\d)/g, '$1 ').trim();
-                            updateContact(group.id, contact.id, { phone: formatted });
-                          }}
+                          onChange={handleContactPhoneChange(group.id, contact.id)}
                           placeholder="06 00 00 00 00"
                           className="text-[10px] px-2 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 text-slate-700"
                         />
@@ -372,9 +376,7 @@ const CrrParticipants = ({
                     <div className="flex justify-center">
                       <DiffusionCheckbox
                         checked={contact.cpr}
-                        onChange={(v) =>
-                          updateContact(group.id, contact.id, { cpr: v })
-                        }
+                        onChange={handleContactCprChange(group.id, contact.id)}
                       />
                     </div>
 

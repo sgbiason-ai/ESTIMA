@@ -13,6 +13,7 @@ import {
   generateCrrId,
 } from '../data/crrData';
 import { useRobustSave } from './useRobustSave';
+import { useStableHash } from './useStableHash';
 
 export const useCrrManager = ({
   project,
@@ -115,13 +116,13 @@ export const useCrrManager = ({
     debounceMs: 2000,
   });
 
-  const lastSavedRef = useRef(JSON.stringify(project));
+  const projectHash = useStableHash(project);
+  const lastSavedHashRef = useRef(projectHash);
   useEffect(() => {
-    const currentStr = JSON.stringify(project);
-    if (currentStr === lastSavedRef.current) return;
-    lastSavedRef.current = currentStr;
+    if (projectHash === lastSavedHashRef.current) return;
+    lastSavedHashRef.current = projectHash;
     triggerSave(project);
-  }, [project, triggerSave]);
+  }, [projectHash, triggerSave]);
 
   // ── ACTIONS REUNIONS ──────────────────────────────────────────────────
 

@@ -57,11 +57,8 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
     getDoc(docRef).then(snap => {
       if (snap.exists()) {
         const data = snap.data();
-        console.log('[Analysis] ✅ Chargé depuis Firestore:', data.companies?.length, 'entreprises');
         if (data.companies?.length > 0) setCompanies(data.companies);
         if (data.scoringConfig) setScoringConfig(data.scoringConfig);
-      } else {
-        console.log('[Analysis] Aucune donnée Firestore pour ce projet');
       }
       setFirestoreLoaded(true);
     }).catch(e => {

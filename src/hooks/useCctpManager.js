@@ -4,6 +4,7 @@ import { SMART_MAPPING } from '../data/cctpData';
 import { parseDocxToTree } from '../utils/wordImporter';
 import { toast, confirm } from '../utils/globalUI';
 import { useRobustSave } from './useRobustSave';
+import { useStableHash } from './useStableHash';
 
 export const useCctpManager = ({
   project,
@@ -88,13 +89,13 @@ export const useCctpManager = ({
 
   const saveStatus = robustSave.saveStatus;
 
-  const lastSavedProjectRef = useRef(JSON.stringify(project));
+  const projectHash = useStableHash(project);
+  const lastSavedHashRef = useRef(projectHash);
   useEffect(() => {
-    const currentProjectString = JSON.stringify(project);
-    if (currentProjectString === lastSavedProjectRef.current) return;
-    lastSavedProjectRef.current = currentProjectString;
+    if (projectHash === lastSavedHashRef.current) return;
+    lastSavedHashRef.current = projectHash;
     robustSave.triggerSave(project);
-  }, [project, robustSave]);
+  }, [projectHash, robustSave]);
 
   const [activeNodeId, setActiveNodeId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');

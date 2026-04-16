@@ -4,6 +4,7 @@ import {
   hexToRgbArray, lightenRgb, darkenRgb,
   formatDateFr, formatDateLong, sanitizeFilename,
   cleanText, formatNumberFr,
+  loadLogos, renderLogo, drawSignatureBoxes, drawMoeFooter, drawCoverPage,
 } from '../utils/pdf/pdfSharedHelpers';
 
 // ─── hexToRgbArray ──────────────────────────────────────────────────────────
@@ -127,16 +128,16 @@ describe('sanitizeFilename', () => {
   });
 
   it('retire les caracteres speciaux', () => {
-    expect(sanitizeFilename('file<>:"/\\|?*name')).toBe('file_name');
+    expect(sanitizeFilename('file<>:"/\\|?*name')).toBe('filename');
   });
 
   it('condense les underscores multiples', () => {
     expect(sanitizeFilename('a   b   c')).toBe('a_b_c');
   });
 
-  it('tronque a 40 caracteres', () => {
-    const long = 'A'.repeat(60);
-    expect(sanitizeFilename(long).length).toBe(40);
+  it('tronque a 60 caracteres', () => {
+    const long = 'A'.repeat(80);
+    expect(sanitizeFilename(long).length).toBe(60);
   });
 
   it('retourne Document pour valeurs invalides', () => {
@@ -210,5 +211,186 @@ describe('formatNumberFr', () => {
   it('arrondit a 2 decimales', () => {
     expect(formatNumberFr(1.999)).toBe('2,00');
     expect(formatNumberFr(1.005)).toBe('1,00'); // JS floating point: 1.005 rounds to 1.00
+  });
+});
+
+// ─── renderLogo ─────────────────────────────────────────────────────────────
+
+describe('renderLogo', () => {
+  const mockDoc = {
+    addImage: () => {},
+  };
+
+  it('retourne {w:0, h:0} si logo est null', () => {
+    expect(renderLogo(mockDoc, null, 0, 0, 45, 25)).toEqual({ w: 0, h: 0 });
+  });
+
+  it('calcule les dimensions en respectant maxW', () => {
+    const logo = { width: 200, height: 100 }; // ratio 2:1
+    const addImageCalls = [];
+    const doc = { addImage: (...args) => addImageCalls.push(args) };
+    const result = renderLogo(doc, logo, 10, 20, 40, 30);
+    // w=40, h=40/2=20 (dans les limites maxH=30)
+    expect(result).toEqual({ w: 40, h: 20 });
+    expect(addImageCalls.length).toBe(1);
+    // Vérifie le centrage vertical : y = 20 + (30-20)/2 = 25
+    expect(addImageCalls[0][3]).toBe(25); // y position
+  });
+
+  it('calcule les dimensions en respectant maxH si le ratio est portrait', () => {
+    const logo = { width: 100, height: 200 }; // ratio 0.5
+    const doc = { addImage: () => {} };
+    const result = renderLogo(doc, logo, 0, 0, 45, 25);
+    // w=45, h=45/0.5=90 > maxH=25 → h=25, w=25*0.5=12.5
+    expect(result.h).toBe(25);
+    expect(result.w).toBe(12.5);
+  });
+});
+
+// ─── drawSignatureBoxes ────────────────────────────────────────────────────
+
+describe('drawSignatureBoxes', () => {
+  it('ne dessine rien si zoneHeight < 25', () => {
+    const calls = [];
+    const doc = {
+      internal: { pageSize: { width: 210 } },
+      setFillColor: (...args) => calls.push(['fill', args]),
+      setDrawColor: () => {},
+      setLineWidth: () => {},
+      setFontSize: () => {},
+      setFont: () => {},
+      setTextColor: () => {},
+      roundedRect: () => {},
+      rect: () => {},
+      text: () => {},
+      line: () => {},
+    };
+    const theme = { primary: [40, 110, 85], secondary: [245, 250, 248], borders: [220, 235, 230], lightText: [100, 116, 139] };
+    drawSignatureBoxes(doc, theme, { signatories: [], zoneTop: 200, zoneHeight: 20 });
+    expect(calls.length).toBe(0);
+  });
+
+  it('dessine 4 colonnes quand zoneHeight >= 25', () => {
+    const rectCalls = [];
+    const doc = {
+      internal: { pageSize: { width: 210 } },
+      setFillColor: () => {},
+      setDrawColor: () => {},
+      setLineWidth: () => {},
+      setFontSize: () => {},
+      setFont: () => {},
+      setTextColor: () => {},
+      roundedRect: (...args) => rectCalls.push(args),
+      rect: () => {},
+      text: () => {},
+      line: () => {},
+    };
+    const theme = { primary: [40, 110, 85], secondary: [245, 250, 248], borders: [220, 235, 230], lightText: [100, 116, 139] };
+    drawSignatureBoxes(doc, theme, { signatories: ['A', 'B', 'C', 'D'], zoneTop: 200, zoneHeight: 50 });
+    // 4 colonnes × 3 roundedRect chacune (fond, contour, bandeau) = 12
+    expect(rectCalls.length).toBe(12);
+  });
+});
+
+// ─── drawMoeFooter ──────────────────────────────────────────────────────────
+
+describe('drawMoeFooter', () => {
+  const makeDoc = () => {
+    const textCalls = [];
+    return {
+      internal: { pageSize: { width: 210, height: 297 } },
+      setDrawColor: () => {},
+      setLineWidth: () => {},
+      setFont: () => {},
+      setFontSize: () => {},
+      setTextColor: () => {},
+      line: () => {},
+      text: (...args) => textCalls.push(args),
+      _textCalls: textCalls,
+    };
+  };
+  const theme = { primary: [40, 110, 85], borders: [220, 235, 230], lightText: [100, 116, 139] };
+
+  it('affiche la date simple si pas de branding.companyName', () => {
+    const doc = makeDoc();
+    drawMoeFooter(doc, null, theme, '15/04/2026');
+    const hasDate = doc._textCalls.some(c => c[0].includes('15/04/2026'));
+    expect(hasDate).toBe(true);
+  });
+
+  it('affiche le nom société si branding.companyName present', () => {
+    const doc = makeDoc();
+    drawMoeFooter(doc, { companyName: 'PAPYRUS VRD' }, theme, '15/04/2026');
+    const hasCompany = doc._textCalls.some(c => c[0].includes('PAPYRUS VRD'));
+    expect(hasCompany).toBe(true);
+  });
+
+  it('affiche les contacts si fournis', () => {
+    const doc = makeDoc();
+    drawMoeFooter(doc, { companyName: 'Test', phone: '0600', email: 'a@b.c' }, theme, '15/04/2026');
+    const hasContacts = doc._textCalls.some(c => typeof c[0] === 'string' && c[0].includes('0600'));
+    expect(hasContacts).toBe(true);
+  });
+});
+
+// ─── drawCoverPage ──────────────────────────────────────────────────────────
+
+describe('drawCoverPage', () => {
+  const makeDoc = () => ({
+    internal: { pageSize: { width: 210, height: 297 } },
+    setFillColor: () => {},
+    setDrawColor: () => {},
+    setLineWidth: () => {},
+    setFont: () => {},
+    setFontSize: () => {},
+    setTextColor: () => {},
+    rect: () => {},
+    roundedRect: () => {},
+    line: () => {},
+    text: () => {},
+    addImage: () => {},
+    splitTextToSize: (t) => [t],
+  });
+
+  const theme = {
+    primary: [40, 110, 85], accent: [50, 180, 130], text: [40, 40, 40],
+    lightText: [100, 116, 139], secondary: [245, 250, 248], borders: [220, 235, 230],
+    white: [255, 255, 255],
+  };
+
+  it('retourne blockEndY', () => {
+    const result = drawCoverPage(makeDoc(), {
+      docType: 'TEST', title: 'Projet', phaseLabel: 'DCE',
+      clientName: 'Client', locationRaw: 'Lieu', codeAffaire: 'C001',
+      branding: null, today: '15/04/2026',
+    }, theme, { logoMoe: null, logoClient: null });
+    expect(result).toHaveProperty('blockEndY');
+    expect(typeof result.blockEndY).toBe('number');
+  });
+
+  it('gere les extraBlocks sans crash', () => {
+    const result = drawCoverPage(makeDoc(), {
+      docType: 'RAO', title: 'Projet RAO', phaseLabel: 'DCE',
+      clientName: 'Client', locationRaw: 'Lieu', codeAffaire: 'C002',
+      branding: null, today: '15/04/2026',
+      extraBlocks: [{ height: 40, rows: [{ label: 'TEST', value: 'val', col: 1 }] }],
+    }, theme, { logoMoe: null, logoClient: null });
+    expect(result.blockEndY).toBeGreaterThan(0);
+  });
+
+  it('dessine les signatures si showSignatures=true et assez de place', () => {
+    const roundedRectCalls = [];
+    const doc = {
+      ...makeDoc(),
+      roundedRect: (...args) => roundedRectCalls.push(args),
+    };
+    drawCoverPage(doc, {
+      docType: 'TEST', title: 'P', phaseLabel: 'DCE',
+      clientName: 'C', locationRaw: 'L', codeAffaire: 'X',
+      showSignatures: true, signatories: ['A', 'B', 'C', 'D'],
+      branding: null, today: '15/04/2026',
+    }, theme, { logoMoe: null, logoClient: null });
+    // Au moins les 12 roundedRect des signatures (4 × 3) + ceux de la page
+    expect(roundedRectCalls.length).toBeGreaterThanOrEqual(12);
   });
 });

@@ -5,7 +5,7 @@
 
 import { DEFAULT_CRITERIA, DEFAULT_ADMIN_PIECES, DEFAULT_OFFER_PIECES } from '../hooks/useRao';
 import { normalizeUnitSymbol } from './helpers';
-import { loadImage, formatNumberFr, cleanText } from './pdf/pdfSharedHelpers';
+import { formatNumberFr, cleanText, loadLogos, renderLogo, drawCoverPage as _drawCoverPage } from './pdf/pdfSharedHelpers';
 import { buildTheme as _buildTheme } from './pdf/buildTheme';
 
 // ─── COULEUR PRIMAIRE RAO : VERT PAPYRUS ────────────────────────────────────
@@ -101,219 +101,43 @@ const drawScoreBar = (doc, x, y, w, h, score, maxScore, color) => {
 // ─── CONSTANTES LAYOUT ─────────────────────────────────────────────────────
 const M = 15; // marge standard 15mm
 
-// ─── PAGE DE GARDE (inchangée, utilise THEME) ──────────────────────────────
-const drawCoverPage = (doc, project, consultation, logoMoe, logoClient, today, branding, THEME) => {
-  const pageWidth = doc.internal.pageSize.width;
-  const pageHeight = doc.internal.pageSize.height;
-
-  const phaseLabel = (consultation?.phase || project?.phase || 'DCE').toUpperCase();
-  const clientName = consultation?.client || project?.client || 'Non renseigné';
-  const clientStreet = project?.clientAddress ? project.clientAddress.trim() : '';
-  const clientCityZip = [project?.clientZip, project?.clientCity].filter(Boolean).join(' ').trim();
-  const locationRaw = consultation?.lieu || project?.location || 'Non renseignée';
-  const codeAffaire = consultation?.code || project?.code || 'Non défini';
-  const subtitle1 = (consultation?.subtitle1 || project?.subtitle1 || '').trim();
-  const subtitle2 = (consultation?.subtitle2 || project?.subtitle2 || '').trim();
-  const showSignatures = project?.showSignatures !== false;
-  const signatories = project?.signatories || ['', '', '', ''];
-
-  doc.setFillColor(...THEME.primary);
-  doc.rect(0, 0, 6, pageHeight, 'F');
-
-  const renderLogo = (logoImage, isLeft) => {
-    if (!logoImage) return;
-    const maxW = 45; const maxH = 25;
-    const ratio = logoImage.width / logoImage.height;
-    let w = maxW; let h = w / ratio;
-    if (h > maxH) { h = maxH; w = h * ratio; }
-    const yPos = 18 + (maxH - h) / 2;
-    const xPos = isLeft ? 18 : pageWidth - 18 - w;
-    doc.addImage(logoImage, 'JPEG', xPos, yPos, w, h);
-  };
-  renderLogo(logoMoe, true);
-  renderLogo(logoClient, false);
-
-  doc.setFont("Helvetica", "bold");
-  doc.setFontSize(10);
-  doc.setTextColor(...THEME.lightText);
-  doc.text("RAPPORT D'ANALYSE DES OFFRES", pageWidth - 18, 52, { align: 'right' });
-  doc.setDrawColor(...THEME.borders); doc.setLineWidth(0.5);
-  doc.line(pageWidth - 85, 57, pageWidth - 18, 57);
-
-  doc.setFontSize(32);
-  doc.setTextColor(...THEME.primary);
-  const title = (consultation?.objet || project?.name || "NOM DU PROJET").toUpperCase();
-  const splitTitle = doc.splitTextToSize(title, pageWidth - 40);
-  doc.text(splitTitle, 18, 100);
-
-  const titleHeight = splitTitle.length * 12;
-  doc.setDrawColor(...THEME.accent);
-  doc.setLineWidth(1.5);
-  doc.line(18, 100 + titleHeight + 4, 60, 100 + titleHeight + 4);
-
-  let subtitleOffset = 0;
-  if (subtitle1) {
-    subtitleOffset += 10;
-    doc.setFontSize(13); doc.setFont("Helvetica", "normal"); doc.setTextColor(...THEME.lightText);
-    doc.text(subtitle1.toUpperCase(), 18, 100 + titleHeight + 4 + subtitleOffset);
-  }
-  if (subtitle2) {
-    subtitleOffset += 7;
-    doc.setFontSize(11); doc.setFont("Helvetica", "normal"); doc.setTextColor(...THEME.lightText);
-    doc.text(subtitle2.toUpperCase(), 18, 100 + titleHeight + 4 + subtitleOffset);
-  }
-
-  const blockY = 125 + titleHeight + subtitleOffset;
-  doc.setFillColor(...THEME.secondary);
-  doc.roundedRect(18, blockY, pageWidth - 36, 60, 3, 3, 'F');
-
-  const col1X = 28;
-  const col2X = pageWidth / 2 + 10;
-  let startY = blockY + 12;
-
-  doc.setFontSize(8); doc.setTextColor(...THEME.lightText); doc.setFont("Helvetica", "bold");
-  doc.text("MAÎTRE D'OUVRAGE", col1X, startY);
-  doc.setFontSize(11); doc.setTextColor(...THEME.text);
-  const splitClient = doc.splitTextToSize(clientName.toUpperCase(), (pageWidth / 2) - 40);
-  doc.text(splitClient, col1X, startY + 6);
-  let currentY = startY + 6 + (splitClient.length * 5);
-  doc.setFontSize(9); doc.setTextColor(...THEME.lightText); doc.setFont("Helvetica", "normal");
-  if (clientStreet) {
-    const splitStreet = doc.splitTextToSize(clientStreet.toUpperCase(), (pageWidth / 2) - 40);
-    doc.text(splitStreet, col1X, currentY);
-    currentY += (splitStreet.length * 5);
-  }
-  if (clientCityZip) {
-    const splitCityZip = doc.splitTextToSize(clientCityZip.toUpperCase(), (pageWidth / 2) - 40);
-    doc.text(splitCityZip, col1X, currentY);
-    currentY += (splitCityZip.length * 5);
-  }
-  currentY += 6;
-  doc.setFontSize(8); doc.setTextColor(...THEME.lightText); doc.setFont("Helvetica", "bold");
-  doc.text("LIEU DE RÉALISATION", col1X, currentY);
-  doc.setFontSize(11); doc.setTextColor(...THEME.text);
-  const splitLoc = doc.splitTextToSize(locationRaw.toUpperCase(), (pageWidth / 2) - 40);
-  doc.text(splitLoc, col1X, currentY + 6);
-
-  doc.setFontSize(8); doc.setTextColor(...THEME.lightText); doc.setFont("Helvetica", "bold");
-  doc.text("PHASE DU PROJET", col2X, startY);
-  doc.setFillColor(...THEME.primary);
-  doc.roundedRect(col2X, startY + 3, 28, 6, 1.5, 1.5, 'F');
-  doc.setFontSize(9); doc.setTextColor(255, 255, 255); doc.setFont("Helvetica", "bold");
-  doc.text(phaseLabel, col2X + 14, startY + 7.5, { align: 'center' });
-
-  let rightY = startY + 20;
-  doc.setFontSize(8); doc.setTextColor(...THEME.lightText); doc.setFont("Helvetica", "bold");
-  doc.text("RÉFÉRENCE PROJET (CODE AFFAIRE)", col2X, rightY);
-  doc.setFontSize(11); doc.setTextColor(...THEME.text);
-  doc.text(codeAffaire.toUpperCase(), col2X, rightY + 6);
-
-  const block2Y = blockY + 65;
-  doc.setFillColor(...THEME.secondary);
-  doc.roundedRect(18, block2Y, pageWidth - 36, 40, 3, 3, 'F');
-  let b2StartY = block2Y + 12;
-
-  doc.setFontSize(8); doc.setTextColor(...THEME.lightText); doc.setFont("Helvetica", "bold");
-  doc.text("PROCÉDURE", col1X, b2StartY);
-  doc.setFontSize(10); doc.setTextColor(...THEME.text); doc.setFont("Helvetica", "normal");
-  doc.text(doc.splitTextToSize(consultation?.procedure || '—', (pageWidth / 2) - 40), col1X, b2StartY + 5);
-
-  doc.setFontSize(8); doc.setTextColor(...THEME.lightText); doc.setFont("Helvetica", "bold");
-  doc.text("LOT", col2X, b2StartY);
-  doc.setFontSize(10); doc.setTextColor(...THEME.text); doc.setFont("Helvetica", "normal");
-  doc.text(doc.splitTextToSize(consultation?.lot || '—', (pageWidth / 2) - 20), col2X, b2StartY + 5);
-
-  let b2CurrentY = b2StartY + 16;
-  doc.setFontSize(8); doc.setTextColor(...THEME.lightText); doc.setFont("Helvetica", "bold");
-  doc.text("DATE LIMITE REMISE", col1X, b2CurrentY);
-  doc.setFontSize(10); doc.setTextColor(...THEME.text); doc.setFont("Helvetica", "normal");
-
+// ─── PAGE DE GARDE RAO — utilise drawCoverPage partagé + bloc consultation ──
+const drawCoverPageRao = (doc, project, consultation, logoMoe, logoClient, today, branding, THEME) => {
+  // Formater la date de remise
   let remiseStr = '—';
   if (consultation?.dateRemise) {
-      try {
-          const parts = consultation.dateRemise.split('-');
-          if(parts.length === 3) remiseStr = `${parts[2]}/${parts[1]}/${parts[0]}`;
-          else remiseStr = consultation.dateRemise;
-          if (consultation.timeRemise) remiseStr += ` à ${consultation.timeRemise}`;
-      } catch(e) {}
-  }
-  doc.text(remiseStr, col1X, b2CurrentY + 5);
-
-  doc.setFontSize(8); doc.setTextColor(...THEME.lightText); doc.setFont("Helvetica", "bold");
-  doc.text("DATE LIMITE APRÈS NÉGO.", col2X, b2CurrentY);
-  doc.setFontSize(10); doc.setTextColor(...THEME.text); doc.setFont("Helvetica", "normal");
-  doc.text(consultation?.dateNego || '—', col2X, b2CurrentY + 5);
-
-  const footerTopY  = branding?.companyName ? pageHeight - 28 : pageHeight - 20;
-  const sigZoneTop  = block2Y + 40 + 6;
-  const sigZoneH    = footerTopY - 6 - sigZoneTop;
-
-  if (showSignatures && sigZoneH > 25) {
-    const margin = 18; const gap = 4; const n = 4;
-    const boxW = (pageWidth - margin * 2 - gap * (n - 1)) / n;
-    const labelH = 8;
-
-    for (let i = 0; i < n; i++) {
-      const bx = margin + i * (boxW + gap);
-      const by = sigZoneTop;
-      doc.setFillColor(...THEME.secondary);
-      doc.roundedRect(bx, by, boxW, sigZoneH, 2, 2, 'F');
-      doc.setDrawColor(...THEME.primary);
-      doc.setLineWidth(0.4);
-      doc.roundedRect(bx, by, boxW, sigZoneH, 2, 2, 'S');
-
-      doc.setFillColor(...THEME.primary);
-      doc.roundedRect(bx, by, boxW, labelH, 2, 2, 'F');
-      doc.rect(bx, by + labelH / 2, boxW, labelH / 2, 'F');
-
-      const sigName = (signatories[i] || ['Le Maître d\'Ouvrage', 'Le Maître d\'Œuvre', 'L\'Entreprise', 'Le Bureau de Contrôle'][i]).trim();
-      doc.setFontSize(7); doc.setFont("Helvetica", "bold"); doc.setTextColor(255, 255, 255);
-      doc.text(sigName.toUpperCase(), bx + boxW / 2, by + labelH / 2 + 1.5, { align: 'center' });
-
-      const luY = by + sigZoneH - 10;
-      doc.setDrawColor(...THEME.borders);
-      doc.setLineWidth(0.3);
-      doc.line(bx + 3, luY, bx + boxW - 3, luY);
-
-      doc.setFontSize(6); doc.setFont("Helvetica", "normal"); doc.setTextColor(...THEME.lightText);
-      doc.text('Lu et approuvé — Signature', bx + boxW / 2, by + sigZoneH - 4, { align: 'center' });
-    }
+    try {
+      const parts = consultation.dateRemise.split('-');
+      if (parts.length === 3) remiseStr = `${parts[2]}/${parts[1]}/${parts[0]}`;
+      else remiseStr = consultation.dateRemise;
+      if (consultation.timeRemise) remiseStr += ` à ${consultation.timeRemise}`;
+    } catch(e) {}
   }
 
-  if (branding?.companyName) {
-    const footerY = pageHeight - 20;
-    doc.setDrawColor(...THEME.borders);
-    doc.setLineWidth(0.3);
-    doc.line(18, footerY - 8, pageWidth - 18, footerY - 8);
-
-    doc.setFont("Helvetica", "bold");
-    doc.setFontSize(7);
-    doc.setTextColor(...THEME.primary);
-    doc.text(branding.companyName.toUpperCase(), 18, footerY - 3);
-
-    if (branding.tagline) {
-      doc.setFont("Helvetica", "normal");
-      doc.setFontSize(6);
-      doc.setTextColor(...THEME.lightText);
-      doc.text(branding.tagline, 18, footerY + 2);
-    }
-
-    const contactParts = [branding.address, branding.phone, branding.email, branding.website].filter(Boolean);
-    if (contactParts.length > 0) {
-      doc.setFont("Helvetica", "normal");
-      doc.setFontSize(6);
-      doc.setTextColor(...THEME.lightText);
-      doc.text(contactParts.join('  ·  '), pageWidth - 18, footerY - 3, { align: 'right' });
-    }
-
-    doc.setFontSize(6);
-    doc.text(`Édité le ${today}`, pageWidth - 18, footerY + 2, { align: 'right' });
-  } else {
-    doc.setFontSize(8);
-    doc.setTextColor(...THEME.lightText);
-    doc.setFont("Helvetica", "normal");
-    doc.text(`Édité le ${today}`, pageWidth - 18, pageHeight - 12, { align: 'right' });
-  }
+  _drawCoverPage(doc, {
+    docType: "RAPPORT D'ANALYSE DES OFFRES",
+    title: consultation?.objet || project?.name,
+    subtitle1: (consultation?.subtitle1 || project?.subtitle1 || '').trim(),
+    subtitle2: (consultation?.subtitle2 || project?.subtitle2 || '').trim(),
+    phaseLabel: (consultation?.phase || project?.phase || 'DCE').toUpperCase(),
+    clientName: consultation?.client || project?.client || 'Non renseigné',
+    clientStreet: project?.clientAddress ? project.clientAddress.trim() : '',
+    clientCityZip: [project?.clientZip, project?.clientCity].filter(Boolean).join(' ').trim(),
+    locationRaw: consultation?.lieu || project?.location || 'Non renseignée',
+    codeAffaire: consultation?.code || project?.code || 'Non défini',
+    showSignatures: project?.showSignatures !== false,
+    signatories: project?.signatories || ['', '', '', ''],
+    branding,
+    today,
+    extraBlocks: [{
+      height: 40,
+      rows: [
+        { label: 'PROCÉDURE', value: consultation?.procedure || '—', col: 1 },
+        { label: 'LOT', value: consultation?.lot || '—', col: 2 },
+        { label: 'DATE LIMITE REMISE', value: remiseStr, col: 1 },
+      ],
+    }],
+  }, THEME, { logoMoe, logoClient });
 };
 
 // ── EN-TÊTE : bande verte pleine + titre blanc ────────────────────────────
@@ -387,8 +211,7 @@ export const generateRaoPDF = async (optionsParams) => {
 
   const THEME = buildTheme(branding);
 
-  const logoMoe = await loadImage(branding?.logo || '/logo.jpg');
-  const logoClient = await loadImage(project?.clientLogo);
+  const { logoMoe, logoClient } = await loadLogos(branding, project);
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const companiesData = rao.companies || {};
@@ -409,7 +232,7 @@ export const generateRaoPDF = async (optionsParams) => {
   };
 
   // ── PAGE 1 : COUVERTURE ──
-  drawCoverPage(doc, project, consultation, logoMoe, logoClient, today, branding, THEME);
+  drawCoverPageRao(doc, project, consultation, logoMoe, logoClient, today, branding, THEME);
 
   // ── PAGE 2 : SOMMAIRE ──
   // On insère une page placeholder pour le sommaire — on la remplira à la fin
@@ -478,19 +301,7 @@ export const generateRaoPDF = async (optionsParams) => {
   doc.text(remiseStr, W / 2, y + 10, { align: 'center' });
   y += 18;
 
-  if (consultation?.dateNego) {
-    tocEntries.push({ label: '3. Phase de Négociations', page: pageNum });
-    y = sectionTitle(doc, '3  Phase de Négociations', y, THEME.primary);
-    doc.setFont('Helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(...THEME.lightText);
-    doc.text('Date et heure limites de réception des offres après négociation :', M, y + 2);
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(...THEME.text);
-    doc.text(consultation.dateNego, W / 2, y + 10, { align: 'center' });
-    y += 18;
-  }
+  // Section 3 (Négociations) supprimée — les négociations sont exclues du PDF RAO.
 
   // Section 4 : Critères de notation
   tocEntries.push({ label: '4. Rappel des critères de notation', page: pageNum });
@@ -1164,64 +975,11 @@ export const generateRaoPDF = async (optionsParams) => {
     }
   }
 
-  // ── NÉGOCIATION ──
-  companyNames.forEach((name, idx) => {
-    const cStyle = getCompanyStyle(idx);
-    const nego = companiesData[name]?.negotiation || {};
-    if (!nego.questions && !nego.responses) return;
-
-    y = addPage(`Négociation — ${name}`, 'a4', 'portrait');
-    if (!tocEntries.find(e => e.label.startsWith('10.'))) {
-      tocEntries.push({ label: '10. Négociations', page: pageNum });
-    }
-    y = sectionTitle(doc, `NÉGOCIATION — ${name}`, y, cStyle.header);
-
-    if (nego.questions) {
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.setTextColor(...cStyle.header);
-      doc.text('Dans le cadre des négociations, nous avons questionné l\'entreprise sur les points suivants :', M, y);
-      y += 6;
-      doc.setFont('Helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(...THEME.lightText);
-      const qLines = doc.splitTextToSize(nego.questions, W - 2 * M);
-      let qRemaining = [...qLines];
-      while (qRemaining.length > 0) {
-        const maxL = Math.floor((297 - y - 20) / 4.5);
-        if (maxL <= 0) { y = addPage(`Négociation — ${name}`, 'a4', 'portrait'); doc.setFont('Helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...THEME.lightText); continue; }
-        const batch = qRemaining.splice(0, maxL);
-        doc.text(batch, M, y);
-        y += batch.length * 4.5 + 2;
-      }
-      y += 6;
-    }
-
-    if (nego.responses) {
-      if (y > 260) { y = addPage(`Négociation — ${name}`, 'a4', 'portrait'); }
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.setTextColor(...cStyle.header);
-      doc.text('RÉPONSES DE L\'ENTREPRISE', M, y);
-      y += 6;
-      doc.setFont('Helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(...THEME.lightText);
-      const rLines = doc.splitTextToSize(nego.responses, W - 2 * M);
-      let rRemaining = [...rLines];
-      while (rRemaining.length > 0) {
-        const maxL = Math.floor((297 - y - 20) / 4.5);
-        if (maxL <= 0) { y = addPage(`Négociation — ${name}`, 'a4', 'portrait'); doc.setFont('Helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...THEME.lightText); continue; }
-        const batch = rRemaining.splice(0, maxL);
-        doc.text(batch, M, y);
-        y += batch.length * 4.5 + 2;
-      }
-    }
-  });
+  // Section Négociation supprimée — les négociations sont exclues du PDF RAO.
 
   // ── RÉCAPITULATIF FINAL ──
   y = addPage('Récapitulatif général', 'a4', 'portrait');
-  tocEntries.push({ label: '11. Récapitulatif général', page: pageNum });
+  tocEntries.push({ label: '10. Récapitulatif général', page: pageNum });
   y = sectionTitle(doc, 'RÉCAPITULATIF GÉNÉRAL', y, THEME.primary);
 
   const priceC = criteria.find(c => c.auto) || criteria[0];

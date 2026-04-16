@@ -1,5 +1,5 @@
 // src/contexts/DialogContext.jsx
-import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { AlertTriangle, Info, X, Check } from 'lucide-react';
 import { registerDialog } from '../utils/globalUI';
 
@@ -45,8 +45,10 @@ export const DialogProvider = ({ children }) => {
   // Enregistrer dans le singleton global pour accès hors React
   useEffect(() => { registerDialog({ confirm, prompt }); }, [confirm, prompt]);
 
+  const value = useMemo(() => ({ confirm, prompt }), [confirm, prompt]);
+
   return (
-    <DialogContext.Provider value={{ confirm, prompt }}>
+    <DialogContext.Provider value={value}>
       {children}
       {dialogs.map(dialog => (
         <DialogModal key={dialog.id} dialog={dialog} onClose={(result) => closeDialog(dialog.id, result)} />

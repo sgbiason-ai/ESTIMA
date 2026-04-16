@@ -1,5 +1,5 @@
 // src/contexts/ToastContext.jsx
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
 import { CheckCircle2, XCircle, AlertTriangle, Info, X } from 'lucide-react';
 import { registerToast } from '../utils/globalUI';
 
@@ -67,8 +67,10 @@ export const ToastProvider = ({ children }) => {
   // Enregistrer dans le singleton global pour accès hors React
   useEffect(() => { registerToast({ success, error, warning, info, toast, dismiss }); }, [success, error, warning, info, toast, dismiss]);
 
+  const value = useMemo(() => ({ toast, success, error, warning, info, dismiss }), [toast, success, error, warning, info, dismiss]);
+
   return (
-    <ToastContext.Provider value={{ toast, success, error, warning, info, dismiss }}>
+    <ToastContext.Provider value={value}>
       {children}
       <ToastContainer toasts={toasts} onDismiss={dismiss} />
     </ToastContext.Provider>

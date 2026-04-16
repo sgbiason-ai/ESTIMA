@@ -1,5 +1,5 @@
 // src/App.jsx
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 
 // ─── HOOKS ────────────────────────────────────────────────────────────────────
 import { useAppAuth }       from './hooks/useAppAuth';
@@ -13,7 +13,7 @@ import { useIsMobile }      from './hooks/useIsMobile';
 import { useIsTesla }       from './hooks/useIsTesla';
 import { useProjectArchives } from './hooks/useProjectArchives';
 
-// ─── COMPOSANTS GLOBAUX ───────────────────────────────────────────────────────
+// ─── COMPOSANTS GLOBAUX (toujours chargés) ───────────────────────────────────
 import Sidebar              from './components/common/Sidebar';
 import DeleteModal          from './components/common/DeleteModal';
 import DraggableCalculator  from './components/common/DraggableCalculator';
@@ -22,34 +22,46 @@ import EditBpuModal         from './components/database/EditBpuModal';
 import CalculationModal     from './components/modals/CalculationModal';
 import ProjectDetailsModal  from './components/modals/ProjectDetailsModal';
 
-// ─── VUES ─────────────────────────────────────────────────────────────────────
+// ─── VUES (chargement auth / critique — statique) ────────────────────────────
 import LoginView            from './views/LoginView';
 import LegalView            from './views/LegalView';
 import ModuleHubView        from './views/ModuleHubView';
-import ProjectManagerView   from './views/projectManager/ProjectManagerView';
-import ProjectView          from './views/ProjectView';
-import DatabaseView         from './views/DatabaseView';
-import PriceAnalysisView    from './views/PriceAnalysisView';
-import CctpGeneratorView    from './views/CctpGeneratorView';
-import RcGeneratorView      from './views/RcGeneratorView';
-import BpuExportView        from './views/bpu/BpuExportView';
-import SettingsView         from './views/SettingsView';
-import BrandingView         from './views/BrandingView';
-import AdminView            from './views/AdminView';
-import RaoAnalysisView      from './views/RaoAnalysisView';
-import CrcView              from './views/crc/CrcView';
-import DocAdminView         from './views/DocAdminView';
-import SiteVisitsView       from './views/SiteVisitsView';
-import TeslaModeView        from './views/TeslaModeView';
-import DevisMoeView         from './views/devisMoe/DevisMoeView';
-import AccountSection       from './components/settings/AccountSection';
 
-// ─── VUE MOBILE ───────────────────────────────────────────────────────────────
-import MobileApp            from './components/mobile/MobileApp';
+// ─── VUES (lazy-loaded — code-splitting par module) ──────────────────────────
+const ProjectManagerView = lazy(() => import('./views/projectManager/ProjectManagerView'));
+const ProjectView        = lazy(() => import('./views/ProjectView'));
+const DatabaseView       = lazy(() => import('./views/DatabaseView'));
+const PriceAnalysisView  = lazy(() => import('./views/PriceAnalysisView'));
+const CctpGeneratorView  = lazy(() => import('./views/CctpGeneratorView'));
+const RcGeneratorView    = lazy(() => import('./views/RcGeneratorView'));
+const BpuExportView      = lazy(() => import('./views/bpu/BpuExportView'));
+const SettingsView       = lazy(() => import('./views/SettingsView'));
+const BrandingView       = lazy(() => import('./views/BrandingView'));
+const AdminView          = lazy(() => import('./views/AdminView'));
+const RaoAnalysisView    = lazy(() => import('./views/RaoAnalysisView'));
+const CrcView            = lazy(() => import('./views/crc/CrcView'));
+const DocAdminView       = lazy(() => import('./views/DocAdminView'));
+const SiteVisitsView     = lazy(() => import('./views/SiteVisitsView'));
+const TeslaModeView      = lazy(() => import('./views/TeslaModeView'));
+const DevisMoeView       = lazy(() => import('./views/devisMoe/DevisMoeView'));
+const AccountSection     = lazy(() => import('./components/settings/AccountSection'));
+
+// ─── VUE MOBILE (lazy — chargée seulement sur mobile) ────────────────────────
+const MobileApp          = lazy(() => import('./components/mobile/MobileApp'));
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 const removeAccents = (str) =>
   str ? str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase() : '';
+
+/** Fallback de chargement pour React.lazy / Suspense */
+const LazyFallback = () => (
+  <div className="flex h-screen items-center justify-center bg-[#f5f5f7]">
+    <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+  </div>
+);
+
+/** Wrapper Suspense pour les composants lazy-loaded */
+const Lazy = ({ children }) => <Suspense fallback={<LazyFallback />}>{children}</Suspense>;
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
 export default function App() {
@@ -107,7 +119,11 @@ export default function App() {
 
   // ── MOBILE → rendu simplifié ──────────────────────────────────────────────
   if (isMobile) {
-    return <MobileApp user={user} companyId={companyId} onLogout={handleLogout} />;
+    return (
+      <Suspense fallback={<LazyFallback />}>
+        <MobileApp user={user} companyId={companyId} onLogout={handleLogout} />
+      </Suspense>
+    );
   }
 
   // ── DESKTOP → Hub de modules ou module actif ──────────────────────────────
@@ -129,100 +145,100 @@ export default function App() {
   // Module : Gestion de Projets (autonome)
   if (activeModule === 'projects_manager') {
     return (
-      <ProjectManagerModule
-        user={user}
-        companyId={companyId}
-        onBackToHub={handleBackToHub}
-        onNavigateModule={setActiveModule}
-        onOpenEstima={(project) => {
-          // Ouvrir ESTIMA VRD directement avec ce projet
-          setActiveModule('estima');
-        }}
-      />
+      <Lazy>
+        <ProjectManagerModule
+          user={user}
+          companyId={companyId}
+          onBackToHub={handleBackToHub}
+          onNavigateModule={setActiveModule}
+          onOpenEstima={(project) => {
+            setActiveModule('estima');
+          }}
+        />
+      </Lazy>
     );
   }
 
   // Module : ESTIMA VRD (app complète avec sidebar)
   if (activeModule === 'estima') {
     return (
-      <DesktopApp
-        user={user}
-        companyId={companyId}
-        isAdmin={isAdmin}
-        handleLogout={handleLogout}
-        onBackToHub={handleBackToHub}
-      />
+      <Lazy>
+        <DesktopApp
+          user={user}
+          companyId={companyId}
+          isAdmin={isAdmin}
+          handleLogout={handleLogout}
+          onBackToHub={handleBackToHub}
+        />
+      </Lazy>
     );
   }
 
   // Module : RAO & Analyse des Prix
   if (activeModule === 'rao_analysis') {
     return (
-      <RaoAnalysisView
-        user={user}
-        companyId={companyId}
-        onBackToHub={handleBackToHub}
-      />
+      <Lazy>
+        <RaoAnalysisView user={user} companyId={companyId} onBackToHub={handleBackToHub} />
+      </Lazy>
     );
   }
 
   // Module : Compte Rendu de Chantier
   if (activeModule === 'crc') {
-    return <CrcView onBackToHub={handleBackToHub} user={user} companyId={companyId} />;
+    return <Lazy><CrcView onBackToHub={handleBackToHub} user={user} companyId={companyId} /></Lazy>;
   }
 
   // Module : Document Administratif
   if (activeModule === 'doc_admin') {
-    return <DocAdminView onBackToHub={handleBackToHub} user={user} companyId={companyId} />;
+    return <Lazy><DocAdminView onBackToHub={handleBackToHub} user={user} companyId={companyId} /></Lazy>;
   }
 
   // Module : Devis MOE
   if (activeModule === 'devis_moe') {
     if (!isAdmin) { setActiveModule(null); return null; }
-    return <DevisMoeView onBackToHub={handleBackToHub} user={user} companyId={companyId} />;
+    return <Lazy><DevisMoeView onBackToHub={handleBackToHub} user={user} companyId={companyId} /></Lazy>;
   }
 
   // Module : Identité & Charte Graphique
   if (activeModule === 'branding') {
-    return (
-      <BrandingModule user={user} companyId={companyId} onBackToHub={handleBackToHub} />
-    );
+    return <Lazy><BrandingModule user={user} companyId={companyId} onBackToHub={handleBackToHub} /></Lazy>;
   }
 
   // Module : Mon Compte & RGPD
   if (activeModule === 'rgpd') {
-    return (
-      <RgpdModule user={user} companyId={companyId} onBackToHub={handleBackToHub} />
-    );
+    return <Lazy><RgpdModule user={user} companyId={companyId} onBackToHub={handleBackToHub} /></Lazy>;
   }
 
   // Module : Visites de Site (Tesla = mode carte plein écran, desktop = lecture classique)
   if (activeModule === 'site_visits') {
     if (isTesla) {
-      return <TeslaModeView user={user} companyId={companyId} onExit={handleBackToHub} />;
+      return <Lazy><TeslaModeView user={user} companyId={companyId} onExit={handleBackToHub} /></Lazy>;
     }
-    return <SiteVisitsModule user={user} companyId={companyId} onBackToHub={handleBackToHub} />;
+    return <Lazy><SiteVisitsModule user={user} companyId={companyId} onBackToHub={handleBackToHub} /></Lazy>;
   }
 
-  // Module : Administration
+  // Module : Administration (réservé aux admins)
   if (activeModule === 'admin') {
+    if (!isAdmin) { setActiveModule(null); return null; }
     return (
-      <div className="flex flex-col h-screen bg-[#f5f5f7] text-gray-900 overflow-hidden"
-        style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
-        <header className="flex items-center gap-4 px-6 py-3 border-b border-gray-200/60 shrink-0 bg-white/80 backdrop-blur-xl">
-          <button
-            onClick={handleBackToHub}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all"
-          >
-            <span className="text-[10px] font-bold uppercase tracking-widest">← Hub</span>
-          </button>
-          <div className="h-5 w-px bg-gray-200/60" />
-          <h1 className="font-bold text-lg text-gray-900 tracking-tight">Administration</h1>
-        </header>
-        <div className="flex-1 overflow-hidden">
-          <AdminView currentUserEmail={user.email} />
+      <Lazy>
+        <div className="flex flex-col h-screen bg-[#f5f5f7] text-gray-900 overflow-hidden"
+          style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
+          <header className="flex items-center gap-4 px-6 py-3 border-b border-gray-200/60 shrink-0 bg-white/80 backdrop-blur-xl">
+            <button
+              onClick={handleBackToHub}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all"
+            >
+              <span className="text-[10px] font-bold uppercase tracking-widest">← Hub</span>
+            </button>
+            <div className="h-5 w-px bg-gray-200/60" />
+            <h1 className="font-bold text-lg text-gray-900 tracking-tight">Administration</h1>
+          </header>
+          <div className="flex-1 overflow-hidden">
+            <AdminView currentUserEmail={user.email} />
+          </div>
         </div>
-      </div>
+      </Lazy>
     );
   }
 
@@ -439,7 +455,7 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub }) {
             <span className="text-sm">Chargement Cloud...</span>
           </div>
         ) : (
-          <>
+          <Suspense fallback={<LazyFallback />}>
             {activeTab === 'project' && (
               <ProjectView
                 project={project}
@@ -514,6 +530,7 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub }) {
                 setItemToDuplicate={(item) => modals.openAddBpuModal(item)}
                 isAdmin={isAdmin}
                 onForceRefresh={db.forceRefresh}
+                masterCctp={resources.masterCctp}
                 onClearObservedPrices={async () => {
                   const items = localMode.currentBpu.filter(i => i.observedPrice);
                   if (items.length === 0) return;
@@ -600,7 +617,7 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub }) {
             )}
 
             {/* Admin est maintenant accessible depuis le Hub */}
-          </>
+          </Suspense>
         )}
       </div>
     </div>

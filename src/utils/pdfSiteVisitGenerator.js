@@ -4,7 +4,7 @@
 
 import jsPDF from 'jspdf';
 import { buildTheme } from './pdf/buildTheme';
-import { loadImage, formatDateFr, formatDateLong, lightenRgb, hexToRgbArray } from './pdf/pdfSharedHelpers';
+import { loadImage, formatDateFr, formatDateLong, lightenRgb, hexToRgbArray, loadLogos } from './pdf/pdfSharedHelpers';
 
 const PW = 210, PH = 297;
 const M = { top: 18, left: 15, right: 15, bottom: 18 };
@@ -928,7 +928,7 @@ export const generateSiteVisitPdf = async (visit, options = {}) => {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
 
   // Charger logo
-  const logoMoe = await loadImage(branding?.logo || '/logo.jpg');
+  const { logoMoe } = await loadLogos(branding, {});
 
   // ── Page 1 : Couverture ──
   drawCoverPage(doc, visit, THEME, logoMoe, branding);

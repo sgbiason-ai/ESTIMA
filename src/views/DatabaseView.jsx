@@ -1,4 +1,5 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { 
   Search, Plus, Trash2, Folder, FolderOpen, LayoutGrid, FileText, 
@@ -42,7 +43,8 @@ const DatabaseView = ({
   onClearObservedPrices = null,
   bpuSearch,
   setBpuSearch,
-  bpuConfig
+  bpuConfig,
+  masterCctp = []
 }) => {
   const [selectedCatId, setSelectedCatId] = useState(null);
   const [isCreatingCat, setIsCreatingCat] = useState(false);
@@ -53,8 +55,30 @@ const DatabaseView = ({
   const { confirm } = useDialog();
   
   const { showToast } = useToast();
+
+  // --- Lookup CCTP : id → titre ---
+  const cctpTitleMap = useMemo(() => {
+    const map = {};
+    const walk = (nodes) => {
+      (nodes || []).forEach(n => {
+        if (n.id && n.title) map[String(n.id)] = n.title;
+        if (n.children) walk(n.children);
+      });
+    };
+    walk(masterCctp);
+    return map;
+  }, [masterCctp]);
+
+  const resolveCctpLabel = (item) => {
+    if (item.cctpLabel) return item.cctpLabel;
+    const refs = item.cctpRefs || (item.cctpRef ? [item.cctpRef] : []);
+    const titles = refs.map(r => cctpTitleMap[String(r)]).filter(Boolean);
+    if (titles.length > 0) return titles.join(', ');
+    return refs.join(', ') || 'CCTP Lié';
+  };
+
   // --- État pour la modale de modification du lien CCTP ---
-  const [cctpLinkModal, setCctpLinkModal] = useState({ isOpen: false, item: null, refValue: '' });
+  const [cctpLinkModal, setCctpLinkModal] = useState({ isOpen: false, item: null, refValue: '', labelValue: '' });
   const [priceHistoryItem, setPriceHistoryItem] = useState(null); // item pour modale historique prix
 
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -86,9 +110,16 @@ const DatabaseView = ({
                 valA = (valA || "").toString().toLowerCase(); valB = (valB || "").toString().toLowerCase();
                 return sortConfig.direction === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
             }
-            if (sortConfig.key === 'description') {
-                valA = (valA || "").toString().toLowerCase(); valB = (valB || "").toString().toLowerCase();
-                return sortConfig.direction === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+            if (sortConfig.key === 'cctp') {
+                const hasA = !!(a.cctpRef || (a.cctpRefs && a.cctpRefs.length > 0));
+                const hasB = !!(b.cctpRef || (b.cctpRefs && b.cctpRefs.length > 0));
+                if (hasA !== hasB) return sortConfig.direction === 'asc' ? (hasB ? 1 : -1) : (hasA ? 1 : -1);
+                if (hasA && hasB) {
+                    const titleA = resolveCctpLabel(a).toLowerCase();
+                    const titleB = resolveCctpLabel(b).toLowerCase();
+                    return sortConfig.direction === 'asc' ? titleA.localeCompare(titleB) : titleB.localeCompare(titleA);
+                }
+                return 0;
             }
             if (sortConfig.key === 'bpuNum') {
                 return sortConfig.direction === 'asc' 
@@ -128,14 +159,15 @@ const DatabaseView = ({
   // --- NOUVELLES FONCTIONS : Gestion des liens CCTP ---
   const handleEditCctpLink = (item) => {
     const currentRef = item.cctpRefs ? item.cctpRefs.join(', ') : (item.cctpRef || '');
-    setCctpLinkModal({ isOpen: true, item, refValue: currentRef });
+    const currentLabel = item.cctpLabel || resolveCctpLabel(item);
+    setCctpLinkModal({ isOpen: true, item, refValue: currentRef, labelValue: currentLabel === 'CCTP Lié' ? '' : currentLabel });
   };
 
   const saveCctpLink = () => {
-    const { item, refValue } = cctpLinkModal;
+    const { item, refValue, labelValue } = cctpLinkModal;
     const refs = refValue.split(',').map(s => s.trim()).filter(Boolean);
     const updatedItem = { ...item };
-    
+
     if (refs.length > 1) {
         updatedItem.cctpRefs = refs;
         delete updatedItem.cctpRef;
@@ -146,9 +178,15 @@ const DatabaseView = ({
         delete updatedItem.cctpRef;
         delete updatedItem.cctpRefs;
     }
-    
+
+    if (labelValue.trim()) {
+        updatedItem.cctpLabel = labelValue.trim();
+    } else {
+        delete updatedItem.cctpLabel;
+    }
+
     if (onUpdateItem) onUpdateItem(updatedItem);
-    setCctpLinkModal({ isOpen: false, item: null, refValue: '' });
+    setCctpLinkModal({ isOpen: false, item: null, refValue: '', labelValue: '' });
   };
   // ----------------------------------------------------
 
@@ -268,18 +306,31 @@ const DatabaseView = ({
                     </div>
                     <button onClick={() => setCctpLinkModal({ isOpen: false, item: null, refValue: '' })} className="p-2 hover:bg-slate-200 rounded-full text-slate-400"><X size={16} /></button>
                 </div>
-                <div className="p-6">
-                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">ID(s) du chapitre CCTP</label>
-                    <input 
-                        type="text" 
-                        autoFocus
-                        value={cctpLinkModal.refValue} 
-                        onChange={(e) => setCctpLinkModal(prev => ({ ...prev, refValue: e.target.value }))}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:border-blue-500 focus:bg-white outline-none text-sm font-semibold text-slate-700 mb-2 transition-colors"
-                        placeholder="Ex: 3.1.2 ou imported_12345"
-                        onKeyDown={(e) => e.key === 'Enter' && saveCctpLink()}
-                    />
-                    <p className="text-[10px] text-slate-400 italic">Pour lier plusieurs chapitres, séparez les identifiants par une virgule (ex: 3.1, 4.2.1)</p>
+                <div className="p-6 space-y-4">
+                    <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Titre du chapitre CCTP</label>
+                        <input
+                            type="text"
+                            autoFocus
+                            value={cctpLinkModal.labelValue}
+                            onChange={(e) => setCctpLinkModal(prev => ({ ...prev, labelValue: e.target.value }))}
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:border-blue-500 focus:bg-white outline-none text-sm font-semibold text-slate-700 transition-colors"
+                            placeholder="Ex: Terrassements généraux"
+                            onKeyDown={(e) => e.key === 'Enter' && saveCctpLink()}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">ID(s) du chapitre CCTP</label>
+                        <input
+                            type="text"
+                            value={cctpLinkModal.refValue}
+                            onChange={(e) => setCctpLinkModal(prev => ({ ...prev, refValue: e.target.value }))}
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:border-blue-500 focus:bg-white outline-none text-xs text-slate-500 transition-colors"
+                            placeholder="Ex: 3.1.2 ou imported_12345"
+                            onKeyDown={(e) => e.key === 'Enter' && saveCctpLink()}
+                        />
+                        <p className="text-[10px] text-slate-400 italic mt-1">Pour lier plusieurs chapitres, séparez les identifiants par une virgule</p>
+                    </div>
                 </div>
                 <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-2">
                     <button onClick={() => setCctpLinkModal({ isOpen: false, item: null, refValue: '' })} className="px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-200 rounded-lg transition-colors">Annuler</button>
@@ -372,9 +423,14 @@ const DatabaseView = ({
                 {(providedDropCat) => (
                     <div ref={providedDropCat.innerRef} {...providedDropCat.droppableProps}>
                         {(() => {
-                            const CAT_FALLBACK = ['#3b82f6','#f59e0b','#8b5cf6','#10b981','#f43f5e','#06b6d4','#ec4899','#84cc16','#f97316','#6366f1','#14b8a6','#e11d48'];
-                            return [...categories].sort((a, b) => a.name.localeCompare(b.name, 'fr')).map((cat, index) => {
-                            const catColor = cat.color || CAT_FALLBACK[index % CAT_FALLBACK.length];
+                            const CAT_FALLBACK = ['#3b82f6','#f59e0b','#8b5cf6','#10b981','#ef4444','#06b6d4','#ec4899','#84cc16','#f97316','#6366f1','#14b8a6','#92400e','#0ea5e9','#d946ef','#64748b','#059669'];
+                            const isValidHex = (c) => /^#[0-9a-fA-F]{6}$/.test(c);
+                            const sorted = [...categories].sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+                            const usedColors = new Set(sorted.filter(c => isValidHex(c.color)).map(c => c.color));
+                            const available = CAT_FALLBACK.filter(c => !usedColors.has(c));
+                            let fbIdx = 0;
+                            return sorted.map((cat, index) => {
+                            const catColor = (cat.color && isValidHex(cat.color)) ? cat.color : (fbIdx < available.length ? available[fbIdx++] : CAT_FALLBACK[(fbIdx++) % CAT_FALLBACK.length]);
                             return (
                             <Draggable key={cat.id} draggableId={cat.id} index={index} isDragDisabled={isLocalMode}>
                                 {(provided, snapshot) => (
@@ -388,15 +444,15 @@ const DatabaseView = ({
                                                     ${snapshot.isDragging ? 'shadow-xl scale-105 z-50' : ''}
                                                     ${snapshotDrop.isDraggingOver ? 'scale-[1.03] shadow-lg ring-2' : ''}`}
                                                 style={{
-                                                    backgroundColor: snapshotDrop.isDraggingOver ? catColor + '30'
-                                                        : selectedCatId === cat.id ? catColor + '22'
-                                                        : catColor + '10',
-                                                    borderLeft: `4px solid ${selectedCatId === cat.id || snapshotDrop.isDraggingOver ? catColor : catColor + '80'}`,
+                                                    backgroundColor: snapshotDrop.isDraggingOver ? catColor + '40'
+                                                        : selectedCatId === cat.id ? catColor + '30'
+                                                        : catColor + '18',
+                                                    borderLeft: `4px solid ${selectedCatId === cat.id || snapshotDrop.isDraggingOver ? catColor : catColor + '90'}`,
                                                     ...(snapshotDrop.isDraggingOver ? { ringColor: catColor, boxShadow: `0 4px 16px ${catColor}40` } : {})
                                                 }}
                                             >
                                                 <div className="text-slate-300 group-hover:text-slate-400"><GripVertical size={13} /></div>
-                                                <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: catColor + '25' }}>
+                                                <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: catColor + '30' }}>
                                                     {snapshotDrop.isDraggingOver || selectedCatId === cat.id
                                                         ? <FolderOpen size={16} style={{ color: catColor }} />
                                                         : <Folder size={16} style={{ color: catColor }} />
@@ -530,16 +586,16 @@ const DatabaseView = ({
                         {sortConfig.key === 'designation' && (sortConfig.direction === 'asc' ? <ArrowDownAZ size={12} /> : <ArrowUpAZ size={12} />)}
                     </div>
                     
-                    <div 
-                        onClick={() => handleSort('description')}
+                    <div
+                        onClick={() => handleSort('cctp')}
                         className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wide cursor-pointer transition-all border ${
-                            sortConfig.key === 'description' 
-                            ? 'bg-blue-500 text-white border-blue-600 shadow-md transform scale-105' 
+                            sortConfig.key === 'cctp'
+                            ? 'bg-blue-500 text-white border-blue-600 shadow-md transform scale-105'
                             : 'bg-white text-slate-500 border-slate-200 hover:border-blue-300 hover:text-blue-600 shadow-sm'
                         }`}
                     >
-                        CCTP
-                        {sortConfig.key === 'description' && (sortConfig.direction === 'asc' ? <AlignLeft size={12} /> : <AlignLeft size={12} className="rotate-180" />)}
+                        <BookOpen size={12} /> CCTP
+                        {sortConfig.key === 'cctp' && <ArrowDownUp size={12} />}
                     </div>
                 </div>
 
@@ -649,10 +705,11 @@ const DatabaseView = ({
                                                             {hasCctp ? (
                                                                 <button
                                                                     onClick={(e) => { e.stopPropagation(); handleEditCctpLink(item); }}
-                                                                    className="flex items-center gap-1 text-[9px] font-black px-1.5 py-0.5 rounded border uppercase tracking-widest text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-100 transition-colors shadow-sm"
-                                                                    title="Modifier le lien CCTP"
+                                                                    className="flex items-center gap-1 text-[9px] font-black px-1.5 py-0.5 rounded border tracking-wide text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-100 transition-colors shadow-sm max-w-[200px]"
+                                                                    title={`CCTP : ${resolveCctpLabel(item)}`}
                                                                 >
-                                                                    <BookOpen size={10} /> CCTP Lié
+                                                                    <BookOpen size={10} className="shrink-0" />
+                                                                    <span className="truncate">{resolveCctpLabel(item)}</span>
                                                                 </button>
                                                             ) : (
                                                                 <button
@@ -774,6 +831,35 @@ const DatabaseView = ({
       })()}
     </div>
   );
+};
+
+DatabaseView.propTypes = {
+  filteredBpu: PropTypes.array,
+  fullBpu: PropTypes.array,
+  setShowAddBpuModal: PropTypes.func.isRequired,
+  onEditItem: PropTypes.func.isRequired,
+  deleteFromBpu: PropTypes.func.isRequired,
+  categories: PropTypes.array,
+  addCategory: PropTypes.func,
+  deleteCategory: PropTypes.func,
+  renameCategory: PropTypes.func,
+  reorderCategories: PropTypes.func,
+  assignCategoryToItem: PropTypes.func,
+  onImportData: PropTypes.func,
+  onReorderItems: PropTypes.func,
+  units: PropTypes.array,
+  onUpdateItem: PropTypes.func.isRequired,
+  setItemToDuplicate: PropTypes.func,
+  isLocalMode: PropTypes.bool,
+  onExitLocalMode: PropTypes.func,
+  onFullResetLocal: PropTypes.func,
+  onForceRefresh: PropTypes.func,
+  isAdmin: PropTypes.bool,
+  onClearObservedPrices: PropTypes.func,
+  bpuSearch: PropTypes.string,
+  setBpuSearch: PropTypes.func.isRequired,
+  bpuConfig: PropTypes.object,
+  masterCctp: PropTypes.array,
 };
 
 export default DatabaseView;

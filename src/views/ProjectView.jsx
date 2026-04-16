@@ -1,5 +1,7 @@
 // src/views/ProjectView.jsx
 import React, { useState, useEffect, useRef } from 'react';
+import PropTypes from 'prop-types';
+import { useStableHash } from '../hooks/useStableHash';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Plus, Trash2, GripVertical, Layers, HelpCircle, Archive, BarChart3 } from 'lucide-react';
 
@@ -369,14 +371,14 @@ const ProjectView = ({
     }
   };
 
-  const [saveStatus, setSaveStatus] = useState('saved'); 
+  const [saveStatus, setSaveStatus] = useState('saved');
   const saveTimeoutRef = useRef(null);
-  const lastSavedProjectRef = useRef(JSON.stringify(project || {}));
+  const projectHash = useStableHash(project);
+  const lastSavedHashRef = useRef(projectHash);
 
   useEffect(() => {
     if (isReadOnly || !project) return;
-    const currentProjectString = JSON.stringify(project);
-    if (currentProjectString === lastSavedProjectRef.current) return;
+    if (projectHash === lastSavedHashRef.current) return;
 
     setSaveStatus('waiting');
     if (onSaveStatusChange) onSaveStatusChange('waiting');
@@ -390,12 +392,12 @@ const ProjectView = ({
           await onSaveProject(project);
           setSaveStatus('saved');
           if (onSaveStatusChange) onSaveStatusChange('saved');
-          lastSavedProjectRef.current = currentProjectString;
+          lastSavedHashRef.current = projectHash;
         } catch (error) { setSaveStatus('error'); if (onSaveStatusChange) onSaveStatusChange('error'); }
       }
     }, 2000);
     return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
-  }, [project, onSaveProject, isReadOnly, onSaveStatusChange]);
+  }, [projectHash, onSaveProject, isReadOnly, onSaveStatusChange]);
 
   // Sauvegarde cloud manuelle (bouton) avec mise à jour du statut
   const handleManualCloudSave = async () => {
@@ -779,6 +781,45 @@ const ProjectView = ({
       </div>
     </ProjectContext.Provider>
   );
+};
+
+ProjectView.propTypes = {
+  project: PropTypes.object,
+  showBpu: PropTypes.bool,
+  setShowBpu: PropTypes.func.isRequired,
+  bpuSearch: PropTypes.string,
+  setBpuSearch: PropTypes.func.isRequired,
+  filteredBpu: PropTypes.array,
+  categories: PropTypes.array,
+  addItemToProject: PropTypes.func.isRequired,
+  selection: PropTypes.object,
+  setSelection: PropTypes.func.isRequired,
+  updateProjectItem: PropTypes.func.isRequired,
+  setModal: PropTypes.func.isRequired,
+  addChapter: PropTypes.func.isRequired,
+  addSubChapter: PropTypes.func.isRequired,
+  updateProjectName: PropTypes.func.isRequired,
+  onDragEnd: PropTypes.func.isRequired,
+  viewMode: PropTypes.string,
+  setViewMode: PropTypes.func.isRequired,
+  clientPercent: PropTypes.number,
+  bpuConfig: PropTypes.object,
+  setBpuConfig: PropTypes.func,
+  onSaveProject: PropTypes.func.isRequired,
+  onSaveStatusChange: PropTypes.func,
+  onReplaceProject: PropTypes.func.isRequired,
+  masterBranding: PropTypes.object,
+  units: PropTypes.array,
+  masterCctp: PropTypes.array,
+  allBpuItems: PropTypes.array,
+  companyId: PropTypes.string,
+  onLoadCloudProject: PropTypes.func,
+  archives: PropTypes.array,
+  activeArchive: PropTypes.object,
+  onCreateArchive: PropTypes.func,
+  onDeleteArchive: PropTypes.func,
+  onViewArchive: PropTypes.func,
+  onCloseArchive: PropTypes.func,
 };
 
 export default ProjectView;

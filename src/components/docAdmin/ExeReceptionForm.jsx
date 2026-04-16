@@ -487,26 +487,21 @@ const TabEXE4 = ({ fiche, data, update, updateReserve, addReserve, removeReserve
             {(data.reserves || []).map((r, idx) => (
               <div key={idx} className="rounded-lg bg-white border border-gray-200 hover:border-gray-300 transition-all overflow-hidden shadow-sm">
                 <div className="grid grid-cols-[40px_1fr_130px_36px] gap-2 items-center p-2.5">
-                  <input type="text" value={r.numero} onChange={(e) => updateReserve(idx, 'numero', e.target.value)} className="px-2 py-2 rounded-md bg-gray-50 border border-gray-300 text-xs text-gray-800 text-center focus:border-blue-500 focus:outline-none w-full" />
-                  <input type="text" value={r.designation} onChange={(e) => updateReserve(idx, 'designation', e.target.value)} placeholder="Description..." className="px-3 py-2 rounded-md bg-gray-50 border border-gray-300 text-xs text-gray-800 placeholder-gray-400 focus:border-blue-500 focus:outline-none w-full" />
-                  <input type="date" value={r.delaiLevee} onChange={(e) => updateReserve(idx, 'delaiLevee', e.target.value)} className="px-2 py-2 rounded-md bg-gray-50 border border-gray-300 text-xs text-gray-800 focus:border-blue-500 focus:outline-none w-full text-center" />
+                  <input type="text" value={r.numero} onChange={handleReserveFieldChange(idx, 'numero')} className="px-2 py-2 rounded-md bg-gray-50 border border-gray-300 text-xs text-gray-800 text-center focus:border-blue-500 focus:outline-none w-full" />
+                  <input type="text" value={r.designation} onChange={handleReserveFieldChange(idx, 'designation')} placeholder="Description..." className="px-3 py-2 rounded-md bg-gray-50 border border-gray-300 text-xs text-gray-800 placeholder-gray-400 focus:border-blue-500 focus:outline-none w-full" />
+                  <input type="date" value={r.delaiLevee} onChange={handleReserveFieldChange(idx, 'delaiLevee')} className="px-2 py-2 rounded-md bg-gray-50 border border-gray-300 text-xs text-gray-800 focus:border-blue-500 focus:outline-none w-full text-center" />
                   <button onClick={() => removeReserve(idx)} className="p-2 rounded-md text-red-400 hover:text-red-600 hover:bg-red-50 transition-all flex items-center justify-center"><Trash2 size={14} /></button>
                 </div>
                 <div className="px-2.5 pb-2.5 flex items-center gap-3">
                   {r.image ? (
                     <div className="relative group">
                       <img src={r.image} alt={`Réserve ${r.numero}`} className="h-16 w-auto rounded-md border border-gray-200 object-cover" loading="lazy" />
-                      <button onClick={() => updateReserve(idx, 'image', null)} className="absolute -top-1.5 -right-1.5 p-0.5 rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"><X size={10} /></button>
+                      <button onClick={handleReserveImageClear(idx)} className="absolute -top-1.5 -right-1.5 p-0.5 rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"><X size={10} /></button>
                     </div>
                   ) : (
                     <label className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[10px] font-bold text-gray-500 bg-gray-50 border border-dashed border-gray-300 hover:border-gray-400 hover:text-gray-600 cursor-pointer transition-all">
                       <ImagePlus size={12} /><span>Photo</span>
-                      <input type="file" accept="image/*" className="hidden" onChange={(e) => {
-                        const file = e.target.files?.[0]; if (!file) return;
-                        const reader = new FileReader();
-                        reader.onload = (ev) => updateReserve(idx, 'image', ev.target.result);
-                        reader.readAsDataURL(file); e.target.value = '';
-                      }} />
+                      <input type="file" accept="image/*" className="hidden" onChange={handleReserveImageUpload(idx)} />
                     </label>
                   )}
                 </div>
@@ -674,26 +669,21 @@ const TabEXE5 = ({ fiche, data, update, updateReserve, addReserve, removeReserve
                     {(data.reserves || []).map((r, idx) => (
                       <div key={idx} className="rounded-lg bg-white border border-gray-200 hover:border-gray-300 transition-all overflow-hidden shadow-sm">
                         <div className="grid grid-cols-[40px_1fr_130px_36px] gap-2 items-center p-2.5">
-                          <input type="text" value={r.numero} onChange={(e) => updateReserve(idx, 'numero', e.target.value)} className="px-2 py-2 rounded-md bg-gray-50 border border-gray-300 text-xs text-gray-800 text-center focus:border-blue-500 focus:outline-none w-full" />
-                          <input type="text" value={r.designation} onChange={(e) => updateReserve(idx, 'designation', e.target.value)} placeholder="Description..." className="px-3 py-2 rounded-md bg-gray-50 border border-gray-300 text-xs text-gray-800 placeholder-gray-400 focus:border-blue-500 focus:outline-none w-full" />
-                          <input type="date" value={r.delaiLevee} onChange={(e) => updateReserve(idx, 'delaiLevee', e.target.value)} className="px-2 py-2 rounded-md bg-gray-50 border border-gray-300 text-xs text-gray-800 focus:border-blue-500 focus:outline-none w-full text-center" />
+                          <input type="text" value={r.numero} onChange={handleReserveFieldChange(idx, 'numero')} className="px-2 py-2 rounded-md bg-gray-50 border border-gray-300 text-xs text-gray-800 text-center focus:border-blue-500 focus:outline-none w-full" />
+                          <input type="text" value={r.designation} onChange={handleReserveFieldChange(idx, 'designation')} placeholder="Description..." className="px-3 py-2 rounded-md bg-gray-50 border border-gray-300 text-xs text-gray-800 placeholder-gray-400 focus:border-blue-500 focus:outline-none w-full" />
+                          <input type="date" value={r.delaiLevee} onChange={handleReserveFieldChange(idx, 'delaiLevee')} className="px-2 py-2 rounded-md bg-gray-50 border border-gray-300 text-xs text-gray-800 focus:border-blue-500 focus:outline-none w-full text-center" />
                           <button onClick={() => removeReserve(idx)} className="p-2 rounded-md text-red-400 hover:text-red-600 hover:bg-red-50 transition-all flex items-center justify-center"><Trash2 size={14} /></button>
                         </div>
                         <div className="px-2.5 pb-2.5 flex items-center gap-3">
                           {r.image ? (
                             <div className="relative group">
                               <img src={r.image} alt={`Réserve ${r.numero}`} className="h-16 w-auto rounded-md border border-gray-200 object-cover" loading="lazy" />
-                              <button onClick={() => updateReserve(idx, 'image', null)} className="absolute -top-1.5 -right-1.5 p-0.5 rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"><X size={10} /></button>
+                              <button onClick={handleReserveImageClear(idx)} className="absolute -top-1.5 -right-1.5 p-0.5 rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"><X size={10} /></button>
                             </div>
                           ) : (
                             <label className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[10px] font-bold text-gray-500 bg-gray-50 border border-dashed border-gray-300 hover:border-gray-400 hover:text-gray-600 cursor-pointer transition-all">
                               <ImagePlus size={12} /><span>Photo</span>
-                              <input type="file" accept="image/*" className="hidden" onChange={(e) => {
-                                const file = e.target.files?.[0]; if (!file) return;
-                                const reader = new FileReader();
-                                reader.onload = (ev) => updateReserve(idx, 'image', ev.target.result);
-                                reader.readAsDataURL(file); e.target.value = '';
-                              }} />
+                              <input type="file" accept="image/*" className="hidden" onChange={handleReserveImageUpload(idx)} />
                             </label>
                           )}
                         </div>
@@ -918,6 +908,22 @@ export default function ExeReceptionForm({ fiche, dateFinRevisee: externalDateFi
   const removeReserve = useCallback((i) => {
     setData((p) => { const l = [...(p.reserves || [])]; l.splice(i, 1); if (!l.length) l.push({ numero: '1', designation: '', delaiLevee: '', image: null }); return { ...p, reserves: l }; });
   }, []);
+
+  // Extracted handlers for .map() rows (reserves)
+  const handleReserveFieldChange = useCallback((idx, field) => (e) => {
+    updateReserve(idx, field, e.target.value);
+  }, [updateReserve]);
+
+  const handleReserveImageUpload = useCallback((idx) => (e) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => updateReserve(idx, 'image', ev.target.result);
+    reader.readAsDataURL(file); e.target.value = '';
+  }, [updateReserve]);
+
+  const handleReserveImageClear = useCallback((idx) => () => {
+    updateReserve(idx, 'image', null);
+  }, [updateReserve]);
 
   // ── Auto-save ──
   const saveTimeoutRef = useRef(null);
