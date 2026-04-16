@@ -44,15 +44,11 @@ function perpendicularDistance(point, lineStart, lineEnd) {
 }
 
 /**
- * Douglas-Peucker : simplifie un trace GPS.
- * @param {Array<{lat, lng, ...}>} coords - Points GPS avec au minimum lat/lng
- * @param {number} epsilon - Tolerance en metres (defaut 5m)
- * @returns {Array} Points simplifies (meme structure, premier et dernier toujours gardes)
+ * Douglas-Peucker recursif (segment continu, sans gestion des breaks).
  */
-export function simplifyGpsTrace(coords, epsilon = 5) {
+function dpSimplify(coords, epsilon) {
   if (!coords || coords.length <= 2) return coords;
 
-  // Trouver le point le plus eloigne du segment start-end
   let maxDist = 0;
   let maxIdx = 0;
 
@@ -64,13 +60,41 @@ export function simplifyGpsTrace(coords, epsilon = 5) {
     }
   }
 
-  // Si le point le plus eloigne depasse epsilon, on divise et on recurse
   if (maxDist > epsilon) {
-    const left = simplifyGpsTrace(coords.slice(0, maxIdx + 1), epsilon);
-    const right = simplifyGpsTrace(coords.slice(maxIdx), epsilon);
+    const left = dpSimplify(coords.slice(0, maxIdx + 1), epsilon);
+    const right = dpSimplify(coords.slice(maxIdx), epsilon);
     return [...left.slice(0, -1), ...right];
   }
 
-  // Sinon on garde seulement les extremites
   return [coords[0], coords[coords.length - 1]];
+}
+
+/**
+ * Douglas-Peucker : simplifie un trace GPS.
+ * Respecte les marqueurs _break (coupures entre sessions) :
+ * chaque segment est simplifie independamment pour ne jamais
+ * relier les points d'arret et de reprise.
+ *
+ * @param {Array<{lat, lng, ...}>} coords - Points GPS avec au minimum lat/lng
+ * @param {number} epsilon - Tolerance en metres (defaut 5m)
+ * @returns {Array} Points simplifies (meme structure, breaks preserves)
+ */
+export function simplifyGpsTrace(coords, epsilon = 5) {
+  if (!coords || coords.length <= 2) return coords;
+
+  // Decouper aux points _break, simplifier chaque segment independamment
+  const segments = [];
+  let current = [];
+  for (const coord of coords) {
+    if (coord._break && current.length > 0) {
+      segments.push(current);
+      current = [coord]; // le point _break demarre le nouveau segment
+    } else {
+      current.push(coord);
+    }
+  }
+  if (current.length > 0) segments.push(current);
+
+  // Simplifier chaque segment, puis rejoindre
+  return segments.flatMap(seg => dpSimplify(seg, epsilon));
 }
