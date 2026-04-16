@@ -7,7 +7,7 @@ import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 import { useMobileSiteVisits } from '../hooks/useMobileSiteVisits';
 import { simplifyGpsTrace } from '../utils/gpsSimplify';
 import {
@@ -35,7 +35,10 @@ const haversine = (a, b) => {
 
 const totalDistance = (coords) => {
   let d = 0;
-  for (let i = 1; i < coords.length; i++) d += haversine(coords[i - 1], coords[i]);
+  for (let i = 1; i < coords.length; i++) {
+    if (coords[i]._break) continue; // ne pas compter le saut entre segments
+    d += haversine(coords[i - 1], coords[i]);
+  }
   return d;
 };
 
@@ -188,6 +191,7 @@ export default function TeslaModeView({ user, companyId, onExit }) {
   const wakeLockRef = useRef(null);
   const timerRef = useRef(null);
   const startTimeRef = useRef(null);
+  const gpsBreakNextRef = useRef(false); // marquer une coupure au prochain point GPS
 
   // Toast feedback
   const [toast, setToast] = useState(null);
@@ -352,16 +356,20 @@ export default function TeslaModeView({ user, companyId, onExit }) {
     if ('wakeLock' in navigator) navigator.wakeLock.request('screen').then(wl => { wakeLockRef.current = wl; }).catch(() => {});
     timerRef.current = setInterval(() => setGpsElapsed(Date.now() - startTimeRef.current), 1000);
 
+    // Si des coords existent déjà, le prochain point démarrera un nouveau segment
+    if (liveCoords.length > 0) gpsBreakNextRef.current = true;
+
     const ref = doc(db, 'companies', companyId, 'site_visits', activeVisit.id);
     updateDoc(ref, { 'gpsTracking.startTime': new Date().toISOString() }).catch(() => {});
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
         const point = { lat: pos.coords.latitude, lng: pos.coords.longitude, timestamp: new Date().toISOString(), accuracy: Math.round(pos.coords.accuracy * 10) / 10 };
+        if (gpsBreakNextRef.current) { point._break = true; gpsBreakNextRef.current = false; }
         setLastAccuracy(point.accuracy);
         setLiveCoords(prev => {
-          // Filtre distance min 5m — ignorer si trop proche du dernier point
-          if (prev.length > 0) {
+          // Filtre distance min 5m — ignorer si trop proche du dernier point (sauf break = nouveau segment)
+          if (!point._break && prev.length > 0) {
             const last = prev[prev.length - 1];
             if (haversine(last, point) < 5) return prev;
           }
@@ -376,7 +384,7 @@ export default function TeslaModeView({ user, companyId, onExit }) {
       () => {},
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
     );
-  }, [companyId, activeVisit?.id]);
+  }, [companyId, activeVisit?.id, liveCoords.length]);
 
   const stopGps = useCallback(async () => {
     setIsRecording(false);
@@ -403,10 +411,83 @@ export default function TeslaModeView({ user, companyId, onExit }) {
     };
   }, []);
 
+  // ── Tesla resilience : token keepalive + wake lock + GPS restart on resume ──
+  useEffect(() => {
+    // Refresh auth token toutes les 30 min (évite expiration pendant longues sessions)
+    const tokenInterval = setInterval(() => {
+      auth.currentUser?.getIdToken(true).catch(() => {});
+    }, 30 * 60 * 1000);
+
+    const handleVisibility = async () => {
+      if (document.visibilityState !== 'visible') return;
+
+      // 1. Force token refresh au retour d'écran
+      try { await auth.currentUser?.getIdToken(true); } catch { /* géré par auth state listener */ }
+
+      // 2. Re-acquérir Wake Lock si on enregistrait
+      if (isRecording && 'wakeLock' in navigator) {
+        try { wakeLockRef.current = await navigator.wakeLock.request('screen'); } catch { /* ignore */ }
+      }
+
+      // 3. Redémarrer GPS watch si le navigateur l'a tué pendant le sleep
+      if (isRecording && navigator.geolocation) {
+        if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current);
+        gpsBreakNextRef.current = true; // ne pas relier ancien tracé et nouveau
+        watchIdRef.current = navigator.geolocation.watchPosition(
+          (pos) => {
+            const point = { lat: pos.coords.latitude, lng: pos.coords.longitude, timestamp: new Date().toISOString(), accuracy: Math.round(pos.coords.accuracy * 10) / 10 };
+            if (gpsBreakNextRef.current) { point._break = true; gpsBreakNextRef.current = false; }
+            setLastAccuracy(point.accuracy);
+            setLiveCoords(prev => {
+              if (!point._break && prev.length > 0 && haversine(prev[prev.length - 1], point) < 5) return prev;
+              const updated = [...prev, point];
+              if (updated.length % 5 === 0 && activeVisit?.id) {
+                updateDoc(doc(db, 'companies', companyId, 'site_visits', activeVisit.id), {
+                  'gpsTracking.coordinates': updated, 'gpsTracking.distance': Math.round(totalDistance(updated)),
+                }).catch(() => {});
+              }
+              return updated;
+            });
+          },
+          () => {},
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+        );
+      }
+
+      // 4. Flush les coords GPS accumulées vers Firestore (rattrapage réseau)
+      if (isRecording && activeVisit?.id && liveCoords.length > 0) {
+        updateDoc(doc(db, 'companies', companyId, 'site_visits', activeVisit.id), {
+          'gpsTracking.coordinates': liveCoords, 'gpsTracking.distance': Math.round(totalDistance(liveCoords)),
+        }).catch(() => {});
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      clearInterval(tokenInterval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [isRecording, companyId, activeVisit?.id, liveCoords]);
+
   // ── Computed ──
   const gpsCoords = isRecording ? liveCoords : (activeVisit?.gpsTracking?.coordinates || []);
   const gpsPositions = gpsCoords.map(c => [c.lat, c.lng]);
   const currentGpsPosition = gpsPositions.length > 0 ? gpsPositions[gpsPositions.length - 1] : null;
+
+  // Découper le tracé GPS en segments séparés aux points _break (pas de ligne entre arrêt/reprise)
+  const gpsSegments = useMemo(() => {
+    const segs = [];
+    let current = [];
+    for (const coord of gpsCoords) {
+      if (coord._break && current.length > 0) {
+        segs.push(current);
+        current = [];
+      }
+      current.push([coord.lat, coord.lng]);
+    }
+    if (current.length > 0) segs.push(current);
+    return segs;
+  }, [gpsCoords]);
 
   const bounds = useMemo(() => {
     const pts = [...gpsPositions];
@@ -523,8 +604,8 @@ export default function TeslaModeView({ user, companyId, onExit }) {
             );
           })}
 
-          {/* Trace GPS continu */}
-          {gpsPositions.length > 1 && <Polyline positions={gpsPositions} pathOptions={{ color: '#80c4f2', weight: 3, opacity: 0.7 }} />}
+          {/* Trace GPS — segments séparés (pas de ligne entre arrêt/reprise) */}
+          {gpsSegments.map((seg, i) => seg.length > 1 && <Polyline key={`gps-seg-${i}`} positions={seg} pathOptions={{ color: '#80c4f2', weight: 3, opacity: 0.7 }} />)}
           {gpsPositions.length > 0 && <Marker position={gpsPositions[0]} icon={startGpsIcon} />}
           {gpsPositions.length > 1 && <Marker position={gpsPositions[gpsPositions.length - 1]} icon={endGpsIcon} />}
         </MapContainer>

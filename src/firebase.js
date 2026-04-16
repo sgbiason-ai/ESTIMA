@@ -6,7 +6,7 @@ import {
   persistentMultipleTabManager,
   memoryLocalCache
 } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
+import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
 
 // Configuration Firebase via variables d'environnement
 // Voir .env.example pour le format attendu
@@ -38,4 +38,10 @@ const db = initializeFirestore(app, {
 });
 
 export const auth = getAuth(app);
+
+// Tesla : forcer localStorage pour la persistance auth (IndexedDB pas fiable sur ce navigateur)
+if (isTeslaBrowser) {
+  setPersistence(auth, browserLocalPersistence).catch(() => {});
+}
+
 export { db };
