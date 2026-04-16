@@ -260,8 +260,10 @@ export default function ModuleHubView({ isAdmin, userEmail, onSelectModule, onLo
             </p>
           </div>
 
-          {/* Bento Grid — 3 cols lg, 2 cols md, 1 col mobile ; hauteurs naturelles sous lg */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[clamp(0.5rem,0.8vh,1.25rem)] lg:flex-1 lg:min-h-0">
+          {/* Bento Grid — desktop : 3 colonnes (rows horizontales)
+              Tablette/mobile : 1 colonne externe (sections empilées),
+                chaque section a ses cartes en grille 2 cols (md) ou 1 col (mobile) */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-[clamp(0.5rem,0.8vh,1.25rem)] lg:flex-1 lg:min-h-0">
             {rows.map((rowNum) => {
               const colModules = visibleModules.filter(m => m.row === rowNum);
               if (colModules.length === 0) return null;
@@ -277,8 +279,8 @@ export default function ModuleHubView({ isAdmin, userEmail, onSelectModule, onLo
                       {ROW_LABELS[rowNum].label}
                     </span>
                   </div>
-                  {/* Cards stacked — height naturelle sous lg, remplit viewport en lg */}
-                  <div className="flex flex-col gap-[clamp(0.375rem,0.6vh,1rem)] lg:flex-1 lg:min-h-0">
+                  {/* Cards : mobile stacked / tablet grid 2 cols / desktop flex-col qui remplit */}
+                  <div className="flex flex-col md:grid md:grid-cols-2 lg:flex lg:flex-col gap-[clamp(0.375rem,0.6vh,1rem)] lg:flex-1 lg:min-h-0">
                     {colModules.map((mod, idx) => (
                       <BentoCard
                         key={mod.id}
