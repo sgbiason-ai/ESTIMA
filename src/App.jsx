@@ -9,7 +9,7 @@ import { useLocalMode }     from './hooks/useLocalMode';
 import { useAppResources }  from './hooks/useAppResources';
 import { useAppModals }     from './hooks/useAppModals';
 import { usePresence }      from './hooks/usePresence';
-import { useIsMobile }      from './hooks/useIsMobile';
+import { useDeviceMode }    from './hooks/useDeviceMode';
 import { useIsTesla }       from './hooks/useIsTesla';
 import { useProjectArchives } from './hooks/useProjectArchives';
 
@@ -66,8 +66,9 @@ const Lazy = ({ children }) => <Suspense fallback={<LazyFallback />}>{children}<
 // ─── APP ──────────────────────────────────────────────────────────────────────
 export default function App() {
 
-  // ── 0. Détection mobile / Tesla ────────────────────────────────────────────
-  const isMobile = useIsMobile(768);
+  // ── 0. Détection device / layout / Tesla ──────────────────────────────────
+  const { isTablet, layoutMode, forceLayout } = useDeviceMode();
+  const isMobile = layoutMode === 'mobile';
   const isTesla = useIsTesla();
 
   // ── 0b. Page légale (accessible sans auth) ────────────────────────────────
@@ -90,6 +91,29 @@ export default function App() {
       }
     }
   }, [authLoading]);
+
+  // ── Bouton flottant "Passer en mobile" pour tablette en mode desktop ──────
+  React.useEffect(() => {
+    if (!isTablet || isMobile) return;
+    const btn = document.createElement('button');
+    btn.setAttribute('aria-label', 'Passer en vue mobile');
+    btn.title = 'Passer en vue mobile (tablette)';
+    btn.style.cssText = [
+      'position:fixed', 'bottom:1rem', 'right:1rem', 'z-index:9999',
+      'width:48px', 'height:48px', 'border-radius:9999px',
+      'background:rgba(255,255,255,0.92)', 'backdrop-filter:blur(12px)',
+      'border:1px solid rgba(0,0,0,0.08)',
+      'box-shadow:0 4px 16px rgba(0,0,0,0.12)',
+      'display:flex', 'align-items:center', 'justify-content:center',
+      'cursor:pointer', 'transition:transform 0.15s ease, box-shadow 0.15s ease',
+    ].join(';');
+    btn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>`;
+    btn.addEventListener('mouseenter', () => { btn.style.transform = 'scale(1.08)'; });
+    btn.addEventListener('mouseleave', () => { btn.style.transform = 'scale(1)'; });
+    btn.onclick = () => forceLayout('mobile');
+    document.body.appendChild(btn);
+    return () => { if (btn.parentNode) btn.parentNode.removeChild(btn); };
+  }, [isTablet, isMobile, forceLayout]);
 
   // ── Page légale (rendue avant les gardes d'auth) ──────────────────────────
   if (showLegal) {
@@ -129,7 +153,13 @@ export default function App() {
   if (isMobile) {
     return (
       <Suspense fallback={<LazyFallback />}>
-        <MobileApp user={user} companyId={companyId} onLogout={handleLogout} />
+        <MobileApp
+          user={user}
+          companyId={companyId}
+          onLogout={handleLogout}
+          isTablet={isTablet}
+          onSwitchToDesktop={isTablet ? () => forceLayout('desktop') : null}
+        />
       </Suspense>
     );
   }

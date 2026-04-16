@@ -2,9 +2,20 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.4.0';
+export const APP_VERSION = '2.4.1';
 
 export const CHANGELOG = [
+  {
+    version: '2.4.1',
+    date: '2026-04-16',
+    title: 'Support tablette Samsung Galaxy Tab S10 FE',
+    highlights: [
+      'Vue mobile centrée sur tablette : 448px portrait, 768px paysage (fond neutre autour)',
+      'Détection améliorée des tablettes (Tab S10 FE, iPad) même en mode "site desktop"',
+      'Bouton flottant discret pour basculer mobile ↔ desktop sur tablette (préférence sauvegardée)',
+      'Nouveau hook `useDeviceMode` : distingue phone / tablet / desktop',
+    ],
+  },
   {
     version: '2.4.0',
     date: '2026-04-16',

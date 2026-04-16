@@ -50,7 +50,7 @@ const ROW_THEMES = {
 
 // ─── COMPOSANT ─────────────────────────────────────────────────────────────
 
-export default function MobileHubView({ userEmail, onSelectModule, onLogout, isLandscape }) {
+export default function MobileHubView({ userEmail, onSelectModule, onLogout, isLandscape, isTablet = false, onSwitchToDesktop = null }) {
   const [mounted, setMounted] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -72,6 +72,16 @@ export default function MobileHubView({ userEmail, onSelectModule, onLogout, isL
             Estima Suite
           </span>
           <div className="flex items-center gap-3">
+            {isTablet && onSwitchToDesktop && (
+              <button
+                onClick={onSwitchToDesktop}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition"
+                title="Passer en vue desktop"
+                aria-label="Passer en vue desktop"
+              >
+                <Icon name="monitor" size={16} color="currentColor" />
+              </button>
+            )}
             <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
               <span className="text-[10px] font-bold text-white">{firstName.charAt(0).toUpperCase()}</span>
             </div>

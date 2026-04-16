@@ -50,7 +50,7 @@ import { useOrientation }   from '../../hooks/useOrientation';
 import { useRobustSave, loadDraft, clearDraft } from '../../hooks/useRobustSave';
 
 // ─── MAIN MOBILE APP ────────────────────────────────────────────────────────
-export default function MobileApp({ user, companyId, onLogout }) {
+export default function MobileApp({ user, companyId, onLogout, isTablet = false, onSwitchToDesktop = null }) {
   const { isLandscape } = useOrientation();
 
   // ── Données ──
@@ -428,8 +428,15 @@ export default function MobileApp({ user, companyId, onLogout }) {
     return map;
   }, [dbHook.bpu]);
 
+  // Container adaptatif :
+  //  - Phone  : max-w-md portrait / w-full landscape (inchangé)
+  //  - Tablet : max-w-md portrait / max-w-3xl landscape (≈ 768px centré)
+  const containerWidth = isTablet
+    ? (isLandscape ? 'max-w-3xl mx-auto' : 'max-w-md mx-auto')
+    : (isLandscape ? 'w-full' : 'max-w-md mx-auto');
+
   return (
-    <div className={`flex flex-col h-dvh bg-[#f5f5f7] font-sans ${isLandscape ? 'w-full' : 'max-w-md mx-auto'}`}
+    <div className={`flex flex-col h-dvh bg-[#f5f5f7] font-sans ${containerWidth}`}
       style={{ height: '100dvh', fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
       <MobileStyles />
       {/* ── Header (masqué sur le hub — il a son propre header) ── */}
@@ -458,6 +465,8 @@ export default function MobileApp({ user, companyId, onLogout }) {
             onSelectModule={handleSelectModule}
             onLogout={onLogout}
             isLandscape={isLandscape}
+            isTablet={isTablet}
+            onSwitchToDesktop={onSwitchToDesktop}
           />
         )}
 
