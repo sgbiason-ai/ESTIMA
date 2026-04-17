@@ -1,5 +1,7 @@
 // src/App.jsx
 import React, { useState, lazy, Suspense } from 'react';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from './firebase';
 
 // ─── HOOKS ────────────────────────────────────────────────────────────────────
 import { useAppAuth }       from './hooks/useAppAuth';
@@ -528,8 +530,12 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub }) {
                 companyId={companyId}
                 onLoadCloudProject={(proj) => {
                   setProject(proj);
-                  if (companyId && proj.id) {
-                    localStorage.setItem(`last_active_project_id__${companyId}`, proj.id);
+                  if (user?.uid && proj?.id) {
+                    setDoc(
+                      doc(db, 'users', user.uid, 'preferences', 'modules'),
+                      { estima: proj.id, updatedAt: serverTimestamp() },
+                      { merge: true }
+                    ).catch(() => {});
                   }
                 }}
                 archives={archives}

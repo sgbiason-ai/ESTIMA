@@ -1,11 +1,11 @@
 // src/hooks/useProjectManager.js
 import { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc, addDoc, collection } from 'firebase/firestore';
+import { doc, getDoc, setDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { generateId } from '../utils/helpers';
 import { safeEvalMathExpr } from '../utils/projectCalculations';
 
-// Clé localStorage spécifique à chaque entreprise pour éviter les collisions
+// Legacy localStorage key — conservé pour migration one-shot vers Firestore prefs.
 const lastProjectKey = (companyId) => `last_active_project_id__${companyId}`;
 
 export const useProjectManager = (user, companyId) => {
@@ -25,9 +25,30 @@ export const useProjectManager = (user, companyId) => {
 
     const loadProject = async () => {
       try {
-        const lastActiveId = localStorage.getItem(lastProjectKey(companyId));
-        const projectId = lastActiveId || 'draft_project';
+        // 1. Lire la pref Firestore
+        const prefsRef = doc(db, 'users', user.uid, 'preferences', 'modules');
+        const prefsSnap = await getDoc(prefsRef);
+        let lastActiveId = prefsSnap.exists() ? prefsSnap.data().estima : null;
 
+        // 2. Migration one-shot : si pas de pref Firestore mais localStorage présent → migrer
+        if (!lastActiveId) {
+          const legacyId = localStorage.getItem(lastProjectKey(companyId));
+          if (legacyId) {
+            lastActiveId = legacyId;
+            try {
+              await setDoc(
+                prefsRef,
+                { estima: legacyId, updatedAt: serverTimestamp() },
+                { merge: true }
+              );
+              localStorage.removeItem(lastProjectKey(companyId));
+            } catch (e) {
+              console.warn('[useProjectManager] Migration prefs échouée:', e.message);
+            }
+          }
+        }
+
+        const projectId = lastActiveId || 'draft_project';
         const docRef  = doc(db, 'companies', companyId, 'projects', projectId);
         const docSnap = await getDoc(docRef);
 
@@ -37,7 +58,9 @@ export const useProjectManager = (user, companyId) => {
           return;
         }
 
+        // Projet mémorisé supprimé → clear pref + fallback draft
         if (lastActiveId) {
+          try { await setDoc(prefsRef, { estima: null }, { merge: true }); } catch {}
           const fallbackRef  = doc(db, 'companies', companyId, 'projects', 'draft_project');
           const fallbackSnap = await getDoc(fallbackRef);
           if (fallbackSnap.exists()) {
@@ -77,7 +100,17 @@ export const useProjectManager = (user, companyId) => {
     if (!projectData || !user || !companyId) return;
 
     const projectId = projectData.id || 'draft_project';
-    localStorage.setItem(lastProjectKey(companyId), projectId);
+
+    // Mémoriser le dernier projet ouvert (Firestore prefs, sync multi-device)
+    try {
+      await setDoc(
+        doc(db, 'users', user.uid, 'preferences', 'modules'),
+        { estima: projectId, updatedAt: serverTimestamp() },
+        { merge: true }
+      );
+    } catch (e) {
+      console.warn('[useProjectManager] MAJ pref estima échouée:', e.message);
+    }
 
     const { __isNew, ...projectToStore } = projectData;
 
