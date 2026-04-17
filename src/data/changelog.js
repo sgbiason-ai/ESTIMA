@@ -2,9 +2,18 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.4.4';
+export const APP_VERSION = '2.4.5';
 
 export const CHANGELOG = [
+  {
+    version: '2.4.5',
+    date: '2026-04-16',
+    title: 'CRC desktop : contacts repliés par défaut',
+    highlights: [
+      'Groupes de participants repliés à l\'ouverture d\'un CRC (scan plus rapide)',
+      'Cliquer sur un groupe déplie ses contacts — état conservé en session',
+    ],
+  },
   {
     version: '2.4.4',
     date: '2026-04-16',

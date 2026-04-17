@@ -60,9 +60,9 @@ const CrrParticipants = ({
   showManagement = false,
 }) => {
   const [collapsed, setCollapsed] = useState(false);
-  const [expandedGroups, setExpandedGroups] = useState(
-    new Set(crrConfig.participantGroups.map((g) => g.id))
-  );
+  // Par defaut tous les groupes sont replies (on voit le nom du groupe + compte,
+  // mais pas la liste des contacts). Meilleur scan visuel a l'ouverture d'un CRC.
+  const [expandedGroups, setExpandedGroups] = useState(new Set());
   const [editingGroup, setEditingGroup] = useState(null);
   const [editingContact, setEditingContact] = useState(null);
 
