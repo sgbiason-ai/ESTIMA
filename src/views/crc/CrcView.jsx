@@ -433,8 +433,8 @@ export default function CrcView({ onBackToHub, user, companyId }) {
           </div>
         </div>
 
-        {/* Ruban principal */}
-        <div className="flex items-end gap-0.5 px-2 py-1 overflow-x-auto max-w-full" style={{ scrollbarWidth: 'none' }}>
+        {/* Ruban principal — wrap multi-lignes sous xl (tablette/laptop), single-line + scroll en xl+ */}
+        <div className="flex items-end flex-wrap xl:flex-nowrap gap-x-1 gap-y-2 xl:gap-x-0.5 xl:gap-y-0 px-2 py-1 xl:overflow-x-auto max-w-full" style={{ scrollbarWidth: 'none' }}>
 
           {/* ── GROUPE : CHANTIER ── */}
           <RibbonGroup label="Chantier" dataTour="chantier">

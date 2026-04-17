@@ -20,7 +20,8 @@ export const RibbonButton = ({ icon: Icon, label, onClick, disabled, variant = '
 };
 
 export const RibbonDivider = () => (
-  <div className="w-px bg-gray-200/60 mx-1 xl:mx-1.5 self-stretch my-1 shrink-0" />
+  // Masque sous xl (ribbon wrap : les dividers seraient mal places)
+  <div className="hidden xl:block w-px bg-gray-200/60 mx-1 xl:mx-1.5 self-stretch my-1 shrink-0" />
 );
 
 export const RibbonGroup = ({ label, children, dataTour }) => (

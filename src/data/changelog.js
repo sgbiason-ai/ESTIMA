@@ -2,9 +2,19 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.4.6';
+export const APP_VERSION = '2.4.7';
 
 export const CHANGELOG = [
+  {
+    version: '2.4.7',
+    date: '2026-04-16',
+    title: 'Ribbon CRC : multi-lignes sur tablette et laptop',
+    highlights: [
+      'Ribbon CRC passe sur 2 lignes (wrap) sous 1280px — fini le scroll horizontal',
+      'Séparateurs masqués en mode wrap (inutiles entre lignes)',
+      'Écrans xl+ (1280px+) conservent le ribbon une ligne classique',
+    ],
+  },
   {
     version: '2.4.6',
     date: '2026-04-16',
