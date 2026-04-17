@@ -2,9 +2,19 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.5.10';
+export const APP_VERSION = '2.5.11';
 
 export const CHANGELOG = [
+  {
+    version: '2.5.11',
+    date: '2026-04-17',
+    title: 'Fix : tablette en site desktop ne bascule plus en mode Tesla',
+    highlights: [
+      'Détection Tesla affinée : largeur écran ≥ 1600px requise',
+      'Galaxy Tab S10 FE (et autres tablettes) en mode desktop → accès normal à Visites de Site',
+      'Tesla 17" (Model S/X/3/Y) toujours correctement détecté',
+    ],
+  },
   {
     version: '2.5.10',
     date: '2026-04-17',

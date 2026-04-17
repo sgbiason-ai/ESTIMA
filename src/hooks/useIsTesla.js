@@ -19,14 +19,19 @@ function detectTesla() {
     if (params.get('tesla') === '1') return true;
   } catch { /* ignore */ }
 
-  // 2. User-Agent Tesla : Chromium nu sur Linux X11, sans mention de distro
-  // UA Tesla : "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 ... Chrome/xxx Safari/537.36"
-  // Pas de "Tesla" dans le UA, mais c'est un Linux X11 sans Ubuntu/Fedora/etc.
   const ua = navigator.userAgent || '';
+
+  // 2. UA explicite "Tesla" (firmwares recents)
   if (/Tesla/i.test(ua)) return true;
+
+  // 3. User-Agent Chromium nu sur Linux X11, sans mention de distro
+  // UA Tesla : "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 ... Chrome/xxx Safari/537.36"
+  // ATTENTION : les tablettes Android en "site desktop" ont le meme UA.
+  // On distingue par la largeur d'ecran : Tesla 17" >= 1600px CSS, tablettes < 1600px.
   if (/X11; Linux x86_64/.test(ua) && /Chrome\/\d/.test(ua)
     && !/Ubuntu|Fedora|Debian|SUSE|Mint|Arch|CrOS|Android/.test(ua)) {
-    return true;
+    const w = typeof window !== 'undefined' ? window.innerWidth : 0;
+    if (w >= 1600) return true;
   }
   return false;
 }
