@@ -57,17 +57,17 @@ const spreadOverlapping = (markers, minDist = 0.00008) => {
   return result;
 };
 
-// ─── OSRM route fetch (segments épousant la route) ─────────────────────────
+// ─── IGN Itinéraires (libre, France) — remplace OSRM demo ────────────────
 
-async function fetchOsrmRoute(from, to) {
+async function fetchIgnRoute(from, to) {
   try {
-    const res = await fetch(
-      `https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`
-    );
+    const url = `https://data.geopf.fr/navigation/itineraire?resource=bdtopo-osrm&start=${from[1]},${from[0]}&end=${to[1]},${to[0]}&profile=car&optimization=fastest&getSteps=false&getBbox=false&distanceUnit=meter&timeUnit=second`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
     const data = await res.json();
-    const route = data.routes?.[0];
-    if (!route) return null;
-    return route.geometry.coordinates.map(c => [c[1], c[0]]);
+    const geom = data?.geometry;
+    if (!geom?.coordinates?.length) return null;
+    return { coordinates: geom.coordinates.map(c => [c[1], c[0]]), distance: Number(data.distance) || 0 };
   } catch { return null; }
 }
 
@@ -253,7 +253,7 @@ function MeasureTool({ active, points, onAddPoint, onReset }) {
   );
 }
 
-// ─── Route entre 2 observations (OSRM) ─────────────────────────────────────
+// ─── Route entre 2 observations (IGN) ─────────────────────────────────────
 
 function RouteOverlay({ from, to }) {
   const [routeCoords, setRouteCoords] = useState([]);
@@ -264,15 +264,11 @@ function RouteOverlay({ from, to }) {
     if (!from || !to) { setRouteCoords([]); setRouteDist(null); return; }
     let cancelled = false;
     setLoading(true);
-    fetch(`https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`)
-      .then(r => r.json())
-      .then(data => {
-        if (cancelled) return;
-        const route = data.routes?.[0];
-        if (route) {
-          setRouteCoords(route.geometry.coordinates.map(c => [c[1], c[0]]));
-          setRouteDist(route.distance);
-        }
+    fetchIgnRoute(from, to)
+      .then(route => {
+        if (cancelled || !route) return;
+        setRouteCoords(route.coordinates);
+        setRouteDist(route.distance);
       })
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -328,17 +324,17 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
     return L.latLngBounds(allPoints);
   }, [positions, photoMarkers, obsMarkers, segmentEndpoints, segmentLines]);
 
-  // ── Cache routes OSRM pour les segments ──
+  // ── Cache routes IGN pour les segments (fallback si pas de route stockée) ──
   const [segmentRoutes, setSegmentRoutes] = useState({});
   const fetchedRef = useRef(new Set());
 
   useEffect(() => {
-    segmentLines.forEach((seg, i) => {
+    segmentLines.forEach((seg) => {
       const key = `${seg.from[0]},${seg.from[1]}-${seg.to[0]},${seg.to[1]}`;
       if (fetchedRef.current.has(key)) return;
       fetchedRef.current.add(key);
-      fetchOsrmRoute(seg.from, seg.to).then(coords => {
-        if (coords) setSegmentRoutes(prev => ({ ...prev, [key]: coords }));
+      fetchIgnRoute(seg.from, seg.to).then(route => {
+        if (route) setSegmentRoutes(prev => ({ ...prev, [key]: route.coordinates }));
       });
     });
   }, [segmentLines]);

@@ -161,19 +161,19 @@ function getCurrentPosition() {
   });
 }
 
-// ─── OSRM route fetch ─────────────────────────────────────────────────────────
+// ─── Routing : IGN Itinéraires (libre, France) ────────────────────────────────
 
-async function fetchOsrmRoute(from, to) {
+async function fetchIgnRoute(from, to) {
   try {
-    const res = await fetch(
-      `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`
-    );
+    const url = `https://data.geopf.fr/navigation/itineraire?resource=bdtopo-osrm&start=${from.lng},${from.lat}&end=${to.lng},${to.lat}&profile=car&optimization=fastest&getSteps=false&getBbox=false&distanceUnit=meter&timeUnit=second`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
     const data = await res.json();
-    const route = data.routes?.[0];
-    if (!route) return null;
+    const geom = data?.geometry;
+    if (!geom?.coordinates?.length) return null;
     return {
-      coordinates: route.geometry.coordinates.map(c => [c[1], c[0]]),
-      distance: route.distance,
+      coordinates: geom.coordinates.map(c => [c[1], c[0]]), // lng,lat → lat,lng
+      distance: Number(data.distance) || 0,
     };
   } catch { return null; }
 }
@@ -265,8 +265,18 @@ export default function TeslaModeView({ user, companyId, onExit }) {
       setPanelOpen(obs.length > 0);
       // Pre-load route cache pour les segments existants
       obs.forEach(o => {
-        if (o.segmentFrom && o.segmentTo && !routeCache[o.id]) {
-          fetchOsrmRoute(o.segmentFrom, o.segmentTo).then(route => {
+        if (routeCache[o.id]) return;
+        // Priorité : route déjà stockée en Firestore (nouveau format)
+        if (Array.isArray(o.segmentRoute) && o.segmentRoute.length >= 2) {
+          setRouteCache(prev => ({ ...prev, [o.id]: {
+            coordinates: o.segmentRoute.map(c => [c.lat, c.lng]),
+            distance: o.segmentDistance || 0,
+          } }));
+          return;
+        }
+        // Legacy : re-fetch via IGN
+        if (o.segmentFrom && o.segmentTo) {
+          fetchIgnRoute(o.segmentFrom, o.segmentTo).then(route => {
             if (route) setRouteCache(prev => ({ ...prev, [o.id]: route }));
           });
         }
@@ -328,7 +338,7 @@ export default function TeslaModeView({ user, companyId, onExit }) {
     setGettingPosition(true);
     try {
       const pos = await getPosition();
-      setPendingPoint({ lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy });
+      setPendingPoint({ lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy, timestamp: Date.now() });
       showToast(`Départ marqué (±${Math.round(pos.accuracy)}m)`);
     } catch (e) {
       showToast('Erreur GPS : ' + e.message);
@@ -343,14 +353,45 @@ export default function TeslaModeView({ user, companyId, onExit }) {
       const pos = await getPosition();
       const pointA = pendingPoint;
       const pointB = { lat: pos.lat, lng: pos.lng };
+      const tsA = pointA.timestamp || 0;
+      const tsB = Date.now();
       setPendingPoint(null);
 
-      showToast('Calcul de la route...');
+      let routeCoords = null; // [{lat, lng}, ...]
+      let distance = null;
+      let source = null; // 'trace' | 'ign' | 'haversine'
 
-      // Fetch route OSRM
-      const route = await fetchOsrmRoute(pointA, pointB);
+      // Priorité 1 : tracé GPS actif pendant la mesure → distance réelle parcourue
+      if (isRecording && tsA && liveCoords.length > 0) {
+        const slice = liveCoords.filter(c => {
+          const t = c.timestamp ? new Date(c.timestamp).getTime() : 0;
+          return t >= tsA && t <= tsB;
+        });
+        if (slice.length >= 2) {
+          routeCoords = slice.map(c => ({ lat: c.lat, lng: c.lng }));
+          distance = totalDistance(slice);
+          source = 'trace';
+        }
+      }
 
-      // Incertitude = précision GPS point A + point B + marge route (~5m)
+      // Priorité 2 : IGN Itinéraires (fallback réseau)
+      if (!routeCoords) {
+        showToast('Calcul itinéraire IGN...');
+        const ign = await fetchIgnRoute(pointA, pointB);
+        if (ign && ign.distance > 0) {
+          routeCoords = ign.coordinates.map(c => ({ lat: c[0], lng: c[1] }));
+          distance = ign.distance;
+          source = 'ign';
+        }
+      }
+
+      // Priorité 3 : haversine (vol d'oiseau) — dernier recours
+      if (distance == null) {
+        distance = haversine(pointA, pointB);
+        source = 'haversine';
+      }
+
+      // Incertitude = précision GPS point A + point B + marge (~5m)
       const uncertainty = Math.round((pointA.accuracy || 0) + (pos.accuracy || 0) + 5);
 
       const segId = `seg_${Date.now()}`;
@@ -361,12 +402,16 @@ export default function TeslaModeView({ user, companyId, onExit }) {
         date: new Date().toISOString().split('T')[0],
         segmentFrom: pointA,
         segmentTo: pointB,
-        segmentDistance: route?.distance || null,
+        segmentDistance: distance,
         segmentDistanceStraight: haversine(pointA, pointB),
         segmentUncertainty: uncertainty,
+        segmentSource: source,
+        segmentRoute: routeCoords, // stocké pour rendu sans re-fetch
       };
 
-      if (route) setRouteCache(prev => ({ ...prev, [segId]: route }));
+      if (routeCoords) {
+        setRouteCache(prev => ({ ...prev, [segId]: { coordinates: routeCoords.map(c => [c.lat, c.lng]), distance } }));
+      }
 
       const updatedObs = [...segments, newSeg];
       setSegments(updatedObs);
@@ -374,12 +419,13 @@ export default function TeslaModeView({ user, companyId, onExit }) {
       setActiveVisit(updated);
       await saveVisit(activeVisit.id, updated);
 
-      showToast(`Segment créé — ${fmtDist(route?.distance || haversine(pointA, pointB))} ${fmtUncertainty(uncertainty)}`);
+      const label = source === 'trace' ? 'tracé réel' : source === 'ign' ? 'IGN' : 'vol d\'oiseau';
+      showToast(`Segment créé — ${fmtDist(distance)} (${label}) ${fmtUncertainty(uncertainty)}`);
     } catch (e) {
       showToast('Erreur GPS : ' + e.message);
     }
     setGettingPosition(false);
-  }, [activeVisit, pendingPoint, gettingPosition, segments, saveVisit, getPosition]);
+  }, [activeVisit, pendingPoint, gettingPosition, segments, saveVisit, getPosition, isRecording, liveCoords]);
 
   const cancelPending = useCallback(() => setPendingPoint(null), []);
 

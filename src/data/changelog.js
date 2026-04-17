@@ -2,9 +2,22 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.5.4';
+export const APP_VERSION = '2.5.5';
 
 export const CHANGELOG = [
+  {
+    version: '2.5.5',
+    date: '2026-04-17',
+    title: 'Distance segments : tracé GPS réel prioritaire + migration IGN',
+    highlights: [
+      'Priorité 1 : si traçé GPS actif, distance = somme des fixes entre Départ et Fin (valeur parcourue réelle, offline)',
+      'Priorité 2 : IGN Itinéraires (data.geopf.fr, libre France) — remplace OSRM demo',
+      'Priorité 3 : haversine (vol d\'oiseau) en dernier recours',
+      'Route stockée en Firestore avec le segment → plus de re-fetch au rechargement',
+      'Toast indique la source utilisée : tracé réel / IGN / vol d\'oiseau',
+      'Fichiers : TeslaModeView, SiteVisitsView, GpsMapView (mobile), pdfSiteVisitGenerator',
+    ],
+  },
   {
     version: '2.5.4',
     date: '2026-04-17',

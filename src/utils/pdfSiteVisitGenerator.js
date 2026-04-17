@@ -219,15 +219,16 @@ const fetchTileAsImg = async (url, maxAttempts = 3, timeoutMs = 5000) => {
 
 // ─── GENERATION CARTE SATELLITE (Canvas natif + tuiles) ──────────────────────
 
-const fetchOsrmRoutePdf = async (from, to) => {
+// IGN Itinéraires (libre, France) — remplace OSRM demo
+const fetchIgnRoutePdf = async (from, to) => {
   try {
-    const res = await fetch(
-      `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`
-    );
+    const url = `https://data.geopf.fr/navigation/itineraire?resource=bdtopo-osrm&start=${from.lng},${from.lat}&end=${to.lng},${to.lat}&profile=car&optimization=fastest&getSteps=false&getBbox=false&distanceUnit=meter&timeUnit=second`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
     const data = await res.json();
-    const route = data.routes?.[0];
-    if (!route) return null;
-    return route.geometry.coordinates.map(c => ({ lat: c[1], lng: c[0] }));
+    const geom = data?.geometry;
+    if (!geom?.coordinates?.length) return null;
+    return geom.coordinates.map(c => ({ lat: c[1], lng: c[0] }));
   } catch { return null; }
 };
 
@@ -368,9 +369,14 @@ const buildMapCanvas = async (visit, THEME) => {
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke();
   }
 
-  // ── Segments mesurés (routes OSRM orange épaisses) ──
+  // ── Segments mesurés (route stockée en Firestore, ou fallback IGN) ──
   const segmentRoutes = await Promise.all(
-    segments.map(seg => fetchOsrmRoutePdf(seg.segmentFrom, seg.segmentTo))
+    segments.map(seg => {
+      if (Array.isArray(seg.segmentRoute) && seg.segmentRoute.length >= 2) {
+        return Promise.resolve(seg.segmentRoute);
+      }
+      return fetchIgnRoutePdf(seg.segmentFrom, seg.segmentTo);
+    })
   );
 
   segments.forEach((seg, i) => {
@@ -655,8 +661,10 @@ const buildObsMiniMap = async (obs, visit, THEME, obsIdx) => {
   }
 
   if (hasSeg) {
-    // Route OSRM
-    const route = await fetchOsrmRoutePdf(obs.segmentFrom, obs.segmentTo);
+    // Route stockée ou fallback IGN
+    const route = Array.isArray(obs.segmentRoute) && obs.segmentRoute.length >= 2
+      ? obs.segmentRoute
+      : await fetchIgnRoutePdf(obs.segmentFrom, obs.segmentTo);
     const pts = route || [obs.segmentFrom, obs.segmentTo];
 
     // Ombre

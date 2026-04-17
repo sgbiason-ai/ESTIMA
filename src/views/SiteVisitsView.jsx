@@ -55,13 +55,16 @@ function getCurrentPosition() {
   });
 }
 
-async function fetchOsrmRoute(from, to) {
+// Routing IGN Itinéraires (libre, France) — remplace OSRM demo
+async function fetchIgnRoute(from, to) {
   try {
-    const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`);
+    const url = `https://data.geopf.fr/navigation/itineraire?resource=bdtopo-osrm&start=${from.lng},${from.lat}&end=${to.lng},${to.lat}&profile=car&optimization=fastest&getSteps=false&getBbox=false&distanceUnit=meter&timeUnit=second`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
     const data = await res.json();
-    const route = data.routes?.[0];
-    if (!route) return null;
-    return { coordinates: route.geometry.coordinates.map(c => [c[1], c[0]]), distance: route.distance };
+    const geom = data?.geometry;
+    if (!geom?.coordinates?.length) return null;
+    return { coordinates: geom.coordinates.map(c => [c[1], c[0]]), distance: Number(data.distance) || 0 };
   } catch { return null; }
 }
 
@@ -374,12 +377,20 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
     finally { setDetailLoading(false); }
   }, [loadVisit, user]);
 
-  // ── Pre-load OSRM routes ──
+  // ── Pre-load routes : stockée en Firestore si dispo, sinon IGN ──
   useEffect(() => {
     if (!fullVisit) return;
     (fullVisit.observations || []).forEach(obs => {
-      if (obs.segmentFrom && obs.segmentTo && !routeCache[obs.id]) {
-        fetchOsrmRoute(obs.segmentFrom, obs.segmentTo).then(route => {
+      if (routeCache[obs.id]) return;
+      if (Array.isArray(obs.segmentRoute) && obs.segmentRoute.length >= 2) {
+        setRouteCache(prev => ({ ...prev, [obs.id]: {
+          coordinates: obs.segmentRoute.map(c => [c.lat, c.lng]),
+          distance: obs.segmentDistance || 0,
+        } }));
+        return;
+      }
+      if (obs.segmentFrom && obs.segmentTo) {
+        fetchIgnRoute(obs.segmentFrom, obs.segmentTo).then(route => {
           if (route) setRouteCache(prev => ({ ...prev, [obs.id]: route }));
         });
       }
@@ -457,13 +468,13 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
     setGettingPosition(true);
     try {
       const pos = await getPosition();
-      setPendingPoint({ lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy });
+      setPendingPoint({ lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy, timestamp: Date.now() });
       showToast(`Départ marqué (±${Math.round(pos.accuracy)}m)`);
     } catch (e) { showToast('Erreur GPS : ' + e.message); }
     setGettingPosition(false);
   }, [fullVisit, gettingPosition, getPosition]);
 
-  // ── Segment: Fin ──
+  // ── Segment: Fin — priorité tracé > IGN > haversine ──
   const handleFin = useCallback(async () => {
     if (!fullVisit || !pendingPoint || gettingPosition) return;
     setGettingPosition(true);
@@ -471,29 +482,68 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
       const pos = await getPosition();
       const pointA = pendingPoint;
       const pointB = { lat: pos.lat, lng: pos.lng };
+      const tsA = pointA.timestamp || 0;
+      const tsB = Date.now();
       setPendingPoint(null);
-      showToast('Calcul de la route...');
 
-      const route = await fetchOsrmRoute(pointA, pointB);
+      let routeCoords = null;
+      let distance = null;
+      let source = null;
+
+      // Priorité 1 : tracé GPS réel parcouru entre Départ et Fin
+      if (isRecording && tsA && liveCoords.length > 0) {
+        const slice = liveCoords.filter(c => {
+          const t = c.timestamp ? new Date(c.timestamp).getTime() : 0;
+          return t >= tsA && t <= tsB;
+        });
+        if (slice.length >= 2) {
+          routeCoords = slice.map(c => ({ lat: c.lat, lng: c.lng }));
+          distance = totalDistance(slice);
+          source = 'trace';
+        }
+      }
+
+      // Priorité 2 : IGN Itinéraires
+      if (!routeCoords) {
+        showToast('Calcul itinéraire IGN...');
+        const ign = await fetchIgnRoute(pointA, pointB);
+        if (ign && ign.distance > 0) {
+          routeCoords = ign.coordinates.map(c => ({ lat: c[0], lng: c[1] }));
+          distance = ign.distance;
+          source = 'ign';
+        }
+      }
+
+      // Priorité 3 : vol d'oiseau
+      if (distance == null) {
+        distance = haversine(pointA, pointB);
+        source = 'haversine';
+      }
+
       const uncertainty = Math.round((pointA.accuracy || 0) + (pos.accuracy || 0) + 5);
       const segId = `seg_${Date.now()}`;
       const newSeg = {
         id: segId, text: '', images: [], date: new Date().toISOString().split('T')[0],
         segmentFrom: pointA, segmentTo: pointB,
-        segmentDistance: route?.distance || null,
+        segmentDistance: distance,
         segmentDistanceStraight: haversine(pointA, pointB),
         segmentUncertainty: uncertainty,
+        segmentSource: source,
+        segmentRoute: routeCoords,
       };
-      if (route) setRouteCache(prev => ({ ...prev, [segId]: route }));
+      if (routeCoords) {
+        setRouteCache(prev => ({ ...prev, [segId]: { coordinates: routeCoords.map(c => [c.lat, c.lng]), distance } }));
+      }
 
       const updatedObs = [...(fullVisit.observations || []), newSeg];
       const updated = { ...fullVisit, observations: updatedObs };
       setFullVisit(updated);
       await saveVisit(fullVisit.id, updated);
-      showToast(`Segment créé — ${fmtDist(route?.distance || haversine(pointA, pointB))} ${fmtUncertainty(uncertainty)}`);
+      const label = source === 'trace' ? 'tracé réel' : source === 'ign' ? 'IGN' : 'vol d\'oiseau';
+      showToast(`Segment créé — ${fmtDist(distance)} (${label}) ${fmtUncertainty(uncertainty)}`);
     } catch (e) { showToast('Erreur GPS : ' + e.message); }
     setGettingPosition(false);
-  }, [fullVisit, pendingPoint, gettingPosition, getPosition, saveVisit]);
+  }, [fullVisit, pendingPoint, gettingPosition, getPosition, saveVisit, isRecording, liveCoords]);
 
   const cancelPending = useCallback(() => setPendingPoint(null), []);
 
