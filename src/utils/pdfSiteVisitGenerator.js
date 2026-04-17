@@ -198,14 +198,23 @@ const latLng2px = (lat, lng, z) => {
   return { x, y };
 };
 
-const fetchTileAsImg = async (url) => {
-  try {
-    const resp = await fetch(url);
-    if (!resp.ok) return null;
-    const blob = await resp.blob();
-    const dataUrl = await new Promise(r => { const rd = new FileReader(); rd.onloadend = () => r(rd.result); rd.readAsDataURL(blob); });
-    return loadImage(dataUrl);
-  } catch { return null; }
+const fetchTileAsImg = async (url, maxAttempts = 3, timeoutMs = 5000) => {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const resp = await fetch(url, { signal: controller.signal });
+      clearTimeout(timer);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const blob = await resp.blob();
+      const dataUrl = await new Promise(r => { const rd = new FileReader(); rd.onloadend = () => r(rd.result); rd.readAsDataURL(blob); });
+      return await loadImage(dataUrl);
+    } catch {
+      clearTimeout(timer);
+      if (attempt < maxAttempts) await new Promise(r => setTimeout(r, 200 * attempt));
+    }
+  }
+  return null;
 };
 
 // ─── GENERATION CARTE SATELLITE (Canvas natif + tuiles) ──────────────────────
