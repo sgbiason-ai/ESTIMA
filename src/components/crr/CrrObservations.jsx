@@ -279,21 +279,21 @@ const ObservationRow = ({ obs, onUpdate, onDelete, meetingDate, participantGroup
               <GripVertical size={14} className="text-gray-300 hover:text-gray-500 transition-colors" />
             </div>
           )}
-          {/* Emetteur */}
+          {/* Emetteur — plus etroit sous xl (tablette / laptop) */}
           <GroupPicker
             value={obs.emitter}
             onChange={(name) => onUpdate(obs.id, { emitter: name })}
             groups={participantGroups}
-            placeholder="Emetteur"
-            className="w-24 shrink-0"
+            placeholder="Em."
+            className="w-14 xl:w-24 shrink-0"
           />
 
-          {/* Date */}
+          {/* Date — compacte sous xl */}
           <input
             type="date"
             value={obs.date}
             onChange={(e) => onUpdate(obs.id, { date: e.target.value })}
-            className="w-32 shrink-0 text-[11px] px-2 py-1 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 text-slate-800"
+            className="w-[105px] xl:w-32 shrink-0 text-[11px] px-1 xl:px-2 py-1 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 text-slate-800"
           />
 
           {/* Texte observation + images */}
@@ -424,7 +424,7 @@ const ObservationRow = ({ obs, onUpdate, onDelete, meetingDate, participantGroup
                 onChange={(name) => onUpdate(obs.id, { actionBy: name })}
                 groups={participantGroups}
                 placeholder="PAR"
-                className="w-28"
+                className="w-14 xl:w-28"
               />
               <input
                 type="date"
@@ -432,7 +432,7 @@ const ObservationRow = ({ obs, onUpdate, onDelete, meetingDate, participantGroup
                 onChange={(e) =>
                   onUpdate(obs.id, { actionDeadline: e.target.value })
                 }
-                className="w-32 text-[11px] px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 text-slate-800"
+                className="w-[105px] xl:w-32 text-[11px] px-1 xl:px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 text-slate-800"
                 title="Pour le"
               />
             </div>
@@ -503,9 +503,9 @@ const CrrObservations = ({
 
       {/* En-tete tableau */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="grid grid-cols-[30px_100px_120px_1fr_280px_30px] gap-1 px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+        <div className="grid grid-cols-[24px_60px_110px_1fr_200px_24px] xl:grid-cols-[30px_100px_120px_1fr_280px_30px] gap-1 px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
           <span />
-          <span>Emetteur</span>
+          <span>Emet.</span>
           <span>Date</span>
           <span>Observations</span>
           <span className="text-center">Actions (Par / Pour le)</span>

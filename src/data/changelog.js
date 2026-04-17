@@ -2,9 +2,19 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.4.7';
+export const APP_VERSION = '2.4.8';
 
 export const CHANGELOG = [
+  {
+    version: '2.4.8',
+    date: '2026-04-16',
+    title: 'Table observations CRC : colonnes compactées sur tablette',
+    highlights: [
+      'Émetteur, Date, PAR et deadline réduits sous 1280px',
+      'Colonne Observation ~140px plus large en tablette portrait',
+      'Écrans PC (xl+) conservent les largeurs normales',
+    ],
+  },
   {
     version: '2.4.7',
     date: '2026-04-16',
