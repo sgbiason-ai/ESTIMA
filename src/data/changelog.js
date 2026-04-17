@@ -2,9 +2,20 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.5.7';
+export const APP_VERSION = '2.5.8';
 
 export const CHANGELOG = [
+  {
+    version: '2.5.8',
+    date: '2026-04-17',
+    title: 'Segments : distance + visu 100% IGN + retry robuste + couleur cadastre',
+    highlights: [
+      'Distance ET visualisation toujours via IGN (plus de fallback tracé GPS) → courbe routière cohérente',
+      'Retry automatique (3 tentatives, backoff 400/800ms) pour IGN Itinéraires — fini les segments en ligne droite sur panne réseau',
+      'Segments en vert sur la vue cadastrale (parcelles orange) pour meilleur contraste',
+      'Cohérent sur Tesla, Desktop, Mobile et PDF',
+    ],
+  },
   {
     version: '2.5.7',
     date: '2026-04-17',

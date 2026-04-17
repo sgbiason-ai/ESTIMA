@@ -69,17 +69,23 @@ function getCurrentPosition() {
   });
 }
 
-// Routing IGN Itinéraires (libre, France) — remplace OSRM demo
-async function fetchIgnRoute(from, to) {
-  try {
-    const url = `https://data.geopf.fr/navigation/itineraire?resource=bdtopo-osrm&start=${from.lng},${from.lat}&end=${to.lng},${to.lat}&profile=car&optimization=fastest&getSteps=false&getBbox=false&distanceUnit=meter&timeUnit=second`;
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const data = await res.json();
-    const geom = data?.geometry;
-    if (!geom?.coordinates?.length) return null;
-    return { coordinates: geom.coordinates.map(c => [c[1], c[0]]), distance: Number(data.distance) || 0 };
-  } catch { return null; }
+// Routing IGN Itinéraires (libre, France) — remplace OSRM demo, avec retry
+async function fetchIgnRoute(from, to, retries = 2) {
+  const url = `https://data.geopf.fr/navigation/itineraire?resource=bdtopo-osrm&start=${from.lng},${from.lat}&end=${to.lng},${to.lat}&profile=car&optimization=fastest&getSteps=false&getBbox=false&distanceUnit=meter&timeUnit=second`;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        const geom = data?.geometry;
+        if (geom?.coordinates?.length >= 2) {
+          return { coordinates: geom.coordinates.map(c => [c[1], c[0]]), distance: Number(data.distance) || 0 };
+        }
+      }
+    } catch { /* retry */ }
+    if (attempt < retries) await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+  }
+  return null;
 }
 
 // ─── Tile Layers ─────────────────────────────────────────────────────────────
@@ -488,7 +494,7 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
     setGettingPosition(false);
   }, [fullVisit, gettingPosition, getPosition]);
 
-  // ── Segment: Fin — priorité tracé > IGN > haversine ──
+  // ── Segment: Fin — IGN route (distance + visu), fallback haversine ──
   const handleFin = useCallback(async () => {
     if (!fullVisit || !pendingPoint || gettingPosition) return;
     setGettingPosition(true);
@@ -496,40 +502,19 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
       const pos = await getPosition();
       const pointA = pendingPoint;
       const pointB = { lat: pos.lat, lng: pos.lng };
-      const tsA = pointA.timestamp || 0;
-      const tsB = Date.now();
       setPendingPoint(null);
 
+      showToast('Calcul itinéraire IGN...');
       let routeCoords = null;
       let distance = null;
       let source = null;
 
-      // Priorité 1 : tracé GPS réel parcouru entre Départ et Fin
-      if (isRecording && tsA && liveCoords.length > 0) {
-        const slice = liveCoords.filter(c => {
-          const t = c.timestamp ? new Date(c.timestamp).getTime() : 0;
-          return t >= tsA && t <= tsB;
-        });
-        if (slice.length >= 2) {
-          routeCoords = slice.map(c => ({ lat: c.lat, lng: c.lng }));
-          distance = totalDistance(slice);
-          source = 'trace';
-        }
-      }
-
-      // Priorité 2 : IGN Itinéraires
-      if (!routeCoords) {
-        showToast('Calcul itinéraire IGN...');
-        const ign = await fetchIgnRoute(pointA, pointB);
-        if (ign && ign.distance > 0) {
-          routeCoords = ign.coordinates.map(c => ({ lat: c[0], lng: c[1] }));
-          distance = ign.distance;
-          source = 'ign';
-        }
-      }
-
-      // Priorité 3 : vol d'oiseau
-      if (distance == null) {
+      const ign = await fetchIgnRoute(pointA, pointB);
+      if (ign && ign.distance > 0 && ign.coordinates?.length >= 2) {
+        routeCoords = ign.coordinates.map(c => ({ lat: c[0], lng: c[1] }));
+        distance = ign.distance;
+        source = 'ign';
+      } else {
         distance = haversine(pointA, pointB);
         source = 'haversine';
       }
@@ -553,11 +538,11 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
       const updated = { ...fullVisit, observations: updatedObs };
       setFullVisit(updated);
       await saveVisit(fullVisit.id, updated);
-      const label = source === 'trace' ? 'tracé réel' : source === 'ign' ? 'IGN' : 'vol d\'oiseau';
+      const label = source === 'ign' ? 'IGN' : 'vol d\'oiseau';
       showToast(`Segment créé — ${fmtDist(distance)} (${label}) ${fmtUncertainty(uncertainty)}`);
     } catch (e) { showToast('Erreur GPS : ' + e.message); }
     setGettingPosition(false);
-  }, [fullVisit, pendingPoint, gettingPosition, getPosition, saveVisit, isRecording, liveCoords]);
+  }, [fullVisit, pendingPoint, gettingPosition, getPosition, saveVisit]);
 
   const cancelPending = useCallback(() => setPendingPoint(null), []);
 
@@ -739,8 +724,8 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
         const route = routeCache[obs.id];
         return (
           <React.Fragment key={obs.id}>
-            {route && <Polyline positions={route.coordinates} pathOptions={{ color: '#f97316', weight: 5, opacity: 0.9 }} />}
-            {!route && <Polyline positions={[[obs.segmentFrom.lat, obs.segmentFrom.lng], [obs.segmentTo.lat, obs.segmentTo.lng]]} pathOptions={{ color: '#f97316', weight: 5, dashArray: '8 6', opacity: 0.8 }} />}
+            {route && <Polyline positions={route.coordinates} pathOptions={{ color: activeLayer === 'cadastre' ? '#22c55e' : '#f97316', weight: 5, opacity: 0.9 }} />}
+            {!route && <Polyline positions={[[obs.segmentFrom.lat, obs.segmentFrom.lng], [obs.segmentTo.lat, obs.segmentTo.lng]]} pathOptions={{ color: activeLayer === 'cadastre' ? '#22c55e' : '#f97316', weight: 5, dashArray: '8 6', opacity: 0.8 }} />}
             <Marker
               position={route ? route.coordinates[Math.floor(route.coordinates.length / 2)] : [(obs.segmentFrom.lat + obs.segmentTo.lat) / 2, (obs.segmentFrom.lng + obs.segmentTo.lng) / 2]}
               icon={createSegmentIcon(idx + 1)}

@@ -179,19 +179,25 @@ function getCurrentPosition() {
 
 // ─── Routing : IGN Itinéraires (libre, France) ────────────────────────────────
 
-async function fetchIgnRoute(from, to) {
-  try {
-    const url = `https://data.geopf.fr/navigation/itineraire?resource=bdtopo-osrm&start=${from.lng},${from.lat}&end=${to.lng},${to.lat}&profile=car&optimization=fastest&getSteps=false&getBbox=false&distanceUnit=meter&timeUnit=second`;
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const data = await res.json();
-    const geom = data?.geometry;
-    if (!geom?.coordinates?.length) return null;
-    return {
-      coordinates: geom.coordinates.map(c => [c[1], c[0]]), // lng,lat → lat,lng
-      distance: Number(data.distance) || 0,
-    };
-  } catch { return null; }
+async function fetchIgnRoute(from, to, retries = 2) {
+  const url = `https://data.geopf.fr/navigation/itineraire?resource=bdtopo-osrm&start=${from.lng},${from.lat}&end=${to.lng},${to.lat}&profile=car&optimization=fastest&getSteps=false&getBbox=false&distanceUnit=meter&timeUnit=second`;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        const geom = data?.geometry;
+        if (geom?.coordinates?.length >= 2) {
+          return {
+            coordinates: geom.coordinates.map(c => [c[1], c[0]]), // lng,lat → lat,lng
+            distance: Number(data.distance) || 0,
+          };
+        }
+      }
+    } catch { /* retry */ }
+    if (attempt < retries) await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+  }
+  return null;
 }
 
 // ─── Composant Principal ──────────────────────────────────────────────────────
@@ -369,45 +375,23 @@ export default function TeslaModeView({ user, companyId, onExit }) {
       const pos = await getPosition();
       const pointA = pendingPoint;
       const pointB = { lat: pos.lat, lng: pos.lng };
-      const tsA = pointA.timestamp || 0;
-      const tsB = Date.now();
       setPendingPoint(null);
 
-      let routeCoords = null; // [{lat, lng}, ...]
+      showToast('Calcul itinéraire IGN...');
+      let routeCoords = null;
       let distance = null;
-      let source = null; // 'trace' | 'ign' | 'haversine'
+      let source = null; // 'ign' | 'haversine'
 
-      // Priorité 1 : tracé GPS actif pendant la mesure → distance réelle parcourue
-      if (isRecording && tsA && liveCoords.length > 0) {
-        const slice = liveCoords.filter(c => {
-          const t = c.timestamp ? new Date(c.timestamp).getTime() : 0;
-          return t >= tsA && t <= tsB;
-        });
-        if (slice.length >= 2) {
-          routeCoords = slice.map(c => ({ lat: c.lat, lng: c.lng }));
-          distance = totalDistance(slice);
-          source = 'trace';
-        }
-      }
-
-      // Priorité 2 : IGN Itinéraires (fallback réseau)
-      if (!routeCoords) {
-        showToast('Calcul itinéraire IGN...');
-        const ign = await fetchIgnRoute(pointA, pointB);
-        if (ign && ign.distance > 0) {
-          routeCoords = ign.coordinates.map(c => ({ lat: c[0], lng: c[1] }));
-          distance = ign.distance;
-          source = 'ign';
-        }
-      }
-
-      // Priorité 3 : haversine (vol d'oiseau) — dernier recours
-      if (distance == null) {
+      const ign = await fetchIgnRoute(pointA, pointB);
+      if (ign && ign.distance > 0 && ign.coordinates?.length >= 2) {
+        routeCoords = ign.coordinates.map(c => ({ lat: c[0], lng: c[1] }));
+        distance = ign.distance;
+        source = 'ign';
+      } else {
         distance = haversine(pointA, pointB);
         source = 'haversine';
       }
 
-      // Incertitude adaptée à la source (propagation quadratique)
       const uncertainty = computeUncertainty(source, pointA.accuracy, pos.accuracy, distance);
 
       const segId = `seg_${Date.now()}`;
@@ -422,7 +406,7 @@ export default function TeslaModeView({ user, companyId, onExit }) {
         segmentDistanceStraight: haversine(pointA, pointB),
         segmentUncertainty: uncertainty,
         segmentSource: source,
-        segmentRoute: routeCoords, // stocké pour rendu sans re-fetch
+        segmentRoute: routeCoords,
       };
 
       if (routeCoords) {
@@ -435,13 +419,13 @@ export default function TeslaModeView({ user, companyId, onExit }) {
       setActiveVisit(updated);
       await saveVisit(activeVisit.id, updated);
 
-      const label = source === 'trace' ? 'tracé réel' : source === 'ign' ? 'IGN' : 'vol d\'oiseau';
+      const label = source === 'ign' ? 'IGN' : 'vol d\'oiseau';
       showToast(`Segment créé — ${fmtDist(distance)} (${label}) ${fmtUncertainty(uncertainty)}`);
     } catch (e) {
       showToast('Erreur GPS : ' + e.message);
     }
     setGettingPosition(false);
-  }, [activeVisit, pendingPoint, gettingPosition, segments, saveVisit, getPosition, isRecording, liveCoords]);
+  }, [activeVisit, pendingPoint, gettingPosition, segments, saveVisit, getPosition]);
 
   const cancelPending = useCallback(() => setPendingPoint(null), []);
 
@@ -790,8 +774,8 @@ export default function TeslaModeView({ user, companyId, onExit }) {
             if (!obs.segmentFrom || !obs.segmentTo) return null;
             return (
               <React.Fragment key={obs.id}>
-                {route && <Polyline positions={route.coordinates} pathOptions={{ color: '#f97316', weight: 6, opacity: 0.9 }} />}
-                {!route && <Polyline positions={[[obs.segmentFrom.lat, obs.segmentFrom.lng], [obs.segmentTo.lat, obs.segmentTo.lng]]} pathOptions={{ color: '#f97316', weight: 6, dashArray: '8 6', opacity: 0.8 }} />}
+                {route && <Polyline positions={route.coordinates} pathOptions={{ color: activeLayer === 'cadastre' ? '#22c55e' : '#f97316', weight: 6, opacity: 0.9 }} />}
+                {!route && <Polyline positions={[[obs.segmentFrom.lat, obs.segmentFrom.lng], [obs.segmentTo.lat, obs.segmentTo.lng]]} pathOptions={{ color: activeLayer === 'cadastre' ? '#22c55e' : '#f97316', weight: 6, dashArray: '8 6', opacity: 0.8 }} />}
                 <Marker
                   position={route ? route.coordinates[Math.floor(route.coordinates.length / 2)] : [(obs.segmentFrom.lat + obs.segmentTo.lat) / 2, (obs.segmentFrom.lng + obs.segmentTo.lng) / 2]}
                   icon={createSegmentIcon(obs._num)}

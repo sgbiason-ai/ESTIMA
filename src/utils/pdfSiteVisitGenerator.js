@@ -219,17 +219,21 @@ const fetchTileAsImg = async (url, maxAttempts = 3, timeoutMs = 5000) => {
 
 // ─── GENERATION CARTE SATELLITE (Canvas natif + tuiles) ──────────────────────
 
-// IGN Itinéraires (libre, France) — remplace OSRM demo
-const fetchIgnRoutePdf = async (from, to) => {
-  try {
-    const url = `https://data.geopf.fr/navigation/itineraire?resource=bdtopo-osrm&start=${from.lng},${from.lat}&end=${to.lng},${to.lat}&profile=car&optimization=fastest&getSteps=false&getBbox=false&distanceUnit=meter&timeUnit=second`;
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const data = await res.json();
-    const geom = data?.geometry;
-    if (!geom?.coordinates?.length) return null;
-    return geom.coordinates.map(c => ({ lat: c[1], lng: c[0] }));
-  } catch { return null; }
+// IGN Itinéraires (libre, France) — remplace OSRM demo, avec retry
+const fetchIgnRoutePdf = async (from, to, retries = 2) => {
+  const url = `https://data.geopf.fr/navigation/itineraire?resource=bdtopo-osrm&start=${from.lng},${from.lat}&end=${to.lng},${to.lat}&profile=car&optimization=fastest&getSteps=false&getBbox=false&distanceUnit=meter&timeUnit=second`;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        const geom = data?.geometry;
+        if (geom?.coordinates?.length >= 2) return geom.coordinates.map(c => ({ lat: c[1], lng: c[0] }));
+      }
+    } catch { /* retry */ }
+    if (attempt < retries) await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+  }
+  return null;
 };
 
 const buildMapCanvas = async (visit, THEME) => {

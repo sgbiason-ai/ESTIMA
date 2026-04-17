@@ -59,16 +59,22 @@ const spreadOverlapping = (markers, minDist = 0.00008) => {
 
 // ─── IGN Itinéraires (libre, France) — remplace OSRM demo ────────────────
 
-async function fetchIgnRoute(from, to) {
-  try {
-    const url = `https://data.geopf.fr/navigation/itineraire?resource=bdtopo-osrm&start=${from[1]},${from[0]}&end=${to[1]},${to[0]}&profile=car&optimization=fastest&getSteps=false&getBbox=false&distanceUnit=meter&timeUnit=second`;
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const data = await res.json();
-    const geom = data?.geometry;
-    if (!geom?.coordinates?.length) return null;
-    return { coordinates: geom.coordinates.map(c => [c[1], c[0]]), distance: Number(data.distance) || 0 };
-  } catch { return null; }
+async function fetchIgnRoute(from, to, retries = 2) {
+  const url = `https://data.geopf.fr/navigation/itineraire?resource=bdtopo-osrm&start=${from[1]},${from[0]}&end=${to[1]},${to[0]}&profile=car&optimization=fastest&getSteps=false&getBbox=false&distanceUnit=meter&timeUnit=second`;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        const geom = data?.geometry;
+        if (geom?.coordinates?.length >= 2) {
+          return { coordinates: geom.coordinates.map(c => [c[1], c[0]]), distance: Number(data.distance) || 0 };
+        }
+      }
+    } catch { /* retry */ }
+    if (attempt < retries) await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+  }
+  return null;
 }
 
 // ─── Lissage Catmull-Rom (courbe naturelle entre les points GPS) ────────────
