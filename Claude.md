@@ -1,6 +1,17 @@
 # Claude.md – EstimaVRD Workflow & Agents
 
-**V2.3** | Avril 2026 | Samuel & Claude | Économe tokens
+**V2.4** | Avril 2026 | Samuel & Claude | Économe tokens
+
+---
+
+## ⚡ Règles d'Or (à lire en PREMIER)
+
+1. **Toujours poser des questions avant de coder** — utiliser `AskUserQuestion` pour affiner la demande, surtout sur les choix UX/design (breakpoints, layout, composant). Ne pas deviner.
+2. **JAMAIS commit sans demander** explicitement l'accord utilisateur. Présenter le diff/récap, attendre le feu vert.
+3. **JAMAIS deploy sans demander** explicitement. Commande : `firebase deploy --only hosting` (pas de `npm run deploy`).
+4. **Français par défaut** — code métier, messages git, communication.
+5. **Court et direct** — bullets > paragraphes, snippets 10-20 lignes max, pas de politesses superflues.
+6. **Changelog à jour** — si changement visible utilisateur : bump `APP_VERSION` + ligne dans `src/data/changelog.js`.
 
 ---
 
@@ -12,6 +23,8 @@
 | **Pragmatique** | Pas d'over-engineering, solutions simples d'abord |
 | **Français** | Code métier, docs, messages git |
 | **Traçabilité** | Audit trail (Firestore history/), Sentry errors, git logs |
+| **Questions d'abord** | Clarifier avant de coder (AskUserQuestion) |
+| **Deploy contrôlé** | Demander systématiquement avant commit/deploy |
 
 ---
 
@@ -116,6 +129,72 @@ Le mobile hérite d'EstimaStyle avec des ajustements pour l'usage extérieur (ch
 
 ---
 
+## 2a-bis. Support Tablette (Galaxy Tab S10 FE & autres)
+
+### Détection device
+Hook `useDeviceMode()` → `{ isPhone, isTablet, isDesktop, device, layoutMode, forceLayout }`
+- Détecte tablette **même en mode "site desktop"** (UA sans Android/Mobile)
+- Phone : UA phone OU (touch + width < 768)
+- Tablet : UA tablet (iPad, Android non-Mobile) OU (touch + 768 ≤ width ≤ 1366)
+- Desktop : tout le reste
+- `layoutMode = 'mobile' | 'desktop'` consommé par `App.jsx`
+- Override utilisateur persisté dans `localStorage.estima_force_layout`
+
+### Container mobile adaptatif (`MobileApp.jsx`)
+| Device | Portrait | Paysage |
+|--------|----------|---------|
+| Phone | `max-w-md` (448px) | `w-full` |
+| **Tablette** | **`max-w-2xl`** (672px) centré | **`max-w-6xl`** (1152px) centré |
+
+### Hub mobile sur tablette
+- Phone : `grid-cols-2` (inchangé)
+- **Tablette portrait** : `grid-cols-2` (container élargi donc cartes plus grandes)
+- **Tablette paysage** : `grid-cols-3`
+
+### Split-view (tablette paysage uniquement)
+- Liste à gauche (360px fixe) + détail à droite (flex-1)
+- Composant réutilisable `SplitView` défini en haut de `MobileApp.jsx`
+- Modules concernés : **Projets, CRC, MOE, Visites de Site, Documents Admin**
+- Empty state si aucune sélection (icône + label "Sélectionnez X à gauche")
+- `ProjectsList` accepte `selectedId` pour highlight bleu de la ligne active
+
+### Bascule mobile ↔ desktop (tablette uniquement)
+- **Bouton 🖥️** (Monitor) dans header `MobileHubView` → passer en desktop
+- **Bouton 📱** (Smartphone) flottant en bas à droite (desktop) → passer en mobile (injecté via `useEffect` dans App.jsx)
+- Jamais affichés sur phone (useless) ni desktop PC
+
+### Capture caméra (tablette/mobile, mode desktop)
+Pattern : deux inputs cachés côte à côte — un avec `capture="environment"`, l'autre sans.
+```jsx
+<input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleAddImages} />
+<input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleAddImages} />
+```
+- `capture="environment"` ouvre l'app photo directement sur tablette/mobile, fallback file picker sur desktop
+- Compression auto via `utils/imageCompressor`
+- Utilisé dans :
+  - `CrrObservations.jsx` (CRC desktop) : boutons "Photo" + "Caméra"
+  - `SiteVisitsView.jsx` ObsEditModal : boutons "Ajouter une image" + "Prendre une photo"
+
+### Breakpoints Tailwind utilisés
+| Breakpoint | Width | Usage EstimaVRD |
+|------------|-------|-----------------|
+| `md` | 768px+ | Tablette portrait (grille 2 cols hub desktop) |
+| `lg` | 1024px+ | PC classique (grille 3 cols hub desktop, cartes flex-1) |
+| `xl` | 1280px+ | Grand écran (ribbon CRC single-line, colonnes observation pleine largeur) |
+
+### Ribbon CRC responsive
+- **< xl (1280px)** : `flex-wrap` → 2 lignes si nécessaire, dividers masqués (`hidden xl:block`)
+- **xl+** : `flex-nowrap` + `overflow-x-auto`, dividers visibles
+
+### Tableau observations CRC responsive (`CrrObservations.jsx`)
+Colonnes réduites sous xl pour laisser plus de place au texte :
+- Émetteur : `w-14` → `xl:w-24`
+- Date obs/action : `w-[105px]` → `xl:w-32`
+- PAR : `w-14` → `xl:w-28`
+- Header grid : `grid-cols-[24px_60px_110px_1fr_200px_24px] xl:grid-cols-[30px_100px_120px_1fr_280px_30px]`
+
+---
+
 ## 2b. Commandes npm Essentielles
 
 | Commande | Rôle |
@@ -125,7 +204,8 @@ Le mobile hérite d'EstimaStyle avec des ajustements pour l'usage extérieur (ch
 | `npm run preview` | Prévisualiser build prod localement |
 | `npm run lint` | ESLint (code quality) |
 | `npm run test` | Vitest (unit tests) |
-| `npm run deploy` | Firebase deploy (Hosting + Firestore rules) |
+| `firebase deploy --only hosting` | **Deploy prod** (pas de script npm, commande directe) |
+| `firebase deploy` | Deploy complet (hosting + rules) — à utiliser rarement |
 
 ---
 
@@ -200,6 +280,9 @@ VITE_APP_VERSION=2.0.0
 | **ExcelJS memory** | Crash sur gros export | Lazy-load + stream si possible |
 | **CORS PWA** | Fail partage natif | shareInterceptor.js gère, vérifier manifest |
 | **Branding not applied** | Styles vieux | Hard refresh (Cmd+Shift+R) ou clear cache |
+| **Tab S10 FE en desktop** | Tablette force "site desktop" (UA sans Android) → bascule inattendue | `useDeviceMode` détecte via touch + width, override possible via bouton flottant |
+| **Preview server mort** | `preview_list` renvoie vide après long run | Relancer `npm run dev` si besoin de preview MCP |
+| **Ribbon CRC déborde tablette** | Scroll horizontal moche en portrait | Déjà géré : `flex-wrap xl:flex-nowrap` + dividers responsive |
 
 ---
 
@@ -292,6 +375,16 @@ Time-box: 45 min.
 | "Utilisateur veut X car Y" | Demandes floues |
 | Limitations Firestore mentionnées | Recharger conversation entière |
 | Questions précises | Vague "aide-moi" |
+| Tableaux & bullets | Paragraphes longs |
+| "Build OK, voici diff, on deploy ?" | Deploy direct sans demander |
+| AskUserQuestion pour UX/design | Deviner les breakpoints/couleurs |
+
+### Préférences utilisateur confirmées
+
+- **Questions d'abord** : avant tout changement d'UX ou refactor, utiliser `AskUserQuestion` avec 3-4 options pour affiner. Le user préfère décider tôt que voir un code à refaire.
+- **Validation avant commit/deploy** : présenter un récap structuré (bullets + tableau) du diff, demander "on commit / on deploy ?", attendre le feu vert.
+- **Pragmatique** : solutions simples d'abord. Éviter les refactors larges sauf demande explicite.
+- **Itérations courtes** : préfère 5 petits commits clairs à 1 gros commit monolithique.
 
 ---
 
@@ -335,9 +428,13 @@ src/components/rao/           # RAO: RaoUI, RaoConstants, tabs/ (Consultation, A
 src/components/mobile/        # Mobile: 7 modules dont RAOView (4 onglets consultation)
 src/hooks/usePriceAnalysis.js # Analyse prix — Firestore dédié (analysis/data), auto-save debounced
 src/hooks/useRao.js           # RAO — critères, sous-critères, groupements, notation technique
+src/hooks/useDeviceMode.js    # Device detection (phone/tablet/desktop) + toggle layout
+src/hooks/useIsMobile.js      # Legacy — préférer useDeviceMode
+src/hooks/useOrientation.js   # Portrait/paysage pour MobileApp
+src/utils/imageCompressor.js  # Compression auto images (camera + upload)
 src/utils/pdf/               # PDF generators (jsPDF)
 src/utils/hooks/             # Custom Firestore hooks
-src/App.jsx                  # Sidebar nav + routing
+src/App.jsx                  # Sidebar nav + routing + FAB switch-to-mobile (tablette)
 ```
 
 **Nommage**: Components `PascalCase`, fonctions `camelCase`, constantes `UPPER_SNAKE`, Firestore `snake_case`.
@@ -371,11 +468,22 @@ src/App.jsx                  # Sidebar nav + routing
 - [x] RAO: OAB détail (modale calcul Double Moyenne)
 - [x] RAO: Vue mobile 4 onglets + module hub
 - [x] RAO: Volets figés analyse financière (sticky left)
+- [x] **Support tablette Galaxy Tab S10 FE** (useDeviceMode, container adaptatif, split-view)
+- [x] **Bascule mobile ↔ desktop** avec bouton flottant sur tablette
+- [x] **Hub mobile multi-colonnes** sur tablette (2 portrait / 3 paysage)
+- [x] **Split-view liste+détail** Projets / CRC / MOE / Visites / Docs Admin en paysage tablette
+- [x] **Hub desktop responsive** (2 cols md, 3 cols lg, hauteurs naturelles sous lg)
+- [x] **Caméra tablette** sur CRC + Visites de Site (capture="environment")
+- [x] **CRC participants** repliés par défaut + toggle "tout déplier/tout replier"
+- [x] **Ribbon CRC multi-lignes** sous xl (flex-wrap tablette portrait)
+- [x] **Table observations CRC** responsive (colonnes compactées sous xl)
 - [ ] RAO: Export PDF avec sous-critères et groupements
 - [ ] CRC: form → Firestore → PDF complet
 - [ ] Admin-docs: templates éditables + role check
 - [ ] Vitest RAO/CRC business logic
 - [ ] Lighthouse audit + optimisation
+- [ ] Split-view autres modules (MOE subView, BPU subView si pertinent)
+- [ ] Export PDF RAO avec sous-critères et groupements
 
 ---
 
@@ -517,6 +625,12 @@ MOI: Code rules + tests
 | **Sous-critères RAO ?** | `criteria[].subCriteria[]` avec `{id, label, description, weight}`, pondération parent = Σ |
 | **Groupement entreprises ?** | `admin.isGroupement` + `admin.groupementMembers[]` par entreprise, pièces admin par membre |
 | **Vue mobile RAO ?** | `src/components/mobile/RAOView.jsx` — charge depuis Firestore dédié, 4 onglets |
+| **Détection tablette ?** | `useDeviceMode()` retourne `{ isTablet, layoutMode, forceLayout }`. Tab S10 FE détectée même en "site desktop" |
+| **Forcer vue desktop sur tablette ?** | Bouton 🖥️ dans header hub mobile, ou `localStorage.setItem('estima_force_layout', 'desktop')` |
+| **Ajouter capture caméra ?** | Input caché `type="file" accept="image/*" capture="environment"`. Voir CrrObservations.jsx pour pattern |
+| **Split-view sur tablette ?** | Composant `SplitView` dans MobileApp.jsx. Activé quand `isTablet && isLandscape` |
+| **Breakpoint tablette portrait ?** | 768-1023px → ciblé via `md:` (768+) et `max-lg:` (< 1024). `xl:` (1280+) pour PC |
+| **Preview MCP ?** | `preview_list` pour voir serveurs, `preview_eval('window.location.reload()')` pour refresh |
 
 ---
 
@@ -524,12 +638,24 @@ MOI: Code rules + tests
 
 | V | Date | Changes |
 |---|------|---------|
+| 2.4 | Avril 2026 | **Support tablette Galaxy Tab S10 FE** : useDeviceMode, container adaptatif, split-view listes, hub multi-colonnes, caméra tablette (CRC + Visites), ribbon responsive, table observations compactée, toggle déplier/replier participants. **Règles d'Or** : questions d'abord, demander avant commit/deploy |
 | 2.3 | Avril 2026 | **Module RAO complet** : sauvegarde Firestore dédiée, sous-critères, groupements, OAB détail, volets figés, vue mobile RAO 4 onglets, hub mobile 2x3, import Excel multi-onglets + fallback ref, export/import JSON |
 | 2.2 | Avril 2026 | **Changelog intégré** + règle auto-update CLAUDE.md |
 | 2.1 | Avril 2026 | **Refonte visuelle** Bento Box Apple, météo, couleurs dossiers, design light |
 | 2.0+ | Avril 2026 | Auto-amélioration cycle + Refactoring Proactif |
 | 2.0 | Avril 2026 | Couverture complète EstimaVRD, agents, économe tokens |
 | 1.0 | Avril 2026 | Initial (CRC + Admin-docs) |
+
+### Versions `APP_VERSION` récentes (voir `src/data/changelog.js`)
+| Version | Apport |
+|---------|--------|
+| 2.4.7 | Ribbon CRC multi-lignes sous xl (flex-wrap tablette/laptop) |
+| 2.4.6 | CRC : toggle "tout déplier / tout replier" participants |
+| 2.4.5 | CRC : groupes participants repliés par défaut |
+| 2.4.4 | Caméra tablette sur CRC + Visites de Site (capture="environment") |
+| 2.4.3 | Fix chevauchement hub desktop sur tablette portrait |
+| 2.4.2 | Tablette : hub multi-colonnes + split-view listes |
+| 2.4.1 | Support tablette Samsung Galaxy Tab S10 FE (useDeviceMode, toggle) |
 
 **Chaque session peut trigger une V2.1, V2.2, etc.** via cycle amélioration, refactor, ou mode silencieux.
 
