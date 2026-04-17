@@ -1037,7 +1037,7 @@ export default function TeslaModeView({ user, companyId, onExit }) {
                   ) : (
                     <>
                       <div className="w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center" style={{ background: T.accent, color: '#fff' }}>{indexedObs[editingSegIdx]?._num}</div>
-                      <span className="text-sm font-bold" style={{ color: T.text }}>Segment {indexedObs[editingSegIdx]?._num} <span className="text-[10px] font-normal" style={{ color: T.muted }}>({fmtDist(segments[editingSegIdx]?.segmentDistance)})</span></span>
+                      <span className="text-sm font-bold" style={{ color: T.text }}>Segment {indexedObs[editingSegIdx]?._num} <span className="text-[10px] font-normal" style={{ color: T.muted }}>({fmtDist(segments[editingSegIdx]?.segmentDistance)} {fmtUncertainty(segments[editingSegIdx]?.segmentUncertainty)})</span></span>
                     </>
                   )}
                 </div>

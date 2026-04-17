@@ -907,11 +907,16 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
                     <Navigation size={10} className="text-blue-500" /> {coordinates.length} pts
                   </div>
                 )}
-                {(liveDistance > 0 || tracking.distance > 0) && (
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 rounded-lg text-[10px] font-bold text-gray-700">
-                    <Ruler size={10} className="text-emerald-500" /> {fmtDist(isRecording ? liveDistance : tracking.distance)}
-                  </div>
-                )}
+                {(liveDistance > 0 || tracking.distance > 0) && (() => {
+                  const d = isRecording ? liveDistance : tracking.distance;
+                  // Tracé GPS : ±5% (jitter cumulé)
+                  const u = Math.round(0.05 * d);
+                  return (
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 rounded-lg text-[10px] font-bold text-gray-700">
+                      <Ruler size={10} className="text-emerald-500" /> {fmtDist(d)} <span className="text-gray-400 text-[9px]">{fmtUncertainty(u)}</span>
+                    </div>
+                  );
+                })()}
                 <div className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 rounded-lg text-[10px] font-bold text-gray-700">
                   <Camera size={10} className="text-blue-500" /> {photoMarkers.length} photo{photoMarkers.length !== 1 ? 's' : ''}
                 </div>

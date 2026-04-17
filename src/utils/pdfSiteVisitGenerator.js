@@ -132,7 +132,7 @@ const drawCoverPage = (doc, visit, THEME, logoMoe, branding) => {
   const tracking = visit.gpsTracking || {};
   const nbObs = observations.length;
   const nbPhotos = countPhotos(observations);
-  const dist = fmtDist(tracking.distance);
+  const dist = tracking.distance ? `${fmtDist(tracking.distance)} ±${Math.round(0.05 * tracking.distance)}m` : '';
   const nbPts = (tracking.coordinates || []).length;
 
   doc.setFillColor(...lightenRgb(THEME.primary, 0.92));
@@ -482,7 +482,7 @@ const drawMapPage = async (doc, mapImage, visit, THEME) => {
       // Legende sous la carte
       const legendY = mapY + imgH + 6;
       const tracking = visit.gpsTracking || {};
-      const dist = fmtDist(tracking.distance);
+      const dist = tracking.distance ? `${fmtDist(tracking.distance)} ±${Math.round(0.05 * tracking.distance)}m` : '';
       const nbPts = (tracking.coordinates || []).length;
 
       doc.setFillColor(...lightenRgb(THEME.primary, 0.94));

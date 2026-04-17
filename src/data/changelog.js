@@ -2,9 +2,21 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.5.6';
+export const APP_VERSION = '2.5.7';
 
 export const CHANGELOG = [
+  {
+    version: '2.5.7',
+    date: '2026-04-17',
+    title: 'Incertitudes affichées sur toutes les vues de mesure',
+    highlights: [
+      'Header éditeur note (Tesla) : ajout ±incertitude à côté de la distance',
+      'Outil règle mobile (MeasureTool) : √(n·σ²) au lieu de n·3m arbitraire',
+      'Route IGN manuelle (mobile) : √(endpoints² + (0.02·d)²) au lieu de ±5m hardcodé',
+      'Tracé GPS global (desktop + PDF) : ±5% distance (jitter cumulé)',
+      'Section GPS mobile : formule alignée ±5% (au lieu de ±7% arbitraire)',
+    ],
+  },
   {
     version: '2.5.6',
     date: '2026-04-17',

@@ -220,6 +220,9 @@ function MeasureTool({ active, points, onAddPoint, onReset }) {
   let totalDist = 0;
   for (let i = 1; i < points.length; i++) totalDist += haversine(points[i - 1], points[i]);
   const fmtDist = (m) => m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(2)} km`;
+  // Incertitude mesure manuelle : ~5m par clic (résolution tuile + doigt), propagation quadratique
+  const clickSigma = 5;
+  const manualUncertainty = Math.round(Math.sqrt(points.length * clickSigma * clickSigma));
 
   return (
     <>
@@ -245,7 +248,7 @@ function MeasureTool({ active, points, onAddPoint, onReset }) {
       {points.length > 1 && (
         <Marker position={points[points.length - 1]} icon={L.divIcon({
           className: '',
-          html: `<div style="position:relative;top:-28px;left:8px;background:#f97316;color:white;font-size:11px;font-weight:800;padding:2px 8px;border-radius:6px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.3);font-family:system-ui">${fmtDist(totalDist)} <span style="opacity:0.7;font-weight:500;font-size:9px">±${Math.max(5, points.length * 3)}m</span></div>`,
+          html: `<div style="position:relative;top:-28px;left:8px;background:#f97316;color:white;font-size:11px;font-weight:800;padding:2px 8px;border-radius:6px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.3);font-family:system-ui">${fmtDist(totalDist)} <span style="opacity:0.7;font-weight:500;font-size:9px">±${manualUncertainty}m</span></div>`,
           iconSize: [0, 0], iconAnchor: [0, 0],
         })} />
       )}
@@ -280,6 +283,8 @@ function RouteOverlay({ from, to }) {
   if (routeCoords.length === 0) return null;
 
   const mid = routeCoords[Math.floor(routeCoords.length / 2)];
+  // Incertitude route IGN : endpoints (5m manuels chacun) + 2% routage
+  const routeUncertainty = routeDist != null ? Math.round(Math.sqrt(50 + (0.02 * routeDist) ** 2)) : 5;
 
   return (
     <>
@@ -287,7 +292,7 @@ function RouteOverlay({ from, to }) {
       {routeDist != null && mid && (
         <Marker position={mid} icon={L.divIcon({
           className: '',
-          html: `<div style="position:relative;top:-24px;left:-30px;background:#22c55e;color:white;font-size:12px;font-weight:800;padding:3px 10px;border-radius:8px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.3);font-family:system-ui">🛣️ ${fmtDist(routeDist)} <span style="opacity:0.7;font-weight:500;font-size:9px">±5m</span></div>`,
+          html: `<div style="position:relative;top:-24px;left:-30px;background:#22c55e;color:white;font-size:12px;font-weight:800;padding:3px 10px;border-radius:8px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.3);font-family:system-ui">🛣️ ${fmtDist(routeDist)} <span style="opacity:0.7;font-weight:500;font-size:9px">±${routeUncertainty}m</span></div>`,
           iconSize: [0, 0], iconAnchor: [0, 0],
         })} />
       )}
