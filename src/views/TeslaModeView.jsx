@@ -438,7 +438,7 @@ export default function TeslaModeView({ user, companyId, onExit }) {
       const ptId = `pt_${Date.now()}`;
       const newPt = {
         id: ptId,
-        text: '',
+        text: `${fmtCoord(pos.lat, pos.lng)} (±${Math.round(pos.accuracy)}m)`,
         images: [],
         date: new Date().toISOString().split('T')[0],
         pointLocation: { lat: pos.lat, lng: pos.lng },

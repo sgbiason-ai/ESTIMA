@@ -2,9 +2,18 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.5.11';
+export const APP_VERSION = '2.5.12';
 
 export const CHANGELOG = [
+  {
+    version: '2.5.12',
+    date: '2026-04-17',
+    title: 'Tesla : points seuls pré-remplis avec leurs coordonnées GPS',
+    highlights: [
+      'Nouveau point GPS → texte d\'observation initialisé avec "lat, lng (±Xm)"',
+      'Fini les observations vides : les coordonnées sont lisibles d\'un coup d\'œil',
+    ],
+  },
   {
     version: '2.5.11',
     date: '2026-04-17',
