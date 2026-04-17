@@ -2,9 +2,33 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.5.1';
+export const APP_VERSION = '2.5.3';
 
 export const CHANGELOG = [
+  {
+    version: '2.5.3',
+    date: '2026-04-17',
+    title: 'Mode Tesla : bandeau observations synchronisé avec la carte',
+    highlights: [
+      'Liste des observations déplacée en bandeau droit (360px) rétractable',
+      'Synchro bidirectionnelle : clic sur un marqueur carte → carte list sélectionnée et auto-scroll ; clic sur une carte list → zoom carte',
+      'Sélection mise en évidence (bordure + fond accent + halo)',
+      'Auto-déplié à l\'ouverture si observations existantes, sinon replié',
+      'Suppression avec confirmation double-tap rouge (3s) — fini les suppressions accidentelles',
+      '« Vue globale » (ex-Recentrer) : zoom fitBounds sur toutes les obs + trace quand pas de suivi GPS',
+      'Bouton « Suivre GPS » apparaît pendant le traçé pour réengager le suivi après drag/zoom',
+    ],
+  },
+  {
+    version: '2.5.2',
+    date: '2026-04-17',
+    title: 'Mode Tesla : boutons gros format tactile',
+    highlights: [
+      'Sortir et Tracé passent au même format que Départ/Point (cible tactile large)',
+      'Recentrer et sélecteur de carte (Plan/Satellite/Cadastre) agrandis',
+      'Suppression du badge visite et du bouton Changer (gain de place en haut)',
+    ],
+  },
   {
     version: '2.5.1',
     date: '2026-04-17',

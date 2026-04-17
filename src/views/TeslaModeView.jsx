@@ -11,7 +11,7 @@ import { db, auth } from '../firebase';
 import { useMobileSiteVisits } from '../hooks/useMobileSiteVisits';
 import { simplifyGpsTrace } from '../utils/gpsSimplify';
 import {
-  Navigation, Play, Square, Plus, X, LogOut, MapPin, Flag, MessageSquare, Trash2, Check, Route, LocateFixed, Pin
+  Navigation, Play, Square, Plus, X, LogOut, MapPin, Flag, MessageSquare, Trash2, Check, Route, LocateFixed, Pin, ChevronLeft, ChevronRight
 } from 'lucide-react';
 
 // ─── Tile Layers ──────────────────────────────────────────────────────────────
@@ -215,8 +215,23 @@ export default function TeslaModeView({ user, companyId, onExit }) {
   // Drag/zoom = navigation libre, follow désactivé
   const handleUserInteraction = useCallback(() => setFollowMode(false), []);
 
-  // Bouton recentrer = réactive le suivi
-  const handleRecenter = useCallback(() => setFollowMode(true), []);
+  // Ref pour bounds (synchronisé via useEffect après bounds useMemo)
+  const boundsRef = useRef(null);
+
+  // Bouton recentrer : si suivi actif → stop ; si pas de suivi → zoom global sur toutes les obs + trace
+  const handleRecenter = useCallback(() => {
+    if (!mapRef.current) return;
+    if (followMode) {
+      setFollowMode(false);
+      return;
+    }
+    if (boundsRef.current && boundsRef.current.isValid()) {
+      mapRef.current.fitBounds(boundsRef.current, { padding: [60, 60], maxZoom: 18, animate: true, duration: 0.5 });
+    }
+  }, [followMode]);
+
+  // Re-engager suivi GPS (seulement visible quand enregistrement + pas en suivi)
+  const handleFollowGps = useCallback(() => setFollowMode(true), []);
 
   // Segments (observations)
   const [segments, setSegments] = useState([]);
@@ -224,11 +239,28 @@ export default function TeslaModeView({ user, companyId, onExit }) {
   const [editingNote, setEditingNote] = useState('');
   const [routeCache, setRouteCache] = useState({}); // segId -> { coordinates, distance }
 
+  // Panel droit rétractable
+  const [panelOpen, setPanelOpen] = useState(true);
+  // Synchro obs sélectionnée (carte ↔ liste)
+  const [selectedObsId, setSelectedObsId] = useState(null);
+  const cardRefs = useRef({});
+  // Scroll auto vers la carte sélectionnée dans le panel
+  useEffect(() => {
+    if (selectedObsId && cardRefs.current[selectedObsId]) {
+      cardRefs.current[selectedObsId].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [selectedObsId]);
+  // Confirmation suppression (double-tap)
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const confirmTimerRef = useRef(null);
+  useEffect(() => () => { if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current); }, []);
+
   // Sync segments depuis visite chargee
   useEffect(() => {
     if (activeVisit) {
       const obs = activeVisit.observations || [];
       setSegments(obs);
+      setPanelOpen(obs.length > 0);
       // Pre-load route cache pour les segments existants
       obs.forEach(o => {
         if (o.segmentFrom && o.segmentTo && !routeCache[o.id]) {
@@ -386,6 +418,19 @@ export default function TeslaModeView({ user, companyId, onExit }) {
     await saveVisit(activeVisit.id, updated);
   }, [activeVisit, segments, saveVisit]);
 
+  // ── Delete avec confirmation double-tap ──
+  const handleDeleteClick = useCallback((obsId) => {
+    if (confirmDeleteId === obsId) {
+      if (confirmTimerRef.current) { clearTimeout(confirmTimerRef.current); confirmTimerRef.current = null; }
+      setConfirmDeleteId(null);
+      deleteSegment(obsId);
+    } else {
+      setConfirmDeleteId(obsId);
+      if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
+      confirmTimerRef.current = setTimeout(() => setConfirmDeleteId(null), 3000);
+    }
+  }, [confirmDeleteId, deleteSegment]);
+
   // ── Save note ──
   const saveSegmentNote = useCallback(async () => {
     if (!activeVisit || editingSegIdx == null) return;
@@ -541,6 +586,24 @@ export default function TeslaModeView({ user, companyId, onExit }) {
     return segs;
   }, [gpsCoords]);
 
+  // Sélection obs (carte ↔ liste)
+  const selectObs = useCallback((id, opts = {}) => {
+    const { flyToMap = false } = opts;
+    setSelectedObsId(id);
+    if (!panelOpen) setPanelOpen(true);
+    if (flyToMap && mapRef.current) {
+      const obs = segments.find(s => s.id === id);
+      if (!obs) return;
+      setFollowMode(false);
+      if (obs.pointLocation) {
+        mapRef.current.setView([obs.pointLocation.lat, obs.pointLocation.lng], 18, { animate: true, duration: 0.5 });
+      } else if (obs.segmentFrom && obs.segmentTo) {
+        const b = L.latLngBounds([[obs.segmentFrom.lat, obs.segmentFrom.lng], [obs.segmentTo.lat, obs.segmentTo.lng]]);
+        mapRef.current.fitBounds(b, { padding: [80, 80], maxZoom: 18, animate: true, duration: 0.5 });
+      }
+    }
+  }, [panelOpen, segments]);
+
   // Numerotation des observations : segments (1,2,3…) et points (P1,P2,P3…) en ordre chrono
   const indexedObs = useMemo(() => {
     let segN = 0, ptN = 0;
@@ -560,6 +623,9 @@ export default function TeslaModeView({ user, companyId, onExit }) {
     if (pts.length === 0) return null;
     return L.latLngBounds(pts);
   }, [gpsPositions, segments]);
+
+  // Sync bounds vers ref (pour handleRecenter sans rebuilder le callback à chaque fix GPS)
+  useEffect(() => { boundsRef.current = bounds; }, [bounds]);
 
   const defaultCenter = gpsPositions.length > 0 ? gpsPositions[0] : [43.6, 2.0];
 
@@ -620,7 +686,7 @@ export default function TeslaModeView({ user, companyId, onExit }) {
 
   // ── Main Map View — Tesla dark chrome ──
   return (
-    <div className="h-screen flex flex-col" style={{ fontFamily: FONT, background: T.bg }}>
+    <div className="h-screen flex" style={{ fontFamily: FONT, background: T.bg }}>
 
       {/* ── Carte plein ecran ── */}
       <div className="flex-1 relative min-h-0">
@@ -644,7 +710,8 @@ export default function TeslaModeView({ user, companyId, onExit }) {
           {indexedObs.map((obs) => {
             if (obs._type === 'point' && obs.pointLocation) {
               return (
-                <Marker key={obs.id} position={[obs.pointLocation.lat, obs.pointLocation.lng]} icon={createPointIcon(obs._num)}>
+                <Marker key={obs.id} position={[obs.pointLocation.lat, obs.pointLocation.lng]} icon={createPointIcon(obs._num)}
+                  eventHandlers={{ click: () => selectObs(obs.id) }}>
                   <Popup>
                     <div style={{ fontSize: 12, fontFamily: 'system-ui', maxWidth: 200 }}>
                       <div style={{ fontWeight: 800, color: '#8b5cf6', marginBottom: 2 }}>Point P{obs._num}</div>
@@ -664,6 +731,7 @@ export default function TeslaModeView({ user, companyId, onExit }) {
                 <Marker
                   position={route ? route.coordinates[Math.floor(route.coordinates.length / 2)] : [(obs.segmentFrom.lat + obs.segmentTo.lat) / 2, (obs.segmentFrom.lng + obs.segmentTo.lng) / 2]}
                   icon={createSegmentIcon(obs._num)}
+                  eventHandlers={{ click: () => selectObs(obs.id) }}
                 >
                   <Popup>
                     <div style={{ fontSize: 12, fontFamily: 'system-ui', maxWidth: 200 }}>
@@ -722,193 +790,220 @@ export default function TeslaModeView({ user, companyId, onExit }) {
             )}
           </div>
 
-          {/* Right : branding + visite + GPS */}
-          <div className="flex items-center gap-2 pointer-events-auto">
-            <div className="flex items-center gap-2 px-3 py-2 rounded-xl backdrop-blur-md" style={{ background: 'rgba(0,0,0,0.75)', border: `1px solid ${T.border}` }}>
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: T.accent }}>
-                <Navigation size={13} color="#fff" />
-              </div>
-              <span className="text-sm font-bold" style={{ color: T.text }}>{activeVisit?.nom || 'Visite'}</span>
-            </div>
-            <button onClick={() => setShowPicker(true)} className="px-3 py-2 rounded-xl backdrop-blur-md text-xs font-medium transition" style={{ background: 'rgba(0,0,0,0.75)', color: T.muted, border: `1px solid ${T.border}` }}>
-              Changer
-            </button>
-            <button onClick={onExit} className="p-2 rounded-xl backdrop-blur-md transition" style={{ background: 'rgba(0,0,0,0.75)', color: T.red, border: `1px solid ${T.border}` }}>
-              <LogOut size={14} />
-            </button>
-
-            <div style={{ width: 1, height: 28, background: T.border, margin: '0 4px' }} />
-
-            {/* GPS continu */}
+          {/* Right : GPS tracé + Sortir (boutons gros format) */}
+          <div className="flex items-center gap-3 pointer-events-auto">
             {!isRecording ? (
               <button onClick={() => { setGpsEnabled(true); startGps(); }}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl backdrop-blur-md text-xs font-bold transition"
-                style={{ background: 'rgba(0,0,0,0.75)', color: '#80c4f2', border: `1px solid ${T.border}` }}>
-                <Play size={13} fill="currentColor" /> Tracé
+                className="flex items-center gap-3 px-6 py-4 rounded-2xl text-lg font-bold transition active:scale-[0.97] shadow-lg"
+                style={{ background: '#0ea5e9', color: '#fff' }}>
+                <Play size={22} fill="currentColor" /> Tracé
               </button>
             ) : (
               <>
                 {lastAccuracy != null && (
-                  <div className="flex items-center gap-1 px-2 py-2 rounded-xl backdrop-blur-md text-[11px] font-bold" style={{ background: 'rgba(0,0,0,0.75)', border: `1px solid ${T.border}` }}>
-                    <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: accuracyColor(lastAccuracy) }} />
+                  <div className="flex items-center gap-2 px-3 py-3 rounded-2xl backdrop-blur-md text-sm font-bold" style={{ background: 'rgba(0,0,0,0.75)', border: `1px solid ${T.border}` }}>
+                    <div className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: accuracyColor(lastAccuracy) }} />
                     <span style={{ color: accuracyColor(lastAccuracy) }}>±{lastAccuracy}m</span>
                   </div>
                 )}
-                <div className="px-2 py-2 rounded-xl backdrop-blur-md text-[11px] font-mono font-bold tabular-nums" style={{ background: 'rgba(0,0,0,0.75)', color: T.text, border: `1px solid ${T.border}` }}>
+                <div className="px-3 py-3 rounded-2xl backdrop-blur-md text-sm font-mono font-bold tabular-nums" style={{ background: 'rgba(0,0,0,0.75)', color: T.text, border: `1px solid ${T.border}` }}>
                   {fmtDuration(gpsElapsed)}
                 </div>
                 <button onClick={stopGps}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition"
+                  className="flex items-center gap-3 px-6 py-4 rounded-2xl text-lg font-bold transition active:scale-[0.97] shadow-lg"
                   style={{ background: T.red, color: '#fff' }}>
-                  <Square size={11} fill="white" /> Stop
+                  <Square size={20} fill="white" /> Stop
                 </button>
               </>
             )}
+            <button onClick={onExit}
+              className="flex items-center gap-3 px-6 py-4 rounded-2xl text-lg font-bold transition active:scale-[0.97] shadow-lg"
+              style={{ background: T.card, color: T.red, border: `1px solid ${T.border}` }}>
+              <LogOut size={22} /> Sortir
+            </button>
           </div>
         </div>
 
-        {/* ── Contrôles bas gauche : recentrer + tile switcher ── */}
-        <div className="absolute bottom-20 left-3 z-[1000] flex flex-col gap-2">
-          {/* Bouton recentrer */}
+        {/* ── Contrôles bas gauche : recentrer + tile switcher (gros format tactile) ── */}
+        <div className="absolute bottom-20 left-3 z-[1000] flex flex-col gap-3">
+          {/* Bouton recentrer : vue globale quand pas de suivi */}
           <button onClick={handleRecenter}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl backdrop-blur-md text-xs font-bold transition"
+            className="flex items-center gap-2.5 px-5 py-3.5 rounded-2xl backdrop-blur-md text-base font-bold transition active:scale-[0.97] shadow-lg"
             style={{
               background: followMode ? T.accent : 'rgba(0,0,0,0.75)',
               color: followMode ? '#fff' : T.muted,
               border: `1px solid ${followMode ? T.accent : T.border}`,
             }}>
-            <LocateFixed size={14} />
-            {followMode ? 'Suivi actif' : 'Recentrer'}
+            <LocateFixed size={22} />
+            {followMode ? 'Suivi actif' : 'Vue globale'}
           </button>
 
+          {/* Bouton re-engager suivi GPS : uniquement si traçé actif + pas de suivi */}
+          {isRecording && !followMode && (
+            <button onClick={handleFollowGps}
+              className="flex items-center gap-2.5 px-5 py-3.5 rounded-2xl backdrop-blur-md text-base font-bold transition active:scale-[0.97] shadow-lg"
+              style={{ background: 'rgba(0,0,0,0.75)', color: '#80c4f2', border: `1px solid #80c4f2` }}>
+              <Navigation size={20} />
+              Suivre GPS
+            </button>
+          )}
+
           {/* Tile layer switcher */}
-          <div className="flex gap-1 backdrop-blur-md p-1 rounded-xl" style={{ background: 'rgba(0,0,0,0.75)', border: `1px solid ${T.border}` }}>
+          <div className="flex gap-1.5 backdrop-blur-md p-1.5 rounded-2xl" style={{ background: 'rgba(0,0,0,0.75)', border: `1px solid ${T.border}` }}>
             {Object.entries(TILE_LAYERS).map(([key, layer]) => (
               <button key={key} onClick={() => setActiveLayer(key)}
-                className="px-3 py-1.5 rounded-lg text-[11px] font-semibold transition"
+                className="px-5 py-3 rounded-xl text-base font-bold transition active:scale-[0.97]"
                 style={{ background: activeLayer === key ? T.accent : 'transparent', color: activeLayer === key ? '#fff' : T.muted }}>
                 {layer.label}
               </button>
             ))}
           </div>
         </div>
+
+        {/* ── Toast feedback ── */}
+        {toast && (
+          <div className="absolute left-1/2 -translate-x-1/2 z-[2000] px-5 py-3 rounded-2xl text-sm font-bold shadow-2xl animate-pulse" style={{ bottom: 40, background: 'rgba(0,0,0,0.85)', color: '#fff', border: `1px solid ${T.border}` }}>
+            {toast}
+          </div>
+        )}
       </div>
 
-      {/* ── Toast feedback ── */}
-      {toast && (
-        <div className="absolute left-1/2 -translate-x-1/2 z-[2000] px-5 py-3 rounded-2xl text-sm font-bold shadow-2xl animate-pulse" style={{ bottom: 160, background: 'rgba(0,0,0,0.85)', color: '#fff', border: `1px solid ${T.border}` }}>
-          {toast}
-        </div>
-      )}
-
-      {/* ── Barre inferieure : segments — Tesla dark ── */}
-      <div className="shrink-0" style={{ background: T.card, borderTop: `1px solid ${T.border}`, maxHeight: editingSegIdx != null ? '45vh' : '180px' }}>
-        <div className="flex items-center justify-between px-4 py-2" style={{ borderBottom: `1px solid ${T.border}` }}>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-bold" style={{ color: T.text }}>Observations</span>
-            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold" style={{ background: T.accent + '30', color: T.accent }}>{segments.length}</span>
-          </div>
-          {isRecording && (
-            <div className="flex items-center gap-2 text-[11px]" style={{ color: T.muted }}>
-              <div className="w-2 h-2 rounded-full bg-[#80c4f2] animate-pulse" />
-              GPS: {liveCoords.length} pts · {fmtDist(totalDistance(liveCoords))}
-            </div>
-          )}
-        </div>
-
-        {editingSegIdx == null ? (
-          <div className="flex gap-2 px-4 py-2 overflow-x-auto">
-            {segments.length === 0 && (
-              <p className="text-sm py-2" style={{ color: T.muted }}>Appuyez « Départ » pour un segment ou « Point » pour une observation ponctuelle</p>
-            )}
-            {indexedObs.map((obs, idx) => {
-              const isPoint = obs._type === 'point';
-              const badgeColor = isPoint ? '#8b5cf6' : T.accent;
-              const badgeLabel = isPoint ? `P${obs._num}` : obs._num;
-              return (
-                <div key={obs.id} className="shrink-0 flex items-center gap-3 px-4 py-2.5 rounded-xl min-w-[280px] cursor-pointer transition hover:brightness-110"
-                  onClick={() => {
-                    if (!mapRef.current) return;
-                    setFollowMode(false);
-                    if (isPoint && obs.pointLocation) {
-                      mapRef.current.setView([obs.pointLocation.lat, obs.pointLocation.lng], 18, { animate: true, duration: 0.5 });
-                    } else if (obs.segmentFrom && obs.segmentTo) {
-                      const bounds = L.latLngBounds([[obs.segmentFrom.lat, obs.segmentFrom.lng], [obs.segmentTo.lat, obs.segmentTo.lng]]);
-                      mapRef.current.fitBounds(bounds, { padding: [80, 80], maxZoom: 18, animate: true, duration: 0.5 });
-                    }
-                  }}
-                  style={{ background: T.bg, border: `1px solid ${T.border}` }}>
-                  <div className="shrink-0 flex items-center justify-center text-sm font-bold rounded-full"
-                    style={{ background: badgeColor, color: '#fff', width: isPoint ? 'auto' : 32, height: 32, minWidth: 32, padding: isPoint ? '0 8px' : 0 }}>
-                    {badgeLabel}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    {isPoint && obs.pointLocation ? (
-                      <>
-                        <div className="text-[11px] font-mono truncate" style={{ color: '#c4b5fd' }}>
-                          {fmtCoord(obs.pointLocation.lat, obs.pointLocation.lng)}
-                        </div>
-                        <div className="text-sm font-bold" style={{ color: T.text }}>
-                          Point <span className="text-[9px] font-normal" style={{ color: T.muted }}>±{obs.pointAccuracy}m</span>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        {obs.segmentFrom && obs.segmentTo && (
-                          <div className="text-[11px] font-mono truncate" style={{ color: T.muted }}>
-                            <span style={{ color: T.green }}>{fmtCoord(obs.segmentFrom.lat, obs.segmentFrom.lng)}</span>
-                            <span style={{ color: T.muted }}> → </span>
-                            <span style={{ color: T.red }}>{fmtCoord(obs.segmentTo.lat, obs.segmentTo.lng)}</span>
-                          </div>
-                        )}
-                        <div className="text-sm font-bold" style={{ color: T.text }}>{fmtDist(obs.segmentDistance)} <span className="text-[9px] font-normal" style={{ color: T.muted }}>{fmtUncertainty(obs.segmentUncertainty)}</span></div>
-                      </>
-                    )}
-                    {obs.text && <div className="text-[11px] truncate mt-0.5" style={{ color: T.muted }}>{obs.text}</div>}
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button onClick={(e) => { e.stopPropagation(); setEditingSegIdx(idx); setEditingNote(obs.text || ''); }}
-                      className="p-1.5 rounded-lg transition" style={{ color: T.muted }}>
-                      <MessageSquare size={14} />
-                    </button>
-                    <button onClick={(e) => { e.stopPropagation(); deleteSegment(obs.id); }}
-                      className="p-1.5 rounded-lg transition" style={{ color: T.border }}>
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
+      {/* ── Bandeau droit rétractable : Observations ── */}
+      <div className="shrink-0 flex flex-col transition-all duration-300 overflow-hidden" style={{ width: panelOpen ? 360 : 48, background: T.card, borderLeft: `1px solid ${T.border}` }}>
+        {panelOpen ? (
+          <>
+            {/* Header */}
+            <div className="flex items-center gap-2 px-3 py-3 shrink-0" style={{ borderBottom: `1px solid ${T.border}` }}>
+              <button onClick={() => setPanelOpen(false)}
+                className="p-2 rounded-xl transition active:scale-[0.95]"
+                style={{ background: T.bg, color: T.muted, border: `1px solid ${T.border}` }}>
+                <ChevronRight size={18} />
+              </button>
+              <span className="text-sm font-bold" style={{ color: T.text }}>Observations</span>
+              <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold" style={{ background: T.accent + '30', color: T.accent }}>{segments.length}</span>
+              {isRecording && (
+                <div className="ml-auto flex items-center gap-1.5 text-[10px]" style={{ color: T.muted }}>
+                  <div className="w-2 h-2 rounded-full bg-[#80c4f2] animate-pulse" />
+                  {liveCoords.length}pts · {fmtDist(totalDistance(liveCoords))}
                 </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="px-4 py-3 space-y-2">
-            <div className="flex items-center gap-2 mb-1">
-              {indexedObs[editingSegIdx]?._type === 'point' ? (
-                <>
-                  <div className="rounded-full text-xs font-bold flex items-center justify-center px-2" style={{ background: '#8b5cf6', color: '#fff', height: 24 }}>P{indexedObs[editingSegIdx]._num}</div>
-                  <span className="text-sm font-bold" style={{ color: T.text }}>Note — Point P{indexedObs[editingSegIdx]._num} (±{segments[editingSegIdx]?.pointAccuracy}m)</span>
-                </>
-              ) : (
-                <>
-                  <div className="w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center" style={{ background: T.accent, color: '#fff' }}>{indexedObs[editingSegIdx]?._num}</div>
-                  <span className="text-sm font-bold" style={{ color: T.text }}>Note — Segment {indexedObs[editingSegIdx]?._num} ({fmtDist(segments[editingSegIdx]?.segmentDistance)} {fmtUncertainty(segments[editingSegIdx]?.segmentUncertainty)})</span>
-                </>
               )}
             </div>
-            <textarea value={editingNote} onChange={(e) => setEditingNote(e.target.value)}
-              className="w-full min-h-[80px] p-3 rounded-xl text-base resize-none outline-none"
-              style={{ background: T.bg, color: T.text, border: `1px solid ${T.border}` }}
-              placeholder="Note optionnelle..."
-              autoFocus />
-            <div className="flex gap-2">
-              <button onClick={saveSegmentNote} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold transition active:scale-[0.97]" style={{ background: T.accent, color: '#fff' }}>
-                <Check size={14} /> Enregistrer
-              </button>
-              <button onClick={() => { setEditingSegIdx(null); setEditingNote(''); }} className="px-4 py-2.5 rounded-xl text-sm font-medium transition" style={{ background: T.bg, color: T.muted, border: `1px solid ${T.border}` }}>
-                Fermer
-              </button>
+
+            {editingSegIdx == null ? (
+              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                {segments.length === 0 && (
+                  <p className="text-sm py-6 px-2 text-center" style={{ color: T.muted }}>Aucune observation. Appuyez « Départ » pour un segment ou « Point » pour une observation ponctuelle.</p>
+                )}
+                {indexedObs.map((obs, idx) => {
+                  const isPoint = obs._type === 'point';
+                  const badgeColor = isPoint ? '#8b5cf6' : T.accent;
+                  const badgeLabel = isPoint ? `P${obs._num}` : obs._num;
+                  const isConfirming = confirmDeleteId === obs.id;
+                  const isSelected = selectedObsId === obs.id;
+                  return (
+                    <div key={obs.id}
+                      ref={(el) => { if (el) cardRefs.current[obs.id] = el; else delete cardRefs.current[obs.id]; }}
+                      className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition hover:brightness-110"
+                      onClick={() => selectObs(obs.id, { flyToMap: true })}
+                      style={{
+                        background: isSelected ? T.accent + '22' : T.bg,
+                        border: `1px solid ${isSelected ? T.accent : T.border}`,
+                        boxShadow: isSelected ? `0 0 0 2px ${T.accent}55` : 'none',
+                      }}>
+                      <div className="shrink-0 flex items-center justify-center text-sm font-bold rounded-full"
+                        style={{ background: badgeColor, color: '#fff', width: isPoint ? 'auto' : 32, height: 32, minWidth: 32, padding: isPoint ? '0 8px' : 0 }}>
+                        {badgeLabel}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        {isPoint && obs.pointLocation ? (
+                          <>
+                            <div className="text-sm font-bold" style={{ color: T.text }}>
+                              Point <span className="text-[10px] font-normal" style={{ color: T.muted }}>±{obs.pointAccuracy}m</span>
+                            </div>
+                            <div className="text-[10px] font-mono truncate mt-0.5" style={{ color: '#c4b5fd' }}>
+                              {fmtCoord(obs.pointLocation.lat, obs.pointLocation.lng)}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="text-sm font-bold" style={{ color: T.text }}>{fmtDist(obs.segmentDistance)} <span className="text-[10px] font-normal" style={{ color: T.muted }}>{fmtUncertainty(obs.segmentUncertainty)}</span></div>
+                            {obs.segmentFrom && obs.segmentTo && (
+                              <div className="text-[10px] font-mono truncate mt-0.5" style={{ color: T.muted }}>
+                                <span style={{ color: T.green }}>{fmtCoord(obs.segmentFrom.lat, obs.segmentFrom.lng)}</span>
+                                <span> → </span>
+                                <span style={{ color: T.red }}>{fmtCoord(obs.segmentTo.lat, obs.segmentTo.lng)}</span>
+                              </div>
+                            )}
+                          </>
+                        )}
+                        {obs.text && <div className="text-[11px] mt-1.5 line-clamp-2" style={{ color: T.muted }}>{obs.text}</div>}
+                        <div className="flex items-center gap-1.5 mt-2">
+                          <button onClick={(e) => { e.stopPropagation(); setEditingSegIdx(idx); setEditingNote(obs.text || ''); }}
+                            className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold transition"
+                            style={{ background: T.card, color: T.muted, border: `1px solid ${T.border}` }}>
+                            <MessageSquare size={12} /> Note
+                          </button>
+                          {isConfirming ? (
+                            <button onClick={(e) => { e.stopPropagation(); handleDeleteClick(obs.id); }}
+                              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold transition animate-pulse"
+                              style={{ background: T.red, color: '#fff' }}>
+                              <Check size={12} /> Confirmer ?
+                            </button>
+                          ) : (
+                            <button onClick={(e) => { e.stopPropagation(); handleDeleteClick(obs.id); }}
+                              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold transition"
+                              style={{ background: T.card, color: T.red, border: `1px solid ${T.border}` }}>
+                              <Trash2 size={12} /> Suppr.
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex-1 p-3 space-y-3 overflow-y-auto">
+                <div className="flex items-center gap-2">
+                  {indexedObs[editingSegIdx]?._type === 'point' ? (
+                    <>
+                      <div className="rounded-full text-xs font-bold flex items-center justify-center px-2" style={{ background: '#8b5cf6', color: '#fff', height: 24 }}>P{indexedObs[editingSegIdx]._num}</div>
+                      <span className="text-sm font-bold" style={{ color: T.text }}>Point P{indexedObs[editingSegIdx]._num} <span className="text-[10px] font-normal" style={{ color: T.muted }}>±{segments[editingSegIdx]?.pointAccuracy}m</span></span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center" style={{ background: T.accent, color: '#fff' }}>{indexedObs[editingSegIdx]?._num}</div>
+                      <span className="text-sm font-bold" style={{ color: T.text }}>Segment {indexedObs[editingSegIdx]?._num} <span className="text-[10px] font-normal" style={{ color: T.muted }}>({fmtDist(segments[editingSegIdx]?.segmentDistance)})</span></span>
+                    </>
+                  )}
+                </div>
+                <textarea value={editingNote} onChange={(e) => setEditingNote(e.target.value)}
+                  className="w-full min-h-[160px] p-3 rounded-xl text-base resize-none outline-none"
+                  style={{ background: T.bg, color: T.text, border: `1px solid ${T.border}` }}
+                  placeholder="Note optionnelle..."
+                  autoFocus />
+                <div className="flex gap-2">
+                  <button onClick={saveSegmentNote} className="flex-1 flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl text-sm font-bold transition active:scale-[0.97]" style={{ background: T.accent, color: '#fff' }}>
+                    <Check size={14} /> Enregistrer
+                  </button>
+                  <button onClick={() => { setEditingSegIdx(null); setEditingNote(''); }} className="px-4 py-3 rounded-xl text-sm font-medium transition" style={{ background: T.bg, color: T.muted, border: `1px solid ${T.border}` }}>
+                    Fermer
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          /* Panel replié : bande verticale cliquable */
+          <button onClick={() => setPanelOpen(true)}
+            className="h-full w-full flex flex-col items-center justify-start py-4 gap-3 transition active:scale-[0.98]"
+            style={{ background: 'transparent' }}>
+            <ChevronLeft size={22} color={T.muted} />
+            <div className="px-1.5 py-0.5 rounded-md text-[10px] font-bold" style={{ background: T.accent + '30', color: T.accent }}>{segments.length}</div>
+            <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', color: T.muted, fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', marginTop: 8 }}>
+              Observations
             </div>
-          </div>
+          </button>
         )}
       </div>
     </div>
