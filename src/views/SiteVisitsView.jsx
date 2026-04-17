@@ -6,7 +6,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense, laz
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { collection, getDocs, getDoc, doc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, deleteDoc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import {
   MapPin, RefreshCw, Camera, MessageSquare, Navigation, Ruler, Trash2, FileDown,
@@ -337,9 +337,22 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
   const [toast, setToast] = useState(null);
   const showToast = (msg, dur = 3000) => { setToast(msg); setTimeout(() => setToast(null), dur); };
 
-  // ── Load visit list + auto-select ──
+  // ── Load visit list + auto-select (dernière visite ouverte via Firestore prefs) ──
+  const prefsLoadedRef = useRef(false);
   useEffect(() => {
-    if (visits.length > 0 && !selectedId) handleLoadDetail(visits[0].id);
+    if (visits.length === 0 || selectedId || prefsLoadedRef.current) return;
+    prefsLoadedRef.current = true;
+    (async () => {
+      let target = visits[0].id;
+      if (user?.uid) {
+        try {
+          const snap = await getDoc(doc(db, 'users', user.uid, 'preferences', 'modules'));
+          const lastId = snap.exists() ? snap.data().visites : null;
+          if (lastId && visits.some((v) => v.id === lastId)) target = lastId;
+        } catch {}
+      }
+      handleLoadDetail(target);
+    })();
   }, [visits]);
 
   const handleLoadDetail = useCallback(async (visitId) => {
@@ -348,9 +361,16 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
     try {
       const v = await loadVisit(visitId);
       setFullVisit(v);
+      if (user?.uid && visitId) {
+        setDoc(
+          doc(db, 'users', user.uid, 'preferences', 'modules'),
+          { visites: visitId, updatedAt: serverTimestamp() },
+          { merge: true }
+        ).catch(() => {});
+      }
     } catch { setFullVisit(null); }
     finally { setDetailLoading(false); }
-  }, [loadVisit]);
+  }, [loadVisit, user]);
 
   // ── Pre-load OSRM routes ──
   useEffect(() => {

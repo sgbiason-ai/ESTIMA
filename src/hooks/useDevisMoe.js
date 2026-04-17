@@ -1,6 +1,6 @@
 // src/hooks/useDevisMoe.js
-import { useState, useEffect, useCallback } from 'react';
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { collection, doc, getDoc, setDoc, deleteDoc, onSnapshot, query, orderBy, limit, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { generateId } from '../utils/helpers';
 import { useToast } from '../contexts/ToastContext';
@@ -163,15 +163,40 @@ export const useDevisMoe = (user, companyId) => {
   const toast = useToast();
   const [devisList, setDevisList] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedId, setSelectedId] = useState(null);
+  const [selectedId, setSelectedIdRaw] = useState(null);
+  const prefsLoadedRef = useRef(false);
+
+  // Wrap setter pour persister la sélection dans les prefs user (Firestore)
+  const setSelectedId = useCallback((id) => {
+    setSelectedIdRaw(id);
+    if (user?.uid) {
+      setDoc(
+        doc(db, 'users', user.uid, 'preferences', 'modules'),
+        { devisMoe: id || null, updatedAt: serverTimestamp() },
+        { merge: true }
+      ).catch(() => {});
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!user || !companyId) return;
     setIsLoading(true);
-    const unsub = onSnapshot(query(col(companyId), orderBy('createdAt', 'desc'), limit(100)), (snap) => {
+    const unsub = onSnapshot(query(col(companyId), orderBy('createdAt', 'desc'), limit(100)), async (snap) => {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setDevisList(data);
       setIsLoading(false);
+
+      // Auto-sélection du dernier devis (prefs Firestore), au 1er chargement
+      if (!prefsLoadedRef.current && user?.uid) {
+        prefsLoadedRef.current = true;
+        try {
+          const prefsSnap = await getDoc(doc(db, 'users', user.uid, 'preferences', 'modules'));
+          const lastId = prefsSnap.exists() ? prefsSnap.data().devisMoe : null;
+          if (lastId && data.some((d) => d.id === lastId)) {
+            setSelectedIdRaw(lastId);
+          }
+        } catch {}
+      }
     }, (err) => {
       console.error('Erreur chargement devis MOE:', err);
       toast.error('Erreur de chargement des devis');

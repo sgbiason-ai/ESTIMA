@@ -2,8 +2,8 @@
 // Hook CRUD pour la gestion des Fiches Marché dans Firestore
 // Collection: companies/{companyId}/fichesMarche/{ficheId}
 
-import { useState, useEffect, useCallback } from 'react';
-import { collection, getDocs, doc, setDoc, deleteDoc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { collection, getDocs, doc, getDoc, setDoc, deleteDoc, onSnapshot, query, orderBy, limit, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { generateId } from '../utils/helpers';
 import { useToast } from '../contexts/ToastContext';
@@ -88,7 +88,20 @@ export const useFichesMarche = (user, companyId) => {
 
   const [fiches, setFiches] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedFicheId, setSelectedFicheId] = useState(null);
+  const [selectedFicheId, setSelectedFicheIdRaw] = useState(null);
+  const prefsLoadedRef = useRef(false);
+
+  // Wrap setter pour persister la sélection dans les prefs user (Firestore)
+  const setSelectedFicheId = useCallback((id) => {
+    setSelectedFicheIdRaw(id);
+    if (user?.uid) {
+      setDoc(
+        doc(db, 'users', user.uid, 'preferences', 'modules'),
+        { docAdmin: id || null, updatedAt: serverTimestamp() },
+        { merge: true }
+      ).catch(() => {});
+    }
+  }, [user]);
 
   // ── Chargement initial + écoute temps réel ────────────────────────────────
   useEffect(() => {
@@ -98,10 +111,22 @@ export const useFichesMarche = (user, companyId) => {
 
     const unsubscribe = onSnapshot(
       query(col(companyId), orderBy('createdAt', 'desc'), limit(100)),
-      (snapshot) => {
+      async (snapshot) => {
         const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
         setFiches(data);
         setIsLoading(false);
+
+        // Auto-sélection de la dernière fiche ouverte (prefs Firestore), au 1er chargement
+        if (!prefsLoadedRef.current && user?.uid) {
+          prefsLoadedRef.current = true;
+          try {
+            const prefsSnap = await getDoc(doc(db, 'users', user.uid, 'preferences', 'modules'));
+            const lastId = prefsSnap.exists() ? prefsSnap.data().docAdmin : null;
+            if (lastId && data.some((f) => f.id === lastId)) {
+              setSelectedFicheIdRaw(lastId);
+            }
+          } catch {}
+        }
       },
       (error) => {
         console.error('Erreur chargement fiches marché:', error);
