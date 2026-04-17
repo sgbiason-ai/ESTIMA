@@ -2,9 +2,19 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.5.9';
+export const APP_VERSION = '2.5.10';
 
 export const CHANGELOG = [
+  {
+    version: '2.5.10',
+    date: '2026-04-17',
+    title: 'PWA : auto-healing des Service Workers empoisonnés',
+    highlights: [
+      'Détection auto d\'un SW servant un index.html avec assets obsolètes',
+      'Désinstallation auto + clear caches + reload (sans intervention utilisateur)',
+      'Flag sessionStorage pour éviter toute boucle de rechargement',
+    ],
+  },
   {
     version: '2.5.9',
     date: '2026-04-17',
