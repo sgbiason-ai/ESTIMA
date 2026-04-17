@@ -8,6 +8,7 @@ import {
   MousePointer2
 } from 'lucide-react';
 import HelpPanel from '../components/help/HelpPanel';
+import { APP_VERSION } from '../data/changelog';
 
 const SettingsView = ({
   units,
@@ -219,11 +220,20 @@ const SettingsView = ({
 
       {/* HEADER */}
       <header className="flex-none bg-white p-6 border-b border-slate-200 shadow-sm z-10">
-        <div className="flex items-center gap-3">
-          <div className="bg-black p-2 rounded"><Settings className="text-white" size={20} /></div>
-          <div>
-            <h2 className="text-xl font-black uppercase text-slate-800 leading-none">Paramètres</h2>
-            <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mt-1.5">Configuration & Base de données</p>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="bg-black p-2 rounded"><Settings className="text-white" size={20} /></div>
+            <div>
+              <h2 className="text-xl font-black uppercase text-slate-800 leading-none">Paramètres</h2>
+              <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mt-1.5">Configuration & Base de données</p>
+            </div>
+          </div>
+          <div
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200"
+            title="Version installée d'EstimaVRD"
+          >
+            <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Version</span>
+            <span className="text-xs font-black text-slate-700 tracking-tight">{APP_VERSION}</span>
           </div>
         </div>
       </header>

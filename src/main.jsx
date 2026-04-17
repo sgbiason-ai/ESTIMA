@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import ErrorBoundary from './components/common/ErrorBoundary.jsx'
+import UpdatePrompt from './components/common/UpdatePrompt.jsx';
 import { DialogProvider } from './contexts/DialogContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { initSentry } from './sentry';
@@ -19,6 +20,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <ToastProvider>
         <DialogProvider>
           <App />
+          <UpdatePrompt />
         </DialogProvider>
       </ToastProvider>
     </ErrorBoundary>

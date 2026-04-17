@@ -2,9 +2,20 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.5.8';
+export const APP_VERSION = '2.5.9';
 
 export const CHANGELOG = [
+  {
+    version: '2.5.9',
+    date: '2026-04-17',
+    title: 'PWA : notification de mise à jour + badge version',
+    highlights: [
+      'Toast "Nouvelle version disponible" avec bouton Recharger (fini les écrans périmés)',
+      'Badge version dans Paramètres (coin haut-droit)',
+      'Nettoyage auto des caches tuiles/fonts lors des montées de version minor/major',
+      'SW passé en mode prompt : l\'utilisateur contrôle le moment du reload',
+    ],
+  },
   {
     version: '2.5.8',
     date: '2026-04-17',
