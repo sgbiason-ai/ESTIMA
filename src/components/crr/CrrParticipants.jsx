@@ -1,6 +1,6 @@
 // src/components/crr/CrrParticipants.jsx
 import React, { useState, useRef, useCallback } from 'react';
-import { Plus, Trash2, UserPlus, ChevronDown, ChevronRight, Users, Check, X, Minus, Edit2, GripVertical } from 'lucide-react';
+import { Plus, Trash2, UserPlus, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Users, Check, X, Minus, Edit2, GripVertical } from 'lucide-react';
 import { PRESENCE_OPTIONS, getGroupColor, abbreviateGroup } from '../../data/crrData';
 import { confirm } from '../../utils/globalUI';
 
@@ -147,14 +147,33 @@ const CrrParticipants = ({
           </span>
         </button>
 
-        {showManagement && !collapsed && (
-          <button
-            onClick={() => addParticipantGroup()}
-            className="flex items-center gap-1 px-2 py-1 text-[11px] bg-emerald-50 text-emerald-600 rounded-md hover:bg-emerald-100 transition-all"
-          >
-            <Plus size={10} />
-            Groupe
-          </button>
+        {!collapsed && (
+          <div className="flex items-center gap-1.5">
+            {/* Toggle tout déplier / tout replier */}
+            {crrConfig.participantGroups.length > 0 && (() => {
+              const allIds = crrConfig.participantGroups.map((g) => g.id);
+              const allExpanded = allIds.length > 0 && allIds.every((id) => expandedGroups.has(id));
+              return (
+                <button
+                  onClick={() => setExpandedGroups(allExpanded ? new Set() : new Set(allIds))}
+                  className="flex items-center gap-1 px-2 py-1 text-[11px] bg-slate-100 text-slate-600 rounded-md hover:bg-slate-200 transition-all"
+                  title={allExpanded ? 'Replier tous les groupes' : 'Déplier tous les groupes'}
+                >
+                  {allExpanded ? <ChevronsDownUp size={10} /> : <ChevronsUpDown size={10} />}
+                  {allExpanded ? 'Tout replier' : 'Tout déplier'}
+                </button>
+              );
+            })()}
+            {showManagement && (
+              <button
+                onClick={() => addParticipantGroup()}
+                className="flex items-center gap-1 px-2 py-1 text-[11px] bg-emerald-50 text-emerald-600 rounded-md hover:bg-emerald-100 transition-all"
+              >
+                <Plus size={10} />
+                Groupe
+              </button>
+            )}
+          </div>
         )}
       </div>
 

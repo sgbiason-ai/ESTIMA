@@ -2,9 +2,18 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.4.5';
+export const APP_VERSION = '2.4.6';
 
 export const CHANGELOG = [
+  {
+    version: '2.4.6',
+    date: '2026-04-16',
+    title: 'CRC desktop : toggle "tout déplier / tout replier" des participants',
+    highlights: [
+      'Bouton dans l\'en-tête Participants pour déplier/replier tous les groupes d\'un coup',
+      'État du toggle adaptatif : affiche "Tout déplier" si au moins un groupe est replié',
+    ],
+  },
   {
     version: '2.4.5',
     date: '2026-04-16',
