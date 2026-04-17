@@ -10,7 +10,7 @@ import {
   HelpCircle, Compass, Archive, UploadCloud, ArrowLeftRight,
   FileText as FileWord, X, MapPin,
 } from 'lucide-react';
-import { doc, getDoc, setDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { DEFAULT_BRANDING } from '../../data/branding';
 import CrcLinkProjectModal from './CrcLinkProjectModal';
@@ -72,7 +72,23 @@ export default function CrcView({ onBackToHub, user, companyId }) {
         if (brandSnap.exists()) setBranding(brandSnap.data().config);
         const libSnap = await getDoc(doc(db, 'companies', companyId, 'resources', 'participantLibrary'));
         if (libSnap.exists()) setParticipantLibrary(libSnap.data().contacts || []);
-        const lastId = localStorage.getItem(`crr_active_chantier__${companyId}`);
+        // Dernier chantier CRC : Firestore prefs + migration one-shot depuis localStorage
+        let lastId = null;
+        if (user?.uid) {
+          const prefsRef = doc(db, 'users', user.uid, 'preferences', 'modules');
+          const prefsSnap = await getDoc(prefsRef);
+          lastId = prefsSnap.exists() ? prefsSnap.data().crc : null;
+          if (!lastId) {
+            const legacyId = localStorage.getItem(`crr_active_chantier__${companyId}`);
+            if (legacyId) {
+              lastId = legacyId;
+              try {
+                await setDoc(prefsRef, { crc: legacyId, updatedAt: serverTimestamp() }, { merge: true });
+                localStorage.removeItem(`crr_active_chantier__${companyId}`);
+              } catch {}
+            }
+          }
+        }
         const target = docs.find((d) => d.id === lastId) || docs[0];
         if (target) {
           // Sync projet lié si nécessaire
@@ -153,13 +169,19 @@ export default function CrcView({ onBackToHub, user, companyId }) {
       await setDoc(doc(db, 'companies', companyId, 'crr', newId), newDoc);
       setChantiers((prev) => [...prev, newDoc]);
       setCrrDoc(newDoc);
-      localStorage.setItem(`crr_active_chantier__${companyId}`, newId);
+      if (user?.uid) {
+        setDoc(
+          doc(db, 'users', user.uid, 'preferences', 'modules'),
+          { crc: newId, updatedAt: serverTimestamp() },
+          { merge: true }
+        ).catch(() => {});
+      }
       setShowInfoChantierModal(true);
     } catch (err) {
       console.error('[CRC] Erreur création chantier:', err);
       toast.error('Impossible de créer le chantier.');
     }
-  }, [companyId]);
+  }, [companyId, user]);
 
   const handleDeleteChantier = useCallback(async (chantierId) => {
     try {
@@ -195,8 +217,14 @@ export default function CrcView({ onBackToHub, user, companyId }) {
       }
     }
     setCrrDoc(docToSet);
-    localStorage.setItem(`crr_active_chantier__${companyId}`, c.id);
-  }, [companyId]);
+    if (user?.uid) {
+      setDoc(
+        doc(db, 'users', user.uid, 'preferences', 'modules'),
+        { crc: c.id, updatedAt: serverTimestamp() },
+        { merge: true }
+      ).catch(() => {});
+    }
+  }, [companyId, user]);
 
   const manager = useCrrManager({
     project: crrDoc,
