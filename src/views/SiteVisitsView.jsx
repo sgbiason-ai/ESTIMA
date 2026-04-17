@@ -44,6 +44,20 @@ const fmtDist = (m) => m == null ? '—' : m < 1000 ? `${Math.round(m)} m` : `${
 const fmtUncertainty = (u) => u == null ? '' : u < 1000 ? `±${Math.round(u)}m` : `±${(u / 1000).toFixed(1)}km`;
 const fmtCoord = (lat, lng) => `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
 
+// Incertitude distance adaptée à la source (propagation quadratique, ~1σ)
+const computeUncertainty = (source, accA, accB, distance) => {
+  const sigEndpoints2 = (accA || 0) ** 2 + (accB || 0) ** 2;
+  if (source === 'ign') {
+    const routingErr = 0.02 * distance;
+    return Math.round(Math.sqrt(sigEndpoints2 + routingErr ** 2));
+  }
+  if (source === 'trace') {
+    const jitterErr = 0.05 * distance;
+    return Math.round(Math.sqrt(sigEndpoints2 + jitterErr ** 2));
+  }
+  return Math.round(Math.sqrt(sigEndpoints2));
+};
+
 function getCurrentPosition() {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) return reject(new Error('Géolocalisation non disponible'));
@@ -520,7 +534,7 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
         source = 'haversine';
       }
 
-      const uncertainty = Math.round((pointA.accuracy || 0) + (pos.accuracy || 0) + 5);
+      const uncertainty = computeUncertainty(source, pointA.accuracy, pos.accuracy, distance);
       const segId = `seg_${Date.now()}`;
       const newSeg = {
         id: segId, text: '', images: [], date: new Date().toISOString().split('T')[0],

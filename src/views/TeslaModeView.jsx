@@ -48,6 +48,22 @@ const fmtDist = (m) => m == null ? '—' : m < 1000 ? `${Math.round(m)} m` : `${
 const fmtUncertainty = (u) => u == null ? '' : u < 1000 ? `±${Math.round(u)}m` : `±${(u / 1000).toFixed(1)}km`;
 const fmtCoord = (lat, lng) => lat.toFixed(4) + ', ' + lng.toFixed(4);
 
+// Incertitude distance adaptée à la source (propagation quadratique, ~1σ)
+// accuracy navigateur = écart-type position ≈ 68% de confiance
+const computeUncertainty = (source, accA, accB, distance) => {
+  const sigEndpoints2 = (accA || 0) ** 2 + (accB || 0) ** 2;
+  if (source === 'ign') {
+    const routingErr = 0.02 * distance; // ~2% erreur routage/carte
+    return Math.round(Math.sqrt(sigEndpoints2 + routingErr ** 2));
+  }
+  if (source === 'trace') {
+    const jitterErr = 0.05 * distance; // ~5% biais cumul jitter GPS
+    return Math.round(Math.sqrt(sigEndpoints2 + jitterErr ** 2));
+  }
+  // haversine (vol d'oiseau) : seuls les 2 fixes comptent
+  return Math.round(Math.sqrt(sigEndpoints2));
+};
+
 const accuracyColor = (acc) => acc <= 5 ? '#22c55e' : acc <= 15 ? '#f59e0b' : '#ef4444';
 
 const fmtDuration = (ms) => {
@@ -391,8 +407,8 @@ export default function TeslaModeView({ user, companyId, onExit }) {
         source = 'haversine';
       }
 
-      // Incertitude = précision GPS point A + point B + marge (~5m)
-      const uncertainty = Math.round((pointA.accuracy || 0) + (pos.accuracy || 0) + 5);
+      // Incertitude adaptée à la source (propagation quadratique)
+      const uncertainty = computeUncertainty(source, pointA.accuracy, pos.accuracy, distance);
 
       const segId = `seg_${Date.now()}`;
       const newSeg = {

@@ -2,9 +2,21 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.5.5';
+export const APP_VERSION = '2.5.6';
 
 export const CHANGELOG = [
+  {
+    version: '2.5.6',
+    date: '2026-04-17',
+    title: 'Incertitudes distance : propagation quadratique adaptée à la source',
+    highlights: [
+      'Somme quadratique √(σA² + σB²) au lieu d\'une somme linéaire grossière',
+      'Tracé GPS : ajout ~5% biais jitter (erreur cumulative réaliste)',
+      'IGN route : ajout ~2% erreur routage/carte',
+      'Haversine : seule l\'erreur des 2 fixes GPS compte',
+      'Fin de la constante arbitraire « +5m » sans justification',
+    ],
+  },
   {
     version: '2.5.5',
     date: '2026-04-17',
