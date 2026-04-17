@@ -2,9 +2,19 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.5.12';
+export const APP_VERSION = '2.5.13';
 
 export const CHANGELOG = [
+  {
+    version: '2.5.13',
+    date: '2026-04-17',
+    title: 'Visites de Site desktop : bouton Point ponctuel',
+    highlights: [
+      'Nouveau bouton « Point » (violet) à côté de Départ, parité avec Tesla',
+      'Point GPS → texte pré-rempli avec "lat, lng (±Xm)"',
+      'Affichage carte + sidebar + bounds mis à jour pour les points seuls',
+    ],
+  },
   {
     version: '2.5.12',
     date: '2026-04-17',

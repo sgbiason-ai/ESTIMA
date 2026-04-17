@@ -546,6 +546,30 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
 
   const cancelPending = useCallback(() => setPendingPoint(null), []);
 
+  // ── Observation ponctuelle (1 point GPS) ──
+  const handlePoint = useCallback(async () => {
+    if (!fullVisit || gettingPosition) return;
+    setGettingPosition(true);
+    try {
+      const pos = await getPosition();
+      const ptId = `pt_${Date.now()}`;
+      const newPt = {
+        id: ptId,
+        text: `${fmtCoord(pos.lat, pos.lng)} (±${Math.round(pos.accuracy)}m)`,
+        images: [],
+        date: new Date().toISOString().split('T')[0],
+        pointLocation: { lat: pos.lat, lng: pos.lng },
+        pointAccuracy: Math.round(pos.accuracy),
+      };
+      const updatedObs = [...(fullVisit.observations || []), newPt];
+      const updated = { ...fullVisit, observations: updatedObs };
+      setFullVisit(updated);
+      await saveVisit(fullVisit.id, updated);
+      showToast(`Point marqué — ${fmtCoord(pos.lat, pos.lng)} (±${Math.round(pos.accuracy)}m)`);
+    } catch (e) { showToast('Erreur GPS : ' + e.message); }
+    setGettingPosition(false);
+  }, [fullVisit, gettingPosition, getPosition, saveVisit]);
+
   // ── Delete segment/obs ──
   const handleDeleteObs = useCallback(async (obsId) => {
     if (!fullVisit) return;
@@ -658,7 +682,8 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
   const obsMarkers = useMemo(() => {
     return observations.map((obs, idx) => {
       let lat = null, lng = null;
-      if (obs.segmentFrom && obs.segmentTo) { lat = (obs.segmentFrom.lat + obs.segmentTo.lat) / 2; lng = (obs.segmentFrom.lng + obs.segmentTo.lng) / 2; }
+      if (obs.pointLocation) { lat = obs.pointLocation.lat; lng = obs.pointLocation.lng; }
+      if (lat == null && obs.segmentFrom && obs.segmentTo) { lat = (obs.segmentFrom.lat + obs.segmentTo.lat) / 2; lng = (obs.segmentFrom.lng + obs.segmentTo.lng) / 2; }
       if (lat == null) { for (const img of (obs.images || [])) { if (typeof img === 'object' && img.lat != null) { lat = img.lat; lng = img.lng; break; } } }
       if (lat == null && coordinates.length > 0) { const pos = Math.min(Math.floor((idx / Math.max(observations.length, 1)) * coordinates.length), coordinates.length - 1); lat = coordinates[pos].lat; lng = coordinates[pos].lng; }
       if (lat == null) return null;
@@ -671,6 +696,7 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
     observations.forEach(o => {
       if (o.segmentFrom) pts.push([o.segmentFrom.lat, o.segmentFrom.lng]);
       if (o.segmentTo) pts.push([o.segmentTo.lat, o.segmentTo.lng]);
+      if (o.pointLocation) pts.push([o.pointLocation.lat, o.pointLocation.lng]);
     });
     photoMarkers.forEach(p => pts.push([p.lat, p.lng]));
     if (pts.length === 0) return null;
@@ -912,10 +938,17 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
                 <div className="ml-auto flex items-center gap-2">
                   {/* Segment buttons */}
                   {!pendingPoint ? (
-                    <button onClick={handleDepart} disabled={gettingPosition}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600 transition active:scale-[0.97] shadow-sm disabled:opacity-50">
-                      <MapPin size={13} /> {gettingPosition ? 'GPS...' : 'Départ'}
-                    </button>
+                    <>
+                      <button onClick={handleDepart} disabled={gettingPosition}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600 transition active:scale-[0.97] shadow-sm disabled:opacity-50">
+                        <MapPin size={13} /> {gettingPosition ? 'GPS...' : 'Départ'}
+                      </button>
+                      <button onClick={handlePoint} disabled={gettingPosition}
+                        title="Observation ponctuelle : marque un seul point GPS"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-violet-500 text-white hover:bg-violet-600 transition active:scale-[0.97] shadow-sm disabled:opacity-50">
+                        <LocateFixed size={13} /> Point
+                      </button>
+                    </>
                   ) : (
                     <>
                       <div className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
