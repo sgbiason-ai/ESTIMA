@@ -313,11 +313,11 @@ const buildMapCanvas = async (visit, THEME) => {
   ctx.fillStyle = '#e8edf2';
   ctx.fillRect(0, 0, tilesW, tilesH);
 
-  // Charger et assembler les tuiles satellite ArcGIS
+  // Charger et assembler les tuiles satellite IGN Géoplateforme (ORTHOPHOTOS)
   const tilePromises = [];
   for (let ty = tileYmin; ty <= tileYmax; ty++) {
     for (let tx = tileXmin; tx <= tileXmax; tx++) {
-      const url = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}/${ty}/${tx}`;
+      const url = `https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX=${zoom}&TILEROW=${ty}&TILECOL=${tx}&FORMAT=image/jpeg`;
       const dx = (tx - tileXmin) * 256;
       const dy = (ty - tileYmin) * 256;
       tilePromises.push(fetchTileAsImg(url).then(img => { if (img) ctx.drawImage(img, dx, dy, 256, 256); }));
@@ -606,13 +606,11 @@ const buildObsMiniMap = async (obs, visit, THEME, obsIdx) => {
   ctx.fillStyle = '#e8edf2';
   ctx.fillRect(0, 0, tilesW, tilesH);
 
-  // Charger tuiles CARTO light (plus fiable que OSM pour le CORS)
+  // Charger tuiles IGN PlanIGNv2 (Géoplateforme — libre, CORS OK)
   const tilePromises = [];
-  const tileServers = ['a', 'b', 'c'];
   for (let ty = tileYmin; ty <= tileYmax; ty++) {
     for (let tx = tileXmin; tx <= tileXmax; tx++) {
-      const s = tileServers[(tx + ty) % 3];
-      const url = `https://${s}.basemaps.cartocdn.com/light_all/${zoom}/${tx}/${ty}.png`;
+      const url = `https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX=${zoom}&TILEROW=${ty}&TILECOL=${tx}&FORMAT=image/png`;
       const dx = (tx - tileXmin) * 256;
       const dy = (ty - tileYmin) * 256;
       tilePromises.push(fetchTileAsImg(url).then(img => { if (img) ctx.drawImage(img, dx, dy, 256, 256); }));

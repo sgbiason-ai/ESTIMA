@@ -2,9 +2,21 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.5.3';
+export const APP_VERSION = '2.5.4';
 
 export const CHANGELOG = [
+  {
+    version: '2.5.4',
+    date: '2026-04-17',
+    title: 'Tuiles carto : migration 100% IGN Géoplateforme',
+    highlights: [
+      'Satellite : ArcGIS World Imagery → IGN ORTHOIMAGERY.ORTHOPHOTOS (libre, officiel France)',
+      'Plan : OpenStreetMap → IGN GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2',
+      'Miniatures PDF (vignettes observations) : CartoDB → IGN PlanIGNv2',
+      'Plus de risque de blocage OSM Tile Policy ni de zone grise ArcGIS commerciale',
+      'Fair-use IGN : ~50 req/s soutenu, couverture France complète, mentions « © IGN-F / Géoplateforme »',
+    ],
+  },
   {
     version: '2.5.3',
     date: '2026-04-17',
