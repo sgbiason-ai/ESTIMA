@@ -2,9 +2,21 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.4.8';
+export const APP_VERSION = '2.5.0';
 
 export const CHANGELOG = [
+  {
+    version: '2.5.0',
+    date: '2026-04-17',
+    title: 'Mémoire du dernier projet par module (sync multi-device)',
+    highlights: [
+      'Chaque module retrouve automatiquement le dernier élément ouvert à la reconnexion',
+      'Estimation, RAO, CRC, Documents Admin, Devis MOE et Visites de Site concernés',
+      'Stockage Firestore (users/{uid}/preferences) → synchro PC ↔ tablette ↔ mobile',
+      'Migration automatique des préférences locales existantes (Estimation + CRC)',
+      'Fix mini-cartes vignettes observations (retry tuiles CartoDB 3x, timeout 5s)',
+    ],
+  },
   {
     version: '2.4.8',
     date: '2026-04-16',
