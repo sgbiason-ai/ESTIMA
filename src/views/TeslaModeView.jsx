@@ -11,7 +11,7 @@ import { db, auth } from '../firebase';
 import { useMobileSiteVisits } from '../hooks/useMobileSiteVisits';
 import { simplifyGpsTrace } from '../utils/gpsSimplify';
 import {
-  Navigation, Play, Square, Plus, X, LogOut, MapPin, Flag, MessageSquare, Trash2, Check, Route, LocateFixed
+  Navigation, Play, Square, Plus, X, LogOut, MapPin, Flag, MessageSquare, Trash2, Check, Route, LocateFixed, Pin
 } from 'lucide-react';
 
 // ─── Tile Layers ──────────────────────────────────────────────────────────────
@@ -67,6 +67,15 @@ const createSegmentIcon = (number) => L.divIcon({
   className: '',
   html: `<div style="width:28px;height:28px;border-radius:50%;background:#2563eb;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:800;font-family:system-ui">${number}</div>`,
   iconSize: [28, 28], iconAnchor: [14, 14],
+});
+
+const createPointIcon = (number) => L.divIcon({
+  className: '',
+  html: `<div style="position:relative;width:30px;height:36px;display:flex;align-items:flex-start;justify-content:center">
+    <div style="position:absolute;top:0;width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#8b5cf6;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4)"></div>
+    <div style="position:absolute;top:5px;color:white;font-size:11px;font-weight:800;font-family:system-ui;line-height:1">P${number}</div>
+  </div>`,
+  iconSize: [30, 36], iconAnchor: [15, 34],
 });
 
 const pendingIcon = createDot('#f97316', 18);
@@ -249,11 +258,27 @@ export default function TeslaModeView({ user, companyId, onExit }) {
   }, [createVisit, refetch]);
 
   // ── Obtenir position (GPS réel ou fallback centre carte) ──
+  // Priorité : dernier fix du tracé actif (<10s) pour éviter timeout getCurrentPosition
+  // qui peut échouer alors que watchPosition (tracé) fonctionne parfaitement.
   const getPosition = useCallback(async () => {
+    if (isRecording && liveCoords.length > 0) {
+      const last = liveCoords[liveCoords.length - 1];
+      const ts = last.timestamp ? new Date(last.timestamp).getTime() : 0;
+      const ageMs = Date.now() - ts;
+      if (ageMs >= 0 && ageMs < 10000) {
+        return { lat: last.lat, lng: last.lng, accuracy: last.accuracy || 999 };
+      }
+    }
     try {
       return await getCurrentPosition();
     } catch (e) {
-      // Fallback : centre de la carte visible (pour test desktop)
+      // Fallback 1 : dernier fix du tracé même si > 10s (mieux que rien)
+      if (liveCoords.length > 0) {
+        const last = liveCoords[liveCoords.length - 1];
+        showToast('GPS lent — dernier fix du tracé utilisé');
+        return { lat: last.lat, lng: last.lng, accuracy: last.accuracy || 999 };
+      }
+      // Fallback 2 : centre de la carte visible (test desktop)
       if (mapRef.current) {
         const center = mapRef.current.getCenter();
         showToast('GPS indisponible — position estimée au centre de la carte');
@@ -261,7 +286,7 @@ export default function TeslaModeView({ user, companyId, onExit }) {
       }
       throw e;
     }
-  }, []);
+  }, [isRecording, liveCoords]);
 
   // ── Segment measurement (GPS position) ──
   const handleDepart = useCallback(async () => {
@@ -323,6 +348,33 @@ export default function TeslaModeView({ user, companyId, onExit }) {
   }, [activeVisit, pendingPoint, gettingPosition, segments, saveVisit, getPosition]);
 
   const cancelPending = useCallback(() => setPendingPoint(null), []);
+
+  // ── Observation ponctuelle (1 point GPS) ──
+  const handlePoint = useCallback(async () => {
+    if (!activeVisit || gettingPosition) return;
+    setGettingPosition(true);
+    try {
+      const pos = await getPosition();
+      const ptId = `pt_${Date.now()}`;
+      const newPt = {
+        id: ptId,
+        text: '',
+        images: [],
+        date: new Date().toISOString().split('T')[0],
+        pointLocation: { lat: pos.lat, lng: pos.lng },
+        pointAccuracy: Math.round(pos.accuracy),
+      };
+      const updatedObs = [...segments, newPt];
+      setSegments(updatedObs);
+      const updated = { ...activeVisit, observations: updatedObs };
+      setActiveVisit(updated);
+      await saveVisit(activeVisit.id, updated);
+      showToast(`Point créé (±${Math.round(pos.accuracy)}m)`);
+    } catch (e) {
+      showToast('Erreur GPS : ' + e.message);
+    }
+    setGettingPosition(false);
+  }, [activeVisit, gettingPosition, getPosition, segments, saveVisit]);
 
   // ── Delete segment ──
   const deleteSegment = useCallback(async (segId) => {
@@ -489,11 +541,21 @@ export default function TeslaModeView({ user, companyId, onExit }) {
     return segs;
   }, [gpsCoords]);
 
+  // Numerotation des observations : segments (1,2,3…) et points (P1,P2,P3…) en ordre chrono
+  const indexedObs = useMemo(() => {
+    let segN = 0, ptN = 0;
+    return segments.map(s => {
+      if (s.pointLocation) return { ...s, _num: ++ptN, _type: 'point' };
+      return { ...s, _num: ++segN, _type: 'segment' };
+    });
+  }, [segments]);
+
   const bounds = useMemo(() => {
     const pts = [...gpsPositions];
     segments.forEach(s => {
       if (s.segmentFrom) pts.push([s.segmentFrom.lat, s.segmentFrom.lng]);
       if (s.segmentTo) pts.push([s.segmentTo.lat, s.segmentTo.lng]);
+      if (s.pointLocation) pts.push([s.pointLocation.lat, s.pointLocation.lng]);
     });
     if (pts.length === 0) return null;
     return L.latLngBounds(pts);
@@ -578,28 +640,41 @@ export default function TeslaModeView({ user, companyId, onExit }) {
             </Marker>
           )}
 
-          {/* Segments enregistres */}
-          {segments.map((seg, idx) => {
-            const route = routeCache[seg.id];
-            if (!seg.segmentFrom || !seg.segmentTo) return null;
-            return (
-              <React.Fragment key={seg.id}>
-                {route && <Polyline positions={route.coordinates} pathOptions={{ color: '#f97316', weight: 6, opacity: 0.9 }} />}
-                {!route && <Polyline positions={[[seg.segmentFrom.lat, seg.segmentFrom.lng], [seg.segmentTo.lat, seg.segmentTo.lng]]} pathOptions={{ color: '#f97316', weight: 6, dashArray: '8 6', opacity: 0.8 }} />}
-                <Marker
-                  position={route ? route.coordinates[Math.floor(route.coordinates.length / 2)] : [(seg.segmentFrom.lat + seg.segmentTo.lat) / 2, (seg.segmentFrom.lng + seg.segmentTo.lng) / 2]}
-                  icon={createSegmentIcon(idx + 1)}
-                >
+          {/* Observations : segments + points ponctuels */}
+          {indexedObs.map((obs) => {
+            if (obs._type === 'point' && obs.pointLocation) {
+              return (
+                <Marker key={obs.id} position={[obs.pointLocation.lat, obs.pointLocation.lng]} icon={createPointIcon(obs._num)}>
                   <Popup>
                     <div style={{ fontSize: 12, fontFamily: 'system-ui', maxWidth: 200 }}>
-                      <div style={{ fontWeight: 800, color: T.accent, marginBottom: 2 }}>Segment {idx + 1}</div>
-                      <div style={{ fontWeight: 700 }}>{fmtDist(seg.segmentDistance)} <span style={{ fontSize: 9, opacity: 0.6, fontWeight: 500 }}>{fmtUncertainty(seg.segmentUncertainty)}</span></div>
-                      {seg.text && <div style={{ color: '#6b7280', marginTop: 2 }}>{seg.text}</div>}
+                      <div style={{ fontWeight: 800, color: '#8b5cf6', marginBottom: 2 }}>Point P{obs._num}</div>
+                      <div style={{ fontSize: 10, color: '#6b7280' }}>{fmtCoord(obs.pointLocation.lat, obs.pointLocation.lng)} ±{obs.pointAccuracy}m</div>
+                      {obs.text && <div style={{ color: '#6b7280', marginTop: 2 }}>{obs.text}</div>}
                     </div>
                   </Popup>
                 </Marker>
-                <Marker position={[seg.segmentFrom.lat, seg.segmentFrom.lng]} icon={createDot(T.green, 10)} />
-                <Marker position={[seg.segmentTo.lat, seg.segmentTo.lng]} icon={createDot(T.red, 10)} />
+              );
+            }
+            const route = routeCache[obs.id];
+            if (!obs.segmentFrom || !obs.segmentTo) return null;
+            return (
+              <React.Fragment key={obs.id}>
+                {route && <Polyline positions={route.coordinates} pathOptions={{ color: '#f97316', weight: 6, opacity: 0.9 }} />}
+                {!route && <Polyline positions={[[obs.segmentFrom.lat, obs.segmentFrom.lng], [obs.segmentTo.lat, obs.segmentTo.lng]]} pathOptions={{ color: '#f97316', weight: 6, dashArray: '8 6', opacity: 0.8 }} />}
+                <Marker
+                  position={route ? route.coordinates[Math.floor(route.coordinates.length / 2)] : [(obs.segmentFrom.lat + obs.segmentTo.lat) / 2, (obs.segmentFrom.lng + obs.segmentTo.lng) / 2]}
+                  icon={createSegmentIcon(obs._num)}
+                >
+                  <Popup>
+                    <div style={{ fontSize: 12, fontFamily: 'system-ui', maxWidth: 200 }}>
+                      <div style={{ fontWeight: 800, color: T.accent, marginBottom: 2 }}>Segment {obs._num}</div>
+                      <div style={{ fontWeight: 700 }}>{fmtDist(obs.segmentDistance)} <span style={{ fontSize: 9, opacity: 0.6, fontWeight: 500 }}>{fmtUncertainty(obs.segmentUncertainty)}</span></div>
+                      {obs.text && <div style={{ color: '#6b7280', marginTop: 2 }}>{obs.text}</div>}
+                    </div>
+                  </Popup>
+                </Marker>
+                <Marker position={[obs.segmentFrom.lat, obs.segmentFrom.lng]} icon={createDot(T.green, 10)} />
+                <Marker position={[obs.segmentTo.lat, obs.segmentTo.lng]} icon={createDot(T.red, 10)} />
               </React.Fragment>
             );
           })}
@@ -615,12 +690,20 @@ export default function TeslaModeView({ user, companyId, onExit }) {
           {/* Left : Départ/Fin (gros boutons tactiles) */}
           <div className="flex items-center gap-3 pointer-events-auto">
             {!pendingPoint ? (
-              <button onClick={handleDepart} disabled={gettingPosition}
-                className="flex items-center gap-3 px-8 py-4 rounded-2xl text-lg font-bold transition active:scale-[0.97] shadow-lg"
-                style={{ background: gettingPosition ? T.border : T.green, color: '#fff' }}>
-                <MapPin size={24} />
-                {gettingPosition ? 'GPS...' : 'Départ'}
-              </button>
+              <>
+                <button onClick={handleDepart} disabled={gettingPosition}
+                  className="flex items-center gap-3 px-8 py-4 rounded-2xl text-lg font-bold transition active:scale-[0.97] shadow-lg"
+                  style={{ background: gettingPosition ? T.border : T.green, color: '#fff' }}>
+                  <MapPin size={24} />
+                  {gettingPosition ? 'GPS...' : 'Départ'}
+                </button>
+                <button onClick={handlePoint} disabled={gettingPosition}
+                  className="flex items-center gap-3 px-6 py-4 rounded-2xl text-lg font-bold transition active:scale-[0.97] shadow-lg"
+                  style={{ background: gettingPosition ? T.border : '#8b5cf6', color: '#fff' }}>
+                  <Pin size={22} />
+                  {gettingPosition ? 'GPS...' : 'Point'}
+                </button>
+              </>
             ) : (
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1.5 px-4 py-3 rounded-xl text-sm font-bold backdrop-blur-md" style={{ background: 'rgba(34,197,94,0.25)', color: T.green, border: `1px solid ${T.green}` }}>
@@ -722,7 +805,7 @@ export default function TeslaModeView({ user, companyId, onExit }) {
       <div className="shrink-0" style={{ background: T.card, borderTop: `1px solid ${T.border}`, maxHeight: editingSegIdx != null ? '45vh' : '180px' }}>
         <div className="flex items-center justify-between px-4 py-2" style={{ borderBottom: `1px solid ${T.border}` }}>
           <div className="flex items-center gap-2">
-            <span className="text-sm font-bold" style={{ color: T.text }}>Segments</span>
+            <span className="text-sm font-bold" style={{ color: T.text }}>Observations</span>
             <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold" style={{ background: T.accent + '30', color: T.accent }}>{segments.length}</span>
           </div>
           {isRecording && (
@@ -736,49 +819,81 @@ export default function TeslaModeView({ user, companyId, onExit }) {
         {editingSegIdx == null ? (
           <div className="flex gap-2 px-4 py-2 overflow-x-auto">
             {segments.length === 0 && (
-              <p className="text-sm py-2" style={{ color: T.muted }}>Appuyez « Départ » pour marquer le début d'un segment</p>
+              <p className="text-sm py-2" style={{ color: T.muted }}>Appuyez « Départ » pour un segment ou « Point » pour une observation ponctuelle</p>
             )}
-            {segments.map((seg, idx) => (
-              <div key={seg.id} className="shrink-0 flex items-center gap-3 px-4 py-2.5 rounded-xl min-w-[280px] cursor-pointer transition hover:brightness-110"
-                onClick={() => {
-                  if (!seg.segmentFrom || !seg.segmentTo || !mapRef.current) return;
-                  setFollowMode(false);
-                  const bounds = L.latLngBounds([[seg.segmentFrom.lat, seg.segmentFrom.lng], [seg.segmentTo.lat, seg.segmentTo.lng]]);
-                  mapRef.current.fitBounds(bounds, { padding: [80, 80], maxZoom: 18, animate: true, duration: 0.5 });
-                }}
-                style={{ background: T.bg, border: `1px solid ${T.border}` }}>
-                <div className="w-8 h-8 rounded-full text-sm font-bold flex items-center justify-center shrink-0" style={{ background: T.accent, color: '#fff' }}>
-                  {idx + 1}
+            {indexedObs.map((obs, idx) => {
+              const isPoint = obs._type === 'point';
+              const badgeColor = isPoint ? '#8b5cf6' : T.accent;
+              const badgeLabel = isPoint ? `P${obs._num}` : obs._num;
+              return (
+                <div key={obs.id} className="shrink-0 flex items-center gap-3 px-4 py-2.5 rounded-xl min-w-[280px] cursor-pointer transition hover:brightness-110"
+                  onClick={() => {
+                    if (!mapRef.current) return;
+                    setFollowMode(false);
+                    if (isPoint && obs.pointLocation) {
+                      mapRef.current.setView([obs.pointLocation.lat, obs.pointLocation.lng], 18, { animate: true, duration: 0.5 });
+                    } else if (obs.segmentFrom && obs.segmentTo) {
+                      const bounds = L.latLngBounds([[obs.segmentFrom.lat, obs.segmentFrom.lng], [obs.segmentTo.lat, obs.segmentTo.lng]]);
+                      mapRef.current.fitBounds(bounds, { padding: [80, 80], maxZoom: 18, animate: true, duration: 0.5 });
+                    }
+                  }}
+                  style={{ background: T.bg, border: `1px solid ${T.border}` }}>
+                  <div className="shrink-0 flex items-center justify-center text-sm font-bold rounded-full"
+                    style={{ background: badgeColor, color: '#fff', width: isPoint ? 'auto' : 32, height: 32, minWidth: 32, padding: isPoint ? '0 8px' : 0 }}>
+                    {badgeLabel}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    {isPoint && obs.pointLocation ? (
+                      <>
+                        <div className="text-[11px] font-mono truncate" style={{ color: '#c4b5fd' }}>
+                          {fmtCoord(obs.pointLocation.lat, obs.pointLocation.lng)}
+                        </div>
+                        <div className="text-sm font-bold" style={{ color: T.text }}>
+                          Point <span className="text-[9px] font-normal" style={{ color: T.muted }}>±{obs.pointAccuracy}m</span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {obs.segmentFrom && obs.segmentTo && (
+                          <div className="text-[11px] font-mono truncate" style={{ color: T.muted }}>
+                            <span style={{ color: T.green }}>{fmtCoord(obs.segmentFrom.lat, obs.segmentFrom.lng)}</span>
+                            <span style={{ color: T.muted }}> → </span>
+                            <span style={{ color: T.red }}>{fmtCoord(obs.segmentTo.lat, obs.segmentTo.lng)}</span>
+                          </div>
+                        )}
+                        <div className="text-sm font-bold" style={{ color: T.text }}>{fmtDist(obs.segmentDistance)} <span className="text-[9px] font-normal" style={{ color: T.muted }}>{fmtUncertainty(obs.segmentUncertainty)}</span></div>
+                      </>
+                    )}
+                    {obs.text && <div className="text-[11px] truncate mt-0.5" style={{ color: T.muted }}>{obs.text}</div>}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button onClick={(e) => { e.stopPropagation(); setEditingSegIdx(idx); setEditingNote(obs.text || ''); }}
+                      className="p-1.5 rounded-lg transition" style={{ color: T.muted }}>
+                      <MessageSquare size={14} />
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); deleteSegment(obs.id); }}
+                      className="p-1.5 rounded-lg transition" style={{ color: T.border }}>
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  {seg.segmentFrom && seg.segmentTo && (
-                    <div className="text-[11px] font-mono truncate" style={{ color: T.muted }}>
-                      <span style={{ color: T.green }}>{fmtCoord(seg.segmentFrom.lat, seg.segmentFrom.lng)}</span>
-                      <span style={{ color: T.muted }}> → </span>
-                      <span style={{ color: T.red }}>{fmtCoord(seg.segmentTo.lat, seg.segmentTo.lng)}</span>
-                    </div>
-                  )}
-                  <div className="text-sm font-bold" style={{ color: T.text }}>{fmtDist(seg.segmentDistance)} <span className="text-[9px] font-normal" style={{ color: T.muted }}>{fmtUncertainty(seg.segmentUncertainty)}</span></div>
-                  {seg.text && <div className="text-[11px] truncate mt-0.5" style={{ color: T.muted }}>{seg.text}</div>}
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <button onClick={() => { setEditingSegIdx(idx); setEditingNote(seg.text || ''); }}
-                    className="p-1.5 rounded-lg transition" style={{ color: T.muted }}>
-                    <MessageSquare size={14} />
-                  </button>
-                  <button onClick={() => deleteSegment(seg.id)}
-                    className="p-1.5 rounded-lg transition" style={{ color: T.border }}>
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="px-4 py-3 space-y-2">
             <div className="flex items-center gap-2 mb-1">
-              <div className="w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center" style={{ background: T.accent, color: '#fff' }}>{editingSegIdx + 1}</div>
-              <span className="text-sm font-bold" style={{ color: T.text }}>Note — Segment {editingSegIdx + 1} ({fmtDist(segments[editingSegIdx]?.segmentDistance)} {fmtUncertainty(segments[editingSegIdx]?.segmentUncertainty)})</span>
+              {indexedObs[editingSegIdx]?._type === 'point' ? (
+                <>
+                  <div className="rounded-full text-xs font-bold flex items-center justify-center px-2" style={{ background: '#8b5cf6', color: '#fff', height: 24 }}>P{indexedObs[editingSegIdx]._num}</div>
+                  <span className="text-sm font-bold" style={{ color: T.text }}>Note — Point P{indexedObs[editingSegIdx]._num} (±{segments[editingSegIdx]?.pointAccuracy}m)</span>
+                </>
+              ) : (
+                <>
+                  <div className="w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center" style={{ background: T.accent, color: '#fff' }}>{indexedObs[editingSegIdx]?._num}</div>
+                  <span className="text-sm font-bold" style={{ color: T.text }}>Note — Segment {indexedObs[editingSegIdx]?._num} ({fmtDist(segments[editingSegIdx]?.segmentDistance)} {fmtUncertainty(segments[editingSegIdx]?.segmentUncertainty)})</span>
+                </>
+              )}
             </div>
             <textarea value={editingNote} onChange={(e) => setEditingNote(e.target.value)}
               className="w-full min-h-[80px] p-3 rounded-xl text-base resize-none outline-none"

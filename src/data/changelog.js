@@ -2,9 +2,21 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.5.0';
+export const APP_VERSION = '2.5.1';
 
 export const CHANGELOG = [
+  {
+    version: '2.5.1',
+    date: '2026-04-17',
+    title: 'Mode Tesla : observation ponctuelle + fix GPS indispo',
+    highlights: [
+      'Nouveau bouton « Point » violet à côté de Départ — marque une observation ponctuelle en 1 appui',
+      'Pin violet numéroté P1, P2… sur la carte, distinct des segments bleus',
+      'Points et segments mêlés en ordre chrono dans la barre du bas (titre « Observations »)',
+      'Clic sur une carte point → recentre la carte sur le pin',
+      'Fix : Départ/Fin/Point réutilisent le dernier fix du tracé (<10s) si actif — fini les « GPS indispo » pendant un traçé qui fonctionne',
+    ],
+  },
   {
     version: '2.5.0',
     date: '2026-04-17',
