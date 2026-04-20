@@ -16,6 +16,7 @@ export const CHANGELOG = [
       'CRC mobile : tap sur observation ouvre directement l\'édition (plus besoin du double-tap)',
       'CRC mobile : bouton Valider dans l\'édition d\'observation',
       'Lecteur PDF mobile : favoris SharePoint synchronisés (Firestore multi-device), étoile sur les récents, renommer/réorganiser/supprimer',
+      'Lecteur PDF mobile : étoile dans la toolbar iframe → favoriser l\'URL courante en un tap',
     ],
   },
   {

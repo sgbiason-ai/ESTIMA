@@ -71,11 +71,30 @@ export default function PdfReaderView({ onToast, userId }) {
             <Icon name="back" size={16} color="#2563eb" />
             Retour
           </button>
-          <button onClick={() => window.open(pdfSrc, '_blank')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-100 text-[12px] font-bold text-gray-700 active:bg-gray-200">
-            <Icon name="share" size={14} color="#374151" />
-            Ouvrir externe
-          </button>
+          <div className="flex items-center gap-2">
+            {userId && pdfSrc && !pdfSrc.startsWith('blob:') && (
+              <button
+                onClick={() => {
+                  if (isFavorite(pdfSrc)) {
+                    const fav = favorites.find(f => f.url === pdfSrc);
+                    if (fav) removeFavorite(fav.id);
+                    onToast?.('Retiré des favoris');
+                  } else {
+                    setFavModal({ mode: 'add', initial: { url: pdfSrc, name: '' } });
+                  }
+                }}
+                className="p-1.5 rounded-xl active:bg-amber-50"
+                aria-label={isFavorite(pdfSrc) ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+              >
+                <Icon name={isFavorite(pdfSrc) ? 'starFilled' : 'star'} size={18} color={isFavorite(pdfSrc) ? '#f59e0b' : '#6b7280'} />
+              </button>
+            )}
+            <button onClick={() => window.open(pdfSrc, '_blank')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-100 text-[12px] font-bold text-gray-700 active:bg-gray-200">
+              <Icon name="share" size={14} color="#374151" />
+              Ouvrir externe
+            </button>
+          </div>
         </div>
         {/* iframe PDF */}
         <iframe
@@ -83,6 +102,21 @@ export default function PdfReaderView({ onToast, userId }) {
           className="flex-1 w-full border-none"
           title="Lecteur PDF"
         />
+
+        {/* Modale ajout favori (depuis toolbar iframe) */}
+        {favModal && (
+          <PdfFavoriteEditModal
+            initial={favModal.mode === 'edit' ? favModal.initial : favModal.initial}
+            onSave={(payload) => {
+              if (favModal.mode === 'edit') {
+                updateFavorite(favModal.initial.id, payload);
+              } else {
+                addFavorite(payload.name, payload.url || favModal.initial?.url);
+              }
+            }}
+            onClose={() => setFavModal(null)}
+          />
+        )}
       </div>
     );
   }
