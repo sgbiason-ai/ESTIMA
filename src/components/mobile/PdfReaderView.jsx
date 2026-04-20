@@ -3,6 +3,8 @@
 
 import React, { useState, useRef, useCallback } from 'react';
 import Icon from './Icon';
+import { usePdfFavorites } from '../../hooks/usePdfFavorites';
+import PdfFavoriteEditModal from './PdfFavoriteEditModal';
 
 const RECENT_KEY = 'estima_pdf_recent';
 const MAX_RECENT = 5;
@@ -20,11 +22,14 @@ function addRecentUrl(url, name) {
   localStorage.setItem(RECENT_KEY, JSON.stringify(recent.slice(0, MAX_RECENT)));
 }
 
-export default function PdfReaderView({ onToast }) {
+export default function PdfReaderView({ onToast, userId }) {
   const [pdfSrc, setPdfSrc] = useState(null);
   const [recentUrls, setRecentUrls] = useState(getRecentUrls);
+  const [favModal, setFavModal] = useState(null); // null | { mode, initial }
   const fileRef = useRef(null);
   const blobRef = useRef(null);
+
+  const { favorites, addFavorite, updateFavorite, removeFavorite, moveFavorite, isFavorite, toggleFavorite } = usePdfFavorites(userId);
 
   const openUrl = useCallback((url) => {
     if (!url.trim()) return;
@@ -117,6 +122,81 @@ export default function PdfReaderView({ onToast }) {
         <Icon name="chevron" size={16} color="#9ca3af" />
       </button>
 
+      {/* Favoris */}
+      {userId && (
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-3">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[11px] font-bold text-gray-700 uppercase tracking-wider">Favoris</span>
+            <button
+              onClick={() => setFavModal({ mode: 'add', initial: null })}
+              className="flex items-center gap-1 text-[11px] text-blue-600 font-semibold active:opacity-60"
+            >
+              <Icon name="plus" size={12} color="#2563eb" />
+              Ajouter
+            </button>
+          </div>
+          {favorites.length === 0 ? (
+            <p className="text-[12px] text-gray-500 py-2">
+              Aucun favori. Étoilez une URL récente ou ajoutez-en une manuellement.
+            </p>
+          ) : (
+            favorites.map((fav, idx) => (
+              <div
+                key={fav.id}
+                className="flex items-center gap-2 py-2.5 border-b border-gray-100 last:border-0"
+              >
+                <button
+                  onClick={() => openUrl(fav.url)}
+                  className="flex items-center gap-3 flex-1 min-w-0 text-left active:opacity-60"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
+                    <Icon name="starFilled" size={16} color="#f59e0b" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[14px] font-semibold text-gray-900 truncate">{fav.name}</div>
+                    <div className="text-[11px] text-gray-600 truncate">{fav.url}</div>
+                  </div>
+                </button>
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <button
+                    onClick={() => moveFavorite(fav.id, 'up')}
+                    disabled={idx === 0}
+                    className="p-1.5 rounded-lg active:bg-gray-100 disabled:opacity-30"
+                    aria-label="Monter"
+                  >
+                    <Icon name="arrowUp" size={14} color="#6b7280" />
+                  </button>
+                  <button
+                    onClick={() => moveFavorite(fav.id, 'down')}
+                    disabled={idx === favorites.length - 1}
+                    className="p-1.5 rounded-lg active:bg-gray-100 disabled:opacity-30"
+                    aria-label="Descendre"
+                  >
+                    <Icon name="arrowDown" size={14} color="#6b7280" />
+                  </button>
+                  <button
+                    onClick={() => setFavModal({ mode: 'edit', initial: fav })}
+                    className="p-1.5 rounded-lg active:bg-gray-100"
+                    aria-label="Renommer"
+                  >
+                    <Icon name="edit" size={14} color="#2563eb" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`Supprimer le favori « ${fav.name} » ?`)) removeFavorite(fav.id);
+                    }}
+                    className="p-1.5 rounded-lg active:bg-red-50"
+                    aria-label="Supprimer"
+                  >
+                    <Icon name="trash" size={14} color="#ef4444" />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
       {/* Récents */}
       {recentUrls.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-200 p-4">
@@ -126,27 +206,42 @@ export default function PdfReaderView({ onToast }) {
               Effacer
             </button>
           </div>
-          {recentUrls.map((item, i) => (
-            <button
-              key={i}
-              onClick={() => openUrl(item.url)}
-              className="flex items-center gap-3 w-full py-3 border-b border-gray-100 last:border-0 text-left active:bg-gray-50 transition"
-            >
-              <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
-                <Icon name="file" size={16} color="#dc2626" />
+          {recentUrls.map((item, i) => {
+            const fav = isFavorite(item.url);
+            return (
+              <div
+                key={i}
+                className="flex items-center gap-2 py-3 border-b border-gray-100 last:border-0"
+              >
+                <button
+                  onClick={() => openUrl(item.url)}
+                  className="flex items-center gap-3 flex-1 min-w-0 text-left active:opacity-60"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
+                    <Icon name="file" size={16} color="#dc2626" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[14px] font-semibold text-gray-900 truncate">{item.name}</div>
+                    <div className="text-[11px] text-gray-600 truncate">{item.url}</div>
+                  </div>
+                </button>
+                {userId && (
+                  <button
+                    onClick={() => toggleFavorite(item.url, item.name)}
+                    className="p-1.5 rounded-lg active:bg-amber-50 shrink-0"
+                    aria-label={fav ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+                  >
+                    <Icon name={fav ? 'starFilled' : 'star'} size={18} color={fav ? '#f59e0b' : '#9ca3af'} />
+                  </button>
+                )}
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[14px] font-semibold text-gray-900 truncate">{item.name}</div>
-                <div className="text-[11px] text-gray-600 truncate">{item.url}</div>
-              </div>
-              <Icon name="chevron" size={14} color="#9ca3af" />
-            </button>
-          ))}
+            );
+          })}
         </div>
       )}
 
       {/* Empty hint */}
-      {recentUrls.length === 0 && (
+      {recentUrls.length === 0 && favorites.length === 0 && (
         <div className="flex flex-col items-center justify-center py-8 text-center">
           <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-3">
             <Icon name="file" size={24} color="#9ca3af" />
@@ -155,6 +250,21 @@ export default function PdfReaderView({ onToast }) {
             Ouvrez SharePoint ou sélectionnez un fichier PDF local.
           </p>
         </div>
+      )}
+
+      {/* Modale ajout / renommage favori */}
+      {favModal && (
+        <PdfFavoriteEditModal
+          initial={favModal.mode === 'edit' ? favModal.initial : null}
+          onSave={(payload) => {
+            if (favModal.mode === 'edit') {
+              updateFavorite(favModal.initial.id, payload);
+            } else {
+              addFavorite(payload.name, payload.url);
+            }
+          }}
+          onClose={() => setFavModal(null)}
+        />
       )}
     </div>
   );

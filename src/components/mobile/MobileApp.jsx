@@ -695,7 +695,7 @@ export default function MobileApp({ user, companyId, onLogout, isTablet = false,
 
         {/* Module Lecteur PDF */}
         {activeModule === 'pdf_reader' && (
-          <PdfReaderView onToast={triggerToast} />
+          <PdfReaderView onToast={triggerToast} userId={user?.uid} />
         )}
 
         {/* Module Exports rapides (depuis le hub, sans projet) */}
