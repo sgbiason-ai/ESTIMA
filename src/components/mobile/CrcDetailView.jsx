@@ -390,7 +390,7 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
             canEdit={canEdit}
             isLandscape={isLandscape}
             onEditObs={setEditingObs}
-            onTapObs={handleOpenSwiper}
+            onTapObs={canEdit ? setEditingObs : handleOpenSwiper}
             onAddObs={canEdit ? (cat) => {
               const newId = manager.addObservation(cat);
               const obs = (meeting.observations || []).find(o => o.id === newId);
