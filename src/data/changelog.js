@@ -17,6 +17,8 @@ export const CHANGELOG = [
       'CRC mobile : bouton Valider dans l\'édition d\'observation',
       'Lecteur PDF mobile : favoris SharePoint synchronisés (Firestore multi-device), étoile sur les récents, renommer/réorganiser/supprimer',
       'Lecteur PDF mobile : étoile dans la toolbar iframe → favoriser l\'URL courante en un tap',
+      'Lecteur PDF mobile : clic sur favori/récent → ouverture externe directe (plus de double-tap via iframe)',
+      'Lecteur PDF mobile : libellés extraits du chemin SharePoint (ex : "26-0704-BLAYE / 09-CHANTIER") au lieu de tokens illisibles',
     ],
   },
   {

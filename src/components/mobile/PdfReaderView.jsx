@@ -10,6 +10,41 @@ const RECENT_KEY = 'estima_pdf_recent';
 const MAX_RECENT = 5;
 const DEFAULT_SHAREPOINT_URL = 'https://papyrusbe.sharepoint.com/:f:/s/Papyrus1/IgCJGPDa78XofbqubIcIBY2TAXZ0Ph8WNW8G5H2-Mj0SVWs?e=9CDM3b';
 
+// Segments SharePoint bruyants à filtrer pour le libellé
+const NOISE_SEGMENTS = new Set([
+  ':f:', ':b:', ':u:', ':w:', ':x:', ':p:', ':o:', ':v:', ':i:',
+  's', 'sites', 'personal', 'teams',
+  'Shared Documents', 'Documents partagés', 'Documents partages',
+]);
+
+// Heuristique : segment ressemble à un token SharePoint aléatoire
+const isToken = (s) => {
+  if (!s) return false;
+  if (s.length > 25 && !/\s/.test(s) && /^[A-Za-z0-9_-]+$/.test(s)) return true;
+  // Ratio majuscules/chiffres élevé + pas d'espace/tiret réguliers
+  if (s.length > 20 && !/\s/.test(s) && /[A-Z]/.test(s) && /[0-9]/.test(s) && !/-/.test(s)) return true;
+  return false;
+};
+
+// Extrait un libellé lisible à partir d'une URL SharePoint / générique
+export function prettyNameFromUrl(url) {
+  try {
+    const u = new URL(url);
+    const path = decodeURIComponent(u.pathname);
+    const parts = path.split('/').filter(Boolean);
+    const meaningful = parts.filter(p => !NOISE_SEGMENTS.has(p) && !isToken(p));
+    // Prendre les 2 derniers segments pour garder le contexte arborescence
+    const tail = meaningful.slice(-2);
+    if (tail.length > 0) return tail.join(' / ');
+    // Fallback : nom de site (parts[1] après /sites/) ou hostname
+    const siteIdx = parts.findIndex(p => p === 'sites' || p === 'personal' || p === 'teams');
+    if (siteIdx >= 0 && parts[siteIdx + 1]) return parts[siteIdx + 1];
+    return u.hostname;
+  } catch {
+    return url;
+  }
+}
+
 function getRecentUrls() {
   try {
     return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
@@ -18,7 +53,8 @@ function getRecentUrls() {
 
 function addRecentUrl(url, name) {
   const recent = getRecentUrls().filter(r => r.url !== url);
-  recent.unshift({ url, name: name || url.split('/').pop() || 'PDF', date: new Date().toISOString() });
+  const label = name || prettyNameFromUrl(url);
+  recent.unshift({ url, name: label, date: new Date().toISOString() });
   localStorage.setItem(RECENT_KEY, JSON.stringify(recent.slice(0, MAX_RECENT)));
 }
 
@@ -31,13 +67,13 @@ export default function PdfReaderView({ onToast, userId }) {
 
   const { favorites, addFavorite, updateFavorite, removeFavorite, moveFavorite, isFavorite, toggleFavorite } = usePdfFavorites(userId);
 
-  const openUrl = useCallback((url) => {
-    if (!url.trim()) return;
-    // Nettoyage ancien blob
-    if (blobRef.current) { URL.revokeObjectURL(blobRef.current); blobRef.current = null; }
-    setPdfSrc(url.trim());
-    addRecentUrl(url.trim());
+  const openUrl = useCallback((url, name) => {
+    const clean = (url || '').trim();
+    if (!clean) return;
+    // URLs distantes (SharePoint...) : ouverture externe directe (iframe bloqué par X-Frame-Options)
+    addRecentUrl(clean, name);
     setRecentUrls(getRecentUrls());
+    window.open(clean, '_blank', 'noopener,noreferrer');
   }, []);
 
   const openFile = useCallback((e) => {
@@ -80,7 +116,7 @@ export default function PdfReaderView({ onToast, userId }) {
                     if (fav) removeFavorite(fav.id);
                     onToast?.('Retiré des favoris');
                   } else {
-                    setFavModal({ mode: 'add', initial: { url: pdfSrc, name: '' } });
+                    setFavModal({ mode: 'add', initial: { url: pdfSrc, name: prettyNameFromUrl(pdfSrc) } });
                   }
                 }}
                 className="p-1.5 rounded-xl active:bg-amber-50"
@@ -180,7 +216,7 @@ export default function PdfReaderView({ onToast, userId }) {
                 className="flex items-center gap-2 py-2.5 border-b border-gray-100 last:border-0"
               >
                 <button
-                  onClick={() => openUrl(fav.url)}
+                  onClick={() => openUrl(fav.url, fav.name)}
                   className="flex items-center gap-3 flex-1 min-w-0 text-left active:opacity-60"
                 >
                   <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
@@ -248,7 +284,7 @@ export default function PdfReaderView({ onToast, userId }) {
                 className="flex items-center gap-2 py-3 border-b border-gray-100 last:border-0"
               >
                 <button
-                  onClick={() => openUrl(item.url)}
+                  onClick={() => openUrl(item.url, item.name)}
                   className="flex items-center gap-3 flex-1 min-w-0 text-left active:opacity-60"
                 >
                   <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
