@@ -75,6 +75,13 @@ export default function ObservationEditSheet({
     }
   }, [onDelete, obs, onClose]);
 
+  const handleValidate = useCallback(() => {
+    if (textRef.current) {
+      update({ text: textRef.current.innerHTML });
+    }
+    onClose();
+  }, [update, onClose]);
+
   // ── Group names for selects ──
   const groupNames = participantGroups.map((g) => g.name).filter(Boolean);
 
@@ -274,6 +281,16 @@ export default function ObservationEditSheet({
               </div>
             )}
           </div>
+        </div>
+
+        {/* Sticky footer : Valider */}
+        <div className="shrink-0 px-4 py-3 border-t border-gray-200 bg-white">
+          <button
+            onClick={handleValidate}
+            className="w-full py-3 rounded-xl bg-blue-600 text-white text-sm font-bold shadow-sm active:scale-[0.98] transition"
+          >
+            Valider
+          </button>
         </div>
       </div>
 

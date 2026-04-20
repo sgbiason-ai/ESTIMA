@@ -14,6 +14,7 @@ export const CHANGELOG = [
       'Point GPS → texte pré-rempli avec "lat, lng (±Xm)"',
       'Affichage carte + sidebar + bounds mis à jour pour les points seuls',
       'CRC mobile : tap sur observation ouvre directement l\'édition (plus besoin du double-tap)',
+      'CRC mobile : bouton Valider dans l\'édition d\'observation',
     ],
   },
   {
