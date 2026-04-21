@@ -212,27 +212,59 @@ const ObservationRow = ({ obs, onUpdate, onDelete, meetingDate, participantGroup
   const handleHighlight = useCallback(() => {
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed) return;
-    editorRef.current?.focus();
-    // Verifier si deja surligne pour toggle
-    const parent = sel.anchorNode?.parentElement;
-    if (parent?.tagName === 'MARK') {
-      // Retirer le surlignage
-      const text = document.createTextNode(parent.textContent);
-      parent.replaceWith(text);
-    } else {
-      const range = sel.getRangeAt(0);
-      const mark = document.createElement('mark');
-      mark.style.backgroundColor = '#fde68a';
-      mark.style.borderRadius = '2px';
-      mark.style.padding = '0 1px';
-      // surroundContents throw si la selection traverse plusieurs noeuds (ex: gras + texte).
-      // Fallback : extraire le contenu, le wrapper, le reinserer.
-      try {
-        range.surroundContents(mark);
-      } catch {
-        mark.appendChild(range.extractContents());
-        range.insertNode(mark);
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
+
+    const range = sel.getRangeAt(0);
+
+    // Deplier un <mark> : on remonte ses enfants dans le parent puis on le supprime
+    // (preserve le gras / italique / soulignement interne).
+    const unwrap = (markEl) => {
+      const parent = markEl.parentNode;
+      if (!parent) return;
+      while (markEl.firstChild) parent.insertBefore(markEl.firstChild, markEl);
+      parent.removeChild(markEl);
+    };
+
+    // Cherche un ancetre MARK (en remontant depuis n, sans sortir de l'editeur)
+    const findMarkAncestor = (node) => {
+      let n = node;
+      while (n && n !== editor) {
+        if (n.nodeType === 1 && n.tagName === 'MARK') return n;
+        n = n.parentNode;
       }
+      return null;
+    };
+
+    // Toggle OFF si la selection touche ou est contenue dans au moins un <mark>
+    const anchorMark = findMarkAncestor(sel.anchorNode);
+    const focusMark = findMarkAncestor(sel.focusNode);
+    const intersecting = Array.from(editor.querySelectorAll('mark'))
+      .filter((m) => range.intersectsNode(m));
+
+    if (anchorMark || focusMark || intersecting.length > 0) {
+      // Retirer tous les MARKs que la selection touche (preserve le contenu interne).
+      const toUnwrap = new Set(intersecting);
+      if (anchorMark) toUnwrap.add(anchorMark);
+      if (focusMark) toUnwrap.add(focusMark);
+      toUnwrap.forEach(unwrap);
+      handleEditorInput();
+      return;
+    }
+
+    // Sinon : poser le fluo sur la selection
+    const mark = document.createElement('mark');
+    mark.style.backgroundColor = '#fde68a';
+    mark.style.borderRadius = '2px';
+    mark.style.padding = '0 1px';
+    // surroundContents throw si la selection traverse plusieurs noeuds (ex: gras + texte).
+    // Fallback : extraire le contenu, le wrapper, le reinserer.
+    try {
+      range.surroundContents(mark);
+    } catch {
+      mark.appendChild(range.extractContents());
+      range.insertNode(mark);
     }
     handleEditorInput();
   }, [handleEditorInput]);
