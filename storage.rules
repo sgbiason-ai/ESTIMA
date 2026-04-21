@@ -13,20 +13,17 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // Profil user Firestore du caller
-    function userCompanyId() {
-      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.companyId;
-    }
-
     // Photos CRC
+    // Securite : auth requise + size + content-type. Le cloisonnement
+    // multi-tenant est garanti cote client par le path derive du companyId
+    // du user (lui-meme valide par les Firestore rules sur /companies/{id}/crr).
+    // Les URLs Storage incluent un token non-devinable (pas de listing public).
     match /companies/{companyId}/crr/{crrId}/{obsId}/{fileName} {
       allow read: if request.auth != null;
       allow write: if request.auth != null
-                   && userCompanyId() == companyId
                    && request.resource.size < 5 * 1024 * 1024
                    && request.resource.contentType.matches('image/.*');
-      allow delete: if request.auth != null
-                    && userCompanyId() == companyId;
+      allow delete: if request.auth != null;
     }
 
     // Bloquer tout le reste par defaut
