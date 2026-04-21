@@ -36,7 +36,7 @@ import CrcGuidedTour from '../../components/crr/CrcGuidedTour';
 import { toast, confirm } from '../../utils/globalUI';
 
 import { RibbonButton, RibbonDivider, RibbonGroup } from './CrcRibbon';
-import CrcChantierDropdown from './CrcChantierDropdown';
+import CrcChantierPickerModal from './CrcChantierPickerModal';
 import CrcMeetingTabs from './CrcMeetingTabs';
 import CrcCategoriesModal from './CrcCategoriesModal';
 import CrcInfoChantierModal from './CrcInfoChantierModal';
@@ -254,6 +254,7 @@ export default function CrcView({ onBackToHub, user, companyId }) {
   const [showHelpPanel, setShowHelpPanel] = useState(false);
   const [showGuidedTour, setShowGuidedTour] = useState(false);
   const [showLibraryModal, setShowLibraryModal] = useState(false);
+  const [showChantierPicker, setShowChantierPicker] = useState(false);
   const [importModal, setImportModal] = useState(null);
   const importFileRef = useRef(null);
 
@@ -505,11 +506,12 @@ export default function CrcView({ onBackToHub, user, companyId }) {
           {/* ── GROUPE : CHANTIER ── */}
           <RibbonGroup label="Chantier" dataTour="chantier">
             <RibbonButton icon={Plus} label="Nouvelle affaire" onClick={handleCreateChantier} variant="primary" title="Créer un nouveau chantier" />
-            <CrcChantierDropdown
-              chantiers={chantiers}
-              activeId={crrDoc?.id}
-              onSelect={handleSelectChantier}
-              onDelete={handleDeleteChantier}
+            <RibbonButton
+              icon={FolderOpen}
+              label={crrDoc?.crrConfig?.chantierInfo?.nom || 'Choisir affaire'}
+              onClick={() => setShowChantierPicker(true)}
+              variant="primary"
+              title="Choisir une affaire parmi la liste"
             />
           </RibbonGroup>
 
@@ -653,6 +655,16 @@ export default function CrcView({ onBackToHub, user, companyId }) {
       )}
 
       {/* ── Modals ── */}
+      <CrcChantierPickerModal
+        isOpen={showChantierPicker}
+        onClose={() => setShowChantierPicker(false)}
+        chantiers={chantiers}
+        activeId={crrDoc?.id}
+        onSelect={handleSelectChantier}
+        onDelete={handleDeleteChantier}
+        companyId={companyId}
+      />
+
       <CrcCategoriesModal isOpen={showCategoriesModal} onClose={() => setShowCategoriesModal(false)}
         categories={manager.crrConfig.categories} addCategory={manager.addCategory}
         renameCategory={manager.renameCategory} deleteCategory={manager.deleteCategory}
