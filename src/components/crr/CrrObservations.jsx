@@ -225,7 +225,14 @@ const ObservationRow = ({ obs, onUpdate, onDelete, meetingDate, participantGroup
       mark.style.backgroundColor = '#fde68a';
       mark.style.borderRadius = '2px';
       mark.style.padding = '0 1px';
-      range.surroundContents(mark);
+      // surroundContents throw si la selection traverse plusieurs noeuds (ex: gras + texte).
+      // Fallback : extraire le contenu, le wrapper, le reinserer.
+      try {
+        range.surroundContents(mark);
+      } catch {
+        mark.appendChild(range.extractContents());
+        range.insertNode(mark);
+      }
     }
     handleEditorInput();
   }, [handleEditorInput]);
