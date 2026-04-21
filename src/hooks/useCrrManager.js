@@ -14,6 +14,7 @@ import {
 } from '../data/crrData';
 import { useRobustSave } from './useRobustSave';
 import { useStableHash } from './useStableHash';
+import { reoptimizeDataUrl } from '../utils/imageCompressor';
 
 export const useCrrManager = ({
   project,
@@ -675,6 +676,70 @@ export const useCrrManager = ({
     participantGroups: activeParticipantGroups,
   }), [crrConfig, activeParticipantGroups]);
 
+  // ── OPTIMISATION IMAGES (hotfix doc > 1 Mo) ───────────────────────────
+  //
+  // Parcourt toutes les reunions et recompresse les images base64 en 600px/q=0.5.
+  // Utilise pour debloquer un doc CRR qui depasse la limite Firestore 1 MiB.
+  // Retourne { optimized, meetingsCount, sizeBefore, sizeAfter } pour feedback.
+
+  const optimizeAllImages = useCallback(async () => {
+    if (!meetings.length) {
+      return { optimized: 0, meetingsCount: 0, sizeBefore: 0, sizeAfter: 0 };
+    }
+
+    const measure = (obj) => {
+      try { return new Blob([JSON.stringify(obj)]).size; } catch { return 0; }
+    };
+    const sizeBefore = measure(meetings);
+    let optimizedCount = 0;
+
+    const newMeetings = await Promise.all(
+      meetings.map(async (m) => {
+        if (!m.observations?.length) return m;
+        const newObs = await Promise.all(
+          m.observations.map(async (obs) => {
+            const imgs = obs.images || [];
+            if (!imgs.length) return obs;
+            const newImgs = await Promise.all(
+              imgs.map(async (img) => {
+                // img peut etre une string (dataURL) ou { src, lat, lng, _placeholder }
+                if (typeof img === 'string') {
+                  if (!img.startsWith('data:image/')) return img;
+                  try {
+                    const out = await reoptimizeDataUrl(img, 600, 0.5);
+                    optimizedCount += 1;
+                    return out;
+                  } catch { return img; }
+                }
+                if (img && typeof img === 'object' && typeof img.src === 'string' && img.src.startsWith('data:image/')) {
+                  try {
+                    const newSrc = await reoptimizeDataUrl(img.src, 600, 0.5);
+                    optimizedCount += 1;
+                    const { _placeholder, ...rest } = img;
+                    return { ...rest, src: newSrc };
+                  } catch { return img; }
+                }
+                return img;
+              })
+            );
+            return { ...obs, images: newImgs };
+          })
+        );
+        return { ...m, observations: newObs };
+      })
+    );
+
+    updateMeetings(newMeetings);
+    const sizeAfter = measure(newMeetings);
+
+    return {
+      optimized: optimizedCount,
+      meetingsCount: meetings.length,
+      sizeBefore,
+      sizeAfter,
+    };
+  }, [meetings, updateMeetings]);
+
   // ── RETURN ────────────────────────────────────────────────────────────
 
   return {
@@ -733,5 +798,6 @@ export const useCrrManager = ({
     diffusionEmails,
     saveStatus,
     forceSave,
+    optimizeAllImages,
   };
 };

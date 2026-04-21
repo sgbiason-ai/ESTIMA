@@ -10,6 +10,8 @@ export const CHANGELOG = [
     date: '2026-04-17',
     title: 'Visites de Site desktop : bouton Point ponctuel',
     highlights: [
+      'CRC : nouveau bouton « Optimiser images » dans le ribbon Archivage — recompresse toutes les photos en 600px/50% pour passer sous la limite Firestore 1 Mo',
+      'CRC : compression des nouvelles photos abaissée à 600px / qualité 50% (desktop + mobile) — évite de saturer le document Firestore',
       'Bouton « Nouveau » dans le ribbon ESTIMA (groupe Fichier) — créer un projet vide d\'un clic',
       'Gestion de Projets : bouton « Nouveau » corrigé — sauve le projet dans le Cloud et ouvre ESTIMA',
       'Nouveau bouton « Point » (violet) à côté de Départ, parité avec Tesla',

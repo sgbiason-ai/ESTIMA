@@ -174,6 +174,34 @@ export const compressImage = async (file, maxW = 800, quality = 0.7, { withGps =
   return gps ? { src, lat: gps.lat, lng: gps.lng } : src;
 };
 
+// ── Recompression d'un dataURL existant (pour alléger un doc déjà sauvé) ───
+/**
+ * Recompresse une image base64/dataURL existante à dimensions + qualité réduites.
+ * Utilisé par le bouton "Optimiser les images" pour récupérer un doc CRC qui
+ * dépasse la limite Firestore 1 Mo.
+ *
+ * @param {string} dataUrl - dataURL existant (data:image/...)
+ * @param {number} maxW - largeur max (défaut 600)
+ * @param {number} quality - qualité JPEG 0..1 (défaut 0.5)
+ * @returns {Promise<string>} nouveau dataURL recompressé
+ */
+export const reoptimizeDataUrl = (dataUrl, maxW = 600, quality = 0.5) =>
+  new Promise((resolve, reject) => {
+    if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) {
+      resolve(dataUrl); // déjà autre chose (URL Storage, null...) → on ne touche pas
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const out = resizeToCanvas(img, maxW, quality);
+        resolve(out);
+      } catch (err) { reject(err); }
+    };
+    img.onerror = () => reject(new Error('Image decode failed'));
+    img.src = dataUrl;
+  });
+
 /**
  * Compresse une image en 2 phases :
  * Phase 1 (instantanée) : miniature 200px, qualité 0.3 → affichage immédiat

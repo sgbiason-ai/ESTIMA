@@ -249,7 +249,7 @@ const ObservationRow = ({ obs, onUpdate, onDelete, meetingDate, participantGroup
     // Les photos importees depuis le disque ont un lastModified ancien → pas de GPS
     const compressed = await Promise.all(files.map((f) => {
       const isFreshCapture = (Date.now() - f.lastModified) < 10000;
-      return compressImage(f, 800, 0.7, { withGps: isFreshCapture });
+      return compressImage(f, 600, 0.5, { withGps: isFreshCapture });
     }));
     onUpdate(obs.id, { images: [...images, ...compressed] });
     if (fileRef.current) fileRef.current.value = '';

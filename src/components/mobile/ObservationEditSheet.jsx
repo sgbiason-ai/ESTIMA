@@ -53,7 +53,7 @@ export default function ObservationEditSheet({
   const handleImageFiles = useCallback(async (files, { withGps = true } = {}) => {
     if (!files || files.length === 0) return;
     const fileList = Array.from(files);
-    const compressed = await Promise.all(fileList.map((f) => compressImage(f, 800, 0.7, { withGps })));
+    const compressed = await Promise.all(fileList.map((f) => compressImage(f, 600, 0.5, { withGps })));
     update({ images: [...images, ...compressed] });
   }, [images, update]);
 

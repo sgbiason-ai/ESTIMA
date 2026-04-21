@@ -8,7 +8,7 @@ import {
   ArrowLeft, ClipboardList, Plus, Trash2, Copy,
   Building2, Users, ListTree, Edit3, Eye, FileDown, Mail, FolderOpen,
   HelpCircle, Compass, Archive, UploadCloud, ArrowLeftRight,
-  FileText as FileWord, X, MapPin,
+  FileText as FileWord, X, MapPin, Minimize2,
 } from 'lucide-react';
 import { doc, getDoc, setDoc, collection, getDocs, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -424,6 +424,29 @@ export default function CrcView({ onBackToHub, user, companyId }) {
     }
   }, [manager, chantierName, branding, companyId, crrDoc]);
 
+  // ── Hotfix doc > 1 Mo : recompression des images du CR complet ──────────
+  const handleOptimizeImages = useCallback(async () => {
+    if (!crrDoc) return;
+    const ok = await confirm(
+      'Recompresser toutes les photos de cette affaire en qualite reduite (600px / 50%) ?\n\nUtile pour passer sous la limite Firestore de 1 Mo.\nLes photos existantes seront remplacees, sans possibilite de retour.',
+      { title: 'Optimiser les images', danger: false }
+    );
+    if (!ok) return;
+    toast.info('Optimisation en cours...');
+    try {
+      const res = await manager.optimizeAllImages();
+      const kbBefore = Math.round(res.sizeBefore / 1024);
+      const kbAfter = Math.round(res.sizeAfter / 1024);
+      const gain = kbBefore - kbAfter;
+      toast.success(
+        `${res.optimized} photo${res.optimized > 1 ? 's' : ''} optimisee${res.optimized > 1 ? 's' : ''} — ${kbBefore} Ko → ${kbAfter} Ko (-${gain} Ko)`
+      );
+    } catch (err) {
+      console.error('[CRC] Optimisation images:', err);
+      toast.error('Erreur pendant l\'optimisation des images.');
+    }
+  }, [crrDoc, manager]);
+
   // ── Rendu ─────────────────────────────────────────────────────────────────
 
   if (loading) {
@@ -539,6 +562,7 @@ export default function CrcView({ onBackToHub, user, companyId }) {
           <RibbonGroup label="Archivage" dataTour="archivage">
             <RibbonButton icon={Archive} label="Archiver" onClick={handleArchiveExport} disabled={!crrDoc} title="Exporter l'affaire complete (.crcestima)" />
             <RibbonButton icon={UploadCloud} label="Importer" onClick={() => importFileRef.current?.click()} title="Importer une affaire (.crcestima)" />
+            <RibbonButton icon={Minimize2} label="Optimiser images" onClick={handleOptimizeImages} disabled={!crrDoc} title="Recompresser toutes les photos pour passer sous la limite Firestore 1 Mo" />
           </RibbonGroup>
 
         </div>
