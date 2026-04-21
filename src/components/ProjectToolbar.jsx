@@ -156,17 +156,13 @@ const ProjectToolbar = ({
                   title="Créer un nouveau projet"
                 />
                 <div className="flex flex-col gap-[3px] justify-center">
-                  <RibbonBtnSmall icon={FolderOpen} label="Ouvrir" onClick={onOpenAffaire} title="Charger une affaire (.json)" accent="text-amber-500" />
-                  <RibbonBtnSmall icon={Save} label="Enregistrer" onClick={onSaveAffaire} title="Sauvegarder l'affaire (.json)" accent="text-blue-500" />
-                  <RibbonBtnSmall icon={Cloud} label="Ouvrir Cloud" onClick={onOpenCloudProject} title="Ouvrir un projet depuis le Cloud" accent="text-sky-500" />
+                  <RibbonBtnSmall icon={Cloud}  label="Ouvrir Cloud" onClick={onOpenCloudProject} title="Ouvrir un projet depuis le Cloud" accent="text-sky-500" />
+                  <RibbonBtnSmall icon={Upload} label="Sauver Cloud" onClick={onSaveProject}      title="Sauvegarder sur le Cloud"          accent="text-blue-500" />
                 </div>
-                <RibbonBtnLarge
-                  icon={Upload}
-                  label="Cloud"
-                  onClick={onSaveProject}
-                  accent="text-blue-500"
-                  title="Sauvegarder sur le Cloud"
-                />
+                <div className="flex flex-col gap-[3px] justify-center">
+                  <RibbonBtnSmall icon={FolderOpen} label="Ouvrir JSON"      onClick={onOpenAffaire} title="Charger une affaire (.json)"      accent="text-amber-500" />
+                  <RibbonBtnSmall icon={Save}       label="Enregistrer JSON" onClick={onSaveAffaire} title="Sauvegarder l'affaire (.json)"    accent="text-slate-500" />
+                </div>
               </RibbonGroup>
             )}
 
