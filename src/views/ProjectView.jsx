@@ -8,7 +8,7 @@ import { Plus, Trash2, GripVertical, Layers, HelpCircle, Archive, BarChart3 } fr
 import { ProjectContext } from '../context/ProjectContext';
 import { EditableTitle, OptionToggle } from '../components/ProjectUI';
 import ItemList from '../components/ItemList';
-import { formatPrice } from '../utils/helpers';
+import { formatPrice, generateId } from '../utils/helpers';
 import { toast, confirm } from '../utils/globalUI';
 
 import ProjectDetailsModal from '../components/modals/ProjectDetailsModal';
@@ -144,6 +144,25 @@ const ProjectView = ({
 
   // ── SAUVEGARDE / OUVERTURE D'AFFAIRE ─────────────────────────────────────────
   const loadAffaireRef = useRef(null);
+
+  const handleNewProject = async () => {
+    const ok = await confirm('Créer un nouveau projet ? Les modifications non sauvegardées seront perdues.');
+    if (!ok) return;
+    const newProject = {
+      id: generateId(),
+      name: '',
+      chapters: [{ id: 'c1', title: 'TRAVAUX PREPARATOIRES', children: [], type: 'chapter', isOption: false }],
+      tranches: [],
+      sourceIds: [],
+    };
+    try {
+      if (onReplaceProject) onReplaceProject(newProject);
+      toast.success('Nouveau projet créé.');
+    } catch (e) {
+      console.error('[ProjectView] Erreur création nouveau projet:', e);
+      toast.error('Impossible de créer le projet.');
+    }
+  };
 
   const handleSaveAffaire = async () => {
     if (!project) return;
@@ -603,6 +622,7 @@ const ProjectView = ({
             bpuConfig={bpuConfig} setBpuConfig={setBpuConfig}
             onSaveAffaire={handleSaveAffaire}
             onOpenAffaire={() => handleOpenAffaire(null)}
+            onNewProject={handleNewProject}
             onOpenCloudProject={() => setShowCloudPicker(v => !v)}
             onArchive={handleArchive}
             archiveCount={archives.length}

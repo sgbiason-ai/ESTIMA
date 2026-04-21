@@ -37,6 +37,7 @@ const ProjectToolbar = ({
   setBpuConfig,
   onSaveAffaire,
   onOpenAffaire,
+  onNewProject,
   onOpenCloudProject,
   onArchive,
   archiveCount = 0,
@@ -147,6 +148,13 @@ const ProjectToolbar = ({
             {/* Fichier */}
             {!isReadOnly && (
               <RibbonGroup label="Fichier">
+                <RibbonBtnLarge
+                  icon={PlusCircle}
+                  label="Nouveau"
+                  onClick={onNewProject}
+                  accent="text-emerald-500"
+                  title="Créer un nouveau projet"
+                />
                 <div className="flex flex-col gap-[3px] justify-center">
                   <RibbonBtnSmall icon={FolderOpen} label="Ouvrir" onClick={onOpenAffaire} title="Charger une affaire (.json)" accent="text-amber-500" />
                   <RibbonBtnSmall icon={Save} label="Enregistrer" onClick={onSaveAffaire} title="Sauvegarder l'affaire (.json)" accent="text-blue-500" />

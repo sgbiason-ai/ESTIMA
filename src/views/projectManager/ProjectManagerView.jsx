@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { HelpCircle, PlusCircle, Clock, Cloud, RefreshCw, Trash2, ArrowUpDown, Search, LayoutGrid, List } from 'lucide-react';
 import { buildFolderColorMap } from './folderColors';
 import { toast, confirm } from '../../utils/globalUI';
+import { generateId } from '../../utils/helpers';
 import { collection, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 
@@ -21,7 +22,7 @@ import PmLocalHistory    from './PmLocalHistory';
 const ProjectManagerView = ({
   project, setProject, resetProject, onSaveProject,
   bpuConfig, clientPercent, setBpuConfig, setClientPercent,
-  companyId, currentUserUid, onNavigateModule,
+  companyId, currentUserUid, onNavigateModule, setActiveTab,
 }) => {
   const [historyTab, setHistoryTab] = useState('cloud');
   const [showHelp,   setShowHelp]   = useState(false);
@@ -137,7 +138,27 @@ const ProjectManagerView = ({
         onCloudSave={cloud.handleCloudSave} onExport={local.handleExport}
         onImportClick={() => local.fileInputRef.current?.click()} onClone={local.handleClone}
         fileInputRef={local.fileInputRef} onImportChange={local.handleImport}
-        onNewProject={async () => { const ok = await confirm('Créer un nouveau projet ?'); if (ok) resetProject(); }}
+        onNewProject={async () => {
+          const ok = await confirm('Créer un nouveau projet ?');
+          if (!ok) return;
+          const newProject = {
+            id: generateId(),
+            name: '',
+            chapters: [{ id: 'c1', title: 'TRAVAUX PREPARATOIRES', children: [], type: 'chapter', isOption: false }],
+            tranches: [],
+            sourceIds: [],
+          };
+          try {
+            await onSaveProject(newProject);
+            setProject(newProject);
+            cloud.setCloudProjects(prev => [{ ...newProject, lastSaved: new Date().toISOString() }, ...prev]);
+            toast.success('Nouveau projet créé.');
+            if (setActiveTab) setActiveTab();
+          } catch (e) {
+            console.error('[ProjectManager] Erreur création projet:', e);
+            toast.error('Impossible de créer le projet.');
+          }
+        }}
         onShowHelp={() => setShowHelp(true)}
       />
 

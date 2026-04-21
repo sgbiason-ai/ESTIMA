@@ -10,6 +10,8 @@ export const CHANGELOG = [
     date: '2026-04-17',
     title: 'Visites de Site desktop : bouton Point ponctuel',
     highlights: [
+      'Bouton « Nouveau » dans le ribbon ESTIMA (groupe Fichier) — créer un projet vide d\'un clic',
+      'Gestion de Projets : bouton « Nouveau » corrigé — sauve le projet dans le Cloud et ouvre ESTIMA',
       'Nouveau bouton « Point » (violet) à côté de Départ, parité avec Tesla',
       'Point GPS → texte pré-rempli avec "lat, lng (±Xm)"',
       'Affichage carte + sidebar + bounds mis à jour pour les points seuls',
