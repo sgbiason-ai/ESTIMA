@@ -92,6 +92,19 @@ export default defineConfig({
               cacheableResponse: { statuses: [0, 200] },
             },
           },
+          {
+            // Cache photos CRC (Firebase Storage)
+            // L'URL contient un token par fichier : une fois en cache, la photo
+            // reste accessible offline sur le chantier. Les photos sont immuables
+            // (nouvelle photo = nouvelle URL), donc CacheFirst.
+            urlPattern: /^https:\/\/(firebasestorage\.googleapis\.com|.*\.firebasestorage\.app)\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'crr-photos-cache',
+              expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
         ],
       },
     }),
