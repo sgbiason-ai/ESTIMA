@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { doc, getDoc, setDoc, collection, getDocs, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { deleteCrrImage } from '../../utils/crrImageStorage';
 import { DEFAULT_BRANDING } from '../../data/branding';
 import CrcLinkProjectModal from './CrcLinkProjectModal';
 
@@ -185,6 +186,15 @@ export default function CrcView({ onBackToHub, user, companyId }) {
 
   const handleDeleteChantier = useCallback(async (chantierId) => {
     try {
+      // Purge Storage en arriere-plan pour toutes les images de l'affaire
+      const target = chantiers.find((c) => c.id === chantierId);
+      if (target?.crrMeetings) {
+        for (const m of target.crrMeetings) {
+          for (const obs of (m.observations || [])) {
+            for (const img of (obs.images || [])) deleteCrrImage(img);
+          }
+        }
+      }
       await deleteDoc(doc(db, 'companies', companyId, 'crr', chantierId));
       setChantiers((prev) => prev.filter((c) => c.id !== chantierId));
       if (crrDoc?.id === chantierId) {
@@ -424,28 +434,33 @@ export default function CrcView({ onBackToHub, user, companyId }) {
     }
   }, [manager, chantierName, branding, companyId, crrDoc]);
 
-  // ── Hotfix doc > 1 Mo : recompression des images du CR complet ──────────
+  // ── Optimisation images : recompression + migration vers Firebase Storage ───
   const handleOptimizeImages = useCallback(async () => {
     if (!crrDoc) return;
     const ok = await confirm(
-      'Recompresser toutes les photos de cette affaire en qualite reduite (600px / 50%) ?\n\nUtile pour passer sous la limite Firestore de 1 Mo.\nLes photos existantes seront remplacees, sans possibilite de retour.',
+      'Optimiser toutes les photos : recompression (600px / 50%) et deplacement vers Firebase Storage.\n\nCela reduit la taille du document Firestore (< 1 Mo) et libere l\'affaire.\nOperation sans possibilite de retour.',
       { title: 'Optimiser les images', danger: false }
     );
     if (!ok) return;
     toast.info('Optimisation en cours...');
     try {
-      const res = await manager.optimizeAllImages();
+      const res = await manager.optimizeAllImages({ companyId });
       const kbBefore = Math.round(res.sizeBefore / 1024);
       const kbAfter = Math.round(res.sizeAfter / 1024);
       const gain = kbBefore - kbAfter;
+      const parts = [];
+      if (res.migrated > 0) parts.push(`${res.migrated} migree${res.migrated > 1 ? 's' : ''} vers Storage`);
+      if (res.optimized > 0) parts.push(`${res.optimized} recompressee${res.optimized > 1 ? 's' : ''}`);
+      if (parts.length === 0) parts.push('aucune photo a optimiser');
+      const errPart = res.migrationErrors > 0 ? ` (${res.migrationErrors} erreur${res.migrationErrors > 1 ? 's' : ''} Storage)` : '';
       toast.success(
-        `${res.optimized} photo${res.optimized > 1 ? 's' : ''} optimisee${res.optimized > 1 ? 's' : ''} — ${kbBefore} Ko → ${kbAfter} Ko (-${gain} Ko)`
+        `${parts.join(' + ')}${errPart} — ${kbBefore} Ko → ${kbAfter} Ko (-${gain} Ko)`
       );
     } catch (err) {
       console.error('[CRC] Optimisation images:', err);
       toast.error('Erreur pendant l\'optimisation des images.');
     }
-  }, [crrDoc, manager]);
+  }, [crrDoc, manager, companyId]);
 
   // ── Rendu ─────────────────────────────────────────────────────────────────
 
@@ -628,7 +643,8 @@ export default function CrcView({ onBackToHub, user, companyId }) {
                     updateObservation={manager.updateObservation} deleteObservation={manager.deleteObservation}
                     reorderObservations={manager.reorderObservations}
                     legalText={manager.crrConfig.legalText}
-                    participantGroups={manager.crrConfig.participantGroups} />
+                    participantGroups={manager.crrConfig.participantGroups}
+                    companyId={companyId} crrId={crrDoc?.id} />
                 </div>
               )}
             </div>

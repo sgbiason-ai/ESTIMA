@@ -8,8 +8,9 @@ import {
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { OBSERVATION_STATUSES, getGroupColor, abbreviateGroup } from '../../data/crrData';
-import { confirm } from '../../utils/globalUI';
+import { confirm, toast } from '../../utils/globalUI';
 import { normalizeObsText } from '../../utils/formatObsText.jsx';
+import { uploadCrrImage, deleteCrrImage } from '../../utils/crrImageStorage';
 
 // ── Pastille de groupe (partagee entre observations et participants) ─────────
 
@@ -145,8 +146,6 @@ const GroupPicker = ({ value, onChange, groups, placeholder, className = '' }) =
   );
 };
 
-import { compressImage } from '../../utils/imageCompressor';
-
 const StatusBadge = ({ status, onChange }) => {
   const cycle = () => {
     const states = ['empty', 'open', 'in_progress', 'done'];
@@ -174,7 +173,7 @@ const StatusBadge = ({ status, onChange }) => {
   );
 };
 
-const ObservationRow = ({ obs, onUpdate, onDelete, meetingDate, participantGroups, dragHandleProps }) => {
+const ObservationRow = ({ obs, onUpdate, onDelete, meetingDate, participantGroups, dragHandleProps, companyId, crrId }) => {
   const [expanded, setExpanded] = useState(true);
   const fileRef = useRef(null);
   const cameraRef = useRef(null);
@@ -284,19 +283,30 @@ const ObservationRow = ({ obs, onUpdate, onDelete, meetingDate, participantGroup
   const handleAddImages = async (e) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
-    // GPS uniquement si photo prise a l'instant (camera) : fichier < 10s
-    // Les photos importees depuis le disque ont un lastModified ancien → pas de GPS
-    const compressed = await Promise.all(files.map((f) => {
-      const isFreshCapture = (Date.now() - f.lastModified) < 10000;
-      return compressImage(f, 600, 0.5, { withGps: isFreshCapture });
-    }));
-    onUpdate(obs.id, { images: [...images, ...compressed] });
-    if (fileRef.current) fileRef.current.value = '';
-    if (cameraRef.current) cameraRef.current.value = '';
+    if (!companyId || !crrId) {
+      toast.error('Contexte CRC incomplet, impossible d\'uploader.');
+      return;
+    }
+    try {
+      // Upload Firebase Storage : la compression + capture GPS est faite dans uploadCrrImage.
+      const uploaded = await Promise.all(
+        files.map((f) => uploadCrrImage(f, { companyId, crrId, obsId: obs.id }))
+      );
+      onUpdate(obs.id, { images: [...images, ...uploaded] });
+    } catch (err) {
+      console.error('[CRC] Upload photo echoue:', err);
+      toast.error('Une photo n\'a pas pu etre uploadee. Reessayez.');
+    } finally {
+      if (fileRef.current) fileRef.current.value = '';
+      if (cameraRef.current) cameraRef.current.value = '';
+    }
   };
 
   const removeImage = (idx) => {
+    const removed = images[idx];
     onUpdate(obs.id, { images: images.filter((_, i) => i !== idx) });
+    // Purge Storage en arriere-plan (no-op si l'image etait en base64 dans l'ancien format)
+    deleteCrrImage(removed);
   };
 
   return (
@@ -511,6 +521,8 @@ const CrrObservations = ({
   reorderObservations,
   legalText,
   participantGroups = [],
+  companyId,
+  crrId,
 }) => {
   const [collapsedCats, setCollapsedCats] = useState(new Set());
 
@@ -616,6 +628,8 @@ const CrrObservations = ({
                               meetingDate={meeting.date}
                               participantGroups={participantGroups}
                               dragHandleProps={prov.dragHandleProps}
+                              companyId={companyId}
+                              crrId={crrId}
                             />
                           </div>
                         )}

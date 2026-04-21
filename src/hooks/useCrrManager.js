@@ -15,6 +15,7 @@ import {
 import { useRobustSave } from './useRobustSave';
 import { useStableHash } from './useStableHash';
 import { reoptimizeDataUrl } from '../utils/imageCompressor';
+import { uploadCrrDataUrl, deleteCrrImage } from '../utils/crrImageStorage';
 
 export const useCrrManager = ({
   project,
@@ -234,6 +235,13 @@ export const useCrrManager = ({
 
   const deleteMeeting = useCallback(
     (meetingId) => {
+      // Purge Storage en arriere-plan pour toutes les images de la reunion
+      const target = meetings.find((m) => m.id === meetingId);
+      if (target?.observations) {
+        for (const obs of target.observations) {
+          for (const img of (obs.images || [])) deleteCrrImage(img);
+        }
+      }
       const newMeetings = meetings.filter((m) => m.id !== meetingId);
       updateMeetings(newMeetings);
       if (activeMeetingId === meetingId) {
@@ -597,6 +605,11 @@ export const useCrrManager = ({
   const deleteObservation = useCallback(
     (obsId) => {
       if (!activeMeeting) return;
+      const target = (activeMeeting.observations || []).find((o) => o.id === obsId);
+      // Purge Storage en arriere-plan pour les images de l'observation
+      if (target?.images?.length) {
+        for (const img of target.images) deleteCrrImage(img);
+      }
       const obs = (activeMeeting.observations || []).filter(
         (o) => o.id !== obsId
       );
@@ -682,16 +695,46 @@ export const useCrrManager = ({
   // Utilise pour debloquer un doc CRR qui depasse la limite Firestore 1 MiB.
   // Retourne { optimized, meetingsCount, sizeBefore, sizeAfter } pour feedback.
 
-  const optimizeAllImages = useCallback(async () => {
+  const optimizeAllImages = useCallback(async ({ companyId } = {}) => {
     if (!meetings.length) {
-      return { optimized: 0, meetingsCount: 0, sizeBefore: 0, sizeAfter: 0 };
+      return { optimized: 0, migrated: 0, meetingsCount: 0, sizeBefore: 0, sizeAfter: 0 };
     }
+
+    const crrId = project?.id;
+    const canMigrate = !!(companyId && crrId);
 
     const measure = (obj) => {
       try { return new Blob([JSON.stringify(obj)]).size; } catch { return 0; }
     };
     const sizeBefore = measure(meetings);
     let optimizedCount = 0;
+    let migratedCount = 0;
+    let migrationErrors = 0;
+
+    // Recompresse un base64 puis tente de migrer vers Storage.
+    // Retourne { src, path?, lat?, lng? } si migration OK,
+    // sinon un string base64 recompresse (fallback robuste).
+    const processDataUrl = async (dataUrl, obsId, extraMeta = {}) => {
+      let recompressed = dataUrl;
+      try { recompressed = await reoptimizeDataUrl(dataUrl, 600, 0.5); } catch { /* garder original */ }
+      if (!canMigrate) {
+        optimizedCount += 1;
+        return { recompressed, uploaded: null };
+      }
+      try {
+        const uploaded = await uploadCrrDataUrl(recompressed, {
+          companyId, crrId, obsId,
+          lat: extraMeta.lat, lng: extraMeta.lng,
+        });
+        migratedCount += 1;
+        return { recompressed, uploaded };
+      } catch (err) {
+        console.warn('[CRC] Migration Storage echouee (obs', obsId, '):', err?.code || err?.message);
+        migrationErrors += 1;
+        optimizedCount += 1;
+        return { recompressed, uploaded: null };
+      }
+    };
 
     const newMeetings = await Promise.all(
       meetings.map(async (m) => {
@@ -702,23 +745,23 @@ export const useCrrManager = ({
             if (!imgs.length) return obs;
             const newImgs = await Promise.all(
               imgs.map(async (img) => {
-                // img peut etre une string (dataURL) ou { src, lat, lng, _placeholder }
+                // Cas 1 : string base64 (ancien format)
                 if (typeof img === 'string') {
                   if (!img.startsWith('data:image/')) return img;
-                  try {
-                    const out = await reoptimizeDataUrl(img, 600, 0.5);
-                    optimizedCount += 1;
-                    return out;
-                  } catch { return img; }
+                  const { recompressed, uploaded } = await processDataUrl(img, obs.id);
+                  return uploaded || recompressed;
                 }
+                // Cas 2 : objet { src, lat, lng, _placeholder } avec src base64
                 if (img && typeof img === 'object' && typeof img.src === 'string' && img.src.startsWith('data:image/')) {
-                  try {
-                    const newSrc = await reoptimizeDataUrl(img.src, 600, 0.5);
-                    optimizedCount += 1;
-                    const { _placeholder, ...rest } = img;
-                    return { ...rest, src: newSrc };
-                  } catch { return img; }
+                  const { _placeholder, src, lat, lng, ...rest } = img;
+                  const { recompressed, uploaded } = await processDataUrl(src, obs.id, { lat, lng });
+                  if (uploaded) return { ...rest, ...uploaded };
+                  // Fallback : garder le base64 recompresse avec lat/lng d'origine
+                  const fallback = { ...rest, src: recompressed };
+                  if (lat != null && lng != null) { fallback.lat = lat; fallback.lng = lng; }
+                  return fallback;
                 }
+                // Cas 3 : deja Storage ({ src: url, path, ... }) → rien a faire
                 return img;
               })
             );
@@ -734,11 +777,13 @@ export const useCrrManager = ({
 
     return {
       optimized: optimizedCount,
+      migrated: migratedCount,
+      migrationErrors,
       meetingsCount: meetings.length,
       sizeBefore,
       sizeAfter,
     };
-  }, [meetings, updateMeetings]);
+  }, [meetings, updateMeetings, project?.id]);
 
   // ── RETURN ────────────────────────────────────────────────────────────
 

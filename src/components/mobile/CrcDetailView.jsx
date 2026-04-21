@@ -47,7 +47,7 @@ const statusColorMobile = (value) => {
 
 // ─── COMPOSANT PRINCIPAL ────────────────────────────────────────────────────
 
-export default function CrcDetailView({ chantier, onSelectMeeting, branding, onToast, manager, isLandscape }) {
+export default function CrcDetailView({ chantier, onSelectMeeting, branding, onToast, manager, isLandscape, companyId }) {
   const config = chantier.crrConfig || {};
   const meetings = chantier.crrMeetings || [];
   const groups = config.participantGroups || [];
@@ -452,6 +452,8 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
             onDelete={(obsId) => manager.deleteObservation(obsId)}
             onClose={() => setEditingObs(null)}
             onViewImage={setViewingImage}
+            companyId={companyId}
+            crrId={chantier?.id}
           />
         </Suspense>
       )}

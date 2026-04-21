@@ -2,6 +2,9 @@
   "firestore": {
     "rules": "firestore.rules"
   },
+  "storage": {
+    "rules": "storage.rules"
+  },
   "hosting": {
     "public": "dist",
     "ignore": [
@@ -23,7 +26,7 @@
           { "key": "X-Frame-Options", "value": "DENY" },
           { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
           { "key": "Permissions-Policy", "value": "camera=(self), microphone=(self), geolocation=(self)" },
-          { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' https://apis.google.com https://*.firebaseapp.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasestorage.app https://api.open-meteo.com https://nominatim.openstreetmap.org https://*.arcgisonline.com https://router.project-osrm.org https://*.tile.openstreetmap.org https://data.geopf.fr https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.de.sentry.io https://*.ingest.us.sentry.io; img-src 'self' data: blob: https://*.arcgisonline.com https://*.tile.openstreetmap.org https://data.geopf.fr https://unpkg.com; frame-src 'self' blob: https://*.firebaseapp.com https://*.google.com; frame-ancestors 'none'" }
+          { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' https://apis.google.com https://*.firebaseapp.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasestorage.app https://api.open-meteo.com https://nominatim.openstreetmap.org https://*.arcgisonline.com https://router.project-osrm.org https://*.tile.openstreetmap.org https://data.geopf.fr https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.de.sentry.io https://*.ingest.us.sentry.io; img-src 'self' data: blob: https://*.arcgisonline.com https://*.tile.openstreetmap.org https://data.geopf.fr https://unpkg.com https://firebasestorage.googleapis.com https://*.firebasestorage.app; frame-src 'self' blob: https://*.firebaseapp.com https://*.google.com; frame-ancestors 'none'" }
         ]
       },
       {

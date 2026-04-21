@@ -7,6 +7,7 @@ import {
   memoryLocalCache
 } from "firebase/firestore";
 import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
+import { getStorage } from "firebase/storage";
 
 // Configuration Firebase via variables d'environnement
 // Voir .env.example pour le format attendu
@@ -45,3 +46,4 @@ if (isTeslaBrowser) {
 }
 
 export { db };
+export const storage = getStorage(app);

@@ -5,9 +5,10 @@
 
 import React, { useState, useRef, useCallback } from 'react';
 import Icon from './Icon';
-import { compressImage } from '../../utils/imageCompressor';
+import { uploadCrrImage, deleteCrrImage } from '../../utils/crrImageStorage';
 import { useOrientation } from '../../hooks/useOrientation';
 import { sanitizeHtml } from '../../utils/helpers';
+import { toast } from '../../utils/globalUI';
 
 // ─── STATUS CONFIG ─────────────────────────────────────────────────────────
 const STATUSES = [
@@ -36,6 +37,8 @@ export default function ObservationEditSheet({
   onDelete,
   onClose,
   onViewImage,
+  companyId,
+  crrId,
 }) {
   const { isLandscape } = useOrientation();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -52,14 +55,27 @@ export default function ObservationEditSheet({
 
   const handleImageFiles = useCallback(async (files, { withGps = true } = {}) => {
     if (!files || files.length === 0) return;
+    if (!companyId || !crrId || !obs?.id) {
+      toast.error('Contexte CRC incomplet, impossible d\'uploader.');
+      return;
+    }
     const fileList = Array.from(files);
-    const compressed = await Promise.all(fileList.map((f) => compressImage(f, 600, 0.5, { withGps })));
-    update({ images: [...images, ...compressed] });
-  }, [images, update]);
+    try {
+      const uploaded = await Promise.all(
+        fileList.map((f) => uploadCrrImage(f, { companyId, crrId, obsId: obs.id, withGps }))
+      );
+      update({ images: [...images, ...uploaded] });
+    } catch (err) {
+      console.error('[CRC] Upload photo echoue:', err);
+      toast.error('Une photo n\'a pas pu etre uploadee. Reessayez.');
+    }
+  }, [images, update, companyId, crrId, obs?.id]);
 
   const handleRemoveImage = useCallback((idx) => {
+    const removed = images[idx];
     const next = images.filter((_, i) => i !== idx);
     update({ images: next });
+    deleteCrrImage(removed);
   }, [images, update]);
 
   const handleTextBlur = useCallback(() => {

@@ -604,7 +604,7 @@ export default function MobileApp({ user, companyId, onLogout, isTablet = false,
           isTablet && isLandscape ? (
             <SplitView
               List={<CrcListView chantiers={crcChantiers} loading={crcLoading} onSelect={handleSelectChantier} onRefresh={crcRefetch} isLandscape={false} />}
-              Detail={fullChantier && <CrcDetailView chantier={fullChantier} branding={resources.masterBranding} onToast={triggerToast} manager={crrManager} isLandscape={isLandscape} />}
+              Detail={fullChantier && <CrcDetailView chantier={fullChantier} branding={resources.masterBranding} onToast={triggerToast} manager={crrManager} isLandscape={isLandscape} companyId={companyId} />}
               hasSelection={!!selectedChantier}
               loading={chantierLoading}
               emptyIcon="clipboard"
@@ -618,7 +618,7 @@ export default function MobileApp({ user, companyId, onLogout, isTablet = false,
               <span className="text-sm">Chargement…</span>
             </div>
           ) : fullChantier ? (
-            <CrcDetailView chantier={fullChantier} branding={resources.masterBranding} onToast={triggerToast} manager={crrManager} isLandscape={isLandscape} />
+            <CrcDetailView chantier={fullChantier} branding={resources.masterBranding} onToast={triggerToast} manager={crrManager} isLandscape={isLandscape} companyId={companyId} />
           ) : null
         )}
 
