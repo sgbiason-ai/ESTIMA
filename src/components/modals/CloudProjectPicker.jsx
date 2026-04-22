@@ -39,7 +39,7 @@ const CloudProjectPicker = ({ companyId, currentProjectId, onSelect, onClose }) 
       try {
         const snap = await getDocs(collection(db, 'companies', companyId, 'projects'));
         const list = snap.docs
-          .map(d => d.data())
+          .map(d => ({ id: d.id, ...d.data() }))
           .sort((a, b) => new Date(b.lastSaved || 0) - new Date(a.lastSaved || 0));
         setProjects(list);
       } catch {

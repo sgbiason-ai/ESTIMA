@@ -18,7 +18,7 @@ export default function CrcLinkProjectModal({ isOpen, onClose, onSelect, company
     getDocs(collection(db, 'companies', companyId, 'projects'))
       .then(snap => {
         const list = snap.docs
-          .map(d => d.data())
+          .map(d => ({ id: d.id, ...d.data() }))
           .filter(p => p.name)
           .sort((a, b) => new Date(b.lastSaved || 0) - new Date(a.lastSaved || 0));
         setProjects(list);
