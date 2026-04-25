@@ -2,7 +2,8 @@
 // Vue desktop — sidebar liste | observations + segments gauche | carte Leaflet droite.
 // Parité fonctionnelle avec TeslaModeView : segments GPS, OSRM, tracé continu, édition.
 
-import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react';
+import lazyWithReload from '../utils/lazyWithReload';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -22,7 +23,7 @@ import { simplifyGpsTrace } from '../utils/gpsSimplify';
 import { useMobileSiteVisits } from '../hooks/useMobileSiteVisits';
 
 // PROVISOIRE — Mode Tesla depuis le desktop
-const TeslaModeView = lazy(() => import('./TeslaModeView'));
+const TeslaModeView = lazyWithReload(() => import('./TeslaModeView'));
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

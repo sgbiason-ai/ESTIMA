@@ -1,5 +1,6 @@
 // src/App.jsx
 import React, { useState, lazy, Suspense } from 'react';
+import lazyWithReload from './utils/lazyWithReload';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -30,26 +31,26 @@ import LegalView            from './views/LegalView';
 import ModuleHubView        from './views/ModuleHubView';
 
 // ─── VUES (lazy-loaded — code-splitting par module) ──────────────────────────
-const ProjectManagerView = lazy(() => import('./views/projectManager/ProjectManagerView'));
-const ProjectView        = lazy(() => import('./views/ProjectView'));
-const DatabaseView       = lazy(() => import('./views/DatabaseView'));
-const PriceAnalysisView  = lazy(() => import('./views/PriceAnalysisView'));
-const CctpGeneratorView  = lazy(() => import('./views/CctpGeneratorView'));
-const RcGeneratorView    = lazy(() => import('./views/RcGeneratorView'));
-const BpuExportView      = lazy(() => import('./views/bpu/BpuExportView'));
-const SettingsView       = lazy(() => import('./views/SettingsView'));
-const BrandingView       = lazy(() => import('./views/BrandingView'));
-const AdminView          = lazy(() => import('./views/AdminView'));
-const RaoAnalysisView    = lazy(() => import('./views/RaoAnalysisView'));
-const CrcView            = lazy(() => import('./views/crc/CrcView'));
-const DocAdminView       = lazy(() => import('./views/DocAdminView'));
-const SiteVisitsView     = lazy(() => import('./views/SiteVisitsView'));
-const TeslaModeView      = lazy(() => import('./views/TeslaModeView'));
-const DevisMoeView       = lazy(() => import('./views/devisMoe/DevisMoeView'));
-const AccountSection     = lazy(() => import('./components/settings/AccountSection'));
+const ProjectManagerView = lazyWithReload(() => import('./views/projectManager/ProjectManagerView'));
+const ProjectView        = lazyWithReload(() => import('./views/ProjectView'));
+const DatabaseView       = lazyWithReload(() => import('./views/DatabaseView'));
+const PriceAnalysisView  = lazyWithReload(() => import('./views/PriceAnalysisView'));
+const CctpGeneratorView  = lazyWithReload(() => import('./views/CctpGeneratorView'));
+const RcGeneratorView    = lazyWithReload(() => import('./views/RcGeneratorView'));
+const BpuExportView      = lazyWithReload(() => import('./views/bpu/BpuExportView'));
+const SettingsView       = lazyWithReload(() => import('./views/SettingsView'));
+const BrandingView       = lazyWithReload(() => import('./views/BrandingView'));
+const AdminView          = lazyWithReload(() => import('./views/AdminView'));
+const RaoAnalysisView    = lazyWithReload(() => import('./views/RaoAnalysisView'));
+const CrcView            = lazyWithReload(() => import('./views/crc/CrcView'));
+const DocAdminView       = lazyWithReload(() => import('./views/DocAdminView'));
+const SiteVisitsView     = lazyWithReload(() => import('./views/SiteVisitsView'));
+const TeslaModeView      = lazyWithReload(() => import('./views/TeslaModeView'));
+const DevisMoeView       = lazyWithReload(() => import('./views/devisMoe/DevisMoeView'));
+const AccountSection     = lazyWithReload(() => import('./components/settings/AccountSection'));
 
 // ─── VUE MOBILE (lazy — chargée seulement sur mobile) ────────────────────────
-const MobileApp          = lazy(() => import('./components/mobile/MobileApp'));
+const MobileApp          = lazyWithReload(() => import('./components/mobile/MobileApp'));
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 const removeAccents = (str) =>

@@ -1,13 +1,14 @@
 // src/components/mobile/GpsTrackingSection.jsx
 // Onglet "Terrain" du CRC mobile — enregistrement GPS + carte satellite.
 
-import React, { useState, useCallback, useRef, useEffect, Suspense, lazy, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useEffect, Suspense, useMemo } from 'react';
+import lazyWithReload from '../../utils/lazyWithReload';
 import Icon from './Icon';
 import { simplifyGpsTrace } from '../../utils/gpsSimplify';
 import { stripHtml } from '../../utils/formatObsText';
 import { Maximize2, X } from 'lucide-react';
 
-const GpsMapView = lazy(() => import('./GpsMapView'));
+const GpsMapView = lazyWithReload(() => import('./GpsMapView'));
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 

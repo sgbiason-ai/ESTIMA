@@ -10,6 +10,8 @@ export const CHANGELOG = [
     date: '2026-04-17',
     title: 'Visites de Site desktop : bouton Point ponctuel',
     highlights: [
+      'PWA : retry automatique si un chunk Vite est obsolète après déploiement — plus d\'écran blanc « Failed to fetch dynamically imported module »',
+      'PWA : check des mises à jour au retour au premier plan — la bannière « Nouvelle version » apparaît immédiatement (au lieu d\'attendre 1h)',
       'CRC : nouveau bouton « Optimiser images » dans le ribbon Archivage — recompresse toutes les photos en 600px/50% pour passer sous la limite Firestore 1 Mo',
       'CRC : compression des nouvelles photos abaissée à 600px / qualité 50% (desktop + mobile) — évite de saturer le document Firestore',
       'Bouton « Nouveau » dans le ribbon ESTIMA (groupe Fichier) — créer un projet vide d\'un clic',

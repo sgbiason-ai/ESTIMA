@@ -4,7 +4,8 @@
 // Affiche : info chantier, onglets réunions, participants, observations.
 // Si `manager` prop fourni → édition activée (tap observation, ajout, images).
 
-import React, { useState, useMemo, useCallback, Suspense, lazy } from 'react';
+import React, { useState, useMemo, useCallback, Suspense } from 'react';
+import lazyWithReload from '../../utils/lazyWithReload';
 import Icon from './Icon';
 import { dateFr } from './formatters';
 import { OBSERVATION_STATUSES, PRESENCE_OPTIONS, MEETING_TYPES, GROUP_COLORS, getGroupColor } from '../../data/crrData';
@@ -15,7 +16,7 @@ import { sanitizeHtml } from '../../utils/helpers';
 import ImageViewerModal from './ImageViewerModal';
 import SaveStatusDot from './SaveStatusDot';
 
-const ObservationEditSheet = lazy(() => import('./ObservationEditSheet'));
+const ObservationEditSheet = lazyWithReload(() => import('./ObservationEditSheet'));
 import GpsTrackingSection from './GpsTrackingSection';
 
 // ─── HELPERS ────────────────────────────────────────────────────────────────

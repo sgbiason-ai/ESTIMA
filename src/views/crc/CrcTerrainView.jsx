@@ -1,11 +1,12 @@
 // src/views/crc/CrcTerrainView.jsx
 // Vue Terrain desktop — carte satellite pleine largeur avec tracé GPS, photos et observations.
 
-import React, { Suspense, lazy, useMemo } from 'react';
+import React, { Suspense, useMemo } from 'react';
+import lazyWithReload from '../../utils/lazyWithReload';
 import { MapPin, Camera, MessageSquare, Navigation, Clock, Ruler } from 'lucide-react';
 import { stripHtml } from '../../utils/formatObsText';
 
-const GpsMapView = lazy(() => import('../../components/mobile/GpsMapView'));
+const GpsMapView = lazyWithReload(() => import('../../components/mobile/GpsMapView'));
 
 const fmtDistance = (m) => m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(2)} km`;
 const fmtDuration = (ms) => {

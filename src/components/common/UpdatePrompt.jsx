@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { RefreshCw, X, Wifi } from 'lucide-react';
 import { APP_VERSION } from '../../data/changelog';
@@ -19,6 +19,7 @@ function cleanRuntimeCachesIfMajorBump(previous, current) {
 }
 
 export default function UpdatePrompt() {
+  const registrationRef = useRef(null);
   const {
     offlineReady: [offlineReady, setOfflineReady],
     needRefresh: [needRefresh, setNeedRefresh],
@@ -26,6 +27,7 @@ export default function UpdatePrompt() {
   } = useRegisterSW({
     onRegisteredSW(swUrl, registration) {
       if (!registration) return;
+      registrationRef.current = registration;
       setInterval(() => registration.update().catch(() => {}), 60 * 60 * 1000);
     },
   });
@@ -34,6 +36,22 @@ export default function UpdatePrompt() {
     const previous = localStorage.getItem(LS_VERSION_KEY);
     cleanRuntimeCachesIfMajorBump(previous, APP_VERSION);
     localStorage.setItem(LS_VERSION_KEY, APP_VERSION);
+  }, []);
+
+  // Force un check d'update quand l'app revient au premier plan (PWA installee
+  // qui sort du background, ou onglet qui reprend le focus). Permet d'afficher
+  // la banniere "Nouvelle version" sans attendre l'intervalle de 60 min.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      registrationRef.current?.update().catch(() => {});
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
   }, []);
 
   const close = () => {
