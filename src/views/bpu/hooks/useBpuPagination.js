@@ -51,7 +51,7 @@ export const useBpuPagination = ({ sortedCatalog, articlesDb, unitResolver, meas
       <div style="font-weight: 900; text-transform: uppercase; margin-bottom: 6px; font-size: 11px; color: #0f172a;">
         ${escapeHtml(cleanText(designation || 'ARTICLE SANS NOM'))}
       </div>
-      <div class="html-content" style="color: #475569; margin-bottom: 8px; font-weight: 500;">
+      <div class="html-content" style="color: #475569; margin-bottom: 8px; font-weight: 500; font-size: 10px; line-height: 1.625;">
         ${descriptionHtml || "<em style='color:#cbd5e1'>Aucune description technique disponible.</em>"}
       </div>
       ${showUnitFooter ? `

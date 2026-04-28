@@ -60,7 +60,7 @@ const BpuExportView = ({
   const { isGeneratingWord, handleDownloadWord } = useBpuWordExport({
     project, branding, resolvedLogo, sortedCatalog, unitResolver, articlesDb,
   });
-  const { isGeneratingPdf, handleDownloadPdf } = useBpuPdfExport({ project, pages });
+  const { isGeneratingPdf, pdfProgress, handleDownloadPdf } = useBpuPdfExport({ project, pages });
 
   return (
     <div className="flex flex-col bg-slate-200 h-screen w-full relative font-sans text-slate-900 overflow-hidden">
@@ -100,6 +100,7 @@ const BpuExportView = ({
         onToggleSort={() => setForceManualSort((v) => !v)}
         isGeneratingWord={isGeneratingWord}
         isGeneratingPdf={isGeneratingPdf}
+        pdfProgress={pdfProgress}
         sortedCatalogLength={sortedCatalog.length}
         onDownloadWord={handleDownloadWord}
         onDownloadPdf={handleDownloadPdf}

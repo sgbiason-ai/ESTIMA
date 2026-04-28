@@ -18,6 +18,7 @@ const BpuToolbar = ({
   onToggleSort,
   isGeneratingWord,
   isGeneratingPdf,
+  pdfProgress,
   sortedCatalogLength,
   onDownloadWord,
   onDownloadPdf,
@@ -112,7 +113,7 @@ const BpuToolbar = ({
         />
         <RibbonBtnLarge
           icon={FileDown}
-          label={isGeneratingPdf ? 'PDF...' : 'PDF'}
+          label={isGeneratingPdf ? (pdfProgress?.total ? `PDF ${pdfProgress.current}/${pdfProgress.total}` : 'PDF...') : 'PDF'}
           onClick={onDownloadPdf}
           disabled={isGeneratingPdf || pages.length === 0}
           accent="text-red-500"

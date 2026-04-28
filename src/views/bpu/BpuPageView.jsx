@@ -268,6 +268,11 @@ const BpuPageView = ({
 
       {/* Styles globaux pour le contenu rich text */}
       <style>{`
+        .html-content,
+        .html-content * {
+          font-size: 10px !important;
+          line-height: 1.625 !important;
+        }
         .html-content ul { list-style-type: disc; padding-left: 1.2em; margin: 0.2em 0; }
         .html-content ol { list-style-type: decimal; padding-left: 1.2em; margin: 0.2em 0; }
         .html-content p { margin-bottom: 0.3em; }

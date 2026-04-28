@@ -113,9 +113,10 @@ service cloud.firestore {
 
       match /bpu/{itemId} {
         allow read: if isCompanyMember(companyId);
-        allow write: if isCompanyMember(companyId)
-                     && request.resource.data.keys().hasAll(['designation', 'unit', 'price'])
-                     && request.resource.data.price is number;
+        allow create, update: if isCompanyMember(companyId)
+                              && request.resource.data.keys().hasAll(['designation', 'unit', 'price'])
+                              && request.resource.data.price is number;
+        allow delete: if isCompanyMember(companyId);
       }
 
       match /categories/{catId} {

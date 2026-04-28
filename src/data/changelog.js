@@ -10,6 +10,10 @@ export const CHANGELOG = [
     date: '2026-04-17',
     title: 'Visites de Site desktop : bouton Point ponctuel',
     highlights: [
+      'BPU : suppression d\'article fonctionnelle (fix règle Firestore qui bloquait les DELETE)',
+      'BPU : taille de texte uniforme dans les descriptions d\'articles (10pt sur tout le contenu rich text)',
+      'BPU export PDF : puces correctement alignées avec leur texte + retrait visuel (fix bug html2canvas)',
+      'BPU export PDF : ~40% plus rapide + indicateur de progression « PDF X/Y » sur le bouton',
       'PWA : retry automatique si un chunk Vite est obsolète après déploiement — plus d\'écran blanc « Failed to fetch dynamically imported module »',
       'PWA : check des mises à jour au retour au premier plan — la bannière « Nouvelle version » apparaît immédiatement (au lieu d\'attendre 1h)',
       'CRC : nouveau bouton « Optimiser images » dans le ribbon Archivage — recompresse toutes les photos en 600px/50% pour passer sous la limite Firestore 1 Mo',
