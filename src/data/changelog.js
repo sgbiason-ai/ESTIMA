@@ -2,9 +2,18 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.5.14';
+export const APP_VERSION = '2.5.15';
 
 export const CHANGELOG = [
+  {
+    version: '2.5.15',
+    date: '2026-04-28',
+    title: 'Estima : formules constantes locales à la tranche',
+    highlights: [
+      'Estima : une formule sans dépendance (=6+4) ne se propage plus sur toutes les tranches — elle reste sur la tranche active uniquement',
+      'Estima : une formule avec dépendance ({ref}) continue de se propager partout (comportement inchangé)',
+    ],
+  },
   {
     version: '2.5.14',
     date: '2026-04-28',

@@ -358,7 +358,14 @@ export const useProjectManager = (user, companyId) => {
                 let newQuantitiesFormula = { ...(it.quantitiesFormula || {}) };
                 let newQuantities = { ...(it.quantities || {}) };
                 if (isFormula) {
-                  prev.tranches.forEach(t => { newQuantitiesFormula[t.id] = qtyValue; });
+                  // Une formule avec dépendance ({ref}) se propage sur toutes les tranches.
+                  // Une constante pure (=6+4) reste sur la tranche active uniquement.
+                  const hasDeps = /\{[^}]+\}/.test(qtyValue);
+                  if (hasDeps) {
+                    prev.tranches.forEach(t => { newQuantitiesFormula[t.id] = qtyValue; });
+                  } else {
+                    newQuantitiesFormula[trancheId] = qtyValue;
+                  }
                 } else if (clearAllFormulas) {
                   prev.tranches.forEach(t => { newQuantitiesFormula[t.id] = ''; });
                   newQuantities[trancheId] = toNumber(qtyValue);
