@@ -2,9 +2,18 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.5.13';
+export const APP_VERSION = '2.5.14';
 
 export const CHANGELOG = [
+  {
+    version: '2.5.14',
+    date: '2026-04-28',
+    title: 'Estima : drag-and-drop d\'articles entre sous-chapitres',
+    highlights: [
+      'Estima : déplacer un article d\'un sous-chapitre à un autre fonctionne désormais (fix attribut DOM data-rfd-* utilisé par hello-pangea-dnd)',
+      'Estima : surbrillance verte sur toute la ligne sous-chapitre au survol (header + zone enfants) pour mieux visualiser la cible du drop',
+    ],
+  },
   {
     version: '2.5.13',
     date: '2026-04-17',

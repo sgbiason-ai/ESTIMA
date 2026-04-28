@@ -462,73 +462,78 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
+          data-subchapter-id={String(el.id)}
           className={`flex flex-col border-b border-slate-200 rounded-lg mb-2 mt-2 overflow-hidden transition-all outline-none ${
             snapshot.isDragging ? 'shadow-xl bg-white z-50' : ''
           } ${el.isOption ? 'bg-slate-50 border-dashed border-slate-300' : 'bg-slate-100 border border-slate-200 shadow-sm'}`}
         >
-          <div
-            className={`flex items-center py-2 ${isSelected ? 'bg-emerald-100' : 'hover:bg-black/5'}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              onSelect({ type: 'subchapter', id: el.id });
-            }}
-          >
-            <div
-              {...provided.dragHandleProps}
-              className={`w-8 flex justify-center shrink-0 p-1 ${isReadOnly ? 'opacity-0 pointer-events-none' : 'text-slate-400 hover:text-emerald-600 cursor-grab active:cursor-grabbing'}`}
-            >
-              {!isReadOnly && <GripVertical size={14} />}
-            </div>
-
-            <div className="w-16 text-[10px] font-mono font-black text-slate-500 shrink-0 text-center">-</div>
-
-            <div className="flex-1 px-2 flex items-center gap-2" style={{ paddingLeft: `${level * 20 + 8}px` }}>
-              <Layers size={14} className={`shrink-0 ${el.isOption ? 'text-slate-400' : 'text-emerald-600'}`} />
-              <EditableTitle
-                value={el.title}
-                onSave={(val) => onUpdate(parentId, el.id, 'title', val)}
-                disabled={isReadOnly}
-                className="text-[11px] font-black uppercase text-slate-800 tracking-wider truncate hover:bg-white/50 px-1 rounded"
-              />
-              <OptionToggle
-                isOption={!!el.isOption}
-                onClick={() => onUpdate(parentId, el.id, 'isOption', !el.isOption)}
-                disabled={isReadOnly}
-              />
-            </div>
-
-            <div className={`w-28 text-right px-3 text-[11px] font-mono font-black ${el.isOption ? 'text-slate-500 line-through' : 'text-emerald-800'}`}>
-              {formatPrice(total)}
-            </div>
-
-            <div className="w-10 flex justify-center gap-1 shrink-0">
-              {!isReadOnly && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onModal({ show: true, target: { type: 'subchapter', id: el.id, parentId } }); }}
-                  className="p-1 text-slate-400 hover:text-red-500"
-                >
-                  <Trash2 size={14} />
-                </button>
-              )}
-            </div>
-          </div>
-
+          {/* Droppable étendu : englobe header + enfants pour que hello-pangea-dnd détecte le sous-chapitre */}
+          {/* comme cible dès le survol du header (items s'écartent + surbrillance native). */}
           <Droppable droppableId={String(el.id)} type="ITEM" isDropDisabled={isReadOnly}>
             {(providedDrop, snapshotDrop) => (
               <div
                 ref={providedDrop.innerRef}
                 {...providedDrop.droppableProps}
-                className={`pl-4 border-l ml-4 min-h-[40px] transition-colors ${
-                  snapshotDrop.isDraggingOver ? 'bg-emerald-100/50 rounded ring-2 ring-emerald-200' : ''
-                } ${el.isOption ? 'border-slate-300 opacity-70' : 'border-slate-300'}`}
+                className={`flex flex-col transition-colors ${
+                  snapshotDrop.isDraggingOver ? 'ring-2 ring-emerald-300 bg-emerald-50/40' : ''
+                }`}
               >
-                <ItemList items={el.children} parentId={el.id} level={level + 1} bpuConfig={bpuConfig} />
-                {providedDrop.placeholder}
-                {(!el.children || el.children.length === 0) && (
-                  <div className={snapshotDrop.isDraggingOver ? 'h-8 flex items-center text-[9px] italic pl-2 text-emerald-500 font-semibold' : 'h-8 flex items-center text-[9px] italic pl-2 text-slate-400'}>
-                    {snapshotDrop.isDraggingOver ? 'Déposer ici ↓' : (!isReadOnly ? 'Glisser ici...': '')}
+                <div
+                  className={`flex items-center py-2 ${isSelected ? 'bg-emerald-100' : 'hover:bg-black/5'}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelect({ type: 'subchapter', id: el.id });
+                  }}
+                >
+                  <div
+                    {...provided.dragHandleProps}
+                    className={`w-8 flex justify-center shrink-0 p-1 ${isReadOnly ? 'opacity-0 pointer-events-none' : 'text-slate-400 hover:text-emerald-600 cursor-grab active:cursor-grabbing'}`}
+                  >
+                    {!isReadOnly && <GripVertical size={14} />}
                   </div>
-                )}
+
+                  <div className="w-16 text-[10px] font-mono font-black text-slate-500 shrink-0 text-center">-</div>
+
+                  <div className="flex-1 px-2 flex items-center gap-2" style={{ paddingLeft: `${level * 20 + 8}px` }}>
+                    <Layers size={14} className={`shrink-0 ${el.isOption ? 'text-slate-400' : 'text-emerald-600'}`} />
+                    <EditableTitle
+                      value={el.title}
+                      onSave={(val) => onUpdate(parentId, el.id, 'title', val)}
+                      disabled={isReadOnly}
+                      className="text-[11px] font-black uppercase text-slate-800 tracking-wider truncate hover:bg-white/50 px-1 rounded"
+                    />
+                    <OptionToggle
+                      isOption={!!el.isOption}
+                      onClick={() => onUpdate(parentId, el.id, 'isOption', !el.isOption)}
+                      disabled={isReadOnly}
+                    />
+                  </div>
+
+                  <div className={`w-28 text-right px-3 text-[11px] font-mono font-black ${el.isOption ? 'text-slate-500 line-through' : 'text-emerald-800'}`}>
+                    {formatPrice(total)}
+                  </div>
+
+                  <div className="w-10 flex justify-center gap-1 shrink-0">
+                    {!isReadOnly && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onModal({ show: true, target: { type: 'subchapter', id: el.id, parentId } }); }}
+                        className="p-1 text-slate-400 hover:text-red-500"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className={`pl-4 border-l ml-4 min-h-[40px] ${el.isOption ? 'border-slate-300 opacity-70' : 'border-slate-300'}`}>
+                  <ItemList items={el.children} parentId={el.id} level={level + 1} bpuConfig={bpuConfig} />
+                  {providedDrop.placeholder}
+                  {(!el.children || el.children.length === 0) && (
+                    <div className={snapshotDrop.isDraggingOver ? 'h-8 flex items-center text-[9px] italic pl-2 text-emerald-500 font-semibold' : 'h-8 flex items-center text-[9px] italic pl-2 text-slate-400'}>
+                      {snapshotDrop.isDraggingOver ? 'Déposer ici ↓' : (!isReadOnly ? 'Glisser ici...': '')}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </Droppable>

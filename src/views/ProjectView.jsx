@@ -354,18 +354,29 @@ const ProjectView = ({
   const getInnermostDroppableAtPos = (x, y) => {
     try {
       const elements = document.elementsFromPoint(x, y);
+      // @hello-pangea/dnd utilise le préfixe data-rfd-* (pas data-rbd-*).
+      // Le Droppable d'un sous-chapitre n'enveloppe que sa zone enfants, pas son header.
+      // On utilise data-subchapter-id sur le wrapper du sous-chapitre pour le détecter
+      // même si on survole son header, et le préférer au droppable du chapitre parent.
+      let pendingSubchapterId = null;
       for (const el of elements) {
-        const id = el.getAttribute && el.getAttribute('data-rbd-droppable-id');
-        if (id) return id;
+        if (!el.getAttribute) continue;
+        const subId = el.getAttribute('data-subchapter-id');
+        if (subId && !pendingSubchapterId) pendingSubchapterId = subId;
+        const dropId = el.getAttribute('data-rfd-droppable-id');
+        if (dropId) {
+          if (pendingSubchapterId && pendingSubchapterId !== dropId) return pendingSubchapterId;
+          return dropId;
+        }
       }
     } catch (e) {} return null;
   };
 
   const getIndexInDroppable = (droppableId, y) => {
     try {
-      const droppableEl = document.querySelector('[data-rbd-droppable-id="' + droppableId + '"]');
+      const droppableEl = document.querySelector('[data-rfd-droppable-id="' + droppableId + '"]');
       if (!droppableEl) return 0;
-      const draggables = droppableEl.querySelectorAll(':scope > [data-rbd-draggable-id]');
+      const draggables = droppableEl.querySelectorAll(':scope > [data-rfd-draggable-id]');
       let index = 0;
       for (const draggable of draggables) {
         const rect = draggable.getBoundingClientRect();
@@ -377,6 +388,7 @@ const ProjectView = ({
 
   const handleDragEndFixed = (result) => {
     const { destination, type } = result;
+
     if (!destination) { onDragEnd(result); return; }
     if (type !== 'ITEM') { onDragEnd(result); return; }
 
