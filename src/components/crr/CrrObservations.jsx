@@ -36,7 +36,7 @@ const GroupPicker = ({ value, onChange, groups, placeholder, className = '' }) =
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const btnRef = useRef(null);
-  const [dropPos, setDropPos] = useState({ top: 0, left: 0 });
+  const [dropPos, setDropPos] = useState({ top: 0, left: 0, openUp: false });
 
   // value = "MOE, Entreprises" → Set {"MOE", "Entreprises"}
   const selected = new Set((value || '').split(',').map((s) => s.trim()).filter(Boolean));
@@ -58,10 +58,21 @@ const GroupPicker = ({ value, onChange, groups, placeholder, className = '' }) =
   };
 
   // Calculer la position du dropdown en fixed par rapport au bouton
+  // Auto-flip vers le haut si pas assez d'espace en bas
   const openDropdown = () => {
     if (btnRef.current) {
       const rect = btnRef.current.getBoundingClientRect();
-      setDropPos({ top: rect.bottom + 4, left: rect.left });
+      const ITEM_HEIGHT = 36; // px-3 py-2 text-xs ≈ 36px
+      const PADDING = 8;      // py-1 container
+      const estimatedHeight = groups.length * ITEM_HEIGHT + PADDING;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const openUp = spaceBelow < estimatedHeight + 16 && rect.top > spaceBelow;
+      setDropPos({
+        top: openUp ? null : rect.bottom + 4,
+        bottom: openUp ? window.innerHeight - rect.top + 4 : null,
+        left: rect.left,
+        openUp,
+      });
     }
     setOpen((v) => !v);
   };
@@ -115,7 +126,14 @@ const GroupPicker = ({ value, onChange, groups, placeholder, className = '' }) =
       {open && ReactDOM.createPortal(
         <div
           className="w-52 bg-white border border-slate-200 rounded-lg shadow-2xl py-1"
-          style={{ position: 'fixed', top: dropPos.top, left: dropPos.left, zIndex: 99999 }}
+          style={{
+            position: 'fixed',
+            left: dropPos.left,
+            zIndex: 99999,
+            ...(dropPos.openUp
+              ? { bottom: dropPos.bottom }
+              : { top: dropPos.top }),
+          }}
           onMouseDown={(e) => e.stopPropagation()}
         >
           {groups.map((group, idx) => {
