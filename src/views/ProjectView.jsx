@@ -441,7 +441,7 @@ const ProjectView = ({
       await onSaveProject(project);
       setSaveStatus('saved');
       if (onSaveStatusChange) onSaveStatusChange('saved');
-      lastSavedProjectRef.current = JSON.stringify(project);
+      lastSavedHashRef.current = projectHash;
     } catch (error) {
       setSaveStatus('error');
       if (onSaveStatusChange) onSaveStatusChange('error');

@@ -2,9 +2,18 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.5.15';
+export const APP_VERSION = '2.5.16';
 
 export const CHANGELOG = [
+  {
+    version: '2.5.16',
+    date: '2026-04-29',
+    title: 'Estima : fix sauvegarde Cloud et chargement projet Cloud',
+    highlights: [
+      'Estima : bouton « Sauver Cloud » à nouveau fonctionnel (fix ReferenceError silencieux qui faisait passer l\'indicateur en rouge alors que la sauvegarde avait réussi)',
+      'Estima : fix erreur Firestore au chargement d\'un projet depuis le Cloud (variable locale qui masquait l\'instance Firestore)',
+    ],
+  },
   {
     version: '2.5.15',
     date: '2026-04-28',

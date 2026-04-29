@@ -2,7 +2,7 @@
 import React, { useState, lazy, Suspense } from 'react';
 import lazyWithReload from './utils/lazyWithReload';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from './firebase';
+import { db as fireDb } from './firebase';
 
 // ─── HOOKS ────────────────────────────────────────────────────────────────────
 import { useAppAuth }       from './hooks/useAppAuth';
@@ -533,7 +533,7 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub }) {
                   setProject(proj);
                   if (user?.uid && proj?.id) {
                     setDoc(
-                      doc(db, 'users', user.uid, 'preferences', 'modules'),
+                      doc(fireDb, 'users', user.uid, 'preferences', 'modules'),
                       { estima: proj.id, updatedAt: serverTimestamp() },
                       { merge: true }
                     ).catch(() => {});
