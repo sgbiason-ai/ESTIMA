@@ -2,9 +2,19 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.5.16';
+export const APP_VERSION = '2.5.17';
 
 export const CHANGELOG = [
+  {
+    version: '2.5.17',
+    date: '2026-04-29',
+    title: 'Estima : refonte du picker « Ouvrir Cloud » (style CRC)',
+    highlights: [
+      'Estima : « Ouvrir Cloud » s\'ouvre désormais en modale plein écran avec grille de cartes (1/2/3 colonnes responsive), comme dans CRC',
+      'Estima picker : recherche multi-critères (nom, client, n°, lieu), bande couleur du dossier sur chaque carte, total HT calculé à la volée',
+      'Estima picker : suppression de projet directement depuis la carte (au survol, avec confirmation) — garde-fou sur le projet actif',
+    ],
+  },
   {
     version: '2.5.16',
     date: '2026-04-29',

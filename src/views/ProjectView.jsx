@@ -643,19 +643,17 @@ const ProjectView = ({
           />
           <input ref={loadAffaireRef} type="file" accept=".json" className="hidden" onChange={handleOpenAffaireFallback} />
 
-          {/* Picker projet cloud */}
+          {/* Picker projet cloud (modal plein écran) */}
           {showCloudPicker && companyId && (
-            <div className="relative shrink-0">
-              <CloudProjectPicker
-                companyId={companyId}
-                currentProjectId={project?.id}
-                onSelect={(proj) => {
-                  setShowCloudPicker(false);
-                  if (onLoadCloudProject) onLoadCloudProject(proj);
-                }}
-                onClose={() => setShowCloudPicker(false)}
-              />
-            </div>
+            <CloudProjectPicker
+              companyId={companyId}
+              currentProjectId={project?.id}
+              onSelect={(proj) => {
+                setShowCloudPicker(false);
+                if (onLoadCloudProject) onLoadCloudProject(proj);
+              }}
+              onClose={() => setShowCloudPicker(false)}
+            />
           )}
 
           {/* Bandeau archive active */}
