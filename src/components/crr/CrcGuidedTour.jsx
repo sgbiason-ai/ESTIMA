@@ -34,7 +34,7 @@ const STEPS = [
   {
     target: '[data-tour="exports"]',
     title: 'Exports et envoi',
-    text: 'Export PDF/Word avec nom personnalisable, envoi Outlook via script VBS. Le dossier et le pattern de nom se configurent dans Info Chantier.',
+    text: 'Export PDF/Word avec nom personnalisable. L\'envoi Outlook telecharge un VBS auto-porte (PDF embarque) - 1 clic depuis la barre de telechargements pour lancer Outlook.',
     position: 'bottom',
   },
   {

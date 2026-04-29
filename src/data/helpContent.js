@@ -286,7 +286,7 @@ export const helpContent = {
             type: 'steps',
             items: [
               { color: 'blue', title: 'Export PDF / Word', description: "Genere un document PDF ou Word professionnel avec en-tete, participants, observations (formatage preserve) et pied de page." },
-              { color: 'emerald', title: 'Envoi par email (Outlook)', description: "Sauvegarde le PDF dans le dossier configure, genere un script VBS qui ouvre Outlook avec les destinataires et le CR en piece jointe." },
+              { color: 'emerald', title: 'Envoi par email (Outlook)', description: "Telecharge un script VBS auto-porte (PDF embarque) - cliquez \"Ouvrir\" dans la barre de telechargements pour lancer Outlook avec destinataires et CR en piece jointe. Le PDF est aussi archive dans le dossier projet." },
               { color: 'amber', title: 'Dossier et nom de fichier', description: "Dans \"Info Chantier\", configurez le dossier d'export et le pattern de nom ({N} = numero, {NOM} = chantier, {DATE} = date)." },
               { color: 'purple', title: 'Archiver / Importer (.crcestima)', description: "\"Archiver\" exporte l'affaire complete dans un fichier .crcestima. \"Importer\" permet de restaurer une affaire archivee." },
               { color: 'rose', title: 'Mode apercu', description: "Basculez en mode \"Apercu\" pour visualiser le rendu final avant export. L'apercu reproduit fidelement le PDF." },

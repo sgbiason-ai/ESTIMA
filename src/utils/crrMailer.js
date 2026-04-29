@@ -1,10 +1,10 @@
 // src/utils/crrMailer.js
 //
 // Workflow envoi CR via Outlook :
-// 1. Sauvegarde le PDF dans un dossier choisi (retenu en memoire via IndexedDB)
-// 2. Genere un script VBS qui ouvre Outlook avec le PDF en piece jointe
-// 3. L'utilisateur double-clique le VBS -> Outlook s'ouvre avec tout pre-rempli
-// 4. Le VBS et le fichier de donnees se suppriment automatiquement
+// 1. Archive le PDF dans le dossier choisi (retenu via IndexedDB) - best-effort
+// 2. Genere un VBS auto-porte (PDF embarque en base64) telecharge par le navigateur
+// 3. L'utilisateur clique "Ouvrir" depuis la barre de telechargements -> Outlook s'ouvre
+// 4. Le VBS extrait le PDF dans %TEMP%, attache au mail, puis se supprime
 
 import { MEETING_TYPES } from '../data/crrData';
 
@@ -93,7 +93,8 @@ const htmlEsc = (s) =>
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/[^\x20-\x7E]/g, (ch) => `&#${ch.codePointAt(0)};`);
 
 const buildMailHtml = (meeting, projectName) => {
   const date = formatDateFR(meeting.date);
@@ -151,118 +152,146 @@ export const buildMailBodyPlainText = (meeting, projectName) => {
   return body;
 };
 
-// ─── Fichier de donnees mail (UTF-8, lu par le VBS via ADODB.Stream) ────────
+// ─── Helpers VBS auto-porte (PDF embarque en base64) ────────────────────────
 
-const buildMailData = (pdfFilename, to, subject, htmlBody) =>
-  ['[TO]', to, '[SUBJECT]', subject, '[PDF]', pdfFilename, '[BODY]', htmlBody].join('\r\n');
+// Encode un Blob en base64 (sans le prefixe data: URI)
+const blobToBase64 = (blob) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = String(reader.result || '');
+      const idx = result.indexOf(',');
+      resolve(idx >= 0 ? result.slice(idx + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
 
-// ─── Script VBS (pur ASCII, lit _crr_mail.txt en UTF-8) ────────────────────
+// Echappe une chaine pour insertion dans un litteral VBS.
+// Les chars non-ASCII sont remplaces par ChrW(code) pour rester ASCII pur.
+const escapeVbsLiteral = (s) => {
+  const str = String(s || '');
+  let out = '';
+  let inQuote = false;
+  for (const ch of str) {
+    const code = ch.codePointAt(0);
+    if (ch === '"') {
+      if (!inQuote) { out += (out ? ' & ' : '') + '"'; inQuote = true; }
+      out += '""';
+    } else if (code < 0x20 || code > 0x7E) {
+      if (inQuote) { out += '"'; inQuote = false; }
+      out += (out ? ' & ' : '') + `ChrW(${code})`;
+    } else {
+      if (!inQuote) { out += (out ? ' & ' : '') + '"'; inQuote = true; }
+      out += ch;
+    }
+  }
+  if (inQuote) out += '"';
+  return out || '""';
+};
 
-const VBS_SCRIPT = `' EstimaVRD - Ouvre Outlook avec le compte rendu en piece jointe.
-' Lit les donnees du mail depuis _crr_mail.txt (UTF-8).
-' Se supprime automatiquement apres execution.
+// Decoupe le base64 en chunks de taille fixe, declares dans un tableau VBS.
+// On evite la concatenation par "& _" (limite de continuation) et la
+// concatenation iterative (couteuse en O(n2)) en utilisant Join().
+const buildBase64VbsArray = (b64, chunkSize = 800) => {
+  const chunks = [];
+  for (let i = 0; i < b64.length; i += chunkSize) {
+    chunks.push(b64.slice(i, i + chunkSize));
+  }
+  const lines = [`Dim b64Chunks(${chunks.length - 1})`];
+  chunks.forEach((c, i) => lines.push(`b64Chunks(${i}) = "${c}"`));
+  lines.push('base64Pdf = Join(b64Chunks, "")');
+  return lines.join('\r\n');
+};
+
+// Genere le VBS auto-porte (PDF embarque, pure ASCII).
+const buildSelfContainedVbs = (base64Pdf, mailTo, mailSubject, mailHtml, pdfFilename) => {
+  const script = `' EstimaVRD - VBS auto-porte : PDF embarque en base64.
+' L'utilisateur clique "Ouvrir" depuis la barre de telechargements -> Outlook s'ouvre.
+' Le PDF est extrait dans %TEMP%, attache au mail, puis le VBS se supprime.
 
 On Error Resume Next
 
-Dim fso, scriptDir, dataPath
-Set fso = CreateObject("Scripting.FileSystemObject")
-scriptDir = fso.GetParentFolderName(WScript.ScriptFullName)
-dataPath = scriptDir & "\\_crr_mail.txt"
+Dim mailTo, mailSubject, mailHtml, pdfFilename, base64Pdf
+mailTo = ${escapeVbsLiteral(mailTo)}
+mailSubject = ${escapeVbsLiteral(mailSubject)}
+mailHtml = ${escapeVbsLiteral(mailHtml)}
+pdfFilename = ${escapeVbsLiteral(pdfFilename)}
 
-' --- Lecture du fichier de donnees (UTF-8) ---
-If Not fso.FileExists(dataPath) Then
-    MsgBox "Fichier de donnees introuvable :" & vbCrLf & dataPath, vbCritical, "EstimaVRD"
-    WScript.Quit
-End If
+${buildBase64VbsArray(base64Pdf)}
 
-Dim stream, content
+' --- Decoder le PDF dans %TEMP% ---
+Dim sh, tempPath
+Set sh = CreateObject("WScript.Shell")
+tempPath = sh.ExpandEnvironmentStrings("%TEMP%") & "\\" & pdfFilename
+
+Dim xml, node, stream
+Set xml = CreateObject("MSXML2.DOMDocument")
+Set node = xml.createElement("base64")
+node.dataType = "bin.base64"
+node.text = base64Pdf
+
 Set stream = CreateObject("ADODB.Stream")
-stream.Charset = "UTF-8"
+stream.Type = 1
 stream.Open
-stream.LoadFromFile dataPath
-content = stream.ReadText
+stream.Write node.nodeTypedValue
+stream.SaveToFile tempPath, 2
 stream.Close
 Set stream = Nothing
+Set node = Nothing
+Set xml = Nothing
 
-' --- Parsing des sections ---
-Dim lines, i, section
-Dim mailTo, mailSubject, mailPdf, mailBody
-lines = Split(content, vbCrLf)
-section = ""
-mailTo = ""
-mailSubject = ""
-mailPdf = ""
-mailBody = ""
-
-For i = 0 To UBound(lines)
-    Select Case Trim(lines(i))
-        Case "[TO]":      section = "TO"
-        Case "[SUBJECT]": section = "SUBJECT"
-        Case "[PDF]":     section = "PDF"
-        Case "[BODY]":    section = "BODY"
-        Case Else
-            Select Case section
-                Case "TO":      If mailTo = "" Then mailTo = Trim(lines(i))
-                Case "SUBJECT": If mailSubject = "" Then mailSubject = Trim(lines(i))
-                Case "PDF":     If mailPdf = "" Then mailPdf = Trim(lines(i))
-                Case "BODY":
-                    If mailBody <> "" Then mailBody = mailBody & vbCrLf
-                    mailBody = mailBody & lines(i)
-            End Select
-    End Select
-Next
-
-' --- Verification du PDF ---
-Dim pdfPath
-pdfPath = scriptDir & "\\" & mailPdf
-
-If Not fso.FileExists(pdfPath) Then
-    MsgBox "PDF non trouve :" & vbCrLf & pdfPath, vbCritical, "EstimaVRD"
+If Err.Number <> 0 Then
+    MsgBox "Erreur lors de l'extraction du PDF dans le dossier temporaire.", vbCritical, "EstimaVRD"
     WScript.Quit
 End If
 
-' --- Ouverture Outlook ---
+' --- Ouvrir Outlook ---
 Dim objOutlook, objMail
 Set objOutlook = CreateObject("Outlook.Application")
-
 If Err.Number <> 0 Then
     MsgBox "Impossible de demarrer Outlook. Verifiez qu'il est installe.", vbCritical, "EstimaVRD"
     WScript.Quit
 End If
 
 Set objMail = objOutlook.CreateItem(0)
-
 With objMail
     .To = mailTo
     .Subject = mailSubject
     .BodyFormat = 2
-    .HTMLBody = mailBody
-    .Attachments.Add pdfPath
+    .HTMLBody = mailHtml
+    .Attachments.Add tempPath
     .Display
 End With
 
-' --- Nettoyage : suppression du fichier de donnees et du script ---
+' --- Nettoyage : suppression du PDF temporaire et du script ---
 On Error Resume Next
-fso.DeleteFile dataPath
+Dim fso
+Set fso = CreateObject("Scripting.FileSystemObject")
+fso.DeleteFile tempPath
 fso.DeleteFile WScript.ScriptFullName
 
 Set objMail = Nothing
 Set objOutlook = Nothing
 Set fso = Nothing
+Set sh = Nothing
 `;
+  return script.replace(/\r?\n/g, '\r\n');
+};
 
 // ─── FONCTION PRINCIPALE ────────────────────────────────────────────────────
 
 /**
- * Workflow complet d'envoi du CR par mail via Outlook :
- * 1. Sauvegarde le PDF dans le dossier d'export (retenu en memoire)
- * 2. Genere _crr_mail.txt (donnees UTF-8) + Envoyer_CR.vbs (script Outlook)
- * 3. L'utilisateur double-clique le VBS pour ouvrir Outlook avec le PDF joint
+ * Workflow d'envoi du CR par mail via Outlook (Chrome desktop Windows) :
+ * 1. Archive le PDF dans le dossier projet (FileSystemAccess, best-effort)
+ * 2. Genere un VBS auto-porte (PDF embarque en base64)
+ * 3. Telecharge le VBS via le navigateur -> apparait dans la barre de telechargements
+ * 4. L'utilisateur clique "Ouvrir" -> Outlook s'ouvre avec PDF + destinataires
  *
- * @returns {{ pdfSaved: boolean, vbsCreated?: boolean, fallback?: boolean }}
+ * @returns {{ pdfSaved: boolean, pdfArchived?: boolean, vbsDownloaded?: boolean, fallback?: boolean }}
  */
 export const openOutlookMail = async (meeting, crrConfig, projectName, emails, pdfData, options = {}) => {
-  // ── Fallback si File System Access API indisponible ──
+  // ── Fallback : navigateur sans File System Access (Firefox, mobile) ──
   if (!window.showDirectoryPicker) {
     const url = URL.createObjectURL(pdfData.blob);
     const a = document.createElement('a');
@@ -277,14 +306,14 @@ export const openOutlookMail = async (meeting, crrConfig, projectName, emails, p
     const to = emails.join(',');
     const body = buildMailBodyPlainText(meeting, projectName);
     window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    return { pdfSaved: true, vbsCreated: false, fallback: true };
+    return { pdfSaved: true, vbsDownloaded: false, fallback: true };
   }
 
-  // ── Obtenir le dossier d'export (priorite au handle configure dans Info Chantier) ──
-  let dir;
+  // ── 1. Archive le PDF dans le dossier projet (best-effort, non-bloquant) ──
+  let pdfArchived = false;
   try {
+    let dir;
     if (options.dirHandle) {
-      // Verifier/redemander la permission sur le handle configure
       const perm = await options.dirHandle.queryPermission({ mode: 'readwrite' });
       if (perm === 'granted') {
         dir = options.dirHandle;
@@ -295,28 +324,34 @@ export const openOutlookMail = async (meeting, crrConfig, projectName, emails, p
     } else {
       dir = await getExportDir();
     }
+    await writeFile(dir, pdfData.filename, pdfData.blob);
+    pdfArchived = true;
   } catch (err) {
-    if (err.name === 'AbortError') return { pdfSaved: false };
-    throw err;
+    if (err.name === 'AbortError') {
+      // L'utilisateur a annule le picker : on poursuit sans archivage
+      // (le VBS reste telechargeable, c'est l'action principale)
+    } else {
+      console.warn('Archivage PDF echoue :', err);
+    }
   }
 
-  // ── 1. Sauvegarder le PDF ──
-  await writeFile(dir, pdfData.filename, pdfData.blob);
-
-  // ── 2. Generer le fichier de donnees mail (UTF-8) ──
+  // ── 2. Construire le VBS auto-porte (PDF embarque en base64) ──
   const subject = buildMailSubject(meeting, projectName);
   const to = emails.join(';');
   const htmlBody = buildMailHtml(meeting, projectName);
-  const mailData = buildMailData(pdfData.filename, to, subject, htmlBody);
+  const base64Pdf = await blobToBase64(pdfData.blob);
+  const vbsContent = buildSelfContainedVbs(base64Pdf, to, subject, htmlBody, pdfData.filename);
 
-  // Sauvegarder en UTF-8 avec BOM (pour ADODB.Stream)
-  const BOM = new Uint8Array([0xEF, 0xBB, 0xBF]);
-  const dataBytes = new TextEncoder().encode(mailData);
-  const dataBlob = new Blob([BOM, dataBytes], { type: 'text/plain' });
-  await writeFile(dir, '_crr_mail.txt', dataBlob);
+  // ── 3. Declencher le telechargement du VBS via <a download> ──
+  const vbsBlob = new Blob([vbsContent], { type: 'application/octet-stream' });
+  const vbsUrl = URL.createObjectURL(vbsBlob);
+  const link = document.createElement('a');
+  link.href = vbsUrl;
+  link.download = 'Envoyer_CR.vbs';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(vbsUrl), 1000);
 
-  // ── 3. Sauvegarder le script VBS (ASCII pur) ──
-  await writeFile(dir, 'Envoyer_CR.vbs', VBS_SCRIPT);
-
-  return { pdfSaved: true, vbsCreated: true };
+  return { pdfSaved: true, pdfArchived, vbsDownloaded: true };
 };

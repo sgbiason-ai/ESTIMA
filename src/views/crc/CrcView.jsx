@@ -428,10 +428,11 @@ export default function CrcView({ onBackToHub, user, companyId }) {
       toast.info('Envoi annule.');
       return;
     }
-    if (result.vbsCreated) {
-      toast.success('Double-cliquez sur "Envoyer_CR.vbs" dans le dossier pour ouvrir Outlook avec le PDF joint.');
+    if (result.vbsDownloaded) {
+      const archiveSuffix = result.pdfArchived ? ' Le PDF est aussi archive dans le dossier projet.' : '';
+      toast.success(`VBS telecharge - cliquez "Ouvrir" dans la barre de telechargements pour lancer Outlook.${archiveSuffix}`);
     } else if (result.fallback) {
-      toast.success('PDF telecharge — glissez-le dans la fenetre Outlook.');
+      toast.success('PDF telecharge - glissez-le dans la fenetre Outlook.');
     }
   }, [manager, chantierName, branding, companyId, crrDoc]);
 

@@ -143,7 +143,7 @@ const TabExports = () => (
       Genere un document PDF ou Word professionnel avec en-tete, participants, observations (formatage gras/souligne/fluo preserve) et pied de page.
     </Step>
     <Step number={2} color="bg-emerald-500" title="Envoi par email (Outlook)">
-      Sauvegarde le PDF dans le dossier configure, genere un script VBS qui ouvre Outlook avec les destinataires et le CR en piece jointe. Double-cliquez sur <strong className="text-white/80">Envoyer_CR.vbs</strong> pour ouvrir Outlook.
+      Telecharge un script VBS auto-porte (PDF embarque). Cliquez sur <strong className="text-white/80">Ouvrir</strong> dans la barre de telechargements du navigateur pour lancer Outlook avec destinataires et CR en piece jointe. Le PDF est aussi archive dans le dossier projet.
     </Step>
     <Step number={3} color="bg-amber-500" title="Dossier et nom de fichier">
       Dans <strong className="text-white/80">Info Chantier</strong>, configurez le dossier d'export et le pattern de nom de fichier. Variables disponibles :
