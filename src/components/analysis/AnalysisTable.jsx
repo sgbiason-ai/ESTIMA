@@ -42,7 +42,7 @@ const PriceCell = ({ value, onChange, style, anomaly }) => {
   if (anomaly) {
     const sign = anomaly.deltaPct > 0 ? '+' : '';
     const label = anomaly.type === 'low' ? 'Anormalement bas' : 'Anormalement haut';
-    tooltip = `${label} (Z=${anomaly.z.toFixed(2)})\nMoyenne marche: ${formatPrice(anomaly.mean)}\nEcart: ${sign}${anomaly.deltaPct.toFixed(0)}%\nBase sur ${anomaly.n} offres`;
+    tooltip = `${label}\nMediane marche: ${formatPrice(anomaly.median)}\nEcart: ${sign}${anomaly.deltaPct.toFixed(0)}%\nBase sur ${anomaly.n} offres`;
   }
 
   return (
@@ -75,31 +75,35 @@ const calculateOABThreshold = (values) => {
   return M2 * 0.90;
 };
 
-// --- DETECTION ANOMALIE PRIX PAR ARTICLE (Z-score) ---
-// Detecte les prix anormalement bas ET hauts sur un meme article, en comparant
-// chaque entreprise a la moyenne du marche pour cet article. Min 4 offres
-// valides + ecart-type non nul, sinon pas de detection.
-const calculateZScoreStats = (prices) => {
+// --- DETECTION ANOMALIE PRIX PAR ARTICLE (mediane + % d'ecart) ---
+// Compare chaque prix a la mediane des offres pour cet article. Robuste aux
+// petits echantillons (4-6 entreprises) et aux outliers (pas de masking comme
+// avec un Z-score classique). Seuil : |ecart a la mediane| > 50%.
+// Min 4 offres valides + mediane non nulle.
+const calculatePriceMedian = (prices) => {
   const valid = prices.filter(p => p > 0);
   if (valid.length < 4) return null;
 
-  const mean = valid.reduce((a, b) => a + b, 0) / valid.length;
-  const variance = valid.reduce((sum, p) => sum + Math.pow(p - mean, 2), 0) / valid.length;
-  const std = Math.sqrt(variance);
-  if (std === 0) return null;
+  const sorted = [...valid].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  const median = sorted.length % 2 === 0
+    ? (sorted[mid - 1] + sorted[mid]) / 2
+    : sorted[mid];
 
-  return { mean, std, n: valid.length };
+  if (median === 0) return null;
+  return { median, n: valid.length };
 };
+
+const ANOMALY_THRESHOLD = 0.5; // 50% d'ecart a la mediane
 
 const detectPriceAnomaly = (price, stats) => {
   if (!stats || price <= 0) return null;
-  const z = (price - stats.mean) / stats.std;
-  if (Math.abs(z) < 2) return null;
+  const deltaPct = (price - stats.median) / stats.median;
+  if (Math.abs(deltaPct) < ANOMALY_THRESHOLD) return null;
   return {
-    type: z < 0 ? 'low' : 'high',
-    z,
-    mean: stats.mean,
-    deltaPct: ((price - stats.mean) / stats.mean) * 100,
+    type: deltaPct < 0 ? 'low' : 'high',
+    deltaPct: deltaPct * 100,
+    median: stats.median,
     n: stats.n,
   };
 };
@@ -268,8 +272,8 @@ const AnalysisTable = ({
 
                   {chapter.items.map((item) => {
                     const itemPrices = companies.map(c => c.offers[item.id] || 0);
-                    // Z-score stats par article (anomalie bas ET haut, complement de l'OAB Double Moyenne)
-                    const zStats = (analysisMode === 'oab') ? calculateZScoreStats(itemPrices) : null;
+                    // Stats mediane par article : detecte anomalies bas ET haut (ecart > 50% mediane)
+                    const medianStats = (analysisMode === 'oab') ? calculatePriceMedian(itemPrices) : null;
 
                     return (
                       <tr key={item.id} className="hover:bg-slate-100 transition-colors group">
@@ -304,7 +308,7 @@ const AnalysisTable = ({
                             cellBg = getHeatmapColor(pu, item.price);
                             style.isHeatmap = true;
                           } else if (analysisMode === 'oab' && pu > 0) {
-                            anomaly = detectPriceAnomaly(pu, zStats);
+                            anomaly = detectPriceAnomaly(pu, medianStats);
                           }
 
                           const totalCellClass =
