@@ -2,9 +2,19 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.5.18';
+export const APP_VERSION = '2.5.19';
 
 export const CHANGELOG = [
+  {
+    version: '2.5.19',
+    date: '2026-04-30',
+    title: 'PWA installable + perf tablette',
+    highlights: [
+      'PWA : installation à nouveau fonctionnelle sur écran d\'accueil (fix chemins icônes manifest)',
+      'CRC observations : édition fluide même sur gros CR — la frappe dans une observation ne re-render plus toutes les autres lignes (memo)',
+      'BPU : recherche dans la bibliothèque plus réactive sur tablette (memo des cartes article)',
+    ],
+  },
   {
     version: '2.5.18',
     date: '2026-04-30',
