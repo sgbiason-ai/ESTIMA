@@ -606,7 +606,7 @@ const BrandingView = ({
 
   return (
     <div className="flex h-full w-full bg-[#f5f5f7] overflow-hidden"
-      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
+      >
 
       <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="branding" />
 

@@ -65,7 +65,7 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout, userEmail, onOpenCalculato
     <div
       className={`relative flex flex-col h-screen z-50 print:hidden border-r border-gray-200/60 bg-white/80 backdrop-blur-xl text-gray-900
         transition-all duration-300 ease-in-out ${isCollapsed ? 'w-20' : 'w-64'}`}
-      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}
+
     >
       {/* HEADER */}
       <div className="p-4 mb-1 flex flex-col gap-3">

@@ -460,7 +460,7 @@ export default function MobileApp({ user, companyId, onLogout, isTablet = false,
 
   return (
     <div className={`flex flex-col h-dvh bg-[#f5f5f7] font-sans ${containerWidth}`}
-      style={{ height: '100dvh', fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
+      style={{ height: '100dvh' }}>
       <MobileStyles />
       {/* ── Header (masqué sur le hub — il a son propre header) ── */}
       {activeModule && (

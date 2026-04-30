@@ -57,7 +57,7 @@ const LoginView = ({ onShowLegal }) => {
 
   return (
     <div className="flex h-screen bg-[#f5f5f7] items-center justify-center relative overflow-hidden"
-      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
+      >
 
       <div className="w-full max-w-md bg-white border border-gray-200/60 p-8 rounded-3xl shadow-xl relative z-10">
 

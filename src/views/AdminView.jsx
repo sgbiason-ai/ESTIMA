@@ -139,7 +139,7 @@ const AdminView = ({ currentUserEmail }) => {
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#f5f5f7] overflow-auto p-6 gap-4"
-      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
+      >
 
       {companyToDelete && (
         <DeleteCompanyModal

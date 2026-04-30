@@ -62,7 +62,7 @@ export default function MobileHubView({ userEmail, onSelectModule, onLogout, isL
 
   return (
     <div className="flex flex-col h-full bg-[#f5f5f7]"
-      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
+      >
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className={`px-5 ${isLandscape ? 'pt-2 pb-1' : 'pt-5 pb-3'} bg-white/70 backdrop-blur-xl border-b border-gray-200/50 shrink-0`}>

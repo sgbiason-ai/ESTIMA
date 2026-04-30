@@ -15,7 +15,7 @@ export default function LegalView({ onBack }) {
 
   return (
     <div className="flex h-screen bg-[#f5f5f7] items-start justify-center relative overflow-auto"
-      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
+      >
 
       <div className="w-full max-w-3xl my-10 mx-4 relative z-10">
         {/* Bouton retour */}

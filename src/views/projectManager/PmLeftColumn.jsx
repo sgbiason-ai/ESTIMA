@@ -85,7 +85,7 @@ const PmLeftColumn = ({
   fileInputRef, onImportChange, onNewProject, onShowHelp,
 }) => (
   <div className="flex-none flex items-stretch bg-white/80 backdrop-blur-xl border-b border-gray-200/60 h-[88px] select-none z-20 overflow-x-auto"
-    style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
+    >
 
     {/* ── App Branding ── */}
     <div className="flex flex-col justify-center px-6 border-r border-gray-200/60 bg-gray-50/50 min-w-[180px]">

@@ -5,7 +5,8 @@
 
 /* 2. RÉGLAGES DE BASE ET TYPOGRAPHIE */
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  /* Police par defaut (design system Apple-style) */
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
   line-height: 1.5;
   font-weight: 400;
   color-scheme: light;

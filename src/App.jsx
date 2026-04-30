@@ -264,7 +264,7 @@ export default function App() {
     return (
       <Lazy>
         <div className="flex flex-col h-screen bg-[#f5f5f7] text-gray-900 overflow-hidden"
-          style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
+          >
           <header className="flex items-center gap-4 px-6 py-3 border-b border-gray-200/60 shrink-0 bg-white/80 backdrop-blur-xl">
             <button
               onClick={handleBackToHub}
@@ -303,7 +303,7 @@ function ProjectManagerModule({ user, companyId, onBackToHub, onOpenEstima, onNa
 
   return (
     <div className="flex flex-col h-screen bg-[#f5f5f7] text-gray-900 overflow-hidden"
-      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
+      >
       <header className="flex items-center gap-4 px-6 py-3 border-b border-gray-200/60 shrink-0 bg-white/80 backdrop-blur-xl">
         <button onClick={onBackToHub}
           className="flex items-center gap-2 px-3 py-2 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all">
@@ -418,7 +418,7 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub }) {
   // ── Render desktop ────────────────────────────────────────────────────────────
   return (
     <div className="flex h-screen bg-[#f5f5f7] text-gray-900 font-sans overflow-hidden relative"
-      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
+      >
 
       {/* ── Calculatrice flottante ─────────────────────────────────────────── */}
       <DraggableCalculator
@@ -675,7 +675,7 @@ function BrandingModule({ user, companyId, onBackToHub }) {
 
   return (
     <div className="flex flex-col h-screen bg-[#f5f5f7] text-gray-900 overflow-hidden"
-      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
+      >
       <header className="flex items-center gap-4 px-6 py-3 border-b border-gray-200/60 shrink-0 bg-white/80 backdrop-blur-xl">
         <button onClick={onBackToHub}
           className="flex items-center gap-2 px-3 py-2 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all">
@@ -700,7 +700,7 @@ function SiteVisitsModule({ user, companyId, onBackToHub }) {
   const resources = useAppResources(user, companyId);
   return (
     <div className="flex flex-col h-screen bg-[#f5f5f7] text-gray-900 overflow-hidden"
-      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
+      >
       <header className="flex items-center gap-4 px-6 py-3 border-b border-gray-200/60 shrink-0 bg-white/80 backdrop-blur-xl">
         <button onClick={onBackToHub}
           className="flex items-center gap-2 px-3 py-2 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all">
@@ -720,7 +720,7 @@ function SiteVisitsModule({ user, companyId, onBackToHub }) {
 function RgpdModule({ user, companyId, onBackToHub }) {
   return (
     <div className="flex flex-col h-screen bg-[#f5f5f7] text-gray-900 overflow-hidden"
-      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
+      >
       <header className="flex items-center gap-4 px-6 py-3 border-b border-gray-200/60 shrink-0 bg-white/80 backdrop-blur-xl">
         <button onClick={onBackToHub}
           className="flex items-center gap-2 px-3 py-2 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all">

@@ -208,7 +208,7 @@ export default function ModuleHubView({ isAdmin, userEmail, onSelectModule, onLo
 
   return (
     <div className="flex flex-col h-screen w-full bg-[#f5f5f7] text-gray-900 overflow-hidden selection:bg-blue-200"
-      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif' }}>
+      >
 
       <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="moduleHub" />
 

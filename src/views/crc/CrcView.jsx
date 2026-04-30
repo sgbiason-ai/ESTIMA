@@ -478,7 +478,7 @@ export default function CrcView({ onBackToHub, user, companyId }) {
 
   return (
     <div className="flex flex-col h-screen bg-[#f5f5f7] text-gray-900 overflow-hidden"
-      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
+      >
 
       {/* ═══════════════════════════════════════════════════════════════════════
           RUBAN ESTIMASTYLE
