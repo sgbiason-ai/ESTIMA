@@ -1,11 +1,12 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
-import { Trash2, ChevronRight, AlertTriangle, Info, HelpCircle } from 'lucide-react';
+import { Trash2, ChevronRight, AlertTriangle, Info, HelpCircle, TrendingDown, TrendingUp } from 'lucide-react';
 import { formatPrice, normalizeUnitSymbol } from '../../utils/helpers';
 import { COMPANY_STYLES } from '../../utils/analysisConstants';
 import OabDetailModal from './OabDetailModal';
 
 // --- SOUS-COMPOSANT : Cellule de Prix ---
-const PriceCell = ({ value, onChange, style, isAnomaly, threshold }) => {
+// anomaly: { type: 'low' | 'high', z, mean, deltaPct, n } | null
+const PriceCell = ({ value, onChange, style, anomaly }) => {
   const [isEditing, setIsEditing] = useState(false);
   const inputRef = useRef(null);
 
@@ -14,10 +15,12 @@ const PriceCell = ({ value, onChange, style, isAnomaly, threshold }) => {
   }, [isEditing]);
 
   let cellClass = style.bg;
-  if (isAnomaly) {
+  if (anomaly?.type === 'low') {
     cellClass = "bg-amber-100 text-amber-900 border-amber-300 font-bold ring-1 ring-inset ring-amber-300";
+  } else if (anomaly?.type === 'high') {
+    cellClass = "bg-orange-100 text-orange-900 border-orange-300 font-bold ring-1 ring-inset ring-orange-300";
   } else if (style.isHeatmap) {
-    cellClass = style.bg; 
+    cellClass = style.bg;
   }
 
   if (isEditing) {
@@ -35,14 +38,22 @@ const PriceCell = ({ value, onChange, style, isAnomaly, threshold }) => {
     );
   }
 
+  let tooltip = "Cliquer pour modifier";
+  if (anomaly) {
+    const sign = anomaly.deltaPct > 0 ? '+' : '';
+    const label = anomaly.type === 'low' ? 'Anormalement bas' : 'Anormalement haut';
+    tooltip = `${label} (Z=${anomaly.z.toFixed(2)})\nMoyenne marche: ${formatPrice(anomaly.mean)}\nEcart: ${sign}${anomaly.deltaPct.toFixed(0)}%\nBase sur ${anomaly.n} offres`;
+  }
+
   return (
-    <div 
+    <div
       onClick={() => setIsEditing(true)}
       className={`w-full h-full min-h-[18px] flex items-center justify-end cursor-text group/cell rounded-sm px-1 transition-all relative ${cellClass}`}
-      title={isAnomaly ? `Suspecté Anormalement Bas (< ${formatPrice(threshold)})` : "Cliquer pour modifier"}
+      title={tooltip}
     >
-      {isAnomaly && <AlertTriangle size={10} className="text-amber-600 absolute left-0.5" />}
-      <span className={`text-[11px] tabular-nums tracking-tight ${isAnomaly ? 'font-black' : 'font-medium'} ${!value ? 'text-slate-300 font-normal' : ''}`}>
+      {anomaly?.type === 'low' && <TrendingDown size={10} className="text-amber-700 absolute left-0.5" />}
+      {anomaly?.type === 'high' && <TrendingUp size={10} className="text-orange-700 absolute left-0.5" />}
+      <span className={`text-[11px] tabular-nums tracking-tight ${anomaly ? 'font-black' : 'font-medium'} ${!value ? 'text-slate-300 font-normal' : ''}`}>
         {value ? formatPrice(value) : '-'}
       </span>
     </div>
@@ -53,15 +64,44 @@ const PriceCell = ({ value, onChange, style, isAnomaly, threshold }) => {
 const calculateOABThreshold = (values) => {
   const validValues = values.filter(v => v > 0);
   if (validValues.length === 0) return 0;
-  
+
   const M1 = validValues.reduce((a, b) => a + b, 0) / validValues.length;
   const upperLimit = M1 * 1.20;
   const filteredValues = validValues.filter(v => v <= upperLimit);
-  
+
   if (filteredValues.length === 0) return M1 * 0.90;
-  
+
   const M2 = filteredValues.reduce((a, b) => a + b, 0) / filteredValues.length;
   return M2 * 0.90;
+};
+
+// --- DETECTION ANOMALIE PRIX PAR ARTICLE (Z-score) ---
+// Detecte les prix anormalement bas ET hauts sur un meme article, en comparant
+// chaque entreprise a la moyenne du marche pour cet article. Min 4 offres
+// valides + ecart-type non nul, sinon pas de detection.
+const calculateZScoreStats = (prices) => {
+  const valid = prices.filter(p => p > 0);
+  if (valid.length < 4) return null;
+
+  const mean = valid.reduce((a, b) => a + b, 0) / valid.length;
+  const variance = valid.reduce((sum, p) => sum + Math.pow(p - mean, 2), 0) / valid.length;
+  const std = Math.sqrt(variance);
+  if (std === 0) return null;
+
+  return { mean, std, n: valid.length };
+};
+
+const detectPriceAnomaly = (price, stats) => {
+  if (!stats || price <= 0) return null;
+  const z = (price - stats.mean) / stats.std;
+  if (Math.abs(z) < 2) return null;
+  return {
+    type: z < 0 ? 'low' : 'high',
+    z,
+    mean: stats.mean,
+    deltaPct: ((price - stats.mean) / stats.mean) * 100,
+    n: stats.n,
+  };
 };
 
 // --- ALGORITHME HEATMAP ---
@@ -228,7 +268,8 @@ const AnalysisTable = ({
 
                   {chapter.items.map((item) => {
                     const itemPrices = companies.map(c => c.offers[item.id] || 0);
-                    const itemThreshold = (analysisMode === 'oab') ? calculateOABThreshold(itemPrices) : 0;
+                    // Z-score stats par article (anomalie bas ET haut, complement de l'OAB Double Moyenne)
+                    const zStats = (analysisMode === 'oab') ? calculateZScoreStats(itemPrices) : null;
 
                     return (
                       <tr key={item.id} className="hover:bg-slate-100 transition-colors group">
@@ -249,35 +290,39 @@ const AnalysisTable = ({
                           )}
                         </td>
                         <td style={STICKY.EST_TOTAL} className="px-1 py-1 text-right border-r border-slate-200 text-[11px] font-bold text-slate-700 bg-slate-50 tabular-nums tracking-tight shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">{formatPrice(item.price * item.activeQty)}</td>
-                        
+
                         {companies.map((company, index) => {
                           const style = COMPANY_STYLES[index % COMPANY_STYLES.length];
                           const pu = company.offers[item.id] || 0;
                           const lineTotal = item.activeQty * pu;
                           const lineEst = item.activeQty * item.price;
-                          
+
                           let cellBg = style.bg;
-                          let isOAB = false;
+                          let anomaly = null;
 
                           if (analysisMode === 'heatmap' && pu > 0) {
                             cellBg = getHeatmapColor(pu, item.price);
                             style.isHeatmap = true;
                           } else if (analysisMode === 'oab' && pu > 0) {
-                            isOAB = pu < itemThreshold;
+                            anomaly = detectPriceAnomaly(pu, zStats);
                           }
+
+                          const totalCellClass =
+                            anomaly?.type === 'low'  ? 'bg-amber-100 text-amber-900 font-black' :
+                            anomaly?.type === 'high' ? 'bg-orange-100 text-orange-900 font-black' :
+                            cellBg + ' font-bold text-slate-700';
 
                           return (
                             <React.Fragment key={`${company.id}-${item.id}`}>
-                              <td className={`px-0.5 py-1 border-r ${style.border} ${isOAB ? '' : cellBg} transition-colors duration-300`}>
-                                <PriceCell 
-                                  value={company.offers[item.id]} 
+                              <td className={`px-0.5 py-1 border-r ${style.border} ${anomaly ? '' : cellBg} transition-colors duration-300`}>
+                                <PriceCell
+                                  value={company.offers[item.id]}
                                   onChange={(val) => updateCompanyOffer(company.id, item.id, val)}
                                   style={{...style, bg: cellBg}}
-                                  isAnomaly={isOAB}
-                                  threshold={itemThreshold}
+                                  anomaly={anomaly}
                                 />
                               </td>
-                              <td className={`px-1 py-1 text-right border-r ${style.border} ${isOAB ? 'bg-amber-100 text-amber-900 font-black' : cellBg + ' font-bold text-slate-700'} text-[11px] tabular-nums tracking-tight transition-colors duration-300`}>
+                              <td className={`px-1 py-1 text-right border-r ${style.border} ${totalCellClass} text-[11px] tabular-nums tracking-tight transition-colors duration-300`}>
                                 {lineTotal !== 0 ? formatPrice(lineTotal) : <span className="text-slate-400">-</span>}
                               </td>
                               <td className={`px-0.5 py-1 text-center border-r border-slate-200 ${cellBg} transition-colors duration-300`}>
