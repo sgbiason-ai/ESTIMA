@@ -1,5 +1,5 @@
 // src/views/ProjectView.jsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { useStableHash } from '../hooks/useStableHash';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
@@ -29,10 +29,13 @@ import ArchiveManagerModal from '../components/modals/ArchiveManagerModal';
 import ArchiveAuditModal from '../components/modals/ArchiveAuditModal';
 import PriceAuditModal from '../components/modals/PriceAuditModal';
 import CloudProjectPicker from '../components/modals/CloudProjectPicker';
+import BpuAuditPanel from './bpu/BpuAuditPanel';
 
 // NOS CUSTOM HOOKS
 import { useProjectTranches } from '../hooks/useProjectTranches';
 import { useProjectCalculations } from '../hooks/useProjectCalculations';
+import { useBpuData } from './bpu/hooks/useBpuData';
+import { useBpuAudit } from './bpu/hooks/useBpuAudit';
 import { saveFileWithPicker, openFileWithPicker, FILE_TYPES, PICKER_IDS } from '../utils/fileSaver';
 
 const ProjectView = ({
@@ -84,6 +87,31 @@ const ProjectView = ({
   const [showArchiveManager, setShowArchiveManager] = useState(false);
   const [showPriceAudit, setShowPriceAudit] = useState(false);
   const [showCloudPicker, setShowCloudPicker] = useState(false);
+  const [showBpuAudit, setShowBpuAudit] = useState(false);
+
+  // ── Audit Bordereau (panneau latéral) ──
+  // Adaptateur : onReplaceProject prend une valeur, useBpuAudit/useBpuData attendent un functional updater
+  const projectRef = useRef(project);
+  projectRef.current = project;
+  const setProjectForBpuAudit = useCallback((updater) => {
+    const next = typeof updater === 'function' ? updater(projectRef.current) : updater;
+    if (onReplaceProject) onReplaceProject(next);
+  }, [onReplaceProject]);
+
+  const { sortedCatalog: bpuSortedCatalog } = useBpuData({
+    project, setProject: setProjectForBpuAudit, bpuConfig, units,
+  });
+  const {
+    audit: bpuAudit,
+    refresh: refreshBpuAudit,
+    syncDescriptions: syncBpuDescriptions,
+    restoreIssues: restoreBpuIssues,
+  } = useBpuAudit({
+    sortedCatalog: bpuSortedCatalog,
+    articlesDb: allBpuItems,
+    bpuOverrides: project?.bpuOverrides,
+    setProject: setProjectForBpuAudit,
+  });
 
   const handleArchive = async () => {
     if (!onCreateArchive) return;
@@ -640,6 +668,8 @@ const ProjectView = ({
             archiveCount={archives.length}
             onOpenArchiveManager={() => setShowArchiveManager(true)}
             onOpenPriceAudit={() => setShowPriceAudit(true)}
+            onOpenBpuAudit={() => { refreshBpuAudit(); setShowBpuAudit(v => !v); }}
+            bpuAuditActive={showBpuAudit}
           />
           <input ref={loadAffaireRef} type="file" accept=".json" className="hidden" onChange={handleOpenAffaireFallback} />
 
@@ -765,11 +795,20 @@ const ProjectView = ({
               </div>
 
               <ProjectFooterStats totalBase={totalBase} totalOption={totalOption} currentMode={currentMode} theme={theme} />
-              
+
             </div>
           </DragDropContext>
         </div>
-      
+
+        {showBpuAudit && bpuAudit && (
+          <BpuAuditPanel
+            audit={bpuAudit}
+            onClose={() => setShowBpuAudit(false)}
+            onSyncDescriptions={syncBpuDescriptions}
+            onRestoreIssues={restoreBpuIssues}
+          />
+        )}
+
       <ProjectDetailsModal isOpen={showDetailsModal} onClose={() => setShowDetailsModal(false)} project={project} onSave={handleSaveDetails} />
       {editItemTarget && <EditBpuModal item={editItemTarget} onClose={() => setEditItemTarget(null)} onUpdate={handleSaveEditedItem} units={units} categories={categories} bpuConfig={bpuConfig} existingItems={[]} masterCctp={masterCctp} projectOnly />}
       <CalculationModal show={showCalculationModal} onClose={() => setShowCalculationModal(false)} onConfirm={handleApplyCalculation} analysis={calculationAnalysis} />

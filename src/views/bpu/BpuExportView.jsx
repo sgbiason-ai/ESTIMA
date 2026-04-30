@@ -52,7 +52,7 @@ const BpuExportView = ({
   const { pages } = useBpuPagination({ sortedCatalog, articlesDb, unitResolver, measureRef });
 
   // ── AUDIT ────────────────────────────────────────────────────────────────────
-  const { audit, showAudit, setShowAudit, refresh: refreshAudit, syncDescriptions } = useBpuAudit({
+  const { audit, showAudit, setShowAudit, refresh: refreshAudit, syncDescriptions, restoreIssues } = useBpuAudit({
     sortedCatalog, articlesDb, bpuOverrides: project?.bpuOverrides, setProject,
   });
 
@@ -130,6 +130,7 @@ const BpuExportView = ({
             audit={audit}
             onClose={() => setShowAudit(false)}
             onSyncDescriptions={syncDescriptions}
+            onRestoreIssues={restoreIssues}
           />
         )}
       </div>

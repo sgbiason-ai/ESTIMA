@@ -197,7 +197,7 @@ const AddBpuModal = ({ isOpen, onClose, onAdd, units, categories = [], bpuConfig
 
               <div className={bpuConfig?.numberingMode === 'manual' ? "col-span-6" : "col-span-8"}>
                 <label className={labelClass}>Désignation</label>
-                <input type="text" value={formData.designation} onChange={(e) => setFormData({...formData, designation: e.target.value.toUpperCase()})} className={`${inputClass} uppercase`} placeholder="NOM DE L'OUVRAGE" autoFocus={bpuConfig?.numberingMode !== 'manual'} />
+                <input type="text" value={formData.designation} onChange={(e) => setFormData({...formData, designation: e.target.value})} className={`${inputClass} uppercase`} placeholder="NOM DE L'OUVRAGE" autoFocus={bpuConfig?.numberingMode !== 'manual'} />
               </div>
 
               <div className="col-span-2">

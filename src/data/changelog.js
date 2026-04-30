@@ -2,9 +2,20 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.5.20';
+export const APP_VERSION = '2.5.21';
 
 export const CHANGELOG = [
+  {
+    version: '2.5.21',
+    date: '2026-04-30',
+    title: 'Audit bordereau : restauration granulaire + accès depuis Estima',
+    highlights: [
+      'Audit BPU : restauration depuis la base d\'un article ou d\'une sélection multiple — bouton ↻ par champ (prix, unité, désignation, description), bouton « Restaurer tout » au survol, cases à cocher + barre d\'action en bas avec confirmation pour les lots',
+      'Estima : nouveau bouton « Audit bordereau » dans la ribbon (à côté d\'Audit prix) qui ouvre le panneau latéral d\'audit BPU directement depuis l\'estimation',
+      'Audit BPU : fix faux positif sur les descriptions — l\'audit ne flag plus les articles sans override (alignement avec le rendu qui prend déjà la description de la base)',
+      'Modale article BPU (ajout/édition) : fix curseur qui sautait en fin de champ lors de l\'édition d\'une désignation au milieu du texte',
+    ],
+  },
   {
     version: '2.5.20',
     date: '2026-04-30',

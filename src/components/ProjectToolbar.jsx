@@ -5,7 +5,7 @@ import {
   CheckCircle2, CloudOff, FileSignature, Bookmark, ListOrdered, Hash,
   FolderOpen, Save, Upload, Eye, Pencil, PlusCircle,
   BarChart3, Download, Info, Table2, FileOutput,
-  Cloud, PanelLeftOpen, FileDown, Archive, ShieldCheck
+  Cloud, PanelLeftOpen, FileDown, Archive, ShieldCheck, ClipboardCheck
 } from 'lucide-react';
 
 import { formatPrice } from '../utils/helpers';
@@ -43,6 +43,8 @@ const ProjectToolbar = ({
   archiveCount = 0,
   onOpenArchiveManager,
   onOpenPriceAudit,
+  onOpenBpuAudit,
+  bpuAuditActive = false,
 }) => {
   const [activeTab, setActiveTab] = useState('accueil');
 
@@ -195,6 +197,16 @@ const ProjectToolbar = ({
                   onClick={onOpenPriceAudit}
                   accent="text-amber-500"
                   title="Auditer les prix du projet vs la base BPU"
+                />
+              )}
+              {!isReadOnly && currentMode === 'study' && onOpenBpuAudit && (
+                <RibbonBtnLarge
+                  icon={ClipboardCheck}
+                  label="Audit bordereau"
+                  onClick={onOpenBpuAudit}
+                  active={bpuAuditActive}
+                  accent="text-cyan-500"
+                  title="Auditer le bordereau (prix, unités, désignations, descriptions) vs la base BPU"
                 />
               )}
               {!isReadOnly && currentMode === 'study' && (

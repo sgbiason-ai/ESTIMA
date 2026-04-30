@@ -72,6 +72,7 @@ export const useBpuAudit = ({ sortedCatalog, articlesDb, bpuOverrides, setProjec
           itemIssues.push({
             type: 'price_diff',
             label: `Prix modifié (base: ${dbPrice.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} € → projet: ${projectPrice.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €)`,
+            dbValue: dbMatch.price,
           });
         }
 
@@ -82,17 +83,18 @@ export const useBpuAudit = ({ sortedCatalog, articlesDb, bpuOverrides, setProjec
           itemIssues.push({
             type: 'unit_diff',
             label: `Unité modifiée (base: ${dbMatch.unit} → projet: ${item.unit})`,
+            dbValue: dbMatch.unit,
           });
         }
       }
 
       // 5. Description différente de la base
-      if (dbMatch) {
+      // Aligné sur getRawDescription : si pas d'override, le rendu utilise dbDesc → pas de diff possible.
+      // On ne flag QUE quand il y a un override qui diverge de la base.
+      if (dbMatch && ov.description !== undefined) {
         const dbDesc = cleanText(dbMatch.description || '').trim();
-        const currentDesc = ov.description !== undefined
-          ? cleanText(ov.description || '').trim()
-          : cleanText(item.description || '').trim();
-        if (dbDesc && currentDesc && dbDesc !== currentDesc) {
+        const overrideDesc = cleanText(ov.description || '').trim();
+        if (dbDesc && overrideDesc && dbDesc !== overrideDesc) {
           itemIssues.push({ type: 'desc_diff', label: 'Description différente de la base BPU' });
         }
       }
@@ -151,11 +153,68 @@ export const useBpuAudit = ({ sortedCatalog, articlesDb, bpuOverrides, setProjec
     setAuditVersion(v => v + 1);
   }, [setProject, dbIndex]);
 
+  // Restaure une liste d'issues : [{ itemId, type, dbValue }]
+  // - price_diff / unit_diff : modifie l'article dans project.chapters
+  // - desc_diff / override : supprime l'override correspondant
+  const restoreIssues = useCallback((restoreList) => {
+    if (!setProject || !restoreList?.length) return;
+
+    const fieldUpdates = new Map(); // itemId -> { price?, unit? }
+    const overrideRemovals = new Map(); // itemId -> Set(['description', 'designation'])
+
+    restoreList.forEach(({ itemId, type, dbValue }) => {
+      if (!itemId) return;
+      if (type === 'price_diff') {
+        const prev = fieldUpdates.get(itemId) || {};
+        fieldUpdates.set(itemId, { ...prev, price: Number(dbValue) || 0 });
+      } else if (type === 'unit_diff') {
+        const prev = fieldUpdates.get(itemId) || {};
+        fieldUpdates.set(itemId, { ...prev, unit: dbValue });
+      } else if (type === 'desc_diff') {
+        if (!overrideRemovals.has(itemId)) overrideRemovals.set(itemId, new Set());
+        overrideRemovals.get(itemId).add('description');
+      } else if (type === 'override') {
+        if (!overrideRemovals.has(itemId)) overrideRemovals.set(itemId, new Set());
+        overrideRemovals.get(itemId).add('designation');
+      }
+    });
+
+    setProject(prev => {
+      const walk = (nodes) => (nodes || []).map(node => {
+        if (node?.type === 'item' && fieldUpdates.has(node.id)) {
+          return { ...node, ...fieldUpdates.get(node.id) };
+        }
+        if (node?.children) {
+          return { ...node, children: walk(node.children) };
+        }
+        return node;
+      });
+
+      const newOverrides = { ...(prev?.bpuOverrides || {}) };
+      overrideRemovals.forEach((fields, itemId) => {
+        if (!newOverrides[itemId]) return;
+        const cleaned = { ...newOverrides[itemId] };
+        fields.forEach(f => { delete cleaned[f]; });
+        if (Object.keys(cleaned).length === 0) delete newOverrides[itemId];
+        else newOverrides[itemId] = cleaned;
+      });
+
+      return {
+        ...prev,
+        chapters: fieldUpdates.size > 0 ? walk(prev?.chapters || []) : prev?.chapters,
+        bpuOverrides: newOverrides,
+      };
+    });
+
+    setAuditVersion(v => v + 1);
+  }, [setProject]);
+
   return {
     audit,
     showAudit,
     setShowAudit,
     refresh,
     syncDescriptions,
+    restoreIssues,
   };
 };
