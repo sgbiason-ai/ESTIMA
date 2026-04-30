@@ -1,5 +1,5 @@
 // src/components/crr/CrrObservations.jsx
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, memo } from 'react';
 import ReactDOM from 'react-dom';
 import {
   Plus, Trash2, ChevronDown, ChevronRight,
@@ -14,7 +14,7 @@ import { uploadCrrImage, deleteCrrImage } from '../../utils/crrImageStorage';
 
 // ── Pastille de groupe (partagee entre observations et participants) ─────────
 
-const GroupBadge = ({ name, colorIndex, onRemove }) => {
+const GroupBadge = memo(({ name, colorIndex, onRemove }) => {
   const c = getGroupColor(colorIndex);
   const abbr = abbreviateGroup(name);
   return (
@@ -28,7 +28,7 @@ const GroupBadge = ({ name, colorIndex, onRemove }) => {
       )}
     </span>
   );
-};
+});
 
 // ── Selecteur multi-groupes avec pastilles (Emetteur / PAR) ─────────────────
 
@@ -164,7 +164,7 @@ const GroupPicker = ({ value, onChange, groups, placeholder, className = '' }) =
   );
 };
 
-const StatusBadge = ({ status, onChange }) => {
+const StatusBadge = memo(({ status, onChange }) => {
   const cycle = () => {
     const states = ['empty', 'open', 'in_progress', 'done'];
     const idx = states.indexOf(status);
@@ -189,9 +189,9 @@ const StatusBadge = ({ status, onChange }) => {
       {st.label}
     </button>
   );
-};
+}, (prev, next) => prev.status === next.status && prev.onChange === next.onChange);
 
-const ObservationRow = ({ obs, onUpdate, onDelete, meetingDate, participantGroups, dragHandleProps, companyId, crrId }) => {
+const ObservationRow = memo(({ obs, onUpdate, onDelete, meetingDate, participantGroups, dragHandleProps, companyId, crrId }) => {
   const [expanded, setExpanded] = useState(true);
   const fileRef = useRef(null);
   const cameraRef = useRef(null);
@@ -527,7 +527,17 @@ const ObservationRow = ({ obs, onUpdate, onDelete, meetingDate, participantGroup
       </div>
     </div>
   );
-};
+}, (prev, next) => {
+  // Ignore onUpdate/onDelete : leur reference change a chaque edition d'une obs
+  // (deps [activeMeeting]), mais leur semantique reste stable car identifiees par obs.id.
+  // Resultat : seule la ligne dont l'obs a vraiment change re-render.
+  return prev.obs === next.obs
+    && prev.meetingDate === next.meetingDate
+    && prev.participantGroups === next.participantGroups
+    && prev.dragHandleProps === next.dragHandleProps
+    && prev.companyId === next.companyId
+    && prev.crrId === next.crrId;
+});
 
 const CrrObservations = ({
   meeting,
