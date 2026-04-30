@@ -76,6 +76,8 @@ const ProjectView = ({
   onDeleteArchive,
   onViewArchive,
   onCloseArchive,
+  onUndo,
+  canUndo = false,
 }) => {
   const currentMode = viewMode || 'study';
   // En mode archive, toujours read-only
@@ -670,6 +672,8 @@ const ProjectView = ({
             onOpenPriceAudit={() => setShowPriceAudit(true)}
             onOpenBpuAudit={() => { refreshBpuAudit(); setShowBpuAudit(v => !v); }}
             bpuAuditActive={showBpuAudit}
+            onUndo={onUndo}
+            canUndo={canUndo}
           />
           <input ref={loadAffaireRef} type="file" accept=".json" className="hidden" onChange={handleOpenAffaireFallback} />
 

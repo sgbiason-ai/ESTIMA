@@ -1,5 +1,5 @@
 // src/App.jsx
-import React, { useState, lazy, Suspense } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import lazyWithReload from './utils/lazyWithReload';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db as fireDb } from './firebase';
@@ -15,6 +15,7 @@ import { usePresence }      from './hooks/usePresence';
 import { useDeviceMode }    from './hooks/useDeviceMode';
 import { useIsTesla }       from './hooks/useIsTesla';
 import { useProjectArchives } from './hooks/useProjectArchives';
+import { useProjectUndo }     from './hooks/useProjectUndo';
 
 // ─── COMPOSANTS GLOBAUX (toujours chargés) ───────────────────────────────────
 import Sidebar              from './components/common/Sidebar';
@@ -244,7 +245,7 @@ export default function App() {
   // Module : Notes de Frais Kilometriques (admin uniquement)
   if (activeModule === 'expense_notes') {
     if (!isAdmin) { setActiveModule(null); return null; }
-    return <Lazy><ExpenseNotesView onBackToHub={handleBackToHub} user={user} companyId={companyId} /></Lazy>;
+    return <Lazy><ExpenseNotesModule onBackToHub={handleBackToHub} user={user} companyId={companyId} /></Lazy>;
   }
 
   // Module : Identité & Charte Graphique
@@ -359,6 +360,30 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub }) {
     archives, activeArchive,
     createArchive, deleteArchive, viewArchive, closeArchive,
   } = useProjectArchives(user, companyId, project);
+
+  // ── 3c. Undo (annuler la dernière action sur Estima) ─────────────────────
+  const { undo: undoProject, canUndo: canUndoProject, reset: resetUndoHistory } = useProjectUndo(project, setProject);
+
+  // Reset historique quand le projet change (ouverture/nouveau projet/archive)
+  useEffect(() => {
+    resetUndoHistory();
+  }, [project?.id, !!activeArchive, resetUndoHistory]);
+
+  // Raccourci clavier Ctrl+Z (hors champs de saisie où l'undo natif s'applique)
+  useEffect(() => {
+    const handler = (e) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      if (e.shiftKey) return;
+      if (e.key !== 'z' && e.key !== 'Z') return;
+      const tag = document.activeElement?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || document.activeElement?.isContentEditable) return;
+      if (!canUndoProject) return;
+      e.preventDefault();
+      undoProject();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [undoProject, canUndoProject]);
 
   // ── 4. Ressources partagées (branding, CCTP, RC) ────────────────────────────
   const resources = useAppResources(user, companyId);
@@ -552,6 +577,8 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub }) {
                 onDeleteArchive={deleteArchive}
                 onViewArchive={viewArchive}
                 onCloseArchive={closeArchive}
+                onUndo={undoProject}
+                canUndo={canUndoProject}
               />
             )}
 
@@ -674,6 +701,12 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub }) {
       </div>
     </div>
   );
+}
+
+// ─── MODULE NOTES DE FRAIS (autonome) ───────────────────────────────────────
+function ExpenseNotesModule({ user, companyId, onBackToHub }) {
+  const resources = useAppResources(user, companyId);
+  return <ExpenseNotesView onBackToHub={onBackToHub} user={user} companyId={companyId} masterBranding={resources.masterBranding} />;
 }
 
 // ─── MODULE IDENTITÉ & CHARTE GRAPHIQUE (autonome, hors ESTIMA) ────────────

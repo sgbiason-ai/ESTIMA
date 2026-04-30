@@ -2,9 +2,20 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.5.21';
+export const APP_VERSION = '2.5.22';
 
 export const CHANGELOG = [
+  {
+    version: '2.5.22',
+    date: '2026-04-30',
+    title: 'Estima : bouton « Annuler » (Ctrl+Z)',
+    highlights: [
+      'Estima : nouveau bouton « Annuler » dans la ribbon (groupe Outils) — annule la dernière action sur le bordereau : chapitres, items, prix, qtés, tranches, overrides BPU, restaurations audit prix et audit bordereau',
+      'Raccourci clavier Ctrl+Z (sauf dans les champs de saisie où l\'undo natif s\'applique)',
+      'Historique de 30 étapes, debounce 500ms pour grouper les saisies texte rapides en une seule entrée',
+      'Reset auto de l\'historique au changement de projet ou ouverture/fermeture d\'archive',
+    ],
+  },
   {
     version: '2.5.21',
     date: '2026-04-30',

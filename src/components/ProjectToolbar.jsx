@@ -5,7 +5,7 @@ import {
   CheckCircle2, CloudOff, FileSignature, Bookmark, ListOrdered, Hash,
   FolderOpen, Save, Upload, Eye, Pencil, PlusCircle,
   BarChart3, Download, Info, Table2, FileOutput,
-  Cloud, PanelLeftOpen, FileDown, Archive, ShieldCheck, ClipboardCheck
+  Cloud, PanelLeftOpen, FileDown, Archive, ShieldCheck, ClipboardCheck, Undo2
 } from 'lucide-react';
 
 import { formatPrice } from '../utils/helpers';
@@ -45,6 +45,8 @@ const ProjectToolbar = ({
   onOpenPriceAudit,
   onOpenBpuAudit,
   bpuAuditActive = false,
+  onUndo,
+  canUndo = false,
 }) => {
   const [activeTab, setActiveTab] = useState('accueil');
 
@@ -183,6 +185,16 @@ const ProjectToolbar = ({
 
             {/* Outils */}
             <RibbonGroup label="Outils">
+              {!isReadOnly && onUndo && (
+                <RibbonBtnLarge
+                  icon={Undo2}
+                  label="Annuler"
+                  onClick={onUndo}
+                  disabled={!canUndo}
+                  accent={canUndo ? 'text-slate-700' : 'text-slate-300'}
+                  title={canUndo ? 'Annuler la dernière action (Ctrl+Z)' : 'Aucune action à annuler'}
+                />
+              )}
               <RibbonBtnLarge
                 icon={Calculator}
                 label="% à valoir"
