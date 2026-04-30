@@ -2,9 +2,20 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.5.17';
+export const APP_VERSION = '2.5.18';
 
 export const CHANGELOG = [
+  {
+    version: '2.5.18',
+    date: '2026-04-30',
+    title: 'Estima : arborescence dossiers + drag-and-drop dans le picker',
+    highlights: [
+      'Estima picker : sidebar dossiers complète avec sous-dossiers (création, renommage, suppression, expansion) — équivalent au module Gestion de Projets',
+      'Estima picker : drag-and-drop d\'un projet vers un dossier de la sidebar (anneau bleu sur le dossier survolé pendant le drag)',
+      'Estima picker : le projet actif peut aussi être déplacé (suppression toujours bloquée)',
+      'Estima picker : titre complet sur plusieurs lignes (plus de troncature avec « ... »)',
+    ],
+  },
   {
     version: '2.5.17',
     date: '2026-04-29',

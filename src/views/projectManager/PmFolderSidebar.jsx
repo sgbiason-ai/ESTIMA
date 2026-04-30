@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   FolderPlus, RefreshCw, Layers, Folder,
   FolderOpen as FolderOpenIcon,
@@ -6,14 +6,47 @@ import {
 } from 'lucide-react';
 import { buildFolderColorMap, NEUTRAL_COLOR } from './folderColors';
 
+/**
+ * PmFolderSidebar
+ *
+ * Sidebar arborescente des dossiers projets.
+ *
+ * @param {Function} [onProjectDrop] - Optionnel : callback (targetFolderId, projectId) appelé
+ *   au drop d'un projet draggable sur un dossier (ou null pour "Sans dossier"). Active le DnD.
+ */
 const PmFolderSidebar = ({
   folders, foldersLoading, selectedFolderId, setSelectedFolderId,
   expandedFolders, creatingFolder, setCreatingFolder, newFolderName, setNewFolderName,
   editingFolder, setEditingFolder, cloudProjects, rootFolders, getSubfolders,
   toggleExpand, handleCreateFolder, handleRenameFolder, handleDeleteFolder,
+  onProjectDrop,
 }) => {
 
   const colorMap = useMemo(() => buildFolderColorMap(folders), [folders]);
+  const dndEnabled = typeof onProjectDrop === 'function';
+  // Cible de drop courante : id du dossier ou '__none__' pour "Sans dossier"
+  const [dropTargetId, setDropTargetId] = useState(null);
+
+  // Handlers DnD factorisés (s'activent uniquement si onProjectDrop fourni)
+  const dndProps = (targetKey, targetFolderId) => {
+    if (!dndEnabled) return {};
+    return {
+      onDragOver: (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (dropTargetId !== targetKey) setDropTargetId(targetKey);
+      },
+      onDragLeave: () => {
+        if (dropTargetId === targetKey) setDropTargetId(null);
+      },
+      onDrop: (e) => {
+        e.preventDefault();
+        const projectId = e.dataTransfer.getData('text/plain');
+        setDropTargetId(null);
+        if (projectId) onProjectDrop(targetFolderId, projectId);
+      },
+    };
+  };
 
   const FolderRow = ({ folder, depth = 0 }) => {
     const subs = getSubfolders(folder.id);
@@ -23,12 +56,15 @@ const PmFolderSidebar = ({
     const projectCount = cloudProjects.filter(p => p.folderId === folder.id).length;
     const isEditing = editingFolder?.id === folder.id;
     const fc = colorMap[folder.id] || NEUTRAL_COLOR;
+    const isDropTarget = dropTargetId === folder.id;
 
     return (
       <div>
         <div
           onClick={() => setSelectedFolderId(folder.id)}
+          {...dndProps(folder.id, folder.id)}
           className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-xl cursor-pointer transition-all text-sm ${
+            isDropTarget ? `${fc.sidebar} ring-2 ring-blue-400 ring-offset-1` :
             isSelected ? fc.sidebar : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
           }`}
           style={{ paddingLeft: `${12 + depth * 16}px` }}
@@ -128,7 +164,9 @@ const PmFolderSidebar = ({
 
         <button
           onClick={() => setSelectedFolderId(null)}
+          {...dndProps('__none__', null)}
           className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
+            dropTargetId === '__none__' ? 'bg-blue-50 text-blue-600 ring-2 ring-blue-400 ring-offset-1' :
             selectedFolderId === null ? 'bg-blue-50 text-blue-600' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
           }`}
         >

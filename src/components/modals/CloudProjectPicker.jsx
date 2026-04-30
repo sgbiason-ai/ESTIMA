@@ -1,20 +1,23 @@
 // src/components/modals/CloudProjectPicker.jsx
 //
 // Modal grille Bento pour ouvrir un projet Cloud depuis ESTIMA.
-// Affiche pour chaque projet : nom + n°, client, date dernière sauvegarde,
-// total HT calculé à la volée, badge couleur du dossier, suppression au hover.
-// Inspiré de CrcChantierPickerModal.jsx pour la cohérence visuelle.
+// Reprend l'arborescence complète des dossiers du module Gestion de Projets :
+// sidebar dossiers (CRUD + sous-dossiers), filtrage, déplacement de projet.
+// Cartes : nom + n°, client, date dernière sauvegarde, total HT, suppression.
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   X, Search, FolderOpen, Cloud, Clock, Trash2, RefreshCw,
-  CloudOff, Building2, Coins,
+  CloudOff, Building2, Coins, MoveRight,
 } from 'lucide-react';
 import { collection, getDocs, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { confirm } from '../../utils/globalUI';
 import { buildFolderColorMap, NEUTRAL_COLOR } from '../../views/projectManager/folderColors';
+import { usePmFolders } from '../../views/projectManager/hooks/usePmFolders';
+import PmFolderSidebar from '../../views/projectManager/PmFolderSidebar';
+import MoveFolderModal from '../../views/projectManager/MoveFolderModal';
 
 // Format date FR : "Aujourd'hui HH:mm" / "14 avr" / "14 avr 2025"
 const formatDate = (iso) => {
@@ -59,22 +62,56 @@ const formatPrice = (n) => {
 const removeAccents = (s) =>
   (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
-const CloudProjectPicker = ({ companyId, currentProjectId, onSelect, onClose }) => {
-  const [projects, setProjects]   = useState([]);
-  const [folders, setFolders]     = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState(null);
-  const [search, setSearch]       = useState('');
-  const [deletingId, setDeletingId] = useState(null);
+const CloudProjectPicker = ({
+  companyId,
+  currentProjectId,
+  project,        // projet Estima actif (optionnel, pour màj folderId si déplacé)
+  setProject,     // setter projet actif (optionnel)
+  onSelect,
+  onClose,
+}) => {
+  const [cloudProjects, setCloudProjects] = useState([]);
+  const [loading, setLoading]             = useState(true);
+  const [error, setError]                 = useState(null);
+  const [search, setSearch]               = useState('');
+  const [deletingId, setDeletingId]       = useState(null);
 
-  // ESC pour fermer
+  // Hook gestion dossiers (réutilisé tel quel depuis ProjectManager)
+  const folderState = usePmFolders({
+    companyId,
+    cloudProjects,
+    setCloudProjects,
+    project: project || null,
+    setProject: setProject || (() => {}),
+  });
+
+  const {
+    folders, foldersLoading,
+    selectedFolderId, setSelectedFolderId,
+    expandedFolders,
+    creatingFolder, setCreatingFolder,
+    newFolderName, setNewFolderName,
+    editingFolder, setEditingFolder,
+    movingProject, setMovingProject,
+    rootFolders, getSubfolders,
+    filteredProjects,
+    toggleExpand,
+    handleCreateFolder, handleRenameFolder, handleDeleteFolder,
+    handleMoveProject,
+  } = folderState;
+
+  // ESC pour fermer (sauf si une modale enfant est ouverte)
   useEffect(() => {
-    const h = (e) => { if (e.key === 'Escape') onClose(); };
+    const h = (e) => {
+      if (e.key !== 'Escape') return;
+      if (movingProject || creatingFolder || editingFolder) return; // laisse l'enfant gérer
+      onClose();
+    };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  }, [onClose]);
+  }, [onClose, movingProject, creatingFolder, editingFolder]);
 
-  // Charger projets + dossiers en parallèle
+  // Charger projets cloud
   useEffect(() => {
     if (!companyId) return;
     let cancelled = false;
@@ -82,17 +119,12 @@ const CloudProjectPicker = ({ companyId, currentProjectId, onSelect, onClose }) 
       setLoading(true);
       setError(null);
       try {
-        const [projSnap, foldSnap] = await Promise.all([
-          getDocs(collection(db, 'companies', companyId, 'projects')),
-          getDocs(collection(db, 'companies', companyId, 'folders')),
-        ]);
+        const snap = await getDocs(collection(db, 'companies', companyId, 'projects'));
         if (cancelled) return;
-        const projList = projSnap.docs
+        const list = snap.docs
           .map(d => ({ id: d.id, ...d.data() }))
           .sort((a, b) => new Date(b.lastSaved || 0) - new Date(a.lastSaved || 0));
-        const foldList = foldSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setProjects(projList);
-        setFolders(foldList);
+        setCloudProjects(list);
       } catch {
         if (!cancelled) setError('Impossible de charger les projets.');
       } finally {
@@ -104,20 +136,21 @@ const CloudProjectPicker = ({ companyId, currentProjectId, onSelect, onClose }) 
 
   const folderColorMap = useMemo(() => buildFolderColorMap(folders), [folders]);
 
-  const filtered = useMemo(() => {
+  // Recherche texte appliquée APRÈS le filtre dossier (filteredProjects)
+  const visibleProjects = useMemo(() => {
     const q = removeAccents(search.trim());
-    if (!q) return projects;
-    return projects.filter(p =>
+    if (!q) return filteredProjects;
+    return filteredProjects.filter(p =>
       removeAccents(p.name || '').includes(q) ||
       removeAccents(p.client || '').includes(q) ||
       removeAccents(p.code || '').includes(q) ||
       removeAccents(p.location || '').includes(q)
     );
-  }, [projects, search]);
+  }, [filteredProjects, search]);
 
   const handleDelete = async (e, proj) => {
     e.stopPropagation();
-    if (proj.id === currentProjectId) return; // garde-fou : pas de suppression du projet actif
+    if (proj.id === currentProjectId) return; // garde-fou
     const ok = await confirm(
       `Supprimer le projet "${proj.name || 'Sans nom'}" ? Cette action est irréversible.`,
       { danger: true, title: 'Supprimer le projet', confirmLabel: 'Supprimer' }
@@ -126,7 +159,7 @@ const CloudProjectPicker = ({ companyId, currentProjectId, onSelect, onClose }) 
     setDeletingId(proj.id);
     try {
       await deleteDoc(doc(db, 'companies', companyId, 'projects', proj.id));
-      setProjects(prev => prev.filter(p => p.id !== proj.id));
+      setCloudProjects(prev => prev.filter(p => p.id !== proj.id));
     } catch (err) {
       console.error('[CloudProjectPicker] Suppression échouée:', err);
       setError('Suppression échouée.');
@@ -134,6 +167,13 @@ const CloudProjectPicker = ({ companyId, currentProjectId, onSelect, onClose }) 
       setDeletingId(null);
     }
   };
+
+  // Libellé du filtre actif (pour le compteur header)
+  const folderLabel = useMemo(() => {
+    if (selectedFolderId === '__all__') return 'Tous';
+    if (selectedFolderId === null) return 'Sans dossier';
+    return folders.find(f => f.id === selectedFolderId)?.name || '';
+  }, [selectedFolderId, folders]);
 
   return createPortal(
     <div
@@ -150,8 +190,9 @@ const CloudProjectPicker = ({ companyId, currentProjectId, onSelect, onClose }) 
           <Cloud size={18} className="text-blue-500" />
           <h2 className="text-lg font-bold text-gray-900 tracking-tight">Ouvrir un projet Cloud</h2>
           <div className="text-xs text-gray-400">
-            {filtered.length} {filtered.length > 1 ? 'projets' : 'projet'}
-            {search && ` (filtrés sur ${projects.length})`}
+            {visibleProjects.length} {visibleProjects.length > 1 ? 'projets' : 'projet'}
+            {selectedFolderId !== '__all__' && ` · ${folderLabel}`}
+            {search && ` · "${search}"`}
           </div>
           <div className="flex-1" />
           <div className="relative w-64">
@@ -174,122 +215,172 @@ const CloudProjectPicker = ({ companyId, currentProjectId, onSelect, onClose }) 
           </button>
         </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {loading && (
-            <div className="h-full flex items-center justify-center gap-2 text-gray-400">
-              <RefreshCw size={18} className="animate-spin" />
-              <span className="text-sm">Chargement...</span>
-            </div>
-          )}
+        {/* Body : sidebar dossiers + grille */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Sidebar dossiers (réutilise PmFolderSidebar, DnD activé) */}
+          <PmFolderSidebar
+            folders={folders}
+            foldersLoading={foldersLoading}
+            selectedFolderId={selectedFolderId}
+            setSelectedFolderId={setSelectedFolderId}
+            expandedFolders={expandedFolders}
+            creatingFolder={creatingFolder}
+            setCreatingFolder={setCreatingFolder}
+            newFolderName={newFolderName}
+            setNewFolderName={setNewFolderName}
+            editingFolder={editingFolder}
+            setEditingFolder={setEditingFolder}
+            cloudProjects={cloudProjects}
+            rootFolders={rootFolders}
+            getSubfolders={getSubfolders}
+            toggleExpand={toggleExpand}
+            handleCreateFolder={handleCreateFolder}
+            handleRenameFolder={handleRenameFolder}
+            handleDeleteFolder={handleDeleteFolder}
+            onProjectDrop={(targetFolderId, projectId) => handleMoveProject(projectId, targetFolderId)}
+          />
 
-          {error && !loading && (
-            <div className="h-full flex flex-col items-center justify-center gap-3 text-red-400 py-20">
-              <CloudOff size={32} />
-              <p className="text-sm">{error}</p>
-            </div>
-          )}
+          {/* Grille de projets */}
+          <div className="flex-1 overflow-y-auto p-6">
+            {loading && (
+              <div className="h-full flex items-center justify-center gap-2 text-gray-400">
+                <RefreshCw size={18} className="animate-spin" />
+                <span className="text-sm">Chargement...</span>
+              </div>
+            )}
 
-          {!loading && !error && filtered.length === 0 && (
-            <div className="h-full flex flex-col items-center justify-center text-gray-400 py-20">
-              <FolderOpen size={48} strokeWidth={1.5} className="mb-3 opacity-50" />
-              <p className="text-sm">
-                {projects.length === 0 ? 'Aucun projet sur le Cloud.' : 'Aucun résultat pour cette recherche.'}
-              </p>
-            </div>
-          )}
+            {error && !loading && (
+              <div className="h-full flex flex-col items-center justify-center gap-3 text-red-400 py-20">
+                <CloudOff size={32} />
+                <p className="text-sm">{error}</p>
+              </div>
+            )}
 
-          {!loading && !error && filtered.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filtered.map((proj) => {
-                const isActive   = proj.id === currentProjectId;
-                const fc         = proj.folderId ? (folderColorMap[proj.folderId] || NEUTRAL_COLOR) : NEUTRAL_COLOR;
-                const totalHT    = computeTotalHT(proj);
-                const totalStr   = formatPrice(totalHT);
-                const isDeleting = deletingId === proj.id;
+            {!loading && !error && visibleProjects.length === 0 && (
+              <div className="h-full flex flex-col items-center justify-center text-gray-400 py-20">
+                <FolderOpen size={48} strokeWidth={1.5} className="mb-3 opacity-50" />
+                <p className="text-sm">
+                  {cloudProjects.length === 0
+                    ? 'Aucun projet sur le Cloud.'
+                    : 'Aucun projet dans cette sélection.'}
+                </p>
+              </div>
+            )}
 
-                return (
-                  <div
-                    key={proj.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => { if (!isActive) { onSelect(proj); onClose(); } }}
-                    onKeyDown={(e) => {
-                      if ((e.key === 'Enter' || e.key === ' ') && !isActive) {
-                        e.preventDefault();
-                        onSelect(proj); onClose();
-                      }
-                    }}
-                    className={`group relative bg-white rounded-2xl border-2 p-5 transition-all overflow-hidden focus:outline-none focus:ring-2 focus:ring-blue-300 ${
-                      isActive
-                        ? `${fc.cardActive} cursor-default`
-                        : `${fc.card} ${fc.cardHover} hover:shadow-lg hover:-translate-y-0.5 cursor-pointer`
-                    } ${isDeleting ? 'opacity-50 pointer-events-none' : ''}`}
-                  >
-                    {/* Bande couleur à gauche (couleur du dossier) */}
-                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${fc.stripe}`} />
+            {!loading && !error && visibleProjects.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {visibleProjects.map((proj) => {
+                  const isActive   = proj.id === currentProjectId;
+                  const fc         = proj.folderId ? (folderColorMap[proj.folderId] || NEUTRAL_COLOR) : NEUTRAL_COLOR;
+                  const totalHT    = computeTotalHT(proj);
+                  const totalStr   = formatPrice(totalHT);
+                  const isDeleting = deletingId === proj.id;
 
-                    {/* Suppression (hover) — pas pour le projet actif */}
-                    {!isActive && (
-                      <button
-                        onClick={(e) => handleDelete(e, proj)}
-                        className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all z-10"
-                        title="Supprimer le projet"
-                      >
-                        {isDeleting ? <RefreshCw size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                      </button>
-                    )}
+                  return (
+                    <div
+                      key={proj.id}
+                      role="button"
+                      tabIndex={0}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('text/plain', proj.id);
+                        e.dataTransfer.effectAllowed = 'move';
+                      }}
+                      onClick={() => { if (!isActive) { onSelect(proj); onClose(); } }}
+                      onKeyDown={(e) => {
+                        if ((e.key === 'Enter' || e.key === ' ') && !isActive) {
+                          e.preventDefault();
+                          onSelect(proj); onClose();
+                        }
+                      }}
+                      className={`group relative bg-white rounded-2xl border-2 p-5 transition-all overflow-hidden focus:outline-none focus:ring-2 focus:ring-blue-300 cursor-grab active:cursor-grabbing ${
+                        isActive
+                          ? `${fc.cardActive}`
+                          : `${fc.card} ${fc.cardHover} hover:shadow-lg hover:-translate-y-0.5`
+                      } ${isDeleting ? 'opacity-50 pointer-events-none' : ''}`}
+                    >
+                      {/* Bande couleur à gauche (couleur du dossier) */}
+                      <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${fc.stripe}`} />
 
-                    {/* Badge ACTIF */}
-                    {isActive && (
-                      <div className={`absolute top-3 right-3 px-2 py-0.5 rounded-md text-[10px] font-bold ${fc.badge}`}>
-                        ACTIF
+                      {/* Actions au hover : Déplacer (toujours), Supprimer (sauf projet actif) */}
+                      <div className="absolute top-3 right-3 flex items-center gap-0.5 z-10">
+                        {isActive && (
+                          <div className={`px-2 py-0.5 rounded-md text-[10px] font-bold mr-1 ${fc.badge}`}>
+                            ACTIF
+                          </div>
+                        )}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setMovingProject(proj); }}
+                          className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-all"
+                          title="Déplacer dans un dossier"
+                        >
+                          <MoveRight size={14} />
+                        </button>
+                        {!isActive && (
+                          <button
+                            onClick={(e) => handleDelete(e, proj)}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all"
+                            title="Supprimer le projet"
+                          >
+                            {isDeleting ? <RefreshCw size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                          </button>
+                        )}
                       </div>
-                    )}
 
-                    {/* Nom + code */}
-                    <div className="pl-2 mb-3 pr-12">
-                      <div className={`font-semibold text-sm truncate ${isActive ? fc.accent : 'text-gray-900'}`}>
-                        {proj.name || 'Projet sans nom'}
+                      {/* Nom + code (titre complet, wrap multiline) */}
+                      <div className="pl-2 mb-3 pr-16">
+                        <div className={`font-semibold text-sm leading-snug break-words ${isActive ? fc.accent : 'text-gray-900'}`}>
+                          {proj.name || 'Projet sans nom'}
+                        </div>
+                        {proj.code && (
+                          <div className="text-[11px] text-gray-400 mt-0.5 font-mono">{proj.code}</div>
+                        )}
                       </div>
-                      {proj.code && (
-                        <div className="text-[11px] text-gray-400 mt-0.5 font-mono">{proj.code}</div>
-                      )}
-                    </div>
 
-                    {/* Client */}
-                    {proj.client && (
-                      <div className="pl-2 flex items-center gap-1.5 text-[11px] text-gray-500 mb-1.5">
-                        <Building2 size={12} strokeWidth={1.75} className="shrink-0" />
-                        <span className="truncate">{proj.client}</span>
-                      </div>
-                    )}
-
-                    {/* Date + total HT */}
-                    <div className="pl-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-500 mt-2">
-                      {proj.lastSaved && (
-                        <div className="flex items-center gap-1">
-                          <Clock size={12} strokeWidth={1.75} className="shrink-0" />
-                          <span>{formatDate(proj.lastSaved)}</span>
+                      {/* Client */}
+                      {proj.client && (
+                        <div className="pl-2 flex items-center gap-1.5 text-[11px] text-gray-500 mb-1.5">
+                          <Building2 size={12} strokeWidth={1.75} className="shrink-0" />
+                          <span className="truncate">{proj.client}</span>
                         </div>
                       )}
-                      {totalStr && (
-                        <>
-                          {proj.lastSaved && <span className="text-gray-300">·</span>}
-                          <div className="flex items-center gap-1 font-semibold text-gray-700">
-                            <Coins size={12} strokeWidth={1.75} className="shrink-0" />
-                            <span>{totalStr}</span>
+
+                      {/* Date + total HT */}
+                      <div className="pl-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-500 mt-2">
+                        {proj.lastSaved && (
+                          <div className="flex items-center gap-1">
+                            <Clock size={12} strokeWidth={1.75} className="shrink-0" />
+                            <span>{formatDate(proj.lastSaved)}</span>
                           </div>
-                        </>
-                      )}
+                        )}
+                        {totalStr && (
+                          <>
+                            {proj.lastSaved && <span className="text-gray-300">·</span>}
+                            <div className="flex items-center gap-1 font-semibold text-gray-700">
+                              <Coins size={12} strokeWidth={1.75} className="shrink-0" />
+                              <span>{totalStr}</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Modal déplacement projet (au-dessus, z-[9999]) */}
+      {movingProject && (
+        <MoveFolderModal
+          project={movingProject}
+          folders={folders}
+          onMove={handleMoveProject}
+          onClose={() => setMovingProject(null)}
+        />
+      )}
     </div>,
     document.body
   );
