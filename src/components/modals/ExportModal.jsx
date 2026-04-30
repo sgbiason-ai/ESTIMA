@@ -310,7 +310,7 @@ const ExportModal = ({
   const isPreview = step === 'preview';
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: isPreview ? 'none' : 'blur(8px)', padding: isPreview ? '0' : '16px' }}>
+    <div className="fixed inset-0 z-modal flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: isPreview ? 'none' : 'blur(8px)', padding: isPreview ? '0' : '16px' }}>
       <div
         className="flex flex-col rounded-xl overflow-hidden shadow-2xl transition-all duration-300"
         style={{

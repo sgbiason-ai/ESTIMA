@@ -106,9 +106,9 @@ export default function CrcChantierPickerModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/30 backdrop-blur-sm p-4 sm:p-8"
+      className="fixed inset-0 z-modal-backdrop flex items-center justify-center bg-black/30 backdrop-blur-sm p-4 sm:p-8"
       onClick={onClose}
-      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}
+
     >
       <div
         className="bg-[#f5f5f7] rounded-3xl shadow-2xl w-full max-w-6xl max-h-[85vh] flex flex-col overflow-hidden"

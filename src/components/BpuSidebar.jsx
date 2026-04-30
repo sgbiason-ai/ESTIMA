@@ -135,7 +135,7 @@ const BpuSidebar = ({
 
       {/* Tooltip rendu via portal pour passer au-dessus du sticky header */}
       {tooltipState.visible && tooltipState.item && createPortal(
-        <div className="z-[9999] w-72 p-3 bg-slate-800 text-white rounded-xl shadow-2xl border border-slate-600 animate-in fade-in zoom-in-95 duration-200 flex flex-col gap-2 pointer-events-none" style={tooltipState.style}>
+        <div className="z-tooltip w-72 p-3 bg-slate-800 text-white rounded-xl shadow-2xl border border-slate-600 animate-in fade-in zoom-in-95 duration-200 flex flex-col gap-2 pointer-events-none" style={tooltipState.style}>
           <div className={`absolute -left-2 w-4 h-4 bg-slate-800 transform rotate-45 border-l border-b border-slate-600 ${tooltipState.style.bottom !== 'auto' ? 'bottom-4' : 'top-4'}`} />
           <div className="shrink-0 font-bold text-xs text-emerald-400 uppercase tracking-wider border-b border-slate-600 pb-2">Article Bibliothèque</div>
           <div className="text-xs font-bold" dangerouslySetInnerHTML={{ __html: sanitizeHtml(tooltipState.item.designation || '') }} />

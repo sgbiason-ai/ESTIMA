@@ -62,7 +62,7 @@ export default function UpdatePrompt() {
   if (!offlineReady && !needRefresh) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-[9999] max-w-sm animate-in fade-in slide-in-from-bottom-4 duration-300">
+    <div className="fixed bottom-4 right-4 z-toast max-w-sm animate-in fade-in slide-in-from-bottom-4 duration-300">
       <div className="bg-white border border-gray-200/60 rounded-2xl shadow-2xl backdrop-blur-xl p-4 flex items-start gap-3">
         <div className={`p-2 rounded-xl ${needRefresh ? 'bg-blue-50' : 'bg-emerald-50'}`}>
           {needRefresh ? (

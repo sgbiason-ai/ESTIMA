@@ -118,7 +118,7 @@ const BrandingModal = ({ isOpen, onClose, branding, onUpdate, onSaveToCloud }) =
   // ── RENDU ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-modal flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         
         {/* Header */}

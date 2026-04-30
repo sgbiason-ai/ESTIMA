@@ -294,7 +294,7 @@ const DatabaseView = ({
       
       {/* MODALE DE LIEN CCTP */}
       {cctpLinkModal.isOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-modal flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                 <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                     <div className="flex items-center gap-3">
@@ -760,7 +760,7 @@ const DatabaseView = ({
         const hasHistory = history.length > 0;
         const fmtD = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
         return (
-          <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4" onClick={() => setPriceHistoryItem(null)}>
+          <div className="fixed inset-0 bg-black/50 z-modal flex items-center justify-center p-4" onClick={() => setPriceHistoryItem(null)}>
             <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden" onClick={e => e.stopPropagation()}>
               {/* Header */}
               <div className="px-5 py-4 border-b border-gray-100">

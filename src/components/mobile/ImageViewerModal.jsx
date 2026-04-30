@@ -11,7 +11,7 @@ export default function ImageViewerModal({ src: rawSrc, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center"
+      className="fixed inset-0 z-modal-stack bg-black/95 flex items-center justify-center"
       onClick={onClose}
     >
       <button

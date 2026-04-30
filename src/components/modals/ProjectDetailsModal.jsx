@@ -281,7 +281,7 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-modal flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={isProjectSavedAndValid ? onClose : undefined} />
 
       <div ref={modalRef} className="relative bg-white rounded-2xl shadow-2xl w-full max-w-[1400px] overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-white/20 ring-1 ring-black/5 will-change-transform flex flex-col">

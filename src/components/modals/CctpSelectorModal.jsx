@@ -98,7 +98,7 @@ const CctpSelectorModal = ({ isOpen, onClose, onSelect, masterCctp, currentRef }
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+    <div className="fixed inset-0 z-modal-stack flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
       <div className="bg-white w-full max-w-2xl h-[80vh] rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
         <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
             <div><h3 className="font-bold text-slate-800">Sélectionner un chapitre CCTP</h3><p className="text-xs text-slate-500">Cliquez sur un élément pour le lier</p></div>

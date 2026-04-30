@@ -30,7 +30,7 @@ export default function PdfFavoriteEditModal({ initial, onSave, onClose }) {
   const canSave = lockUrl ? name.trim().length > 0 : url.trim().length > 0;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
+    <div className="fixed inset-0 z-modal-stack flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden">
         <div className="flex flex-col items-center pt-3 pb-2 px-4 sm:hidden">

@@ -161,7 +161,7 @@ const SettingsView = ({
       
       {/* --- MODALE DE MAPPING DES UNITÉS --- */}
       {showUnitMapModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-modal flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
             <div className="p-5 border-b border-slate-100 bg-amber-50">
               <div className="flex items-center gap-3 text-amber-800">

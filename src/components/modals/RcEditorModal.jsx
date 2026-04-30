@@ -63,7 +63,7 @@ const RcEditorModal = ({ isOpen, onClose, node, onSave, availableVariables }) =>
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-modal flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div 
         className={`bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300 ${isFullScreen ? 'w-[98vw] h-[95vh]' : 'w-full max-w-5xl h-[85vh]'}`}
       >

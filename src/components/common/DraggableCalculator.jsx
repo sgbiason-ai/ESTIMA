@@ -131,7 +131,7 @@ const DraggableCalculator = ({ isOpen, onClose }) => {
   return (
     <div 
       style={{ left: `${position.x}px`, top: `${position.y}px` }}
-      className="fixed z-[9999] shadow-[0_20px_50px_rgba(0,0,0,0.5)] rounded-2xl overflow-hidden flex flex-col w-80"
+      className="fixed z-modal shadow-[0_20px_50px_rgba(0,0,0,0.5)] rounded-2xl overflow-hidden flex flex-col w-80"
     >
       <div className="bg-[#0f172a] border border-emerald-500/30 p-4 w-full backdrop-blur-md bg-opacity-95">
         

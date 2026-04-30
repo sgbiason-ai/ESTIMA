@@ -145,7 +145,7 @@ const ArchiveAuditModal = ({ show, onClose, sourceArchive, archives, currentProj
   const totalDiffPct = sourceData?.totalHT ? ((totalDiff / sourceData.totalHT) * 100) : 0;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-modal-stack flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-xl shadow-2xl w-[900px] max-h-[85vh] flex flex-col overflow-hidden border border-slate-200">
 
         {/* Header */}

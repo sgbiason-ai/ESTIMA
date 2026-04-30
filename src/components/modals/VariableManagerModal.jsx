@@ -68,7 +68,7 @@ const VariableManagerModal = ({ isOpen, onClose, currentVariables, onUpdate, det
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-modal flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]">
         
         <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-slate-50 shrink-0">

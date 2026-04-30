@@ -38,9 +38,9 @@ export default function CrcChantierDropdown({ chantiers, activeId, onSelect, onD
 
       {open && createPortal(
         <>
-          <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
+          <div className="fixed inset-0 z-modal-backdrop" onClick={() => setOpen(false)} />
           <div
-            className="fixed w-80 rounded-2xl shadow-2xl z-[9999] max-h-72 overflow-y-auto border border-gray-200"
+            className="fixed w-80 rounded-2xl shadow-2xl z-modal max-h-72 overflow-y-auto border border-gray-200"
             style={{ top: pos.top, left: pos.left, backgroundColor: '#fff' }}
           >
             {chantiers.length === 0 && (

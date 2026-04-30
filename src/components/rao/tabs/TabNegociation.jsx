@@ -174,8 +174,8 @@ const LetterEditorModal = ({ isOpen, onClose, mode, initialHtml, companyName, on
   };
 
   const containerClasses = isFullscreen
-    ? "fixed inset-0 z-[9999] bg-slate-100 flex flex-col animate-in fade-in duration-200"
-    : "fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4";
+    ? "fixed inset-0 z-modal bg-slate-100 flex flex-col animate-in fade-in duration-200"
+    : "fixed inset-0 z-modal flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4";
 
   const modalClasses = isFullscreen
     ? "bg-white w-full h-full flex flex-col shadow-2xl"

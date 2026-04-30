@@ -156,7 +156,7 @@ const AddBpuModal = ({ isOpen, onClose, onAdd, units, categories = [], bpuConfig
   }`;
 
   return (
-    <div className={`fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm ${isFullScreen ? 'p-0' : 'p-4'}`}>
+    <div className={`fixed inset-0 z-modal flex items-center justify-center bg-slate-900/80 backdrop-blur-sm ${isFullScreen ? 'p-0' : 'p-4'}`}>
       <div className={`bg-white w-full shadow-2xl overflow-hidden border border-slate-200 flex flex-col relative transition-all duration-300 ${isFullScreen ? 'h-full rounded-none' : 'max-w-7xl h-[90vh] rounded-xl'}`}>
         
         <CctpSelectorModal 
@@ -235,7 +235,7 @@ const AddBpuModal = ({ isOpen, onClose, onAdd, units, categories = [], bpuConfig
               </div>
 
                {/* DOSSIERS MULTI */}
-               <div className={`col-span-6 relative ${showCatSelector ? 'z-[100]' : 'z-auto'}`} ref={catDropdownRef}>
+               <div className={`col-span-6 relative ${showCatSelector ? 'z-modal' : 'z-auto'}`} ref={catDropdownRef}>
                  <label className={labelClass} onClick={() => setShowCatSelector(!showCatSelector)}><Folder size={10} className="inline mr-1"/> Dossiers ({formData.categoryIds?.length || 0})</label>
                  <div onClick={(e) => { e.stopPropagation(); setShowCatSelector(!showCatSelector); }} className={`${selectorBaseClass} border-slate-300 hover:border-emerald-500`}>
                     <div className="flex flex-wrap gap-1 items-center flex-1 overflow-hidden pr-2">

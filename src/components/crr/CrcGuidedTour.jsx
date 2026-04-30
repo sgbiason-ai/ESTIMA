@@ -131,7 +131,7 @@ const CrcGuidedTour = ({ onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[60]">
+    <div className="fixed inset-0 z-modal-stack">
       {/* Overlay avec trou */}
       <svg className="absolute inset-0 w-full h-full" style={{ pointerEvents: 'none' }}>
         <defs>
@@ -174,7 +174,7 @@ const CrcGuidedTour = ({ onClose }) => {
 
       {/* Bulle explicative */}
       <div
-        className="fixed z-[61] bg-[#0f1e2a] rounded-xl shadow-2xl border border-white/10 p-4 w-[340px]"
+        className="fixed z-tooltip bg-[#0f1e2a] rounded-xl shadow-2xl border border-white/10 p-4 w-[340px]"
         style={getBubbleStyle()}
       >
         {/* Header */}

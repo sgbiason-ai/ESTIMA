@@ -154,7 +154,7 @@ const PriceAuditModal = ({ show, onClose, project, allBpuItems, onRestorePrice, 
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-modal-stack flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-xl shadow-2xl w-[1050px] max-h-[85vh] flex flex-col overflow-hidden border border-slate-200">
 
         {/* ══ HEADER ══ */}

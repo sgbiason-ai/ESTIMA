@@ -104,7 +104,7 @@ const DialogModal = ({ dialog, onClose }) => {
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-150"
+      className="fixed inset-0 z-modal-stack flex items-center justify-center bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-150"
       onClick={handleCancel}
       onKeyDown={handleKeyDown}
     >

@@ -201,8 +201,8 @@ const AnalysisToolbar = ({
       {/* ── Menu déroulant Notation ── */}
       {showScoringSettings && (
         <>
-          <div className="fixed inset-0 z-[9998]" onClick={() => setShowScoringSettings(false)} />
-          <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 w-96 bg-white rounded-xl shadow-2xl border border-slate-200 p-4 z-[9999] animate-in fade-in zoom-in-95 duration-150">
+          <div className="fixed inset-0 z-modal-backdrop" onClick={() => setShowScoringSettings(false)} />
+          <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 w-96 bg-white rounded-xl shadow-2xl border border-slate-200 p-4 z-modal animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
               <h3 className="text-xs font-black uppercase text-slate-700 flex items-center gap-2">
                 <Settings2 size={16} className="text-indigo-500" /> Configuration notation

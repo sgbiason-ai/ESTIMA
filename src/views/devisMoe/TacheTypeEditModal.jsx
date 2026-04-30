@@ -36,7 +36,7 @@ export default function TacheTypeEditModal({ isOpen, tache, phases, onSave, onCl
   const activePhases = (phases || PHASES_LOI_MOP).filter(p => p.actif);
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center" onMouseDown={onClose}>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-modal-stack flex items-center justify-center" onMouseDown={onClose}>
       <div className="bg-white border border-slate-200 rounded-2xl w-[480px] mx-4 shadow-2xl" onMouseDown={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
