@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Calculator, BarChart3, ClipboardList, FileStack, ShieldCheck,
-  Folder, LogOut, Lock, Briefcase, Wrench, Receipt,
+  Folder, LogOut, Lock, Briefcase, Wrench, Receipt, Car,
   Layers, Settings, Palette, Shield,
   Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudDrizzle, CloudFog, MapPin, ChevronRight, Sparkles
 } from 'lucide-react';
@@ -60,6 +60,7 @@ const MODULES = [
   { id: 'rao_analysis', label: 'RAO & Analyse', description: "Rapport d'analyse des offres et analyse comparative", icon: BarChart3, access: 'all', tag: 'Analyse', row: 1 },
   // Row 2 — Outils & Administration (copper glass)
   { id: 'devis_moe', label: 'Devis MOE', description: "Proposition d'honoraires de maîtrise d'œuvre VRD", icon: Receipt, access: 'admin_only', tag: 'Finance', row: 2 },
+  { id: 'expense_notes', label: 'Notes de Frais', description: 'Frais kilométriques avec barème fiscal', icon: Car, access: 'admin_only', tag: 'Finance', row: 2 },
   { id: 'crc', label: 'Compte Rendu Chantier', description: 'Suivi de chantier et comptes rendus de réunion', icon: ClipboardList, access: 'admin_or_unlocked', tag: 'Terrain', row: 2 },
   { id: 'doc_admin', label: 'Documents Administratifs', description: 'Génération des documents administratifs de marché', icon: FileStack, access: 'admin_or_unlocked', tag: 'Admin', row: 2 },
   { id: 'site_visits', label: 'Visites de Site', description: 'Documentation terrain avec photos et GPS', icon: MapPin, access: 'all', tag: 'Terrain', row: 2 },

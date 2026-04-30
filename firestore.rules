@@ -164,6 +164,21 @@ service cloud.firestore {
         allow write: if isCompanyMember(companyId)
                      && request.auth.uid == presenceId;
       }
+
+      // Notes de frais kilométriques — admins uniquement
+      match /expenseNotes/{noteId} {
+        allow read, write: if isCompanyAdmin(companyId);
+      }
+
+      // Véhicules (pour calcul barème fiscal) — admins uniquement
+      match /vehicles/{vehicleId} {
+        allow read, write: if isCompanyAdmin(companyId);
+      }
+
+      // Adresses favorites pour notes de frais — admins uniquement
+      match /expenseLocations/{locationId} {
+        allow read, write: if isCompanyAdmin(companyId);
+      }
     }
   }
 }

@@ -1,0 +1,187 @@
+// src/hooks/useExpenseNotes.js
+// CRUD + temps reel pour le module Notes de Frais Kilometriques (admin uniquement).
+//
+// Stockage Firestore :
+//   /companies/{cId}/expenseNotes/{YYYY-MM}      — un doc par mois (trips[])
+//   /companies/{cId}/vehicles/{vehicleId}        — vehicules avec puissance fiscale
+//   /companies/{cId}/expenseLocations/{id}       — adresses favorites (incl. domicile)
+
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  collection, doc, setDoc, addDoc, updateDoc, deleteDoc,
+  onSnapshot, query, where, serverTimestamp,
+} from 'firebase/firestore';
+import { db } from '../firebase';
+
+const monthId = (year, monthIdx0) => `${year}-${String(monthIdx0 + 1).padStart(2, '0')}`;
+
+export function useExpenseNotes(companyId, year) {
+  const [notes, setNotes] = useState({});       // { 'YYYY-MM': { id, trips, totalKm, ... } }
+  const [vehicles, setVehicles] = useState([]);
+  const [locations, setLocations] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // ── Sub : notes du mois pour l'annee selectionnee ─────────────────────────
+  useEffect(() => {
+    if (!companyId || !year) {
+      setNotes({});
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const yearStr = String(year);
+    const q = query(
+      collection(db, 'companies', companyId, 'expenseNotes'),
+      where('month', '>=', `${yearStr}-01`),
+      where('month', '<=', `${yearStr}-12`),
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      const map = {};
+      snap.forEach((d) => { map[d.id] = { id: d.id, ...d.data() }; });
+      setNotes(map);
+      setLoading(false);
+    }, (err) => {
+      console.error('[ExpenseNotes] notes snapshot error', err);
+      setLoading(false);
+    });
+    return () => unsub();
+  }, [companyId, year]);
+
+  // ── Sub : vehicules ───────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!companyId) { setVehicles([]); return; }
+    const unsub = onSnapshot(collection(db, 'companies', companyId, 'vehicles'), (snap) => {
+      setVehicles(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    }, (err) => console.error('[ExpenseNotes] vehicles snapshot error', err));
+    return () => unsub();
+  }, [companyId]);
+
+  // ── Sub : adresses favorites ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!companyId) { setLocations([]); return; }
+    const unsub = onSnapshot(collection(db, 'companies', companyId, 'expenseLocations'), (snap) => {
+      setLocations(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    }, (err) => console.error('[ExpenseNotes] locations snapshot error', err));
+    return () => unsub();
+  }, [companyId]);
+
+  // ── Helpers note (trajets) ────────────────────────────────────────────────
+  const upsertNote = useCallback(async (month, patch) => {
+    if (!companyId) return;
+    const ref = doc(db, 'companies', companyId, 'expenseNotes', month);
+    await setDoc(ref, { ...patch, month, updatedAt: serverTimestamp() }, { merge: true });
+  }, [companyId]);
+
+  const recomputeTotals = (trips) => {
+    const totalKm = trips.reduce((s, t) => s + (Number(t.km) || 0), 0);
+    return { trips, totalKm };
+  };
+
+  const addTrip = useCallback(async (month, trip) => {
+    const note = notes[month] || { trips: [] };
+    const id = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const newTrip = { ...trip, id };
+    const { trips, totalKm } = recomputeTotals([...(note.trips || []), newTrip]);
+    await upsertNote(month, { trips, totalKm });
+    return id;
+  }, [notes, upsertNote]);
+
+  const updateTrip = useCallback(async (month, tripId, patch) => {
+    const note = notes[month];
+    if (!note) return;
+    const { trips, totalKm } = recomputeTotals(
+      (note.trips || []).map((t) => (t.id === tripId ? { ...t, ...patch } : t))
+    );
+    await upsertNote(month, { trips, totalKm });
+  }, [notes, upsertNote]);
+
+  const deleteTrip = useCallback(async (month, tripId) => {
+    const note = notes[month];
+    if (!note) return;
+    const { trips, totalKm } = recomputeTotals((note.trips || []).filter((t) => t.id !== tripId));
+    await upsertNote(month, { trips, totalKm });
+  }, [notes, upsertNote]);
+
+  const setNoteVehicle = useCallback(async (month, vehicleId) => {
+    await upsertNote(month, { vehicleId });
+  }, [upsertNote]);
+
+  // ── Cumul annuel ──────────────────────────────────────────────────────────
+  const sortedMonths = useMemo(() => Object.keys(notes).sort(), [notes]);
+
+  const getCumulBeforeMonth = useCallback((month) => {
+    let cumul = 0;
+    for (const m of sortedMonths) {
+      if (m >= month) break;
+      cumul += notes[m]?.totalKm || 0;
+    }
+    return cumul;
+  }, [notes, sortedMonths]);
+
+  const getCumulToMonth = useCallback((month) => {
+    return getCumulBeforeMonth(month) + (notes[month]?.totalKm || 0);
+  }, [notes, getCumulBeforeMonth]);
+
+  const yearTotalKm = useMemo(
+    () => sortedMonths.reduce((s, m) => s + (notes[m]?.totalKm || 0), 0),
+    [notes, sortedMonths],
+  );
+
+  // ── CRUD Vehicules ────────────────────────────────────────────────────────
+  const addVehicle = useCallback(async (data) => {
+    if (!companyId) return;
+    return addDoc(collection(db, 'companies', companyId, 'vehicles'), {
+      ...data, createdAt: serverTimestamp(),
+    });
+  }, [companyId]);
+
+  const updateVehicle = useCallback(async (id, patch) => {
+    if (!companyId) return;
+    return updateDoc(doc(db, 'companies', companyId, 'vehicles', id), patch);
+  }, [companyId]);
+
+  const deleteVehicle = useCallback(async (id) => {
+    if (!companyId) return;
+    return deleteDoc(doc(db, 'companies', companyId, 'vehicles', id));
+  }, [companyId]);
+
+  // ── CRUD Adresses favorites ───────────────────────────────────────────────
+  const addLocation = useCallback(async (data) => {
+    if (!companyId) return;
+    return addDoc(collection(db, 'companies', companyId, 'expenseLocations'), {
+      ...data, createdAt: serverTimestamp(),
+    });
+  }, [companyId]);
+
+  const updateLocation = useCallback(async (id, patch) => {
+    if (!companyId) return;
+    return updateDoc(doc(db, 'companies', companyId, 'expenseLocations', id), patch);
+  }, [companyId]);
+
+  const deleteLocation = useCallback(async (id) => {
+    if (!companyId) return;
+    return deleteDoc(doc(db, 'companies', companyId, 'expenseLocations', id));
+  }, [companyId]);
+
+  // Vehicule par defaut (premier marque isDefault, sinon premier de la liste)
+  const defaultVehicle = useMemo(() => {
+    return vehicles.find((v) => v.isDefault) || vehicles[0] || null;
+  }, [vehicles]);
+
+  // Domicile (premiere adresse marquee isHome)
+  const homeLocation = useMemo(() => locations.find((l) => l.isHome) || null, [locations]);
+
+  return {
+    notes, vehicles, locations, loading,
+    defaultVehicle, homeLocation,
+    yearTotalKm,
+    addTrip, updateTrip, deleteTrip, setNoteVehicle,
+    getCumulBeforeMonth, getCumulToMonth,
+    addVehicle, updateVehicle, deleteVehicle,
+    addLocation, updateLocation, deleteLocation,
+  };
+}
+
+export const monthIdFor = monthId;

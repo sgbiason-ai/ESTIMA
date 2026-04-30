@@ -47,6 +47,7 @@ const DocAdminView       = lazyWithReload(() => import('./views/DocAdminView'));
 const SiteVisitsView     = lazyWithReload(() => import('./views/SiteVisitsView'));
 const TeslaModeView      = lazyWithReload(() => import('./views/TeslaModeView'));
 const DevisMoeView       = lazyWithReload(() => import('./views/devisMoe/DevisMoeView'));
+const ExpenseNotesView   = lazyWithReload(() => import('./views/expenseNotes/ExpenseNotesView'));
 const AccountSection     = lazyWithReload(() => import('./components/settings/AccountSection'));
 
 // ─── VUE MOBILE (lazy — chargée seulement sur mobile) ────────────────────────
@@ -238,6 +239,12 @@ export default function App() {
   if (activeModule === 'devis_moe') {
     if (!isAdmin) { setActiveModule(null); return null; }
     return <Lazy><DevisMoeView onBackToHub={handleBackToHub} user={user} companyId={companyId} /></Lazy>;
+  }
+
+  // Module : Notes de Frais Kilometriques (admin uniquement)
+  if (activeModule === 'expense_notes') {
+    if (!isAdmin) { setActiveModule(null); return null; }
+    return <Lazy><ExpenseNotesView onBackToHub={handleBackToHub} user={user} companyId={companyId} /></Lazy>;
   }
 
   // Module : Identité & Charte Graphique
