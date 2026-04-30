@@ -2,9 +2,19 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.5.19';
+export const APP_VERSION = '2.5.20';
 
 export const CHANGELOG = [
+  {
+    version: '2.5.20',
+    date: '2026-04-30',
+    title: 'RAO : drapeaux d\'anomalies prix par article',
+    highlights: [
+      'RAO mode OAB : drapeaux 🔻 (rouge ambre) et 🔺 (orange) sur les cellules de prix anormalement bas/hauts vs la médiane des offres (seuil 50%)',
+      'Tooltip détaillé au survol : médiane marché, écart en %, nombre d\'offres analysées',
+      'Détection robuste pour petits échantillons (4-6 entreprises) — basée médiane + % d\'écart, plus pertinente que Z-score classique',
+    ],
+  },
   {
     version: '2.5.19',
     date: '2026-04-30',
