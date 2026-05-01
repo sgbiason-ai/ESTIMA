@@ -2,7 +2,7 @@
 // Modale de gestion des vehicules (CRUD + selection vehicule par defaut).
 
 import React, { useState } from 'react';
-import { X, Plus, Trash2, Star, Car } from 'lucide-react';
+import { X, Plus, Trash2, Star, Car, Zap, Eraser } from 'lucide-react';
 import { PUISSANCES } from '../../data/baremeFiscal2025';
 import { confirm } from '../../utils/globalUI';
 
@@ -11,6 +11,7 @@ const VehiclesPanel = ({ expense, onClose }) => {
   const [newLabel, setNewLabel] = useState('');
   const [newPuissance, setNewPuissance] = useState(5);
   const [newPlate, setNewPlate] = useState('');
+  const [newElectric, setNewElectric] = useState(false);
 
   const handleAdd = async (e) => {
     e.preventDefault();
@@ -19,12 +20,39 @@ const VehiclesPanel = ({ expense, onClose }) => {
       label: newLabel.trim(),
       puissance: Number(newPuissance),
       plateNumber: newPlate.trim(),
+      isElectric: newElectric,
       isDefault: expense.vehicles.length === 0,
     });
     setNewLabel('');
     setNewPlate('');
     setNewPuissance(5);
+    setNewElectric(false);
     setAdding(false);
+  };
+
+  const toggleElectric = async (v) => {
+    await expense.updateVehicle(v.id, { isElectric: !v.isElectric });
+  };
+
+  // Nombre de "Vehicule personnel" (bootstrap auto) — utile pour proposer le
+  // nettoyage si plusieurs doublons existent.
+  const bootstrapDupes = expense.vehicles.filter((v) => v.label === 'Vehicule personnel');
+  const canCleanup = bootstrapDupes.length > 1 || (bootstrapDupes.length === 1 && expense.vehicles.length > 1);
+
+  const handleCleanupDuplicates = async () => {
+    const ok = await confirm(
+      `Supprimer ${bootstrapDupes.length} entree(s) "Vehicule personnel" (creees automatiquement) ?`,
+      { danger: true }
+    );
+    if (!ok) return;
+    for (const v of bootstrapDupes) {
+      await expense.deleteVehicle(v.id);
+    }
+    // Si le defaut etait l'un des supprimes, redesigner le 1er restant
+    const remaining = expense.vehicles.filter((v) => v.label !== 'Vehicule personnel');
+    if (remaining.length > 0 && !remaining.some((v) => v.isDefault)) {
+      await expense.updateVehicle(remaining[0].id, { isDefault: true });
+    }
   };
 
   const handleSetDefault = async (id) => {
@@ -60,13 +88,26 @@ const VehiclesPanel = ({ expense, onClose }) => {
           <div className="flex items-center gap-2">
             <Car size={18} className="text-amber-600" />
             <h2 className="text-base font-bold text-gray-900">Vehicules</h2>
+            <span className="text-[10px] font-medium text-gray-400">({expense.vehicles.length})</span>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            {canCleanup && (
+              <button
+                onClick={handleCleanupDuplicates}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 transition-colors"
+                title={`Supprimer ${bootstrapDupes.length} doublon(s) "Vehicule personnel"`}
+              >
+                <Eraser size={11} />
+                Nettoyer doublons ({bootstrapDupes.length})
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         <div className="p-6 max-h-[60vh] overflow-y-auto space-y-2">
@@ -87,12 +128,30 @@ const VehiclesPanel = ({ expense, onClose }) => {
                 <Star size={16} fill={v.isDefault ? 'currentColor' : 'none'} />
               </button>
               <div className="flex-1 min-w-0">
-                <div className="font-bold text-sm text-gray-900 truncate">{v.label}</div>
+                <div className="font-bold text-sm text-gray-900 truncate flex items-center gap-1.5">
+                  {v.label}
+                  {v.isElectric && (
+                    <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
+                      <Zap size={9} fill="currentColor" /> +20%
+                    </span>
+                  )}
+                </div>
                 <div className="text-xs text-gray-500">
                   {PUISSANCES.find((p) => p.value === v.puissance)?.label || `${v.puissance} CV`}
                   {v.plateNumber ? ` · ${v.plateNumber}` : ''}
                 </div>
               </div>
+              <button
+                onClick={() => toggleElectric(v)}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  v.isElectric
+                    ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                    : 'text-gray-300 hover:text-emerald-500 hover:bg-emerald-50'
+                }`}
+                title={v.isElectric ? 'Vehicule electrique (+20%) — cliquer pour desactiver' : 'Marquer comme electrique (+20%)'}
+              >
+                <Zap size={14} fill={v.isElectric ? 'currentColor' : 'none'} />
+              </button>
               <button
                 onClick={() => handleDelete(v)}
                 className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
@@ -144,6 +203,16 @@ const VehiclesPanel = ({ expense, onClose }) => {
                   />
                 </div>
               </div>
+              <label className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg cursor-pointer select-none hover:bg-emerald-50 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={newElectric}
+                  onChange={(e) => setNewElectric(e.target.checked)}
+                  className="w-4 h-4 rounded text-emerald-600"
+                />
+                <Zap size={12} className={newElectric ? 'text-emerald-600' : 'text-gray-400'} fill={newElectric ? 'currentColor' : 'none'} />
+                <span className="text-xs font-medium text-gray-700">Vehicule electrique <span className="text-emerald-600 font-bold">(+20% bonus fiscal)</span></span>
+              </label>
               <div className="flex items-center justify-end gap-2 pt-1">
                 <button
                   type="button"

@@ -179,6 +179,16 @@ service cloud.firestore {
       match /expenseLocations/{locationId} {
         allow read, write: if isCompanyAdmin(companyId);
       }
+
+      // Reglages annuels (forcedTranche, customBareme...) — admins uniquement
+      match /expenseYearSettings/{year} {
+        allow read, write: if isCompanyAdmin(companyId);
+      }
+
+      // Reglages globaux (majorations distances, etc.) — admins uniquement
+      match /expenseSettings/{docId} {
+        allow read, write: if isCompanyAdmin(companyId);
+      }
     }
   }
 }

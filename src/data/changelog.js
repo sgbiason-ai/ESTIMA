@@ -2,9 +2,24 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.5.22';
+export const APP_VERSION = '2.5.23';
 
 export const CHANGELOG = [
+  {
+    version: '2.5.23',
+    date: '2026-05-01',
+    title: 'Notes de Frais : autocomplete adresses + routing OpenRouteService',
+    highlights: [
+      'Notes de Frais : autocomplete d\'adresses (Nominatim) avec sauvegarde en favoris (domicile + lieux fréquents)',
+      'Notes de Frais : calcul automatique de distance et durée via OpenRouteService (2000 req/jour) au lieu d\'OSRM (instable). Token configurable via .env.local (VITE_ORS_TOKEN)',
+      'Notes de Frais : étapes intermédiaires sur un trajet — la distance est calculée via les étapes',
+      'Notes de Frais : retour direct (A/R + étapes) — checkbox « Retour au départ » qui calcule un retour sans repasser par les étapes',
+      'Notes de Frais : fallback automatique en distance vol d\'oiseau ×1.3 si l\'API de routing est indisponible (badge ambré dans le formulaire)',
+      'Notes de Frais : majorations de distance par paliers (gestion modale dédiée), véhicules multiples, lieux favoris (panneau dédié)',
+      'Notes de Frais : carte interactive avec aperçu du trajet (Leaflet + OpenStreetMap)',
+      'Notes de Frais : export PDF des notes mensuelles',
+    ],
+  },
   {
     version: '2.5.22',
     date: '2026-04-30',

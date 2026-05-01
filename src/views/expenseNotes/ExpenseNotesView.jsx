@@ -3,11 +3,15 @@
 // Affiche la grille des 12 mois de l'annee courante OU le detail d'un mois selectionne.
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Car, Plus, Settings } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Car, Plus, Settings, Zap, Sliders, MapPin } from 'lucide-react';
 import { useExpenseNotes } from '../../hooks/useExpenseNotes';
-import { calculateAnnualAmount, getActiveTranche, PUISSANCES } from '../../data/baremeFiscal2025';
+import { useBranding } from '../../hooks/useBranding';
+import { calculateAnnualAmount, getActiveTranche, getMarginalRate, getRateForTranche, getTrancheLabel, PUISSANCES } from '../../data/baremeFiscal2025';
+import { getTripTotalKm } from '../../utils/distanceMargin';
 import ExpenseNotesMonthView from './ExpenseNotesMonthView';
 import VehiclesPanel from './VehiclesPanel';
+import LocationsPanel from './LocationsPanel';
+import DistanceMarginsModal from './DistanceMarginsModal';
 
 const MONTH_LABELS = [
   'Janvier', 'Fevrier', 'Mars', 'Avril', 'Mai', 'Juin',
@@ -21,34 +25,106 @@ const formatEur = (n) => {
 
 const formatKm = (n) => `${(n || 0).toLocaleString('fr-FR')} km`;
 
-const ExpenseNotesView = ({ user, companyId, onBackToHub }) => {
+const ExpenseNotesView = ({ user, companyId, onBackToHub, masterBranding }) => {
+  const branding = useBranding(masterBranding, null);
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(null); // 'YYYY-MM' ou null
   const [showVehicles, setShowVehicles] = useState(false);
+  const [showLocations, setShowLocations] = useState(false);
+  const [showMargins, setShowMargins] = useState(false);
 
   const expense = useExpenseNotes(companyId, year);
 
-  // Bootstrap : creer un vehicule par defaut si l'utilisateur n'en a aucun
+  // Bootstrap : creer un vehicule par defaut UNIQUEMENT apres le 1er snapshot
+  // Firestore (sinon on cree des doublons en boucle a chaque reload pendant
+  // la milliseconde ou vehicles est encore vide cote client).
   useEffect(() => {
     if (!companyId) return;
-    if (expense.loading) return;
-    if (expense.vehicles.length === 0) {
-      expense.addVehicle({
-        label: 'Vehicule personnel',
-        puissance: 5,
-        plateNumber: '',
-        isDefault: true,
-      });
+    if (!expense.vehiclesLoaded) return;
+    if (expense.vehicles.length > 0) return;
+    expense.addVehicle({
+      label: 'Vehicule personnel',
+      puissance: 5,
+      plateNumber: '',
+      isDefault: true,
+    });
+  }, [companyId, expense.vehiclesLoaded, expense.vehicles.length, expense.addVehicle]);
+
+  const puissance = expense.defaultVehicle?.puissance || 5;
+  const isElectric = expense.defaultVehicle?.isElectric || false;
+  const customBareme = expense.customBareme;
+  const forcedTranche = expense.forcedTranche;
+  const margins = expense.distanceMargins;
+  const marginsEnabled = expense.distanceMarginsEnabled;
+
+  // Sommes effectives par mois (avec A/R + majoration courante)
+  const effectiveMonthlyKm = useMemo(() => {
+    const map = {};
+    for (let i = 0; i < 12; i++) {
+      const m = `${year}-${String(i + 1).padStart(2, '0')}`;
+      const monthTrips = expense.notes[m]?.trips || [];
+      map[m] = monthTrips.reduce((s, t) => s + getTripTotalKm(t, margins, marginsEnabled), 0);
     }
-  }, [companyId, expense.loading, expense.vehicles.length, expense.addVehicle]);
+    return map;
+  }, [expense.notes, year, margins, marginsEnabled]);
+
+  const effectiveYearKm = useMemo(
+    () => Object.values(effectiveMonthlyKm).reduce((s, k) => s + k, 0),
+    [effectiveMonthlyKm],
+  );
+
+  // Si tranche forcee : taux fixe applique a tous les trajets (km × rate)
+  // Sinon : differentiel des cumuls annuels (mode default fiscalement exact)
+  const ratePerKm = useMemo(() => {
+    if (forcedTranche !== null) {
+      return getRateForTranche(forcedTranche, puissance, customBareme, isElectric);
+    }
+    return getMarginalRate(effectiveYearKm, puissance, customBareme, isElectric);
+  }, [forcedTranche, puissance, customBareme, isElectric, effectiveYearKm]);
 
   const yearAmount = useMemo(() => {
-    const puissance = expense.defaultVehicle?.puissance || 5;
-    return calculateAnnualAmount(expense.yearTotalKm, puissance);
-  }, [expense.yearTotalKm, expense.defaultVehicle]);
+    if (forcedTranche !== null) {
+      return effectiveYearKm * ratePerKm;
+    }
+    return calculateAnnualAmount(effectiveYearKm, puissance, customBareme, isElectric);
+  }, [forcedTranche, effectiveYearKm, ratePerKm, puissance, customBareme, isElectric]);
 
-  const tranche = useMemo(() => getActiveTranche(expense.yearTotalKm), [expense.yearTotalKm]);
+  const trancheLabel = useMemo(() => {
+    if (forcedTranche !== null) return getTrancheLabel(forcedTranche, customBareme);
+    return getActiveTranche(effectiveYearKm, customBareme).label;
+  }, [forcedTranche, effectiveYearKm, customBareme]);
+
+  const handleTrancheChange = async (e) => {
+    const v = e.target.value;
+    if (v === 'auto') {
+      await expense.setForcedTranche(year, null);
+    } else {
+      await expense.setForcedTranche(year, Number(v));
+    }
+  };
+
+  // Montant par mois (utilise km effectif avec A/R + majoration)
+  const monthlyAmounts = useMemo(() => {
+    const map = {};
+    if (forcedTranche !== null) {
+      for (let i = 0; i < 12; i++) {
+        const m = `${year}-${String(i + 1).padStart(2, '0')}`;
+        map[m] = (effectiveMonthlyKm[m] || 0) * ratePerKm;
+      }
+    } else {
+      let running = 0;
+      for (let i = 0; i < 12; i++) {
+        const m = `${year}-${String(i + 1).padStart(2, '0')}`;
+        const km = effectiveMonthlyKm[m] || 0;
+        const before = running;
+        running += km;
+        map[m] = calculateAnnualAmount(running, puissance, customBareme, isElectric)
+               - calculateAnnualAmount(before, puissance, customBareme, isElectric);
+      }
+    }
+    return map;
+  }, [effectiveMonthlyKm, forcedTranche, year, puissance, customBareme, isElectric, ratePerKm]);
 
   // ── Vue mensuelle (delegation) ────────────────────────────────────────────
   if (selectedMonth) {
@@ -56,6 +132,8 @@ const ExpenseNotesView = ({ user, companyId, onBackToHub }) => {
       <ExpenseNotesMonthView
         month={selectedMonth}
         expense={expense}
+        branding={branding}
+        user={user}
         onBack={() => setSelectedMonth(null)}
         onBackToHub={onBackToHub}
       />
@@ -81,6 +159,29 @@ const ExpenseNotesView = ({ user, companyId, onBackToHub }) => {
 
         <div className="flex-1" />
 
+        <button
+          onClick={() => setShowLocations(true)}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all text-xs font-medium"
+          title="Gerer les adresses favorites (domicile, chantiers...)"
+        >
+          <MapPin size={14} />
+          Adresses
+          {expense.locations?.length > 0 && (
+            <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1 py-0.5 rounded">{expense.locations.length}</span>
+          )}
+        </button>
+        <button
+          onClick={() => setShowMargins(true)}
+          className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all text-xs font-medium ${
+            expense.distanceMarginsEnabled && expense.distanceMargins?.length > 0
+              ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+              : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+          }`}
+          title="Configurer la majoration automatique des distances"
+        >
+          <Sliders size={14} />
+          Majoration km
+        </button>
         <button
           onClick={() => setShowVehicles(true)}
           className="flex items-center gap-2 px-3 py-2 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all text-xs font-medium"
@@ -115,8 +216,13 @@ const ExpenseNotesView = ({ user, companyId, onBackToHub }) => {
 
             <div className="flex items-center gap-2 text-xs">
               {expense.defaultVehicle ? (
-                <span className="px-3 py-1.5 bg-amber-50 text-amber-800 rounded-xl border border-amber-200 font-semibold">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-800 rounded-xl border border-amber-200 font-semibold">
                   {expense.defaultVehicle.label} · {PUISSANCES.find((p) => p.value === expense.defaultVehicle.puissance)?.label || `${expense.defaultVehicle.puissance} CV`}
+                  {isElectric && (
+                    <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
+                      <Zap size={9} fill="currentColor" /> +20%
+                    </span>
+                  )}
                 </span>
               ) : (
                 <span className="px-3 py-1.5 bg-gray-100 text-gray-500 rounded-xl">Aucun vehicule</span>
@@ -127,15 +233,38 @@ const ExpenseNotesView = ({ user, companyId, onBackToHub }) => {
           <div className="grid grid-cols-3 gap-4">
             <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
               <div className="text-[10px] uppercase font-bold text-blue-600 tracking-widest">Total Annuel</div>
-              <div className="text-2xl font-bold text-gray-900 tabular-nums mt-1">{formatKm(expense.yearTotalKm)}</div>
+              <div className="text-2xl font-bold text-gray-900 tabular-nums mt-1">{formatKm(effectiveYearKm)}</div>
+              <div className="text-[10px] text-blue-400 mt-1 italic">
+                {effectiveYearKm > 0
+                  ? `km effectifs ${marginsEnabled && margins?.length > 0 ? '(A/R + majoration)' : '(A/R inclus)'}`
+                  : 'Aucun trajet'}
+              </div>
             </div>
             <div className="p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-100">
               <div className="text-[10px] uppercase font-bold text-emerald-600 tracking-widest">Montant Deductible</div>
               <div className="text-2xl font-bold text-gray-900 tabular-nums mt-1">{formatEur(yearAmount)}</div>
             </div>
             <div className="p-4 bg-gradient-to-br from-violet-50 to-purple-50 rounded-xl border border-violet-100">
-              <div className="text-[10px] uppercase font-bold text-violet-600 tracking-widest">Tranche Active</div>
-              <div className="text-sm font-bold text-gray-900 mt-1">{tranche.label}</div>
+              <div className="flex items-center justify-between">
+                <div className="text-[10px] uppercase font-bold text-violet-600 tracking-widest">Tranche Active</div>
+                {forcedTranche !== null && (
+                  <span className="text-[9px] font-bold text-violet-700 bg-violet-100 px-1.5 py-0.5 rounded uppercase tracking-wider">forcee</span>
+                )}
+              </div>
+              <select
+                value={forcedTranche === null ? 'auto' : String(forcedTranche)}
+                onChange={handleTrancheChange}
+                className="w-full mt-1 px-2 py-1 bg-white/80 border border-violet-200 rounded-lg text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400 cursor-pointer"
+              >
+                <option value="auto">Auto (selon cumul saisi)</option>
+                <option value="0">{getTrancheLabel(0, customBareme)}</option>
+                <option value="1">{getTrancheLabel(1, customBareme)}</option>
+                <option value="2">{getTrancheLabel(2, customBareme)}</option>
+              </select>
+              <div className="text-[11px] font-bold text-violet-700 tabular-nums mt-1.5">
+                {ratePerKm.toFixed(3)} € / km
+                {isElectric && <span className="ml-1 text-emerald-600">(+20%)</span>}
+              </div>
             </div>
           </div>
         </div>
@@ -145,7 +274,7 @@ const ExpenseNotesView = ({ user, companyId, onBackToHub }) => {
           {MONTH_LABELS.map((label, idx) => {
             const m = `${year}-${String(idx + 1).padStart(2, '0')}`;
             const note = expense.notes[m];
-            const km = note?.totalKm || 0;
+            const km = effectiveMonthlyKm[m] || 0;
             const trips = note?.trips?.length || 0;
             const isCurrent = m === `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
             const isFuture = year > today.getFullYear() || (year === today.getFullYear() && idx > today.getMonth());
@@ -171,6 +300,7 @@ const ExpenseNotesView = ({ user, companyId, onBackToHub }) => {
                 {km > 0 ? (
                   <div className="space-y-1">
                     <div className="text-2xl font-bold text-gray-900 tabular-nums">{formatKm(km)}</div>
+                    <div className="text-sm font-bold text-emerald-600 tabular-nums">{formatEur(monthlyAmounts[m] || 0)}</div>
                     <div className="text-xs text-gray-500">{trips} trajet{trips > 1 ? 's' : ''}</div>
                   </div>
                 ) : (
@@ -187,6 +317,19 @@ const ExpenseNotesView = ({ user, companyId, onBackToHub }) => {
 
       {showVehicles && (
         <VehiclesPanel expense={expense} onClose={() => setShowVehicles(false)} />
+      )}
+
+      {showLocations && (
+        <LocationsPanel expense={expense} onClose={() => setShowLocations(false)} />
+      )}
+
+      {showMargins && (
+        <DistanceMarginsModal
+          rules={expense.distanceMargins}
+          enabled={expense.distanceMarginsEnabled}
+          onSave={(rules, enabled) => expense.setDistanceMargins(rules, enabled)}
+          onClose={() => setShowMargins(false)}
+        />
       )}
     </div>
   );

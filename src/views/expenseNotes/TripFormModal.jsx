@@ -1,51 +1,235 @@
 // src/views/expenseNotes/TripFormModal.jsx
-// Phase 1 : modal d'ajout / edition de trajet — saisie manuelle des km.
-// Phase 2 (futur) : autocomplete adresses + calcul OSRM auto.
+// Phase 2 : autocomplete adresses Nominatim + calcul OSRM automatique + favoris.
+// Le user peut toujours ajuster le km manuellement (override OSRM).
 
-import React, { useState, useEffect } from 'react';
-import { X, Save, Calendar, MapPin, Repeat, FileText, Hash } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { X, Save, Calendar, Repeat, FileText, Hash, Loader2, MapPin, Home as HomeIcon, TrendingUp, Plus, Trash2, RotateCcw, AlertTriangle } from 'lucide-react';
+import AddressAutocomplete from '../../components/expenseNotes/AddressAutocomplete';
+import TripMapPreview from '../../components/expenseNotes/TripMapPreview';
+import { calculateRouteDistance, formatDuration } from '../../utils/expenseGeo';
+import { applyDistanceMargin, getApplicableMarginPct } from '../../utils/distanceMargin';
 
-const TripFormModal = ({ month, trip, onSave, onClose }) => {
+// Motifs preetablis (le user peut taper du libre en plus)
+const DEFAULT_MOTIFS = ['Chantier', 'Reunion sur site', 'Visite de site', 'Commerce'];
+
+const TripFormModal = ({ month, trip, expense, onSave, onClose }) => {
   const [date, setDate] = useState(trip?.date || `${month}-01`);
   const [motif, setMotif] = useState(trip?.motif || '');
-  const [departure, setDeparture] = useState(trip?.departure || '');
-  const [arrival, setArrival] = useState(trip?.arrival || '');
+  const [departure, setDeparture] = useState(
+    trip?.departureGeo
+      ? { label: trip.departure || '', lat: trip.departureGeo.lat, lon: trip.departureGeo.lon }
+      : trip?.departure
+        ? { label: trip.departure, lat: null, lon: null }
+        : null
+  );
+  const [arrival, setArrival] = useState(
+    trip?.arrivalGeo
+      ? { label: trip.arrival || '', lat: trip.arrivalGeo.lat, lon: trip.arrivalGeo.lon }
+      : trip?.arrival
+        ? { label: trip.arrival, lat: null, lon: null }
+        : null
+  );
+  const [waypoints, setWaypoints] = useState(trip?.waypoints || []);
   const [km, setKm] = useState(trip?.km != null ? String(trip.km) : '');
+  const [kmManualOverride, setKmManualOverride] = useState(Boolean(trip?.kmManualOverride));
   const [roundTrip, setRoundTrip] = useState(trip?.roundTrip || false);
+  const [duration, setDuration] = useState(trip?.durationMin || null);
+  const [computing, setComputing] = useState(false);
+  const [askSaveHome, setAskSaveHome] = useState(false);
+  const [rawKm, setRawKm] = useState(trip?.rawKmOsrm || null); // distance OSRM aller (avec etapes)
+  const [estimated, setEstimated] = useState(false); // true si fallback Haversine (OSRM indispo)
+  // Geometrie OSRM : Firestore n'accepte pas les arrays imbriques, on stocke
+  // donc des [{lat, lon}, ...] et on reconvertit en [[lat, lon], ...] pour Leaflet.
+  const objToLatLon = (arr) => Array.isArray(arr) ? arr.map((p) => Array.isArray(p) ? p : [p.lat, p.lon]) : null;
+  const [routeCoords, setRouteCoords] = useState(objToLatLon(trip?.routeCoords));
+  // Retour direct (A/R + etapes) : retour SANS repasser par les etapes
+  const [rawKmReturn, setRawKmReturn] = useState(trip?.rawKmReturn || null);
+  const [returnCoords, setReturnCoords] = useState(objToLatLon(trip?.returnCoords));
 
-  // Sync si on edite un autre trajet sans demonter le modal
-  useEffect(() => {
-    if (trip) {
-      setDate(trip.date || `${month}-01`);
-      setMotif(trip.motif || '');
-      setDeparture(trip.departure || '');
-      setArrival(trip.arrival || '');
-      setKm(trip.km != null ? String(trip.km) : '');
-      setRoundTrip(trip.roundTrip || false);
+  const noHomeYet = !expense.homeLocation;
+
+  // Suggestions motif : defauts + motifs deja utilises dans l'historique
+  const motifSuggestions = useMemo(() => {
+    const set = new Set(DEFAULT_MOTIFS);
+    for (const note of Object.values(expense.notes || {})) {
+      for (const t of note.trips || []) {
+        const m = (t.motif || '').trim();
+        if (m) set.add(m);
+      }
     }
-  }, [trip, month]);
+    return [...set].sort((a, b) => a.localeCompare(b, 'fr'));
+  }, [expense.notes]);
+  // On laisse vide pour qu'a l'ouverture d'un trajet existant, on re-fetche
+  // OSRM et qu'on recupere la geometrie pour afficher le vrai trace sur la
+  // carte (sinon : ligne droite seulement). Le cache OSRM cote utilitaire
+  // rend l'appel quasi-instantane si meme coords.
+  const lastComputeKey = useRef('');
 
-  const handleSubmit = (e) => {
+  // Pre-remplir le depart avec le domicile si nouvelle saisie + domicile defini
+  useEffect(() => {
+    if (!trip && !departure && expense.homeLocation) {
+      const h = expense.homeLocation;
+      setDeparture({ label: h.label, lat: h.lat, lon: h.lon });
+    }
+  }, [trip, expense.homeLocation]); // eslint-disable-line
+
+  // Effect 1 : fetch OSRM (aller via etapes + eventuellement retour direct si A/R + etapes)
+  const validWaypoints = waypoints.filter((w) => w?.lat != null && w?.lon != null);
+  const waypointsKey = validWaypoints.map((w) => `${w.lat},${w.lon}`).join('|');
+
+  useEffect(() => {
+    if (kmManualOverride) return;
+    const fromOk = departure?.lat != null && departure?.lon != null;
+    const toOk = arrival?.lat != null && arrival?.lon != null;
+    if (!fromOk || !toOk) {
+      setDuration(null);
+      return;
+    }
+    const key = `${departure.lat},${departure.lon}|${waypointsKey}|${arrival.lat},${arrival.lon}|${roundTrip ? 'AR' : 'A'}`;
+    if (key === lastComputeKey.current) return;
+    lastComputeKey.current = key;
+
+    setComputing(true);
+    let cancelled = false;
+
+    // Fetch aller (avec etapes)
+    const forwardP = calculateRouteDistance(departure, arrival, validWaypoints);
+    // Fetch retour direct UNIQUEMENT si A/R coche ET il y a des etapes
+    // (sans etape, le retour = aller × 2 calcul automatique cote getTripTotalKm)
+    const returnP = (roundTrip && validWaypoints.length > 0)
+      ? calculateRouteDistance(arrival, departure, [])
+      : Promise.resolve(null);
+
+    Promise.all([forwardP, returnP]).then(([fwd, ret]) => {
+      if (cancelled) return;
+      setComputing(false);
+      if (fwd) {
+        setRawKm(fwd.km);
+        setDuration(fwd.durationMin);
+        setRouteCoords(fwd.coordinates || null);
+        // Si l'aller OU le retour est une estimation, on flag
+        setEstimated(Boolean(fwd.estimated || ret?.estimated));
+      }
+      if (ret) {
+        setRawKmReturn(ret.km);
+        setReturnCoords(ret.coordinates || null);
+      } else {
+        // Pas de A/R+etapes : nettoyer le retour stocke
+        setRawKmReturn(null);
+        setReturnCoords(null);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [departure?.lat, departure?.lon, arrival?.lat, arrival?.lon, kmManualOverride, waypointsKey, roundTrip]); // eslint-disable-line
+
+  // Effect 2 : applique la majoration courante au rawKm (recompute live quand
+  // les regles changent). Sert aussi a la 1ere init quand on ouvre un trajet
+  // existant avec son rawKm restaure.
+  useEffect(() => {
+    if (kmManualOverride) return;
+    if (!rawKm) return;
+    const finalKm = expense.distanceMarginsEnabled
+      ? applyDistanceMargin(rawKm, expense.distanceMargins)
+      : rawKm;
+    setKm(String(finalKm));
+  }, [rawKm, expense.distanceMarginsEnabled, expense.distanceMargins, kmManualOverride]);
+
+  // Pourcentage de majoration appliquee (pour affichage)
+  const appliedMarginPct = rawKm && expense.distanceMarginsEnabled
+    ? getApplicableMarginPct(rawKm, expense.distanceMargins)
+    : 0;
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const kmNum = Number(String(km).replace(',', '.'));
     if (!date || !kmNum || kmNum <= 0) return;
+
+    // Ne stocker que les etapes valides (avec coords ou texte non vide)
+    const cleanWaypoints = waypoints
+      .filter((w) => w && (w.label?.trim() || w.lat != null))
+      .map((w) => ({
+        label: (w.label || '').trim(),
+        lat: w.lat ?? null,
+        lon: w.lon ?? null,
+      }));
+
+    // Firestore ne supporte pas les arrays imbriques → on convertit en objets
+    const latLonToObj = (arr) => Array.isArray(arr) ? arr.map(([lat, lon]) => ({ lat, lon })) : null;
+
     onSave({
       date,
       motif: motif.trim(),
-      departure: departure.trim(),
-      arrival: arrival.trim(),
+      departure: departure?.label?.trim() || '',
+      arrival: arrival?.label?.trim() || '',
+      departureGeo: departure?.lat != null ? { lat: departure.lat, lon: departure.lon } : null,
+      arrivalGeo: arrival?.lat != null ? { lat: arrival.lat, lon: arrival.lon } : null,
+      waypoints: cleanWaypoints,
       km: kmNum,
+      rawKmOsrm: rawKm,                            // aller : distance route brute (avant majoration)
+      routeCoords: latLonToObj(routeCoords),        // [{lat, lon}, ...] pour Firestore
+      rawKmReturn,                                  // retour direct (A/R + etapes uniquement, sinon null)
+      returnCoords: latLonToObj(returnCoords),
+      kmManualOverride,
+      durationMin: duration,
       roundTrip,
     });
+
+    // Si on est en train de saisir une adresse de depart geocodee et qu'aucun domicile
+    // n'est encore defini, proposer la sauvegarde post-fermeture.
+    if (askSaveHome && departure?.lat != null) {
+      try {
+        await expense.addLocation({
+          label: departure.label,
+          address: departure.label,
+          lat: departure.lat,
+          lon: departure.lon,
+          isHome: true,
+        });
+      } catch (err) {
+        console.warn('[TripForm] save home failed', err);
+      }
+    }
+  };
+
+  const handleSaveFavorite = async (data) => {
+    try {
+      await expense.addLocation({
+        ...data,
+        isHome: false,
+      });
+    } catch (err) {
+      console.warn('[TripForm] saveFavorite failed', err);
+    }
+  };
+
+  const handleKmChange = (e) => {
+    setKm(e.target.value);
+    setKmManualOverride(true);
   };
 
   const isEdit = Boolean(trip);
+  const hasWaypoints = validWaypoints.length > 0;
+  const kmNum = Number(String(km).replace(',', '.') || 0);
+  // Total enregistré : aller (avec majoration) + retour
+  //  - Sans étape : retour = aller × 2
+  //  - Avec étapes : retour direct (rawKmReturn, avec majoration éventuelle)
+  let totalKm = kmNum;
+  if (roundTrip) {
+    if (hasWaypoints && rawKmReturn) {
+      const ret = expense.distanceMarginsEnabled
+        ? applyDistanceMargin(rawKmReturn, expense.distanceMargins)
+        : rawKmReturn;
+      totalKm = kmNum + ret;
+    } else {
+      totalKm = kmNum * 2;
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-modal flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
       <form
         onSubmit={handleSubmit}
-        className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden"
+        className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden"
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h2 className="text-base font-bold text-gray-900">
@@ -60,93 +244,220 @@ const TripFormModal = ({ month, trip, onSave, onClose }) => {
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 flex items-center gap-1.5 mb-1.5">
-              <Calendar size={11} /> Date
-            </label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-              className="w-full px-3 py-2 bg-gray-100 border border-gray-200/60 rounded-xl focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-sm"
-            />
-          </div>
-
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 flex items-center gap-1.5 mb-1.5">
-              <FileText size={11} /> Motif
-            </label>
-            <input
-              type="text"
-              value={motif}
-              onChange={(e) => setMotif(e.target.value)}
-              placeholder="Visite chantier, RDV client, deplacement bureau…"
-              className="w-full px-3 py-2 bg-gray-100 border border-gray-200/60 rounded-xl focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-sm"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
+        <div className="p-6 grid grid-cols-1 md:grid-cols-[1fr_420px] gap-6">
+          <div className="space-y-4">
+          <div className="grid grid-cols-[140px_1fr] gap-3">
             <div>
               <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 flex items-center gap-1.5 mb-1.5">
-                <MapPin size={11} className="text-emerald-600" /> Depart
+                <Calendar size={11} /> Date
               </label>
               <input
-                type="text"
-                value={departure}
-                onChange={(e) => setDeparture(e.target.value)}
-                placeholder="Toulouse"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                required
                 className="w-full px-3 py-2 bg-gray-100 border border-gray-200/60 rounded-xl focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-sm"
               />
             </div>
             <div>
               <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 flex items-center gap-1.5 mb-1.5">
-                <MapPin size={11} className="text-rose-600" /> Arrivee
+                <FileText size={11} /> Motif
               </label>
               <input
                 type="text"
-                value={arrival}
-                onChange={(e) => setArrival(e.target.value)}
-                placeholder="Albi"
+                list="trip-motif-suggestions"
+                value={motif}
+                onChange={(e) => setMotif(e.target.value)}
+                placeholder="Chantier, Reunion sur site…"
                 className="w-full px-3 py-2 bg-gray-100 border border-gray-200/60 rounded-xl focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-sm"
               />
+              <datalist id="trip-motif-suggestions">
+                {motifSuggestions.map((m) => (
+                  <option key={m} value={m} />
+                ))}
+              </datalist>
             </div>
+          </div>
+
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 flex items-center gap-1.5 mb-1.5">
+              <MapPin size={11} className="text-emerald-600" /> Depart
+              {noHomeYet && departure?.lat != null && (
+                <button
+                  type="button"
+                  onClick={() => setAskSaveHome((v) => !v)}
+                  className={`ml-auto flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold transition-colors ${
+                    askSaveHome ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500 hover:bg-amber-50 hover:text-amber-600'
+                  }`}
+                  title="Sauvegarder comme adresse domicile (1ere fois seulement)"
+                >
+                  <HomeIcon size={9} />
+                  {askSaveHome ? 'Sera enregistre comme domicile' : 'Definir comme domicile'}
+                </button>
+              )}
+            </label>
+            <AddressAutocomplete
+              value={departure}
+              onChange={setDeparture}
+              favorites={expense.locations}
+              placeholder="Toulouse, 12 rue de la Republique…"
+              iconColor="text-emerald-500"
+              onSaveAsFavorite={handleSaveFavorite}
+            />
+          </div>
+
+          {/* Etapes intermediaires */}
+          {waypoints.map((wp, idx) => (
+            <div key={idx}>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 flex items-center gap-1.5 mb-1.5">
+                <MapPin size={11} className="text-blue-500" /> Etape {idx + 1}
+                <button
+                  type="button"
+                  onClick={() => setWaypoints((arr) => arr.filter((_, i) => i !== idx))}
+                  className="ml-auto p-1 rounded-md hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
+                  title="Supprimer cette etape"
+                >
+                  <Trash2 size={11} />
+                </button>
+              </label>
+              <AddressAutocomplete
+                value={wp}
+                onChange={(val) => setWaypoints((arr) => arr.map((w, i) => (i === idx ? val : w)))}
+                favorites={expense.locations}
+                placeholder="Etape intermediaire..."
+                iconColor="text-blue-500"
+                onSaveAsFavorite={handleSaveFavorite}
+              />
+            </div>
+          ))}
+
+          <button
+            type="button"
+            onClick={() => setWaypoints((arr) => [...arr, null])}
+            className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-blue-300 text-blue-600 hover:border-blue-500 hover:bg-blue-50/50 transition-all text-[11px] font-medium w-fit"
+          >
+            <Plus size={11} />
+            Ajouter une etape
+          </button>
+
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 flex items-center gap-1.5 mb-1.5">
+              <MapPin size={11} className="text-rose-600" /> Arrivee
+            </label>
+            <AddressAutocomplete
+              value={arrival}
+              onChange={setArrival}
+              favorites={expense.locations}
+              placeholder="Albi, Mairie de Castres…"
+              iconColor="text-rose-500"
+              onSaveAsFavorite={handleSaveFavorite}
+            />
           </div>
 
           <div className="grid grid-cols-[1fr_auto] gap-3 items-end">
             <div>
               <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 flex items-center gap-1.5 mb-1.5">
                 <Hash size={11} /> Distance (km)
+                {kmManualOverride && (
+                  <button
+                    type="button"
+                    onClick={() => setKmManualOverride(false)}
+                    className="ml-auto text-[9px] font-bold text-blue-600 hover:underline"
+                  >
+                    Recalculer auto
+                  </button>
+                )}
               </label>
-              <input
-                type="number"
-                step="0.1"
-                min="0"
-                value={km}
-                onChange={(e) => setKm(e.target.value)}
-                required
-                placeholder="78.4"
-                className="w-full px-3 py-2 bg-gray-100 border border-gray-200/60 rounded-xl focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-sm tabular-nums"
-              />
+              <div className="relative">
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={km}
+                  onChange={handleKmChange}
+                  required
+                  placeholder="78.4"
+                  className="w-full px-3 py-2 bg-gray-100 border border-gray-200/60 rounded-xl focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-sm tabular-nums pr-12"
+                />
+                {computing && (
+                  <Loader2 size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-500 animate-spin" />
+                )}
+              </div>
             </div>
-            <label className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-xl border border-gray-200/60 cursor-pointer select-none hover:bg-gray-200/50 transition-colors">
+            <label
+              className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-xl border border-gray-200/60 cursor-pointer select-none hover:bg-gray-200/50 transition-colors"
+              title={
+                hasWaypoints
+                  ? 'Coché : retour direct depuis l\'arrivée vers le départ (sans repasser par les étapes)'
+                  : 'Coché : la distance est doublée (aller-retour)'
+              }
+            >
               <input
                 type="checkbox"
                 checked={roundTrip}
                 onChange={(e) => setRoundTrip(e.target.checked)}
                 className="w-4 h-4 rounded text-blue-600"
               />
-              <Repeat size={12} className="text-gray-500" />
-              <span className="text-xs font-medium text-gray-700">A/R</span>
+              {hasWaypoints ? (
+                <>
+                  <RotateCcw size={12} className="text-gray-500" />
+                  <span className="text-xs font-medium text-gray-700 whitespace-nowrap">Retour au départ</span>
+                </>
+              ) : (
+                <>
+                  <Repeat size={12} className="text-gray-500" />
+                  <span className="text-xs font-medium text-gray-700">A/R</span>
+                </>
+              )}
             </label>
           </div>
 
-          {roundTrip && km && (
-            <div className="text-[11px] text-gray-500 italic">
-              Aller-retour : {(Number(String(km).replace(',', '.')) * 2).toLocaleString('fr-FR')} km au total seront enregistres.
+          {(duration || (roundTrip && km) || appliedMarginPct > 0 || estimated) && (
+            <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-[11px] text-gray-500 italic px-1">
+              {estimated && !kmManualOverride && (
+                <span
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-700 not-italic font-medium"
+                  title={`OSRM est temporairement indisponible. Distance estimée à vol d'oiseau × ${1.3} (facteur route europe). Tu peux ajuster le km manuellement.`}
+                >
+                  <AlertTriangle size={11} />
+                  OSRM indispo — estimation vol d'oiseau ×1.3
+                </span>
+              )}
+              {duration && (
+                <span className="flex items-center gap-1">
+                  <span className="text-gray-400">⏱</span>
+                  ~{formatDuration(duration)} {kmManualOverride && '(estimation initiale)'}
+                </span>
+              )}
+              {appliedMarginPct > 0 && rawKm && !kmManualOverride && (
+                <>
+                  {duration && <span className="text-gray-300">·</span>}
+                  <span className="flex items-center gap-1 text-indigo-600 not-italic font-medium">
+                    <TrendingUp size={11} />
+                    +{appliedMarginPct}% applique ({rawKm.toLocaleString('fr-FR')} km route → {Number(km).toLocaleString('fr-FR')} km)
+                  </span>
+                </>
+              )}
+              {roundTrip && km && (
+                <>
+                  {(duration || appliedMarginPct > 0) && <span className="text-gray-300">·</span>}
+                  <span>A/R : {totalKm.toLocaleString('fr-FR')} km enregistres</span>
+                </>
+              )}
             </div>
           )}
+          </div>
+
+          {/* Colonne droite : carte preview */}
+          <div className="md:sticky md:top-0">
+            {(departure?.lat != null || arrival?.lat != null || validWaypoints.length > 0) ? (
+              <TripMapPreview from={departure} to={arrival} waypoints={waypoints} coordinates={routeCoords} returnCoordinates={returnCoords} />
+            ) : (
+              <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 h-[420px] flex items-center justify-center text-[11px] text-gray-400 italic px-4 text-center">
+                Selectionne un depart et une arrivee pour voir le trajet sur la carte.
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center justify-end gap-2 px-6 py-4 bg-gray-50 border-t border-gray-100">

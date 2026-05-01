@@ -18,7 +18,10 @@ const monthId = (year, monthIdx0) => `${year}-${String(monthIdx0 + 1).padStart(2
 export function useExpenseNotes(companyId, year) {
   const [notes, setNotes] = useState({});       // { 'YYYY-MM': { id, trips, totalKm, ... } }
   const [vehicles, setVehicles] = useState([]);
+  const [vehiclesLoaded, setVehiclesLoaded] = useState(false);
   const [locations, setLocations] = useState([]);
+  const [yearSettings, setYearSettings] = useState({}); // { 'YYYY': { priorKm, forcedTranche } }
+  const [globalSettings, setGlobalSettings] = useState({}); // { distanceMargins, distanceMarginsEnabled, ... }
   const [loading, setLoading] = useState(true);
 
   // ── Sub : notes du mois pour l'annee selectionnee ─────────────────────────
@@ -49,9 +52,11 @@ export function useExpenseNotes(companyId, year) {
 
   // ── Sub : vehicules ───────────────────────────────────────────────────────
   useEffect(() => {
-    if (!companyId) { setVehicles([]); return; }
+    if (!companyId) { setVehicles([]); setVehiclesLoaded(false); return; }
+    setVehiclesLoaded(false);
     const unsub = onSnapshot(collection(db, 'companies', companyId, 'vehicles'), (snap) => {
       setVehicles(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setVehiclesLoaded(true);
     }, (err) => console.error('[ExpenseNotes] vehicles snapshot error', err));
     return () => unsub();
   }, [companyId]);
@@ -63,6 +68,62 @@ export function useExpenseNotes(companyId, year) {
       setLocations(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     }, (err) => console.error('[ExpenseNotes] locations snapshot error', err));
     return () => unsub();
+  }, [companyId]);
+
+  // ── Sub : reglages par annee (priorKm pour cumul initial) ─────────────────
+  useEffect(() => {
+    if (!companyId) { setYearSettings({}); return; }
+    const unsub = onSnapshot(collection(db, 'companies', companyId, 'expenseYearSettings'), (snap) => {
+      const map = {};
+      snap.forEach((d) => { map[d.id] = d.data(); });
+      setYearSettings(map);
+    }, (err) => console.error('[ExpenseNotes] yearSettings snapshot error', err));
+    return () => unsub();
+  }, [companyId]);
+
+  // ── Sub : reglages globaux (majorations distances, etc.) ──────────────────
+  useEffect(() => {
+    if (!companyId) { setGlobalSettings({}); return; }
+    const ref = doc(db, 'companies', companyId, 'expenseSettings', 'main');
+    const unsub = onSnapshot(ref, (snap) => {
+      setGlobalSettings(snap.exists() ? snap.data() : {});
+    }, (err) => console.error('[ExpenseNotes] globalSettings snapshot error', err));
+    return () => unsub();
+  }, [companyId]);
+
+  const distanceMargins = useMemo(() => globalSettings.distanceMargins || [], [globalSettings]);
+  const distanceMarginsEnabled = useMemo(() => globalSettings.distanceMarginsEnabled !== false, [globalSettings]);
+
+  const setDistanceMargins = useCallback(async (rules, enabled) => {
+    if (!companyId) return;
+    const ref = doc(db, 'companies', companyId, 'expenseSettings', 'main');
+    await setDoc(ref, {
+      distanceMargins: rules,
+      distanceMarginsEnabled: enabled,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+  }, [companyId]);
+
+  const customBareme = useMemo(() => yearSettings[String(year)]?.customBareme || null, [yearSettings, year]);
+
+  // forcedTranche : index 0/1/2 pour fixer la tranche fiscale appliquee aux
+  // trajets, ou null pour auto (selon cumul saisi).
+  const forcedTranche = useMemo(() => {
+    const v = yearSettings[String(year)]?.forcedTranche;
+    return (v === 0 || v === 1 || v === 2) ? v : null;
+  }, [yearSettings, year]);
+
+  const setForcedTranche = useCallback(async (yr, value) => {
+    if (!companyId) return;
+    const ref = doc(db, 'companies', companyId, 'expenseYearSettings', String(yr));
+    // null pour reinitialiser
+    await setDoc(ref, { forcedTranche: value === null ? null : Number(value), updatedAt: serverTimestamp() }, { merge: true });
+  }, [companyId]);
+
+  const setCustomBareme = useCallback(async (yr, bareme) => {
+    if (!companyId) return;
+    const ref = doc(db, 'companies', companyId, 'expenseYearSettings', String(yr));
+    await setDoc(ref, { customBareme: bareme, updatedAt: serverTimestamp() }, { merge: true });
   }, [companyId]);
 
   // ── Helpers note (trajets) ────────────────────────────────────────────────
@@ -124,10 +185,14 @@ export function useExpenseNotes(companyId, year) {
     return getCumulBeforeMonth(month) + (notes[month]?.totalKm || 0);
   }, [notes, getCumulBeforeMonth]);
 
-  const yearTotalKm = useMemo(
+  // Total km saisi dans l'app sur l'annee
+  const yearLoggedKm = useMemo(
     () => sortedMonths.reduce((s, m) => s + (notes[m]?.totalKm || 0), 0),
     [notes, sortedMonths],
   );
+
+  // Alias historique
+  const yearTotalKm = yearLoggedKm;
 
   // ── CRUD Vehicules ────────────────────────────────────────────────────────
   const addVehicle = useCallback(async (data) => {
@@ -174,9 +239,12 @@ export function useExpenseNotes(companyId, year) {
   const homeLocation = useMemo(() => locations.find((l) => l.isHome) || null, [locations]);
 
   return {
-    notes, vehicles, locations, loading,
+    notes, vehicles, vehiclesLoaded, locations, loading,
     defaultVehicle, homeLocation,
-    yearTotalKm,
+    yearTotalKm, yearLoggedKm,
+    forcedTranche, setForcedTranche,
+    customBareme, setCustomBareme,
+    distanceMargins, distanceMarginsEnabled, setDistanceMargins,
     addTrip, updateTrip, deleteTrip, setNoteVehicle,
     getCumulBeforeMonth, getCumulToMonth,
     addVehicle, updateVehicle, deleteVehicle,
