@@ -18,6 +18,8 @@ export const CHANGELOG = [
       'Notes de Frais : majorations de distance par paliers (gestion modale dédiée), véhicules multiples, lieux favoris (panneau dédié)',
       'Notes de Frais : carte interactive avec aperçu du trajet (Leaflet + OpenStreetMap)',
       'Notes de Frais : export PDF des notes mensuelles',
+      'Notes de Frais : affichage détaillé du calcul de distance dans le formulaire — pour un trajet avec étapes + retour, on voit Aller / Retour direct / Total séparément (au lieu d\'un total opaque)',
+      'Notes de Frais : sauvegarde optimiste — le formulaire se ferme instantanément au clic sur Enregistrer/Mettre à jour (le write Firestore continue en arrière-plan, toast d\'erreur en cas d\'échec)',
     ],
   },
   {

@@ -6,7 +6,7 @@ import { Plus, Trash2, ArrowLeft, FileDown } from 'lucide-react';
 import { calculateMonthAmount, calculateAnnualAmount, getActiveTranche, getMarginalRate, getRateForTranche, getTrancheLabel, PUISSANCES } from '../../data/baremeFiscal2025';
 import { getTripTotalKm } from '../../utils/distanceMargin';
 import TripFormModal from './TripFormModal';
-import { confirm } from '../../utils/globalUI';
+import { confirm, toast } from '../../utils/globalUI';
 import { generateExpenseNotesPdf } from '../../utils/pdf/pdfExpenseNotesGenerator';
 
 const MONTH_LABELS_FR = [
@@ -101,14 +101,23 @@ const ExpenseNotesMonthView = ({ month, expense, branding, user, onBack, onBackT
     ? effectiveMonthKm * ratePerKm
     : calculateMonthAmount(cumulBefore, effectiveMonthKm, puissance, customBareme, isElectric);
 
-  const handleSaveTrip = async (data) => {
-    if (editingTrip) {
-      await expense.updateTrip(month, editingTrip.id, data);
-    } else {
-      await expense.addTrip(month, data);
-    }
+  const handleSaveTrip = (data) => {
+    // Fermeture optimiste : on ferme le modal immediatement et on ecrit en
+    // arriere-plan (le write Firestore peut prendre 200-500ms). En cas
+    // d'echec, toast d'erreur ; l'utilisateur peut re-saisir.
+    const wasEditing = Boolean(editingTrip);
+    const editId = editingTrip?.id;
     setShowForm(false);
     setEditingTrip(null);
+
+    const promise = wasEditing
+      ? expense.updateTrip(month, editId, data)
+      : expense.addTrip(month, data);
+
+    promise.catch((err) => {
+      console.error('[ExpenseNotes] save trip failed', err);
+      toast.error(`Échec de la sauvegarde : ${err?.message || err}`);
+    });
   };
 
   const handleDeleteTrip = async (trip) => {

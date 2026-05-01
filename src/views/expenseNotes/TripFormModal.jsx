@@ -138,6 +138,15 @@ const TripFormModal = ({ month, trip, expense, onSave, onClose }) => {
   const appliedMarginPct = rawKm && expense.distanceMarginsEnabled
     ? getApplicableMarginPct(rawKm, expense.distanceMargins)
     : 0;
+  // Idem pour le retour direct (cas A/R + etapes seulement)
+  const appliedMarginPctReturn = rawKmReturn && expense.distanceMarginsEnabled
+    ? getApplicableMarginPct(rawKmReturn, expense.distanceMargins)
+    : 0;
+  const kmReturn = rawKmReturn
+    ? (expense.distanceMarginsEnabled
+        ? applyDistanceMargin(rawKmReturn, expense.distanceMargins)
+        : rawKmReturn)
+    : 0;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -174,20 +183,18 @@ const TripFormModal = ({ month, trip, expense, onSave, onClose }) => {
       roundTrip,
     });
 
-    // Si on est en train de saisir une adresse de depart geocodee et qu'aucun domicile
-    // n'est encore defini, proposer la sauvegarde post-fermeture.
+    // Sauvegarde domicile en background (non-bloquant) : la fermeture du modal
+    // est deja faite cote parent (handleSaveTrip optimiste).
     if (askSaveHome && departure?.lat != null) {
-      try {
-        await expense.addLocation({
-          label: departure.label,
-          address: departure.label,
-          lat: departure.lat,
-          lon: departure.lon,
-          isHome: true,
-        });
-      } catch (err) {
+      expense.addLocation({
+        label: departure.label,
+        address: departure.label,
+        lat: departure.lat,
+        lon: departure.lon,
+        isHome: true,
+      }).catch((err) => {
         console.warn('[TripForm] save home failed', err);
-      }
+      });
     }
   };
 
@@ -417,10 +424,10 @@ const TripFormModal = ({ month, trip, expense, onSave, onClose }) => {
               {estimated && !kmManualOverride && (
                 <span
                   className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-700 not-italic font-medium"
-                  title={`OSRM est temporairement indisponible. Distance estimée à vol d'oiseau × ${1.3} (facteur route europe). Tu peux ajuster le km manuellement.`}
+                  title={`Service de routing temporairement indisponible. Distance estimée à vol d'oiseau × ${1.3} (facteur route europe). Tu peux ajuster le km manuellement.`}
                 >
                   <AlertTriangle size={11} />
-                  OSRM indispo — estimation vol d'oiseau ×1.3
+                  Routing indispo — estimation vol d'oiseau ×1.3
                 </span>
               )}
               {duration && (
@@ -429,19 +436,47 @@ const TripFormModal = ({ month, trip, expense, onSave, onClose }) => {
                   ~{formatDuration(duration)} {kmManualOverride && '(estimation initiale)'}
                 </span>
               )}
-              {appliedMarginPct > 0 && rawKm && !kmManualOverride && (
+              {/* CAS DETAILLE : A/R + etapes (rawKmReturn defini) → aller + retour direct */}
+              {roundTrip && hasWaypoints && rawKmReturn && !kmManualOverride ? (
                 <>
                   {duration && <span className="text-gray-300">·</span>}
                   <span className="flex items-center gap-1 text-indigo-600 not-italic font-medium">
                     <TrendingUp size={11} />
-                    +{appliedMarginPct}% applique ({rawKm.toLocaleString('fr-FR')} km route → {Number(km).toLocaleString('fr-FR')} km)
+                    Aller : {rawKm?.toLocaleString('fr-FR')} km
+                    {appliedMarginPct > 0 && ` → ${Number(km).toLocaleString('fr-FR')} km (+${appliedMarginPct}%)`}
+                  </span>
+                  <span className="text-gray-300">·</span>
+                  <span className="flex items-center gap-1 text-indigo-600 not-italic font-medium">
+                    <RotateCcw size={11} />
+                    Retour direct : {rawKmReturn.toLocaleString('fr-FR')} km
+                    {appliedMarginPctReturn > 0 && ` → ${kmReturn.toLocaleString('fr-FR')} km (+${appliedMarginPctReturn}%)`}
+                  </span>
+                  <span className="text-gray-300">·</span>
+                  <span className="not-italic font-bold text-gray-700">
+                    Total : {totalKm.toLocaleString('fr-FR')} km enregistrés
                   </span>
                 </>
-              )}
-              {roundTrip && km && (
+              ) : (
                 <>
-                  {(duration || appliedMarginPct > 0) && <span className="text-gray-300">·</span>}
-                  <span>A/R : {totalKm.toLocaleString('fr-FR')} km enregistres</span>
+                  {/* CAS SIMPLE : majoration sur l'aller seul (avec ou sans doublement) */}
+                  {appliedMarginPct > 0 && rawKm && !kmManualOverride && (
+                    <>
+                      {duration && <span className="text-gray-300">·</span>}
+                      <span className="flex items-center gap-1 text-indigo-600 not-italic font-medium">
+                        <TrendingUp size={11} />
+                        +{appliedMarginPct}% appliqué ({rawKm.toLocaleString('fr-FR')} km → {Number(km).toLocaleString('fr-FR')} km)
+                      </span>
+                    </>
+                  )}
+                  {/* Doublement A/R sans etape */}
+                  {roundTrip && km && (
+                    <>
+                      {(duration || appliedMarginPct > 0) && <span className="text-gray-300">·</span>}
+                      <span className="not-italic font-bold text-gray-700">
+                        A/R : {totalKm.toLocaleString('fr-FR')} km enregistrés
+                      </span>
+                    </>
+                  )}
                 </>
               )}
             </div>
