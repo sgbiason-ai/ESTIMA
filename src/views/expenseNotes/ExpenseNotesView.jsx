@@ -6,7 +6,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Car, Plus, Settings, Zap, Sliders, MapPin } from 'lucide-react';
 import { useExpenseNotes } from '../../hooks/useExpenseNotes';
 import { useBranding } from '../../hooks/useBranding';
-import { calculateAnnualAmount, getActiveTranche, getMarginalRate, getRateForTranche, getTrancheLabel, PUISSANCES } from '../../data/baremeFiscal2025';
+import { calculateAnnualAmount, getActiveTranche, getMarginalRate, getRateForTranche, getTrancheLabel, PUISSANCES, DEFAULT_TRANCHE_BREAKS } from '../../data/baremeFiscal2025';
 import { getTripTotalKm } from '../../utils/distanceMargin';
 import ExpenseNotesMonthView from './ExpenseNotesMonthView';
 import VehiclesPanel from './VehiclesPanel';
@@ -73,6 +73,22 @@ const ExpenseNotesView = ({ user, companyId, onBackToHub, masterBranding }) => {
     () => Object.values(effectiveMonthlyKm).reduce((s, k) => s + k, 0),
     [effectiveMonthlyKm],
   );
+
+  const maxMonthKm = useMemo(
+    () => Math.max(0, ...Object.values(effectiveMonthlyKm)),
+    [effectiveMonthlyKm],
+  );
+
+  const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+
+  // Index de la tranche fiscale active selon le cumul annuel et les breaks
+  // (custom si actif, sinon DEFAULT_TRANCHE_BREAKS = [5000, 20000])
+  const trancheBreaks = customBareme?.enabled && customBareme?.breaks?.length === 2
+    ? customBareme.breaks
+    : DEFAULT_TRANCHE_BREAKS;
+  const activeTrancheIdx = effectiveYearKm <= trancheBreaks[0]
+    ? 0
+    : effectiveYearKm <= trancheBreaks[1] ? 1 : 2;
 
   // Si tranche forcee : taux fixe applique a tous les trajets (km × rate)
   // Sinon : differentiel des cumuls annuels (mode default fiscalement exact)
@@ -269,7 +285,127 @@ const ExpenseNotesView = ({ user, companyId, onBackToHub, masterBranding }) => {
           </div>
         </div>
 
+        {/* Évolution mensuelle + progression tranche fiscale */}
+        {effectiveYearKm > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+            {/* Chart : 12 barres mensuelles (lg = 2 cols sur 3) */}
+            <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200/60 p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Évolution mensuelle</h3>
+                <span className="text-[10px] text-gray-400 tabular-nums">
+                  Pic : {Math.round(maxMonthKm).toLocaleString('fr-FR')} km
+                </span>
+              </div>
+              <div className="flex items-end gap-1.5 h-24">
+                {MONTH_LABELS.map((label, i) => {
+                  const m = `${year}-${String(i + 1).padStart(2, '0')}`;
+                  const km = effectiveMonthlyKm[m] || 0;
+                  const amount = monthlyAmounts[m] || 0;
+                  const heightPct = maxMonthKm > 0 ? (km / maxMonthKm) * 100 : 0;
+                  const isCurrent = m === currentMonth;
+                  const isFuture = year > today.getFullYear() || (year === today.getFullYear() && i > today.getMonth());
+                  return (
+                    <button
+                      key={m}
+                      onClick={() => !isFuture && setSelectedMonth(m)}
+                      disabled={isFuture}
+                      className="flex-1 flex flex-col items-stretch gap-1 group disabled:cursor-not-allowed h-full"
+                      title={`${label} ${year} : ${formatKm(km)} · ${formatEur(amount)}`}
+                    >
+                      <div className="flex-1 flex items-end relative">
+                        <div
+                          className={`w-full rounded-t transition-all ${
+                            isCurrent
+                              ? 'bg-amber-400 group-hover:bg-amber-500'
+                              : isFuture
+                                ? 'bg-gray-100'
+                                : km > 0
+                                  ? 'bg-blue-300 group-hover:bg-blue-500'
+                                  : 'bg-gray-100'
+                          }`}
+                          style={{ height: km > 0 ? `${Math.max(heightPct, 5)}%` : '4px' }}
+                        />
+                      </div>
+                      <span className={`text-[9px] uppercase tracking-wider text-center ${
+                        isCurrent ? 'text-amber-700 font-bold' : 'text-gray-400'
+                      }`}>
+                        {label.slice(0, 3)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Progression tranche fiscale */}
+            <div className="bg-white rounded-2xl border border-gray-200/60 p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Progression tranche</h3>
+                <span className="text-[10px] font-bold text-violet-700 bg-violet-100 px-1.5 py-0.5 rounded">
+                  T{activeTrancheIdx + 1}
+                </span>
+              </div>
+              {(() => {
+                const barMax = Math.max(trancheBreaks[1], effectiveYearKm);
+                const fillPct = (effectiveYearKm / barMax) * 100;
+                const mark1Pct = (trancheBreaks[0] / barMax) * 100;
+                const mark2Pct = (trancheBreaks[1] / barMax) * 100;
+                return (
+                  <>
+                    <div className="text-xl font-bold text-gray-900 tabular-nums mb-3">
+                      {formatKm(effectiveYearKm)}
+                    </div>
+                    <div className="relative h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="absolute inset-y-0 left-0 bg-gradient-to-r from-violet-400 to-purple-500 rounded-full transition-all"
+                        style={{ width: `${fillPct}%` }}
+                      />
+                      {/* marker 5000 */}
+                      <div className="absolute inset-y-0 w-px bg-gray-400/70" style={{ left: `${mark1Pct}%` }} />
+                      {/* marker 20000 */}
+                      <div className="absolute inset-y-0 w-px bg-gray-400/70" style={{ left: `${mark2Pct}%` }} />
+                    </div>
+                    <div className="relative h-3 mt-1 text-[9px] text-gray-400 tabular-nums">
+                      <span className="absolute" style={{ left: `${mark1Pct}%`, transform: 'translateX(-50%)' }}>
+                        {trancheBreaks[0].toLocaleString('fr-FR')}
+                      </span>
+                      <span className="absolute" style={{ left: `${mark2Pct}%`, transform: 'translateX(-50%)' }}>
+                        {trancheBreaks[1].toLocaleString('fr-FR')}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-gray-500 mt-3 leading-relaxed">
+                      {activeTrancheIdx === 0 && (
+                        <>Reste <span className="font-bold text-gray-700 tabular-nums">{formatKm(trancheBreaks[0] - effectiveYearKm)}</span> avant la tranche 2</>
+                      )}
+                      {activeTrancheIdx === 1 && (
+                        <>Reste <span className="font-bold text-gray-700 tabular-nums">{formatKm(trancheBreaks[1] - effectiveYearKm)}</span> avant la tranche 3</>
+                      )}
+                      {activeTrancheIdx === 2 && (
+                        <>Tranche maximale atteinte</>
+                      )}
+                    </p>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+
+        {/* Skeleton loader pendant le 1er fetch Firestore */}
+        {expense.loading && (
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-2xl border border-gray-200/60 p-5 animate-pulse">
+                <div className="h-3 w-8 bg-gray-200 rounded mb-2" />
+                <div className="h-5 w-20 bg-gray-200 rounded mb-3" />
+                <div className="h-7 w-24 bg-gray-100 rounded" />
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Grille des 12 mois */}
+        {!expense.loading && (
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {MONTH_LABELS.map((label, idx) => {
             const m = `${year}-${String(idx + 1).padStart(2, '0')}`;
@@ -313,6 +449,7 @@ const ExpenseNotesView = ({ user, companyId, onBackToHub, masterBranding }) => {
             );
           })}
         </div>
+        )}
       </div>
 
       {showVehicles && (
@@ -331,6 +468,7 @@ const ExpenseNotesView = ({ user, companyId, onBackToHub, masterBranding }) => {
           onClose={() => setShowMargins(false)}
         />
       )}
+
     </div>
   );
 };

@@ -1,15 +1,18 @@
 // src/utils/pdf/pdfExpenseNotesGenerator.js
 // Generation du PDF "Note de frais kilometriques" mensuelle.
-// Utilise le branding centralise (logo, couleurs primaires, identite societe).
+// Aligne sur l'UI ecran : trajets groupes par date, badges motif colores,
+// marquage weekend / jour ferie sur les en-tetes de groupe.
 
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { buildTheme } from './buildTheme';
 import { loadImage } from './pdfSharedHelpers';
+import { getMotifColor } from '../motifColors';
+import { getHolidayLabel, getWeekendName } from '../frenchHolidays';
 
 // Nettoyage caracteres non-WinAnsi (helvetica jsPDF)
 const clean = (s) => String(s || '')
-  .replace(/[  ​ ]/g, ' ')
+  .replace(/[  ​ ]/g, ' ')
   .replace(/[‘’′]/g, "'")
   .replace(/[“”]/g, '"')
   .replace(/…/g, '...');
@@ -19,10 +22,12 @@ const formatEur = (n) =>
 
 const formatKm = (n) => clean(`${(n || 0).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} km`);
 
-const formatDateShort = (iso) => {
-  if (!iso) return '';
-  const [y, m, d] = iso.split('-');
-  return `${d}/${m}/${y}`;
+const formatDateLong = (iso) => {
+  if (!iso) return 'Sans date';
+  const date = new Date(iso + 'T00:00:00');
+  if (Number.isNaN(date.getTime())) return iso;
+  // jsPDF helvetica = WinAnsi, donc clean pour eviter les surprises
+  return clean(new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).format(date));
 };
 
 const formatTrajet = (trip) => {
@@ -31,7 +36,22 @@ const formatTrajet = (trip) => {
     if (w?.label) parts.push(w.label);
   }
   parts.push(trip.arrival || '?');
-  return parts.join(' -> ') + (trip.roundTrip ? '  (A/R)' : '');
+  let s = parts.join(' -> ');
+  // Annotation A/R
+  if (trip.roundTrip) {
+    s += (trip.waypoints?.length > 0) ? '  (+ retour direct)' : '  (A/R)';
+  }
+  return clean(s);
+};
+
+// Couleur de fond du group header selon le type de jour
+//  - férié : rose pâle    (rose-50)
+//  - weekend : ambre pâle (amber-50)
+//  - normal : neutre (theme.tableBg)
+const groupHeaderBg = (dateStr, theme) => {
+  if (getHolidayLabel(dateStr)) return [255, 241, 242];   // rose-50
+  if (getWeekendName(dateStr)) return [255, 251, 235];     // amber-50
+  return theme.tableBg;
 };
 
 /**
@@ -44,7 +64,7 @@ const formatTrajet = (trip) => {
  * @param {string} opts.trancheLabel
  * @param {number} opts.ratePerKm
  * @param {boolean} opts.forcedTranche
- * @param {object} opts.branding   — branding resolu (useBranding)
+ * @param {object} opts.branding
  * @param {string} opts.userName
  */
 export async function generateExpenseNotesPdf(opts) {
@@ -71,7 +91,7 @@ export async function generateExpenseNotesPdf(opts) {
   doc.setFillColor(...theme.primary);
   doc.rect(0, 0, pageW, 28, 'F');
 
-  // Logo à gauche si dispo
+  // Logo a gauche si dispo
   let titleX = margin;
   if (branding.logo) {
     try {
@@ -151,7 +171,7 @@ export async function generateExpenseNotesPdf(opts) {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(11);
   doc.setTextColor(...theme.primary);
-  doc.text(clean(`${ratePerKm.toFixed(3)} €/km`), baremeX, y + 17);
+  doc.text(clean(`${ratePerKm.toFixed(3)} EUR/km`), baremeX, y + 17);
   doc.setTextColor(...theme.text);
 
   // Utilisateur (si fourni)
@@ -161,22 +181,88 @@ export async function generateExpenseNotesPdf(opts) {
     doc.text(clean(`Beneficiaire : ${userName}`), margin + 3, y + 21);
   }
 
-  // ── Tableau des trajets ────────────────────────────────────────────────────
-  const body = tripsWithAmount.map((t) => [
-    formatDateShort(t.date),
-    clean(t.motif || ''),
-    clean(formatTrajet(t)),
-    formatKm(t.effectiveKm),
-    formatEur(t.amount),
-  ]);
+  // ── Tableau des trajets, groupé par date ───────────────────────────────────
+  // 4 colonnes : Motif | Trajet | KM | Montant
+  // Date dans les headers de groupe (avec weekend/ferie eventuel)
+
+  // Tri + groupement par date ISO
+  const groupedByDate = (() => {
+    const sorted = [...tripsWithAmount].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const map = new Map();
+    for (const t of sorted) {
+      const d = t.date || '';
+      if (!map.has(d)) map.set(d, []);
+      map.get(d).push(t);
+    }
+    return [...map.entries()];
+  })();
+
+  const body = [];
+  for (const [dateStr, dateTrips] of groupedByDate) {
+    const holiday = getHolidayLabel(dateStr);
+    const weekend = !holiday ? getWeekendName(dateStr) : null;
+    const dateKm = dateTrips.reduce((s, t) => s + (t.effectiveKm || 0), 0);
+    const dateAmount = dateTrips.reduce((s, t) => s + (t.amount || 0), 0);
+
+    // Label : "Lundi 4 mai" + tag eventuel
+    let label = formatDateLong(dateStr);
+    if (holiday) label += ` - Ferie : ${clean(holiday)}`;
+    else if (weekend) label += ` - ${weekend}`;
+
+    const headerBg = groupHeaderBg(dateStr, theme);
+    const headerText = holiday ? [136, 19, 55] : weekend ? [146, 64, 14] : theme.text; // rose-900 / amber-900 / default
+
+    // Group header row : date plus grande et plus marquee que les badges motif
+    // pour que le repere temporel domine visuellement.
+    const headerStyle = {
+      fillColor: headerBg,
+      fontStyle: 'bold',
+      fontSize: 11,
+      textColor: headerText,
+      cellPadding: { top: 3.5, right: 2.5, bottom: 3.5, left: 2.5 },
+      minCellHeight: 9,
+    };
+    body.push([
+      {
+        content: label,
+        colSpan: 2,
+        styles: headerStyle,
+      },
+      {
+        content: formatKm(dateKm),
+        styles: { ...headerStyle, halign: 'right' },
+      },
+      {
+        content: formatEur(dateAmount),
+        styles: { ...headerStyle, halign: 'right' },
+      },
+    ]);
+
+    // Trip rows pour cette date
+    for (const t of dateTrips) {
+      const motif = (t.motif || '').trim();
+      const motifColor = motif ? getMotifColor(motif).pdf : null;
+      body.push([
+        {
+          content: motif || '-',
+          styles: motifColor
+            ? { fillColor: motifColor.bg, textColor: motifColor.text, fontStyle: 'bold', fontSize: 8 }
+            : { fontSize: 8, textColor: [156, 163, 175] /* gray-400 */ },
+        },
+        clean(formatTrajet(t)),
+        formatKm(t.effectiveKm),
+        formatEur(t.amount),
+      ]);
+    }
+  }
 
   autoTable(doc, {
     startY: y + 28,
-    head: [['Date', 'Motif', 'Trajet', 'KM', 'Montant']],
+    head: [['Motif', 'Trajet', 'KM', 'Montant']],
     body,
     foot: [
       [
-        { content: 'TOTAL', colSpan: 3, styles: { halign: 'right', fontStyle: 'bold' } },
+        { content: 'TOTAL', colSpan: 2, styles: { halign: 'right', fontStyle: 'bold' } },
         { content: formatKm(totalKm), styles: { halign: 'right', fontStyle: 'bold' } },
         { content: formatEur(totalAmount), styles: { halign: 'right', fontStyle: 'bold' } },
       ],
@@ -200,15 +286,11 @@ export async function generateExpenseNotesPdf(opts) {
       fillColor: theme.tableBg,
       textColor: theme.text,
     },
-    alternateRowStyles: {
-      fillColor: theme.lightBg,
-    },
     columnStyles: {
-      0: { cellWidth: 22 },
-      1: { cellWidth: 35 },
-      2: { cellWidth: 'auto' },
-      3: { cellWidth: 22, halign: 'right' },
-      4: { cellWidth: 28, halign: 'right' },
+      0: { cellWidth: 40 },           // Motif
+      1: { cellWidth: 'auto' },       // Trajet
+      2: { cellWidth: 22, halign: 'right' },
+      3: { cellWidth: 28, halign: 'right' },
     },
     margin: { left: margin, right: margin },
   });

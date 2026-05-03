@@ -2,9 +2,33 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.5.23';
+export const APP_VERSION = '2.5.24';
 
 export const CHANGELOG = [
+  {
+    version: '2.5.24',
+    date: '2026-05-03',
+    title: 'Notes de Frais : refonte UX (groupement, récurrence, polish visuel)',
+    highlights: [
+      'Notes de Frais : trajets groupés par date dans le récap mensuel — un en-tête de jour avec total km / € + lignes indentées dessous',
+      'Notes de Frais : bouton « Dupliquer » sur chaque ligne — pré-remplit un nouveau trajet avec la date du jour',
+      'Notes de Frais : recherche + filtres motif (pills cliquables) + empty states illustrés',
+      'Notes de Frais : raccourcis clavier — N nouveau trajet, / focus recherche, ESC ferme/efface filtres',
+      'Notes de Frais : édition inline du km dans le tableau (clic sur la valeur → input)',
+      'Notes de Frais : trajets récurrents — coche « Répéter ce trajet » dans le formulaire avec fréquence (quotidien, jours ouvrés, hebdo, bi-mensuel, mensuel) jusqu\'à une date de fin (max 366)',
+      'Notes de Frais : suggestion automatique du motif basée sur l\'arrivée (le motif le plus utilisé pour cette destination est pré-rempli)',
+      'Notes de Frais : graphique annuel — 12 barres mensuelles cliquables, mois en cours en ambre, pic affiché',
+      'Notes de Frais : barre de progression tranche fiscale annuelle avec markers 5000/20000 km et reste avant prochaine tranche',
+      'Notes de Frais : carte du mois (panneau dépliable) — tous les trajets du mois sur une seule carte Leaflet, polylines colorées par motif, légende, marqueurs départ/arrivée',
+      'Notes de Frais : marquage weekends et jours fériés français (8 fixes + 3 mobiles : Pâques, Ascension, Pentecôte) — badges 🟡/🎉 dans le formulaire (date + récurrence) et fond coloré + bordure latérale dans le récap mensuel',
+      'Notes de Frais : badges motifs colorés (Chantier ambre, Réunion bleu, Visite violet, Commerce vert) avec palette cohérente entre tableau et carte',
+      'Notes de Frais : skeleton loaders pendant le chargement initial Firestore (12 cartes grises pulsantes)',
+      'Notes de Frais : animation au save — la ligne créée ou modifiée pulse en vert pendant 1.8s',
+      'Notes de Frais : dropdown motif custom (remplace le datalist natif au positionnement aléatoire selon le navigateur)',
+      'Notes de Frais : PDF de sortie adapté — trajets groupés par date avec totaux journaliers, badges motifs colorés, marquage weekends/jours fériés (fond rose/ambre, bordure latérale, tag explicite)',
+      'Notes de Frais : en-têtes de date du récap mensuel agrandis et plus contrastés (text-sm bold, bordure latérale colorée, total journalier en gras)',
+    ],
+  },
   {
     version: '2.5.23',
     date: '2026-05-01',

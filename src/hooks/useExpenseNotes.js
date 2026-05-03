@@ -238,6 +238,37 @@ export function useExpenseNotes(companyId, year) {
   // Domicile (premiere adresse marquee isHome)
   const homeLocation = useMemo(() => locations.find((l) => l.isHome) || null, [locations]);
 
+  // ── Trajets recurrents : creation en lot a partir d'un trajet template ────
+  // Genere un id unique pour chaque trajet, regroupe par mois pour minimiser
+  // les writes Firestore (1 write par mois touché).
+  const addRecurringTrips = useCallback(async (baseTrip, dates) => {
+    if (!Array.isArray(dates) || dates.length === 0) return;
+    const newId = () => (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    // Group by month YYYY-MM
+    const byMonth = new Map();
+    for (const date of dates) {
+      const m = String(date).slice(0, 7);
+      if (!byMonth.has(m)) byMonth.set(m, []);
+      byMonth.get(m).push(date);
+    }
+
+    // Sequentiel pour eviter les races sur le meme mois
+    for (const [m, monthDates] of byMonth.entries()) {
+      const existing = notes[m]?.trips || [];
+      const newTrips = monthDates.map((date) => ({
+        ...baseTrip,
+        id: newId(),
+        date,
+      }));
+      const merged = [...existing, ...newTrips];
+      const totalKm = merged.reduce((s, t) => s + (Number(t.km) || 0), 0);
+      await upsertNote(m, { trips: merged, totalKm });
+    }
+  }, [notes, upsertNote]);
+
   return {
     notes, vehicles, vehiclesLoaded, locations, loading,
     defaultVehicle, homeLocation,
@@ -246,6 +277,7 @@ export function useExpenseNotes(companyId, year) {
     customBareme, setCustomBareme,
     distanceMargins, distanceMarginsEnabled, setDistanceMargins,
     addTrip, updateTrip, deleteTrip, setNoteVehicle,
+    addRecurringTrips,
     getCumulBeforeMonth, getCumulToMonth,
     addVehicle, updateVehicle, deleteVehicle,
     addLocation, updateLocation, deleteLocation,
