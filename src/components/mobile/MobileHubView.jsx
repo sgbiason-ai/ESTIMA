@@ -6,14 +6,18 @@ import { APP_VERSION } from '../../data/changelog';
 import ChangelogModal from '../ChangelogModal';
 
 // ─── MODULES MOBILES ───────────────────────────────────────────────────────
-
+//
+// `desktopGate` mappe l'ID mobile vers les IDs desktop équivalents.
+// Si `userModules` est défini (restriction Firestore activée), le module mobile
+// est masqué si AUCUN de ses desktopGate n'est dans la liste autorisée.
+// Si `desktopGate` est absent ou vide → toujours visible (ex : pdf_reader).
 const MOBILE_MODULES = [
-  { id: 'projects',    label: 'Projets & RAO',    description: 'Devis, DQE et analyse des offres', icon: 'folder',    tag: 'Core',    row: 1 },
+  { id: 'projects',    label: 'Projets & RAO',    description: 'Devis, DQE et analyse des offres', icon: 'folder',    tag: 'Core',    row: 1, desktopGate: ['projects_manager', 'estima', 'rao_analysis'] },
   { id: 'pdf_reader',  label: 'Serveur Papyrus',  description: 'Plans, documents et fichiers PDF', icon: 'file',      tag: 'Cloud',   row: 1 },
-  { id: 'site_visits', label: 'Visites de Site',  description: 'Notes terrain, photos et GPS',     icon: 'camera',    tag: 'Terrain', row: 2 },
-  { id: 'crc',         label: 'Comptes Rendus',   description: 'CR de chantier',                   icon: 'clipboard', tag: 'CRC',     row: 2 },
-  { id: 'moe',         label: 'Devis MOE',        description: 'Honoraires maîtrise d\'œuvre',     icon: 'euro',      tag: 'MOE',     row: 3 },
-  { id: 'doc_admin',   label: 'Documents Admin',  description: 'Fiches marché et docs EXE',        icon: 'file',      tag: 'EXE',     row: 3 },
+  { id: 'site_visits', label: 'Visites de Site',  description: 'Notes terrain, photos et GPS',     icon: 'camera',    tag: 'Terrain', row: 2, desktopGate: ['site_visits'] },
+  { id: 'crc',         label: 'Comptes Rendus',   description: 'CR de chantier',                   icon: 'clipboard', tag: 'CRC',     row: 2, desktopGate: ['crc'] },
+  { id: 'moe',         label: 'Devis MOE',        description: 'Honoraires maîtrise d\'œuvre',     icon: 'euro',      tag: 'MOE',     row: 3, desktopGate: ['devis_moe'] },
+  { id: 'doc_admin',   label: 'Documents Admin',  description: 'Fiches marché et docs EXE',        icon: 'file',      tag: 'EXE',     row: 3, desktopGate: ['doc_admin'] },
 ];
 
 // ─── THÈMES PAR ROW ───────────────────────────────────────────────────────
@@ -50,7 +54,7 @@ const ROW_THEMES = {
 
 // ─── COMPOSANT ─────────────────────────────────────────────────────────────
 
-export default function MobileHubView({ userEmail, onSelectModule, onLogout, isLandscape, isTablet = false, onSwitchToDesktop = null }) {
+export default function MobileHubView({ userEmail, userModules, onSelectModule, onLogout, isLandscape, isTablet = false, onSwitchToDesktop = null }) {
   const [mounted, setMounted] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -59,6 +63,15 @@ export default function MobileHubView({ userEmail, onSelectModule, onLogout, isL
   const displayName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
+
+  // Filtrage par permissions : si userModules est défini, on masque les modules
+  // mobiles dont aucun desktopGate n'est autorisé (modules sans gate restent visibles).
+  const hasRestriction = Array.isArray(userModules);
+  const visibleModules = MOBILE_MODULES.filter(mod => {
+    if (!hasRestriction) return true;
+    if (!mod.desktopGate || mod.desktopGate.length === 0) return true;
+    return mod.desktopGate.some(id => userModules.includes(id));
+  });
 
   return (
     <div className="flex flex-col h-full bg-[#f5f5f7]"
@@ -111,7 +124,7 @@ export default function MobileHubView({ userEmail, onSelectModule, onLogout, isL
         <div className={`grid gap-2.5 flex-1 ${
           isTablet && isLandscape ? 'grid-cols-3' : 'grid-cols-2'
         }`}>
-          {MOBILE_MODULES.map((mod, idx) => {
+          {visibleModules.map((mod, idx) => {
             const theme = ROW_THEMES[mod.row];
             return (
               <button

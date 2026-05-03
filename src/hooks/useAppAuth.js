@@ -8,6 +8,9 @@ export const useAppAuth = () => {
   const [user, setUser]           = useState(null);
   const [companyId, setCompanyId] = useState(null);
   const [isAdmin, setIsAdmin]     = useState(false);
+  // userModules : array d'IDs de modules autorisés. null = pas de restriction
+  // (fallback comportement legacy basé sur isAdmin + access).
+  const [userModules, setUserModules] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const hadUserRef = useRef(false);
   const logoutTimerRef = useRef(null);
@@ -26,6 +29,7 @@ export const useAppAuth = () => {
           setUser(null);
           setCompanyId(null);
           setIsAdmin(false);
+          setUserModules(null);
           setAuthLoading(false);
           hadUserRef.current = false;
           intentionalLogoutRef.current = false;
@@ -50,16 +54,19 @@ export const useAppAuth = () => {
           const data = userSnap.data();
           setCompanyId(data.companyId || null);
           setIsAdmin(data.isAdmin === true);
+          setUserModules(Array.isArray(data.modules) ? data.modules : null);
         } else {
           // Utilisateur authentifié mais pas encore assigné à une entreprise
           console.warn('Profil utilisateur introuvable dans Firestore (/users/' + currentUser.uid + ')');
           setCompanyId(null);
           setIsAdmin(false);
+          setUserModules(null);
         }
       } catch (e) {
         console.error('Erreur lecture profil utilisateur :', e);
         setCompanyId(null);
         setIsAdmin(false);
+        setUserModules(null);
       }
 
       setUser(currentUser);
@@ -82,5 +89,5 @@ export const useAppAuth = () => {
     }
   };
 
-  return { user, companyId, isAdmin, authLoading, handleLogout };
+  return { user, companyId, isAdmin, userModules, authLoading, handleLogout };
 };

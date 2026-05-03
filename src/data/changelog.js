@@ -10,6 +10,7 @@ export const CHANGELOG = [
     date: '2026-05-03',
     title: 'Notes de Frais : refonte UX (groupement, récurrence, polish visuel)',
     highlights: [
+      'Administration : nouvel onglet « Permissions » (réservé au super-admin) — grille users × modules avec checkboxes pour autoriser/masquer chaque module du Hub par utilisateur. Actions rapides par ligne : tout cocher / tout décocher / réinitialiser. Filtre par entreprise. Sauvegarde immédiate dans Firestore (champ `users/{uid}.modules`). Fallback transparent : un user sans champ `modules` garde son accès actuel (zéro régression). Le module Administration reste contrôlé par le statut Admin.',
       'Notes de Frais : trajets groupés par date dans le récap mensuel — un en-tête de jour avec total km / € + lignes indentées dessous',
       'Notes de Frais : bouton « Dupliquer » sur chaque ligne — pré-remplit un nouveau trajet avec la date du jour',
       'Notes de Frais : recherche + filtres motif (pills cliquables) + empty states illustrés',

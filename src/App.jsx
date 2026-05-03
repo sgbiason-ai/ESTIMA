@@ -83,7 +83,18 @@ export default function App() {
   const [activeModule, setActiveModule] = useState(null);
 
   // ── 1. Auth ─────────────────────────────────────────────────────────────────
-  const { user, companyId, isAdmin, authLoading, handleLogout } = useAppAuth();
+  const { user, companyId, isAdmin, userModules, authLoading, handleLogout } = useAppAuth();
+
+  // Helper : un user a-t-il accès à ce module ?
+  // - admin global → toujours oui
+  // - module 'admin' → uniquement isAdmin
+  // - userModules défini (array) → filtrage strict
+  // - userModules absent → fallback legacy (true, le hub gère access)
+  const hasModuleAccess = (modId) => {
+    if (modId === 'admin') return isAdmin;
+    if (!Array.isArray(userModules)) return true;
+    return userModules.includes(modId);
+  };
 
   // ── Masquer le splash HTML une fois l'auth résolu ─────────────────────────
   React.useEffect(() => {
@@ -161,6 +172,7 @@ export default function App() {
         <MobileApp
           user={user}
           companyId={companyId}
+          userModules={userModules}
           onLogout={handleLogout}
           isTablet={isTablet}
           onSwitchToDesktop={isTablet ? () => forceLayout('desktop') : null}
@@ -179,10 +191,18 @@ export default function App() {
       <ModuleHubView
         isAdmin={isAdmin}
         userEmail={user.email}
+        userModules={userModules}
         onSelectModule={setActiveModule}
         onLogout={handleLogout}
       />
     );
+  }
+
+  // Garde générique : si l'utilisateur n'a pas accès au module choisi
+  // (ex : restriction désactivée à chaud par le super-admin), retour au hub.
+  if (!hasModuleAccess(activeModule)) {
+    setActiveModule(null);
+    return null;
   }
 
   // Module : Gestion de Projets (autonome)
@@ -296,6 +316,7 @@ export default function App() {
     <ModuleHubView
       isAdmin={isAdmin}
       userEmail={user.email}
+      userModules={userModules}
       onSelectModule={setActiveModule}
       onLogout={handleLogout}
     />

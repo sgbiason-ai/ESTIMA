@@ -181,13 +181,20 @@ const ROW_LABELS = {
 
 // ─── COMPOSANT PRINCIPAL ────────────────────────────────────────────────────
 
-export default function ModuleHubView({ isAdmin, userEmail, onSelectModule, onLogout }) {
+export default function ModuleHubView({ isAdmin, userEmail, userModules, onSelectModule, onLogout }) {
   const [mounted, setMounted] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
+  // Si userModules est défini (array Firestore), filtrage strict par module
+  // (le module 'admin' reste exclusivement contrôlé par isAdmin).
+  const hasModuleRestriction = Array.isArray(userModules);
+  const isAllowedByRestriction = (mod) =>
+    !hasModuleRestriction || mod.id === 'admin' || userModules.includes(mod.id);
+
   const canAccess = (mod) => {
+    if (!isAllowedByRestriction(mod)) return false;
     if (mod.access === 'all') return true;
     if (mod.access === 'admin_only') return isAdmin;
     if (mod.access === 'admin_or_unlocked') return isAdmin;
@@ -195,6 +202,7 @@ export default function ModuleHubView({ isAdmin, userEmail, onSelectModule, onLo
   };
 
   const isVisible = (mod) => {
+    if (!isAllowedByRestriction(mod)) return false;
     if (mod.access === 'admin_only') return isAdmin;
     return true;
   };

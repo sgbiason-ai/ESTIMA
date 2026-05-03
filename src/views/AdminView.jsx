@@ -8,7 +8,7 @@ import { generateId } from '../utils/helpers';
 import {
   Building2, UserPlus, Trash2, RefreshCw,
   ChevronDown, ChevronRight, Copy, Check,
-  HelpCircle, TrendingUp, BarChart2, Plus
+  HelpCircle, TrendingUp, BarChart2, Plus, ShieldCheck,
 } from 'lucide-react';
 import { confirm } from '../utils/globalUI';
 
@@ -16,17 +16,23 @@ import DeleteCompanyModal from './admin/DeleteCompanyModal';
 import HelpPanel from '../components/help/HelpPanel';
 import FirebaseSimulatorModal from './admin/FirebaseSimulatorModal';
 import FirebaseStatsPanel from './admin/FirebaseStatsPanel';
+import PermissionsMatrix from './admin/PermissionsMatrix';
+import { isSuperAdmin } from '../config/superAdmin';
 
 const slugify = (str) =>
   str.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '').substring(0, 30);
 
-const TABS = [
+const BASE_TABS = [
   { id: 'companies', label: 'Entreprises',        icon: Building2 },
   { id: 'new',       label: 'Nouvelle entreprise', icon: Plus },
   { id: 'capacity',  label: 'Capacités',           icon: BarChart2 },
 ];
 
+const SUPER_ADMIN_TAB = { id: 'permissions', label: 'Permissions', icon: ShieldCheck };
+
 const AdminView = ({ currentUserEmail }) => {
+  const isSuper = isSuperAdmin(currentUserEmail);
+  const TABS = isSuper ? [...BASE_TABS, SUPER_ADMIN_TAB] : BASE_TABS;
   const [companies, setCompanies]   = useState([]);
   const [users, setUsers]           = useState([]);
   const [loading, setLoading]       = useState(false);
@@ -46,8 +52,8 @@ const AdminView = ({ currentUserEmail }) => {
     setTimeout(() => setFeedback(null), 4000);
   };
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (opts = {}) => {
+    if (!opts.silent) setLoading(true);
     try {
       const [compSnap, usersSnap] = await Promise.all([
         getDocs(collection(db, 'companies')),
@@ -58,7 +64,7 @@ const AdminView = ({ currentUserEmail }) => {
     } catch (e) {
       showFeedback('error', 'Erreur de chargement.');
     } finally {
-      setLoading(false);
+      if (!opts.silent) setLoading(false);
     }
   };
 
@@ -348,6 +354,16 @@ const AdminView = ({ currentUserEmail }) => {
       {/* ─── TAB : Capacités ───────────────────────────────────────────── */}
       {activeTab === 'capacity' && (
         <FirebaseStatsPanel companies={companies} users={users} />
+      )}
+
+      {/* ─── TAB : Permissions (super-admin uniquement) ─────────────────── */}
+      {activeTab === 'permissions' && isSuper && (
+        <PermissionsMatrix
+          companies={companies}
+          users={users}
+          onRefresh={loadData}
+          showFeedback={showFeedback}
+        />
       )}
     </div>
   );
