@@ -82,7 +82,16 @@ export default function UpdatePrompt() {
           </p>
           {needRefresh && (
             <button
-              onClick={() => updateServiceWorker(true)}
+              onClick={async () => {
+                // 1. Tente de demander au SW d'activer la nouvelle version (no-op
+                //    si workbox a deja skip-waiting ou si pas de SW en attente).
+                try { await updateServiceWorker(true); } catch { /* ignore */ }
+                // 2. Reload defensif : si updateServiceWorker n'a pas reload
+                //    (cas frequent avec skipWaiting deja actif au niveau du SW),
+                //    on force le reload manuellement. Le setTimeout est annule
+                //    par l'unmount si le reload se fait deja.
+                setTimeout(() => window.location.reload(), 200);
+              }}
               className="mt-3 w-full bg-gradient-to-br from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-semibold py-2 px-4 rounded-xl shadow-sm transition-all active:scale-[0.97]"
             >
               Recharger maintenant

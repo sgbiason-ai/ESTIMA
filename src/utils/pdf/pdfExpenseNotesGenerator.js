@@ -1,7 +1,7 @@
 // src/utils/pdf/pdfExpenseNotesGenerator.js
-// Generation du PDF "Note de frais kilometriques" mensuelle.
-// Aligne sur l'UI ecran : trajets groupes par date, badges motif colores,
-// marquage weekend / jour ferie sur les en-tetes de groupe.
+// Génération du PDF "Note de frais kilométriques" mensuelle.
+// Aligné sur l'UI écran : trajets groupés par date, badges motif colorés,
+// marquage weekend / jour férié sur les en-têtes de groupe.
 
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -10,9 +10,13 @@ import { loadImage } from './pdfSharedHelpers';
 import { getMotifColor } from '../motifColors';
 import { getHolidayLabel, getWeekendName } from '../frenchHolidays';
 
-// Nettoyage caracteres non-WinAnsi (helvetica jsPDF)
+// Nettoyage des caractères pour helvetica jsPDF (encodage WinAnsi).
+// On normalise tous les espaces "spéciaux" en espaces classiques :
+//   U+00A0 NBSP, U+2009 thin space, U+202F NNBSP (sépar. milliers fr-FR par
+//   Intl.NumberFormat), U+200B ZWSP, U+2060 word joiner, U+3000 idéographique.
+// Sans ça jsPDF rend "20 000" comme "20 /000".
 const clean = (s) => String(s || '')
-  .replace(/[  ​ ]/g, ' ')
+  .replace(/[   ​⁠　]/g, ' ')
   .replace(/[‘’′]/g, "'")
   .replace(/[“”]/g, '"')
   .replace(/…/g, '...');
@@ -22,12 +26,18 @@ const formatEur = (n) =>
 
 const formatKm = (n) => clean(`${(n || 0).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} km`);
 
+const formatRate = (n) =>
+  clean(`${(n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} €/km`);
+
+// Capitalise la 1ère lettre (Intl.DateTimeFormat fr-FR retourne en minuscule)
+const capFirst = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+
 const formatDateLong = (iso) => {
   if (!iso) return 'Sans date';
   const date = new Date(iso + 'T00:00:00');
   if (Number.isNaN(date.getTime())) return iso;
-  // jsPDF helvetica = WinAnsi, donc clean pour eviter les surprises
-  return clean(new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).format(date));
+  const formatted = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).format(date);
+  return clean(capFirst(formatted));
 };
 
 const formatTrajet = (trip) => {
@@ -87,11 +97,11 @@ export async function generateExpenseNotesPdf(opts) {
   const pageH = doc.internal.pageSize.getHeight();
   const margin = 15;
 
-  // ── Bandeau d'en-tete couleur primaire ─────────────────────────────────────
+  // ── Bandeau d'en-tête couleur primaire ─────────────────────────────────────
   doc.setFillColor(...theme.primary);
   doc.rect(0, 0, pageW, 28, 'F');
 
-  // Logo a gauche si dispo
+  // Logo à gauche si dispo
   let titleX = margin;
   if (branding.logo) {
     try {
@@ -111,10 +121,10 @@ export async function generateExpenseNotesPdf(opts) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(15);
   doc.setTextColor(255);
-  doc.text('Note de frais kilometriques', titleX, 12);
+  doc.text(clean('Note de frais kilométriques'), titleX, 12);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
-  doc.text(monthLabel, titleX, 19);
+  doc.text(clean(monthLabel), titleX, 19);
 
   // Identité société (à droite)
   if (branding.companyName) {
@@ -135,7 +145,7 @@ export async function generateExpenseNotesPdf(opts) {
     }
   }
 
-  // ── Bloc vehicule + bareme ─────────────────────────────────────────────────
+  // ── Bloc véhicule + barème ─────────────────────────────────────────────────
   doc.setTextColor(...theme.text);
   let y = 36;
   doc.setFillColor(...theme.lightBg);
@@ -143,10 +153,10 @@ export async function generateExpenseNotesPdf(opts) {
   doc.setLineWidth(0.2);
   doc.roundedRect(margin, y, pageW - margin * 2, 22, 2, 2, 'FD');
 
-  // Vehicule (gauche)
+  // Véhicule (gauche)
   doc.setFontSize(7);
   doc.setTextColor(...theme.lightText);
-  doc.text('VEHICULE', margin + 3, y + 5);
+  doc.text(clean('VÉHICULE'), margin + 3, y + 5);
   doc.setTextColor(...theme.text);
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
@@ -157,33 +167,33 @@ export async function generateExpenseNotesPdf(opts) {
   const subParts = [];
   if (vehicle.puissanceLabel) subParts.push(vehicle.puissanceLabel);
   if (vehicle.plateNumber) subParts.push(vehicle.plateNumber);
-  if (vehicle.isElectric) subParts.push('Electrique +20%');
+  if (vehicle.isElectric) subParts.push('Électrique +20%');
   doc.text(clean(subParts.join('  ·  ')), margin + 3, y + 16);
 
-  // Bareme (droite)
+  // Barème (droite)
   const baremeX = pageW - margin - 70;
   doc.setFontSize(7);
-  doc.text('BAREME APPLIQUE', baremeX, y + 5);
+  doc.text(clean('BARÈME APPLIQUÉ'), baremeX, y + 5);
   doc.setTextColor(...theme.text);
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
-  doc.text(clean(trancheLabel + (forcedTranche ? ' (forcee)' : '')), baremeX, y + 11);
+  doc.text(clean(trancheLabel + (forcedTranche ? ' (forcée)' : '')), baremeX, y + 11);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(11);
   doc.setTextColor(...theme.primary);
-  doc.text(clean(`${ratePerKm.toFixed(3)} EUR/km`), baremeX, y + 17);
+  doc.text(formatRate(ratePerKm), baremeX, y + 17);
   doc.setTextColor(...theme.text);
 
   // Utilisateur (si fourni)
   if (userName) {
     doc.setFontSize(8);
     doc.setTextColor(...theme.lightText);
-    doc.text(clean(`Beneficiaire : ${userName}`), margin + 3, y + 21);
+    doc.text(clean(`Bénéficiaire : ${userName}`), margin + 3, y + 21);
   }
 
   // ── Tableau des trajets, groupé par date ───────────────────────────────────
   // 4 colonnes : Motif | Trajet | KM | Montant
-  // Date dans les headers de groupe (avec weekend/ferie eventuel)
+  // Date dans les headers de groupe (avec weekend/férié éventuel)
 
   // Tri + groupement par date ISO
   const groupedByDate = (() => {
@@ -204,16 +214,16 @@ export async function generateExpenseNotesPdf(opts) {
     const dateKm = dateTrips.reduce((s, t) => s + (t.effectiveKm || 0), 0);
     const dateAmount = dateTrips.reduce((s, t) => s + (t.amount || 0), 0);
 
-    // Label : "Lundi 4 mai" + tag eventuel
+    // Label : "Lundi 4 mai" + tag éventuel
     let label = formatDateLong(dateStr);
-    if (holiday) label += ` - Ferie : ${clean(holiday)}`;
+    if (holiday) label += ` - Férié : ${clean(holiday)}`;
     else if (weekend) label += ` - ${weekend}`;
 
     const headerBg = groupHeaderBg(dateStr, theme);
     const headerText = holiday ? [136, 19, 55] : weekend ? [146, 64, 14] : theme.text; // rose-900 / amber-900 / default
 
-    // Group header row : date plus grande et plus marquee que les badges motif
-    // pour que le repere temporel domine visuellement.
+    // Group header row : date plus grande et plus marquée que les badges motif
+    // pour que le repère temporel domine visuellement.
     const headerStyle = {
       fillColor: headerBg,
       fontStyle: 'bold',
@@ -244,12 +254,12 @@ export async function generateExpenseNotesPdf(opts) {
       const motifColor = motif ? getMotifColor(motif).pdf : null;
       body.push([
         {
-          content: motif || '-',
+          content: clean(motif || '-'),
           styles: motifColor
             ? { fillColor: motifColor.bg, textColor: motifColor.text, fontStyle: 'bold', fontSize: 8 }
             : { fontSize: 8, textColor: [156, 163, 175] /* gray-400 */ },
         },
-        clean(formatTrajet(t)),
+        formatTrajet(t),
         formatKm(t.effectiveKm),
         formatEur(t.amount),
       ]);
@@ -305,7 +315,7 @@ export async function generateExpenseNotesPdf(opts) {
     doc.roundedRect(margin, finalY, pageW - margin * 2, 12, 1.5, 1.5, 'FD');
     doc.setFontSize(8);
     doc.setTextColor(...theme.lightText);
-    const note = `Bareme kilometrique fiscal francais ${forcedTranche ? '(tranche forcee)' : '(tranche selon cumul)'}${vehicle.isElectric ? ' avec bonus +20% vehicule electrique' : ''}.`;
+    const note = `Barème kilométrique fiscal français ${forcedTranche ? '(tranche forcée)' : '(tranche selon cumul)'}${vehicle.isElectric ? ' avec bonus +20% véhicule électrique' : ''}.`;
     doc.text(clean(note), margin + 3, finalY + 5);
     if (branding.tagline) {
       doc.text(clean(branding.tagline), margin + 3, finalY + 9);
@@ -316,7 +326,7 @@ export async function generateExpenseNotesPdf(opts) {
   doc.setFontSize(7.5);
   doc.setTextColor(...theme.lightText);
   doc.text(
-    clean(`Document genere le ${new Date().toLocaleDateString('fr-FR')} - EstimaVRD`),
+    clean(`Document généré le ${new Date().toLocaleDateString('fr-FR')} - EstimaVRD`),
     pageW / 2,
     pageH - 8,
     { align: 'center' }
