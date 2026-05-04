@@ -74,22 +74,39 @@ export const useCrrManager = ({
     [activeMeeting, crrConfig.participantGroups]
   );
 
+  // Refs pour echapper aux closures stales lors d'editions rapides successives.
+  // Sans ces refs, deux modifications quasi-simultanees d'observations peuvent
+  // se baser sur un meme snapshot de project → la 2eme ecrase silencieusement la 1ere.
+  const activeMeetingIdRef = useRef(activeMeetingId);
+  const meetingsRef = useRef(meetings);
+  useEffect(() => { activeMeetingIdRef.current = activeMeetingId; }, [activeMeetingId]);
+  useEffect(() => { meetingsRef.current = meetings; }, [meetings]);
+
   // ── HELPERS PERSISTANCE ───────────────────────────────────────────────
+  // Tous bases sur des functional updaters → React garantit qu'on lit toujours
+  // le dernier etat, meme avec des appels rapprochees dans le meme tick.
 
   const updateProject = useCallback(
     (patch) => {
-      if (onUpdateProject && project) {
-        onUpdateProject({ ...project, ...patch });
-      }
+      if (!onUpdateProject) return;
+      onUpdateProject((prev) => (prev ? { ...prev, ...patch } : prev));
     },
-    [project, onUpdateProject]
+    [onUpdateProject]
   );
 
   const updateMeetings = useCallback(
-    (newMeetings) => {
-      updateProject({ crrMeetings: newMeetings });
+    (newMeetingsOrFn) => {
+      if (!onUpdateProject) return;
+      onUpdateProject((prev) => {
+        if (!prev) return prev;
+        const currentMeetings = prev.crrMeetings || [];
+        const newMeetings = typeof newMeetingsOrFn === 'function'
+          ? newMeetingsOrFn(currentMeetings)
+          : newMeetingsOrFn;
+        return { ...prev, crrMeetings: newMeetings };
+      });
     },
-    [updateProject]
+    [onUpdateProject]
   );
 
   const updateConfig = useCallback(
@@ -99,15 +116,23 @@ export const useCrrManager = ({
     [updateProject]
   );
 
+  // patchOrFn peut etre :
+  //  - un objet patch    : { observations: [...] }
+  //  - une fonction      : (meeting) => ({ observations: [...] })
+  // La forme fonctionnelle est preferee pour eviter les closures stales.
   const updateActiveMeeting = useCallback(
-    (patch) => {
-      if (!activeMeetingId) return;
-      const newMeetings = meetings.map((m) =>
-        m.id === activeMeetingId ? { ...m, ...patch } : m
+    (patchOrFn) => {
+      const id = activeMeetingIdRef.current;
+      if (!id) return;
+      updateMeetings((meetings) =>
+        meetings.map((m) => {
+          if (m.id !== id) return m;
+          const patch = typeof patchOrFn === 'function' ? patchOrFn(m) : patchOrFn;
+          return { ...m, ...patch };
+        })
       );
-      updateMeetings(newMeetings);
     },
-    [activeMeetingId, meetings, updateMeetings]
+    [updateMeetings]
   );
 
   // ── AUTOSAVE (robuste : debounce + retry + brouillon localStorage) ──
@@ -264,12 +289,11 @@ export const useCrrManager = ({
 
   const updateNextMeeting = useCallback(
     (field, value) => {
-      if (!activeMeeting) return;
-      updateActiveMeeting({
-        nextMeeting: { ...activeMeeting.nextMeeting, [field]: value },
-      });
+      updateActiveMeeting((meeting) => ({
+        nextMeeting: { ...(meeting.nextMeeting || {}), [field]: value },
+      }));
     },
-    [activeMeeting, updateActiveMeeting]
+    [updateActiveMeeting]
   );
 
   // ── ACTIONS PARTICIPANTS (par reunion) ─────────────────────────────────
@@ -500,22 +524,20 @@ export const useCrrManager = ({
 
   const setAttendance = useCallback(
     (contactId, status) => {
-      if (!activeMeeting) return;
-      updateActiveMeeting({
-        attendance: { ...activeMeeting.attendance, [contactId]: status },
-      });
+      updateActiveMeeting((meeting) => ({
+        attendance: { ...(meeting.attendance || {}), [contactId]: status },
+      }));
     },
-    [activeMeeting, updateActiveMeeting]
+    [updateActiveMeeting]
   );
 
   const setDiffusion = useCallback(
     (contactId, value) => {
-      if (!activeMeeting) return;
-      updateActiveMeeting({
-        diffusion: { ...activeMeeting.diffusion, [contactId]: value },
-      });
+      updateActiveMeeting((meeting) => ({
+        diffusion: { ...(meeting.diffusion || {}), [contactId]: value },
+      }));
     },
-    [activeMeeting, updateActiveMeeting]
+    [updateActiveMeeting]
   );
 
   // ── ACTIONS CATEGORIES ────────────────────────────────────────────────
@@ -580,72 +602,76 @@ export const useCrrManager = ({
 
   const addObservation = useCallback(
     (category) => {
-      if (!activeMeeting) return;
+      // Generer l'obs une seule fois (id stable) ; date relue dans l'updater pour
+      // refleter une eventuelle modif de meeting.date entre temps.
       const newObs = createEmptyObservation(category);
-      newObs.date = activeMeeting.date;
-      updateActiveMeeting({
-        observations: [...(activeMeeting.observations || []), newObs],
-      });
+      updateActiveMeeting((meeting) => ({
+        observations: [
+          ...(meeting.observations || []),
+          { ...newObs, date: meeting.date },
+        ],
+      }));
       return newObs.id;
     },
-    [activeMeeting, updateActiveMeeting]
+    [updateActiveMeeting]
   );
 
   const updateObservation = useCallback(
     (obsId, patch) => {
-      if (!activeMeeting) return;
-      const obs = (activeMeeting.observations || []).map((o) =>
-        o.id === obsId ? { ...o, ...patch } : o
-      );
-      updateActiveMeeting({ observations: obs });
+      // Functional updater → on mappe sur les observations LES PLUS RECENTES,
+      // pas sur celles capturees au moment ou onUpdate a ete passe a la ligne.
+      // C'est le fix qui empeche le revert de la derniere observation editee.
+      updateActiveMeeting((meeting) => ({
+        observations: (meeting.observations || []).map((o) =>
+          o.id === obsId ? { ...o, ...patch } : o
+        ),
+      }));
     },
-    [activeMeeting, updateActiveMeeting]
+    [updateActiveMeeting]
   );
 
   const deleteObservation = useCallback(
     (obsId) => {
-      if (!activeMeeting) return;
-      const target = (activeMeeting.observations || []).find((o) => o.id === obsId);
-      // Purge Storage en arriere-plan pour les images de l'observation
+      // Best-effort cleanup Storage : lit la derniere version connue via ref.
+      // Si jamais on rate une image (race), on aura un orphelin dans Storage,
+      // pas un bug fonctionnel.
+      const id = activeMeetingIdRef.current;
+      const currentMeeting = meetingsRef.current?.find((m) => m.id === id);
+      const target = currentMeeting?.observations?.find((o) => o.id === obsId);
       if (target?.images?.length) {
         for (const img of target.images) deleteCrrImage(img);
       }
-      const obs = (activeMeeting.observations || []).filter(
-        (o) => o.id !== obsId
-      );
-      updateActiveMeeting({ observations: obs });
+      updateActiveMeeting((meeting) => ({
+        observations: (meeting.observations || []).filter((o) => o.id !== obsId),
+      }));
     },
-    [activeMeeting, updateActiveMeeting]
+    [updateActiveMeeting]
   );
 
   const reorderObservations = useCallback(
     (obsId, toCategory, toIndex) => {
-      if (!activeMeeting) return;
-      const obs = [...(activeMeeting.observations || [])];
+      updateActiveMeeting((meeting) => {
+        const obs = [...(meeting.observations || [])];
+        const fromIdx = obs.findIndex((o) => o.id === obsId);
+        if (fromIdx === -1) return {};
+        const [original] = obs.splice(fromIdx, 1);
+        // Clone pour eviter de muter l'observation originale (re-render fiable)
+        const moved = { ...original, category: toCategory };
 
-      // Retirer l'observation de sa position actuelle
-      const fromIdx = obs.findIndex(o => o.id === obsId);
-      if (fromIdx === -1) return;
-      const [moved] = obs.splice(fromIdx, 1);
-
-      // Mettre à jour la catégorie si changement
-      moved.category = toCategory;
-
-      // Trouver l'index d'insertion global correspondant à toIndex dans la catégorie cible
-      const catObs = obs.filter(o => o.category === toCategory);
-      if (toIndex >= catObs.length) {
-        const lastInCat = catObs[catObs.length - 1];
-        const globalIdx = lastInCat ? obs.indexOf(lastInCat) + 1 : obs.length;
-        obs.splice(globalIdx, 0, moved);
-      } else {
-        const targetObs = catObs[toIndex];
-        const globalIdx = obs.indexOf(targetObs);
-        obs.splice(globalIdx, 0, moved);
-      }
-
-      updateActiveMeeting({ observations: obs });
+        const catObs = obs.filter((o) => o.category === toCategory);
+        if (toIndex >= catObs.length) {
+          const lastInCat = catObs[catObs.length - 1];
+          const globalIdx = lastInCat ? obs.indexOf(lastInCat) + 1 : obs.length;
+          obs.splice(globalIdx, 0, moved);
+        } else {
+          const targetObs = catObs[toIndex];
+          const globalIdx = obs.indexOf(targetObs);
+          obs.splice(globalIdx, 0, moved);
+        }
+        return { observations: obs };
+      });
     },
-    [activeMeeting, updateActiveMeeting]
+    [updateActiveMeeting]
   );
 
   // ── OBSERVATIONS GROUPEES PAR CATEGORIE ───────────────────────────────

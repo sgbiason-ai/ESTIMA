@@ -30,6 +30,7 @@ export const CHANGELOG = [
       'Notes de Frais : en-têtes de date du récap mensuel agrandis et plus contrastés (text-sm bold, bordure latérale colorée, total journalier en gras)',
       'PDF Notes de Frais : fix coquilles — accents rétablis (Note de frais kilométriques, VÉHICULE, BARÈME APPLIQUÉ, Bénéficiaire, Férié, généré, électrique, etc.) + bug "20 /000 km" / "4 /036,3 km" résolu (séparateur de milliers \\u202F mal géré dans le clean WinAnsi) + symbole € au lieu d\'EUR pour le taux',
       'PWA : bouton "Recharger maintenant" sur la bannière "Nouvelle version" — ajout d\'un reload défensif après 200ms pour garantir que la page se recharge même quand le SW a déjà skip-waiting (cas où updateServiceWorker ne déclenche pas de controllerchange)',
+      'CRC : fix bug de revert sur édition d\'observations — race condition entre éditions rapides successives (la 2ème modif écrasait silencieusement la 1ère via une closure stale sur activeMeeting). Refactor de useCrrManager avec functional updaters → React garantit qu\'on lit toujours le dernier état. Concerne updateObservation/addObservation/deleteObservation/reorderObservations + setAttendance/setDiffusion/updateNextMeeting',
     ],
   },
   {
