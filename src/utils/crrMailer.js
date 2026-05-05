@@ -309,7 +309,7 @@ export const openOutlookMail = async (meeting, crrConfig, projectName, emails, p
     return { pdfSaved: true, vbsDownloaded: false, fallback: true };
   }
 
-  // ── 1. Construire le script (PDF embarque en base64) ──
+  // Construit le script et le retourne (le caller gere la sauvegarde via showSaveFilePicker)
   const subject = buildMailSubject(meeting, projectName);
   const to = emails.join(';');
   const htmlBody = buildMailHtml(meeting, projectName);
@@ -318,50 +318,18 @@ export const openOutlookMail = async (meeting, crrConfig, projectName, emails, p
   const vbsBlob = new Blob([vbsContent], { type: 'application/octet-stream' });
   const vbsFilename = 'Envoyer_CR.estimavrd';
 
-  // ── 2. Download Chrome EN PREMIER (gesture frais, visible immediatement) ──
-  const vbsUrl = URL.createObjectURL(vbsBlob);
-  const link = document.createElement('a');
-  link.href = vbsUrl;
-  link.download = vbsFilename;
-  link.style.display = 'none';
-  document.body.appendChild(link);
-  link.click();
-  setTimeout(() => { link.remove(); URL.revokeObjectURL(vbsUrl); }, 4000);
+  return { vbsBlob, vbsFilename, ready: true };
+};
 
-  // ── 3. Archive folder (avec confirm callback du caller) ──
-  let dir = null;
-  if (options.dirHandle) {
-    try {
-      const perm = await options.dirHandle.queryPermission({ mode: 'readwrite' });
-      if (perm === 'granted') dir = options.dirHandle;
-      else {
-        const req = await options.dirHandle.requestPermission({ mode: 'readwrite' });
-        if (req === 'granted') dir = options.dirHandle;
-      }
-    } catch (err) {
-      console.warn('Permission dossier projet refusee :', err);
-    }
-  }
-
-  let pdfArchived = false;
-  let vbsArchived = false;
-  let folderSkipped = false;
-  if (dir) {
-    const existing = [];
-    try { await dir.getFileHandle(pdfData.filename, { create: false }); existing.push(pdfData.filename); } catch {}
-    try { await dir.getFileHandle(vbsFilename, { create: false }); existing.push(vbsFilename); } catch {}
-
-    let canWrite = true;
-    if (existing.length > 0 && typeof options.confirmOverwrite === 'function') {
-      canWrite = await options.confirmOverwrite(existing);
-      if (!canWrite) folderSkipped = true;
-    }
-
-    if (canWrite) {
-      try { await writeFile(dir, pdfData.filename, pdfData.blob); pdfArchived = true; } catch (err) { console.warn('Archivage PDF echoue :', err); }
-      try { await writeFile(dir, vbsFilename, vbsBlob); vbsArchived = true; } catch (err) { console.warn('Archivage script echoue :', err); }
-    }
-  }
-
-  return { pdfSaved: true, pdfArchived, vbsArchived, folderSkipped, vbsDownloaded: true };
+// Helper exporte pour build seul — retourne un .vbs direct (utilise `<a download>` cote caller)
+export const buildMailScript = async (meeting, projectName, emails, pdfData) => {
+  const subject = buildMailSubject(meeting, projectName);
+  const to = emails.join(';');
+  const htmlBody = buildMailHtml(meeting, projectName);
+  const base64Pdf = await blobToBase64(pdfData.blob);
+  const vbsContent = buildSelfContainedVbs(base64Pdf, to, subject, htmlBody, pdfData.filename);
+  return {
+    blob: new Blob([vbsContent], { type: 'application/octet-stream' }),
+    filename: 'Envoyer_CR.vbs',
+  };
 };

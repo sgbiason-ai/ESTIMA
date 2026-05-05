@@ -51,9 +51,9 @@ export const ToastProvider = ({ children }) => {
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 350);
   }, []);
 
-  const toast = useCallback((message, type = 'info', { duration = 4000, title } = {}) => {
+  const toast = useCallback((message, type = 'info', { duration = 4000, title, action } = {}) => {
     const id = `toast_${Date.now()}_${Math.random()}`;
-    setToasts(prev => [...prev, { id, message, type, title, leaving: false }]);
+    setToasts(prev => [...prev, { id, message, type, title, action, leaving: false }]);
     if (duration > 0) setTimeout(() => dismiss(id), duration);
     return id;
   }, [dismiss]);
@@ -126,14 +126,24 @@ const ToastItem = ({ toast, onDismiss }) => {
         <Icon size={18} className={config.icon_color} />
       </div>
 
-      {/* Contenu */}
-      <div className="flex-1 py-3 pr-2 min-w-0">
+      {/* Contenu (cliquable si action) */}
+      <div
+        className={`flex-1 py-3 pr-2 min-w-0 ${toast.action ? 'cursor-pointer hover:bg-slate-50' : ''}`}
+        onClick={toast.action ? () => { toast.action.onClick(); onDismiss(toast.id); } : undefined}
+        role={toast.action ? 'button' : undefined}
+        tabIndex={toast.action ? 0 : undefined}
+      >
         {toast.title && (
           <p className="text-xs font-black text-slate-800 uppercase tracking-wide mb-0.5">
             {toast.title}
           </p>
         )}
         <p className="text-xs text-slate-600 leading-relaxed">{toast.message}</p>
+        {toast.action?.label && (
+          <p className="text-[11px] font-semibold text-blue-600 mt-1 hover:underline">
+            {toast.action.label} →
+          </p>
+        )}
       </div>
 
       {/* Bouton fermer */}

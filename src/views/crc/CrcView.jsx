@@ -301,8 +301,7 @@ export default function CrcView({ onBackToHub, user, companyId }) {
   }, [manager]);
 
   const handleExportPdf = useCallback(async () => {
-    const { generatePdfCrr } = await import('../../utils/pdfCrrGenerator');
-    const { buildExportFilename, loadDirHandle, saveToDirectory } = await import('../../utils/exportHelpers');
+    const { buildExportFilename, loadDirHandle } = await import('../../utils/exportHelpers');
     const info = manager.crrConfig.chantierInfo || {};
     const meeting = manager.activeMeeting;
 
@@ -310,57 +309,50 @@ export default function CrcView({ onBackToHub, user, companyId }) {
       number: meeting.number, projectName: chantierName, date: meeting.date, ext: 'pdf',
     });
 
+    // Boite Save As Windows native, defaut dossier projet (modale info chantier)
+    const dirKey = `${companyId}_${crrDoc?.id || 'default'}`;
+    const dirHandle = await loadDirHandle(dirKey);
+    let saveHandle;
+    try {
+      saveHandle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        startIn: dirHandle || 'documents',
+        types: [{ description: 'Document PDF', accept: { 'application/pdf': ['.pdf'] } }],
+      });
+    } catch (err) {
+      if (err.name === 'AbortError') { toast.info('Annule.'); return; }
+      toast.error(`Erreur : ${err.message}`);
+      return;
+    }
+
+    // Generer PDF puis ecrire dans le handle choisi
+    const { generatePdfCrr } = await import('../../utils/pdfCrrGenerator');
     const result = await generatePdfCrr(meeting, manager.crrConfig, chantierName, branding, { returnBlob: true });
     if (!result?.blob) { toast.error('Echec generation PDF.'); return; }
 
-    // 1. Download Chrome EN PREMIER (gesture frais, visible immediatement)
-    const url = URL.createObjectURL(result.blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = filename; a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 4000);
-
-    // 2. Tente d'archiver dans le dossier projet (confirm si ecrasement)
-    let folderArchived = false;
-    let folderSkipped = false;
-    const dirKey = `${companyId}_${crrDoc?.id || 'default'}`;
-    const dirHandle = await loadDirHandle(dirKey);
-    if (dirHandle) {
-      let granted = (await dirHandle.queryPermission({ mode: 'readwrite' })) === 'granted';
-      if (!granted) granted = (await dirHandle.requestPermission({ mode: 'readwrite' })) === 'granted';
-      if (granted) {
-        let wasExisting = false;
-        try {
-          await dirHandle.getFileHandle(filename, { create: false });
-          wasExisting = true;
-        } catch { /* n'existe pas */ }
-        if (wasExisting) {
-          const ok = await confirm(
-            `"${filename}" existe deja dans le dossier projet. L'ecraser ?`,
-            { title: 'Ecraser le fichier ?' }
-          );
-          if (!ok) folderSkipped = true;
-        }
-        if (!folderSkipped) {
-          folderArchived = await saveToDirectory(dirHandle, filename, result.blob);
-        }
-      }
-    }
-
-    // 3. Toast final
-    if (folderArchived) {
-      toast.success(`Telecharge + copie dans le dossier projet : ${filename}`);
-    } else if (folderSkipped) {
-      toast.info(`Telecharge : ${filename} (dossier projet inchange)`);
-    } else {
-      toast.success(`Telecharge : ${filename}`);
+    try {
+      const writable = await saveHandle.createWritable();
+      await writable.write(result.blob);
+      await writable.close();
+      toast.success(`Sauvegarde : ${saveHandle.name}`, {
+        title: 'PDF enregistre',
+        duration: 8000,
+        action: {
+          label: 'Ouvrir le PDF',
+          onClick: () => {
+            const blobUrl = URL.createObjectURL(result.blob);
+            window.open(blobUrl, '_blank');
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+          },
+        },
+      });
+    } catch (err) {
+      toast.error(`Echec ecriture : ${err.message}`);
     }
   }, [manager, chantierName, branding, companyId, crrDoc]);
 
   const handleExportWord = useCallback(async () => {
-    const { generateWordCrr } = await import('../../utils/crrWordExporter');
-    const { buildExportFilename, loadDirHandle, saveToDirectory } = await import('../../utils/exportHelpers');
+    const { buildExportFilename, loadDirHandle } = await import('../../utils/exportHelpers');
     const info = manager.crrConfig.chantierInfo || {};
     const meeting = manager.activeMeeting;
 
@@ -368,51 +360,32 @@ export default function CrcView({ onBackToHub, user, companyId }) {
       number: meeting.number, projectName: chantierName, date: meeting.date, ext: 'doc',
     });
 
+    const dirKey = `${companyId}_${crrDoc?.id || 'default'}`;
+    const dirHandle = await loadDirHandle(dirKey);
+    let saveHandle;
+    try {
+      saveHandle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        startIn: dirHandle || 'documents',
+        types: [{ description: 'Document Word', accept: { 'application/msword': ['.doc'] } }],
+      });
+    } catch (err) {
+      if (err.name === 'AbortError') { toast.info('Annule.'); return; }
+      toast.error(`Erreur : ${err.message}`);
+      return;
+    }
+
+    const { generateWordCrr } = await import('../../utils/crrWordExporter');
     const result = await generateWordCrr(meeting, manager.crrConfig, chantierName, branding, { filename, returnBlob: true });
     if (!result?.blob) { toast.error('Echec generation Word.'); return; }
 
-    // 1. Download Chrome EN PREMIER (gesture frais, visible immediatement)
-    const url = URL.createObjectURL(result.blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = filename; a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 4000);
-
-    // 2. Tente d'archiver dans le dossier projet (confirm si ecrasement)
-    let folderArchived = false;
-    let folderSkipped = false;
-    const dirKey = `${companyId}_${crrDoc?.id || 'default'}`;
-    const dirHandle = await loadDirHandle(dirKey);
-    if (dirHandle) {
-      let granted = (await dirHandle.queryPermission({ mode: 'readwrite' })) === 'granted';
-      if (!granted) granted = (await dirHandle.requestPermission({ mode: 'readwrite' })) === 'granted';
-      if (granted) {
-        let wasExisting = false;
-        try {
-          await dirHandle.getFileHandle(filename, { create: false });
-          wasExisting = true;
-        } catch { /* n'existe pas */ }
-        if (wasExisting) {
-          const ok = await confirm(
-            `"${filename}" existe deja dans le dossier projet. L'ecraser ?`,
-            { title: 'Ecraser le fichier ?' }
-          );
-          if (!ok) folderSkipped = true;
-        }
-        if (!folderSkipped) {
-          folderArchived = await saveToDirectory(dirHandle, filename, result.blob);
-        }
-      }
-    }
-
-    // 3. Toast final
-    if (folderArchived) {
-      toast.success(`Telecharge + copie dans le dossier projet : ${filename}`);
-    } else if (folderSkipped) {
-      toast.info(`Telecharge : ${filename} (dossier projet inchange)`);
-    } else {
-      toast.success(`Telecharge : ${filename}`);
+    try {
+      const writable = await saveHandle.createWritable();
+      await writable.write(result.blob);
+      await writable.close();
+      toast.success(`Sauvegarde : ${saveHandle.name}`);
+    } catch (err) {
+      toast.error(`Echec ecriture : ${err.message}`);
     }
   }, [manager, chantierName, branding, companyId, crrDoc]);
 
@@ -489,41 +462,56 @@ export default function CrcView({ onBackToHub, user, companyId }) {
     const info = manager.crrConfig.chantierInfo || {};
     const meeting = manager.activeMeeting;
 
-    const filename = buildExportFilename(info.exportPattern, {
+    const pdfFilename = buildExportFilename(info.exportPattern, {
       number: meeting.number, projectName: chantierName, date: meeting.date, ext: 'pdf',
     });
 
-    const { generatePdfCrr } = await import('../../utils/pdfCrrGenerator');
-    const pdfData = await generatePdfCrr(
-      meeting, manager.crrConfig, chantierName, branding, { returnBlob: true, filename }
-    );
-
+    // 1. Boite Save As pour le PDF, defaut dossier projet
     const dirKey = `${companyId}_${crrDoc?.id || 'default'}`;
     const dirHandle = await loadDirHandle(dirKey);
-
-    const { openOutlookMail } = await import('../../utils/crrMailer');
-    const result = await openOutlookMail(meeting, manager.crrConfig, chantierName, manager.diffusionEmails, pdfData, {
-      dirHandle,
-      confirmOverwrite: async (existing) => confirm(
-        `Fichier(s) existant(s) dans le dossier projet : ${existing.join(' + ')}. Ecraser ?`,
-        { title: 'Ecraser le(s) fichier(s) ?' }
-      ),
-    });
-    if (!result.pdfSaved) {
-      toast.info('Envoi annule.');
+    let pdfSaveHandle;
+    try {
+      pdfSaveHandle = await window.showSaveFilePicker({
+        suggestedName: pdfFilename,
+        startIn: dirHandle || 'documents',
+        types: [{ description: 'Document PDF', accept: { 'application/pdf': ['.pdf'] } }],
+      });
+    } catch (err) {
+      if (err.name === 'AbortError') { toast.info('Annule.'); return; }
+      toast.error(`Erreur : ${err.message}`);
       return;
     }
-    if (result.vbsDownloaded) {
-      let archivePart = '';
-      if (result.pdfArchived && result.vbsArchived) {
-        archivePart = ' + copie dans le dossier projet';
-      } else if (result.folderSkipped) {
-        archivePart = ' (dossier projet inchange)';
-      }
-      toast.success(`Script telecharge${archivePart} — cliquez "Ouvrir" dans Chrome pour lancer Outlook.`);
-    } else if (result.fallback) {
-      toast.success('PDF telecharge - glissez-le dans la fenetre Outlook.');
+
+    // 2. Generer le PDF, l'ecrire dans le handle choisi
+    const { generatePdfCrr } = await import('../../utils/pdfCrrGenerator');
+    const pdfData = await generatePdfCrr(
+      meeting, manager.crrConfig, chantierName, branding, { returnBlob: true, filename: pdfFilename }
+    );
+    if (!pdfData?.blob) { toast.error('Echec generation PDF.'); return; }
+
+    try {
+      const writable = await pdfSaveHandle.createWritable();
+      await writable.write(pdfData.blob);
+      await writable.close();
+    } catch (err) {
+      toast.error(`Echec ecriture PDF : ${err.message}`);
+      return;
     }
+
+    // 3. Construire le script .vbs et le telecharger via <a download> (Chrome)
+    const { buildMailScript } = await import('../../utils/crrMailer');
+    const scriptData = await buildMailScript(meeting, chantierName, manager.diffusionEmails, pdfData);
+
+    const url = URL.createObjectURL(scriptData.blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = scriptData.filename; a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 4000);
+
+    toast.success(`PDF sauvegarde : ${pdfSaveHandle.name}. Le .vbs est telecharge — deplace-le ou tu veux et double-clic pour lancer Outlook.`, {
+      duration: 8000,
+    });
   }, [manager, chantierName, branding, companyId, crrDoc]);
 
   // ── Optimisation images : recompression + migration vers Firebase Storage ───
