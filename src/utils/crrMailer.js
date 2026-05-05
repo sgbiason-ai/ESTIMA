@@ -309,40 +309,7 @@ export const openOutlookMail = async (meeting, crrConfig, projectName, emails, p
     return { pdfSaved: true, vbsDownloaded: false, fallback: true };
   }
 
-  // ── 1. Resoudre le dossier d'export (dirHandle de la modale, sinon picker) ──
-  let dir = null;
-  try {
-    if (options.dirHandle) {
-      const perm = await options.dirHandle.queryPermission({ mode: 'readwrite' });
-      if (perm === 'granted') {
-        dir = options.dirHandle;
-      } else {
-        const req = await options.dirHandle.requestPermission({ mode: 'readwrite' });
-        if (req === 'granted') dir = options.dirHandle;
-      }
-    }
-    if (!dir) dir = await getExportDir();
-  } catch (err) {
-    if (err.name !== 'AbortError') {
-      console.warn('Acquisition dossier d\'export echouee :', err);
-    }
-  }
-
-  // ── 2. Archiver le PDF dans le dossier (best-effort) ──
-  let pdfArchived = false;
-  if (dir) {
-    try {
-      await writeFile(dir, pdfData.filename, pdfData.blob);
-      pdfArchived = true;
-    } catch (err) {
-      console.warn('Archivage PDF echoue :', err);
-    }
-  }
-
-  // ── 3. Construire le script auto-porte (PDF embarque en base64) ──
-  // Extension .estimavrd (au lieu de .vbs) pour contourner le blocage
-  // FileSystemAccess de Chrome sur les extensions executables.
-  // L'utilisateur configure Windows une fois (Ouvrir avec... -> wscript.exe).
+  // ── 1. Construire le script (PDF embarque en base64) ──
   const subject = buildMailSubject(meeting, projectName);
   const to = emails.join(';');
   const htmlBody = buildMailHtml(meeting, projectName);
@@ -351,26 +318,50 @@ export const openOutlookMail = async (meeting, crrConfig, projectName, emails, p
   const vbsBlob = new Blob([vbsContent], { type: 'application/octet-stream' });
   const vbsFilename = 'Envoyer_CR.estimavrd';
 
-  // ── 4. Archiver le script dans le dossier (best-effort) ──
-  let vbsArchived = false;
-  if (dir) {
-    try {
-      await writeFile(dir, vbsFilename, vbsBlob);
-      vbsArchived = true;
-    } catch (err) {
-      console.warn('Archivage script echoue :', err);
-    }
-  }
-
-  // ── 5. Declencher le telechargement du script via <a download> ──
+  // ── 2. Download Chrome EN PREMIER (gesture frais, visible immediatement) ──
   const vbsUrl = URL.createObjectURL(vbsBlob);
   const link = document.createElement('a');
   link.href = vbsUrl;
   link.download = vbsFilename;
+  link.style.display = 'none';
   document.body.appendChild(link);
   link.click();
-  document.body.removeChild(link);
-  setTimeout(() => URL.revokeObjectURL(vbsUrl), 1000);
+  setTimeout(() => { link.remove(); URL.revokeObjectURL(vbsUrl); }, 4000);
 
-  return { pdfSaved: true, pdfArchived, vbsArchived, vbsDownloaded: true };
+  // ── 3. Archive folder (avec confirm callback du caller) ──
+  let dir = null;
+  if (options.dirHandle) {
+    try {
+      const perm = await options.dirHandle.queryPermission({ mode: 'readwrite' });
+      if (perm === 'granted') dir = options.dirHandle;
+      else {
+        const req = await options.dirHandle.requestPermission({ mode: 'readwrite' });
+        if (req === 'granted') dir = options.dirHandle;
+      }
+    } catch (err) {
+      console.warn('Permission dossier projet refusee :', err);
+    }
+  }
+
+  let pdfArchived = false;
+  let vbsArchived = false;
+  let folderSkipped = false;
+  if (dir) {
+    const existing = [];
+    try { await dir.getFileHandle(pdfData.filename, { create: false }); existing.push(pdfData.filename); } catch {}
+    try { await dir.getFileHandle(vbsFilename, { create: false }); existing.push(vbsFilename); } catch {}
+
+    let canWrite = true;
+    if (existing.length > 0 && typeof options.confirmOverwrite === 'function') {
+      canWrite = await options.confirmOverwrite(existing);
+      if (!canWrite) folderSkipped = true;
+    }
+
+    if (canWrite) {
+      try { await writeFile(dir, pdfData.filename, pdfData.blob); pdfArchived = true; } catch (err) { console.warn('Archivage PDF echoue :', err); }
+      try { await writeFile(dir, vbsFilename, vbsBlob); vbsArchived = true; } catch (err) { console.warn('Archivage script echoue :', err); }
+    }
+  }
+
+  return { pdfSaved: true, pdfArchived, vbsArchived, folderSkipped, vbsDownloaded: true };
 };

@@ -222,7 +222,12 @@ export const generateWordCrr = (meeting, crrConfig, projectName = '', branding =
     filename = `CR_${crNum}_${safeName}_${meeting.date || 'ND'}.doc`;
   }
 
-  // Tenter l'enregistrement dans le dossier choisi (File System Access)
+  // Si returnBlob, on rend le blob a l'appelant (qui gere download + archive)
+  if (options.returnBlob) {
+    return { blob, filename };
+  }
+
+  // Sinon comportement legacy : essayer dossier puis fallback download
   if (options.dirHandle && options.saveToDirectory) {
     options.saveToDirectory(options.dirHandle, filename, blob).then((saved) => {
       if (!saved) fallbackDownload(blob, filename);

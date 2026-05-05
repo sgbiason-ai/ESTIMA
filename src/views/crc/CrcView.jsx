@@ -310,50 +310,49 @@ export default function CrcView({ onBackToHub, user, companyId }) {
       number: meeting.number, projectName: chantierName, date: meeting.date, ext: 'pdf',
     });
 
-    // Generer le PDF en blob
     const result = await generatePdfCrr(meeting, manager.crrConfig, chantierName, branding, { returnBlob: true });
     if (!result?.blob) { toast.error('Echec generation PDF.'); return; }
 
-    // Toujours declencher le download (visible dans la barre du navigateur)
+    // 1. Download Chrome EN PREMIER (gesture frais, visible immediatement)
     const url = URL.createObjectURL(result.blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
+    a.href = url; a.download = filename; a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 4000);
 
-    // Tenter d'archiver dans le dossier projet (avec confirmation si le fichier existe)
+    // 2. Tente d'archiver dans le dossier projet (confirm si ecrasement)
+    let folderArchived = false;
+    let folderSkipped = false;
     const dirKey = `${companyId}_${crrDoc?.id || 'default'}`;
     const dirHandle = await loadDirHandle(dirKey);
-    if (!dirHandle) { toast.success(`Telecharge : ${filename}`); return; }
-
-    // Permission
-    let granted = (await dirHandle.queryPermission({ mode: 'readwrite' })) === 'granted';
-    if (!granted) {
-      granted = (await dirHandle.requestPermission({ mode: 'readwrite' })) === 'granted';
-    }
-    if (!granted) { toast.success(`Telecharge : ${filename}`); return; }
-
-    // Le fichier existe-t-il deja dans le dossier ?
-    let fileExists = false;
-    try {
-      await dirHandle.getFileHandle(filename, { create: false });
-      fileExists = true;
-    } catch { /* n'existe pas, on poursuit */ }
-
-    if (fileExists) {
-      const ok = await confirm(
-        `"${filename}" existe deja dans le dossier projet. L'ecraser ?`,
-        { title: 'Ecraser le fichier ?' }
-      );
-      if (!ok) { toast.success(`Telecharge : ${filename} (dossier projet inchange)`); return; }
+    if (dirHandle) {
+      let granted = (await dirHandle.queryPermission({ mode: 'readwrite' })) === 'granted';
+      if (!granted) granted = (await dirHandle.requestPermission({ mode: 'readwrite' })) === 'granted';
+      if (granted) {
+        let wasExisting = false;
+        try {
+          await dirHandle.getFileHandle(filename, { create: false });
+          wasExisting = true;
+        } catch { /* n'existe pas */ }
+        if (wasExisting) {
+          const ok = await confirm(
+            `"${filename}" existe deja dans le dossier projet. L'ecraser ?`,
+            { title: 'Ecraser le fichier ?' }
+          );
+          if (!ok) folderSkipped = true;
+        }
+        if (!folderSkipped) {
+          folderArchived = await saveToDirectory(dirHandle, filename, result.blob);
+        }
+      }
     }
 
-    const saved = await saveToDirectory(dirHandle, filename, result.blob);
-    if (saved) {
-      toast.success(`Telecharge + archive dans le dossier projet : ${filename}`);
+    // 3. Toast final
+    if (folderArchived) {
+      toast.success(`Telecharge + copie dans le dossier projet : ${filename}`);
+    } else if (folderSkipped) {
+      toast.info(`Telecharge : ${filename} (dossier projet inchange)`);
     } else {
       toast.success(`Telecharge : ${filename}`);
     }
@@ -369,9 +368,52 @@ export default function CrcView({ onBackToHub, user, companyId }) {
       number: meeting.number, projectName: chantierName, date: meeting.date, ext: 'doc',
     });
 
+    const result = await generateWordCrr(meeting, manager.crrConfig, chantierName, branding, { filename, returnBlob: true });
+    if (!result?.blob) { toast.error('Echec generation Word.'); return; }
+
+    // 1. Download Chrome EN PREMIER (gesture frais, visible immediatement)
+    const url = URL.createObjectURL(result.blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 4000);
+
+    // 2. Tente d'archiver dans le dossier projet (confirm si ecrasement)
+    let folderArchived = false;
+    let folderSkipped = false;
     const dirKey = `${companyId}_${crrDoc?.id || 'default'}`;
     const dirHandle = await loadDirHandle(dirKey);
-    generateWordCrr(meeting, manager.crrConfig, chantierName, branding, { filename, dirHandle, saveToDirectory });
+    if (dirHandle) {
+      let granted = (await dirHandle.queryPermission({ mode: 'readwrite' })) === 'granted';
+      if (!granted) granted = (await dirHandle.requestPermission({ mode: 'readwrite' })) === 'granted';
+      if (granted) {
+        let wasExisting = false;
+        try {
+          await dirHandle.getFileHandle(filename, { create: false });
+          wasExisting = true;
+        } catch { /* n'existe pas */ }
+        if (wasExisting) {
+          const ok = await confirm(
+            `"${filename}" existe deja dans le dossier projet. L'ecraser ?`,
+            { title: 'Ecraser le fichier ?' }
+          );
+          if (!ok) folderSkipped = true;
+        }
+        if (!folderSkipped) {
+          folderArchived = await saveToDirectory(dirHandle, filename, result.blob);
+        }
+      }
+    }
+
+    // 3. Toast final
+    if (folderArchived) {
+      toast.success(`Telecharge + copie dans le dossier projet : ${filename}`);
+    } else if (folderSkipped) {
+      toast.info(`Telecharge : ${filename} (dossier projet inchange)`);
+    } else {
+      toast.success(`Telecharge : ${filename}`);
+    }
   }, [manager, chantierName, branding, companyId, crrDoc]);
 
   // ── Archive export (.crcestima) ──
@@ -451,30 +493,34 @@ export default function CrcView({ onBackToHub, user, companyId }) {
       number: meeting.number, projectName: chantierName, date: meeting.date, ext: 'pdf',
     });
 
-    const dirKey = `${companyId}_${crrDoc?.id || 'default'}`;
-    const dirHandle = await loadDirHandle(dirKey);
-
     const { generatePdfCrr } = await import('../../utils/pdfCrrGenerator');
     const pdfData = await generatePdfCrr(
       meeting, manager.crrConfig, chantierName, branding, { returnBlob: true, filename }
     );
 
+    const dirKey = `${companyId}_${crrDoc?.id || 'default'}`;
+    const dirHandle = await loadDirHandle(dirKey);
+
     const { openOutlookMail } = await import('../../utils/crrMailer');
-    const result = await openOutlookMail(meeting, manager.crrConfig, chantierName, manager.diffusionEmails, pdfData, { dirHandle });
+    const result = await openOutlookMail(meeting, manager.crrConfig, chantierName, manager.diffusionEmails, pdfData, {
+      dirHandle,
+      confirmOverwrite: async (existing) => confirm(
+        `Fichier(s) existant(s) dans le dossier projet : ${existing.join(' + ')}. Ecraser ?`,
+        { title: 'Ecraser le(s) fichier(s) ?' }
+      ),
+    });
     if (!result.pdfSaved) {
       toast.info('Envoi annule.');
       return;
     }
     if (result.vbsDownloaded) {
-      let archiveSuffix = '';
+      let archivePart = '';
       if (result.pdfArchived && result.vbsArchived) {
-        archiveSuffix = ' PDF + script archives dans le dossier projet.';
-      } else if (result.pdfArchived) {
-        archiveSuffix = ' PDF archive dans le dossier projet.';
-      } else if (result.vbsArchived) {
-        archiveSuffix = ' Script archive dans le dossier projet.';
+        archivePart = ' + copie dans le dossier projet';
+      } else if (result.folderSkipped) {
+        archivePart = ' (dossier projet inchange)';
       }
-      toast.success(`Script telecharge - cliquez "Ouvrir" dans la barre de telechargements pour lancer Outlook.${archiveSuffix}`);
+      toast.success(`Script telecharge${archivePart} — cliquez "Ouvrir" dans Chrome pour lancer Outlook.`);
     } else if (result.fallback) {
       toast.success('PDF telecharge - glissez-le dans la fenetre Outlook.');
     }
