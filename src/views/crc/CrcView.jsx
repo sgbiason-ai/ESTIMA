@@ -429,7 +429,14 @@ export default function CrcView({ onBackToHub, user, companyId }) {
       return;
     }
     if (result.vbsDownloaded) {
-      const archiveSuffix = result.pdfArchived ? ' Le PDF est aussi archive dans le dossier projet.' : '';
+      let archiveSuffix = '';
+      if (result.pdfArchived && result.vbsArchived) {
+        archiveSuffix = ' PDF + VBS archives dans le dossier projet.';
+      } else if (result.pdfArchived) {
+        archiveSuffix = ' Le PDF est archive dans le dossier projet.';
+      } else if (result.vbsArchived) {
+        archiveSuffix = ' Le VBS est archive dans le dossier projet.';
+      }
       toast.success(`VBS telecharge - cliquez "Ouvrir" dans la barre de telechargements pour lancer Outlook.${archiveSuffix}`);
     } else if (result.fallback) {
       toast.success('PDF telecharge - glissez-le dans la fenetre Outlook.');

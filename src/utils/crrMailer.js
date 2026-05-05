@@ -309,49 +309,65 @@ export const openOutlookMail = async (meeting, crrConfig, projectName, emails, p
     return { pdfSaved: true, vbsDownloaded: false, fallback: true };
   }
 
-  // ── 1. Archive le PDF dans le dossier projet (best-effort, non-bloquant) ──
-  let pdfArchived = false;
+  // ── 1. Resoudre le dossier d'export (dirHandle de la modale, sinon picker) ──
+  let dir = null;
   try {
-    let dir;
     if (options.dirHandle) {
       const perm = await options.dirHandle.queryPermission({ mode: 'readwrite' });
       if (perm === 'granted') {
         dir = options.dirHandle;
       } else {
         const req = await options.dirHandle.requestPermission({ mode: 'readwrite' });
-        dir = req === 'granted' ? options.dirHandle : await getExportDir();
+        if (req === 'granted') dir = options.dirHandle;
       }
-    } else {
-      dir = await getExportDir();
     }
-    await writeFile(dir, pdfData.filename, pdfData.blob);
-    pdfArchived = true;
+    if (!dir) dir = await getExportDir();
   } catch (err) {
-    if (err.name === 'AbortError') {
-      // L'utilisateur a annule le picker : on poursuit sans archivage
-      // (le VBS reste telechargeable, c'est l'action principale)
-    } else {
+    if (err.name !== 'AbortError') {
+      console.warn('Acquisition dossier d\'export echouee :', err);
+    }
+  }
+
+  // ── 2. Archiver le PDF dans le dossier (best-effort) ──
+  let pdfArchived = false;
+  if (dir) {
+    try {
+      await writeFile(dir, pdfData.filename, pdfData.blob);
+      pdfArchived = true;
+    } catch (err) {
       console.warn('Archivage PDF echoue :', err);
     }
   }
 
-  // ── 2. Construire le VBS auto-porte (PDF embarque en base64) ──
+  // ── 3. Construire le VBS auto-porte (PDF embarque en base64) ──
   const subject = buildMailSubject(meeting, projectName);
   const to = emails.join(';');
   const htmlBody = buildMailHtml(meeting, projectName);
   const base64Pdf = await blobToBase64(pdfData.blob);
   const vbsContent = buildSelfContainedVbs(base64Pdf, to, subject, htmlBody, pdfData.filename);
-
-  // ── 3. Declencher le telechargement du VBS via <a download> ──
   const vbsBlob = new Blob([vbsContent], { type: 'application/octet-stream' });
+  const vbsFilename = 'Envoyer_CR.vbs';
+
+  // ── 4. Archiver le VBS dans le dossier (best-effort) ──
+  let vbsArchived = false;
+  if (dir) {
+    try {
+      await writeFile(dir, vbsFilename, vbsBlob);
+      vbsArchived = true;
+    } catch (err) {
+      console.warn('Archivage VBS echoue :', err);
+    }
+  }
+
+  // ── 5. Declencher le telechargement du VBS via <a download> ──
   const vbsUrl = URL.createObjectURL(vbsBlob);
   const link = document.createElement('a');
   link.href = vbsUrl;
-  link.download = 'Envoyer_CR.vbs';
+  link.download = vbsFilename;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   setTimeout(() => URL.revokeObjectURL(vbsUrl), 1000);
 
-  return { pdfSaved: true, pdfArchived, vbsDownloaded: true };
+  return { pdfSaved: true, pdfArchived, vbsArchived, vbsDownloaded: true };
 };
