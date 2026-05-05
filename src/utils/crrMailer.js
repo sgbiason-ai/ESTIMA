@@ -339,27 +339,30 @@ export const openOutlookMail = async (meeting, crrConfig, projectName, emails, p
     }
   }
 
-  // ── 3. Construire le VBS auto-porte (PDF embarque en base64) ──
+  // ── 3. Construire le script auto-porte (PDF embarque en base64) ──
+  // Extension .estimavrd (au lieu de .vbs) pour contourner le blocage
+  // FileSystemAccess de Chrome sur les extensions executables.
+  // L'utilisateur configure Windows une fois (Ouvrir avec... -> wscript.exe).
   const subject = buildMailSubject(meeting, projectName);
   const to = emails.join(';');
   const htmlBody = buildMailHtml(meeting, projectName);
   const base64Pdf = await blobToBase64(pdfData.blob);
   const vbsContent = buildSelfContainedVbs(base64Pdf, to, subject, htmlBody, pdfData.filename);
   const vbsBlob = new Blob([vbsContent], { type: 'application/octet-stream' });
-  const vbsFilename = 'Envoyer_CR.vbs';
+  const vbsFilename = 'Envoyer_CR.estimavrd';
 
-  // ── 4. Archiver le VBS dans le dossier (best-effort) ──
+  // ── 4. Archiver le script dans le dossier (best-effort) ──
   let vbsArchived = false;
   if (dir) {
     try {
       await writeFile(dir, vbsFilename, vbsBlob);
       vbsArchived = true;
     } catch (err) {
-      console.warn('Archivage VBS echoue :', err);
+      console.warn('Archivage script echoue :', err);
     }
   }
 
-  // ── 5. Declencher le telechargement du VBS via <a download> ──
+  // ── 5. Declencher le telechargement du script via <a download> ──
   const vbsUrl = URL.createObjectURL(vbsBlob);
   const link = document.createElement('a');
   link.href = vbsUrl;
