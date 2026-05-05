@@ -59,10 +59,10 @@ export default function CrcMeetingTabs({ meetings, activeMeetingId, setActiveMee
               key={m.id}
               data-mid={m.id}
               onClick={() => setActiveMeetingId(m.id)}
-              className={`shrink-0 px-3 py-1.5 text-[11px] font-medium transition-all whitespace-nowrap rounded-lg ${
+              className={`shrink-0 px-3.5 py-1.5 text-[11px] transition-all whitespace-nowrap rounded-lg ${
                 active
-                  ? 'bg-white text-gray-900 shadow-sm border border-gray-200/60'
-                  : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                  ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white font-bold shadow-md shadow-blue-500/30 ring-2 ring-blue-200/60 scale-[1.02]'
+                  : 'font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100'
               }`}
             >
               CR {String(m.number).padStart(2, '0')}{m.date ? ` · ${fmtDate(m.date)}` : ''}
