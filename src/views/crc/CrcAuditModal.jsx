@@ -2,6 +2,7 @@
 // Modal d'audit (diff entre 2 comptes rendus CRC)
 import React from 'react';
 import { ArrowLeftRight } from 'lucide-react';
+import { renderFormattedText, stripHtml } from '../../utils/formatObsText';
 
 const statusLabel = (s) => s === 'done' ? 'FAIT' : s === 'in_progress' ? 'En cours' : 'Ouvert';
 const statusColor = (s) => s === 'done' ? 'text-emerald-700 bg-emerald-50' : s === 'in_progress' ? 'text-blue-700 bg-blue-50' : 'text-amber-700 bg-amber-50';
@@ -160,17 +161,24 @@ export default function CrcAuditModal({ isOpen, onClose, currentMeeting, previou
                   <div key={obs.id} className="px-3 py-2 bg-blue-50 rounded-lg border border-blue-100">
                     <div className="flex items-start gap-2 mb-1">
                       <span className="text-[10px] font-bold text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded shrink-0">{obs.category}</span>
-                      <span className="text-xs text-slate-700 line-clamp-1">{obs.text || '(vide)'}</span>
+                      <span className="text-xs text-slate-700 line-clamp-1">{stripHtml(obs.text) || '(vide)'}</span>
                     </div>
                     <div className="space-y-0.5 ml-2">
-                      {changes.map((c, i) => (
-                        <div key={i} className="text-[10px] text-slate-600">
-                          <span className="font-medium text-slate-500">{c.field} :</span>{' '}
-                          <span className="line-through text-red-400">{c.from || '—'}</span>
-                          {' → '}
-                          <span className="font-semibold text-blue-700">{c.to || '—'}</span>
-                        </div>
-                      ))}
+                      {changes.map((c, i) => {
+                        const isHtmlField = c.field === 'Texte';
+                        return (
+                          <div key={i} className="text-[10px] text-slate-600">
+                            <span className="font-medium text-slate-500">{c.field} :</span>{' '}
+                            <span className="line-through text-red-400">
+                              {isHtmlField ? (renderFormattedText(c.from) || '—') : (c.from || '—')}
+                            </span>
+                            {' → '}
+                            <span className="font-semibold text-blue-700">
+                              {isHtmlField ? (renderFormattedText(c.to) || '—') : (c.to || '—')}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 ))}
