@@ -272,6 +272,7 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
                     // Sélectionner le meeting puis dupliquer
                     handleSelectMeeting(contextMenu.meetingIdx);
                     const nextDate = (() => {
+                      if (m.nextMeeting?.date) return m.nextMeeting.date;
                       if (!m.date) return '';
                       try { const d = new Date(m.date + 'T00:00:00'); d.setDate(d.getDate() + 7); return d.toISOString().split('T')[0]; }
                       catch { return ''; }

@@ -277,8 +277,10 @@ export default function CrcView({ onBackToHub, user, companyId }) {
         .sort((a, b) => b.number - a.number)[0] || null
     : null;
 
-  // Date par defaut pour la duplication : date de la reunion active + 7 jours
+  // Date par defaut pour la duplication : date de prochaine reunion du CR actif
   const defaultDuplicateDate = (() => {
+    const nextDate = manager.activeMeeting?.nextMeeting?.date;
+    if (nextDate) return nextDate;
     if (!manager.activeMeeting?.date) return '';
     try {
       const d = new Date(manager.activeMeeting.date + 'T00:00:00');
