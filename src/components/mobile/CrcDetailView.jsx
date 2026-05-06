@@ -274,7 +274,7 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
                     const nextDate = (() => {
                       if (m.nextMeeting?.date) return m.nextMeeting.date;
                       if (!m.date) return '';
-                      try { const d = new Date(m.date + 'T00:00:00'); d.setDate(d.getDate() + 7); return d.toISOString().split('T')[0]; }
+                      try { const d = new Date(m.date + 'T00:00:00'); d.setDate(d.getDate() + 7); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
                       catch { return ''; }
                     })();
                     manager.duplicateMeeting(nextDate);

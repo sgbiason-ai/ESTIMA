@@ -223,20 +223,13 @@ export const useCrrManager = ({
         originObsId: obs.id,
       }));
 
-      // Prochaine reunion = date prochaine reunion du CR source + 7 jours
+      // Prochaine reunion = newDate + 7 jours
       let nextDate = '';
-      const sourceNextDate = source.nextMeeting?.date;
-      if (sourceNextDate) {
-        try {
-          const d = new Date(sourceNextDate + 'T00:00:00');
-          d.setDate(d.getDate() + 7);
-          nextDate = d.toISOString().split('T')[0];
-        } catch { /* ignore */ }
-      } else if (newDate) {
+      if (newDate) {
         try {
           const d = new Date(newDate + 'T00:00:00');
           d.setDate(d.getDate() + 7);
-          nextDate = d.toISOString().split('T')[0];
+          nextDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
         } catch { /* ignore */ }
       }
 

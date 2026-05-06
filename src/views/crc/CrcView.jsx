@@ -285,7 +285,7 @@ export default function CrcView({ onBackToHub, user, companyId }) {
     try {
       const d = new Date(manager.activeMeeting.date + 'T00:00:00');
       d.setDate(d.getDate() + 7);
-      return d.toISOString().split('T')[0];
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     } catch { return ''; }
   })();
 
