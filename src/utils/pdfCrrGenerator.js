@@ -1029,11 +1029,11 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
         if (meta.type === 'text' && data.column.index === 3) {
           const obs = meta.obs;
           if (obs.status === 'done') {
-            drawBadge(doc, data.cell, 'FAIT', THEME.doneBg.map(c => Math.max(0, c - 20)), THEME.doneTxt, fontH);
+            drawBadge(doc, data.cell, 'FAIT', [180, 230, 200], [15, 100, 55], fontH);
           } else if (obs.status === 'in_progress') {
-            drawBadge(doc, data.cell, 'En cours', THEME.progressBg.map(c => Math.max(0, c - 20)), THEME.progressTxt, fontH);
+            drawBadge(doc, data.cell, 'En cours', [185, 215, 250], [20, 70, 150], fontH);
           } else if (obs.status !== 'empty') {
-            drawBadge(doc, data.cell, 'Ouvert', THEME.openBg.map(c => Math.max(0, c - 20)), THEME.openTxt, fontH);
+            drawBadge(doc, data.cell, 'Ouvert', [240, 215, 185], [170, 90, 10], fontH);
           }
         }
       },

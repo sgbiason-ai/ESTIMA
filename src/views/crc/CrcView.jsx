@@ -472,60 +472,60 @@ export default function CrcView({ onBackToHub, user, companyId }) {
       toast.warning('Aucun destinataire avec email et diffusion cochee.');
       return;
     }
-    const { buildExportFilename, loadDirHandle } = await import('../../utils/exportHelpers');
+    const { buildExportFilename, loadDirHandle, saveDirHandle, saveToDirectory } = await import('../../utils/exportHelpers');
+    const { buildLightVbs, buildMailSubject, buildMailHtml } = await import('../../utils/crrMailer');
     const info = manager.crrConfig.chantierInfo || {};
     const meeting = manager.activeMeeting;
 
+    // 1. Obtenir le dossier projet (sauvegarde ou picker)
+    const dirKey = `${companyId}_${crrDoc?.id || 'default'}`;
+    let dirHandle = await loadDirHandle(dirKey);
+
+    if (dirHandle) {
+      try {
+        const perm = await dirHandle.queryPermission({ mode: 'readwrite' });
+        if (perm !== 'granted') {
+          const req = await dirHandle.requestPermission({ mode: 'readwrite' });
+          if (req !== 'granted') dirHandle = null;
+        }
+      } catch { dirHandle = null; }
+    }
+
+    if (!dirHandle) {
+      try {
+        dirHandle = await window.showDirectoryPicker({ id: 'crr-export', mode: 'readwrite', startIn: 'documents' });
+        await saveDirHandle(dirKey, dirHandle);
+      } catch (err) {
+        if (err.name === 'AbortError') { toast.info('Annule.'); return; }
+        toast.error(`Erreur : ${err.message}`);
+        return;
+      }
+    }
+
+    // 2. Generer le PDF
     const pdfFilename = buildExportFilename(info.exportPattern, {
       number: meeting.number, projectName: chantierName, date: meeting.date, ext: 'pdf',
     });
-
-    // 1. Boite Save As pour le PDF, defaut dossier projet
-    const dirKey = `${companyId}_${crrDoc?.id || 'default'}`;
-    const dirHandle = await loadDirHandle(dirKey);
-    let pdfSaveHandle;
-    try {
-      pdfSaveHandle = await window.showSaveFilePicker({
-        suggestedName: pdfFilename,
-        startIn: dirHandle || 'documents',
-        types: [{ description: 'Document PDF', accept: { 'application/pdf': ['.pdf'] } }],
-      });
-    } catch (err) {
-      if (err.name === 'AbortError') { toast.info('Annule.'); return; }
-      toast.error(`Erreur : ${err.message}`);
-      return;
-    }
-
-    // 2. Generer le PDF, l'ecrire dans le handle choisi
     const { generatePdfCrr } = await import('../../utils/pdfCrrGenerator');
     const pdfData = await generatePdfCrr(
       meeting, manager.crrConfig, chantierName, branding, { returnBlob: true, filename: pdfFilename, sortDate, sortCat }
     );
     if (!pdfData?.blob) { toast.error('Echec generation PDF.'); return; }
 
-    try {
-      const writable = await pdfSaveHandle.createWritable();
-      await writable.write(pdfData.blob);
-      await writable.close();
-    } catch (err) {
-      toast.error(`Echec ecriture PDF : ${err.message}`);
-      return;
-    }
+    // 3. Sauvegarder le PDF dans le dossier projet
+    const pdfSaved = await saveToDirectory(dirHandle, pdfFilename, pdfData.blob);
+    if (!pdfSaved) { toast.error('Echec ecriture PDF dans le dossier.'); return; }
 
-    // 3. Construire le script .vbs et le telecharger via <a download> (Chrome)
-    const { buildMailScript } = await import('../../utils/crrMailer');
-    const scriptData = await buildMailScript(meeting, chantierName, manager.diffusionEmails, pdfData);
+    // 4. Generer et sauvegarder le VBS (leger, reference le PDF par nom)
+    const subject = buildMailSubject(meeting, chantierName);
+    const to = manager.diffusionEmails.join(';');
+    const htmlBody = buildMailHtml(meeting, chantierName);
+    const vbsContent = buildLightVbs(pdfFilename, to, subject, htmlBody);
+    const vbsBlob = new Blob([vbsContent], { type: 'application/octet-stream' });
+    const vbsFilename = `Envoyer_CR_${String(meeting.number).padStart(2, '0')}.vbs`;
+    await saveToDirectory(dirHandle, vbsFilename, vbsBlob);
 
-    const url = URL.createObjectURL(scriptData.blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = scriptData.filename; a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 4000);
-
-    toast.success(`PDF sauvegarde : ${pdfSaveHandle.name}. Le .vbs est telecharge — deplace-le ou tu veux et double-clic pour lancer Outlook.`, {
-      duration: 8000,
-    });
+    toast.success(`${pdfFilename} + ${vbsFilename} enregistres.\nDouble-cliquez le .vbs pour ouvrir Outlook.`, { duration: 8000 });
   }, [manager, chantierName, branding, companyId, crrDoc]);
 
   // ── Optimisation images : recompression + migration vers Firebase Storage ───

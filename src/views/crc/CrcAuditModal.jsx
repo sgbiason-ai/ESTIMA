@@ -141,7 +141,7 @@ export default function CrcAuditModal({ isOpen, onClose, currentMeeting, previou
                 {newObs.map((obs) => (
                   <div key={obs.id} className="flex items-start gap-2 px-3 py-2 bg-emerald-50 rounded-lg border border-emerald-100">
                     <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded shrink-0">{obs.category}</span>
-                    <span className="text-xs text-slate-700 line-clamp-2">{obs.text || '(vide)'}</span>
+                    <span className="text-xs text-slate-700 line-clamp-2">{stripHtml(obs.text) || '(vide)'}</span>
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ml-auto ${statusColor(obs.status)}`}>{statusLabel(obs.status)}</span>
                   </div>
                 ))}
@@ -163,19 +163,30 @@ export default function CrcAuditModal({ isOpen, onClose, currentMeeting, previou
                       <span className="text-[10px] font-bold text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded shrink-0">{obs.category}</span>
                       <span className="text-xs text-slate-700 line-clamp-1">{stripHtml(obs.text) || '(vide)'}</span>
                     </div>
-                    <div className="space-y-0.5 ml-2">
+                    <div className="space-y-1 ml-2">
                       {changes.map((c, i) => {
                         const isHtmlField = c.field === 'Texte';
+                        if (isHtmlField) {
+                          // Layout vertical pour le champ Texte (HTML potentiellement multi-lignes)
+                          return (
+                            <div key={i} className="text-[10px] text-slate-600 space-y-1">
+                              <div className="font-medium text-slate-500">{c.field} :</div>
+                              <div className="px-2 py-1 bg-red-50/70 border-l-2 border-red-300 rounded-r text-red-700 line-through">
+                                {renderFormattedText(c.from) || <span className="italic text-slate-400">(vide)</span>}
+                              </div>
+                              <div className="px-2 py-1 bg-emerald-50/70 border-l-2 border-emerald-400 rounded-r text-slate-800">
+                                {renderFormattedText(c.to) || <span className="italic text-slate-400">(vide)</span>}
+                              </div>
+                            </div>
+                          );
+                        }
+                        // Layout inline pour les autres champs (Statut, Echeance, Responsable)
                         return (
                           <div key={i} className="text-[10px] text-slate-600">
                             <span className="font-medium text-slate-500">{c.field} :</span>{' '}
-                            <span className="line-through text-red-400">
-                              {isHtmlField ? (renderFormattedText(c.from) || '—') : (c.from || '—')}
-                            </span>
+                            <span className="line-through text-red-400">{c.from || '—'}</span>
                             {' → '}
-                            <span className="font-semibold text-blue-700">
-                              {isHtmlField ? (renderFormattedText(c.to) || '—') : (c.to || '—')}
-                            </span>
+                            <span className="font-semibold text-blue-700">{c.to || '—'}</span>
                           </div>
                         );
                       })}
@@ -197,7 +208,7 @@ export default function CrcAuditModal({ isOpen, onClose, currentMeeting, previou
                 {deletedObs.map((obs) => (
                   <div key={obs.id} className="flex items-start gap-2 px-3 py-2 bg-red-50 rounded-lg border border-red-100 opacity-75">
                     <span className="text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded shrink-0">{obs.category}</span>
-                    <span className="text-xs text-slate-500 line-through line-clamp-2">{obs.text || '(vide)'}</span>
+                    <span className="text-xs text-slate-500 line-through line-clamp-2">{stripHtml(obs.text) || '(vide)'}</span>
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ml-auto ${statusColor(obs.status)}`}>{statusLabel(obs.status)}</span>
                   </div>
                 ))}

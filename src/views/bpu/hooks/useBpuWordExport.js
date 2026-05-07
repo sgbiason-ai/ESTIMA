@@ -19,6 +19,41 @@ const ensureDocx = async () => {
      VerticalAlign, HeightRule, SimpleField } = docx);
 };
 
+const base64ToUint8Array = (dataUri) => {
+  const base64 = dataUri.split(',')[1];
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+};
+
+const resolveImageData = async (src) => {
+  try {
+    let buffer;
+    if (src.startsWith('data:')) {
+      buffer = base64ToUint8Array(src);
+    } else {
+      const resp = await fetch(src);
+      if (!resp.ok) return null;
+      buffer = new Uint8Array(await resp.arrayBuffer());
+    }
+    const dims = await new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+      img.onerror = () => resolve(null);
+      img.src = src;
+    });
+    if (!dims) return null;
+    const MAX_W = 350, MAX_H = 250;
+    let { w, h } = dims;
+    if (w > MAX_W) { h = Math.round(h * MAX_W / w); w = MAX_W; }
+    if (h > MAX_H) { w = Math.round(w * MAX_H / h); h = MAX_H; }
+    return { buffer, width: w, height: h };
+  } catch {
+    return null;
+  }
+};
+
 /**
  * useBpuWordExport
  * Génère et télécharge le fichier Word (.docx) du BPU.
@@ -43,7 +78,7 @@ export const useBpuWordExport = ({
   const today = new Date().toLocaleDateString('fr-FR');
 
   // ── CONVERSION HTML → DOCX ───────────────────────────────────────────────────
-  const processHtmlToDocx = (htmlString) => {
+  const processHtmlToDocx = async (htmlString) => {
     if (!htmlString) return [];
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = htmlString;
@@ -51,10 +86,28 @@ export const useBpuWordExport = ({
     const nodes = Array.from(tempDiv.childNodes);
     if (nodes.length === 0) return [];
 
+    const imgElements = tempDiv.querySelectorAll('img');
+    const imageMap = new Map();
+    await Promise.all(
+      Array.from(imgElements).map(async (img) => {
+        const src = img.getAttribute('src');
+        if (src && !imageMap.has(src)) {
+          const data = await resolveImageData(src);
+          if (data) imageMap.set(src, data);
+        }
+      })
+    );
+
     const getRunsFromNode = (node, style = {}) => {
       if (node.nodeType === 3)
         return [new TextRun({ text: node.textContent, ...style, size: 20, font: branding.fonts.main, color: '475569' })];
       if (node.nodeType === 1) {
+        if (node.tagName === 'IMG') {
+          const src = node.getAttribute('src');
+          const imgData = imageMap.get(src);
+          if (imgData) return [new ImageRun({ data: imgData.buffer, transformation: { width: imgData.width, height: imgData.height } })];
+          return [];
+        }
         let newStyle = { ...style };
         if (node.tagName === 'STRONG' || node.tagName === 'B') { newStyle.bold = true; newStyle.color = '1E293B'; }
         if (node.tagName === 'EM'     || node.tagName === 'I') newStyle.italics = true;
@@ -76,6 +129,15 @@ export const useBpuWordExport = ({
             paragraphs.push(new Paragraph({ children: runs, bullet: { level: 0 }, alignment: AlignmentType.JUSTIFIED, spacing: { after: 40 } }));
           }
         });
+      } else if (node.nodeName === 'IMG') {
+        const src = node.getAttribute('src');
+        const imgData = imageMap.get(src);
+        if (imgData) {
+          paragraphs.push(new Paragraph({
+            children: [new ImageRun({ data: imgData.buffer, transformation: { width: imgData.width, height: imgData.height } })],
+            spacing: { after: 60 },
+          }));
+        }
       } else if (node.nodeName === 'P' || node.nodeName === 'DIV') {
         const runs = [];
         node.childNodes.forEach((child) => runs.push(...getRunsFromNode(child)));

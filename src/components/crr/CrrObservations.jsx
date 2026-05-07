@@ -195,10 +195,23 @@ const StatusBadge = memo(({ status, onChange }) => {
 // ── Barre flottante formatage + photo (apparait au focus editeur) ──────────
 
 const FloatingToolbar = ({ editorRef, onExecFormat, onHighlight, fileRef, cameraRef }) => {
+  const [kbOffset, setKbOffset] = useState(0);
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const sync = () => setKbOffset(Math.max(0, window.innerHeight - vv.height - vv.offsetTop));
+    vv.addEventListener('resize', sync);
+    vv.addEventListener('scroll', sync);
+    sync();
+    return () => { vv.removeEventListener('resize', sync); vv.removeEventListener('scroll', sync); };
+  }, []);
+
   if (!editorRef) return null;
   return ReactDOM.createPortal(
     <div
-      className="fixed bottom-0 left-0 right-0 z-[9999] flex items-center justify-center gap-1 px-4 py-2.5 bg-white/95 backdrop-blur-xl border-t border-gray-200/80 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]"
+      className="fixed left-0 right-0 z-[9999] flex items-center justify-center gap-1 px-4 py-2.5 bg-white/95 backdrop-blur-xl border-t border-gray-200/80 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]"
+      style={{ bottom: kbOffset }}
       onMouseDown={(e) => e.preventDefault()}
     >
       <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">

@@ -96,7 +96,7 @@ const htmlEsc = (s) =>
     .replace(/"/g, '&quot;')
     .replace(/[^\x20-\x7E]/g, (ch) => `&#${ch.codePointAt(0)};`);
 
-const buildMailHtml = (meeting, projectName) => {
+export const buildMailHtml = (meeting, projectName) => {
   const date = formatDateFR(meeting.date);
   const num = meeting.number || '';
 
@@ -275,6 +275,50 @@ Set objMail = Nothing
 Set objOutlook = Nothing
 Set fso = Nothing
 Set sh = Nothing
+`;
+  return script.replace(/\r?\n/g, '\r\n');
+};
+
+// ─── VBS leger : reference le PDF par nom (pas de base64) ──────────────────
+
+export const buildLightVbs = (pdfFilename, mailTo, mailSubject, mailHtml) => {
+  const script = `' EstimaVRD - Ouvrir Outlook avec le CR en piece jointe.
+' Double-cliquez ce fichier pour lancer Outlook.
+
+On Error Resume Next
+
+Dim fso, pdfPath, scriptDir
+Set fso = CreateObject("Scripting.FileSystemObject")
+scriptDir = fso.GetParentFolderName(WScript.ScriptFullName)
+pdfPath = scriptDir & "\\" & ${escapeVbsLiteral(pdfFilename)}
+
+If Not fso.FileExists(pdfPath) Then
+    MsgBox "Le fichier PDF n'a pas ete trouve :" & vbCrLf & pdfPath, vbCritical, "EstimaVRD"
+    WScript.Quit
+End If
+
+Dim objOutlook, objMail
+Set objOutlook = CreateObject("Outlook.Application")
+If Err.Number <> 0 Then
+    MsgBox "Impossible de demarrer Outlook. Verifiez qu'il est installe.", vbCritical, "EstimaVRD"
+    WScript.Quit
+End If
+
+Set objMail = objOutlook.CreateItem(0)
+With objMail
+    .To = ${escapeVbsLiteral(mailTo)}
+    .Subject = ${escapeVbsLiteral(mailSubject)}
+    .BodyFormat = 2
+    .HTMLBody = ${escapeVbsLiteral(mailHtml)}
+    .Attachments.Add pdfPath
+    .Display
+End With
+
+On Error Resume Next
+fso.DeleteFile WScript.ScriptFullName
+Set objMail = Nothing
+Set objOutlook = Nothing
+Set fso = Nothing
 `;
   return script.replace(/\r?\n/g, '\r\n');
 };
