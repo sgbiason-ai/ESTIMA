@@ -532,7 +532,11 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
   // 5. OBSERVATIONS
   // ═══════════════════════════════════════════════════════════════════════════
 
-  const categories = crrConfig.categories || [];
+  const rawCategories = crrConfig.categories || [];
+  const { sortDate, sortCat } = options || {};
+  const categories = sortCat
+    ? [...rawCategories].sort((a, b) => sortCat === 'asc' ? a.localeCompare(b) : b.localeCompare(a))
+    : rawCategories;
   const observations = meeting.observations || [];
 
   // Statistiques
@@ -601,7 +605,10 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
   let isFirstObsTable = true;
   for (let ci = 0; ci < categories.length; ci++) {
     const cat = categories[ci];
-    const catObs = observations.filter((o) => o.category === cat);
+    const rawCatObs = observations.filter((o) => o.category === cat);
+    const catObs = sortDate
+      ? [...rawCatObs].sort((a, b) => { const da = a.date || ''; const db = b.date || ''; return sortDate === 'asc' ? da.localeCompare(db) : db.localeCompare(da); })
+      : rawCatObs;
     const catColor = CAT_COLORS[ci % CAT_COLORS.length];
 
     ensureSpace(doc, cursor, 14);

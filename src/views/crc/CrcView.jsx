@@ -246,6 +246,18 @@ export default function CrcView({ onBackToHub, user, companyId }) {
   const chantierName = manager.crrConfig.chantierInfo?.nom || '';
 
   const [viewMode, setViewMode] = useState('edit');
+  const [sortDate, setSortDate] = useState(() => localStorage.getItem('crc_sort_date') || null);
+  const [sortCat, setSortCat] = useState(() => localStorage.getItem('crc_sort_cat') || null);
+  const cycleDateSort = useCallback(() => setSortDate(p => {
+    const next = p === null ? 'asc' : p === 'asc' ? 'desc' : null;
+    next ? localStorage.setItem('crc_sort_date', next) : localStorage.removeItem('crc_sort_date');
+    return next;
+  }), []);
+  const cycleCatSort = useCallback(() => setSortCat(p => {
+    const next = p === null ? 'asc' : p === 'asc' ? 'desc' : null;
+    next ? localStorage.setItem('crc_sort_cat', next) : localStorage.removeItem('crc_sort_cat');
+    return next;
+  }), []);
   const [showCategoriesModal, setShowCategoriesModal] = useState(false);
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   const [showInfoChantierModal, setShowInfoChantierModal] = useState(false);
@@ -329,7 +341,7 @@ export default function CrcView({ onBackToHub, user, companyId }) {
 
     // Generer PDF puis ecrire dans le handle choisi
     const { generatePdfCrr } = await import('../../utils/pdfCrrGenerator');
-    const result = await generatePdfCrr(meeting, manager.crrConfig, chantierName, branding, { returnBlob: true });
+    const result = await generatePdfCrr(meeting, manager.crrConfig, chantierName, branding, { returnBlob: true, sortDate, sortCat });
     if (!result?.blob) { toast.error('Echec generation PDF.'); return; }
 
     try {
@@ -378,7 +390,7 @@ export default function CrcView({ onBackToHub, user, companyId }) {
     }
 
     const { generateWordCrr } = await import('../../utils/crrWordExporter');
-    const result = await generateWordCrr(meeting, manager.crrConfig, chantierName, branding, { filename, returnBlob: true });
+    const result = await generateWordCrr(meeting, manager.crrConfig, chantierName, branding, { filename, returnBlob: true, sortDate, sortCat });
     if (!result?.blob) { toast.error('Echec generation Word.'); return; }
 
     try {
@@ -487,7 +499,7 @@ export default function CrcView({ onBackToHub, user, companyId }) {
     // 2. Generer le PDF, l'ecrire dans le handle choisi
     const { generatePdfCrr } = await import('../../utils/pdfCrrGenerator');
     const pdfData = await generatePdfCrr(
-      meeting, manager.crrConfig, chantierName, branding, { returnBlob: true, filename: pdfFilename }
+      meeting, manager.crrConfig, chantierName, branding, { returnBlob: true, filename: pdfFilename, sortDate, sortCat }
     );
     if (!pdfData?.blob) { toast.error('Echec generation PDF.'); return; }
 
@@ -709,7 +721,7 @@ export default function CrcView({ onBackToHub, user, companyId }) {
                 </div>
               ) : viewMode === 'preview' ? (
                 <div className="p-6 bg-gray-100 min-h-full">
-                  <CrrPreview meeting={manager.activeMeeting} crrConfig={manager.crrConfig} projectName={chantierName} branding={branding} />
+                  <CrrPreview meeting={manager.activeMeeting} crrConfig={manager.crrConfig} projectName={chantierName} branding={branding} sortDate={sortDate} sortCat={sortCat} />
                 </div>
               ) : (
                 <div className="p-6 space-y-6 max-w-[1200px] mx-auto">
@@ -727,7 +739,9 @@ export default function CrcView({ onBackToHub, user, companyId }) {
                     reorderObservations={manager.reorderObservations}
                     legalText={manager.crrConfig.legalText}
                     participantGroups={manager.crrConfig.participantGroups}
-                    companyId={companyId} crrId={crrDoc?.id} />
+                    companyId={companyId} crrId={crrDoc?.id}
+                    sortDate={sortDate} sortCat={sortCat}
+                    onCycleDateSort={cycleDateSort} onCycleCatSort={cycleCatSort} />
                 </div>
               )}
             </div>

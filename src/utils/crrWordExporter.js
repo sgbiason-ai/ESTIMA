@@ -46,7 +46,11 @@ export const generateWordCrr = (meeting, crrConfig, projectName = '', branding =
   const typeLabel = MEETING_TYPES.find((t) => t.value === meeting.type)?.label || 'Reunion';
   const pdfProjectName = (projectName || 'PROJET').toUpperCase();
   const groups = crrConfig.participantGroups || [];
-  const categories = crrConfig.categories || [];
+  const { sortDate, sortCat } = options || {};
+  const rawCategories = crrConfig.categories || [];
+  const categories = sortCat
+    ? [...rawCategories].sort((a, b) => sortCat === 'asc' ? a.localeCompare(b) : b.localeCompare(a))
+    : rawCategories;
   const observations = meeting.observations || [];
 
   // ── Construction du HTML ──
@@ -171,7 +175,10 @@ export const generateWordCrr = (meeting, crrConfig, projectName = '', branding =
   </tr></thead></table>`;
 
   for (const cat of categories) {
-    const catObs = observations.filter((o) => o.category === cat);
+    const rawCatObs = observations.filter((o) => o.category === cat);
+    const catObs = sortDate
+      ? [...rawCatObs].sort((a, b) => { const da = a.date || ''; const db = b.date || ''; return sortDate === 'asc' ? da.localeCompare(db) : db.localeCompare(da); })
+      : rawCatObs;
     html += `<div class="cat-banner">${cat.toUpperCase()} <span style="float:right;font-weight:normal;font-size:8pt">${catObs.length} observation${catObs.length > 1 ? 's' : ''}</span></div>`;
 
     if (catObs.length === 0) {

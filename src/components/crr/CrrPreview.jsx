@@ -21,7 +21,7 @@ const rgb = (c) => `rgb(${c.r},${c.g},${c.b})`;
 const rgbLight = (c, f = 0.88) =>
   `rgb(${Math.round(c.r + (255 - c.r) * f)},${Math.round(c.g + (255 - c.g) * f)},${Math.round(c.b + (255 - c.b) * f)})`;
 
-const CrrPreview = ({ meeting, crrConfig, projectName, branding }) => {
+const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortCat }) => {
   if (!meeting) {
     return (
       <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
@@ -64,7 +64,10 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding }) => {
 
   const typeLabel = MEETING_TYPES.find((t) => t.value === meeting.type)?.label || 'Reunion';
   const groups = crrConfig.participantGroups || [];
-  const categories = crrConfig.categories || [];
+  const rawCategories = crrConfig.categories || [];
+  const categories = sortCat
+    ? [...rawCategories].sort((a, b) => sortCat === 'asc' ? a.localeCompare(b) : b.localeCompare(a))
+    : rawCategories;
   const observations = meeting.observations || [];
   const pdfProjectName = (projectName || 'NOM DU PROJET').toUpperCase();
 
@@ -284,7 +287,10 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding }) => {
 
         {/* Categories */}
         {categories.map((cat, ci) => {
-          const catObs = observations.filter((o) => o.category === cat);
+          const rawCatObs = observations.filter((o) => o.category === cat);
+          const catObs = sortDate
+            ? [...rawCatObs].sort((a, b) => { const da = a.date || ''; const db = b.date || ''; return sortDate === 'asc' ? da.localeCompare(db) : db.localeCompare(da); })
+            : rawCatObs;
           const catColor = CAT_COLORS[ci % CAT_COLORS.length];
 
           return (

@@ -3,8 +3,9 @@ import React, { useState, useRef, useCallback, useEffect, memo } from 'react';
 import ReactDOM from 'react-dom';
 import {
   Plus, Trash2, ChevronDown, ChevronRight,
-  MinusCircle, Circle, Loader, CheckCircle2, Calendar, User, MessageSquare,
+  MinusCircle, Circle, Loader, CheckCircle2,
   ImagePlus, Camera, X, Bold, Underline, Highlighter, List, GripVertical,
+  ArrowUp, ArrowDown,
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { OBSERVATION_STATUSES, getGroupColor, abbreviateGroup } from '../../data/crrData';
@@ -100,7 +101,7 @@ const GroupPicker = ({ value, onChange, groups, placeholder, className = '' }) =
         ref={btnRef}
         type="button"
         onClick={openDropdown}
-        className={`w-full min-h-[28px] flex flex-wrap items-center gap-1 px-1.5 py-0.5 border border-slate-200 rounded bg-slate-50 transition-all
+        className={`w-full min-h-[28px] flex flex-wrap items-center justify-center gap-1 px-1.5 py-0.5 border border-slate-200 rounded bg-slate-50 transition-all
           ${open ? 'ring-1 ring-emerald-400 border-emerald-400' : 'hover:border-slate-300'}`}
       >
         {selected.size > 0 ? (
@@ -191,14 +192,59 @@ const StatusBadge = memo(({ status, onChange }) => {
   );
 }, (prev, next) => prev.status === next.status && prev.onChange === next.onChange);
 
-const ObservationRow = memo(({ obs, onUpdate, onDelete, meetingDate, participantGroups, dragHandleProps, companyId, crrId }) => {
-  const [expanded, setExpanded] = useState(true);
+// ── Barre flottante formatage + photo (apparait au focus editeur) ──────────
+
+const FloatingToolbar = ({ editorRef, onExecFormat, onHighlight, fileRef, cameraRef }) => {
+  if (!editorRef) return null;
+  return ReactDOM.createPortal(
+    <div
+      className="fixed bottom-0 left-0 right-0 z-[9999] flex items-center justify-center gap-1 px-4 py-2.5 bg-white/95 backdrop-blur-xl border-t border-gray-200/80 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]"
+      onMouseDown={(e) => e.preventDefault()}
+    >
+      <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
+        <button type="button" onClick={() => onExecFormat('bold')} title="Gras (Ctrl+B)"
+          className="p-2 rounded-lg hover:bg-white hover:shadow-sm text-gray-500 hover:text-gray-900 transition-all">
+          <Bold size={16} strokeWidth={2.5} />
+        </button>
+        <button type="button" onClick={() => onExecFormat('underline')} title="Souligné (Ctrl+U)"
+          className="p-2 rounded-lg hover:bg-white hover:shadow-sm text-gray-500 hover:text-gray-900 transition-all">
+          <Underline size={16} strokeWidth={2.5} />
+        </button>
+        <button type="button" onClick={onHighlight} title="Fluo (Ctrl+H)"
+          className="p-2 rounded-lg hover:bg-amber-50 hover:shadow-sm text-gray-500 hover:text-amber-600 transition-all">
+          <Highlighter size={16} strokeWidth={2.5} />
+        </button>
+        <button type="button" onClick={() => onExecFormat('insertUnorderedList')} title="Liste à puces (Ctrl+L)"
+          className="p-2 rounded-lg hover:bg-white hover:shadow-sm text-gray-500 hover:text-gray-900 transition-all">
+          <List size={16} strokeWidth={2.5} />
+        </button>
+      </div>
+
+      <div className="w-px h-6 bg-gray-200 mx-1" />
+
+      <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
+        <button type="button" onClick={() => fileRef.current?.click()} title="Ajouter une photo"
+          className="p-2 rounded-lg hover:bg-white hover:shadow-sm text-gray-500 hover:text-emerald-600 transition-all flex items-center gap-1.5">
+          <ImagePlus size={16} />
+          <span className="text-xs font-medium hidden sm:inline">Photo</span>
+        </button>
+        <button type="button" onClick={() => cameraRef.current?.click()} title="Prendre une photo (tablette/mobile)"
+          className="p-2 rounded-lg hover:bg-white hover:shadow-sm text-gray-500 hover:text-emerald-600 transition-all flex items-center gap-1.5">
+          <Camera size={16} />
+          <span className="text-xs font-medium hidden sm:inline">Caméra</span>
+        </button>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
+const ObservationRow = memo(({ obs, onUpdate, onDelete, meetingDate, participantGroups, dragHandleProps, companyId, crrId, isEditing, onEditorFocus, onEditorBlur }) => {
   const fileRef = useRef(null);
   const cameraRef = useRef(null);
   const editorRef = useRef(null);
   const lastHtmlRef = useRef('');
 
-  // Synchroniser le contenu HTML quand obs.text change (ex: undo externe)
   useEffect(() => {
     const el = editorRef.current;
     if (!el) return;
@@ -213,7 +259,6 @@ const ObservationRow = memo(({ obs, onUpdate, onDelete, meetingDate, participant
     const el = editorRef.current;
     if (!el) return;
     const html = el.innerHTML;
-    // Eviter les boucles : ne mettre a jour que si le contenu a change
     if (html !== lastHtmlRef.current) {
       lastHtmlRef.current = html;
       onUpdate(obs.id, { text: html === '<br>' ? '' : html });
@@ -235,8 +280,6 @@ const ObservationRow = memo(({ obs, onUpdate, onDelete, meetingDate, participant
 
     const range = sel.getRangeAt(0);
 
-    // Deplier un <mark> : on remonte ses enfants dans le parent puis on le supprime
-    // (preserve le gras / italique / soulignement interne).
     const unwrap = (markEl) => {
       const parent = markEl.parentNode;
       if (!parent) return;
@@ -244,7 +287,6 @@ const ObservationRow = memo(({ obs, onUpdate, onDelete, meetingDate, participant
       parent.removeChild(markEl);
     };
 
-    // Cherche un ancetre MARK (en remontant depuis n, sans sortir de l'editeur)
     const findMarkAncestor = (node) => {
       let n = node;
       while (n && n !== editor) {
@@ -254,14 +296,12 @@ const ObservationRow = memo(({ obs, onUpdate, onDelete, meetingDate, participant
       return null;
     };
 
-    // Toggle OFF si la selection touche ou est contenue dans au moins un <mark>
     const anchorMark = findMarkAncestor(sel.anchorNode);
     const focusMark = findMarkAncestor(sel.focusNode);
     const intersecting = Array.from(editor.querySelectorAll('mark'))
       .filter((m) => range.intersectsNode(m));
 
     if (anchorMark || focusMark || intersecting.length > 0) {
-      // Retirer tous les MARKs que la selection touche (preserve le contenu interne).
       const toUnwrap = new Set(intersecting);
       if (anchorMark) toUnwrap.add(anchorMark);
       if (focusMark) toUnwrap.add(focusMark);
@@ -270,13 +310,10 @@ const ObservationRow = memo(({ obs, onUpdate, onDelete, meetingDate, participant
       return;
     }
 
-    // Sinon : poser le fluo sur la selection
     const mark = document.createElement('mark');
     mark.style.backgroundColor = '#fde68a';
     mark.style.borderRadius = '2px';
     mark.style.padding = '0 1px';
-    // surroundContents throw si la selection traverse plusieurs noeuds (ex: gras + texte).
-    // Fallback : extraire le contenu, le wrapper, le reinserer.
     try {
       range.surroundContents(mark);
     } catch {
@@ -306,7 +343,6 @@ const ObservationRow = memo(({ obs, onUpdate, onDelete, meetingDate, participant
       return;
     }
     try {
-      // Upload Firebase Storage : la compression + capture GPS est faite dans uploadCrrImage.
       const uploaded = await Promise.all(
         files.map((f) => uploadCrrImage(f, { companyId, crrId, obsId: obs.id }))
       );
@@ -323,14 +359,19 @@ const ObservationRow = memo(({ obs, onUpdate, onDelete, meetingDate, participant
   const removeImage = (idx) => {
     const removed = images[idx];
     onUpdate(obs.id, { images: images.filter((_, i) => i !== idx) });
-    // Purge Storage en arriere-plan (no-op si l'image etait en base64 dans l'ancien format)
     deleteCrrImage(removed);
   };
+
+  const handleFocus = useCallback(() => {
+    onEditorFocus({ obsId: obs.id, editorRef, execFormat, handleHighlight, fileRef, cameraRef });
+  }, [obs.id, onEditorFocus, execFormat, handleHighlight]);
 
   return (
     <div
       className={`border rounded-lg transition-all ${
-        obs.status === 'done'
+        isEditing
+          ? 'ring-2 ring-blue-200 border-blue-300 bg-blue-50/20'
+          : obs.status === 'done'
           ? 'border-emerald-200 bg-emerald-50/30 opacity-75'
           : obs.status === 'in_progress'
           ? 'border-blue-200 bg-blue-50/30'
@@ -338,53 +379,39 @@ const ObservationRow = memo(({ obs, onUpdate, onDelete, meetingDate, participant
       }`}
     >
       <div className="px-3 py-2">
-        {/* Ligne principale */}
-        <div className="flex items-start gap-2">
-          {/* Drag handle */}
-          {dragHandleProps && (
-            <div {...dragHandleProps} className="flex items-center pt-1.5 cursor-grab active:cursor-grabbing shrink-0" title="Glisser pour réordonner">
+        <div className="grid grid-cols-[24px_48px_100px_1fr_72px_48px_100px_24px] xl:grid-cols-[30px_80px_120px_1fr_86px_80px_120px_30px] gap-x-2 items-center">
+          {/* Col 1 — Drag */}
+          {dragHandleProps ? (
+            <div {...dragHandleProps} className="flex items-center justify-center cursor-grab active:cursor-grabbing" title="Glisser pour réordonner">
               <GripVertical size={14} className="text-gray-300 hover:text-gray-500 transition-colors" />
             </div>
-          )}
-          {/* Emetteur — plus etroit sous xl (tablette / laptop) */}
+          ) : <span />}
+
+          {/* Col 2 — Emetteur */}
           <GroupPicker
             value={obs.emitter}
             onChange={(name) => onUpdate(obs.id, { emitter: name })}
             groups={participantGroups}
             placeholder="Em."
-            className="w-14 xl:w-24 shrink-0"
           />
 
-          {/* Date — compacte sous xl */}
-          <input
-            type="date"
-            value={obs.date}
-            onChange={(e) => onUpdate(obs.id, { date: e.target.value })}
-            className="w-[105px] xl:w-32 shrink-0 text-[11px] px-1 xl:px-2 py-1 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 text-slate-800"
-          />
+          {/* Col 3 — Date obs */}
+          <div className="flex items-center gap-0.5">
+            <input
+              type="date"
+              value={obs.date}
+              onChange={(e) => onUpdate(obs.id, { date: e.target.value })}
+              className={`w-full text-[11px] px-1 xl:px-2 py-1 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 ${obs.date ? 'text-slate-800' : 'text-slate-300'}`}
+            />
+            {obs.date && (
+              <button onClick={() => onUpdate(obs.id, { date: '' })} className="p-0.5 text-slate-300 hover:text-red-400 transition-colors" title="Effacer la date">
+                <X size={10} />
+              </button>
+            )}
+          </div>
 
-          {/* Texte observation + images */}
-          <div className="flex-1 flex flex-col gap-1">
-            {/* Mini-toolbar formatage */}
-            <div className="flex items-center gap-0.5">
-              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat('bold')} title="Gras (Ctrl+B)"
-                className="p-0.5 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors">
-                <Bold size={13} strokeWidth={2.5} />
-              </button>
-              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat('underline')} title="Souligné (Ctrl+U)"
-                className="p-0.5 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors">
-                <Underline size={13} strokeWidth={2.5} />
-              </button>
-              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={handleHighlight} title="Fluo (Ctrl+H)"
-                className="p-0.5 rounded hover:bg-amber-50 text-slate-400 hover:text-amber-500 transition-colors">
-                <Highlighter size={13} strokeWidth={2.5} />
-              </button>
-              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat('insertUnorderedList')} title="Liste à puces (Ctrl+L)"
-                className="p-0.5 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors">
-                <List size={13} strokeWidth={2.5} />
-              </button>
-            </div>
-            {/* Editeur WYSIWYG */}
+          {/* Col 4 — Texte observation */}
+          <div className="flex flex-col gap-1 min-w-0">
             <div
               ref={(el) => {
                 editorRef.current = el;
@@ -397,6 +424,8 @@ const ObservationRow = memo(({ obs, onUpdate, onDelete, meetingDate, participant
               contentEditable
               onInput={handleEditorInput}
               onKeyDown={handleKeyDown}
+              onFocus={handleFocus}
+              onBlur={onEditorBlur}
               onPaste={(e) => {
                 e.preventDefault();
                 const text = e.clipboardData.getData('text/plain');
@@ -409,7 +438,6 @@ const ObservationRow = memo(({ obs, onUpdate, onDelete, meetingDate, participant
               style={{ outline: 'none' }}
             />
 
-            {/* Miniatures images */}
             {images.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {images.map((img, idx) => {
@@ -443,84 +471,55 @@ const ObservationRow = memo(({ obs, onUpdate, onDelete, meetingDate, participant
               </div>
             )}
 
-            {/* Boutons ajout image : fichier + caméra (pour tablette/mobile) */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => fileRef.current?.click()}
-                className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-emerald-600 transition-colors"
-              >
-                <ImagePlus size={12} />
-                Photo
-              </button>
-              <button
-                onClick={() => cameraRef.current?.click()}
-                className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-emerald-600 transition-colors"
-                title="Prendre une photo avec l'appareil (tablette/mobile)"
-              >
-                <Camera size={12} />
-                Caméra
-              </button>
-            </div>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={handleAddImages}
-            />
-            <input
-              ref={cameraRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={handleAddImages}
-            />
+            <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleAddImages} />
+            <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleAddImages} />
           </div>
 
-          {/* Actions */}
-          <div className="flex flex-col gap-1 shrink-0 items-end">
-            <StatusBadge
-              status={obs.status}
-              onChange={(s) => onUpdate(obs.id, { status: s })}
+          {/* Col 5 — Statut */}
+          <StatusBadge
+            status={obs.status}
+            onChange={(s) => onUpdate(obs.id, { status: s })}
+          />
+
+          {/* Col 6 — PAR */}
+          <GroupPicker
+            value={obs.actionBy}
+            onChange={(name) => onUpdate(obs.id, { actionBy: name })}
+            groups={participantGroups}
+            placeholder="PAR"
+          />
+
+          {/* Col 7 — Date action */}
+          <div className="flex items-center gap-0.5">
+            <input
+              type="date"
+              value={obs.actionDeadline || ''}
+              onChange={(e) => onUpdate(obs.id, { actionDeadline: e.target.value })}
+              className={`w-full text-[11px] px-1 xl:px-2 py-1 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 ${obs.actionDeadline ? 'text-slate-800' : 'text-slate-300'}`}
+              title="Pour le"
             />
-            <div className="flex items-center gap-1">
-              <GroupPicker
-                value={obs.actionBy}
-                onChange={(name) => onUpdate(obs.id, { actionBy: name })}
-                groups={participantGroups}
-                placeholder="PAR"
-                className="w-14 xl:w-28"
-              />
-              <input
-                type="date"
-                value={obs.actionDeadline || ''}
-                onChange={(e) =>
-                  onUpdate(obs.id, { actionDeadline: e.target.value })
-                }
-                className="w-[105px] xl:w-32 text-[11px] px-1 xl:px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 text-slate-800"
-                title="Pour le"
-              />
-            </div>
+            {obs.actionDeadline && (
+              <button onClick={() => onUpdate(obs.id, { actionDeadline: '' })} className="p-0.5 text-slate-300 hover:text-red-400 transition-colors" title="Effacer la date">
+                <X size={10} />
+              </button>
+            )}
           </div>
 
-          {/* Supprimer */}
+          {/* Col 8 — Supprimer */}
           <button
             onClick={async () => {
               const ok = await confirm('Supprimer cette observation ?', { danger: true });
               if (ok) onDelete(obs.id);
             }}
-            className="p-1 text-slate-300 hover:text-red-500 rounded hover:bg-red-50 transition-all shrink-0"
+            className="p-1 text-slate-300 hover:text-red-500 rounded hover:bg-red-50 transition-all flex items-center justify-center"
             title="Supprimer"
           >
             <Trash2 size={12} />
           </button>
         </div>
 
-        {/* Indicateur report */}
         {isCarried && (
-          <div className="mt-1 ml-[6.5rem] text-[10px] text-slate-400 italic">
+          <div className="mt-1 text-[10px] text-slate-400 italic" style={{ marginLeft: 'calc(24px + 56px + 120px + 1rem)' }}>
             Report du CR n°{obs.originMeetingNumber}
           </div>
         )}
@@ -528,15 +527,13 @@ const ObservationRow = memo(({ obs, onUpdate, onDelete, meetingDate, participant
     </div>
   );
 }, (prev, next) => {
-  // Ignore onUpdate/onDelete : leur reference change a chaque edition d'une obs
-  // (deps [activeMeeting]), mais leur semantique reste stable car identifiees par obs.id.
-  // Resultat : seule la ligne dont l'obs a vraiment change re-render.
   return prev.obs === next.obs
     && prev.meetingDate === next.meetingDate
     && prev.participantGroups === next.participantGroups
     && prev.dragHandleProps === next.dragHandleProps
     && prev.companyId === next.companyId
-    && prev.crrId === next.crrId;
+    && prev.crrId === next.crrId
+    && prev.isEditing === next.isEditing;
 });
 
 const CrrObservations = ({
@@ -551,8 +548,27 @@ const CrrObservations = ({
   participantGroups = [],
   companyId,
   crrId,
+  sortDate,
+  sortCat,
+  onCycleDateSort,
+  onCycleCatSort,
 }) => {
   const [collapsedCats, setCollapsedCats] = useState(new Set());
+  const [activeEdit, setActiveEdit] = useState(null);
+  const blurTimeoutRef = useRef(null);
+
+  const sortedCategories = sortCat
+    ? [...categories].sort((a, b) => sortCat === 'asc' ? a.localeCompare(b) : b.localeCompare(a))
+    : categories;
+
+  const sortObsForCat = (obs) => {
+    if (!sortDate) return obs;
+    return [...obs].sort((a, b) => {
+      const da = a.date || '';
+      const db = b.date || '';
+      return sortDate === 'asc' ? da.localeCompare(db) : db.localeCompare(da);
+    });
+  };
 
   const toggleCat = (cat) => {
     const s = new Set(collapsedCats);
@@ -560,6 +576,27 @@ const CrrObservations = ({
     else s.add(cat);
     setCollapsedCats(s);
   };
+
+  const handleEditorFocus = useCallback((info) => {
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = null;
+    }
+    setActiveEdit(info);
+  }, []);
+
+  const handleEditorBlur = useCallback(() => {
+    blurTimeoutRef.current = setTimeout(() => {
+      setActiveEdit(null);
+      blurTimeoutRef.current = null;
+    }, 150);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current);
+    };
+  }, []);
 
   const handleDragEnd = useCallback((result) => {
     const { source, destination, draggableId } = result;
@@ -572,7 +609,7 @@ const CrrObservations = ({
 
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
-    <div className="space-y-3">
+    <div className={`space-y-3 ${activeEdit ? 'pb-16' : ''}`}>
       {/* Texte legal */}
       <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
         <p className="text-[11px] text-amber-800 leading-relaxed italic">
@@ -581,25 +618,34 @@ const CrrObservations = ({
       </div>
 
       {/* En-tete tableau */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="grid grid-cols-[24px_60px_110px_1fr_200px_24px] xl:grid-cols-[30px_100px_120px_1fr_280px_30px] gap-1 px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden sticky top-0 z-30">
+        <div className="grid grid-cols-[24px_48px_100px_1fr_72px_48px_100px_24px] xl:grid-cols-[30px_80px_120px_1fr_86px_80px_120px_30px] gap-x-2 items-center px-3 py-2.5 bg-gray-50 border-b border-gray-200 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
           <span />
-          <span>Emet.</span>
-          <span>Date</span>
-          <span>Observations</span>
-          <span className="text-center">Actions (Par / Pour le)</span>
+          <span className="text-center">Emet.</span>
+          <button onClick={onCycleDateSort} className={`flex items-center justify-center gap-0.5 hover:text-blue-600 transition-colors ${sortDate ? 'text-blue-600' : ''}`} title="Trier par date">
+            Date
+            {sortDate === 'asc' && <ArrowUp size={10} />}
+            {sortDate === 'desc' && <ArrowDown size={10} />}
+          </button>
+          <button onClick={onCycleCatSort} className={`flex items-center gap-0.5 hover:text-blue-600 transition-colors ${sortCat ? 'text-blue-600' : ''}`} title="Trier par chapitre">
+            Observations
+            {sortCat === 'asc' && <ArrowUp size={10} />}
+            {sortCat === 'desc' && <ArrowDown size={10} />}
+          </button>
+          <span className="text-center">Statut</span>
+          <span className="text-center">Par</span>
+          <span className="text-center">Pour le</span>
           <span />
         </div>
       </div>
 
       {/* Categories */}
-      {categories.map((cat) => {
-        const obs = observationsByCategory[cat] || [];
+      {sortedCategories.map((cat) => {
+        const obs = sortObsForCat(observationsByCategory[cat] || []);
         const isCollapsed = collapsedCats.has(cat);
 
         return (
           <div key={cat} className="space-y-1.5">
-            {/* Bandeau categorie */}
             <div
               className="flex items-center justify-between bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/60 rounded-xl px-4 py-2.5 cursor-pointer hover:from-blue-100/80 hover:to-indigo-100/80 transition-all"
               onClick={() => toggleCat(cat)}
@@ -627,7 +673,6 @@ const CrrObservations = ({
               </button>
             </div>
 
-            {/* Observations — Droppable zone */}
             {!isCollapsed && (
               <Droppable droppableId={cat}>
                 {(provided, snapshot) => (
@@ -658,6 +703,9 @@ const CrrObservations = ({
                               dragHandleProps={prov.dragHandleProps}
                               companyId={companyId}
                               crrId={crrId}
+                              isEditing={activeEdit?.obsId === ob.id}
+                              onEditorFocus={handleEditorFocus}
+                              onEditorBlur={handleEditorBlur}
                             />
                           </div>
                         )}
@@ -672,6 +720,16 @@ const CrrObservations = ({
         );
       })}
     </div>
+
+    {activeEdit && (
+      <FloatingToolbar
+        editorRef={activeEdit.editorRef}
+        onExecFormat={activeEdit.execFormat}
+        onHighlight={activeEdit.handleHighlight}
+        fileRef={activeEdit.fileRef}
+        cameraRef={activeEdit.cameraRef}
+      />
+    )}
     </DragDropContext>
   );
 };
