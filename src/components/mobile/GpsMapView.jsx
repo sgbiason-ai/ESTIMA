@@ -159,6 +159,50 @@ function createTileLayer(key, opacity = 1) {
 }
 
 // Recalcule la taille de la carte quand le conteneur change (split resize)
+// Clic sur couche WMS → GetFeatureInfo → popup avec infos du monument
+function WmsFeatureInfo({ overlayKey, disabled }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!overlayKey || disabled) return;
+    const cfg = TILE_LAYERS[overlayKey];
+    if (cfg?.type !== 'wms') return;
+    const handleClick = async (e) => {
+      const point = map.latLngToContainerPoint(e.latlng);
+      const size = map.getSize();
+      const bounds = map.getBounds();
+      const sw = L.CRS.EPSG3857.project(bounds.getSouthWest());
+      const ne = L.CRS.EPSG3857.project(bounds.getNorthEast());
+      const url = `${cfg.url}?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetFeatureInfo`
+        + `&LAYERS=${cfg.layers}&QUERY_LAYERS=${cfg.layers}`
+        + `&INFO_FORMAT=application/json`
+        + `&I=${Math.round(point.x)}&J=${Math.round(point.y)}`
+        + `&CRS=EPSG:3857&BBOX=${sw.x},${sw.y},${ne.x},${ne.y}`
+        + `&WIDTH=${size.x}&HEIGHT=${size.y}`;
+      try {
+        const res = await fetch(url);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.features?.length) return;
+        const p = data.features[0].properties || {};
+        const labels = { nom: 'Monument', type: 'Type', categorie: 'Catégorie', dateProt: 'Date protection', commune: 'Commune', departement: 'Département', codeInsee: 'Code INSEE' };
+        let html = '<div style="font-family:system-ui;font-size:12px;max-width:300px;line-height:1.5">';
+        const nom = p.nom || p.NOM || p.libelle || p.LIBELLE || '';
+        if (nom) html += `<div style="font-weight:800;color:#1f2937;font-size:13px;margin-bottom:6px;border-bottom:1px solid #e5e7eb;padding-bottom:4px">${nom}</div>`;
+        for (const [key, val] of Object.entries(p)) {
+          if (!val || key === 'bbox' || key === 'gid' || key === 'geom') continue;
+          const label = labels[key] || key.replace(/_/g, ' ');
+          html += `<div><span style="font-weight:600;color:#6b7280;font-size:11px">${label} :</span> <span style="color:#374151">${val}</span></div>`;
+        }
+        html += '</div>';
+        L.popup({ maxWidth: 320 }).setLatLng(e.latlng).setContent(html).openOn(map);
+      } catch { /* ignore */ }
+    };
+    map.on('click', handleClick);
+    return () => map.off('click', handleClick);
+  }, [map, overlayKey, disabled]);
+  return null;
+}
+
 function InvalidateSize() {
   const map = useMap();
   useEffect(() => {
@@ -401,6 +445,7 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
           attributionControl={false}
         >
           <DualTileLayer baseKey={activeLayer} overlayKey={overlayLayer} overlayOpacity={overlayOpacity} />
+          <WmsFeatureInfo overlayKey={overlayLayer} disabled={measuring || routeMode} />
           <InvalidateSize />
           {livePosition && <FollowPosition position={livePosition} follow={followMode} />}
           <UserInteractionDetector onInteraction={handleUserInteraction} />
