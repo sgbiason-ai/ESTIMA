@@ -167,10 +167,14 @@ export default function MobileApp({ user, companyId, userModules = null, onLogou
     const data = await loadChantier(ch.id);
     // Vérifier si un brouillon local plus récent existe (sauvegarde interrompue)
     const draft = loadDraft(`draft_crr_${ch.id}`);
-    if (draft?.id && data?.lastSaved && draft.lastSaved > data.lastSaved) {
-      setFullChantier(draft);
+    const draftAt = draft?._draftAt || 0;
+    const firestoreAt = data?.lastSaved ? new Date(data.lastSaved).getTime() : 0;
+    if (draft && draftAt > firestoreAt) {
+      const { _draftAt, ...cleanDraft } = draft;
+      setFullChantier(cleanDraft);
       setToast('Brouillon CRC local restauré');
       setTimeout(() => setToast(null), 2400);
+      clearDraft(`draft_crr_${ch.id}`);
     } else {
       setFullChantier(data);
       if (draft) clearDraft(`draft_crr_${ch.id}`);
@@ -229,10 +233,14 @@ export default function MobileApp({ user, companyId, userModules = null, onLogou
     const data = await loadVisit(v.id);
     // Vérifier si un brouillon local plus récent existe (sauvegarde interrompue)
     const draft = loadDraft(`draft_sv_${v.id}`);
-    if (draft?.lastSaved && data?.lastSaved && draft.lastSaved > data.lastSaved) {
-      setFullVisit(draft);
+    const svDraftAt = draft?._draftAt || 0;
+    const svFirestoreAt = data?.lastSaved ? new Date(data.lastSaved).getTime() : 0;
+    if (draft && svDraftAt > svFirestoreAt) {
+      const { _draftAt, ...cleanDraft } = draft;
+      setFullVisit(cleanDraft);
       setToast('Brouillon local restauré');
       setTimeout(() => setToast(null), 2400);
+      clearDraft(`draft_sv_${v.id}`);
     } else {
       setFullVisit(data);
       if (draft) clearDraft(`draft_sv_${v.id}`);
