@@ -646,7 +646,20 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
     4: { cellWidth: 24 },
     5: { cellWidth: 20 },
   };
-  let isFirstObsTable = true;
+  // Header colonnes (une seule fois, avant les categories)
+  autoTable(doc, {
+    startY: cursor.y,
+    margin: { left: M.left, right: M.right },
+    tableWidth: CW,
+    head: OBS_HEAD,
+    body: [],
+    theme: 'grid',
+    styles: { lineColor: THEME.borders, lineWidth: 0.12 },
+    headStyles: obsHeadStyles,
+    columnStyles: OBS_COL_STYLES,
+  });
+  cursor.y = doc.lastAutoTable.finalY;
+
   for (let ci = 0; ci < categories.length; ci++) {
     const cat = categories[ci];
     const rawCatObs = observations.filter((o) => o.category === cat);
@@ -737,7 +750,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
         }
         imgH += 2;
       }
-      const estH = textH + imgH + (isFirstObsTable && obsIdx === 0 ? 8 : 0);
+      const estH = textH + imgH;
 
       // Saut de page si l'observation ne rentre pas
       if (cursor.y + estH > pageBottom && cursor.y > M.top + 20) {
@@ -750,8 +763,8 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
       margin: { left: M.left, right: M.right, top: M.top, bottom: M.bottom },
       tableWidth: CW,
       rowPageBreak: 'auto',
-      head: isFirstObsTable && obsIdx === 0 ? OBS_HEAD : [],
-      showHead: isFirstObsTable && obsIdx === 0 ? 'firstPage' : 'never',
+      head: [],
+      showHead: 'never',
       body: obsBody,
       theme: 'grid',
       styles: {
@@ -1087,7 +1100,6 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
     cursor.y = doc.lastAutoTable.finalY;
     }); // fin forEach obs
 
-    isFirstObsTable = false;
     cursor.y += 3;
   }
 
