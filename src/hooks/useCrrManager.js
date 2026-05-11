@@ -97,7 +97,7 @@ export const useCrrManager = ({
   const syncDraft = (data) => {
     const key = draftKeyRef.current;
     if (!key || !data) return;
-    try { localStorage.setItem(key, JSON.stringify(data)); } catch {}
+    try { localStorage.setItem(key, JSON.stringify({ ...data, _draftAt: Date.now() })); } catch {}
   };
 
   const updateProject = useCallback(
@@ -158,7 +158,7 @@ export const useCrrManager = ({
 
   // ── AUTOSAVE (robuste : debounce + retry + brouillon localStorage) ──
 
-  const { saveStatus, triggerSave, forceSave, saveDraftSync } = useRobustSave({
+  const { saveStatus, triggerSave, forceSave } = useRobustSave({
     saveFn: onSaveProject,
     draftKey: project?.id ? `draft_crr_${project.id}` : null,
     debounceMs: 1500,
@@ -178,12 +178,10 @@ export const useCrrManager = ({
 
   useEffect(() => {
     const flush = () => {
-      if (document.visibilityState === 'hidden' || true) {
-        const data = projectRef.current;
-        if (data) {
-          triggerSave(data);
-          forceSave();
-        }
+      const data = projectRef.current;
+      if (data) {
+        triggerSave(data);
+        forceSave();
       }
     };
     const onHidden = () => { if (document.visibilityState === 'hidden') flush(); };

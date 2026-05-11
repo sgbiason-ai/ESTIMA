@@ -121,12 +121,6 @@ export function useRobustSave({ saveFn, draftKey, debounceMs = 1500, maxRetries 
     }
   }, [executeSave]);
 
-  // ── saveDraftSync : permet au caller de forcer un brouillon localStorage ──
-  const saveDraftSync = useCallback((data) => {
-    if (!draftKeyRef.current || !data) return;
-    try { safeStorage.set(draftKeyRef.current, JSON.stringify(data)); } catch {}
-  }, []);
-
   // ── Protection beforeunload + visibilitychange + pagehide ─────────────────
   useEffect(() => {
     const handleBeforeUnload = (e) => {
@@ -189,5 +183,5 @@ export function useRobustSave({ saveFn, draftKey, debounceMs = 1500, maxRetries 
 
   const hasPendingChanges = saveStatus !== 'saved' && saveStatus !== 'idle';
 
-  return { saveStatus, triggerSave, forceSave, saveDraftSync, hasPendingChanges };
+  return { saveStatus, triggerSave, forceSave, hasPendingChanges };
 }

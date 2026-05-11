@@ -96,8 +96,11 @@ export default function CrcView({ onBackToHub, user, companyId }) {
           // Verifier s'il y a un brouillon localStorage plus recent
           const draftKey = `draft_crr_${target.id}`;
           const draft = loadDraft(draftKey);
-          if (draft && draft.lastSaved && target.lastSaved && draft.lastSaved > target.lastSaved) {
-            setCrrDoc(draft);
+          const draftAt = draft?._draftAt || 0;
+          const firestoreAt = target.lastSaved ? new Date(target.lastSaved).getTime() : 0;
+          if (draft && draftAt > firestoreAt) {
+            const { _draftAt, ...cleanDraft } = draft;
+            setCrrDoc(cleanDraft);
             toast.warning('Brouillon local restauré (dernière sauvegarde non envoyée).', { duration: 6000 });
             clearDraft(draftKey);
           } else {

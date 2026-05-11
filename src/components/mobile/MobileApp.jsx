@@ -137,6 +137,7 @@ export default function MobileApp({ user, companyId, userModules = null, onLogou
       await saveChantier(selectedChantier.id, data);
     } catch (err) {
       console.error('[Mobile] Erreur sauvegarde CRC:', err);
+      throw err;
     }
   }, [selectedChantier, saveChantier]);
 
