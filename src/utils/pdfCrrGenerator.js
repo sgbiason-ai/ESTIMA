@@ -567,17 +567,39 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
 
   // Precharger toutes les images des observations (supporte string ou { src, lat, lng })
   // Les URLs Firebase Storage doivent etre converties en data URL pour jsPDF.
+  // Import dynamique Firebase SDK (ne pas casser le lazy-load du module).
+  let fbGetBlob, fbRef, fbStorage;
+  try {
+    const fbMod = await import('firebase/storage');
+    fbGetBlob = fbMod.getBlob;
+    fbRef = fbMod.ref;
+    fbStorage = (await import('../firebase')).storage;
+  } catch { /* Firebase non disponible */ }
+
   const imageCache = new Map();
   const imageGps = new Map();
   for (const obs of observations) {
     for (const imgEntry of (obs.images || [])) {
       const src = typeof imgEntry === 'string' ? imgEntry : imgEntry.src;
+      const path = typeof imgEntry === 'object' ? imgEntry.path : null;
       if (!imageCache.has(src) && src) {
         let dataUri = null;
 
         if (src.startsWith('data:')) {
           dataUri = src;
-        } else {
+        } else if (path && fbGetBlob) {
+          try {
+            const blob = await fbGetBlob(fbRef(fbStorage, path));
+            dataUri = await new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result);
+              reader.onerror = () => resolve(null);
+              reader.readAsDataURL(blob);
+            });
+          } catch { /* fallback fetch ci-dessous */ }
+        }
+
+        if (!dataUri && !src.startsWith('data:')) {
           try {
             const resp = await fetch(src);
             if (resp.ok) {
