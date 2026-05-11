@@ -12,7 +12,7 @@ import { db, auth } from '../firebase';
 import {
   MapPin, RefreshCw, Camera, MessageSquare, Navigation, Ruler, Trash2, FileDown,
   Maximize2, X, Play, Square, Flag, Check, Route, LocateFixed, Pencil, Plus, Info,
-  ImagePlus,
+  ImagePlus, Layers,
 } from 'lucide-react';
 import { stripHtml } from '../utils/formatObsText';
 import { compressImage } from '../utils/imageCompressor';
@@ -97,7 +97,16 @@ const TILE_LAYERS = {
   satellite: { url: `${IGN_BASE}&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&FORMAT=image/jpeg`, maxZoom: 19, label: 'Satellite' },
   plan: { url: `${IGN_BASE}&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&FORMAT=image/png`, maxZoom: 19, label: 'Plan' },
   cadastre: { url: `${IGN_BASE}&LAYER=CADASTRALPARCELS.PARCELLAIRE_EXPRESS&FORMAT=image/png`, maxZoom: 20, label: 'Cadastre' },
+  abf: { type: 'wms', url: 'https://data.geopf.fr/wms-v/ows', layers: 'monument_historique', maxZoom: 20, label: 'ABF (MH)', overlayOnly: true },
 };
+
+function createTileLayer(key, opacity = 1) {
+  const cfg = TILE_LAYERS[key];
+  if (cfg.type === 'wms') {
+    return L.tileLayer.wms(cfg.url, { layers: cfg.layers, format: 'image/png', transparent: true, version: '1.3.0', opacity, maxZoom: cfg.maxZoom });
+  }
+  return L.tileLayer(cfg.url, { maxZoom: cfg.maxZoom, opacity });
+}
 
 // ─── Leaflet icons ───────────────────────────────────────────────────────────
 
@@ -122,13 +131,20 @@ const endGpsIcon = createDot('#ef4444', 14);
 
 // ─── Map sub-components ──────────────────────────────────────────────────────
 
-function DynamicTileLayer({ layerKey }) {
+function DualTileLayer({ baseKey, overlayKey, overlayOpacity }) {
   const map = useMap();
+  const overlayRef = useRef(null);
   useEffect(() => {
     map.eachLayer((layer) => { if (layer instanceof L.TileLayer) map.removeLayer(layer); });
-    const cfg = TILE_LAYERS[layerKey];
-    L.tileLayer(cfg.url, { maxZoom: cfg.maxZoom }).addTo(map);
-  }, [map, layerKey]);
+    overlayRef.current = null;
+    createTileLayer(baseKey).addTo(map);
+    if (overlayKey && overlayKey !== baseKey) {
+      const ol = createTileLayer(overlayKey, overlayOpacity);
+      ol.addTo(map);
+      overlayRef.current = ol;
+    }
+  }, [map, baseKey, overlayKey]);
+  useEffect(() => { if (overlayRef.current) overlayRef.current.setOpacity(overlayOpacity); }, [overlayOpacity]);
   return null;
 }
 
@@ -356,6 +372,9 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
 
   // ── Map ──
   const [activeLayer, setActiveLayer] = useState('plan');
+  const [overlayLayer, setOverlayLayer] = useState(null);
+  const [overlayOpacity, setOverlayOpacity] = useState(0.5);
+  const [showOverlayPanel, setShowOverlayPanel] = useState(false);
   const [followMode, setFollowMode] = useState(true);
   const mapRef = useRef(null);
 
@@ -730,8 +749,7 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
   // ── Carte Leaflet (partagée entre inline et fullscreen) ──
   const renderMap = (height = '100%') => (
     <MapContainer center={defaultCenter} zoom={17} style={{ height, width: '100%' }} zoomControl={false} attributionControl={false}>
-      <TileLayer url={TILE_LAYERS[activeLayer].url} maxZoom={TILE_LAYERS[activeLayer].maxZoom} />
-      <DynamicTileLayer layerKey={activeLayer} />
+      <DualTileLayer baseKey={activeLayer} overlayKey={overlayLayer} overlayOpacity={overlayOpacity} />
       <InvalidateSize />
       <MapRefCapture mapRef={mapRef} />
       <FollowPosition position={currentGpsPosition} follow={followMode} />
@@ -1084,14 +1102,45 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
                 <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 shrink-0">
                   <span className="text-xs font-bold text-gray-900">Carte terrain</span>
                   <div className="flex items-center gap-2">
-                    {/* Tile layer switcher */}
-                    <div className="flex gap-0.5 bg-gray-100 p-0.5 rounded-lg">
-                      {Object.entries(TILE_LAYERS).map(([key, layer]) => (
-                        <button key={key} onClick={() => setActiveLayer(key)}
-                          className={`px-2 py-1 rounded-md text-[10px] font-semibold transition ${activeLayer === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-700'}`}>
-                          {layer.label}
+                    {/* Tile layer switcher + overlay */}
+                    <div className="relative">
+                      <div className="flex items-center gap-1">
+                        <div className="flex gap-0.5 bg-gray-100 p-0.5 rounded-lg">
+                          {Object.entries(TILE_LAYERS).filter(([, l]) => !l.overlayOnly).map(([key, layer]) => (
+                            <button key={key} onClick={() => { setActiveLayer(key); if (overlayLayer === key) setOverlayLayer(null); }}
+                              className={`px-2 py-1 rounded-md text-[10px] font-semibold transition ${activeLayer === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-700'}`}>
+                              {layer.label}
+                            </button>
+                          ))}
+                        </div>
+                        <button onClick={() => setShowOverlayPanel(!showOverlayPanel)}
+                          className={`p-1.5 rounded-lg transition active:scale-[0.95] ${overlayLayer ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-500'}`}
+                          title="Superposer une couche">
+                          <Layers size={14} />
                         </button>
-                      ))}
+                      </div>
+                      {showOverlayPanel && (
+                        <div className="absolute top-full right-0 mt-1 z-[1100] bg-white/95 backdrop-blur-xl rounded-xl shadow-lg border border-gray-200/60 p-3 min-w-[220px]">
+                          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Superposer</div>
+                          <div className="flex flex-wrap gap-1 mb-2">
+                            {Object.entries(TILE_LAYERS).filter(([key]) => key !== activeLayer).map(([key, layer]) => (
+                              <button key={key} onClick={() => setOverlayLayer(overlayLayer === key ? null : key)}
+                                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${overlayLayer === key ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500 hover:text-gray-700'}`}>
+                                {layer.label}
+                              </button>
+                            ))}
+                          </div>
+                          {overlayLayer && (
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-[10px] text-gray-400 font-semibold">Opacité</span>
+                              <input type="range" min="0" max="100" value={Math.round(overlayOpacity * 100)}
+                                onChange={(e) => setOverlayOpacity(Number(e.target.value) / 100)}
+                                className="flex-1 h-1 accent-blue-500" />
+                              <span className="text-[10px] font-bold text-gray-700 min-w-[28px] text-right">{Math.round(overlayOpacity * 100)}%</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <button onClick={() => setFullscreenMap(true)}
                       className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 transition active:scale-[0.95]" title="Plein écran">
@@ -1136,13 +1185,44 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
           <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200/60 shrink-0 bg-white/80 backdrop-blur-xl">
             <span className="text-sm font-bold text-gray-900">{fullVisit?.nom || 'Carte terrain'}</span>
             <div className="flex items-center gap-3">
-              <div className="flex gap-0.5 bg-gray-100 p-0.5 rounded-lg">
-                {Object.entries(TILE_LAYERS).map(([key, layer]) => (
-                  <button key={key} onClick={() => setActiveLayer(key)}
-                    className={`px-2 py-1 rounded-md text-[10px] font-semibold transition ${activeLayer === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-700'}`}>
-                    {layer.label}
+              <div className="relative">
+                <div className="flex items-center gap-1">
+                  <div className="flex gap-0.5 bg-gray-100 p-0.5 rounded-lg">
+                    {Object.entries(TILE_LAYERS).filter(([, l]) => !l.overlayOnly).map(([key, layer]) => (
+                      <button key={key} onClick={() => { setActiveLayer(key); if (overlayLayer === key) setOverlayLayer(null); }}
+                        className={`px-2 py-1 rounded-md text-[10px] font-semibold transition ${activeLayer === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-700'}`}>
+                        {layer.label}
+                      </button>
+                    ))}
+                  </div>
+                  <button onClick={() => setShowOverlayPanel(!showOverlayPanel)}
+                    className={`p-1.5 rounded-lg transition active:scale-[0.95] ${overlayLayer ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-500'}`}
+                    title="Superposer une couche">
+                    <Layers size={14} />
                   </button>
-                ))}
+                </div>
+                {showOverlayPanel && (
+                  <div className="absolute top-full right-0 mt-1 z-[5100] bg-white/95 backdrop-blur-xl rounded-xl shadow-lg border border-gray-200/60 p-3 min-w-[220px]">
+                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Superposer</div>
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {Object.entries(TILE_LAYERS).filter(([key]) => key !== activeLayer).map(([key, layer]) => (
+                        <button key={key} onClick={() => setOverlayLayer(overlayLayer === key ? null : key)}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${overlayLayer === key ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500 hover:text-gray-700'}`}>
+                          {layer.label}
+                        </button>
+                      ))}
+                    </div>
+                    {overlayLayer && (
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] text-gray-400 font-semibold">Opacité</span>
+                        <input type="range" min="0" max="100" value={Math.round(overlayOpacity * 100)}
+                          onChange={(e) => setOverlayOpacity(Number(e.target.value) / 100)}
+                          className="flex-1 h-1 accent-blue-500" />
+                        <span className="text-[10px] font-bold text-gray-700 min-w-[28px] text-right">{Math.round(overlayOpacity * 100)}%</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <span className="text-xs text-gray-400">{coordinates.length} pts · {photoMarkers.length} photos</span>
               <button onClick={() => setFullscreenMap(false)}
