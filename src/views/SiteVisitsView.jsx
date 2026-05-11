@@ -1102,45 +1102,21 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
                 <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 shrink-0">
                   <span className="text-xs font-bold text-gray-900">Carte terrain</span>
                   <div className="flex items-center gap-2">
-                    {/* Tile layer switcher + overlay */}
-                    <div className="relative">
-                      <div className="flex items-center gap-1">
-                        <div className="flex gap-0.5 bg-gray-100 p-0.5 rounded-lg">
-                          {Object.entries(TILE_LAYERS).filter(([, l]) => !l.overlayOnly).map(([key, layer]) => (
-                            <button key={key} onClick={() => { setActiveLayer(key); if (overlayLayer === key) setOverlayLayer(null); }}
-                              className={`px-2 py-1 rounded-md text-[10px] font-semibold transition ${activeLayer === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-700'}`}>
-                              {layer.label}
-                            </button>
-                          ))}
-                        </div>
-                        <button onClick={() => setShowOverlayPanel(!showOverlayPanel)}
-                          className={`p-1.5 rounded-lg transition active:scale-[0.95] ${overlayLayer ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-500'}`}
-                          title="Superposer une couche">
-                          <Layers size={14} />
-                        </button>
+                    {/* Tile layer switcher */}
+                    <div className="flex items-center gap-1">
+                      <div className="flex gap-0.5 bg-gray-100 p-0.5 rounded-lg">
+                        {Object.entries(TILE_LAYERS).filter(([, l]) => !l.overlayOnly).map(([key, layer]) => (
+                          <button key={key} onClick={() => { setActiveLayer(key); if (overlayLayer === key) setOverlayLayer(null); }}
+                            className={`px-2 py-1 rounded-md text-[10px] font-semibold transition ${activeLayer === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-700'}`}>
+                            {layer.label}
+                          </button>
+                        ))}
                       </div>
-                      {showOverlayPanel && (
-                        <div className="absolute top-full right-0 mt-1 z-[1100] bg-white/95 backdrop-blur-xl rounded-xl shadow-lg border border-gray-200/60 p-3 min-w-[220px]">
-                          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Superposer</div>
-                          <div className="flex flex-wrap gap-1 mb-2">
-                            {Object.entries(TILE_LAYERS).filter(([key]) => key !== activeLayer).map(([key, layer]) => (
-                              <button key={key} onClick={() => setOverlayLayer(overlayLayer === key ? null : key)}
-                                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${overlayLayer === key ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500 hover:text-gray-700'}`}>
-                                {layer.label}
-                              </button>
-                            ))}
-                          </div>
-                          {overlayLayer && (
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-[10px] text-gray-400 font-semibold">Opacité</span>
-                              <input type="range" min="0" max="100" value={Math.round(overlayOpacity * 100)}
-                                onChange={(e) => setOverlayOpacity(Number(e.target.value) / 100)}
-                                className="flex-1 h-1 accent-blue-500" />
-                              <span className="text-[10px] font-bold text-gray-700 min-w-[28px] text-right">{Math.round(overlayOpacity * 100)}%</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                      <button onClick={() => setShowOverlayPanel(!showOverlayPanel)}
+                        className={`p-1.5 rounded-lg transition active:scale-[0.95] ${overlayLayer ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-500'}`}
+                        title="Superposer une couche">
+                        <Layers size={14} />
+                      </button>
                     </div>
                     <button onClick={() => setFullscreenMap(true)}
                       className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 transition active:scale-[0.95]" title="Plein écran">
@@ -1150,6 +1126,30 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
                 </div>
                 <div className="flex-1 min-h-0 relative">
                   {renderMap('100%')}
+
+                  {/* Panneau overlay — sur la carte */}
+                  {showOverlayPanel && (
+                    <div className="absolute top-3 right-3 z-[1100] bg-white/95 backdrop-blur-xl rounded-xl shadow-lg border border-gray-200/60 p-3 min-w-[220px]">
+                      <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Superposer</div>
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {Object.entries(TILE_LAYERS).filter(([key]) => key !== activeLayer).map(([key, layer]) => (
+                          <button key={key} onClick={() => setOverlayLayer(overlayLayer === key ? null : key)}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${overlayLayer === key ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500 hover:text-gray-700'}`}>
+                            {layer.label}
+                          </button>
+                        ))}
+                      </div>
+                      {overlayLayer && (
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[10px] text-gray-400 font-semibold">Opacité</span>
+                          <input type="range" min="0" max="100" value={Math.round(overlayOpacity * 100)}
+                            onChange={(e) => setOverlayOpacity(Number(e.target.value) / 100)}
+                            className="flex-1 h-1 accent-blue-500" />
+                          <span className="text-[10px] font-bold text-gray-700 min-w-[28px] text-right">{Math.round(overlayOpacity * 100)}%</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Recentrer */}
                   <div className="absolute bottom-3 left-3 z-[1000]">
@@ -1201,28 +1201,6 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
                     <Layers size={14} />
                   </button>
                 </div>
-                {showOverlayPanel && (
-                  <div className="absolute top-full right-0 mt-1 z-[5100] bg-white/95 backdrop-blur-xl rounded-xl shadow-lg border border-gray-200/60 p-3 min-w-[220px]">
-                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Superposer</div>
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      {Object.entries(TILE_LAYERS).filter(([key]) => key !== activeLayer).map(([key, layer]) => (
-                        <button key={key} onClick={() => setOverlayLayer(overlayLayer === key ? null : key)}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${overlayLayer === key ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500 hover:text-gray-700'}`}>
-                          {layer.label}
-                        </button>
-                      ))}
-                    </div>
-                    {overlayLayer && (
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[10px] text-gray-400 font-semibold">Opacité</span>
-                        <input type="range" min="0" max="100" value={Math.round(overlayOpacity * 100)}
-                          onChange={(e) => setOverlayOpacity(Number(e.target.value) / 100)}
-                          className="flex-1 h-1 accent-blue-500" />
-                        <span className="text-[10px] font-bold text-gray-700 min-w-[28px] text-right">{Math.round(overlayOpacity * 100)}%</span>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
               <span className="text-xs text-gray-400">{coordinates.length} pts · {photoMarkers.length} photos</span>
               <button onClick={() => setFullscreenMap(false)}
@@ -1233,6 +1211,31 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
           </div>
           <div className="flex-1 min-h-0 relative">
             {renderMap('100%')}
+
+            {/* Panneau overlay — sur la carte fullscreen */}
+            {showOverlayPanel && (
+              <div className="absolute top-3 right-3 z-[5100] bg-white/95 backdrop-blur-xl rounded-xl shadow-lg border border-gray-200/60 p-3 min-w-[220px]">
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Superposer</div>
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {Object.entries(TILE_LAYERS).filter(([key]) => key !== activeLayer).map(([key, layer]) => (
+                    <button key={key} onClick={() => setOverlayLayer(overlayLayer === key ? null : key)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${overlayLayer === key ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500 hover:text-gray-700'}`}>
+                      {layer.label}
+                    </button>
+                  ))}
+                </div>
+                {overlayLayer && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-[10px] text-gray-400 font-semibold">Opacité</span>
+                    <input type="range" min="0" max="100" value={Math.round(overlayOpacity * 100)}
+                      onChange={(e) => setOverlayOpacity(Number(e.target.value) / 100)}
+                      className="flex-1 h-1 accent-blue-500" />
+                    <span className="text-[10px] font-bold text-gray-700 min-w-[28px] text-right">{Math.round(overlayOpacity * 100)}%</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="absolute bottom-3 left-3 z-[1000]">
               <button onClick={handleRecenter}
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition shadow-sm ${
