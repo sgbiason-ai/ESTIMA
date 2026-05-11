@@ -617,9 +617,6 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
         if (dataUri) {
           const img = await loadImage(dataUri).catch(() => null);
           if (img) imageCache.set(src, { w: img.width, h: img.height, uri: dataUri });
-          else console.warn('[PDF-IMG] loadImage echoue, dataUri len:', dataUri?.length);
-        } else {
-          console.warn('[PDF-IMG] Aucune methode OK — path:', path, 'src:', src?.substring(0, 120));
         }
       }
       if (typeof imgEntry === 'object' && imgEntry.lat != null && imgEntry.lng != null) {
@@ -627,7 +624,6 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
       }
     }
   }
-  if (imageCache.size > 0 || imageGps.size > 0) console.log('[PDF-IMG] cache:', imageCache.size, 'images,', imageGps.size, 'GPS');
 
   const IMG_ROW_H = 25; // mm par rangee d'images
   const OBS_COL_W = CW - 20 - 18 - 18 - 24 - 20; // largeur auto de la colonne obs
