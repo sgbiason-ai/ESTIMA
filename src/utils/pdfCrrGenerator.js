@@ -14,8 +14,6 @@ import { MEETING_TYPES, GROUP_COLORS, abbreviateGroup } from '../data/crrData';
 import { parseObsHtml, stripHtml } from './formatObsText.jsx';
 import { lightenRgb, darkenRgb, loadImage, formatDateFr, formatDateLong, sanitizeFilename, loadLogos } from './pdf/pdfSharedHelpers';
 import { buildTheme as _buildTheme } from './pdf/buildTheme';
-import { ref as storageRef, getBlob } from 'firebase/storage';
-import { storage } from '../firebase';
 
 // ─── HELPERS ────────────────────────────────────────────────────────────────
 
@@ -568,50 +566,31 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
   cursor.y += 13;
 
   // Precharger toutes les images des observations (supporte string ou { src, lat, lng })
-  // Firebase Storage URLs bloquees par CORS avec crossOrigin='Anonymous' →
-  // on utilise getBlob du SDK Firebase pour telecharger sans CORS.
+  // Les URLs Firebase Storage doivent etre converties en data URL pour jsPDF.
   const imageCache = new Map();
   const imageGps = new Map();
   for (const obs of observations) {
     for (const imgEntry of (obs.images || [])) {
       const src = typeof imgEntry === 'string' ? imgEntry : imgEntry.src;
-      if (!imageCache.has(src)) {
-        const path = typeof imgEntry === 'object' ? imgEntry.path : null;
+      if (!imageCache.has(src) && src) {
         let dataUri = null;
 
-        // 1. Firebase Storage : SDK getBlob (bypass CORS)
-        if (path) {
+        if (src.startsWith('data:')) {
+          dataUri = src;
+        } else {
+          // URL distante (Firebase Storage) : fetch → blob → data URL
           try {
-            const blob = await getBlob(storageRef(storage, path));
-            dataUri = await new Promise((resolve, reject) => {
+            const resp = await fetch(src);
+            const blob = await resp.blob();
+            dataUri = await new Promise((resolve) => {
               const reader = new FileReader();
               reader.onload = () => resolve(reader.result);
-              reader.onerror = reject;
+              reader.onerror = () => resolve(null);
               reader.readAsDataURL(blob);
             });
-          } catch { /* fallback ci-dessous */ }
+          } catch { /* network error — image ignoree */ }
         }
 
-        // 2. Data URL existant (legacy base64)
-        if (!dataUri && src && src.startsWith('data:')) {
-          dataUri = src;
-        }
-
-        // 3. Fallback URL distante sans path (ancien format)
-        if (!dataUri && src) {
-          const img = await loadImage(src).catch(() => null);
-          if (img) {
-            try {
-              const cvs = document.createElement('canvas');
-              cvs.width = img.width;
-              cvs.height = img.height;
-              cvs.getContext('2d').drawImage(img, 0, 0);
-              dataUri = cvs.toDataURL('image/jpeg', 0.85);
-            } catch { /* canvas tainted */ }
-          }
-        }
-
-        // Charger les dimensions depuis le data URL
         if (dataUri) {
           const img = await loadImage(dataUri).catch(() => null);
           if (img) imageCache.set(src, { w: img.width, h: img.height, uri: dataUri });
