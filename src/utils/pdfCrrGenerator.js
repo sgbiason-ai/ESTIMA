@@ -573,7 +573,19 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
       const src = typeof imgEntry === 'string' ? imgEntry : imgEntry.src;
       if (!imageCache.has(src)) {
         const img = await loadImage(src).catch(() => null);
-        if (img) imageCache.set(src, { w: img.width, h: img.height, uri: src });
+        if (img) {
+          let uri = src;
+          if (!src.startsWith('data:')) {
+            try {
+              const cvs = document.createElement('canvas');
+              cvs.width = img.width;
+              cvs.height = img.height;
+              cvs.getContext('2d').drawImage(img, 0, 0);
+              uri = cvs.toDataURL('image/jpeg', 0.85);
+            } catch { /* canvas tainted — fallback URL */ }
+          }
+          imageCache.set(src, { w: img.width, h: img.height, uri });
+        }
       }
       if (typeof imgEntry === 'object' && imgEntry.lat != null && imgEntry.lng != null) {
         imageGps.set(src, { lat: imgEntry.lat, lng: imgEntry.lng });
