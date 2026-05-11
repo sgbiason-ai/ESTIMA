@@ -13,6 +13,7 @@ import {
 import { doc, getDoc, setDoc, collection, getDocs, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { deleteCrrImage } from '../../utils/crrImageStorage';
+import { loadDraft, clearDraft } from '../../hooks/useRobustSave';
 import { DEFAULT_BRANDING } from '../../data/branding';
 import CrcLinkProjectModal from './CrcLinkProjectModal';
 
@@ -92,23 +93,33 @@ export default function CrcView({ onBackToHub, user, companyId }) {
         }
         const target = docs.find((d) => d.id === lastId) || docs[0];
         if (target) {
-          // Sync projet lié si nécessaire
-          if (target.linkedProjectId) {
-            try {
-              const projSnap = await getDoc(doc(db, 'companies', companyId, 'projects', target.linkedProjectId));
-              if (projSnap.exists()) {
-                const mapped = mapProjectToChantierInfo(projSnap.data());
-                const merged = { ...target.crrConfig?.chantierInfo, ...mapped };
-                const synced = { ...target, crrConfig: { ...target.crrConfig, chantierInfo: merged } };
-                await setDoc(doc(db, 'companies', companyId, 'crr', target.id), synced, { merge: true });
-                setCrrDoc(synced);
-                setChantiers(prev => prev.map(c => c.id === target.id ? synced : c));
-              } else {
-                setCrrDoc(target);
-              }
-            } catch { setCrrDoc(target); }
+          // Verifier s'il y a un brouillon localStorage plus recent
+          const draftKey = `draft_crr_${target.id}`;
+          const draft = loadDraft(draftKey);
+          if (draft && draft.lastSaved && target.lastSaved && draft.lastSaved > target.lastSaved) {
+            setCrrDoc(draft);
+            toast.warning('Brouillon local restauré (dernière sauvegarde non envoyée).', { duration: 6000 });
+            clearDraft(draftKey);
           } else {
-            setCrrDoc(target);
+            if (draft) clearDraft(draftKey);
+            // Sync projet lié si nécessaire
+            if (target.linkedProjectId) {
+              try {
+                const projSnap = await getDoc(doc(db, 'companies', companyId, 'projects', target.linkedProjectId));
+                if (projSnap.exists()) {
+                  const mapped = mapProjectToChantierInfo(projSnap.data());
+                  const merged = { ...target.crrConfig?.chantierInfo, ...mapped };
+                  const synced = { ...target, crrConfig: { ...target.crrConfig, chantierInfo: merged } };
+                  await setDoc(doc(db, 'companies', companyId, 'crr', target.id), synced, { merge: true });
+                  setCrrDoc(synced);
+                  setChantiers(prev => prev.map(c => c.id === target.id ? synced : c));
+                } else {
+                  setCrrDoc(target);
+                }
+              } catch { setCrrDoc(target); }
+            } else {
+              setCrrDoc(target);
+            }
           }
         }
       } catch (e) {
@@ -135,7 +146,6 @@ export default function CrcView({ onBackToHub, user, companyId }) {
         );
       } catch (err) {
         console.error('[CRC] Erreur sauvegarde:', err);
-        toast.error('Impossible de sauvegarder le compte rendu.');
         throw err;
       }
     },

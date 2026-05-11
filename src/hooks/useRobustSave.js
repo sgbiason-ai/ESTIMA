@@ -1,6 +1,6 @@
 // src/hooks/useRobustSave.js
 // Hook partagé pour sauvegarde robuste : debounce, retry, brouillon localStorage,
-// indicateur de statut, protection beforeunload/visibilitychange.
+// indicateur de statut, protection beforeunload/visibilitychange/pagehide.
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useToast } from '../contexts/ToastContext';
@@ -48,6 +48,7 @@ export function useRobustSave({ saveFn, draftKey, debounceMs = 1500, maxRetries 
   const retryTimerRef = useRef(null);
   const retryCountRef = useRef(0);
   const statusRef = useRef('idle');
+  const lastSavedJsonRef = useRef('');
 
   // Garder les refs à jour sans déclencher de re-renders
   useEffect(() => { saveFnRef.current = saveFn; }, [saveFn]);
@@ -65,20 +66,23 @@ export function useRobustSave({ saveFn, draftKey, debounceMs = 1500, maxRetries 
       setSaveStatus('saved');
       retryCountRef.current = 0;
       pendingDataRef.current = null;
-      // Brouillon réussi → nettoyer localStorage
+      lastSavedJsonRef.current = JSON.stringify(data);
       if (draftKeyRef.current) safeStorage.remove(draftKeyRef.current);
     } catch (err) {
       console.error('[RobustSave] Erreur sauvegarde:', err);
+      retryCountRef.current++;
       if (retryCountRef.current < maxRetries) {
-        retryCountRef.current++;
+        if (retryCountRef.current === 2) {
+          toast.warning('Connexion instable, nouvelle tentative...', { duration: 3000 });
+        }
         const backoff = Math.min(1000 * Math.pow(2, retryCountRef.current), 8000);
         retryTimerRef.current = setTimeout(executeSave, backoff);
-        // Rester en 'saving' pendant les retries
       } else {
         setSaveStatus('error');
         retryCountRef.current = 0;
         toast.error('Sauvegarde impossible. Vos données sont conservées localement.', {
           title: 'Erreur de connexion',
+          duration: 10000,
         });
       }
     }
@@ -93,7 +97,6 @@ export function useRobustSave({ saveFn, draftKey, debounceMs = 1500, maxRetries 
       try {
         safeStorage.set(draftKeyRef.current, JSON.stringify(data));
       } catch (e) {
-        // JSON.stringify peut échouer si données trop volumineuses ou circulaires
         console.warn('[RobustSave] Brouillon non sauvegardé:', e);
       }
     }
@@ -102,7 +105,7 @@ export function useRobustSave({ saveFn, draftKey, debounceMs = 1500, maxRetries 
 
     // Annuler le debounce précédent
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    // Annuler un retry en cours
+    // Annuler un retry en cours (nouvelle donnée → recommencer)
     if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
     retryCountRef.current = 0;
 
@@ -113,41 +116,67 @@ export function useRobustSave({ saveFn, draftKey, debounceMs = 1500, maxRetries 
   const forceSave = useCallback(() => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
-    retryCountRef.current = 0;
     if (pendingDataRef.current) {
       executeSave();
     }
   }, [executeSave]);
 
-  // ── Protection beforeunload + visibilitychange ────────────────────────────
+  // ── saveDraftSync : permet au caller de forcer un brouillon localStorage ──
+  const saveDraftSync = useCallback((data) => {
+    if (!draftKeyRef.current || !data) return;
+    try { safeStorage.set(draftKeyRef.current, JSON.stringify(data)); } catch {}
+  }, []);
+
+  // ── Protection beforeunload + visibilitychange + pagehide ─────────────────
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (pendingDataRef.current && statusRef.current !== 'saved' && statusRef.current !== 'idle') {
         e.preventDefault();
         e.returnValue = '';
-        // Tenter un flush synchrone du brouillon (le Firestore write est async, on ne peut pas l'attendre)
         if (draftKeyRef.current && pendingDataRef.current) {
           safeStorage.set(draftKeyRef.current, JSON.stringify(pendingDataRef.current));
         }
       }
     };
 
+    const handlePageHide = () => {
+      // Flush immédiat — pagehide est le dernier signal fiable sur mobile/tablette
+      if (pendingDataRef.current && statusRef.current !== 'saved' && statusRef.current !== 'idle') {
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        if (draftKeyRef.current) {
+          safeStorage.set(draftKeyRef.current, JSON.stringify(pendingDataRef.current));
+        }
+        executeSave();
+      }
+    };
+
     const handleVisibilityChange = () => {
-      // Quand l'utilisateur switch d'app (caméra, appel, etc.) → flush immédiat
       if (document.visibilityState === 'hidden' && pendingDataRef.current &&
           (statusRef.current === 'waiting' || statusRef.current === 'error')) {
         if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-        retryCountRef.current = 0;
         executeSave();
       }
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', handlePageHide);
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', handlePageHide);
     };
+  }, [executeSave]);
+
+  // ── Auto-flush périodique : rattrape les debounces ratés ──────────────────
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (pendingDataRef.current && statusRef.current === 'waiting') {
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        executeSave();
+      }
+    }, 5000);
+    return () => clearInterval(interval);
   }, [executeSave]);
 
   // ── Cleanup timers on unmount ─────────────────────────────────────────────
@@ -160,5 +189,5 @@ export function useRobustSave({ saveFn, draftKey, debounceMs = 1500, maxRetries 
 
   const hasPendingChanges = saveStatus !== 'saved' && saveStatus !== 'idle';
 
-  return { saveStatus, triggerSave, forceSave, hasPendingChanges };
+  return { saveStatus, triggerSave, forceSave, saveDraftSync, hasPendingChanges };
 }

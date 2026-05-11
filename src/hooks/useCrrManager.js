@@ -85,11 +85,30 @@ export const useCrrManager = ({
   // ── HELPERS PERSISTANCE ───────────────────────────────────────────────
   // Tous bases sur des functional updaters → React garantit qu'on lit toujours
   // le dernier etat, meme avec des appels rapprochees dans le meme tick.
+  //
+  // Chaque updater sauvegarde aussi un brouillon localStorage DANS le callback
+  // setState (synchrone), ce qui couvre le gap de batching React 18 : meme si
+  // le composant n'a pas encore re-rendu et que triggerSave n'a pas ete appele,
+  // le brouillon est a jour quand visibilitychange/pagehide se declenchent.
+
+  const draftKeyRef = useRef(project?.id ? `draft_crr_${project.id}` : null);
+  draftKeyRef.current = project?.id ? `draft_crr_${project.id}` : null;
+
+  const syncDraft = (data) => {
+    const key = draftKeyRef.current;
+    if (!key || !data) return;
+    try { localStorage.setItem(key, JSON.stringify(data)); } catch {}
+  };
 
   const updateProject = useCallback(
     (patch) => {
       if (!onUpdateProject) return;
-      onUpdateProject((prev) => (prev ? { ...prev, ...patch } : prev));
+      onUpdateProject((prev) => {
+        if (!prev) return prev;
+        const next = { ...prev, ...patch };
+        syncDraft(next);
+        return next;
+      });
     },
     [onUpdateProject]
   );
@@ -103,7 +122,9 @@ export const useCrrManager = ({
         const newMeetings = typeof newMeetingsOrFn === 'function'
           ? newMeetingsOrFn(currentMeetings)
           : newMeetingsOrFn;
-        return { ...prev, crrMeetings: newMeetings };
+        const next = { ...prev, crrMeetings: newMeetings };
+        syncDraft(next);
+        return next;
       });
     },
     [onUpdateProject]
@@ -137,10 +158,10 @@ export const useCrrManager = ({
 
   // ── AUTOSAVE (robuste : debounce + retry + brouillon localStorage) ──
 
-  const { saveStatus, triggerSave, forceSave } = useRobustSave({
+  const { saveStatus, triggerSave, forceSave, saveDraftSync } = useRobustSave({
     saveFn: onSaveProject,
     draftKey: project?.id ? `draft_crr_${project.id}` : null,
-    debounceMs: 2000,
+    debounceMs: 1500,
   });
 
   const projectHash = useStableHash(project);
@@ -149,7 +170,30 @@ export const useCrrManager = ({
     if (projectHash === lastSavedHashRef.current) return;
     lastSavedHashRef.current = projectHash;
     triggerSave(project);
-  }, [projectHash, triggerSave]);
+  }, [projectHash, triggerSave, project]);
+
+  // Ref toujours a jour pour le handler visibilitychange (pas de closure stale)
+  const projectRef = useRef(project);
+  projectRef.current = project;
+
+  useEffect(() => {
+    const flush = () => {
+      if (document.visibilityState === 'hidden' || true) {
+        const data = projectRef.current;
+        if (data) {
+          triggerSave(data);
+          forceSave();
+        }
+      }
+    };
+    const onHidden = () => { if (document.visibilityState === 'hidden') flush(); };
+    document.addEventListener('visibilitychange', onHidden);
+    window.addEventListener('pagehide', flush);
+    return () => {
+      document.removeEventListener('visibilitychange', onHidden);
+      window.removeEventListener('pagehide', flush);
+    };
+  }, [triggerSave, forceSave]);
 
   // ── ACTIONS REUNIONS ──────────────────────────────────────────────────
 
