@@ -55,6 +55,17 @@ export function useRobustSave({ saveFn, draftKey, debounceMs = 1500, maxRetries 
   useEffect(() => { draftKeyRef.current = draftKey; }, [draftKey]);
   useEffect(() => { statusRef.current = saveStatus; }, [saveStatus]);
 
+  // ── Helper : écriture brouillon localStorage avec timestamp ───────────────
+  const writeDraft = (data) => {
+    const key = draftKeyRef.current;
+    if (!key || !data) return;
+    try {
+      safeStorage.set(key, JSON.stringify({ ...data, _draftAt: Date.now() }));
+    } catch (e) {
+      console.warn('[RobustSave] Brouillon non sauvegardé:', e);
+    }
+  };
+
   // ── executeSave : tentative + retry avec backoff ──────────────────────────
   const executeSave = useCallback(async () => {
     const data = pendingDataRef.current;
@@ -65,7 +76,7 @@ export function useRobustSave({ saveFn, draftKey, debounceMs = 1500, maxRetries 
       await saveFnRef.current(data);
       setSaveStatus('saved');
       retryCountRef.current = 0;
-      pendingDataRef.current = null;
+      if (pendingDataRef.current === data) pendingDataRef.current = null;
       lastSavedJsonRef.current = JSON.stringify(data);
       if (draftKeyRef.current) safeStorage.remove(draftKeyRef.current);
     } catch (err) {
@@ -92,14 +103,7 @@ export function useRobustSave({ saveFn, draftKey, debounceMs = 1500, maxRetries 
   const triggerSave = useCallback((data) => {
     pendingDataRef.current = data;
 
-    // Sauvegarder le brouillon en localStorage immédiatement
-    if (draftKeyRef.current) {
-      try {
-        safeStorage.set(draftKeyRef.current, JSON.stringify(data));
-      } catch (e) {
-        console.warn('[RobustSave] Brouillon non sauvegardé:', e);
-      }
-    }
+    writeDraft(data);
 
     setSaveStatus('waiting');
 
@@ -127,19 +131,14 @@ export function useRobustSave({ saveFn, draftKey, debounceMs = 1500, maxRetries 
       if (pendingDataRef.current && statusRef.current !== 'saved' && statusRef.current !== 'idle') {
         e.preventDefault();
         e.returnValue = '';
-        if (draftKeyRef.current && pendingDataRef.current) {
-          safeStorage.set(draftKeyRef.current, JSON.stringify(pendingDataRef.current));
-        }
+        writeDraft(pendingDataRef.current);
       }
     };
 
     const handlePageHide = () => {
-      // Flush immédiat — pagehide est le dernier signal fiable sur mobile/tablette
       if (pendingDataRef.current && statusRef.current !== 'saved' && statusRef.current !== 'idle') {
         if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-        if (draftKeyRef.current) {
-          safeStorage.set(draftKeyRef.current, JSON.stringify(pendingDataRef.current));
-        }
+        writeDraft(pendingDataRef.current);
         executeSave();
       }
     };

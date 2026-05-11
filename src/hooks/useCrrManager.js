@@ -177,13 +177,7 @@ export const useCrrManager = ({
   projectRef.current = project;
 
   useEffect(() => {
-    const flush = () => {
-      const data = projectRef.current;
-      if (data) {
-        triggerSave(data);
-        forceSave();
-      }
-    };
+    const flush = () => { forceSave(); };
     const onHidden = () => { if (document.visibilityState === 'hidden') flush(); };
     document.addEventListener('visibilitychange', onHidden);
     window.addEventListener('pagehide', flush);
@@ -191,7 +185,7 @@ export const useCrrManager = ({
       document.removeEventListener('visibilitychange', onHidden);
       window.removeEventListener('pagehide', flush);
     };
-  }, [triggerSave, forceSave]);
+  }, [forceSave]);
 
   // ── ACTIONS REUNIONS ──────────────────────────────────────────────────
 

@@ -48,7 +48,12 @@
       "Bash(echo $?)",
       "Bash(node -e \"try { require\\(''esbuild''\\).transformSync\\(require\\(''fs''\\).readFileSync\\(''C:/Projet/Estima/src/views/DevisMoeView.jsx'',''utf8''\\), { jsx: ''transform'', loader: ''jsx'' }\\); console.log\\(''OK''\\); } catch\\(e\\) { console.log\\(e.message.split\\(''\\\\n''\\).slice\\(0,5\\).join\\(''\\\\n''\\)\\); }\")",
       "Bash(find /c/Projet/Estima/src -name *crr* -o -name *CRR*)",
-      "Bash(grep -r \"participantGroups\\\\|subLabel\" /c/Projet/Estima/src --include=*.js --include=*.jsx)"
+      "Bash(grep -r \"participantGroups\\\\|subLabel\" /c/Projet/Estima/src --include=*.js --include=*.jsx)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :5173)",
+      "Bash(findstr LISTENING)",
+      "PowerShell(Stop-Process -Id 31244 -Force)",
+      "Bash(firebase deploy *)"
     ]
   }
 }
