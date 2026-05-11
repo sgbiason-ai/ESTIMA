@@ -567,43 +567,17 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
 
   // Precharger toutes les images des observations (supporte string ou { src, lat, lng })
   // Les URLs Firebase Storage doivent etre converties en data URL pour jsPDF.
-  // Firebase SDK getBlob bypass CORS — import dynamique pour ne pas casser le lazy-load.
-  let fbGetBlob, fbRef, fbStorage;
-  try {
-    const fbMod = await import('firebase/storage');
-    fbGetBlob = fbMod.getBlob;
-    fbRef = fbMod.ref;
-    fbStorage = (await import('../firebase')).storage;
-  } catch (e) { console.warn('[PDF] Firebase Storage SDK indisponible:', e); }
-
   const imageCache = new Map();
   const imageGps = new Map();
-  let imgDebug = { total: 0, ok: 0, fail: 0 };
   for (const obs of observations) {
     for (const imgEntry of (obs.images || [])) {
       const src = typeof imgEntry === 'string' ? imgEntry : imgEntry.src;
-      const path = typeof imgEntry === 'object' ? imgEntry.path : null;
       if (!imageCache.has(src) && src) {
-        imgDebug.total++;
         let dataUri = null;
 
         if (src.startsWith('data:')) {
           dataUri = src;
-        } else if (path && fbGetBlob) {
-          // Firebase SDK getBlob (pas de CORS requis)
-          try {
-            const blob = await fbGetBlob(fbRef(fbStorage, path));
-            dataUri = await new Promise((resolve) => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(reader.result);
-              reader.onerror = () => resolve(null);
-              reader.readAsDataURL(blob);
-            });
-          } catch (e) { console.warn('[PDF] getBlob echoue pour', path, e); }
-        }
-
-        // Fallback : fetch direct sur l'URL
-        if (!dataUri && !src.startsWith('data:')) {
+        } else {
           try {
             const resp = await fetch(src);
             if (resp.ok) {
@@ -614,19 +588,13 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
                 reader.onerror = () => resolve(null);
                 reader.readAsDataURL(blob);
               });
-            } else {
-              console.warn('[PDF] fetch echoue:', resp.status, src.substring(0, 100));
             }
-          } catch (e) { console.warn('[PDF] fetch erreur:', e.message, src.substring(0, 100)); }
+          } catch { /* image ignoree */ }
         }
 
         if (dataUri) {
           const img = await loadImage(dataUri).catch(() => null);
-          if (img) { imageCache.set(src, { w: img.width, h: img.height, uri: dataUri }); imgDebug.ok++; }
-          else { console.warn('[PDF] loadImage echoue sur dataUri de', (path || src).substring(0, 80)); imgDebug.fail++; }
-        } else {
-          console.warn('[PDF] Aucune methode n\'a charge l\'image:', path || src.substring(0, 100));
-          imgDebug.fail++;
+          if (img) imageCache.set(src, { w: img.width, h: img.height, uri: dataUri });
         }
       }
       if (typeof imgEntry === 'object' && imgEntry.lat != null && imgEntry.lng != null) {
@@ -634,7 +602,6 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
       }
     }
   }
-  console.log('[PDF] Images:', imgDebug.total, 'total,', imgDebug.ok, 'OK,', imgDebug.fail, 'echouees, cache:', imageCache.size);
 
   const IMG_ROW_H = 25; // mm par rangee d'images
   const OBS_COL_W = CW - 20 - 18 - 18 - 24 - 20; // largeur auto de la colonne obs

@@ -2,9 +2,18 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.5.24';
+export const APP_VERSION = '2.5.25';
 
 export const CHANGELOG = [
+  {
+    version: '2.5.25',
+    date: '2026-05-11',
+    title: 'CRC : photos et localisation GPS dans l\'export PDF',
+    highlights: [
+      'CRC : les photos des observations apparaissent désormais dans l\'export PDF (correction CORS Firebase Storage)',
+      'CRC : les liens de localisation GPS sont restaurés sous chaque photo dans le PDF',
+    ],
+  },
   {
     version: '2.5.24',
     date: '2026-05-03',
