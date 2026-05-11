@@ -5,7 +5,7 @@ import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react'
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { LocateFixed } from 'lucide-react';
+import { LocateFixed, Layers } from 'lucide-react';
 
 // Fix icônes Leaflet
 delete L.Icon.Default.prototype._getIconUrl;
@@ -133,7 +133,30 @@ const TILE_LAYERS = {
     maxZoom: 20,
     label: 'Cadastre',
   },
+  abf: {
+    type: 'wms',
+    url: 'https://data.geopf.fr/wms-v/ows',
+    layers: 'monument_historique',
+    maxZoom: 20,
+    label: 'ABF (MH)',
+    overlayOnly: true,
+  },
 };
+
+function createTileLayer(key, opacity = 1) {
+  const cfg = TILE_LAYERS[key];
+  if (cfg.type === 'wms') {
+    return L.tileLayer.wms(cfg.url, {
+      layers: cfg.layers,
+      format: 'image/png',
+      transparent: true,
+      version: '1.3.0',
+      opacity,
+      maxZoom: cfg.maxZoom,
+    });
+  }
+  return L.tileLayer(cfg.url, { maxZoom: cfg.maxZoom, opacity });
+}
 
 // Recalcule la taille de la carte quand le conteneur change (split resize)
 function InvalidateSize() {
@@ -159,17 +182,28 @@ function FitBounds({ bounds }) {
   return null;
 }
 
-// Composant qui change le fond de carte dynamiquement
-function DynamicTileLayer({ layerKey }) {
+// Gère fond de base + couche overlay avec opacité variable
+function DualTileLayer({ baseKey, overlayKey, overlayOpacity }) {
   const map = useMap();
+  const overlayRef = useRef(null);
+
   useEffect(() => {
-    // Supprimer les anciens tile layers
     map.eachLayer((layer) => {
       if (layer instanceof L.TileLayer) map.removeLayer(layer);
     });
-    const cfg = TILE_LAYERS[layerKey];
-    L.tileLayer(cfg.url, { maxZoom: cfg.maxZoom }).addTo(map);
-  }, [map, layerKey]);
+    overlayRef.current = null;
+    createTileLayer(baseKey).addTo(map);
+    if (overlayKey && overlayKey !== baseKey) {
+      const ol = createTileLayer(overlayKey, overlayOpacity);
+      ol.addTo(map);
+      overlayRef.current = ol;
+    }
+  }, [map, baseKey, overlayKey]);
+
+  useEffect(() => {
+    if (overlayRef.current) overlayRef.current.setOpacity(overlayOpacity);
+  }, [overlayOpacity]);
+
   return null;
 }
 
@@ -310,6 +344,9 @@ function RouteOverlay({ from, to }) {
 
 export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMarkers = [], segmentEndpoints = [], segmentLines = [], livePosition = null, height = '100%', highlightedObs = null, onSelectObs = null, showMeasure = false }) {
   const [activeLayer, setActiveLayer] = useState('satellite');
+  const [overlayLayer, setOverlayLayer] = useState(null);
+  const [overlayOpacity, setOverlayOpacity] = useState(0.5);
+  const [showOverlayPanel, setShowOverlayPanel] = useState(false);
   const [measuring, setMeasuring] = useState(false);
   const [measurePoints, setMeasurePoints] = useState([]);
   const [routeMode, setRouteMode] = useState(false);
@@ -351,7 +388,6 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
   }, [segmentLines]);
 
   const defaultCenter = positions.length > 0 ? positions[0] : [43.6, 2.0];
-  const cfg = TILE_LAYERS[activeLayer];
 
   return (
     <div style={{ height, width: '100%', position: 'relative' }}>
@@ -364,8 +400,7 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
           zoomControl={false}
           attributionControl={false}
         >
-          <TileLayer url={cfg.url} maxZoom={cfg.maxZoom} />
-          <DynamicTileLayer layerKey={activeLayer} />
+          <DualTileLayer baseKey={activeLayer} overlayKey={overlayLayer} overlayOpacity={overlayOpacity} />
           <InvalidateSize />
           {livePosition && <FollowPosition position={livePosition} follow={followMode} />}
           <UserInteractionDetector onInteraction={handleUserInteraction} />
@@ -521,12 +556,50 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
           </div>
         )}
 
-        {/* Sélecteur de fond de carte — superposé en bas de la carte */}
-        <div style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', zIndex: 1000, display: 'flex', gap: 4, background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(8px)', padding: '4px', borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
-          {Object.entries(TILE_LAYERS).map(([key, layer]) => (
+        {/* Panneau overlay — au-dessus du sélecteur */}
+        {showOverlayPanel && (
+          <div style={{ position: 'absolute', bottom: 52, left: '50%', transform: 'translateX(-50%)', zIndex: 1000, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(12px)', padding: '8px 12px', borderRadius: 14, boxShadow: '0 4px 16px rgba(0,0,0,0.15)', minWidth: 200 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Superposer</div>
+            <div style={{ display: 'flex', gap: 4, marginBottom: overlayLayer ? 8 : 0 }}>
+              {Object.entries(TILE_LAYERS)
+                .filter(([key]) => key !== activeLayer)
+                .map(([key, layer]) => (
+                  <button
+                    key={key}
+                    onClick={() => setOverlayLayer(overlayLayer === key ? null : key)}
+                    style={{
+                      padding: '4px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600,
+                      border: 'none', cursor: 'pointer', transition: 'all 0.15s',
+                      background: overlayLayer === key ? '#3b82f6' : '#f3f4f6',
+                      color: overlayLayer === key ? '#fff' : '#6b7280',
+                    }}
+                  >
+                    {layer.label}
+                  </button>
+                ))}
+            </div>
+            {overlayLayer && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 10, color: '#9ca3af', fontWeight: 600, whiteSpace: 'nowrap' }}>Opacité</span>
+                <input
+                  type="range" min="0" max="100" value={Math.round(overlayOpacity * 100)}
+                  onChange={(e) => setOverlayOpacity(Number(e.target.value) / 100)}
+                  style={{ flex: 1, accentColor: '#3b82f6', height: 4 }}
+                />
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#374151', minWidth: 28, textAlign: 'right' }}>{Math.round(overlayOpacity * 100)}%</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Sélecteur de fond de carte + bouton overlay */}
+        <div style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', zIndex: 1000, display: 'flex', gap: 4, alignItems: 'center', background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(8px)', padding: '4px', borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
+          {Object.entries(TILE_LAYERS)
+            .filter(([, layer]) => !layer.overlayOnly)
+            .map(([key, layer]) => (
             <button
               key={key}
-              onClick={() => setActiveLayer(key)}
+              onClick={() => { setActiveLayer(key); if (overlayLayer === key) setOverlayLayer(null); }}
               style={{
                 padding: '5px 12px',
                 borderRadius: 8,
@@ -542,6 +615,18 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
               {layer.label}
             </button>
           ))}
+          <div style={{ width: 1, height: 16, background: '#e5e7eb', margin: '0 2px' }} />
+          <button
+            onClick={() => setShowOverlayPanel(!showOverlayPanel)}
+            style={{
+              padding: '5px 8px', borderRadius: 8, border: 'none', cursor: 'pointer',
+              background: overlayLayer ? '#3b82f6' : (showOverlayPanel ? '#f3f4f6' : 'transparent'),
+              color: overlayLayer ? '#fff' : '#6b7280',
+              display: 'flex', alignItems: 'center', transition: 'all 0.15s',
+            }}
+          >
+            <Layers size={14} />
+          </button>
         </div>
       </div>
     </div>
