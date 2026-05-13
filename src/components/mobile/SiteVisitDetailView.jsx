@@ -9,9 +9,7 @@ import ImageViewerModal from './ImageViewerModal';
 import SiteVisitObsEditSheet from './SiteVisitObsEditSheet';
 import GpsTrackingSection from './GpsTrackingSection';
 import SaveStatusDot from './SaveStatusDot';
-
-const fmtCoord = (lat, lng) => `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-const fmtDist = (m) => m == null ? '—' : m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(2)} km`;
+import { fmtCoord, fmtDist } from '../../utils/geoHelpers';
 
 // ─── Sous-composants ───────────────────────────────────────────────────────
 

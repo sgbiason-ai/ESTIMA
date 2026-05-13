@@ -113,50 +113,8 @@ function smoothPath(points, tension = 0.5, segments = 8) {
   return result;
 }
 
-// ─── Fonds de carte ────────────────────────────────────────────────────────
-
-// IGN Géoplateforme (libre, officiel, France) — fair-use ~50 req/s soutenu
-const IGN_BASE = 'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}';
-const TILE_LAYERS = {
-  satellite: {
-    url: `${IGN_BASE}&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&FORMAT=image/jpeg`,
-    maxZoom: 19,
-    label: 'Satellite',
-  },
-  plan: {
-    url: `${IGN_BASE}&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&FORMAT=image/png`,
-    maxZoom: 19,
-    label: 'Plan',
-  },
-  cadastre: {
-    url: `${IGN_BASE}&LAYER=CADASTRALPARCELS.PARCELLAIRE_EXPRESS&FORMAT=image/png`,
-    maxZoom: 20,
-    label: 'Cadastre',
-  },
-  abf: {
-    type: 'wms',
-    url: 'https://data.geopf.fr/wms-v/ows',
-    layers: 'monument_historique',
-    maxZoom: 20,
-    label: 'ABF (MH)',
-    overlayOnly: true,
-  },
-};
-
-function createTileLayer(key, opacity = 1) {
-  const cfg = TILE_LAYERS[key];
-  if (cfg.type === 'wms') {
-    return L.tileLayer.wms(cfg.url, {
-      layers: cfg.layers,
-      format: 'image/png',
-      transparent: true,
-      version: '1.3.0',
-      opacity,
-      maxZoom: cfg.maxZoom,
-    });
-  }
-  return L.tileLayer(cfg.url, { maxZoom: cfg.maxZoom, opacity });
-}
+// ─── Fonds de carte (import partagé) ──────────────────────────────────────
+import { TILE_LAYERS, createTileLayer } from '../../utils/leafletConfig';
 
 // Recalcule la taille de la carte quand le conteneur change (split resize)
 // Clic sur couche WMS → GetFeatureInfo → popup avec infos du monument

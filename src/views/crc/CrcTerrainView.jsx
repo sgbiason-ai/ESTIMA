@@ -5,18 +5,9 @@ import React, { Suspense, useMemo } from 'react';
 import lazyWithReload from '../../utils/lazyWithReload';
 import { MapPin, Camera, MessageSquare, Navigation, Clock, Ruler } from 'lucide-react';
 import { stripHtml } from '../../utils/formatObsText';
+import { fmtDist as fmtDistance, fmtDuration } from '../../utils/geoHelpers';
 
 const GpsMapView = lazyWithReload(() => import('../../components/mobile/GpsMapView'));
-
-const fmtDistance = (m) => m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(2)} km`;
-const fmtDuration = (ms) => {
-  if (!ms || ms <= 0) return '—';
-  const s = Math.floor(ms / 1000);
-  const min = Math.floor(s / 60);
-  const h = Math.floor(min / 60);
-  if (h > 0) return `${h}h${String(min % 60).padStart(2, '0')}`;
-  return `${min} min`;
-};
 
 export default function CrcTerrainView({ meeting, observationsByCategory }) {
   const tracking = meeting?.gpsTracking || {};

@@ -4,18 +4,17 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react';
 import lazyWithReload from '../utils/lazyWithReload';
-import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, Polyline, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { collection, getDocs, getDoc, doc, deleteDoc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { getDoc, doc, deleteDoc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import {
-  MapPin, RefreshCw, Camera, MessageSquare, Navigation, Ruler, Trash2, FileDown,
-  Maximize2, X, Play, Square, Flag, Check, Route, LocateFixed, Pencil, Plus, Info,
-  ImagePlus, Layers,
+  MapPin, RefreshCw, Camera, MessageSquare, Ruler, Trash2, FileDown,
+  Maximize2, X, Play, Square, Flag, LocateFixed, Pencil, Plus, Info,
+  Layers,
 } from 'lucide-react';
 import { stripHtml } from '../utils/formatObsText';
-import { compressImage } from '../utils/imageCompressor';
 import { confirm } from '../utils/globalUI';
 import HelpPanel from '../components/help/HelpPanel';
 import HelpButton from '../components/help/HelpButton';
@@ -23,361 +22,23 @@ import { simplifyGpsTrace } from '../utils/gpsSimplify';
 import { useMobileSiteVisits } from '../hooks/useMobileSiteVisits';
 import { useRobustSave } from '../hooks/useRobustSave';
 import SaveStatusDot from '../components/mobile/SaveStatusDot';
+import {
+  haversine, totalDistance, splitTraceSegments, accuracyColor,
+  fmtDuration, fmtDate, fmtDist, fmtUncertainty, fmtCoord,
+  computeUncertainty, getCurrentPosition, fetchIgnRoute,
+} from '../utils/geoHelpers';
+import {
+  TILE_LAYERS, createDot, createSegmentIcon, createObsIcon,
+  pendingIcon, startGpsIcon, endGpsIcon,
+} from '../utils/leafletConfig';
+import {
+  DualTileLayer, WmsFeatureInfo, InvalidateSize, MapRefCapture,
+  FollowPosition, UserInteractionDetector, FitBoundsOnce,
+} from './siteVisits/MapSubComponents';
+import { VisitInfoModal, ObsEditModal } from './siteVisits/SiteVisitModals';
 
 // PROVISOIRE — Mode Tesla depuis le desktop
 const TeslaModeView = lazyWithReload(() => import('./TeslaModeView'));
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-const haversine = (a, b) => {
-  const R = 6371000;
-  const toRad = (x) => (x * Math.PI) / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-};
-const totalDistance = (coords) => { let d = 0; for (let i = 1; i < coords.length; i++) { if (coords[i].break || coords[i - 1].break) continue; d += haversine(coords[i - 1], coords[i]); } return d; };
-// Découpe un tableau de coordonnées avec des {break:true} en segments continus
-const splitTraceSegments = (coords) => { const segs = []; let cur = []; for (const c of coords) { if (c.break) { if (cur.length > 1) segs.push(cur); cur = []; } else { cur.push([c.lat, c.lng]); } } if (cur.length > 1) segs.push(cur); return segs; };
-const accuracyColor = (acc) => acc <= 5 ? '#22c55e' : acc <= 15 ? '#f59e0b' : '#ef4444';
-const fmtDuration = (ms) => { const s = Math.floor(ms / 1000); const m = Math.floor(s / 60); const h = Math.floor(m / 60); return h > 0 ? `${h}h${String(m % 60).padStart(2, '0')}` : `${m}min ${String(s % 60).padStart(2, '0')}s`; };
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
-const fmtDist = (m) => m == null ? '—' : m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(2)} km`;
-const fmtUncertainty = (u) => u == null ? '' : u < 1000 ? `±${Math.round(u)}m` : `±${(u / 1000).toFixed(1)}km`;
-const fmtCoord = (lat, lng) => `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-
-// Incertitude distance adaptée à la source (propagation quadratique, ~1σ)
-const computeUncertainty = (source, accA, accB, distance) => {
-  const sigEndpoints2 = (accA || 0) ** 2 + (accB || 0) ** 2;
-  if (source === 'ign') {
-    const routingErr = 0.02 * distance;
-    return Math.round(Math.sqrt(sigEndpoints2 + routingErr ** 2));
-  }
-  if (source === 'trace') {
-    const jitterErr = 0.05 * distance;
-    return Math.round(Math.sqrt(sigEndpoints2 + jitterErr ** 2));
-  }
-  return Math.round(Math.sqrt(sigEndpoints2));
-};
-
-function getCurrentPosition() {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) return reject(new Error('Géolocalisation non disponible'));
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }),
-      (err) => reject(err),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
-    );
-  });
-}
-
-// Routing IGN Itinéraires (libre, France) — remplace OSRM demo, avec retry
-async function fetchIgnRoute(from, to, retries = 2) {
-  const url = `https://data.geopf.fr/navigation/itineraire?resource=bdtopo-osrm&start=${from.lng},${from.lat}&end=${to.lng},${to.lat}&profile=car&optimization=fastest&getSteps=false&getBbox=false&distanceUnit=meter&timeUnit=second`;
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const res = await fetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        const geom = data?.geometry;
-        if (geom?.coordinates?.length >= 2) {
-          return { coordinates: geom.coordinates.map(c => [c[1], c[0]]), distance: Number(data.distance) || 0 };
-        }
-      }
-    } catch { /* retry */ }
-    if (attempt < retries) await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
-  }
-  return null;
-}
-
-// ─── Tile Layers ─────────────────────────────────────────────────────────────
-
-// IGN Géoplateforme (libre, officiel, France) — fair-use ~50 req/s soutenu
-const IGN_BASE = 'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}';
-const TILE_LAYERS = {
-  satellite: { url: `${IGN_BASE}&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&FORMAT=image/jpeg`, maxZoom: 19, label: 'Satellite' },
-  plan: { url: `${IGN_BASE}&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&FORMAT=image/png`, maxZoom: 19, label: 'Plan' },
-  cadastre: { url: `${IGN_BASE}&LAYER=CADASTRALPARCELS.PARCELLAIRE_EXPRESS&FORMAT=image/png`, maxZoom: 20, label: 'Cadastre' },
-  abf: { type: 'wms', url: 'https://data.geopf.fr/wms-v/ows', layers: 'monument_historique', maxZoom: 20, label: 'ABF (MH)', overlayOnly: true },
-};
-
-function createTileLayer(key, opacity = 1) {
-  const cfg = TILE_LAYERS[key];
-  if (cfg.type === 'wms') {
-    return L.tileLayer.wms(cfg.url, { layers: cfg.layers, format: 'image/png', transparent: true, version: '1.3.0', opacity, maxZoom: cfg.maxZoom });
-  }
-  return L.tileLayer(cfg.url, { maxZoom: cfg.maxZoom, opacity });
-}
-
-// ─── Leaflet icons ───────────────────────────────────────────────────────────
-
-const createDot = (color, size = 14) => L.divIcon({
-  className: '',
-  html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>`,
-  iconSize: [size, size], iconAnchor: [size / 2, size / 2],
-});
-const createSegmentIcon = (number) => L.divIcon({
-  className: '',
-  html: `<div style="width:28px;height:28px;border-radius:50%;background:#3b82f6;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:800;font-family:system-ui">${number}</div>`,
-  iconSize: [28, 28], iconAnchor: [14, 14],
-});
-const createObsIcon = (number, highlighted) => L.divIcon({
-  className: '',
-  html: `<div style="width:24px;height:24px;border-radius:50%;background:${highlighted ? '#f97316' : '#3b82f6'};border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:white;font-size:10px;font-weight:800;font-family:system-ui">${number}</div>`,
-  iconSize: [24, 24], iconAnchor: [12, 12],
-});
-const pendingIcon = createDot('#f97316', 18);
-const startGpsIcon = createDot('#22c55e', 14);
-const endGpsIcon = createDot('#ef4444', 14);
-
-// ─── Map sub-components ──────────────────────────────────────────────────────
-
-function DualTileLayer({ baseKey, overlayKey, overlayOpacity }) {
-  const map = useMap();
-  const overlayRef = useRef(null);
-  useEffect(() => {
-    map.eachLayer((layer) => { if (layer instanceof L.TileLayer) map.removeLayer(layer); });
-    overlayRef.current = null;
-    createTileLayer(baseKey).addTo(map);
-    if (overlayKey && overlayKey !== baseKey) {
-      const ol = createTileLayer(overlayKey, overlayOpacity);
-      ol.addTo(map);
-      overlayRef.current = ol;
-    }
-  }, [map, baseKey, overlayKey]);
-  useEffect(() => { if (overlayRef.current) overlayRef.current.setOpacity(overlayOpacity); }, [overlayOpacity]);
-  return null;
-}
-
-// Clic sur couche WMS → GetFeatureInfo → popup avec infos du monument
-function WmsFeatureInfo({ overlayKey }) {
-  const map = useMap();
-  useEffect(() => {
-    if (!overlayKey) return;
-    const cfg = TILE_LAYERS[overlayKey];
-    if (cfg?.type !== 'wms') return;
-
-    const handleClick = async (e) => {
-      const point = map.latLngToContainerPoint(e.latlng);
-      const size = map.getSize();
-      const bounds = map.getBounds();
-      const sw = L.CRS.EPSG3857.project(bounds.getSouthWest());
-      const ne = L.CRS.EPSG3857.project(bounds.getNorthEast());
-      const url = `${cfg.url}?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetFeatureInfo`
-        + `&LAYERS=${cfg.layers}&QUERY_LAYERS=${cfg.layers}`
-        + `&INFO_FORMAT=application/json`
-        + `&I=${Math.round(point.x)}&J=${Math.round(point.y)}`
-        + `&CRS=EPSG:3857&BBOX=${sw.x},${sw.y},${ne.x},${ne.y}`
-        + `&WIDTH=${size.x}&HEIGHT=${size.y}`;
-      try {
-        const res = await fetch(url);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!data.features?.length) return;
-        const p = data.features[0].properties || {};
-        const labels = { nom: 'Monument', type: 'Type', categorie: 'Catégorie', dateProt: 'Date protection', commune: 'Commune', departement: 'Département', codeInsee: 'Code INSEE' };
-        let html = '<div style="font-family:system-ui;font-size:12px;max-width:300px;line-height:1.5">';
-        const nom = p.nom || p.NOM || p.libelle || p.LIBELLE || '';
-        if (nom) html += `<div style="font-weight:800;color:#1f2937;font-size:13px;margin-bottom:6px;border-bottom:1px solid #e5e7eb;padding-bottom:4px">${nom}</div>`;
-        for (const [key, val] of Object.entries(p)) {
-          if (!val || key === 'bbox' || key === 'gid' || key === 'geom') continue;
-          const label = labels[key] || key.replace(/_/g, ' ');
-          html += `<div><span style="font-weight:600;color:#6b7280;font-size:11px">${label} :</span> <span style="color:#374151">${val}</span></div>`;
-        }
-        html += '</div>';
-        L.popup({ maxWidth: 320 }).setLatLng(e.latlng).setContent(html).openOn(map);
-      } catch { /* ignore */ }
-    };
-    map.on('click', handleClick);
-    return () => map.off('click', handleClick);
-  }, [map, overlayKey]);
-  return null;
-}
-
-function InvalidateSize() {
-  const map = useMap();
-  useEffect(() => {
-    const observer = new ResizeObserver(() => map.invalidateSize());
-    observer.observe(map.getContainer());
-    return () => observer.disconnect();
-  }, [map]);
-  return null;
-}
-
-function MapRefCapture({ mapRef }) {
-  const map = useMap();
-  useEffect(() => { mapRef.current = map; }, [map, mapRef]);
-  return null;
-}
-
-function FollowPosition({ position, follow }) {
-  const map = useMap();
-  useEffect(() => {
-    if (follow && position) map.setView(position, map.getZoom(), { animate: true, duration: 0.5 });
-  }, [map, follow, position?.[0], position?.[1]]);
-  return null;
-}
-
-function UserInteractionDetector({ onInteraction }) {
-  const map = useMap();
-  useEffect(() => {
-    const handler = () => onInteraction();
-    map.on('dragstart', handler); map.on('zoomstart', handler);
-    return () => { map.off('dragstart', handler); map.off('zoomstart', handler); };
-  }, [map, onInteraction]);
-  return null;
-}
-
-function FitBoundsOnce({ bounds }) {
-  const map = useMap();
-  const fittedRef = useRef(false);
-  useEffect(() => {
-    if (!fittedRef.current && bounds?.isValid()) {
-      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 18 });
-      fittedRef.current = true;
-    }
-  }, [map, bounds]);
-  return null;
-}
-
-// ─── Modale édition infos visite ─────────────────────────────────────────────
-
-function VisitInfoModal({ isOpen, onClose, visit, onSave }) {
-  const [form, setForm] = useState({ nom: '', lieu: '', client: '', date: '' });
-  useEffect(() => {
-    if (isOpen && visit) setForm({ nom: visit.nom || '', lieu: visit.lieu || '', client: visit.client || '', date: visit.date || '' });
-  }, [isOpen, visit?.id]);
-  if (!isOpen) return null;
-
-  const inputCls = "w-full px-3 py-2.5 text-sm border border-gray-200/60 rounded-xl text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400";
-  const labelCls = "flex items-center gap-1.5 text-[11px] text-gray-500 font-medium mb-1.5";
-
-  return (
-    <div className="fixed inset-0 bg-black/60 z-modal flex items-center justify-center" onMouseDown={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-[440px] max-h-[90vh] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200/60">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-blue-50"><Info size={18} className="text-blue-600" /></div>
-            <h3 className="text-sm font-bold text-gray-900">Informations de la visite</h3>
-          </div>
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-xl transition"><X size={16} className="text-gray-400" /></button>
-        </div>
-        <div className="p-6 space-y-4">
-          <div>
-            <label className={labelCls}><MapPin size={11} /> Nom de la visite</label>
-            <input type="text" value={form.nom} onChange={(e) => setForm(p => ({ ...p, nom: e.target.value }))} placeholder="Ex: Visite chantier RD45" className={inputCls} />
-          </div>
-          <div>
-            <label className={labelCls}><Navigation size={11} /> Lieu</label>
-            <input type="text" value={form.lieu} onChange={(e) => setForm(p => ({ ...p, lieu: e.target.value }))} placeholder="Ex: Commune d'Aiguefonde (81)" className={inputCls} />
-          </div>
-          <div>
-            <label className={labelCls}><MessageSquare size={11} /> Client</label>
-            <input type="text" value={form.client} onChange={(e) => setForm(p => ({ ...p, client: e.target.value }))} placeholder="Ex: Mairie de..." className={inputCls} />
-          </div>
-          <div>
-            <label className={labelCls}>Date</label>
-            <input type="date" value={form.date} onChange={(e) => setForm(p => ({ ...p, date: e.target.value }))} className={inputCls} />
-          </div>
-        </div>
-        <div className="px-6 py-4 border-t border-gray-200/60 flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-500 rounded-xl hover:bg-gray-100 transition">Annuler</button>
-          <button onClick={() => { onSave(form); onClose(); }} className="px-5 py-2 bg-gray-900 text-white text-sm font-medium rounded-xl hover:bg-gray-800 transition active:scale-[0.97]">Enregistrer</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Modale édition observation ──────────────────────────────────────────────
-
-function ObsEditModal({ isOpen, onClose, obs, onSave }) {
-  const [text, setText] = useState('');
-  const [images, setImages] = useState([]);
-  const fileRef = useRef(null);
-  const cameraRef = useRef(null);
-
-  useEffect(() => {
-    if (isOpen && obs) {
-      setText(obs.text || '');
-      setImages(obs.images || []);
-    }
-  }, [isOpen, obs?.id]);
-
-  const handleAddImages = async (e) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-    const compressed = await Promise.all(files.map(f => compressImage(f)));
-    setImages(prev => [...prev, ...compressed]);
-    if (fileRef.current) fileRef.current.value = '';
-    if (cameraRef.current) cameraRef.current.value = '';
-  };
-
-  const handleRemoveImage = (idx) => {
-    setImages(prev => prev.filter((_, i) => i !== idx));
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black/60 z-modal flex items-center justify-center" onMouseDown={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-[560px] max-h-[90vh] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200/60">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-amber-50"><Pencil size={18} className="text-amber-600" /></div>
-            <h3 className="text-sm font-bold text-gray-900">Modifier l'observation</h3>
-          </div>
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-xl transition"><X size={16} className="text-gray-400" /></button>
-        </div>
-        <div className="p-6 space-y-4">
-          <textarea value={text} onChange={(e) => setText(e.target.value)}
-            className="w-full min-h-[120px] p-3 rounded-xl text-sm resize-y outline-none bg-gray-50 text-gray-900 border border-gray-200/60 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-            placeholder="Note ou observation..." autoFocus />
-
-          {/* Photos */}
-          {images.length > 0 && (
-            <div className="grid grid-cols-4 gap-2">
-              {images.map((img, idx) => {
-                const imgSrc = typeof img === 'string' ? img : img.src;
-                return (
-                  <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-gray-200 group">
-                    <img src={imgSrc} alt="" className="w-full h-full object-cover" loading="lazy" />
-                    <button onClick={() => handleRemoveImage(idx)}
-                      className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-500/90 hover:bg-red-600 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
-                      <X size={12} className="text-white" />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Ajouter photo : fichier + caméra */}
-          <div className="flex gap-2">
-            <button onClick={() => fileRef.current?.click()}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-medium text-gray-700 transition">
-              <ImagePlus size={16} />
-              Ajouter une image
-            </button>
-            <button onClick={() => cameraRef.current?.click()}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-50 hover:bg-blue-100 rounded-xl text-sm font-medium text-blue-700 transition"
-              title="Prendre une photo avec l'appareil (tablette/mobile)">
-              <Camera size={16} />
-              Prendre une photo
-            </button>
-          </div>
-          <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleAddImages} />
-          <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleAddImages} />
-        </div>
-        <div className="px-6 py-4 border-t border-gray-200/60 flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-500 rounded-xl hover:bg-gray-100 transition">Annuler</button>
-          <button onClick={() => { onSave(text, images); onClose(); }} className="px-5 py-2 bg-gray-900 text-white text-sm font-medium rounded-xl hover:bg-gray-800 transition active:scale-[0.97]">Enregistrer</button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ─── Composant Principal ─────────────────────────────────────────────────────

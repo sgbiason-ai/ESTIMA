@@ -7,44 +7,12 @@ import Icon from './Icon';
 import { simplifyGpsTrace } from '../../utils/gpsSimplify';
 import { stripHtml } from '../../utils/formatObsText';
 import { Maximize2, X } from 'lucide-react';
+import {
+  haversine, totalDistance, accuracyColor,
+  fmtDuration, fmtDist as fmtDistance,
+} from '../../utils/geoHelpers';
 
 const GpsMapView = lazyWithReload(() => import('./GpsMapView'));
-
-// ─── Helpers ───────────────────────────────────────────────────────────────
-
-const fmtDuration = (ms) => {
-  const s = Math.floor(ms / 1000);
-  const m = Math.floor(s / 60);
-  const h = Math.floor(m / 60);
-  if (h > 0) return `${h}h${String(m % 60).padStart(2, '0')}`;
-  return `${m}min ${String(s % 60).padStart(2, '0')}s`;
-};
-
-const fmtDistance = (meters) => {
-  if (meters < 1000) return `${Math.round(meters)} m`;
-  return `${(meters / 1000).toFixed(2)} km`;
-};
-
-const haversine = (a, b) => {
-  const R = 6371000;
-  const toRad = (x) => (x * Math.PI) / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-};
-
-const totalDistance = (coords) => {
-  let d = 0;
-  for (let i = 1; i < coords.length; i++) d += haversine(coords[i - 1], coords[i]);
-  return d;
-};
-
-const accuracyColor = (acc) => {
-  if (acc <= 5) return '#22c55e';
-  if (acc <= 15) return '#f59e0b';
-  return '#ef4444';
-};
 
 // ─── Composant principal ───────────────────────────────────────────────────
 

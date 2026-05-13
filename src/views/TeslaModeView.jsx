@@ -13,92 +13,15 @@ import { simplifyGpsTrace } from '../utils/gpsSimplify';
 import {
   Navigation, Play, Square, Plus, X, LogOut, MapPin, Flag, MessageSquare, Trash2, Check, Route, LocateFixed, Pin, ChevronLeft, ChevronRight
 } from 'lucide-react';
-
-// ─── Tile Layers ──────────────────────────────────────────────────────────────
-
-// IGN Géoplateforme (libre, officiel, France) — fair-use ~50 req/s soutenu
-const IGN_BASE = 'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}';
-const TILE_LAYERS = {
-  satellite: { url: `${IGN_BASE}&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&FORMAT=image/jpeg`, maxZoom: 19, label: 'Satellite' },
-  plan: { url: `${IGN_BASE}&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&FORMAT=image/png`, maxZoom: 19, label: 'Plan' },
-  cadastre: { url: `${IGN_BASE}&LAYER=CADASTRALPARCELS.PARCELLAIRE_EXPRESS&FORMAT=image/png`, maxZoom: 20, label: 'Cadastre' },
-};
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const haversine = (a, b) => {
-  const R = 6371000;
-  const toRad = (x) => (x * Math.PI) / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-};
-
-const totalDistance = (coords) => {
-  let d = 0;
-  for (let i = 1; i < coords.length; i++) {
-    if (coords[i]._break) continue; // ne pas compter le saut entre segments
-    d += haversine(coords[i - 1], coords[i]);
-  }
-  return d;
-};
-
-const fmtDist = (m) => m == null ? '—' : m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(2)} km`;
-const fmtUncertainty = (u) => u == null ? '' : u < 1000 ? `±${Math.round(u)}m` : `±${(u / 1000).toFixed(1)}km`;
-const fmtCoord = (lat, lng) => lat.toFixed(4) + ', ' + lng.toFixed(4);
-
-// Incertitude distance adaptée à la source (propagation quadratique, ~1σ)
-// accuracy navigateur = écart-type position ≈ 68% de confiance
-const computeUncertainty = (source, accA, accB, distance) => {
-  const sigEndpoints2 = (accA || 0) ** 2 + (accB || 0) ** 2;
-  if (source === 'ign') {
-    const routingErr = 0.02 * distance; // ~2% erreur routage/carte
-    return Math.round(Math.sqrt(sigEndpoints2 + routingErr ** 2));
-  }
-  if (source === 'trace') {
-    const jitterErr = 0.05 * distance; // ~5% biais cumul jitter GPS
-    return Math.round(Math.sqrt(sigEndpoints2 + jitterErr ** 2));
-  }
-  // haversine (vol d'oiseau) : seuls les 2 fixes comptent
-  return Math.round(Math.sqrt(sigEndpoints2));
-};
-
-const accuracyColor = (acc) => acc <= 5 ? '#22c55e' : acc <= 15 ? '#f59e0b' : '#ef4444';
-
-const fmtDuration = (ms) => {
-  const s = Math.floor(ms / 1000);
-  const m = Math.floor(s / 60);
-  const h = Math.floor(m / 60);
-  return h > 0 ? `${h}h${String(m % 60).padStart(2, '0')}` : `${m}:${String(s % 60).padStart(2, '0')}`;
-};
-
-// ─── Leaflet icons ────────────────────────────────────────────────────────────
-
-const createDot = (color, size = 14) => L.divIcon({
-  className: '',
-  html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.5)"></div>`,
-  iconSize: [size, size], iconAnchor: [size / 2, size / 2],
-});
-
-const createSegmentIcon = (number) => L.divIcon({
-  className: '',
-  html: `<div style="width:28px;height:28px;border-radius:50%;background:#2563eb;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:800;font-family:system-ui">${number}</div>`,
-  iconSize: [28, 28], iconAnchor: [14, 14],
-});
-
-const createPointIcon = (number) => L.divIcon({
-  className: '',
-  html: `<div style="position:relative;width:30px;height:36px;display:flex;align-items:flex-start;justify-content:center">
-    <div style="position:absolute;top:0;width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#8b5cf6;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4)"></div>
-    <div style="position:absolute;top:5px;color:white;font-size:11px;font-weight:800;font-family:system-ui;line-height:1">P${number}</div>
-  </div>`,
-  iconSize: [30, 36], iconAnchor: [15, 34],
-});
-
-const pendingIcon = createDot('#f97316', 18);
-const startGpsIcon = createDot('#22c55e', 14);
-const endGpsIcon = createDot('#ef4444', 14);
+import {
+  haversine, totalDistance, accuracyColor, fmtDuration,
+  fmtDist, fmtUncertainty, fmtCoord, computeUncertainty,
+  getCurrentPosition, fetchIgnRoute,
+} from '../utils/geoHelpers';
+import {
+  TILE_LAYERS, createDot, createSegmentIcon, createPointIcon,
+  pendingIcon, startGpsIcon, endGpsIcon,
+} from '../utils/leafletConfig';
 
 // ─── Map sub-components ───────────────────────────────────────────────────────
 
@@ -161,42 +84,6 @@ function FitBoundsOnce({ bounds }) {
       fittedRef.current = true;
     }
   }, [map, bounds]);
-  return null;
-}
-
-// ─── Geolocation helper ───────────────────────────────────────────────────────
-
-function getCurrentPosition() {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) return reject(new Error('Géolocalisation non disponible'));
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }),
-      (err) => reject(err),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
-    );
-  });
-}
-
-// ─── Routing : IGN Itinéraires (libre, France) ────────────────────────────────
-
-async function fetchIgnRoute(from, to, retries = 2) {
-  const url = `https://data.geopf.fr/navigation/itineraire?resource=bdtopo-osrm&start=${from.lng},${from.lat}&end=${to.lng},${to.lat}&profile=car&optimization=fastest&getSteps=false&getBbox=false&distanceUnit=meter&timeUnit=second`;
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const res = await fetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        const geom = data?.geometry;
-        if (geom?.coordinates?.length >= 2) {
-          return {
-            coordinates: geom.coordinates.map(c => [c[1], c[0]]), // lng,lat → lat,lng
-            distance: Number(data.distance) || 0,
-          };
-        }
-      }
-    } catch { /* retry */ }
-    if (attempt < retries) await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
-  }
   return null;
 }
 
