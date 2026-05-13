@@ -21,6 +21,8 @@ import HelpPanel from '../components/help/HelpPanel';
 import HelpButton from '../components/help/HelpButton';
 import { simplifyGpsTrace } from '../utils/gpsSimplify';
 import { useMobileSiteVisits } from '../hooks/useMobileSiteVisits';
+import { useRobustSave } from '../hooks/useRobustSave';
+import SaveStatusDot from '../components/mobile/SaveStatusDot';
 
 // PROVISOIRE — Mode Tesla depuis le desktop
 const TeslaModeView = lazyWithReload(() => import('./TeslaModeView'));
@@ -385,10 +387,21 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
   const user = auth.currentUser;
   const { visits, isLoading: listLoading, refetch, loadVisit, saveVisit, createVisit } = useMobileSiteVisits(user, companyId);
 
+  // ── Sauvegarde robuste (debounce, retry, brouillon localStorage, beforeunload) ──
+  const visitSaveFn = useCallback(async (data) => {
+    if (!data?.id) return;
+    await saveVisit(data.id, data);
+  }, [saveVisit]);
+  const [selectedId, setSelectedId] = useState(null);
+  const { saveStatus, triggerSave, forceSave, hasPendingChanges } = useRobustSave({
+    saveFn: visitSaveFn,
+    draftKey: selectedId ? `draft_svd_${selectedId}` : null,
+    debounceMs: 1500,
+  });
+
   // PROVISOIRE — Mode Tesla
   const [teslaMode, setTeslaMode] = useState(false);
 
-  const [selectedId, setSelectedId] = useState(null);
   const [fullVisit, setFullVisit] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [fullscreenMap, setFullscreenMap] = useState(false);
@@ -446,6 +459,7 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
   }, [visits]);
 
   const handleLoadDetail = useCallback(async (visitId) => {
+    forceSave();
     setSelectedId(visitId);
     setDetailLoading(true);
     try {
@@ -460,7 +474,7 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
       }
     } catch { setFullVisit(null); }
     finally { setDetailLoading(false); }
-  }, [loadVisit, user]);
+  }, [loadVisit, user, forceSave]);
 
   // ── Pre-load routes : stockée en Firestore si dispo, sinon IGN ──
   useEffect(() => {
@@ -499,17 +513,16 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
   }, [companyId, selectedId, refetch]);
 
   // ── Save visit info (modal) ──
-  const handleSaveInfo = useCallback(async (info) => {
+  const handleSaveInfo = useCallback((info) => {
     if (!fullVisit) return;
     const updated = { ...fullVisit, ...info };
     setFullVisit(updated);
-    await saveVisit(fullVisit.id, updated);
+    triggerSave(updated);
     refetch();
-    showToast('Informations enregistrées');
-  }, [fullVisit, saveVisit, refetch]);
+  }, [fullVisit, triggerSave, refetch]);
 
   // ── Save observation (text + images) ──
-  const handleSaveObsText = useCallback(async (newText, newImages) => {
+  const handleSaveObsText = useCallback((newText, newImages) => {
     if (!fullVisit || !editingObs) return;
     const updatedObs = (fullVisit.observations || []).map(o =>
       o.id === editingObs.id
@@ -518,10 +531,9 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
     );
     const updated = { ...fullVisit, observations: updatedObs };
     setFullVisit(updated);
-    await saveVisit(fullVisit.id, updated);
+    triggerSave(updated);
     setEditingObs(null);
-    showToast('Observation enregistrée');
-  }, [fullVisit, editingObs, saveVisit]);
+  }, [fullVisit, editingObs, triggerSave]);
 
   // ── Create visit ──
   const handleCreateVisit = useCallback(async () => {
@@ -602,12 +614,12 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
       const updatedObs = [...(fullVisit.observations || []), newSeg];
       const updated = { ...fullVisit, observations: updatedObs };
       setFullVisit(updated);
-      await saveVisit(fullVisit.id, updated);
+      triggerSave(updated);
       const label = source === 'ign' ? 'IGN' : 'vol d\'oiseau';
       showToast(`Segment créé — ${fmtDist(distance)} (${label}) ${fmtUncertainty(uncertainty)}`);
     } catch (e) { showToast('Erreur GPS : ' + e.message); }
     setGettingPosition(false);
-  }, [fullVisit, pendingPoint, gettingPosition, getPosition, saveVisit]);
+  }, [fullVisit, pendingPoint, gettingPosition, getPosition, triggerSave]);
 
   const cancelPending = useCallback(() => setPendingPoint(null), []);
 
@@ -629,20 +641,20 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
       const updatedObs = [...(fullVisit.observations || []), newPt];
       const updated = { ...fullVisit, observations: updatedObs };
       setFullVisit(updated);
-      await saveVisit(fullVisit.id, updated);
+      triggerSave(updated);
       showToast(`Point marqué — ${fmtCoord(pos.lat, pos.lng)} (±${Math.round(pos.accuracy)}m)`);
     } catch (e) { showToast('Erreur GPS : ' + e.message); }
     setGettingPosition(false);
-  }, [fullVisit, gettingPosition, getPosition, saveVisit]);
+  }, [fullVisit, gettingPosition, getPosition, triggerSave]);
 
   // ── Delete segment/obs ──
-  const handleDeleteObs = useCallback(async (obsId) => {
+  const handleDeleteObs = useCallback((obsId) => {
     if (!fullVisit) return;
     const updatedObs = (fullVisit.observations || []).filter(o => o.id !== obsId);
     const updated = { ...fullVisit, observations: updatedObs };
     setFullVisit(updated);
-    await saveVisit(fullVisit.id, updated);
-  }, [fullVisit, saveVisit]);
+    triggerSave(updated);
+  }, [fullVisit, triggerSave]);
 
   // ── Zoom to segment on map ──
   const zoomToSegment = useCallback((obs) => {
@@ -950,6 +962,7 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <h2 className="text-xl font-bold text-gray-900 truncate">{fullVisit.nom || 'Visite sans nom'}</h2>
+                    <SaveStatusDot status={saveStatus} />
                     <button onClick={() => setShowInfoModal(true)} className="p-1 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition shrink-0" title="Modifier les informations">
                       <Pencil size={14} />
                     </button>
