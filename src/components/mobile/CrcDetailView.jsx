@@ -61,6 +61,7 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
   const [viewingImage, setViewingImage] = useState(null);
   const [swiperObsIdx, setSwiperObsIdx] = useState(null);
   const [contextMenu, setContextMenu] = useState(null); // { meetingIdx, x, y } // index dans allObs pour le swiper
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
 
   const meeting = meetings[activeMeetingIdx] || null;
   const chantierName = config.chantierInfo?.nom || '';
@@ -111,6 +112,23 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
       setExporting(null);
     }
   }, [meeting, config, chantierName, branding, onToast, manager]);
+
+  const handleDuplicate = useCallback((date) => {
+    if (!manager || !meeting) return;
+    manager.duplicateMeeting(date);
+    setShowDuplicateModal(false);
+    onToast?.(`CR n°${meeting.number} dupliqué`);
+  }, [manager, meeting, onToast]);
+
+  const handleDeleteMeeting = useCallback(async () => {
+    if (!manager || !meeting) return;
+    const { confirm } = await import('../../utils/globalUI');
+    const ok = await confirm(`Supprimer le CR n°${meeting.number} ?`, { danger: true });
+    if (ok) {
+      manager.deleteMeeting(meeting.id);
+      onToast?.(`CR n°${meeting.number} supprimé`);
+    }
+  }, [manager, meeting, onToast]);
 
   // ── Envoi par mail aux diffusés (même sujet/corps/destinataires que PC) ──
   const handleSendMail = useCallback(async () => {
@@ -353,6 +371,20 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
                     : <Icon name="mail" size={14} color="#60a5fa" />}
                 </button>
               )}
+              {canEdit && (
+                <button onClick={() => setShowDuplicateModal(true)}
+                  className="w-8 h-8 rounded-lg border flex items-center justify-center transition bg-emerald-500/10 border-emerald-500/20 active:bg-emerald-500/30"
+                  title="Dupliquer ce CR">
+                  <Icon name="file" size={14} color="#10b981" />
+                </button>
+              )}
+              {canEdit && (
+                <button onClick={handleDeleteMeeting}
+                  className="w-8 h-8 rounded-lg border flex items-center justify-center transition bg-red-500/10 border-red-500/20 active:bg-red-500/30"
+                  title="Supprimer ce CR">
+                  <Icon name="trash" size={14} color="#ef4444" />
+                </button>
+              )}
             </div>
           </div>
           {meeting.nextMeeting?.date && !isLandscape && (
@@ -452,7 +484,6 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
             participantGroups={manager.activeParticipantGroups || groups}
             onUpdate={(obsId, patch) => {
               manager.updateObservation(obsId, patch);
-              // Update local editingObs to reflect changes
               setEditingObs(prev => prev ? { ...prev, ...patch } : null);
             }}
             onDelete={(obsId) => manager.deleteObservation(obsId)}
@@ -462,6 +493,15 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
             crrId={chantier?.id}
           />
         </Suspense>
+      )}
+
+      {/* ── Modale duplication CR ── */}
+      {showDuplicateModal && meeting && (
+        <DuplicateModal
+          meeting={meeting}
+          onConfirm={handleDuplicate}
+          onClose={() => setShowDuplicateModal(false)}
+        />
       )}
     </div>
   );
@@ -477,6 +517,62 @@ function SectionTab({ label, active, onClick }) {
       }`}>
       {label}
     </button>
+  );
+}
+
+// ─── MODALE DUPLICATION ─────────────────────────────────────────────────────
+
+function DuplicateModal({ meeting, onConfirm, onClose }) {
+  const defaultDate = (() => {
+    if (meeting.nextMeeting?.date) return meeting.nextMeeting.date;
+    if (!meeting.date) return '';
+    try {
+      const d = new Date(meeting.date + 'T00:00:00');
+      d.setDate(d.getDate() + 7);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    } catch { return ''; }
+  })();
+  const [date, setDate] = useState(defaultDate);
+
+  return (
+    <>
+      <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-x-4 top-1/3 z-50 bg-white rounded-2xl shadow-2xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100 bg-emerald-50">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center">
+              <Icon name="file" size={16} color="#10b981" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-gray-900">Dupliquer le CR n°{meeting.number}</h3>
+              <p className="text-[11px] text-gray-500">Observations, présences et diffusion reportées</p>
+            </div>
+          </div>
+        </div>
+        <div className="px-5 py-4">
+          <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-2">Date de la nouvelle réunion</label>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 text-gray-900"
+            autoFocus
+          />
+        </div>
+        <div className="px-5 py-3 border-t border-gray-100 flex gap-3">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-gray-600 bg-gray-100 active:bg-gray-200 transition">
+            Annuler
+          </button>
+          <button
+            onClick={() => onConfirm(date)}
+            disabled={!date}
+            className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-emerald-500 active:bg-emerald-600 disabled:opacity-40 transition shadow-sm"
+          >
+            Dupliquer
+          </button>
+        </div>
+      </div>
+    </>
   );
 }
 
