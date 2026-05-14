@@ -87,16 +87,20 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
       // Générer le PDF en blob puis télécharger
       const pdfData = await generatePdfCrr(meeting, manager?.crrConfig || config, chantierName, branding || {}, { returnBlob: true, filename });
       if (pdfData?.blob) {
-        const url = URL.createObjectURL(pdfData.blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        const file = new File([pdfData.blob], filename, { type: 'application/pdf' });
+        if (navigator.share && navigator.canShare?.({ files: [file] })) {
+          await navigator.share({ files: [file], title: filename });
+        } else {
+          const url = URL.createObjectURL(pdfData.blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
+        }
       } else {
-        // Fallback : génération directe (ouvre le PDF)
         await generatePdfCrr(meeting, manager?.crrConfig || config, chantierName, branding || {}, { filename });
       }
       onToast?.(`CR n°${meeting.number} téléchargé`);
@@ -392,7 +396,7 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
             canEdit={canEdit}
             isLandscape={isLandscape}
             onEditObs={setEditingObs}
-            onTapObs={canEdit ? setEditingObs : handleOpenSwiper}
+            onTapObs={handleOpenSwiper}
             onAddObs={canEdit ? (cat) => {
               const newId = manager.addObservation(cat);
               const obs = (meeting.observations || []).find(o => o.id === newId);
@@ -491,7 +495,7 @@ function ObservationsSection({ obsByCategory, allContacts, canEdit, isLandscape,
 
   const contactName = (id) => {
     const c = allContacts.find(c => c.id === id);
-    return c ? `${c.prenom || ''} ${c.nom || ''}`.trim() || c.email || id : id;
+    return c ? c.name || `${c.prenom || ''} ${c.nom || ''}`.trim() || c.email || id : id;
   };
 
   const categories = Object.keys(obsByCategory);
@@ -643,6 +647,10 @@ function SwiperSlide({ obs, allContacts, onViewImage }) {
   const st = statusMeta(obs.status);
   const text = obs.text || '';
   const images = obs.images || [];
+  const contactName = (id) => {
+    const c = allContacts.find(ct => ct.id === id);
+    return c ? c.name || `${c.prenom || ''} ${c.nom || ''}`.trim() || c.email || id : id;
+  };
 
   return (
     <div className="px-5 py-4" style={{ scrollbarWidth: 'none', height: '100%', overflowY: 'auto' }}>
@@ -657,7 +665,7 @@ function SwiperSlide({ obs, allContacts, onViewImage }) {
         <span className={`px-2.5 py-1 rounded-lg text-[12px] font-bold uppercase border ${statusColorMobile(obs.status)}`}>
           {st.label}
         </span>
-        {obs.emitter && <span className="text-[13px] text-gray-700 font-medium">{obs.emitter}</span>}
+        {obs.emitter && <span className="text-[13px] text-gray-700 font-medium">{contactName(obs.emitter)}</span>}
         {obs.date && <span className="text-[13px] text-gray-400 ml-auto">{dateFr(obs.date)}</span>}
       </div>
 
@@ -691,7 +699,7 @@ function SwiperSlide({ obs, allContacts, onViewImage }) {
 
       {(obs.actionBy || obs.actionDeadline) && (
         <div className="bg-gray-50 rounded-xl p-3 space-y-1 mb-4">
-          {obs.actionBy && <div className="text-xs text-gray-700"><span className="font-bold">Action par :</span> {obs.actionBy}</div>}
+          {obs.actionBy && <div className="text-xs text-gray-700"><span className="font-bold">Action par :</span> {contactName(obs.actionBy)}</div>}
           {obs.actionDeadline && <div className="text-xs text-gray-700"><span className="font-bold">Échéance :</span> {dateFr(obs.actionDeadline)}</div>}
         </div>
       )}
@@ -801,6 +809,7 @@ function ObservationSwiper({ observations, currentIdx, onChangeIdx, onClose, onE
         <div
           ref={containerRef}
           className="flex-1 min-h-0 overflow-hidden"
+          style={{ touchAction: 'pan-y' }}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -885,14 +894,14 @@ function ParticipantsSection({ groups, attendance, diffusion, canEdit, onSetAtte
             {contacts.map(c => {
               const pres = attendance[c.id] || 'not_summoned';
               const diff = diffusion?.[c.id] || false;
-              const fullName = `${c.prenom || ''} ${c.nom || ''}`.trim() || c.email || '—';
+              const fullName = c.name || `${c.prenom || ''} ${c.nom || ''}`.trim() || c.email || '—';
 
               return (
                 <div key={c.id} className="flex items-center gap-2 px-3 py-2 border-t border-white/[0.03]">
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-semibold text-gray-600 truncate">{fullName}</div>
-                    {c.fonction && (
-                      <div className="text-[10px] text-gray-700 truncate">{c.fonction}</div>
+                    {(c.subLabel || c.fonction) && (
+                      <div className="text-[10px] text-gray-700 truncate">{c.subLabel || c.fonction}</div>
                     )}
                   </div>
                   {/* Diffusion toggle */}

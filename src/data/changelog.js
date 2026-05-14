@@ -12,6 +12,7 @@ export const CHANGELOG = [
     highlights: [
       'CRC : les photos des observations apparaissent désormais dans l\'export PDF (correction CORS Firebase Storage)',
       'CRC : les liens de localisation GPS sont restaurés sous chaque photo dans le PDF',
+      'CRC mobile : tap sur une observation ouvre une vue plein écran (swiper) pour un meilleur confort de lecture',
     ],
   },
   {
