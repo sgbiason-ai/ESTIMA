@@ -8,7 +8,7 @@ import React, { useState, useMemo, useCallback, Suspense } from 'react';
 import lazyWithReload from '../../utils/lazyWithReload';
 import Icon from './Icon';
 import { dateFr } from './formatters';
-import { OBSERVATION_STATUSES, PRESENCE_OPTIONS, MEETING_TYPES, GROUP_COLORS, getGroupColor } from '../../data/crrData';
+import { OBSERVATION_STATUSES, PRESENCE_OPTIONS, MEETING_TYPES, GROUP_COLORS, getGroupColor, abbreviateGroup } from '../../data/crrData';
 import { normalizeObsText, stripHtml } from '../../utils/formatObsText';
 import { sanitizeHtml } from '../../utils/helpers';
 // fileSaver non utilisé — export PDF direct par téléchargement
@@ -232,6 +232,13 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
     return list;
   }, [meetingGroups]);
 
+  // ── Map nom de groupe → index couleur ──
+  const groupColorMap = useMemo(() => {
+    const map = {};
+    (meetingGroups || []).forEach((g, i) => { map[g.name] = i; });
+    return map;
+  }, [meetingGroups]);
+
   if (meetings.length === 0) {
     return (
       <div className="text-center py-12 text-gray-700 text-sm">
@@ -425,6 +432,7 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
           <ObservationsSection
             obsByCategory={obsByCategory}
             allContacts={allContacts}
+            groupColorMap={groupColorMap}
             canEdit={canEdit}
             isLandscape={isLandscape}
             onEditObs={setEditingObs}
@@ -472,6 +480,7 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
           onClose={() => setSwiperObsIdx(null)}
           onEdit={canEdit ? (obs) => { setSwiperObsIdx(null); setEditingObs(obs); } : null}
           allContacts={allContacts}
+          groupColorMap={groupColorMap}
           onViewImage={setViewingImage}
         />
       )}
@@ -482,6 +491,7 @@ export default function CrcDetailView({ chantier, onSelectMeeting, branding, onT
           <ObservationEditSheet
             obs={editingObs}
             participantGroups={manager.activeParticipantGroups || groups}
+            groupColorMap={groupColorMap}
             onUpdate={(obsId, patch) => {
               manager.updateObservation(obsId, patch);
               setEditingObs(prev => prev ? { ...prev, ...patch } : null);
@@ -576,9 +586,23 @@ function DuplicateModal({ meeting, onConfirm, onClose }) {
   );
 }
 
+// ─── BADGE GROUPE COLORÉ ────────────────────────────────────────────────────
+
+function GroupBadgeMobile({ name, colorIndex }) {
+  if (!name) return null;
+  const c = getGroupColor(colorIndex ?? 0);
+  const abbr = abbreviateGroup(name);
+  return (
+    <span className={`inline-flex items-center rounded-full border font-bold leading-none whitespace-nowrap text-[9px] px-1.5 py-0.5 gap-1 ${c.bg} ${c.text} ${c.border}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${c.dot} shrink-0`} />
+      {abbr}
+    </span>
+  );
+}
+
 // ─── SECTION OBSERVATIONS ───────────────────────────────────────────────────
 
-function ObservationsSection({ obsByCategory, allContacts, canEdit, isLandscape, onEditObs, onTapObs, onAddObs, onViewImage }) {
+function ObservationsSection({ obsByCategory, allContacts, groupColorMap, canEdit, isLandscape, onEditObs, onTapObs, onAddObs, onViewImage }) {
   const [expandedCats, setExpandedCats] = useState(() => new Set(Object.keys(obsByCategory)));
 
   const toggleCat = (cat) => {
@@ -635,6 +659,7 @@ function ObservationsSection({ obsByCategory, allContacts, canEdit, isLandscape,
                 key={o.id}
                 obs={o}
                 contactName={contactName}
+                groupColorMap={groupColorMap}
                 canEdit={canEdit}
                 onEdit={() => onEditObs?.(o)}
                 onTap={() => onTapObs?.(o)}
@@ -659,7 +684,7 @@ function ObservationsSection({ obsByCategory, allContacts, canEdit, isLandscape,
   );
 }
 
-function ObservationCard({ obs, contactName, canEdit, onEdit, onTap, onViewImage }) {
+function ObservationCard({ obs, contactName, groupColorMap, canEdit, onEdit, onTap, onViewImage }) {
   const st = statusMeta(obs.status);
   const text = stripHtml(obs.text);
   const images = obs.images || [];
@@ -675,9 +700,7 @@ function ObservationCard({ obs, contactName, canEdit, onEdit, onTap, onViewImage
           {st.label}
         </span>
         {obs.emitter && (
-          <span className="text-[11px] text-gray-600 font-medium truncate">
-            {contactName(obs.emitter)}
-          </span>
+          <GroupBadgeMobile name={obs.emitter} colorIndex={groupColorMap[obs.emitter]} />
         )}
         {obs.originMeetingNumber && (
           <span className="text-[10px] text-gray-600 ml-auto shrink-0">CR{obs.originMeetingNumber}</span>
@@ -699,7 +722,8 @@ function ObservationCard({ obs, contactName, canEdit, onEdit, onTap, onViewImage
         <div className="flex items-center gap-3 mt-1.5 text-[11px] text-gray-700">
           {obs.actionBy && (
             <span className="flex items-center gap-1">
-              <span className="font-semibold">Action :</span> {contactName(obs.actionBy)}
+              <span className="font-semibold">Action :</span>
+              <GroupBadgeMobile name={obs.actionBy} colorIndex={groupColorMap[obs.actionBy]} />
             </span>
           )}
           {obs.actionDeadline && (
@@ -738,7 +762,7 @@ function ObservationCard({ obs, contactName, canEdit, onEdit, onTap, onViewImage
 
 // ─── OBSERVATION SWIPER (carrousel plein écran) ────────────────────────────
 
-function SwiperSlide({ obs, allContacts, onViewImage }) {
+function SwiperSlide({ obs, allContacts, groupColorMap, onViewImage }) {
   if (!obs) return <div className="w-full shrink-0" />;
   const st = statusMeta(obs.status);
   const text = obs.text || '';
@@ -761,7 +785,7 @@ function SwiperSlide({ obs, allContacts, onViewImage }) {
         <span className={`px-2.5 py-1 rounded-lg text-[12px] font-bold uppercase border ${statusColorMobile(obs.status)}`}>
           {st.label}
         </span>
-        {obs.emitter && <span className="text-[13px] text-gray-700 font-medium">{contactName(obs.emitter)}</span>}
+        {obs.emitter && <GroupBadgeMobile name={obs.emitter} colorIndex={groupColorMap?.[obs.emitter]} />}
         {obs.date && <span className="text-[13px] text-gray-400 ml-auto">{dateFr(obs.date)}</span>}
       </div>
 
@@ -795,7 +819,7 @@ function SwiperSlide({ obs, allContacts, onViewImage }) {
 
       {(obs.actionBy || obs.actionDeadline) && (
         <div className="bg-gray-50 rounded-xl p-3 space-y-1 mb-4">
-          {obs.actionBy && <div className="text-xs text-gray-700"><span className="font-bold">Action par :</span> {contactName(obs.actionBy)}</div>}
+          {obs.actionBy && <div className="text-xs text-gray-700 flex items-center gap-1"><span className="font-bold">Action par :</span> <GroupBadgeMobile name={obs.actionBy} colorIndex={groupColorMap?.[obs.actionBy]} /></div>}
           {obs.actionDeadline && <div className="text-xs text-gray-700"><span className="font-bold">Échéance :</span> {dateFr(obs.actionDeadline)}</div>}
         </div>
       )}
@@ -807,7 +831,7 @@ function SwiperSlide({ obs, allContacts, onViewImage }) {
   );
 }
 
-function ObservationSwiper({ observations, currentIdx, onChangeIdx, onClose, onEdit, allContacts, onViewImage }) {
+function ObservationSwiper({ observations, currentIdx, onChangeIdx, onClose, onEdit, allContacts, groupColorMap, onViewImage }) {
   const [touchStartX, setTouchStartX] = useState(null);
   const [offsetX, setOffsetX] = useState(0); // en pixels, drag en cours
   const [settling, setSettling] = useState(false); // transition retour en cours
@@ -919,13 +943,13 @@ function ObservationSwiper({ observations, currentIdx, onChangeIdx, onClose, onE
             }}
           >
             <div style={{ width: slideW, flexShrink: 0, height: '100%', overflowY: 'auto' }}>
-              {canPrev && <SwiperSlide obs={observations[currentIdx - 1]} allContacts={allContacts} onViewImage={onViewImage} />}
+              {canPrev && <SwiperSlide obs={observations[currentIdx - 1]} allContacts={allContacts} groupColorMap={groupColorMap} onViewImage={onViewImage} />}
             </div>
             <div style={{ width: slideW, flexShrink: 0, height: '100%', overflowY: 'auto' }}>
-              <SwiperSlide obs={observations[currentIdx]} allContacts={allContacts} onViewImage={onViewImage} />
+              <SwiperSlide obs={observations[currentIdx]} allContacts={allContacts} groupColorMap={groupColorMap} onViewImage={onViewImage} />
             </div>
             <div style={{ width: slideW, flexShrink: 0, height: '100%', overflowY: 'auto' }}>
-              {canNext && <SwiperSlide obs={observations[currentIdx + 1]} allContacts={allContacts} onViewImage={onViewImage} />}
+              {canNext && <SwiperSlide obs={observations[currentIdx + 1]} allContacts={allContacts} groupColorMap={groupColorMap} onViewImage={onViewImage} />}
             </div>
           </div>
         </div>

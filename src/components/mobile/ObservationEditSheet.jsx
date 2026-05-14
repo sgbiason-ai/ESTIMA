@@ -9,6 +9,7 @@ import { uploadCrrImage, deleteCrrImage } from '../../utils/crrImageStorage';
 import { useOrientation } from '../../hooks/useOrientation';
 import { sanitizeHtml } from '../../utils/helpers';
 import { toast } from '../../utils/globalUI';
+import { getGroupColor, abbreviateGroup } from '../../data/crrData';
 
 // ─── STATUS CONFIG ─────────────────────────────────────────────────────────
 const STATUSES = [
@@ -33,6 +34,7 @@ const inputClass  = 'w-full px-3 py-2.5 rounded-xl bg-white/[0.04] border border
 export default function ObservationEditSheet({
   obs,
   participantGroups = [],
+  groupColorMap = {},
   onUpdate,
   onDelete,
   onClose,
@@ -105,36 +107,31 @@ export default function ObservationEditSheet({
 
   return (
     <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      {/* Plein écran */}
+      <div className="fixed inset-0 z-50 flex flex-col bg-white">
 
-      {/* Sheet */}
-      <div className={`fixed inset-x-0 bottom-0 z-50 flex flex-col bg-white border-t border-gray-200 rounded-t-3xl overflow-hidden animate-slideUp shadow-2xl ${isLandscape ? 'max-h-[95vh]' : 'max-h-[88vh]'}`}>
-
-        {/* Handle + header */}
-        <div className="flex flex-col items-center pt-3 pb-2 px-4 shrink-0">
-          <div className="w-10 h-1 rounded-full bg-gray-300 mb-3" />
-          <div className="flex items-center justify-between w-full">
-            <h3 className="text-sm font-bold text-gray-900">Modifier l'observation</h3>
-            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white">
-              <Icon name="close" size={18} color="#94a3b8" />
-            </button>
-          </div>
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 pt-3 pb-2 shrink-0 border-b border-gray-200/60 bg-white/80 backdrop-blur-xl">
+          <button onClick={onClose} className="p-1.5 rounded-xl hover:bg-gray-100 transition">
+            <Icon name="close" size={18} color="#6b7280" />
+          </button>
+          <h3 className="text-sm font-bold text-gray-900">Modifier l'observation</h3>
+          <div className="w-8" />
         </div>
 
-        {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-4">
+        {/* Content — flex col pour maximiser la zone texte */}
+        <div className="flex-1 flex flex-col overflow-hidden px-4">
 
-          {/* Status pills */}
-          <Field label="Statut">
-            <div className="flex gap-2">
+          {/* Compact top row: status + emitter + date */}
+          <div className="flex items-end gap-2 py-2 shrink-0">
+            <div className="flex gap-1 flex-1">
               {STATUSES.map((s) => (
                 <button
                   key={s.value}
                   onClick={() => update({ status: s.value })}
-                  className={`flex-1 py-2 rounded-xl text-xs font-bold text-center transition-all ${
+                  className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold text-center transition-all ${
                     obs.status === s.value
-                      ? `${s.activeBg} text-white shadow-lg`
+                      ? `${s.activeBg} text-white shadow-sm`
                       : `${s.bg} ${s.text}`
                   }`}
                 >
@@ -142,171 +139,98 @@ export default function ObservationEditSheet({
                 </button>
               ))}
             </div>
-          </Field>
-
-          {/* Emitter + Date row */}
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Émetteur">
-              <select
-                value={obs.emitter || ''}
-                onChange={(e) => update({ emitter: e.target.value })}
-                className={selectClass}
-              >
-                <option value="">—</option>
-                {groupNames.map((g) => (
-                  <option key={g} value={g}>{g}</option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Date">
-              <input
-                type="date"
-                value={obs.date || ''}
-                onChange={(e) => update({ date: e.target.value })}
-                className={inputClass}
-              />
-            </Field>
           </div>
 
-          {/* Text (contentEditable) */}
-          <Field label="Observation">
-            <div
-              ref={textRef}
-              contentEditable
-              suppressContentEditableWarning
-              onBlur={handleTextBlur}
-              className="min-h-[100px] px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-gray-900 leading-relaxed focus:outline-none focus:border-emerald-500/40"
-              dangerouslySetInnerHTML={{ __html: sanitizeHtml(obs.text || '') }}
-            />
-
-          </Field>
-
-          {/* Action by + Deadline */}
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Action par">
-              <select
-                value={obs.actionBy || ''}
-                onChange={(e) => update({ actionBy: e.target.value })}
-                className={selectClass}
-              >
-                <option value="">—</option>
-                {groupNames.map((g) => (
-                  <option key={g} value={g}>{g}</option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Échéance">
-              <input
-                type="date"
-                value={obs.actionDeadline || ''}
-                onChange={(e) => update({ actionDeadline: e.target.value })}
-                className={inputClass}
-              />
-            </Field>
+          <div className="grid grid-cols-2 gap-2 pb-2 shrink-0">
+            <ColoredSelect value={obs.emitter || ''} onChange={(v) => update({ emitter: v })} placeholder="Émetteur…" options={groupNames} groupColorMap={groupColorMap} />
+            <input type="date" value={obs.date || ''} onChange={(e) => update({ date: e.target.value })} className={`${inputClass} text-xs py-2`} />
           </div>
 
-          {/* Images */}
-          <Field label={`Photos (${images.length})`}>
-            {/* Thumbnails grid */}
-            {images.length > 0 && (
-              <div className="grid grid-cols-4 gap-2 mb-2">
-                {images.map((img, idx) => {
-                  const imgSrc = typeof img === 'string' ? img : img.src;
-                  return (
-                    <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-gray-200">
-                      <img
-                        src={imgSrc}
-                        alt={`Photo ${idx + 1}`}
-                        className="w-full h-full object-cover"
-                        onClick={() => onViewImage?.(imgSrc)}
-                        loading="lazy"
-                      />
-                      <button
-                        onClick={() => handleRemoveImage(idx)}
-                        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500/90 flex items-center justify-center"
-                      >
-                        <Icon name="close" size={10} color="#fff" />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+          {/* Toolbar formatage */}
+          <FormatToolbar textRef={textRef} onInput={handleTextBlur} />
 
-            {/* Camera + Gallery buttons */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => cameraRef.current?.click()}
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-600 text-xs font-semibold active:scale-[0.98] transition"
-              >
-                <Icon name="camera" size={16} color="#34d399" />
-                Photo
+          {/* Zone texte — prend tout l'espace restant */}
+          <div
+            ref={textRef}
+            contentEditable
+            suppressContentEditableWarning
+            onBlur={handleTextBlur}
+            onKeyDown={(e) => {
+              if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
+                if (e.key === 'b') { e.preventDefault(); document.execCommand('bold'); }
+                else if (e.key === 'u') { e.preventDefault(); document.execCommand('underline'); }
+                else if (e.key === 'l') { e.preventDefault(); document.execCommand('insertUnorderedList'); }
+              }
+            }}
+            onPaste={(e) => {
+              e.preventDefault();
+              const text = e.clipboardData.getData('text/plain');
+              document.execCommand('insertText', false, text);
+            }}
+            className="flex-1 overflow-y-auto px-3 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-sm text-gray-900 leading-relaxed focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 [&_mark]:bg-amber-200 [&_mark]:rounded-sm [&_mark]:px-0.5"
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(obs.text || '') }}
+          />
+
+          {/* Bas de page scrollable sous la zone texte */}
+          <div className="shrink-0 space-y-3 pt-3">
+            {/* Action par + Échéance */}
+            <div className="grid grid-cols-2 gap-2">
+              <ColoredSelect value={obs.actionBy || ''} onChange={(v) => update({ actionBy: v })} placeholder="Action par…" options={groupNames} groupColorMap={groupColorMap} />
+              <input type="date" value={obs.actionDeadline || ''} onChange={(e) => update({ actionDeadline: e.target.value })} className={`${inputClass} text-xs py-2`} placeholder="Échéance" />
+            </div>
+
+            {/* Photos — compact row */}
+            <div className="flex items-center gap-2">
+              {images.length > 0 && (
+                <div className="flex gap-1.5 overflow-x-auto scrollbar-none">
+                  {images.map((img, idx) => {
+                    const imgSrc = typeof img === 'string' ? img : img.src;
+                    return (
+                      <div key={idx} className="relative w-10 h-10 rounded-lg overflow-hidden border border-gray-200 shrink-0">
+                        <img src={imgSrc} alt="" className="w-full h-full object-cover" onClick={() => onViewImage?.(imgSrc)} loading="lazy" />
+                        <button onClick={() => handleRemoveImage(idx)} className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 flex items-center justify-center">
+                          <Icon name="close" size={8} color="#fff" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <button onClick={() => cameraRef.current?.click()} className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center shrink-0 active:scale-95 transition">
+                <Icon name="camera" size={16} color="#3b82f6" />
               </button>
-              <button
-                onClick={() => galleryRef.current?.click()}
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-blue-500/15 border border-blue-500/20 text-blue-400 text-xs font-semibold active:scale-[0.98] transition"
-              >
+              <button onClick={() => galleryRef.current?.click()} className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center shrink-0 active:scale-95 transition">
                 <Icon name="image" size={16} color="#60a5fa" />
-                Galerie
               </button>
             </div>
 
             {/* Hidden file inputs */}
-            <input
-              ref={cameraRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={(e) => { handleImageFiles(e.target.files, { withGps: true }); e.target.value = ''; }}
-            />
-            <input
-              ref={galleryRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={(e) => { handleImageFiles(e.target.files, { withGps: false }); e.target.value = ''; }}
-            />
-          </Field>
-
-          {/* Delete button */}
-          <div className="pt-2 border-t border-white/[0.06]">
-            {!showDeleteConfirm ? (
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-red-400 text-xs font-semibold hover:bg-red-500/10 transition"
-              >
-                <Icon name="trash" size={14} color="#f87171" />
-                Supprimer cette observation
-              </button>
-            ) : (
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="flex-1 py-3 rounded-xl bg-white/[0.04] text-gray-600 text-xs font-semibold"
-                >
-                  Annuler
-                </button>
-                <button
-                  onClick={handleDelete}
-                  className="flex-1 py-3 rounded-xl bg-red-500 text-white text-xs font-bold"
-                >
-                  Confirmer
-                </button>
-              </div>
-            )}
+            <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { handleImageFiles(e.target.files, { withGps: true }); e.target.value = ''; }} />
+            <input ref={galleryRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { handleImageFiles(e.target.files, { withGps: false }); e.target.value = ''; }} />
           </div>
         </div>
 
-        {/* Sticky footer : Valider */}
-        <div className="shrink-0 px-4 py-3 border-t border-gray-200 bg-white">
-          <button
-            onClick={handleValidate}
-            className="w-full py-3 rounded-xl bg-blue-600 text-white text-sm font-bold shadow-sm active:scale-[0.98] transition"
-          >
-            Valider
-          </button>
+        {/* Footer : Supprimer + Valider */}
+        <div className="shrink-0 flex items-center gap-2 px-4 py-3 border-t border-gray-200 bg-white">
+          {!showDeleteConfirm ? (
+            <>
+              <button onClick={() => setShowDeleteConfirm(true)} className="w-10 h-10 rounded-xl flex items-center justify-center bg-red-50 border border-red-200 active:bg-red-100 transition">
+                <Icon name="trash" size={16} color="#ef4444" />
+              </button>
+              <button onClick={handleValidate} className="flex-1 py-3 rounded-xl bg-blue-600 text-white text-sm font-bold shadow-sm active:scale-[0.98] transition">
+                Valider
+              </button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-3 rounded-xl bg-gray-100 text-gray-600 text-xs font-semibold active:bg-gray-200 transition">
+                Annuler
+              </button>
+              <button onClick={handleDelete} className="flex-1 py-3 rounded-xl bg-red-500 text-white text-xs font-bold active:bg-red-600 transition">
+                Supprimer
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -319,5 +243,94 @@ export default function ObservationEditSheet({
         .animate-slideUp { animation: slideUp 0.3s ease-out; }
       `}</style>
     </>
+  );
+}
+
+// ─── TOOLBAR FORMATAGE ────────────────────────────────────────────────────
+
+function ColoredSelect({ value, onChange, placeholder, options, groupColorMap }) {
+  const colorIdx = groupColorMap[value];
+  const c = colorIdx != null ? getGroupColor(colorIdx) : null;
+  return (
+    <div className="relative">
+      {c && (
+        <span className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full ${c.dot}`} />
+      )}
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${selectClass} text-xs py-2 ${c ? `pl-7 ${c.border} ${c.bg}` : ''}`}
+      >
+        <option value="">{placeholder}</option>
+        {options.map((g) => (<option key={g} value={g}>{g}</option>))}
+      </select>
+    </div>
+  );
+}
+
+function FormatToolbar({ textRef, onInput }) {
+  const exec = (cmd) => {
+    textRef.current?.focus();
+    document.execCommand(cmd, false, null);
+    onInput?.();
+  };
+
+  const handleHighlight = () => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) return;
+    const editor = textRef.current;
+    if (!editor) return;
+    editor.focus();
+    const range = sel.getRangeAt(0);
+
+    const findMark = (node) => {
+      let n = node;
+      while (n && n !== editor) {
+        if (n.nodeType === 1 && n.tagName === 'MARK') return n;
+        n = n.parentNode;
+      }
+      return null;
+    };
+
+    const marks = Array.from(editor.querySelectorAll('mark')).filter(m => range.intersectsNode(m));
+    const anchorMark = findMark(sel.anchorNode);
+    const focusMark = findMark(sel.focusNode);
+
+    if (anchorMark || focusMark || marks.length > 0) {
+      const toUnwrap = new Set([...marks, anchorMark, focusMark].filter(Boolean));
+      toUnwrap.forEach(m => {
+        const p = m.parentNode;
+        while (m.firstChild) p.insertBefore(m.firstChild, m);
+        p.removeChild(m);
+      });
+      onInput?.();
+      return;
+    }
+
+    const mark = document.createElement('mark');
+    mark.style.backgroundColor = '#fde68a';
+    mark.style.borderRadius = '2px';
+    mark.style.padding = '0 1px';
+    try { range.surroundContents(mark); } catch { mark.appendChild(range.extractContents()); range.insertNode(mark); }
+    onInput?.();
+  };
+
+  const btnClass = 'w-9 h-9 rounded-lg flex items-center justify-center text-gray-500 active:bg-white active:shadow-sm active:text-gray-900 transition-all';
+
+  return (
+    <div className="flex items-center gap-0.5 bg-gray-100 rounded-xl p-1 mb-1.5">
+      <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => exec('bold')} className={btnClass} title="Gras">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M6 4h8a4 4 0 014 4 4 4 0 01-4 4H6z"/><path d="M6 12h9a4 4 0 014 4 4 4 0 01-4 4H6z"/></svg>
+      </button>
+      <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => exec('underline')} className={btnClass} title="Souligné">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3v7a6 6 0 006 6 6 6 0 006-6V3"/><line x1="4" y1="21" x2="20" y2="21"/></svg>
+      </button>
+      <button type="button" onMouseDown={e => e.preventDefault()} onClick={handleHighlight} className={btnClass} title="Surligner">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      </button>
+      <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => exec('insertUnorderedList')} className={btnClass} title="Liste à puces">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      </button>
+    </div>
   );
 }
