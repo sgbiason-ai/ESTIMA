@@ -452,20 +452,8 @@ const ItemRow = memo(
               )}
             </div>
 
-            {/* Supprimer */}
-            <div className="w-10 flex justify-center shrink-0">
-              {!isReadOnly && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onModal({ show: true, target: { type: 'item', id: el.id, parentId } });
-                  }}
-                  className="text-slate-300 hover:text-red-500"
-                >
-                  <Trash2 size={14} />
-                </button>
-              )}
-            </div>
+            {/* Spacer (suppression via multi-selection checkbox a gauche) */}
+            <div className="w-10 shrink-0" />
           </div>
         )}
       </Draggable>
