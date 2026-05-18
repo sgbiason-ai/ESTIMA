@@ -224,24 +224,26 @@ export const useProjectManager = (user, companyId) => {
       isFixed: !!bpuItem.isFixed,
     };
 
-    const targetParentId =
-      parentId ||
-      (selection?.type === 'chapter' || selection?.type === 'subchapter' ? selection.id : null) ||
-      (project.chapters?.[0]?.id || null);
+    setProject(prev => {
+      const targetParentId =
+        parentId ||
+        (selection?.type === 'chapter' || selection?.type === 'subchapter' ? selection.id : null) ||
+        (prev.chapters?.[0]?.id || null);
 
-    if (!targetParentId) {
-      console.warn('Aucun chapitre disponible.');
-      return;
-    }
+      if (!targetParentId) {
+        console.warn('Aucun chapitre disponible.');
+        return prev;
+      }
 
-    const insertRecursive = (nodes) =>
-      nodes.map(node => {
-        if (node.id === targetParentId) return { ...node, children: [...(node.children || []), newLine] };
-        if (node.children) return { ...node, children: insertRecursive(node.children) };
-        return node;
-      });
+      const insertRecursive = (nodes) =>
+        nodes.map(node => {
+          if (node.id === targetParentId) return { ...node, children: [...(node.children || []), newLine] };
+          if (node.children) return { ...node, children: insertRecursive(node.children) };
+          return node;
+        });
 
-    setProject(prev => ({ ...prev, chapters: insertRecursive(prev.chapters || []) }));
+      return { ...prev, chapters: insertRecursive(prev.chapters || []) };
+    });
     setProjectVersion(v => v + 1);
   };
 
