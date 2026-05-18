@@ -12,7 +12,7 @@ import { db, auth } from '../firebase';
 import {
   MapPin, RefreshCw, Camera, MessageSquare, Ruler, Trash2, FileDown,
   Maximize2, X, Play, Square, Flag, LocateFixed, Pencil, Plus, Info,
-  Layers,
+  Layers, Navigation,
 } from 'lucide-react';
 import { stripHtml } from '../utils/formatObsText';
 import { confirm } from '../utils/globalUI';
