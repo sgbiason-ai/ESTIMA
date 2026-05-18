@@ -650,7 +650,7 @@ const ProjectView = ({
         {!isReadOnly && (
           <BpuSidebar
             showBpu={showBpu} setShowBpu={setShowBpu} bpuSearch={bpuSearch} setBpuSearch={setBpuSearch}
-            filteredBpu={filteredBpu} categories={categories} bpuConfig={bpuConfig} addItemToProject={addItemToProject}
+            filteredBpu={filteredBpu} categories={categories} bpuConfig={bpuConfig} addItemToProject={(item) => addItemToProject(item, null, selection)}
           />
         )}
 

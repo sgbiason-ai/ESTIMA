@@ -74,7 +74,8 @@ export const usePmCloudProjects = ({
     if (proj.priceAnalysisData && proj.id) {
       localStorage.setItem(`price_analysis_data_${proj.id}`, JSON.stringify(proj.priceAnalysisData));
     }
-    if (proj.__bpuConfig    && typeof setBpuConfig      === 'function') setBpuConfig(proj.__bpuConfig);
+    const loadedBpuConfig = proj.bpuConfig || proj.__bpuConfig;
+    if (loadedBpuConfig && typeof setBpuConfig === 'function') setBpuConfig(loadedBpuConfig);
     if (proj.__clientPercent !== undefined && typeof setClientPercent === 'function') setClientPercent(proj.__clientPercent);
   };
 
@@ -143,6 +144,7 @@ export const usePmCloudProjects = ({
 
       const updatedProject = {
         ...project,
+        bpuConfig: bpuConfig || { numberingMode: 'auto' },
         priceAnalysisData: analysisData,
         lastSaved: now,
         saveHistory,

@@ -330,6 +330,18 @@ function ProjectManagerModule({ user, companyId, onBackToHub, onOpenEstima, onNa
   const [bpuConfig, setBpuConfig] = useState({ numberingMode: 'auto' });
   const [clientPercent, setClientPercent] = useState(10);
 
+  // Persistance bpuConfig dans le projet (Firestore)
+  useEffect(() => {
+    if (project?.bpuConfig) setBpuConfig(project.bpuConfig);
+  }, [project?.id]);
+
+  useEffect(() => {
+    setProject(prev => {
+      if (JSON.stringify(prev?.bpuConfig) === JSON.stringify(bpuConfig)) return prev;
+      return { ...prev, bpuConfig };
+    });
+  }, [bpuConfig, setProject]);
+
   return (
     <div className="flex flex-col h-screen bg-[#f5f5f7] text-gray-900 overflow-hidden"
       >
@@ -431,6 +443,18 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub }) {
   const [showBpu,        setShowBpu]        = useState(true);
   const [bpuConfig,      setBpuConfig]      = useState({ numberingMode: 'auto' });
   const [clientPercent,  setClientPercent]  = useState(10);
+
+  // ── 6b. Persistance bpuConfig dans le projet (Firestore) ───────────────────
+  useEffect(() => {
+    if (project?.bpuConfig) setBpuConfig(project.bpuConfig);
+  }, [project?.id]);
+
+  useEffect(() => {
+    setProject(prev => {
+      if (JSON.stringify(prev?.bpuConfig) === JSON.stringify(bpuConfig)) return prev;
+      return { ...prev, bpuConfig };
+    });
+  }, [bpuConfig, setProject]);
 
   // ── 7. Présence temps réel ──────────────────────────────────────────────────
   usePresence({
