@@ -20,6 +20,7 @@ import { useProjectUndo }     from './hooks/useProjectUndo';
 // ─── COMPOSANTS GLOBAUX (toujours chargés) ───────────────────────────────────
 import Sidebar              from './components/common/Sidebar';
 import DeleteModal          from './components/common/DeleteModal';
+import MultiDeleteModal     from './components/common/MultiDeleteModal';
 import DraggableCalculator  from './components/common/DraggableCalculator';
 import AddBpuModal          from './components/database/AddBpuModal';
 import EditBpuModal         from './components/database/EditBpuModal';
@@ -552,6 +553,13 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub }) {
         onConfirm={modals.confirmDelete}
       />
 
+      <MultiDeleteModal
+        show={modals.multiDeleteModal.show}
+        items={modals.multiDeleteModal.items}
+        onClose={modals.closeMultiDeleteModal}
+        onConfirm={modals.confirmMultiDelete}
+      />
+
       {/* ── Sidebar ───────────────────────────────────────────────────────── */}
       <Sidebar
         activeTab={activeTab}
@@ -586,6 +594,10 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub }) {
                 addItemToProject={(item) => addItemToProject(item, null, modals.selection)}
                 selection={modals.selection}
                 setSelection={modals.setSelection}
+                multiSelection={modals.multiSelection}
+                toggleMultiSelection={modals.toggleMultiSelection}
+                clearMultiSelection={modals.clearMultiSelection}
+                openMultiDeleteModal={modals.openMultiDeleteModal}
                 updateProjectItem={updateProjectItem}
                 setModal={modals.openDeleteModal}
                 addChapter={addChapter}

@@ -1,7 +1,7 @@
 // src/components/ItemList.jsx
 import React, { useContext, memo, useEffect, useRef, useState, useCallback } from 'react';
 import { Draggable, Droppable } from '@hello-pangea/dnd'; 
-import { GripVertical, Layers, Trash2, Plus, ShieldCheck, AlertCircle, FunctionSquare } from 'lucide-react';
+import { GripVertical, Layers, Trash2, Plus, ShieldCheck, AlertCircle, FunctionSquare, Check } from 'lucide-react';
 
 import { ProjectContext } from '../context/ProjectContext';
 import { EditableTitle, FormattedInput, OptionToggle } from './ProjectUI';
@@ -184,7 +184,7 @@ const ItemRow = memo(
     level,
     isSelected,
     isReadOnly,
-    isGlobalMode, 
+    isGlobalMode,
     viewMode,
     showComparison,
     clientQtyMap,
@@ -200,6 +200,9 @@ const ItemRow = memo(
     sourceIds,
     allItems,
     onEditItem,
+    isMultiSelected,
+    hasMultiSelection,
+    onToggleMultiSelection,
   }) => {
     const draggableId = `item:${stableKey}`;
 
@@ -280,10 +283,10 @@ const ItemRow = memo(
           <div
             ref={provided.innerRef}
             {...provided.draggableProps}
-            className={`flex items-center border-b border-slate-100 py-1 outline-none transition-colors
-              ${isSelected ? 'bg-emerald-50 ring-1 ring-inset ring-emerald-200' : 'bg-white'} 
-              ${hasFormula && !isSelected ? 'bg-emerald-50/30' : ''}
-              ${isSource && !isSelected ? 'bg-blue-50/30' : ''}
+            className={`group flex items-center border-b border-slate-100 py-1 outline-none transition-colors
+              ${isMultiSelected ? 'bg-red-50/60 ring-1 ring-inset ring-red-200' : isSelected ? 'bg-emerald-50 ring-1 ring-inset ring-emerald-200' : 'bg-white'}
+              ${hasFormula && !isSelected && !isMultiSelected ? 'bg-emerald-50/30' : ''}
+              ${isSource && !isSelected && !isMultiSelected ? 'bg-blue-50/30' : ''}
               ${formulaMode?.isActive ? 'cursor-crosshair hover:bg-amber-50 hover:ring-1 hover:ring-inset hover:ring-amber-300' : 'cursor-default hover:bg-emerald-50'}
               ${snapshot.isDragging ? 'shadow-lg z-50 rotate-1 scale-[1.01]' : ''}`}
             onClick={(e) => {
@@ -304,6 +307,27 @@ const ItemRow = memo(
               }
             }}
           >
+            {/* Checkbox multi-sélection (colonne dédiée, séparée du drag handle) */}
+            <div className="w-6 flex justify-center shrink-0">
+              {!isReadOnly && onToggleMultiSelection && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onToggleMultiSelection(el.id); }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  title={isMultiSelected ? 'Désélectionner' : 'Sélectionner pour suppression'}
+                  className={`w-4 h-4 rounded border flex items-center justify-center transition-all cursor-pointer
+                    ${isMultiSelected
+                      ? 'bg-red-500 border-red-500 text-white opacity-100'
+                      : hasMultiSelection
+                        ? 'bg-white border-slate-300 hover:border-red-400 opacity-100'
+                        : 'bg-white border-slate-300 hover:border-red-400 opacity-0 group-hover:opacity-100'
+                    }`}
+                >
+                  {isMultiSelected && <Check size={11} strokeWidth={3} />}
+                </button>
+              )}
+            </div>
+
             <div
               {...provided.dragHandleProps}
               className={`w-8 flex justify-center shrink-0 p-1 ${
@@ -485,6 +509,9 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
                     onSelect({ type: 'subchapter', id: el.id });
                   }}
                 >
+                  {/* Spacer pour aligner avec la colonne checkbox des items */}
+                  <div className="w-6 shrink-0" />
+
                   <div
                     {...provided.dragHandleProps}
                     className={`w-8 flex justify-center shrink-0 p-1 ${isReadOnly ? 'opacity-0 pointer-events-none' : 'text-slate-400 hover:text-emerald-600 cursor-grab active:cursor-grabbing'}`}
@@ -547,12 +574,15 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
 // ITEMLIST (ORCHESTRATEUR)
 // --------------------
 const ItemList = ({ items, parentId, level = 0, bpuConfig }) => {
-  const { 
-    selection, setSelection, updateProjectItem, setModal, addSubChapter, 
+  const {
+    selection, setSelection, updateProjectItem, setModal, addSubChapter,
     refMap, viewMode, showComparison, clientQtyMap, isGlobalMode,
     formulaMode, setFormulaMode, activeTrancheId, sourceIds, allItems,
     onEditItem,
+    multiSelection, toggleMultiSelection,
   } = useContext(ProjectContext);
+
+  const hasMultiSelection = multiSelection && multiSelection.size > 0;
 
   if (!items || !Array.isArray(items)) return null;
 
@@ -582,7 +612,7 @@ const ItemList = ({ items, parentId, level = 0, bpuConfig }) => {
           level={level}
           isSelected={isSelected}
           isReadOnly={isReadOnly}
-          isGlobalMode={isGlobalMode} 
+          isGlobalMode={isGlobalMode}
           viewMode={viewMode}
           showComparison={showComparison}
           clientQtyMap={clientQtyMap}
@@ -597,6 +627,9 @@ const ItemList = ({ items, parentId, level = 0, bpuConfig }) => {
           sourceIds={sourceIds}
           allItems={allItems}
           onEditItem={onEditItem}
+          isMultiSelected={multiSelection?.has(el.id) || false}
+          hasMultiSelection={hasMultiSelection}
+          onToggleMultiSelection={toggleMultiSelection}
         />
       );
     }

@@ -78,6 +78,10 @@ const ProjectView = ({
   onCloseArchive,
   onUndo,
   canUndo = false,
+  multiSelection,
+  toggleMultiSelection,
+  clearMultiSelection,
+  openMultiDeleteModal,
 }) => {
   const currentMode = viewMode || 'study';
   // En mode archive, toujours read-only
@@ -618,11 +622,12 @@ const ProjectView = ({
     setEditItemTarget(null);
   };
 
-  const contextValue = { 
+  const contextValue = {
       selection, setSelection, updateProjectItem: handleUpdateItem, removeProjectItem: handleRemoveItem,
-      setModal: handleModalIntercept, addSubChapter, refMap, viewMode: currentMode, showComparison, 
+      setModal: handleModalIntercept, addSubChapter, refMap, viewMode: currentMode, showComparison,
       clientQtyMap, activeTrancheId, isGlobalMode, bpuConfig, onOpenCalculation: handleOpenCalculation,
       formulaMode, setFormulaMode, allItems, sourceIds: project?.sourceIds || [],
+      multiSelection, toggleMultiSelection,
       onEditItem: (item) => {
         const bpuSource = allBpuItems?.find(b => String(b.id) === String(item?.uid) || String(b.uid) === String(item?.uid));
         setEditItemTarget({
@@ -849,6 +854,33 @@ const ProjectView = ({
           <HelpCircle size={16} />
           <span className="text-[11px] font-bold uppercase tracking-wide max-w-0 overflow-hidden group-hover:max-w-[120px] transition-all duration-300 whitespace-nowrap">Aide formules</span>
         </button>
+      )}
+
+      {!isReadOnly && multiSelection && multiSelection.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9000] flex items-center gap-3 px-4 py-3 bg-white rounded-2xl shadow-2xl border border-slate-200 animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <div className="flex items-center gap-2 px-2">
+            <div className="w-7 h-7 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-xs font-black">
+              {multiSelection.size}
+            </div>
+            <span className="text-xs font-bold text-slate-900">
+              article{multiSelection.size > 1 ? 's' : ''} sélectionné{multiSelection.size > 1 ? 's' : ''}
+            </span>
+          </div>
+          <div className="h-6 w-px bg-slate-200" />
+          <button
+            onClick={clearMultiSelection}
+            className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+          >
+            Désélectionner
+          </button>
+          <button
+            onClick={openMultiDeleteModal}
+            className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors flex items-center gap-1.5"
+          >
+            <Trash2 size={13} />
+            Supprimer
+          </button>
+        </div>
       )}
 
       </div>

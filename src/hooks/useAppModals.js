@@ -3,7 +3,7 @@
  * Centralise tous les états et handlers de modales de l'application.
  * Allège considérablement App.jsx.
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export const useAppModals = ({ project, setProject, clientPercent, setClientPercent, setViewMode, handleSaveProject }) => {
 
@@ -65,18 +65,18 @@ export const useAppModals = ({ project, setProject, clientPercent, setClientPerc
         };
       }
 
-      // 3. Suppression d'un Article (Niveau 3)
+      // 3. Suppression d'un Article (peut être niveau 2 direct sous chapitre OU niveau 3 sous sous-chapitre)
       if (target.type === 'item') {
-        return {
-          ...prev,
-          chapters: currentChapters.map(chapter => ({
-            ...chapter,
-            children: (chapter.children || []).map(sub => ({
-              ...sub,
-              children: (sub.children || []).filter(item => String(item.id) !== targetIdStr)
-            }))
-          }))
+        const removeItem = (nodes) => {
+          if (!Array.isArray(nodes)) return nodes;
+          return nodes
+            .filter(node => !(node && node.type === 'item' && String(node.id) === targetIdStr))
+            .map(node => {
+              if (node && node.children) return { ...node, children: removeItem(node.children) };
+              return node;
+            });
         };
+        return { ...prev, chapters: removeItem(currentChapters) };
       }
 
       return prev;
@@ -136,6 +136,72 @@ export const useAppModals = ({ project, setProject, clientPercent, setClientPerc
   // ─── SÉLECTION ACTIVE (CHAPITRE / SOUS-CHAPITRE) ──────────────────────────
   const [selection, setSelection] = useState({ type: null, id: null });
 
+  // ─── MULTI-SÉLECTION D'ARTICLES (pour suppression en masse) ─────────────
+  const [multiSelection, setMultiSelection] = useState(() => new Set());
+  const [multiDeleteModal, setMultiDeleteModal] = useState({ show: false, items: [] });
+
+  const toggleMultiSelection = (itemId) => {
+    setMultiSelection(prev => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  };
+
+  const clearMultiSelection = () => setMultiSelection(new Set());
+
+  // Réinitialise la multi-sélection au changement de projet (IDs deviennent invalides)
+  useEffect(() => {
+    setMultiSelection(new Set());
+    setMultiDeleteModal({ show: false, items: [] });
+  }, [project?.id]);
+
+  const findItemsByIds = (chapters, idsSet) => {
+    const found = [];
+    const visit = (nodes) => {
+      if (!Array.isArray(nodes)) return;
+      nodes.forEach(node => {
+        if (node && node.type === 'item' && idsSet.has(node.id)) found.push(node);
+        if (node && node.children) visit(node.children);
+      });
+    };
+    visit(chapters);
+    return found;
+  };
+
+  const openMultiDeleteModal = () => {
+    if (multiSelection.size === 0) return;
+    const items = findItemsByIds(project?.chapters || [], multiSelection);
+    setMultiDeleteModal({ show: true, items });
+  };
+
+  const closeMultiDeleteModal = () => setMultiDeleteModal({ show: false, items: [] });
+
+  const confirmMultiDelete = () => {
+    const idsToRemove = new Set(multiSelection);
+    if (idsToRemove.size === 0) { closeMultiDeleteModal(); return; }
+
+    // Suppression récursive à tous les niveaux (article direct sous chapitre OU sous sous-chapitre)
+    const removeFromTree = (nodes) => {
+      if (!Array.isArray(nodes)) return nodes;
+      return nodes
+        .filter(node => !(node && node.type === 'item' && idsToRemove.has(node.id)))
+        .map(node => {
+          if (node && node.children) return { ...node, children: removeFromTree(node.children) };
+          return node;
+        });
+    };
+
+    setProject(prev => ({
+      ...prev,
+      chapters: removeFromTree(prev.chapters || []),
+    }));
+
+    clearMultiSelection();
+    closeMultiDeleteModal();
+  };
+
   // ─── AVERTISSEMENTS IMPORT ───────────────────────────────────────────────
   const [importWarnings, setImportWarnings] = useState([]);
 
@@ -154,6 +220,9 @@ export const useAppModals = ({ project, setProject, clientPercent, setClientPerc
     showFloatingCalculator, setShowFloatingCalculator,
     // Sélection
     selection, setSelection,
+    // Multi-sélection (suppression masse)
+    multiSelection, toggleMultiSelection, clearMultiSelection,
+    multiDeleteModal, openMultiDeleteModal, closeMultiDeleteModal, confirmMultiDelete,
     // Import
     importWarnings, setImportWarnings,
   };

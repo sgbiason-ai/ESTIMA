@@ -15,6 +15,9 @@ export const CHANGELOG = [
       'CRC mobile : boutons Dupliquer et Supprimer un CR (comme sur desktop)',
       'CRC mobile : modale de duplication avec choix de date',
       'CRC mobile : export PDF via partage natif (navigator.share) plus fiable',
+      'Estima : le choix de numérotation (auto / manuel) est désormais sauvegardé avec le projet',
+      'Estima : clic sur un article BPU avec un chapitre/sous-chapitre sélectionné l\'insère directement dedans',
+      'Estima : multi-sélection d\'articles via checkbox (apparaît au survol) + barre d\'actions flottante pour suppression en masse avec modale de confirmation détaillée',
     ],
   },
   {
