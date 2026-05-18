@@ -1,5 +1,5 @@
 // src/components/BpuSidebar.jsx
-import React, { useState, useMemo, useRef, memo } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback, memo } from 'react';
 import { createPortal } from 'react-dom';
 import { Package, PanelLeftClose, Search, Filter } from 'lucide-react';
 import { formatPrice, cleanText, normalizeUnitSymbol, sanitizeHtml } from '../utils/helpers';
@@ -96,10 +96,15 @@ const BpuSidebar = ({
     setTooltipState(prev => ({ ...prev, visible: false }));
   };
 
-  const handleSelect = (item) => {
+  // Ref vers le dernier addItemToProject pour que handleSelect reste stable
+  // (sinon le memo custom de BpuItemCard fige le onClick avec une closure stale)
+  const addItemToProjectRef = useRef(addItemToProject);
+  useEffect(() => { addItemToProjectRef.current = addItemToProject; }, [addItemToProject]);
+
+  const handleSelect = useCallback((item) => {
     const cleanItem = { ...item, uid: item.id || item.uid };
-    addItemToProject(cleanItem);
-  };
+    addItemToProjectRef.current(cleanItem);
+  }, []);
 
   if (!showBpu) return null;
 
