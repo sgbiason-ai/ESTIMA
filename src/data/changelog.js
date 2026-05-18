@@ -10,6 +10,7 @@ export const CHANGELOG = [
     date: '2026-05-14',
     title: 'CRC mobile : confort lecture, participants, dupliquer/supprimer CR',
     highlights: [
+      'Devis MOE : sauvegarde sécurisée — auto-save 3s après inactivité, avertissement si on quitte avec des modifs non enregistrées (Hub, autre devis, fermeture onglet), protection anti double-clic',
       'CRC mobile : tap sur une observation ouvre une vue plein écran (swiper) avec navigation swipe',
       'CRC mobile : participants affichent le nom + label au lieu de l\'email',
       'CRC mobile : boutons Dupliquer et Supprimer un CR (comme sur desktop)',

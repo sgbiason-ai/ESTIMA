@@ -1,6 +1,6 @@
 // src/views/devisMoe/DevisMoeView.jsx
 // Module Devis MOE — Composant principal (orchestrateur + sidebar + ribbon)
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Receipt, ArrowLeft, Plus, Trash2, Copy, Search,
   Save, Calculator, AlertTriangle, CheckCircle2,
@@ -35,6 +35,13 @@ export default function DevisMoeView({ onBackToHub, user, companyId }) {
   const [configOpen, setConfigOpen]       = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null); // { type: 'hub' | 'select', id? }
+
+  // Refs anti double-save + auto-save debounced
+  const savingRef = useRef(false);
+  const autoSaveTimerRef = useRef(null);
+  const draftRef = useRef(null);
+  const isDirtyRef = useRef(false);
 
   useEffect(() => {
     if (selected) setDraft(prev => (!prev || prev.id !== selected.id) ? { ...selected } : prev);
@@ -46,6 +53,10 @@ export default function DevisMoeView({ onBackToHub, user, companyId }) {
     return JSON.stringify(draft) !== JSON.stringify(selected);
   }, [draft, selected]);
 
+  // Synchroniser les refs (utilisées dans les handlers async / event listeners)
+  useEffect(() => { draftRef.current = draft; }, [draft]);
+  useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+
   const quickTotalHon = useMemo(() => {
     if (!draft) return 0;
     const cats = draft.categories || [];
@@ -55,19 +66,68 @@ export default function DevisMoeView({ onBackToHub, user, companyId }) {
       s + (isPct ? pct(l, draft.tauxHonorairesGlobal) : activePh.reduce((s2, ph) => s2 + honPhaseTemps(l, ph.id, cats), 0)), 0);
   }, [draft]);
 
-  const handleSave = async () => {
-    if (!draft) return;
+  // Save sécurisé : anti double-clic via ref, validation minimale, annule l'auto-save en cours
+  const performSave = useCallback(async () => {
+    const d = draftRef.current;
+    if (!d || !d.id || savingRef.current) return false;
+    savingRef.current = true;
     setIsSaving(true);
-    const updated = { ...draft, updatedAt: new Date().toISOString() };
+    if (autoSaveTimerRef.current) { clearTimeout(autoSaveTimerRef.current); autoSaveTimerRef.current = null; }
+    const updated = { ...d, updatedAt: new Date().toISOString() };
     const ok = await saveDevis(updated);
     if (ok) setDraft(updated);
     setIsSaving(false);
-  };
+    savingRef.current = false;
+    return ok;
+  }, [saveDevis]);
+
+  const handleSave = performSave;
 
   const handleCreate = async () => {
     setActiveTab('infos');
     await createDevis('Nouveau devis MOE');
   };
+
+  // Auto-save debounced (3s d'inactivité)
+  useEffect(() => {
+    if (!isDirty || !draft) {
+      if (autoSaveTimerRef.current) { clearTimeout(autoSaveTimerRef.current); autoSaveTimerRef.current = null; }
+      return;
+    }
+    autoSaveTimerRef.current = setTimeout(() => { performSave(); }, 3000);
+    return () => { if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current); };
+  }, [draft, isDirty, performSave]);
+
+  // Garde fermeture navigateur (onglet / refresh) si modifs non sauvegardées
+  useEffect(() => {
+    const handler = (e) => { if (isDirtyRef.current) { e.preventDefault(); e.returnValue = ''; } };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, []);
+
+  // Garde navigation : Hub
+  const handleBackToHub = useCallback(() => {
+    if (isDirtyRef.current) { setPendingAction({ type: 'hub' }); return; }
+    onBackToHub();
+  }, [onBackToHub]);
+
+  // Garde navigation : sélection d'un autre devis
+  const handleSelectDevis = useCallback((id) => {
+    if (id === selectedId) return;
+    if (isDirtyRef.current) { setPendingAction({ type: 'select', id }); return; }
+    setSelectedId(id);
+    setActiveTab('infos');
+  }, [selectedId, setSelectedId]);
+
+  // Résolution du modal "modifications non enregistrées"
+  const executePendingAction = useCallback(async (choice) => {
+    const action = pendingAction;
+    setPendingAction(null);
+    if (choice === 'save') await performSave();
+    if (!action) return;
+    if (action.type === 'hub') onBackToHub();
+    else if (action.type === 'select') { setSelectedId(action.id); setActiveTab('infos'); }
+  }, [pendingAction, performSave, onBackToHub, setSelectedId]);
 
   const filteredList = useMemo(() => {
     const q = searchTerm.toLowerCase();
@@ -118,7 +178,7 @@ export default function DevisMoeView({ onBackToHub, user, companyId }) {
         {/* Ribbon body */}
         <RibbonContainer>
           <RibbonGroup label="Navigation">
-            <RibbonBtnLarge icon={ArrowLeft} label="Hub" onClick={onBackToHub} />
+            <RibbonBtnLarge icon={ArrowLeft} label="Hub" onClick={handleBackToHub} />
           </RibbonGroup>
 
           {/* Info devis courant */}
@@ -239,7 +299,7 @@ export default function DevisMoeView({ onBackToHub, user, companyId }) {
                 ) : (
                   filteredList.map(d => (
                     <div key={d.id}
-                      onClick={() => { setSelectedId(d.id); setActiveTab('infos'); }}
+                      onClick={() => handleSelectDevis(d.id)}
                       className={`group relative p-3 rounded-lg cursor-default border transition-all duration-200 ${
                         d.id === selectedId
                           ? 'bg-emerald-50/80 border-emerald-200 shadow-sm border-l-[3px] border-l-emerald-500'
@@ -331,6 +391,37 @@ export default function DevisMoeView({ onBackToHub, user, companyId }) {
         setDraft={setDraft}
         onClose={() => setShowTemplateModal(false)}
       />}
+
+      {/* ══════════════════════ MODAL MODIFS NON ENREGISTRÉES ══════════════════════ */}
+      {pendingAction && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-md w-full mx-4 shadow-xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-lg bg-amber-50 border border-amber-100">
+                <AlertTriangle size={20} className="text-amber-500" />
+              </div>
+              <h3 className="font-bold text-slate-800">Modifications non enregistrées</h3>
+            </div>
+            <p className="text-sm text-slate-500 mb-6">
+              Vous avez des modifications en cours sur ce devis. Voulez-vous les enregistrer avant de continuer&nbsp;?
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setPendingAction(null)}
+                className="flex-1 px-3 py-2.5 rounded-xl bg-slate-100 border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-200 transition-all cursor-default">
+                Annuler
+              </button>
+              <button onClick={() => executePendingAction('discard')}
+                className="flex-1 px-3 py-2.5 rounded-xl bg-red-50 border border-red-200 text-sm font-medium text-red-600 hover:bg-red-100 transition-all cursor-default">
+                Ne pas enregistrer
+              </button>
+              <button onClick={() => executePendingAction('save')}
+                className="flex-1 px-3 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-sm font-bold text-emerald-600 hover:bg-emerald-100 transition-all cursor-default">
+                Enregistrer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ══════════════════════ MODAL SUPPRESSION ══════════════════════ */}
       {confirmDelete && (

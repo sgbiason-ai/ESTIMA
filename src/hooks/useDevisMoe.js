@@ -223,7 +223,7 @@ export const useDevisMoe = (user, companyId) => {
   const saveDevis = useCallback(async (data) => {
     if (!companyId || !data?.id) return false;
     try {
-      await setDoc(dref(companyId, data.id), { ...data, updatedAt: new Date().toISOString() });
+      await setDoc(dref(companyId, data.id), data);
       return true;
     } catch (e) { console.error(e); toast.error('Erreur lors de la sauvegarde'); return false; }
   }, [companyId]);
