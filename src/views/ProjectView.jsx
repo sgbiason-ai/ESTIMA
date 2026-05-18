@@ -766,6 +766,9 @@ const ProjectView = ({
                               <div ref={provided.innerRef} {...provided.draggableProps} className={`rounded-xl border overflow-hidden transition-all duration-200 ${selection?.id === chap.id ? 'ring-4 ring-emerald-50/50 border-emerald-500' : 'hover:shadow-md'} ${chap.isOption ? 'bg-slate-50 border-slate-300 border-dashed' : 'bg-white border-slate-200'} ${snapshot.isDragging ? 'shadow-2xl z-50 ring-4 ring-emerald-500/20 rotate-1 bg-white' : ''}`}>
                                 <div className={`p-3 flex justify-between items-center transition-colors duration-300 ${selection?.id === chap.id ? 'bg-emerald-600 text-white' : chap.isOption ? 'bg-slate-100 text-slate-600' : theme.chapterHeader + ' text-white'}`} onClick={() => setSelection({ type: 'chapter', id: chap.id })}>
                                   <div className="flex items-center gap-4">
+                                    {!isReadOnly && (
+                                      <button onClick={(e) => { e.stopPropagation(); handleModalIntercept({ show: true, target: { type: 'chapter', id: chap.id } }); }} className={`p-1 ${chap.isOption ? 'text-slate-400 hover:text-red-500' : 'text-white/40 hover:text-red-300'}`} title="Supprimer le chapitre"><Trash2 size={16} /></button>
+                                    )}
                                     <div {...provided.dragHandleProps} className={`p-1 ${isReadOnly ? 'opacity-0 pointer-events-none' : chap.isOption ? 'text-slate-400 hover:text-slate-600' : 'text-white/40 hover:text-white cursor-grab active:cursor-grabbing'}`}>{!isReadOnly && <GripVertical size={18} />}</div>
                                     <span className={`w-6 h-6 rounded flex items-center justify-center font-mono text-[10px] font-black ${chap.isOption ? 'bg-slate-200 text-slate-500' : 'bg-white/20 text-white'}`}>{index + 1}</span>
                                     <EditableTitle value={chap.title} onSave={(val) => updateProjectItem('root', chap.id, 'title', val)} disabled={isReadOnly} className="font-black uppercase tracking-widest text-[11px] hover:bg-white/10" />
@@ -774,10 +777,7 @@ const ProjectView = ({
                                   <div className="flex items-center gap-4">
                                     <span className={`font-mono font-black text-xs px-3 py-1 rounded-full ${chap.isOption ? 'bg-slate-200 text-slate-600 line-through decoration-slate-400' : 'bg-black/20 text-white'}`}>{formatPrice(chapTotal)}</span>
                                     {!isReadOnly && (
-                                      <div className={`flex gap-1 border-l pl-2 ${chap.isOption ? 'border-slate-300' : 'border-white/20'}`}>
-                                        <button onClick={(e) => { e.stopPropagation(); addSubChapter(chap.id); }} className={`p-1.5 rounded-md ${chap.isOption ? 'hover:bg-slate-200 text-slate-500' : 'hover:bg-white/20 text-white'}`}><Plus size={16} /></button>
-                                        <button onClick={(e) => { e.stopPropagation(); handleModalIntercept({ show: true, target: { type: 'chapter', id: chap.id } }); }} className={`p-1.5 ${chap.isOption ? 'text-slate-400 hover:text-red-500' : 'text-white/30 hover:text-red-400'}`}><Trash2 size={16} /></button>
-                                      </div>
+                                      <button onClick={(e) => { e.stopPropagation(); addSubChapter(chap.id); }} className={`p-1.5 rounded-md ${chap.isOption ? 'hover:bg-slate-200 text-slate-500' : 'hover:bg-white/20 text-white'}`} title="Ajouter un sous-chapitre"><Plus size={16} /></button>
                                     )}
                                   </div>
                                 </div>

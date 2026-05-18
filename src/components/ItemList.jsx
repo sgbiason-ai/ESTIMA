@@ -497,8 +497,18 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
                     onSelect({ type: 'subchapter', id: el.id });
                   }}
                 >
-                  {/* Spacer pour aligner avec la colonne checkbox des items */}
-                  <div className="w-6 shrink-0" />
+                  {/* Corbeille a gauche (aligne avec la checkbox des items) */}
+                  <div className="w-6 flex justify-center shrink-0">
+                    {!isReadOnly && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onModal({ show: true, target: { type: 'subchapter', id: el.id, parentId } }); }}
+                        className="text-slate-300 hover:text-red-500 transition-colors"
+                        title="Supprimer le sous-chapitre"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
 
                   <div
                     {...provided.dragHandleProps}
@@ -528,15 +538,9 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
                     {formatPrice(total)}
                   </div>
 
-                  <div className="w-10 flex justify-center gap-1 shrink-0">
-                    {!isReadOnly && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); onModal({ show: true, target: { type: 'subchapter', id: el.id, parentId } }); }}
-                        className="p-1 text-slate-400 hover:text-red-500"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
+                  {/* Spacer (corbeille deplacee a gauche) */}
+                  <div className="w-10 shrink-0">
+                    {null}
                   </div>
                 </div>
 
