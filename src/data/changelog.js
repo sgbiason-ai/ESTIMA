@@ -21,6 +21,7 @@ export const CHANGELOG = [
       'RAO PDF : cohérence des scores entre tableau classement et graphique barres — utilisation du ranking étendu (avec variantes retenues + recalcul Pmin/Pmoy/Pmax sans irrégulières)',
       'RAO PDF : bandeau sous-critère dans l\'Analyse technique wrap automatiquement si le titre est trop long (hauteur dynamique)',
       'RAO PDF : correction d\'une dizaine de coquilles — footer dupliqué (jusqu\'à 5×), numéros de page figés sur tables A3, critère "Valeur technique" sans numéro "2.", montant brut affiché dans les barres de la synthèse financière, baselines décalées dans le tableau critères',
+      'RAO : refonte complète de l\'aide contextuelle des 3 modules (Landing, Analyse financière, RAO) avec workflow complet, articles CCP appliqués, variantes, OAB, sauvegarde et nouvelle feature justification des variantes',
     ],
   },
   {

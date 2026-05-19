@@ -785,64 +785,131 @@ export const helpContent = {
   },
 
   // ──────────────────────────────────────────────────────────────────────────
-  // ANALYSE DES PRIX
+  // ANALYSE FINANCIÈRE (sous-onglet du module RAO)
   // ──────────────────────────────────────────────────────────────────────────
   priceAnalysis: {
-    title: 'Guide — Analyse des prix',
-    subtitle: 'Comparer les offres des entreprises',
+    title: 'Guide — Analyse financière',
+    subtitle: 'Comparer les offres prix par prix',
     tabs: [
       {
-        id: 'entreprises', label: 'Entreprises', icon: 'Building2',
+        id: 'import', label: 'Import offres', icon: 'Upload',
         sections: [
-          { type: 'intro', text: "Ajoutez les entreprises soumissionnaires et importez leurs offres de prix." },
+          { type: 'intro', text: "Importez les offres des entreprises soumissionnaires depuis Excel ou PDF. Les prix sont automatiquement associés aux articles du DQE." },
           {
             type: 'steps',
             items: [
-              { color: 'blue', title: 'Ajouter une entreprise', description: "Cliquez sur \"+ Entreprise\" dans la toolbar. Donnez-lui un nom et une couleur." },
-              { color: 'emerald', title: 'Importer les prix', description: "Importez les prix depuis un fichier Excel. Les prix sont automatiquement associes aux articles du BPU par numero de reference." },
-              { color: 'amber', title: 'Saisie manuelle', description: "Vous pouvez aussi saisir les prix manuellement dans le tableau, cellule par cellule." },
+              { color: 'blue', title: 'Import Excel', description: "Bouton « Importer » dans la toolbar. Le fichier doit contenir une colonne de référence (P.01, 1005, ...) et une colonne de prix unitaire." },
+              { color: 'emerald', title: 'Import PDF', description: "Le module accepte aussi les PDF natifs (texte). Cascade de matching : référence exacte → désignation → préfixe de référence." },
+              { color: 'amber', title: 'PDF scannés (OCR)', description: "Pour les PDF scannés (images), un OCR Tesseract.js est lancé automatiquement avec barre de progression. La reconnaissance reste limitée sur les scans très dégradés." },
+              { color: 'purple', title: 'Saisie manuelle', description: "Vous pouvez aussi ajouter une entreprise sans import puis taper les prix directement dans le tableau." },
             ],
           },
-          { type: 'tip', text: "L'import Excel utilise le numero de reference (colonne A) pour faire le lien avec vos articles BPU." },
-        ],
-      },
-      {
-        id: 'comparaison', label: 'Comparaison', icon: 'BarChart3',
-        sections: [
-          { type: 'intro', text: "Comparez les offres visuellement avec le mode heatmap et les indicateurs de prix." },
+          { type: 'tip', text: "Le bouton « Dépouillement » dans la toolbar du RAO permet de pré-déclarer les entreprises consultées et leur montant AE avant l'import des prix." },
           {
-            type: 'steps',
-            items: [
-              { color: 'blue', title: 'Mode heatmap', description: "Activez le mode heatmap dans la toolbar pour colorer les cellules du moins cher (vert) au plus cher (rouge)." },
-              { color: 'emerald', title: 'Ecarts', description: "Les ecarts en pourcentage sont affiches par rapport a l'estimation. Survolez une cellule pour plus de details." },
-              { color: 'amber', title: 'Totaux', description: "Les totaux par entreprise sont affiches en bas du tableau, avec le classement automatique." },
-            ],
+            type: 'card',
+            icon: 'AlertTriangle', color: 'amber',
+            title: 'Alerte AE vs total recalculé',
+            description: "Après l'import, si le total calculé à partir du BPU diffère du montant AE annoncé dans la modale Dépouillement, une alerte apparaît dans l'onglet Admin du RAO et la section Conformité du PDF.",
           },
         ],
       },
       {
-        id: 'notation', label: 'Notation', icon: 'Award',
+        id: 'variantes', label: 'Variantes', icon: 'GitBranch',
         sections: [
-          { type: 'intro', text: "Evaluez les entreprises avec un systeme de notation multi-criteres." },
+          { type: 'intro', text: "Chaque entreprise peut proposer une ou plusieurs variantes (CCP R2151-8 à R2151-11). Elles s'affichent en colonnes parallèles à l'offre de base." },
           {
             type: 'steps',
             items: [
-              { color: 'blue', title: 'Criteres', description: "Definissez vos criteres de notation (prix, delai, references...) avec leur ponderation." },
-              { color: 'emerald', title: 'Sous-criteres', description: "Chaque critere peut avoir des sous-criteres avec leur propre ponderation." },
-              { color: 'amber', title: 'Notation technique', description: "Notez chaque entreprise sur chaque critere. La note finale est calculee automatiquement." },
-              { color: 'purple', title: 'OAB', description: "L'Offre Anormalement Basse (OAB) est detectee automatiquement via la methode de la Double Moyenne." },
+              { color: 'blue', title: 'Importer une variante', description: "Sur la ligne d'une entreprise déjà importée, bouton « + Variante » (Excel ou PDF). Une variante peut contenir des prix nouveaux, des articles supprimés et des quantités modifiées." },
+              { color: 'emerald', title: 'Articles ajoutés', description: "Les articles « hors DQE » (nouveaux prix) apparaissent dans une section dédiée en bas du tableau d'analyse financière." },
+              { color: 'amber', title: 'Articles supprimés', description: "Les articles que l'entreprise propose de retirer sont marqués « supprimé » dans le tableau (cellule grisée italique)." },
+              { color: 'rose', title: 'Quantités modifiées', description: "Une colonne dédiée « Qté var » apparaît avec la quantité proposée par l'entreprise. La modification est mise en gras orange si différente du DQE." },
+              { color: 'purple', title: 'Retenir une variante', description: "Dans l'onglet Admin du RAO, cochez « Retenue » pour qu'une variante remplace la base de l'entreprise dans le classement final (R2151-11)." },
             ],
           },
         ],
       },
       {
-        id: 'export', label: 'Export', icon: 'FileDown',
+        id: 'conformite', label: 'Conformité', icon: 'Shield',
         sections: [
+          { type: 'intro', text: "La conformité CCP L2152-2 est vérifiée automatiquement. Une offre qui modifie les quantités du DQE est signalée comme irrégulière." },
+          {
+            type: 'table',
+            title: "Cas détectés automatiquement",
+            rows: [
+              { label: "Écart Acte d'Engagement (AE) vs total recalculé", desc: "Le montant annoncé sur l'AE diffère du total calculé via le BPU." },
+              { label: "Quantités modifiées par rapport au DQE", desc: "L'entreprise a saisi des quantités différentes de celles fournies." },
+              { label: "Conclusion modifiable", desc: "Régulière / Irrégulière / Inacceptable / Inappropriée — voir onglet Admin." },
+            ],
+          },
+          { type: 'warning', text: "Une offre déclarée Irrégulière peut être régularisée manuellement par décision motivée du pouvoir adjudicateur (CCP R2152-2)." },
+          {
+            type: 'card',
+            icon: 'Info', color: 'blue',
+            title: 'Note importante',
+            description: "Les variantes ne sont PAS automatiquement irrégulières même si la base l'est. Le statut variant.adminConclusion est indépendant.",
+          },
+        ],
+      },
+      {
+        id: 'modes', label: 'Modes analyse', icon: 'BarChart3',
+        sections: [
+          { type: 'intro', text: "Deux modes d'analyse visuelle viennent enrichir le tableau de comparaison." },
+          {
+            type: 'card',
+            icon: 'BarChart3', color: 'rose',
+            title: 'Mode Heatmap',
+            description: "Colore chaque prix unitaire selon son écart vs l'estimation MOE. Du vert intense (-50 % et plus) au rouge (+50 % et plus).",
+            steps: [
+              "Activé via le segmented control en haut de la toolbar",
+              "Les écarts sont calculés ligne par ligne (PU vs PU estimation)",
+              "Permet d'identifier visuellement les articles surévalués / sous-évalués",
+            ],
+          },
+          {
+            type: 'card',
+            icon: 'AlertTriangle', color: 'amber',
+            title: 'Mode OAB (Offre Anormalement Basse)',
+            description: "Méthode de la double moyenne pour détecter les prix anormalement bas — articles L2152-5 et R2152-3 du CCP.",
+            steps: [
+              "M1 = moyenne arithmétique de tous les prix de la ligne",
+              "Borne haute = M1 × 1,20 (offres supérieures écartées)",
+              "M2 = moyenne des prix ≤ borne haute",
+              "Seuil OAB = M2 × 0,90 (10 % sous M2)",
+              "Cellule fond orange si prix < seuil OAB",
+            ],
+            tip: "Une OAB ne peut pas être rejetée automatiquement : le PA doit demander des précisions au soumissionnaire avant tout rejet motivé.",
+          },
+          {
+            type: 'card',
+            icon: 'Calculator', color: 'indigo',
+            title: 'Détail OAB d\'un article',
+            description: "Cliquez sur l'icône OAB d'une cellule pour ouvrir la modale détail : calcul M1/M2/seuil + visualisation des prix vs seuil.",
+          },
+        ],
+      },
+      {
+        id: 'outils', label: 'Outils', icon: 'Settings',
+        sections: [
+          { type: 'intro', text: "Plusieurs outils complémentaires pour exploiter l'analyse." },
           {
             type: 'steps',
             items: [
-              { color: 'blue', title: 'Export PDF', description: "Generez un rapport d'analyse complet au format PDF avec tableaux comparatifs et graphiques." },
-              { color: 'emerald', title: 'Export Excel', description: "Exportez les donnees brutes au format Excel pour un traitement complementaire." },
+              { color: 'blue', title: 'Mode rendu / client', description: "Le mode « Rendu » applique le pourcentage client (clientPercent) sur les quantités. Permet de basculer entre quantités MOE et quantités majorées client." },
+              { color: 'emerald', title: 'Multi-tranches', description: "Si le projet a des tranches (TF, TC1, TC2...), un sélecteur permet de filtrer l'analyse par tranche ou de tout afficher (Global)." },
+              { color: 'amber', title: 'Pousser les moyennes vers le BPU', description: "Bouton « Pousser moyennes vers BPU » : copie les moyennes hors OAB dans les prix unitaires du BPU. Utile après l'analyse pour mettre à jour l'estimation MOE de référence." },
+              { color: 'purple', title: 'Observatoire des prix', description: "Bouton « Sauvegarder » : enregistre l'instantané dans l'observatoire (history) pour comparaison ultérieure. Undo possible (10 derniers)." },
+              { color: 'rose', title: 'Export JSON / Import JSON', description: "Sauvegarde locale au format JSON portable. Utile pour backup ou transfert entre projets." },
+            ],
+          },
+          {
+            type: 'card',
+            icon: 'FileDown', color: 'teal',
+            title: 'Exports',
+            description: "Deux formats disponibles depuis la toolbar.",
+            steps: [
+              "PDF — Analyse comparative avec mise en page Vert Papyrus",
+              "Excel — Données brutes pour traitement externe (toutes colonnes)",
             ],
           },
         ],
@@ -851,35 +918,79 @@ export const helpContent = {
   },
 
   // ──────────────────────────────────────────────────────────────────────────
-  // RAO (Rapport d'Analyse des Offres)
+  // RAO — Rapport d'Analyse des Offres (sous-onglets de la vue RAO)
   // ──────────────────────────────────────────────────────────────────────────
   rao: {
     title: 'Guide — Rapport RAO',
-    subtitle: "Rapport d'Analyse des Offres",
+    subtitle: "Rédaction du rapport CCP-compliant",
     tabs: [
       {
-        id: 'consultation', label: 'Consultation', icon: 'FileSearch',
+        id: 'workflow', label: 'Workflow', icon: 'ListTree',
         sections: [
-          { type: 'intro', text: "L'onglet Consultation regroupe les informations generales de la consultation : objet, date, lots." },
+          { type: 'intro', text: "Le RAO suit un workflow en 6 étapes correspondant aux onglets de la vue." },
           {
             type: 'steps',
             items: [
-              { color: 'blue', title: 'Informations generales', description: "Renseignez l'objet de la consultation, le maitre d'ouvrage, les dates de publication et de remise." },
-              { color: 'emerald', title: 'Lots', description: "Definissez les lots du marche, leur description et les entreprises attributaires." },
+              { color: 'blue', title: '1. Consultation', description: "Critères de notation + sous-critères. La fiche affaire (modale icône stylo dans le ribbon) regroupe les infos du projet." },
+              { color: 'amber', title: '2. Dépouillement', description: "Déclarez les entreprises consultées, le régime des variantes et les exigences minimales. Génère un PV de dépouillement automatique." },
+              { color: 'emerald', title: '3. Administratif', description: "Cochez les pièces fournies, gérez les groupements et statuez sur la conformité de chaque offre (régulière / irrégulière / inacceptable / inappropriée)." },
+              { color: 'purple', title: '4. Technique', description: "Notez chaque offre sur les critères techniques, rédigez les commentaires, justifiez l'acceptation des variantes." },
+              { color: 'rose', title: '5. Négociation', description: "Optionnel — Suivez les phases de négociation et les engagements des entreprises." },
+              { color: 'indigo', title: '6. Récapitulatif', description: "Classement final combiné (Prix × Valeur technique), recommandation MOE et export PDF du rapport complet." },
             ],
+          },
+          { type: 'tip', text: "Le bouton « Sauvegarder » dans le ribbon enregistre le RAO entier dans Firestore (projects/.../rao/data). Pensez à sauvegarder régulièrement — pas d'auto-save sur cette partie." },
+        ],
+      },
+      {
+        id: 'consultation', label: 'Consultation', icon: 'FileSearch',
+        sections: [
+          { type: 'intro', text: "Onglet Consultation : critères de notation et sous-critères. Les infos de l'affaire sont saisies dans la modale « Fiche affaire » (icône stylo dans le ribbon)." },
+          {
+            type: 'steps',
+            items: [
+              { color: 'blue', title: 'Critère Prix (auto)', description: "Le critère Prix est généré automatiquement à partir de l'analyse financière. Vous choisissez seulement sa pondération (50 % par défaut) et la formule de scoring (f1 à f9)." },
+              { color: 'emerald', title: 'Critères techniques', description: "Ajoutez les critères de valeur technique (méthodologie, délais, sécurité…) avec leur pondération. La somme des pondérations = 100." },
+              { color: 'amber', title: 'Sous-critères', description: "Chaque critère peut être détaillé en sous-critères avec leur propre pondération. La pondération du critère parent = somme des sous-critères." },
+              { color: 'purple', title: 'Description', description: "Pour chaque critère/sous-critère, une description longue peut être saisie. Elle sera reprise dans le PDF (section 3 — Rappel des critères de notation)." },
+            ],
+          },
+          {
+            type: 'card',
+            icon: 'FunctionSquare', color: 'indigo',
+            title: 'Formules de scoring Prix',
+            description: "9 formules disponibles (f1 à f9) pour calculer la note prix. La plus courante : f1 = Nmax × (Pmin / P). Voir Annexe B du PDF pour le détail.",
           },
         ],
       },
       {
-        id: 'administratif', label: 'Administratif', icon: 'Shield',
+        id: 'depouillement', label: 'Dépouillement', icon: 'ClipboardList',
         sections: [
-          { type: 'intro', text: "Verifiez la conformite administrative des candidatures." },
+          { type: 'intro', text: "Modale ouverte automatiquement au premier import. Pré-déclare les entreprises consultées et le régime des variantes — base du PV de dépouillement (CCP L2113-1)." },
           {
             type: 'steps',
             items: [
-              { color: 'blue', title: 'Pieces administratives', description: "Cochez les pieces fournies par chaque entreprise : Kbis, attestations, assurances..." },
-              { color: 'emerald', title: 'Groupements', description: "Si une entreprise est en groupement, renseignez les membres et leur role (mandataire, cotraitant)." },
-              { color: 'amber', title: 'Conformite', description: "Le statut de conformite est calcule automatiquement en fonction des pieces fournies." },
+              { color: 'blue', title: 'Entreprises consultées', description: "Liste des soumissionnaires + montant AE (Acte d'Engagement) annoncé. Si une offre est importée avec un total différent, une alerte apparaît." },
+              { color: 'emerald', title: 'Régime des variantes', description: "Autorisées / Interdites / Obligatoires (CCP R2151-8 à R2151-11) + exigences minimales fixées dans la consultation." },
+              { color: 'amber', title: 'Date d\'ouverture des plis', description: "Date à laquelle les plis ont été ouverts. Reprise sur le PV." },
+              { color: 'purple', title: 'PV automatique', description: "Le PV de dépouillement est généré automatiquement dans le PDF (section 4) à partir de ces infos + des montants AE." },
+            ],
+          },
+          { type: 'tip', text: "Vous pouvez rouvrir la modale Dépouillement à tout moment via le bouton « Dépouillement » dans le ribbon." },
+        ],
+      },
+      {
+        id: 'admin', label: 'Administratif', icon: 'Shield',
+        sections: [
+          { type: 'intro', text: "Onglet Administratif : pièces de candidature et d'offre, groupements, statut de conformité." },
+          {
+            type: 'steps',
+            items: [
+              { color: 'blue', title: 'Pièces administratives + d\'offre', description: "Cochez OUI / NON pour chaque pièce demandée. Liste paramétrable et drag-and-drop pour réordonner." },
+              { color: 'emerald', title: 'Groupement d\'entreprises', description: "Si l'entreprise est en groupement, cochez « En groupement » et listez les membres (Mandataire / Cotraitant) avec leurs pièces individuelles." },
+              { color: 'amber', title: 'Conclusion admin', description: "Déclarez : Régulière / Irrégulière / Inacceptable / Inappropriée. Une offre non régulière est exclue de la notation et du classement final." },
+              { color: 'rose', title: 'Variantes — admin', description: "Pour chaque variante importée, choisir « Retenue » ou « Non retenue ». Une variante retenue se substitue à la base dans le classement final (CCP R2151-11)." },
+              { color: 'purple', title: 'Alertes Quantités / AE', description: "Panneaux dédiés affichent les écarts de quantités vs DQE et les écarts entre AE annoncé et total recalculé." },
             ],
           },
         ],
@@ -887,40 +998,50 @@ export const helpContent = {
       {
         id: 'technique', label: 'Technique', icon: 'Settings',
         sections: [
-          { type: 'intro', text: "Evaluez les offres sur les criteres techniques definis." },
+          { type: 'intro', text: "Onglet Technique : notation détaillée + commentaires + justification des variantes. Tout est repris dans le PDF (sections 7.bis + 8)." },
           {
             type: 'steps',
             items: [
-              { color: 'blue', title: 'Criteres et sous-criteres', description: "Definissez vos criteres techniques avec leur ponderation. Ajoutez des sous-criteres si necessaire." },
-              { color: 'emerald', title: 'Notation', description: "Notez chaque entreprise sur chaque critere. Les notes sont ponderees automatiquement." },
-              { color: 'amber', title: 'Commentaires', description: "Ajoutez des commentaires justifiant chaque note pour le rapport final." },
+              { color: 'blue', title: 'Note + barème', description: "Pour chaque critère/sous-critère, saisissez la note (ex: 4) et le barème (ex: 5). Le score pondéré est calculé automatiquement (note/barème × poids)." },
+              { color: 'emerald', title: 'Commentaires', description: "Saisie libre pour chaque critère et sous-critère, repris intégralement dans le PDF section 8 (Analyse technique)." },
+              { color: 'amber', title: 'Synthèse globale', description: "Champ « Synthèse pour le rapport » par critère : conclusion synthétique reprise en gras dans le PDF." },
+              { color: 'purple', title: 'Justification variantes', description: "Si l'entreprise propose une variante, un encadré dédié permet de justifier son acceptation ou son rejet. Ce texte apparaît en encadré vert dans la section 7.bis du PDF." },
             ],
+          },
+          {
+            type: 'card',
+            icon: 'GitBranch', color: 'purple',
+            title: 'Bloc Variantes proposées',
+            description: "Visible uniquement si l'entreprise sélectionnée a au moins une variante. Affiche pour chaque variante : numéro, label, statut (RETENUE / NON RETENUE), montant HT, et un textarea de justification.",
           },
         ],
       },
       {
-        id: 'negociation', label: 'Negociation', icon: 'MessageSquare',
+        id: 'negociation', label: 'Négociation', icon: 'MessageSquare',
         sections: [
-          { type: 'intro', text: "Gerez les phases de negociation et les demandes de precisions." },
+          { type: 'intro', text: "Onglet Négociation (optionnel) : points négociés et engagements pris par chaque entreprise." },
           {
             type: 'steps',
             items: [
-              { color: 'blue', title: 'Points de negociation', description: "Listez les points a negocier avec chaque entreprise." },
-              { color: 'emerald', title: 'Reponses', description: "Enregistrez les reponses et engagements des entreprises." },
+              { color: 'blue', title: 'Points de négociation', description: "Liste des points discutés avec chaque entreprise (délais, méthodes, prix unitaires…)." },
+              { color: 'emerald', title: 'Réponses et engagements', description: "Texte libre par point. Cette section n'est PAS reprise dans le PDF (exclue par défaut)." },
             ],
           },
+          { type: 'warning', text: "Section confidentielle : les négociations ne sont pas exportées dans le PDF du rapport final." },
         ],
       },
       {
-        id: 'recap', label: 'Recapitulatif', icon: 'BarChart3',
+        id: 'recap', label: 'Récapitulatif', icon: 'Award',
         sections: [
-          { type: 'intro', text: "Le recapitulatif presente la synthese de l'analyse : classement final, attribution proposee." },
+          { type: 'intro', text: "Synthèse finale : classement combiné Prix + Valeur technique avec recommandation MOE et export PDF." },
           {
             type: 'steps',
             items: [
-              { color: 'blue', title: 'Classement', description: "Le classement combine les notes techniques et financieres selon les ponderations definies." },
-              { color: 'emerald', title: 'Proposition d\'attribution', description: "Redigez la proposition d'attribution avec la justification." },
-              { color: 'amber', title: 'Export du rapport', description: "Cliquez sur \"Sauvegarder\" pour enregistrer, puis exportez le rapport complet en PDF." },
+              { color: 'blue', title: 'Classement étendu', description: "Inclut la base + les variantes retenues, recalcule Pmin/Pmoy/Pmax sur les seules offres régulières, attribue les rangs." },
+              { color: 'emerald', title: 'Mieux-disant', description: "Le rang 1 est mis en avant. Si une variante retenue gagne, c'est elle qui est désignée mieux-disante (et pas la base de l'entreprise)." },
+              { color: 'amber', title: 'Recommandation MOE', description: "Phrase générée automatiquement : « L'offre de l'entreprise X (variante V1 retenue) est l'offre économiquement la plus avantageuse — Score / Montant ». Reprise dans le PDF." },
+              { color: 'purple', title: 'Visualisation barres', description: "Graphique empilé Prix (vert) + Technique (bleu) par entreprise. Les variantes apparaissent en couleur plus claire de leur entreprise." },
+              { color: 'rose', title: 'Export PDF final', description: "Bouton « Générer le PDF final » : compile l'ensemble en un rapport CCP-compliant (cover + sommaire + 9 sections + annexes A/B/C)." },
             ],
           },
         ],
@@ -1097,52 +1218,100 @@ export const helpContent = {
   },
 
   // ──────────────────────────────────────────────────────────────────────────
-  // ANALYSE RAO (standalone)
+  // RAO & ANALYSE DES PRIX — Module standalone (landing + workflow général)
   // ──────────────────────────────────────────────────────────────────────────
   raoAnalysis: {
-    title: 'Guide — Analyse RAO',
-    subtitle: 'Analyse financiere des offres',
+    title: 'Guide — RAO & Analyse des Prix',
+    subtitle: 'Module complet CCP-compliant',
     tabs: [
       {
-        id: 'presentation', label: 'Presentation', icon: 'Info',
+        id: 'presentation', label: 'Présentation', icon: 'Info',
         sections: [
-          { type: 'intro', text: "Le module Analyse RAO combine l'analyse financiere des prix et le rapport d'analyse des offres. Il se compose de deux parties principales." },
+          { type: 'intro', text: "Module complet pour analyser les offres entreprises et rédiger le Rapport d'Analyse des Offres conforme au Code de la Commande Publique." },
           {
             type: 'grid',
             items: [
-              { title: 'Analyse Financiere', text: "Comparez les prix unitaires des entreprises avec votre estimation. Mode heatmap, ecarts, classement automatique.", color: 'blue' },
-              { title: 'Rapport RAO', text: "Redigez le rapport complet d'analyse des offres avec les 5 volets : consultation, administratif, technique, negociation et recapitulatif.", color: 'indigo' },
+              { title: 'RAO', text: "Workflow en 6 onglets : Consultation, Dépouillement, Admin, Technique, Négo, Récap. Auto-sauvegarde 1.5s + sauvegarde manuelle.", color: 'blue' },
+              { title: 'Analyse financière', text: "Comparaison prix par prix avec heatmap, mode OAB, variantes intégrées, conformité automatique, push moyennes vers BPU.", color: 'indigo' },
             ],
+          },
+          {
+            type: 'card',
+            icon: 'Shield', color: 'emerald',
+            title: 'Conformité CCP',
+            description: "Le module applique automatiquement les articles : L2113-1 (AE), L2152-2 (irrégularité), L2152-5 / R2152-3 (OAB), R2151-8 à R2151-11 (variantes), R2152-7 (pondération critères).",
           },
         ],
       },
       {
-        id: 'import', label: 'Import', icon: 'Upload',
+        id: 'workflow', label: 'Workflow', icon: 'ListTree',
         sections: [
-          { type: 'intro', text: "Importez les offres des entreprises depuis des fichiers Excel." },
+          { type: 'intro', text: "Étapes recommandées d'un RAO de A à Z. Le module guide automatiquement à travers les choix." },
           {
             type: 'steps',
             items: [
-              { color: 'blue', title: 'Import Excel', description: "Cliquez sur \"Importer\" dans la toolbar. Selectionnez le fichier Excel de l'entreprise." },
-              { color: 'emerald', title: 'Multi-onglets', description: "Si votre fichier contient plusieurs onglets (tranches), ils sont importes automatiquement." },
-              { color: 'amber', title: 'Correspondance automatique', description: "Les prix sont associes aux articles par numero de reference. Un fallback par prefixe (P.01...) est utilise si le numero exact n'est pas trouve." },
+              { color: 'blue', title: '1. Créer le RAO depuis l\'estimation MOE', description: "Bouton « Nouveau RAO » sur la landing : import du fichier Excel d'estimation MOE (.xlsx). Le module détecte les chapitres/sous-chapitres et les articles." },
+              { color: 'emerald', title: '2. Valider la structure', description: "Modale de validation post-import : vérifier la hiérarchie chapitres → sous-chapitres → articles. Possibilité de réorganiser avant création." },
+              { color: 'amber', title: '3. Définir les critères de notation', description: "Onglet Consultation : critère Prix (auto) + critères techniques avec sous-critères. Pondérations = 100." },
+              { color: 'purple', title: '4. Dépouillement', description: "Modale Dépouillement : entreprises consultées, régime variantes, date d'ouverture. Génère le PV automatique." },
+              { color: 'rose', title: '5. Importer les offres', description: "Pour chaque entreprise : import Excel ou PDF (avec OCR si scanné). Variantes en + via bouton dédié." },
+              { color: 'indigo', title: '6. Saisir l\'analyse', description: "Onglets Admin (pièces, groupement, conformité, variantes retenues) + Technique (notes, commentaires, justifications variantes)." },
+              { color: 'teal', title: '7. Générer le PDF', description: "Onglet Récap : bouton « Générer le PDF final ». Export A4 (rapport) + A3 (détail prix unitaires) avec annexes CCP." },
             ],
           },
-          { type: 'tip', text: "Verifiez que la colonne A de votre fichier Excel contient les numeros de reference identiques a ceux de votre BPU." },
+          { type: 'tip', text: "Le RAO peut être autonome (créé depuis une estimation MOE) ou rattaché à un projet existant via le module Gestion de Projets." },
         ],
       },
       {
         id: 'sauvegarde', label: 'Sauvegarde', icon: 'Save',
         sections: [
-          { type: 'intro', text: "L'analyse financiere et le rapport RAO sont sauvegardes separement dans Firestore." },
+          { type: 'intro', text: "Les données sont sauvegardées dans Firestore sur 3 documents distincts pour éviter de saturer la limite 1MB par document." },
           {
-            type: 'grid',
-            items: [
-              { title: 'Analyse (auto-save)', text: "Les donnees de l'analyse financiere sont sauvegardees automatiquement apres chaque modification.", color: 'emerald' },
-              { title: 'Rapport (save manuel)', text: "Le rapport RAO doit etre sauvegarde manuellement via le bouton \"Sauvegarder\".", color: 'amber' },
+            type: 'table',
+            title: "Stockage Firestore",
+            headers: ['Type', 'Document', 'Sauvegarde'],
+            rows: [
+              { label: 'Projet (chapitres, branding, fiche affaire)', desc: 'projects/{id}', extra: 'Manuel (bouton)' },
+              { label: 'Analyse financière (offres, variantes, observatoire)', desc: 'projects/{id}/analysis/data', extra: 'Auto (800ms)' },
+              { label: 'Rapport RAO (consultation, critères, notes, commentaires)', desc: 'projects/{id}/rao/data', extra: 'Auto (1.5s)' },
             ],
           },
-          { type: 'warning', text: "N'oubliez pas de cliquer \"Sauvegarder\" dans le rapport RAO — contrairement a l'analyse, il n'y a pas d'auto-save." },
+          {
+            type: 'card',
+            icon: 'Save', color: 'emerald',
+            title: 'Sauvegarde automatique',
+            description: "L'auto-save est actif sur l'analyse (800ms debounced) ET sur le RAO (1.5s debounced). Un indicateur « Dernière sauvegarde : il y a Xs » apparaît dans le ribbon.",
+          },
+          {
+            type: 'card',
+            icon: 'FileJson', color: 'amber',
+            title: 'Export / Import JSON',
+            description: "Bouton « Export JSON » dans la toolbar de l'analyse financière. Permet de sauvegarder l'état complet localement (backup, transfert entre projets, archive).",
+          },
+        ],
+      },
+      {
+        id: 'ccp', label: 'CCP', icon: 'Shield',
+        sections: [
+          { type: 'intro', text: "Articles du Code de la Commande Publique appliqués par le module. Les références sont reprises dans le PDF (annexe C)." },
+          {
+            type: 'table',
+            title: "Articles CCP appliqués",
+            rows: [
+              { label: 'L2113-1', desc: "Engagement contractuel via l'AE (Acte d'Engagement)" },
+              { label: 'L2152-2', desc: "Irrégularité : offre qui modifie les quantités du DQE" },
+              { label: 'L2152-5 / R2152-3', desc: "Offre Anormalement Basse (OAB) — détection via double moyenne" },
+              { label: 'R2151-8 à R2151-11', desc: "Variantes : autorisées, interdites, obligatoires ; règles de substitution" },
+              { label: 'R2152-1, R2152-6, R2152-7', desc: "Critères d'attribution, offre économiquement la plus avantageuse, pondération" },
+              { label: 'R2152-2', desc: "Régularisation manuelle d'une offre irrégulière par décision motivée du PA" },
+            ],
+          },
+          {
+            type: 'card',
+            icon: 'AlertTriangle', color: 'amber',
+            title: 'Responsabilité du pouvoir adjudicateur',
+            description: "Le module détecte et signale automatiquement les non-conformités, mais c'est le PA qui décide en dernier ressort (notation, attribution, régularisation, rejet OAB).",
+          },
         ],
       },
     ],
