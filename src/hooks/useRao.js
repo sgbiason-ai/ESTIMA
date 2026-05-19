@@ -95,25 +95,40 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
     updateRao(r => ({ consultation: { ...(r.consultation || {}), [field]: value } }));
 
   // ── CRITÈRES ─────────────────────────────────────────────────────────────
-  const criteria = rao.criteria || DEFAULT_CRITERIA;
-  const updateCriteria = (newCriteria) => updateRao(() => ({ criteria: newCriteria }));
+  // Garantit toujours la présence du critère "Prix" (auto) en première position.
+  // Si manquant dans rao.criteria (anciennes données, suppression accidentelle…),
+  // on le réinjecte automatiquement depuis DEFAULT_CRITERIA.
+  const ensurePriceCriterion = (list) => {
+    const safeList = Array.isArray(list) && list.length > 0 ? list : DEFAULT_CRITERIA;
+    if (safeList.some(c => c.auto)) return safeList;
+    // Pas de critère auto → on insère DEFAULT_CRITERIA[0] (Prix) en tête
+    return [DEFAULT_CRITERIA[0], ...safeList];
+  };
+
+  const criteria = ensurePriceCriterion(rao.criteria);
+
+  const updateCriteria = (newCriteria) => updateRao(() => ({ criteria: ensurePriceCriterion(newCriteria) }));
 
   const addCriterion = () => {
     const newId = `c${Date.now()}`;
     updateRao(r => ({
-      criteria: [...(r.criteria || DEFAULT_CRITERIA), {
+      criteria: [...ensurePriceCriterion(r.criteria), {
         id: newId, label: 'Nouveau critère', weight: 0, auto: false, description: '', subCriteria: [],
       }],
     }));
   };
 
   const removeCriterion = (id) => {
-    updateRao(r => ({ criteria: (r.criteria || DEFAULT_CRITERIA).filter(c => c.id !== id) }));
+    updateRao(r => ({
+      criteria: ensurePriceCriterion(
+        ensurePriceCriterion(r.criteria).filter(c => c.id !== id)
+      ),
+    }));
   };
 
   const addSubCriterion = (parentId) => {
     updateRao(r => ({
-      criteria: (r.criteria || DEFAULT_CRITERIA).map(c => {
+      criteria: ensurePriceCriterion(r.criteria).map(c => {
         if (c.id !== parentId) return c;
         const subs = c.subCriteria || [];
         return { ...c, subCriteria: [...subs, { id: `sc${Date.now()}`, label: '', description: '' }] };
@@ -123,7 +138,7 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
 
   const removeSubCriterion = (parentId, subId) => {
     updateRao(r => ({
-      criteria: (r.criteria || DEFAULT_CRITERIA).map(c => {
+      criteria: ensurePriceCriterion(r.criteria).map(c => {
         if (c.id !== parentId) return c;
         const newSubs = (c.subCriteria || []).filter(sc => sc.id !== subId);
         const totalWeight = newSubs.reduce((s, sc) => s + (Number(sc.weight) || 0), 0);
@@ -134,7 +149,7 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
 
   const updateSubCriterion = (parentId, subId, field, value) => {
     updateRao(r => ({
-      criteria: (r.criteria || DEFAULT_CRITERIA).map(c => {
+      criteria: ensurePriceCriterion(r.criteria).map(c => {
         if (c.id !== parentId) return c;
         const newSubs = (c.subCriteria || []).map(sc => sc.id === subId ? { ...sc, [field]: value } : sc);
         // Recalcule le weight parent = somme des sous-critères
@@ -281,12 +296,23 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
     const N = Number(scoringConfig?.maxScore || 40);
     const mode = scoringConfig?.mode || 'f1';
 
-    // Totaux depuis l'analyse financière (source de vérité)
+    // Totaux depuis l'analyse financière (source de vérité unique)
     const effectiveStats = raoAnalysisStats || analysisStats;
     const companiesTotals = effectiveStats?.companiesTotals || {};
 
-    // Calcul Pmin/Pmax/Pmoy depuis les totaux
-    const validTotals = analysisCompanies.map(c => companiesTotals[c.id] || 0).filter(t => t > 0);
+    // Détection des offres irrégulières (CCP : exclues de la notation)
+    // Source : project.rao.companies[name].admin.conclusion
+    const NON_REGULAR = ['irreguliere', 'inacceptable', 'inappropriee'];
+    const isIrregular = (companyName) => {
+      const conclusion = rao.companies?.[companyName]?.admin?.conclusion;
+      return conclusion && NON_REGULAR.includes(conclusion);
+    };
+
+    // Calcul Pmin/Pmax/Pmoy depuis les totaux — EXCLUSION des entreprises irrégulières
+    const validTotals = analysisCompanies
+      .filter(c => !isIrregular(c.name))
+      .map(c => companiesTotals[c.id] || 0)
+      .filter(t => t > 0);
     const Pmin = validTotals.length ? Math.min(...validTotals) : 0;
     const Pmax = validTotals.length ? Math.max(...validTotals) : 0;
     const Pmoy = validTotals.length ? validTotals.reduce((a, b) => a + b, 0) / validTotals.length : 0;
@@ -295,24 +321,28 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
     analysisCompanies.forEach((company) => {
       const name = company.name;
       const price = companiesTotals[company.id] || 0;
+      const irregular = isIrregular(name);
 
-      // Score prix : recalculé avec la formule et N (barème RAO)
-      let rawScore = 0;
-      if (price > 0 && Pmin > 0) {
-        switch (mode) {
-          case 'f1': rawScore = N * (Pmin / price); break;
-          case 'f2': rawScore = N * Math.pow(Pmin / price, 2); break;
-          case 'f3': rawScore = N * Math.pow(Pmin / price, 3); break;
-          case 'f4': rawScore = N * (1 - (price - Pmin) / Pmin); break;
-          case 'f5': rawScore = N * (1 - (price - Pmin) / Pmoy); break;
-          case 'f6': rawScore = price <= Pmoy ? N * Math.sqrt(Pmin / price) : N * Math.pow(Pmin / price, 2); break;
-          case 'f7': rawScore = Pmax === Pmin ? N : N * (1 - (price - Pmin) / (Pmax - Pmin)); break;
-          case 'f8': rawScore = (N * Pmoy) / (Pmoy + price); break;
-          case 'f9': rawScore = N * ((2 * Pmin) / (Pmin + price)); break;
-          default:   rawScore = N * (Pmin / price);
+      // Score prix : 0 si offre irrégulière (exclue de la notation — CCP)
+      let priceScore = 0;
+      if (!irregular) {
+        let rawScore = 0;
+        if (price > 0 && Pmin > 0) {
+          switch (mode) {
+            case 'f1': rawScore = N * (Pmin / price); break;
+            case 'f2': rawScore = N * Math.pow(Pmin / price, 2); break;
+            case 'f3': rawScore = N * Math.pow(Pmin / price, 3); break;
+            case 'f4': rawScore = N * (1 - (price - Pmin) / Pmin); break;
+            case 'f5': rawScore = N * (1 - (price - Pmin) / Pmoy); break;
+            case 'f6': rawScore = price <= Pmoy ? N * Math.sqrt(Pmin / price) : N * Math.pow(Pmin / price, 2); break;
+            case 'f7': rawScore = Pmax === Pmin ? N : N * (1 - (price - Pmin) / (Pmax - Pmin)); break;
+            case 'f8': rawScore = (N * Pmoy) / (Pmoy + price); break;
+            case 'f9': rawScore = N * ((2 * Pmin) / (Pmin + price)); break;
+            default:   rawScore = N * (Pmin / price);
+          }
         }
+        priceScore = Math.max(0, Math.min(N, rawScore));
       }
-      const priceScore = Math.max(0, Math.min(N, rawScore));
 
       // Scores techniques (notes saisies dans le RAO)
       const techScores = {};
@@ -336,17 +366,24 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
       });
 
       const totalScore = priceScore + Object.values(techScores).reduce((a, b) => a + b, 0);
-      scores[name] = { priceScore, techScores, totalScore, price };
+      scores[name] = { priceScore, techScores, totalScore, price, irregular };
     });
     return scores;
   };
 
   // ── CLASSEMENT ────────────────────────────────────────────────────────────
+  // Les offres irrégulières sont placées en bas et n'ont pas de rang (CCP).
   const getRanking = () => {
     const scores = computeScores();
-    return Object.entries(scores)
+    const entries = Object.entries(scores);
+    const regular = entries
+      .filter(([, s]) => !s.irregular)
       .sort((a, b) => b[1].totalScore - a[1].totalScore)
       .map(([name, s], i) => ({ name, rank: i + 1, ...s }));
+    const irregular = entries
+      .filter(([, s]) => s.irregular)
+      .map(([name, s]) => ({ name, rank: null, ...s }));
+    return [...regular, ...irregular];
   };
 
   return {

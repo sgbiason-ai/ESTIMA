@@ -1,8 +1,103 @@
 // src/components/rao/tabs/TabConsultation.jsx
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Info, BarChart2, Plus, Trash2, Layers, Lock, AlertTriangle, ShieldCheck, CornerDownRight } from 'lucide-react';
+import { Info, BarChart2, Plus, Trash2, Layers, Lock, AlertTriangle, ShieldCheck, CornerDownRight, GitBranch, ScrollText, FileSignature } from 'lucide-react';
 import { Field, Input } from '../RaoUI';
 import { FORMULA_LABELS_CONSULT } from '../RaoConstants';
+
+// ─── Section Variantes (CCP R2151-8 à R2151-11) ──────────────────────────────
+const VARIANT_REGIMES = [
+  {
+    value: 'forbidden',
+    label: 'Interdites',
+    desc: 'Aucune variante ne sera examinée.',
+    color: 'red',
+  },
+  {
+    value: 'allowed',
+    label: 'Autorisées',
+    desc: 'Les variantes sont examinées en complément de l\'offre de base.',
+    color: 'blue',
+  },
+  {
+    value: 'mandatory',
+    label: 'Obligatoires',
+    desc: 'Le soumissionnaire doit proposer au moins une variante.',
+    color: 'amber',
+  },
+];
+
+const VariantsSection = ({ consultation, updateConsultation }) => {
+  const regime = consultation.variantsAllowed || 'forbidden';
+  const requirements = consultation.variantsRequirements || '';
+
+  return (
+    <div>
+      <h4 className="text-[11px] font-black uppercase tracking-widest text-purple-600 mb-4 flex items-center gap-2">
+        <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+        Variantes entreprises (CCP R2151-8 à R2151-11)
+      </h4>
+
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
+        {/* Régime des variantes */}
+        <div className="md:col-span-12">
+          <Field label="Régime des variantes pour cette consultation">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-1">
+              {VARIANT_REGIMES.map(r => {
+                const active = regime === r.value;
+                const colorClasses = active
+                  ? r.color === 'red'   ? 'bg-red-500 text-white border-red-500 shadow-md shadow-red-500/30'
+                  : r.color === 'blue'  ? 'bg-blue-500 text-white border-blue-500 shadow-md shadow-blue-500/30'
+                  :                        'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/30'
+                  : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-50';
+                return (
+                  <button
+                    key={r.value}
+                    onClick={() => updateConsultation('variantsAllowed', r.value)}
+                    className={`px-4 py-3 rounded-xl border-2 text-left transition-all ${colorClasses}`}
+                  >
+                    <div className="flex items-center gap-2 text-sm font-bold">
+                      <GitBranch size={14} />
+                      {r.label}
+                    </div>
+                    <p className={`text-[11px] mt-1 leading-snug ${active ? 'text-white/90' : 'text-slate-500'}`}>
+                      {r.desc}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
+        </div>
+
+        {/* Exigences minimales (uniquement si autorisées/obligatoires) */}
+        {regime !== 'forbidden' && (
+          <div className="md:col-span-12">
+            <Field label="Exigences minimales que les variantes doivent respecter">
+              <textarea
+                value={requirements}
+                onChange={e => updateConsultation('variantsRequirements', e.target.value)}
+                rows={4}
+                placeholder="Ex. Respect des performances techniques minimales de la solution de base. Maintien des caractéristiques fonctionnelles. Aucune diminution du périmètre des prestations…"
+                className="w-full px-3 py-2 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100 transition-all resize-none"
+              />
+            </Field>
+          </div>
+        )}
+
+        {/* Rappel CCP */}
+        <div className="md:col-span-12 bg-purple-50/60 border border-purple-200 rounded-xl px-4 py-3 flex items-start gap-3">
+          <ScrollText size={16} className="text-purple-600 shrink-0 mt-0.5" />
+          <div className="text-[11px] text-purple-900 leading-relaxed">
+            <strong>Rappel CCP :</strong> en procédure formalisée avec pouvoir adjudicateur, les variantes sont
+            <strong> interdites par défaut</strong> sauf mention contraire dans l'avis de marché. En procédure adaptée (MAPA),
+            elles sont <strong>autorisées par défaut</strong> sauf mention contraire dans les documents de consultation.
+            Les exigences minimales sont obligatoires dès que les variantes sont autorisées ou exigées.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // ─── Textarea auto-resize ────────────────────────────────────────────────────
 const AutoTextarea = ({ value, onChange, className, placeholder }) => {
@@ -107,121 +202,48 @@ const TabConsultation = ({
           </div>
         </div>
         
-        <div className="flex flex-col gap-8">
-          {/* Section 1 : Identification du Projet */}
-          <div>
-            <h4 className="text-[11px] font-black uppercase tracking-widest text-emerald-600 mb-4 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-              Identification du projet
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
-              <div className="md:col-span-9">
-                <Field label="Objet des travaux / Titre principal">
-                  <Input value={consultation.objet} onChange={v => updateConsultation('objet', v)} placeholder="Ex. Aménagement du Boulevard..." />
-                </Field>
-              </div>
-              <div className="md:col-span-3">
-                <Field label="Code Affaire / Réf.">
-                  <Input value={consultation.code} onChange={v => updateConsultation('code', v)} placeholder="Ex. 26-0001" />
-                </Field>
-              </div>
-              <div className="md:col-span-6">
-                <Field label="Sous-titre 1 (Optionnel)">
-                  <Input value={consultation.subtitle1} onChange={v => updateConsultation('subtitle1', v)} placeholder="Ex. Voirie et Réseaux Divers" />
-                </Field>
-              </div>
-              <div className="md:col-span-6">
-                <Field label="Sous-titre 2 (Optionnel)">
-                  <Input value={consultation.subtitle2} onChange={v => updateConsultation('subtitle2', v)} placeholder="Ex. Tranche 1" />
-                </Field>
-              </div>
+        <div className="flex flex-col gap-6">
+          {/* Bandeau info : renvoie vers Fiche affaire pour les infos générales */}
+          <div className="flex items-start gap-3 px-4 py-3 bg-blue-50/70 border border-blue-200 rounded-2xl">
+            <div className="p-2 rounded-xl bg-blue-100 shrink-0">
+              <FileSignature size={16} className="text-blue-700" />
+            </div>
+            <div className="text-xs text-blue-900 leading-relaxed">
+              <strong>Informations générales du projet</strong> (client, MOE, lieu, dates, durées, phase…) :
+              utilisez le bouton <strong>Fiche affaire</strong> dans le ribbon pour les saisir et les modifier.
+              <br />
+              Cet onglet se concentre désormais sur les <strong>spécificités RAO</strong> : procédure, lot, et les
+              <strong> critères de notation</strong> (volet droit).
             </div>
           </div>
 
-          <div className="w-full h-px bg-slate-100"></div>
-
-          {/* Section 2 : Acteurs & Marché */}
+          {/* Spécificités RAO (procédure marché public, lot, date après négo) */}
           <div>
-            <h4 className="text-[11px] font-black uppercase tracking-widest text-blue-600 mb-4 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-              Acteurs & Caractéristiques du marché
+            <h4 className="text-[11px] font-black uppercase tracking-widest text-emerald-600 mb-4 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              Spécificités RAO
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
               <div className="md:col-span-4">
-                <Field label="Client / Maître d'Ouvrage">
-                  <Input value={consultation.client} onChange={v => updateConsultation('client', v)} placeholder="Nom du client" />
-                </Field>
-              </div>
-              <div className="md:col-span-4">
-                <Field label="Maître d'Œuvre (MOE)">
-                  <Input value={consultation.moe} onChange={v => updateConsultation('moe', v)} placeholder="Ex. PAPYRUS" />
-                </Field>
-              </div>
-              <div className="md:col-span-4">
-                <Field label="Lieu d'exécution">
-                  <Input value={consultation.lieu} onChange={v => updateConsultation('lieu', v)} placeholder="Ex. Aussillon (81)" />
-                </Field>
-              </div>
-              
-              <div className="md:col-span-3">
-                <Field label="Type de Marché">
-                  <Input value={consultation.marketType} onChange={v => updateConsultation('marketType', v)} placeholder="Ex. Privé ou Public" />
-                </Field>
-              </div>
-              <div className="md:col-span-3">
                 <Field label="Procédure">
                   <Input value={consultation.procedure} onChange={v => updateConsultation('procedure', v)} placeholder="Ex. Procédure adaptée ouverte" />
                 </Field>
               </div>
-              <div className="md:col-span-3">
-                <Field label="Phase">
-                  <Input value={consultation.phase} onChange={v => updateConsultation('phase', v)} placeholder="Ex. DCE" />
-                </Field>
-              </div>
-              <div className="md:col-span-3">
+              <div className="md:col-span-4">
                 <Field label="Lot">
                   <Input value={consultation.lot} onChange={v => updateConsultation('lot', v)} placeholder="Ex. Lot 1 — Voirie et génie civil" />
                 </Field>
               </div>
-            </div>
-          </div>
-
-          <div className="w-full h-px bg-slate-100"></div>
-
-          {/* Section 3 : Calendrier & Délais */}
-          <div>
-            <h4 className="text-[11px] font-black uppercase tracking-widest text-amber-600 mb-4 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-              Calendrier & Délais
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-10 gap-5">
-              <div className="md:col-span-2">
-                <Field label="Date remise des offres">
-                  <Input type="date" value={consultation.dateRemise} onChange={v => updateConsultation('dateRemise', v)} />
-                </Field>
-              </div>
-              <div className="md:col-span-2">
-                <Field label="Heure limite">
-                  <Input type="time" value={consultation.timeRemise} onChange={v => updateConsultation('timeRemise', v)} />
-                </Field>
-              </div>
-              <div className="md:col-span-2">
+              <div className="md:col-span-4">
                 <Field label="Date limite après négo.">
                   <Input value={consultation.dateNego} onChange={v => updateConsultation('dateNego', v)} placeholder="Ex. 3 oct. à 17H00" />
                 </Field>
               </div>
-              <div className="md:col-span-2">
-                <Field label="Délai préparation">
-                  <Input value={consultation.prepPeriod} onChange={v => updateConsultation('prepPeriod', v)} placeholder="Ex. 1 mois" />
-                </Field>
-              </div>
-              <div className="md:col-span-2">
-                <Field label="Durée des travaux">
-                  <Input value={consultation.duration} onChange={v => updateConsultation('duration', v)} placeholder="Ex. 4 mois" />
-                </Field>
-              </div>
             </div>
           </div>
+
+          {/* Note : la déclaration du régime des variantes (CCP R2151-8) a été
+              déplacée dans la modale Dépouillement pour simplifier le workflow. */}
         </div>
       </div>
       }

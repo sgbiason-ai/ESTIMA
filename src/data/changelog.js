@@ -2,15 +2,35 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.5.26';
+export const APP_VERSION = '2.5.27';
 
 export const CHANGELOG = [
+  {
+    version: '2.5.27',
+    date: '2026-05-19',
+    title: 'RAO : refonte PDF complète + justification des variantes',
+    highlights: [
+      'RAO : nouvelle section dans la tab Technique pour justifier l\'acceptation ou le rejet de chaque variante proposée (encadré dédié, repris dans le PDF section 7.bis avec motivation surlignée)',
+      'RAO PDF : refonte de la section "Détail des prix unitaires" — variantes retenues affichées comme colonnes parallèles à la base avec quantité variante / PU / total / % (cohérence onglet Analyse financière)',
+      'RAO PDF : "Analyse technique" aérée — 1 sous-critère = 1 page dédiée, gap entre entreprises réparti pour remplir l\'espace, distribution sur 2+ pages si débordement (plus de troncature)',
+      'RAO PDF : section "Rappel des critères de notation" refonte complète en rendu manuel — typographie agrandie (font 11 critère / 9 sous-critère), descriptions justifiées par paragraphe (lignes finissant par \\n non étirées), bandeau vert clair pour critères principaux',
+      'RAO PDF : suppression des pages "Synthèse Exécutive" et "Réponses reçues" — les infos clés sont dans le Récap final et le PV de dépouillement',
+      'RAO PDF : sommaire renuméroté proprement (3, 3.bis, 4, 5, 5.bis... au lieu de 4, 4.bis, 5... avec un trou sur le 3)',
+      'RAO PDF : header dynamique — wrap automatique du titre sur 2 lignes si trop long (hauteur du bandeau ajustée), évite le débordement sur le logo',
+      'RAO PDF : tous les paragraphes longs sont désormais en alignement justifié (intros CCP, recommandation, commentaires techniques, descriptions de critères, descriptifs de variantes)',
+      'RAO PDF : cohérence des scores entre tableau classement et graphique barres — utilisation du ranking étendu (avec variantes retenues + recalcul Pmin/Pmoy/Pmax sans irrégulières)',
+      'RAO PDF : bandeau sous-critère dans l\'Analyse technique wrap automatiquement si le titre est trop long (hauteur dynamique)',
+      'RAO PDF : correction d\'une dizaine de coquilles — footer dupliqué (jusqu\'à 5×), numéros de page figés sur tables A3, critère "Valeur technique" sans numéro "2.", montant brut affiché dans les barres de la synthèse financière, baselines décalées dans le tableau critères',
+    ],
+  },
   {
     version: '2.5.26',
     date: '2026-05-14',
     title: 'CRC mobile : confort lecture, participants, dupliquer/supprimer CR',
     highlights: [
       'Devis MOE : sauvegarde sécurisée — auto-save 3s après inactivité, avertissement si on quitte avec des modifs non enregistrées (Hub, autre devis, fermeture onglet), protection anti double-clic',
+      'Devis MOE : onglet Informations sur une seule ligne — Identification + Maître d\'ouvrage côte à côte, container max-w-7xl, paddings réduits',
+      'Devis MOE : onglet Honoraires — colonnes jours/heures alignées en tableau entre rangées tâches et en-têtes de phase (catColW unifié, drag handle uniforme, suppression dividers 1px)',
       'CRC mobile : tap sur une observation ouvre une vue plein écran (swiper) avec navigation swipe',
       'CRC mobile : participants affichent le nom + label au lieu de l\'email',
       'CRC mobile : boutons Dupliquer et Supprimer un CR (comme sur desktop)',

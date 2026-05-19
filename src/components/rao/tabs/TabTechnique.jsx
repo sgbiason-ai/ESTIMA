@@ -1,6 +1,6 @@
 // src/components/rao/tabs/TabTechnique.jsx
 import React, { useRef, useEffect } from 'react';
-import { Brain, MessageSquare, AlertCircle } from 'lucide-react';
+import { Brain, MessageSquare, AlertCircle, GitBranch, Check, X } from 'lucide-react';
 import { ScoreBadge } from '../RaoUI';
 import { COMPANY_UI_COLORS, FORMULA_LABELS_CONSULT } from '../RaoConstants';
 import CompanySidebar from '../CompanySidebar';
@@ -15,7 +15,8 @@ const AutoTextarea = ({ value, onChange, className, placeholder, rows }) => {
 const TabTechnique = ({
   companyNames, companiesData, criteria, updateTechnical,
   analysisStats, scoringConfig, analysisCompanies = [],
-  selectedCompany, onSelectCompany
+  selectedCompany, onSelectCompany,
+  onUpdateVariantJustification = null,
 }) => {
   const nonAuto = criteria.filter(c => !c.auto);
   const autoCrit = criteria.find(c => c.auto);
@@ -152,6 +153,75 @@ const TabTechnique = ({
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Variantes proposées par l'entreprise (si applicable) ── */}
+          {(companyObj?.variants || []).length > 0 && (
+            <div className="bg-white border-2 border-purple-200 rounded-[24px] overflow-hidden shadow-sm">
+              <div className="flex items-center gap-3 px-6 py-4 bg-purple-50/60 border-b border-purple-100">
+                <div className="p-2 bg-purple-100 text-purple-700 rounded-xl">
+                  <GitBranch size={18} />
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-extrabold text-slate-800 text-lg tracking-tight">
+                    Variantes proposées
+                    <span className="ml-2 text-xs font-bold text-purple-600 bg-purple-100 px-2 py-0.5 rounded-md align-middle">
+                      {(companyObj.variants || []).length}
+                    </span>
+                  </h4>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                    Justification de l'acceptation/rejet (reprise dans le PDF section 7.bis)
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-4">
+                {(companyObj.variants || []).map((v, vi) => (
+                  <div key={v.id} className={`rounded-2xl border-2 p-4 space-y-3 ${v.retained ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-slate-50/50'}`}>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className="flex items-center justify-center w-8 h-8 rounded-xl bg-purple-600 text-white text-xs font-black shadow-sm">
+                        V{vi + 1}
+                      </span>
+                      <span className="flex-1 text-sm font-bold text-slate-700">
+                        {v.label || `Variante ${vi + 1}`}
+                      </span>
+                      {v.retained ? (
+                        <span className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500 text-white rounded-lg text-[10px] font-black uppercase tracking-widest shadow-sm">
+                          <Check size={12} strokeWidth={3} /> Retenue
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-300 text-slate-700 rounded-lg text-[10px] font-black uppercase tracking-widest">
+                          <X size={12} strokeWidth={3} /> Non retenue
+                        </span>
+                      )}
+                      {v.total > 0 && (
+                        <span className="font-mono font-bold text-slate-600 text-sm">
+                          {v.total.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} € HT
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between mb-1 px-1">
+                      <label className="flex items-center gap-2 text-[11px] font-black text-slate-700 uppercase tracking-widest">
+                        <MessageSquare size={13} className="text-purple-500" />
+                        Justification {v.retained ? 'd\'acceptation' : 'de rejet'}
+                      </label>
+                      <span className="px-2 py-0.5 bg-purple-50 text-purple-600 rounded-full text-[10px] font-bold tracking-widest uppercase">PDF</span>
+                    </div>
+                    <AutoTextarea
+                      value={v.justification || ''}
+                      onChange={e => onUpdateVariantJustification && onUpdateVariantJustification(companyObj.id, v.id, e.target.value)}
+                      placeholder={v.retained
+                        ? "Pourquoi cette variante est-elle retenue ? (avantages technique/économique/délai, conformité aux exigences min, etc.)"
+                        : "Pourquoi cette variante n'est-elle pas retenue ? (non-conformité, désintérêt technique, surcoût, etc.)"
+                      }
+                      className="w-full bg-white border-2 border-purple-100 rounded-xl p-4 text-sm font-medium text-slate-700 leading-relaxed shadow-inner focus:border-purple-400 focus:ring-4 focus:ring-purple-500/10 outline-none transition-all min-h-[60px]"
+                      rows={2}
+                    />
+                  </div>
+                ))}
               </div>
             </div>
           )}

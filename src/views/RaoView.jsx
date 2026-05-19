@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   FileText, CheckSquare, Brain, MessageSquare, BarChart2, AlertCircle,
-  FileDown, Loader2, Users, Save, CheckCircle2
+  FileDown, Loader2, Users, Save, CheckCircle2, ScrollText, FileSignature
 } from 'lucide-react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db as fireDb } from '../firebase';
@@ -15,13 +15,17 @@ import TabAdministrative from '../components/rao/tabs/TabAdministrative';
 import TabTechnique from '../components/rao/tabs/TabTechnique';
 import TabNegociation from '../components/rao/tabs/TabNegociation';
 import TabRecap from '../components/rao/tabs/TabRecap';
+import TabDepouillement from '../components/rao/tabs/TabDepouillement';
+import DepouillementModal from '../components/rao/DepouillementModal';
+import ProjectDetailsModal from '../components/modals/ProjectDetailsModal';
 
 const TABS = [
-  { id: 'consultation', label: 'Consultation',   icon: FileText },
-  { id: 'admin',        label: 'Administrative', icon: CheckSquare },
-  { id: 'technique',    label: 'Technique',      icon: Brain },
-  { id: 'negociation',  label: 'Négociation',    icon: MessageSquare },
-  { id: 'recap',        label: 'Récapitulatif',  icon: BarChart2 },
+  { id: 'consultation',  label: 'Consultation',  icon: FileText },
+  { id: 'depouillement', label: 'Dépouillement', icon: ScrollText },
+  { id: 'admin',         label: 'Administrative', icon: CheckSquare },
+  { id: 'technique',     label: 'Technique',     icon: Brain },
+  { id: 'negociation',   label: 'Négociation',   icon: MessageSquare },
+  { id: 'recap',         label: 'Récapitulatif', icon: BarChart2 },
 ];
 
 import { RibbonGroup, RibbonBtnLarge } from '../components/common/RibbonParts';
@@ -40,13 +44,51 @@ const RaoView = ({
   bpuRefMap = new Map(),
   activeTrancheId = 'global',
   tranches = [],
-  analysisMode = 'standard'
+  analysisMode = 'standard',
+  onImportVariant = null,
+  onRemoveVariant = null,
+  onToggleVariantRetained = null,
+  onUpdateVariantJustification = null,
+  onApplyDepouillement = null,
+  onImportOffer = null,
+  onImportPdfOffer = null,
+  handleSaveProject = null,
 }) => {
-  const [activeTab, setActiveTab] = useState('consultation');
+  const [activeTab, setActiveTab] = useState('depouillement');
   const [selectedCompany, setSelectedCompany] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
+  // État de la modale Dépouillement
+  const [depouillementOpen, setDepouillementOpen] = useState(false);
+  // Trace si la modale a déjà été présentée pour éviter la réouverture en boucle
+  const autoOpenedRef = useRef(false);
+  // État de la modale Fiche affaire (identique au module ESTIMA)
+  const [detailsOpen, setDetailsOpen] = useState(false);
+
+  // Sauvegarde des détails du projet — merge sur le projet + persistance Firestore
+  const handleSaveProjectDetails = useCallback(async (details) => {
+    if (!details || !setProject) return;
+    let merged = null;
+    setProject(prev => {
+      if (!prev) return prev;
+      merged = { ...prev, ...details };
+      return merged;
+    });
+    // Persister immédiatement le projet (sinon le state local est mis à jour
+    // mais le doc racine companies/{id}/projects/{id} ne reflète pas les changements).
+    if (handleSaveProject && merged) {
+      try {
+        await handleSaveProject(merged);
+        toast.success('Fiche affaire sauvegardée.');
+      } catch (e) {
+        console.error('[FicheAffaire] Erreur sauvegarde:', e);
+        toast.error('Erreur lors de la sauvegarde de la fiche affaire.');
+      }
+    } else {
+      toast.success('Fiche affaire mise à jour.');
+    }
+  }, [setProject, handleSaveProject]);
 
   const rao = useRao(project, setProject, analysisCompanies, analysisStats, scoringConfig, tranches);
 
@@ -55,6 +97,8 @@ const RaoView = ({
 
   // Chargement Firestore au montage (une seule fois)
   const loadedForRef = useRef(null);
+  // Garde-fou pour ne pas déclencher l'auto-save juste après le chargement
+  const skipNextAutoSaveRef = useRef(false);
   useEffect(() => {
     if (!projectId || !companyId) return;
     if (loadedForRef.current === projectId) return;
@@ -62,23 +106,63 @@ const RaoView = ({
     const docRef = doc(fireDb, 'companies', companyId, 'projects', projectId, 'rao', 'data');
     getDoc(docRef).then(snap => {
       if (snap.exists() && snap.data().rao) {
+        skipNextAutoSaveRef.current = true; // évite de re-sauver les données qu'on vient de charger
         setProject(prev => ({ ...prev, rao: snap.data().rao }));
       }
     }).catch(e => console.error('[RAO] Erreur chargement:', e));
   }, [projectId, companyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Sauvegarde manuelle uniquement (pas d'auto-save)
-  const saveRaoToFirestore = useCallback(() => {
-    if (!projectId || !companyId) return;
+  // Sauvegarde RAO dans Firestore (utilisée par auto-save + bouton manuel)
+  const saveRaoToFirestore = useCallback((silent = false) => {
+    if (!projectId || !companyId) return Promise.resolve();
     const docRef = doc(fireDb, 'companies', companyId, 'projects', projectId, 'rao', 'data');
     const payload = { rao: project?.rao || {}, lastSaved: new Date().toISOString() };
-    setDoc(docRef, payload)
-      .then(() => { setLastSaved(new Date()); toast.success('Rapport RAO sauvegardé.'); })
-      .catch(e => { console.error('[RAO] Erreur sauvegarde:', e); toast.error('Erreur de sauvegarde.'); });
+    return setDoc(docRef, payload)
+      .then(() => {
+        setLastSaved(new Date());
+        if (!silent) toast.success('Rapport RAO sauvegardé.');
+      })
+      .catch(e => {
+        console.error('[RAO] Erreur sauvegarde:', e);
+        if (!silent) toast.error('Erreur de sauvegarde.');
+      });
   }, [projectId, companyId, project?.rao]);
+
+  // ─── AUTO-SAVE — déclenché 1.5s après toute modification de project.rao ──
+  // Couvre : auto-flag irregulière à l'import, dépouillement, pièces admin/offre
+  // réordonnées par drag&drop, critères, technique, négociation.
+  const raoRef = useRef(project?.rao);
+  useEffect(() => { raoRef.current = project?.rao; }, [project?.rao]);
+
+  useEffect(() => {
+    if (!projectId || !companyId) return;
+    if (!project?.rao) return;
+    // Skipper l'auto-save juste après chargement Firestore
+    if (skipNextAutoSaveRef.current) {
+      skipNextAutoSaveRef.current = false;
+      return;
+    }
+    const handle = setTimeout(() => {
+      saveRaoToFirestore(true); // silent : pas de toast pour l'auto-save
+    }, 1500);
+    return () => clearTimeout(handle);
+  }, [project?.rao, projectId, companyId, saveRaoToFirestore]);
 
   const ranking = rao.getRanking();
   const companyNames = analysisCompanies.map(c => c.name);
+
+  // Auto-ouverture de la modale Dépouillement si aucune entreprise saisie
+  // (une seule fois par session, ne se réouvre pas après fermeture)
+  useEffect(() => {
+    if (autoOpenedRef.current) return;
+    if (!onApplyDepouillement) return;
+    if (analysisCompanies.length === 0) {
+      autoOpenedRef.current = true;
+      setDepouillementOpen(true);
+    } else {
+      autoOpenedRef.current = true; // déjà des entreprises → ne pas auto-ouvrir plus tard
+    }
+  }, [analysisCompanies.length, onApplyDepouillement]);
 
   // Sync selectedCompany avec la liste des entreprises
   useEffect(() => {
@@ -113,7 +197,12 @@ const RaoView = ({
           ? (rao.raoTrancheId === 'global' ? 'Global (toutes tranches)' : (tranches.find(t => t.id === rao.raoTrancheId)?.name || rao.raoTrancheId))
           : null,
         analysisMode,
-        scoringConfig
+        scoringConfig,
+        // Nouvelles props pour la refonte complète du PDF
+        optionChapters: rao.optionChapters,
+        includedOptions: rao.includedOptions,
+        adminPieces: rao.adminPieces,
+        offerPieces: rao.offerPieces
       });
     } catch (e) { 
       console.error('PDF RAO error:', e); 
@@ -181,8 +270,32 @@ const RaoView = ({
             })}
           </RibbonGroup>
 
+          {/* Fiche affaire */}
+          <RibbonGroup label="Affaire">
+            <RibbonBtnLarge
+              icon={FileSignature}
+              label="Fiche affaire"
+              onClick={() => setDetailsOpen(true)}
+              accent="text-purple-500"
+              title="Éditer les informations du projet (client, MOE, lieu, dates…)"
+            />
+          </RibbonGroup>
+
           {/* Spacer */}
           <div className="flex-1 min-w-[16px]" />
+
+          {/* Dépouillement */}
+          {onApplyDepouillement && (
+            <RibbonGroup label="Dépouillement">
+              <RibbonBtnLarge
+                icon={ScrollText}
+                label="Dépouillement"
+                onClick={() => setDepouillementOpen(true)}
+                accent="text-indigo-500"
+                title="Recenser les entreprises et montants AE (PV de dépouillement)"
+              />
+            </RibbonGroup>
+          )}
 
           {/* Sauvegarde */}
           <RibbonGroup label="Sauvegarde">
@@ -214,16 +327,49 @@ const RaoView = ({
         </div>
       </header>
 
-      <div className={`flex-1 relative ${activeTab === 'admin' || activeTab === 'technique' || activeTab === 'negociation' ? 'overflow-hidden' : 'overflow-y-auto p-6'}`}>
-        <div className={activeTab === 'admin' || activeTab === 'technique' || activeTab === 'negociation' ? 'h-full' : ''}>
+      {/* Modale Dépouillement */}
+      <DepouillementModal
+        open={depouillementOpen}
+        existingCompanies={analysisCompanies}
+        existingConsultation={rao.consultation || {}}
+        onConfirm={(payload) => {
+          if (onApplyDepouillement) onApplyDepouillement(payload);
+          setDepouillementOpen(false);
+        }}
+        onCancel={() => setDepouillementOpen(false)}
+      />
+
+      {/* Modale Fiche affaire (identique au module ESTIMA) */}
+      <ProjectDetailsModal
+        isOpen={detailsOpen}
+        onClose={() => setDetailsOpen(false)}
+        project={project}
+        onSave={handleSaveProjectDetails}
+        branding={masterBranding}
+      />
+
+      <div className={`flex-1 relative ${activeTab === 'admin' || activeTab === 'technique' || activeTab === 'negociation' || activeTab === 'depouillement' ? 'overflow-hidden' : 'overflow-y-auto p-6'}`}>
+        <div className={activeTab === 'admin' || activeTab === 'technique' || activeTab === 'negociation' || activeTab === 'depouillement' ? 'h-full' : ''}>
+          {activeTab === 'depouillement' && (
+            <TabDepouillement
+              consultation={rao.consultation}
+              analysisCompanies={analysisCompanies}
+              onReopenDepouillement={() => setDepouillementOpen(true)}
+              onImportOffer={onImportOffer}
+              onImportPdfOffer={onImportPdfOffer}
+              onImportVariant={onImportVariant}
+              onGoToTechnique={(name) => { setSelectedCompany(name); setActiveTab('technique'); }}
+              onGoToAdmin={(name) => { setSelectedCompany(name); setActiveTab('admin'); }}
+            />
+          )}
           {activeTab === 'consultation' && (
             <TabConsultation consultation={rao.consultation} updateConsultation={rao.updateConsultation} criteria={rao.criteria} updateCriteria={rao.updateCriteria} addCriterion={rao.addCriterion} removeCriterion={rao.removeCriterion} addSubCriterion={rao.addSubCriterion} removeSubCriterion={rao.removeSubCriterion} updateSubCriterion={rao.updateSubCriterion} scoringConfig={scoringConfig} hasTranches={rao.hasTranches} tranches={rao.tranches} raoTrancheId={rao.raoTrancheId} setRaoTrancheId={rao.setRaoTrancheId} />
           )}
           {activeTab === 'admin' && (
-            <TabAdministrative companyNames={companyNames} companiesData={project?.rao?.companies || {}} updateAdminPiece={rao.updateAdminPiece} updateAdminField={rao.updateAdminField} selectedCompany={selectedCompany} onSelectCompany={setSelectedCompany} adminPieces={rao.adminPieces} offerPieces={rao.offerPieces} setAdminPieces={rao.setAdminPieces} setOfferPieces={rao.setOfferPieces} />
+            <TabAdministrative companyNames={companyNames} companiesData={project?.rao?.companies || {}} updateAdminPiece={rao.updateAdminPiece} updateAdminField={rao.updateAdminField} selectedCompany={selectedCompany} onSelectCompany={setSelectedCompany} adminPieces={rao.adminPieces} offerPieces={rao.offerPieces} setAdminPieces={rao.setAdminPieces} setOfferPieces={rao.setOfferPieces} analysisCompanies={analysisCompanies} consultation={rao.consultation} onImportVariant={onImportVariant} onRemoveVariant={onRemoveVariant} onToggleVariantRetained={onToggleVariantRetained} />
           )}
           {activeTab === 'technique' && (
-            <TabTechnique companyNames={companyNames} companiesData={project?.rao?.companies || {}} criteria={rao.criteria} updateTechnical={rao.updateTechnical} analysisStats={rao.raoAnalysisStats} scoringConfig={scoringConfig} analysisCompanies={analysisCompanies} selectedCompany={selectedCompany} onSelectCompany={setSelectedCompany} />
+            <TabTechnique companyNames={companyNames} companiesData={project?.rao?.companies || {}} criteria={rao.criteria} updateTechnical={rao.updateTechnical} analysisStats={rao.raoAnalysisStats} scoringConfig={scoringConfig} analysisCompanies={analysisCompanies} selectedCompany={selectedCompany} onSelectCompany={setSelectedCompany} onUpdateVariantJustification={onUpdateVariantJustification} />
           )}
           {activeTab === 'negociation' && (
             <TabNegociation
@@ -240,7 +386,7 @@ const RaoView = ({
             />
           )}
           {activeTab === 'recap' && (
-            <TabRecap criteria={rao.criteria} ranking={ranking} companyNames={companyNames} onExportPDF={handleExportPDF} isExporting={isExporting} scoringConfig={scoringConfig} hasTranches={rao.hasTranches} raoTrancheId={rao.raoTrancheId} tranches={rao.tranches} />
+            <TabRecap criteria={rao.criteria} ranking={ranking} companyNames={companyNames} onExportPDF={handleExportPDF} isExporting={isExporting} scoringConfig={scoringConfig} hasTranches={rao.hasTranches} raoTrancheId={rao.raoTrancheId} tranches={rao.tranches} analysisCompanies={analysisCompanies} optionChapters={rao.optionChapters} includedOptions={rao.includedOptions} />
           )}
         </div>
       </div>

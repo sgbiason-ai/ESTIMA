@@ -416,7 +416,7 @@ export default function DevisMoeHonorairesTab({ draft, onChange, templatesOpen, 
                       {/* Ligne 1 : en-têtes assignee (mode groupement uniquement) */}
                       {assigneeKeys && assigneeKeys.length > 1 && (
                         <div className="flex items-center px-4 py-1.5 bg-gradient-to-r from-slate-100 to-slate-50">
-                          <div className="w-14 shrink-0" />
+                          <div className="w-8 shrink-0" />
                           <div className="flex-1 min-w-0 px-2" />
                           {assigneeKeys.map((aKey, ai) => {
                             const color = aKey === 'mandataire' ? MANDATAIRE_COLOR : aKey === 'notreEntreprise' ? COTRAITANT_COLORS[0] : (COTRAITANT_COLORS[(draft.cotraitants || []).findIndex(c => c.id === aKey)] || COTRAITANT_COLORS[0]);
@@ -436,7 +436,7 @@ export default function DevisMoeHonorairesTab({ draft, onChange, templatesOpen, 
                       )}
                       {/* Ligne 2 : bouton phase + labels catégories */}
                       <div className="flex items-end px-4 py-2 bg-gradient-to-r from-slate-100 to-slate-50">
-                        <div className="w-14 shrink-0" />
+                        <div className="w-8 shrink-0" />
                         <div className="flex-1 min-w-0 px-2">
                           <div className="relative inline-block">
                             <button onClick={() => setShowPhaseMenu(!showPhaseMenu)}
@@ -481,7 +481,7 @@ export default function DevisMoeHonorairesTab({ draft, onChange, templatesOpen, 
                 <DragDropContext onDragEnd={handleDragEnd}>
                   <Droppable droppableId="root" type="PHASE">
                     {(provided) => (
-                      <div ref={provided.innerRef} {...provided.droppableProps} className="p-3 space-y-4">
+                      <div ref={provided.innerRef} {...provided.droppableProps} className="py-3 space-y-4">
                         {activePhases.map((phase, phaseIdx) => {
                           const phaseTaches = tachesByPhase[phase.id] || [];
                           const phaseTotHon = assigneeKeys
@@ -492,11 +492,10 @@ export default function DevisMoeHonorairesTab({ draft, onChange, templatesOpen, 
                             <Draggable key={phase.id} draggableId={`phase:${phase.id}`} index={phaseIdx}>
                               {(provPhase, snapPhase) => (
                                 <div ref={provPhase.innerRef} {...provPhase.draggableProps}
-                                  className={`rounded-xl border overflow-hidden transition-all duration-200 ${selectedPhaseId === phase.id ? 'ring-4 ring-emerald-50/50 border-emerald-500' : ''} ${snapPhase.isDragging ? 'shadow-2xl z-50 ring-4 ring-emerald-500/20 rotate-1' : 'hover:shadow-md'} border-slate-200 bg-white`}>
+                                  className={`overflow-hidden transition-all duration-200 ${selectedPhaseId === phase.id ? 'ring-2 ring-emerald-400/50' : ''} ${snapPhase.isDragging ? 'shadow-2xl z-50 ring-4 ring-emerald-500/20 rotate-1' : ''} bg-white`}>
                                   {/* Phase header dark — aligné sur les colonnes */}
                                   {(() => {
-                                    const phCatColW = assigneeKeys && assigneeKeys.length > 2 ? 'w-14' : assigneeKeys && assigneeKeys.length > 1 ? 'w-16' : 'w-20';
-                                    const phHoursByA = assigneeKeys && assigneeKeys.length > 1 ? phaseHoursByAssignee(phaseTaches, phase.id, catsMap || cats, assigneeKeys) : null;
+                                    const catColW = assigneeKeys && assigneeKeys.length > 2 ? 'w-11' : assigneeKeys && assigneeKeys.length > 1 ? 'w-12' : 'w-14';
                                     return (
                                       <div className={`flex items-center px-4 py-3 transition-colors duration-300 ${selectedPhaseId === phase.id ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-white'}`}
                                         onClick={() => setSelectedPhaseId(phase.id)}>
@@ -521,7 +520,7 @@ export default function DevisMoeHonorairesTab({ draft, onChange, templatesOpen, 
                                             return cats.map(cat => {
                                               const tot = phaseTaches.reduce((s, t) => s + (parseFloat(t.temps?.[cat.id]) || 0), 0);
                                               const disp = tot > 0 ? (uniteTemps === 'j' ? `${parseFloat((tot / H_PAR_JOUR).toFixed(1))}j` : `${fmt(tot)}h`) : '';
-                                              return <div key={cat.id} className="w-20 text-center px-1 shrink-0 text-[10px] font-bold text-white/60">{disp}</div>;
+                                              return <div key={cat.id} className={`${catColW} text-center px-0.5 shrink-0 text-[10px] font-bold text-white/60`}>{disp}</div>;
                                             });
                                           }
 
@@ -572,7 +571,7 @@ export default function DevisMoeHonorairesTab({ draft, onChange, templatesOpen, 
                                             <Draggable key={t.id} draggableId={t.id} index={tIdx}>
                                               {(provT, snapT) => (
                                                 <div ref={provT.innerRef} {...provT.draggableProps}
-                                                  className={`flex items-center border-b border-slate-100 py-1 transition-colors hover:bg-emerald-50/30 group ${snapT.isDragging ? 'shadow-lg z-50 rotate-1 scale-[1.01] bg-white' : ''}`}>
+                                                  className={`flex items-center border-b border-slate-100 px-4 py-1 transition-colors hover:bg-emerald-50/30 group ${snapT.isDragging ? 'shadow-lg z-50 rotate-1 scale-[1.01] bg-white' : ''}`}>
                                                   {/* Drag handle */}
                                                   <div {...provT.dragHandleProps} className="w-8 flex justify-center shrink-0 text-slate-300 hover:text-emerald-500 cursor-grab active:cursor-grabbing">
                                                     <GripVertical size={14} />
@@ -590,14 +589,13 @@ export default function DevisMoeHonorairesTab({ draft, onChange, templatesOpen, 
                                                       : (t.temps || {});
                                                     return (
                                                       <React.Fragment key={aKey || 'solo'}>
-                                                        {aKey && aIdx > 0 && <div className={`w-px self-stretch ${color?.border || 'border-slate-200'} bg-slate-200`} />}
                                                         {cats.map(cat => {
                                                           const hRaw = parseFloat(tempsData[cat.id]);
                                                           const dv = !hRaw ? (tempsData[cat.id] || '') : (uniteTemps === 'j' ? parseFloat((hRaw / H_PAR_JOUR).toFixed(2)) : hRaw);
                                                           return (
                                                             <div key={`${aKey || 'solo'}-${cat.id}`} className={`${catColW} px-0.5 shrink-0 ${color ? color.bg : ''}`}>
                                                               <input type="number" min="0" step="0.5"
-                                                                className={`w-full border rounded py-0.5 px-1 text-right text-xs font-mono font-bold outline-none transition-colors focus:border-emerald-500 focus:bg-white text-slate-700 tabular-nums ${color ? `bg-white/60 ${color.border}` : 'bg-slate-50 border-slate-200'}`}
+                                                                className={`w-full border rounded py-0.5 px-1 text-center text-xs font-mono font-bold outline-none transition-colors focus:border-emerald-500 focus:bg-white text-slate-700 tabular-nums ${color ? `bg-white/60 ${color.border}` : 'bg-slate-50 border-slate-200'}`}
                                                                 value={dv} onChange={handleTacheTempsChange(t.id, cat.id, aKey)} placeholder="—" />
                                                             </div>
                                                           );
@@ -650,7 +648,7 @@ export default function DevisMoeHonorairesTab({ draft, onChange, templatesOpen, 
                   return (
                     <>
                       <div className="flex items-center px-4 py-3 border-t-2 border-slate-300 bg-gradient-to-r from-slate-100 to-white">
-                        <div className="w-14 shrink-0" />
+                        <div className="w-8 shrink-0" />
                         <div className="flex-1 min-w-0 px-2">
                           <span className="text-[10px] font-black uppercase tracking-wider text-slate-700">Total général</span>
                         </div>
@@ -658,7 +656,6 @@ export default function DevisMoeHonorairesTab({ draft, onChange, templatesOpen, 
                           const color = aKey === 'mandataire' ? MANDATAIRE_COLOR : aKey === 'notreEntreprise' ? COTRAITANT_COLORS[0] : aKey ? (COTRAITANT_COLORS[(draft.cotraitants || []).findIndex(c => c.id === aKey)] || COTRAITANT_COLORS[0]) : null;
                           return (
                             <React.Fragment key={aKey || 'solo'}>
-                              {aKey && aIdx > 0 && <div className="w-px self-stretch bg-slate-200" />}
                               {cats.map(cat => {
                                 const tot = grandHoursBA
                                   ? (grandHoursBA[aKey]?.[cat.id] || 0)
@@ -680,7 +677,7 @@ export default function DevisMoeHonorairesTab({ draft, onChange, templatesOpen, 
                       {/* Sous-totaux par assignee — alignés sous les colonnes */}
                       {grandBudgetBA && (
                         <div className="flex items-center px-4 py-2 border-t border-slate-200 bg-slate-50/50">
-                          <div className="w-14 shrink-0" />
+                          <div className="w-8 shrink-0" />
                           <div className="flex-1 min-w-0 px-2" />
                           {assigneeKeys.map(aKey => {
                             const color = aKey === 'mandataire' ? MANDATAIRE_COLOR : aKey === 'notreEntreprise' ? COTRAITANT_COLORS[0] : (COTRAITANT_COLORS[(draft.cotraitants || []).findIndex(c => c.id === aKey)] || COTRAITANT_COLORS[0]);

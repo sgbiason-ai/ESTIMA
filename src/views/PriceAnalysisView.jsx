@@ -6,13 +6,15 @@ import AnalysisTable from '../components/analysis/AnalysisTable';
 import RaoView from './RaoView';
 import HelpPanel from '../components/help/HelpPanel';
 import HelpButton from '../components/help/HelpButton';
+import OcrProgressModal from '../components/rao/OcrProgressModal';
 
 // MAGIE : On importe le moteur de calcul du projet !
 import { useProjectCalculations } from '../hooks/useProjectCalculations';
 
-const PriceAnalysisView = ({ project, companyId, setProject, bpuConfig, clientPercent, masterBranding = null, bpu = [], updateBpuItem = null }) => {
+const PriceAnalysisView = ({ project, companyId, setProject, handleSaveProject = null, bpuConfig, clientPercent, masterBranding = null, bpu = [], updateBpuItem = null }) => {
   // --- ÉTATS ---
-  const [activeMainTab, setActiveMainTab] = useState('analyse');
+  // RAO en premier (point d'entrée du module — workflow dépouillement → analyses)
+  const [activeMainTab, setActiveMainTab] = useState('rao');
   const [activeTrancheId, setActiveTrancheId] = useState('global');
   const [analysisMode, setAnalysisMode] = useState('none'); // 'none', 'heatmap' ou 'oab'
   const [showHelp, setShowHelp] = useState(false);
@@ -86,25 +88,33 @@ const PriceAnalysisView = ({ project, companyId, setProject, bpuConfig, clientPe
 
       <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="priceAnalysis" />
 
+      {/* Modale globale de progression OCR (PDF scannés) */}
+      <OcrProgressModal open={!!analysis.ocrProgress} progress={analysis.ocrProgress} />
+
       {/* ── ONGLETS PRINCIPAUX ── */}
       <div className="shrink-0 flex items-center gap-1 px-4 pt-3 bg-white border-b border-slate-100">
         <HelpButton onClick={() => setShowHelp(true)} />
+        {/* Ordre : RAO (1) → Analyse financière (2)
+            Les variantes sont désormais intégrées directement dans le tableau d'analyse. */}
         {[
-          { id: 'analyse', label: '📊 Analyse financière' },
           { id: 'rao',     label: "📋 Rapport d'analyse (RAO)" },
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveMainTab(tab.id)}
-            className={`px-4 py-2 text-xs font-bold rounded-t-xl transition-all border-b-2 ${
-              activeMainTab === tab.id
-                ? 'text-emerald-700 border-emerald-500 bg-emerald-50'
-                : 'text-slate-400 border-transparent hover:text-slate-600'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+          { id: 'analyse', label: '📊 Analyse financière' },
+        ].map(tab => {
+          const isActive = activeMainTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveMainTab(tab.id)}
+              className={`px-4 py-2 text-xs font-bold rounded-t-xl transition-all border-b-2 ${
+                isActive
+                  ? 'text-emerald-700 border-emerald-500 bg-emerald-50'
+                  : 'text-slate-400 border-transparent hover:text-slate-600'
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
       {activeMainTab === 'rao' && (
@@ -121,6 +131,18 @@ const PriceAnalysisView = ({ project, companyId, setProject, bpuConfig, clientPe
           activeTrancheId={activeTrancheId}
           tranches={tranches}
           analysisMode={analysisMode}
+          onImportVariant={analysis.handleImportVariant}
+          onRemoveVariant={analysis.removeVariant}
+          onToggleVariantRetained={analysis.toggleVariantRetained}
+          onUpdateVariantJustification={analysis.updateVariantJustification}
+          onApplyDepouillement={analysis.applyDepouillement}
+          onImportOffer={(companyName, file) =>
+            analysis.handleImportExcel({ target: { files: [file], value: null } }, companyName)
+          }
+          onImportPdfOffer={(companyName, file) =>
+            analysis.handleImportPdfOffer(file, companyName)
+          }
+          handleSaveProject={handleSaveProject}
         />
       )}
 

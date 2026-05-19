@@ -139,64 +139,67 @@ export default function DevisMoeInfoTab({ draft, onChange }) {
   );
 
   return (
-    <div className="p-6 space-y-4 max-w-2xl">
-      <Card title="Identification">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2">
-            <label className="block text-[11px] font-medium text-slate-500 mb-1.5">Intitulé du devis *</label>
-            <input className={iCls} value={draft.nom || ''} onChange={e => set('nom', e.target.value)} placeholder="Ex: Devis MOE — Route Principale" />
-          </div>
-          <div>
-            <label className="block text-[11px] font-medium text-slate-500 mb-1.5">N° Devis</label>
-            <div className="px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs font-mono text-slate-700 select-text">
-              {draft.numero || '—'}
+    <div className="p-4 space-y-3 max-w-7xl mx-auto">
+      {/* ── Row 1 : Identification + Maître d'ouvrage (2 colonnes lg+) ─────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <Card title="Identification">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <label className="block text-[11px] font-medium text-slate-500 mb-1.5">Intitulé du devis *</label>
+              <input className={iCls} value={draft.nom || ''} onChange={e => set('nom', e.target.value)} placeholder="Ex: Devis MOE — Route Principale" />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-slate-500 mb-1.5">N° Devis</label>
+              <div className="px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs font-mono text-slate-700 select-text">
+                {draft.numero || '—'}
+              </div>
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-slate-500 mb-1.5">Date</label>
+              <input type="date" className={iCls} value={draft.dateDevis || ''} onChange={e => set('dateDevis', e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-slate-500 mb-1.5">TVA (%)</label>
+              <input type="number" className={iCls} value={draft.tva ?? 20} onChange={e => set('tva', e.target.value)} min="0" max="100" />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-slate-500 mb-1.5">Montant travaux HT (€)</label>
+              <input type="number" className={iCls} value={draft.montantTravauxGlobal || ''} onChange={e => set('montantTravauxGlobal', e.target.value)} min="0" placeholder="500 000" />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-[11px] font-medium text-slate-500 mb-1.5">Objet de la mission</label>
+              <textarea className={`${iCls} resize-none`} rows={2} value={draft.objet || ''} onChange={e => set('objet', e.target.value)} placeholder="Décrire la mission de maîtrise d'œuvre…" />
             </div>
           </div>
-          <div>
-            <label className="block text-[11px] font-medium text-slate-500 mb-1.5">Date</label>
-            <input type="date" className={iCls} value={draft.dateDevis || ''} onChange={e => set('dateDevis', e.target.value)} />
-          </div>
-          <div>
-            <label className="block text-[11px] font-medium text-slate-500 mb-1.5">TVA (%)</label>
-            <input type="number" className={iCls} value={draft.tva ?? 20} onChange={e => set('tva', e.target.value)} min="0" max="100" />
-          </div>
-          <div>
-            <label className="block text-[11px] font-medium text-slate-500 mb-1.5">Montant travaux HT (€)</label>
-            <input type="number" className={iCls} value={draft.montantTravauxGlobal || ''} onChange={e => set('montantTravauxGlobal', e.target.value)} min="0" placeholder="500 000" />
-          </div>
-          <div className="col-span-2">
-            <label className="block text-[11px] font-medium text-slate-500 mb-1.5">Objet de la mission</label>
-            <textarea className={`${iCls} resize-none`} rows={3} value={draft.objet || ''} onChange={e => set('objet', e.target.value)} placeholder="Décrire la mission de maîtrise d'œuvre…" />
-          </div>
-        </div>
-      </Card>
+        </Card>
 
-      <Card title="Maître d'ouvrage">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2">
-            <label className="block text-[11px] font-medium text-slate-500 mb-1.5">Désignation</label>
-            <input className={iCls} value={draft.client?.designation || ''} onChange={e => set('client.designation', e.target.value)} placeholder="Nom de la collectivité / maître d'ouvrage" />
+        <Card title="Maître d'ouvrage">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <label className="block text-[11px] font-medium text-slate-500 mb-1.5">Désignation</label>
+              <input className={iCls} value={draft.client?.designation || ''} onChange={e => set('client.designation', e.target.value)} placeholder="Nom de la collectivité / maître d'ouvrage" />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-[11px] font-medium text-slate-500 mb-1.5">Adresse</label>
+              <input className={iCls} value={draft.client?.adresse || ''} onChange={e => set('client.adresse', e.target.value)} placeholder="Adresse" />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-slate-500 mb-1.5">Code postal</label>
+              <input className={iCls} value={draft.client?.codePostal || ''} onChange={e => set('client.codePostal', e.target.value)} placeholder="00000" />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-slate-500 mb-1.5">Ville</label>
+              <input className={iCls} value={draft.client?.ville || ''} onChange={e => set('client.ville', e.target.value)} placeholder="Ville" />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-[11px] font-medium text-slate-500 mb-1.5">Contact</label>
+              <input className={iCls} value={draft.client?.contact || ''} onChange={e => set('client.contact', e.target.value)} placeholder="Nom du contact" />
+            </div>
           </div>
-          <div className="col-span-2">
-            <label className="block text-[11px] font-medium text-slate-500 mb-1.5">Adresse</label>
-            <input className={iCls} value={draft.client?.adresse || ''} onChange={e => set('client.adresse', e.target.value)} placeholder="Adresse" />
-          </div>
-          <div>
-            <label className="block text-[11px] font-medium text-slate-500 mb-1.5">Code postal</label>
-            <input className={iCls} value={draft.client?.codePostal || ''} onChange={e => set('client.codePostal', e.target.value)} placeholder="00000" />
-          </div>
-          <div>
-            <label className="block text-[11px] font-medium text-slate-500 mb-1.5">Ville</label>
-            <input className={iCls} value={draft.client?.ville || ''} onChange={e => set('client.ville', e.target.value)} placeholder="Ville" />
-          </div>
-          <div className="col-span-2">
-            <label className="block text-[11px] font-medium text-slate-500 mb-1.5">Contact</label>
-            <input className={iCls} value={draft.client?.contact || ''} onChange={e => set('client.contact', e.target.value)} placeholder="Nom du contact" />
-          </div>
-        </div>
-      </Card>
+        </Card>
+      </div>
 
-      {/* ── Type de MOE ──────────────────────────────────────────────────────── */}
+      {/* ── Row 2 : Type de MOE (pleine largeur) ────────────────────────────── */}
       <Card title="Type de maîtrise d'œuvre" accent="bg-violet-400">
         <div className="flex gap-3">
           {[
@@ -205,12 +208,12 @@ export default function DevisMoeInfoTab({ draft, onChange }) {
             { v: 'cotraitant',  Icon: Users, label: 'Co-traitant', desc: 'Vous êtes co-traitant dans un groupement' },
           ].map(({ v, Icon, label, desc }) => (
             <button key={v} onClick={() => setMoeType(v)}
-              className={`flex-1 flex items-start gap-3 p-4 rounded-xl border text-left transition-all duration-200 cursor-default ${
+              className={`flex-1 flex items-center gap-3 px-4 py-2.5 rounded-xl border text-left transition-all duration-200 cursor-default ${
                 moeType === v
                   ? 'bg-indigo-50/80 border-indigo-200 shadow-[0_0_15px_rgba(99,102,241,0.12)]'
                   : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50 hover:-translate-y-0.5 hover:shadow-sm'
               }`}>
-              <div className={`mt-0.5 p-2 rounded-lg shrink-0 transition-transform duration-200 ${moeType === v ? 'bg-indigo-100 text-indigo-600 scale-110' : 'bg-slate-100 text-slate-400'}`}>
+              <div className={`p-2 rounded-lg shrink-0 transition-transform duration-200 ${moeType === v ? 'bg-indigo-100 text-indigo-600 scale-110' : 'bg-slate-100 text-slate-400'}`}>
                 <Icon size={14} />
               </div>
               <div>
@@ -222,13 +225,15 @@ export default function DevisMoeInfoTab({ draft, onChange }) {
         </div>
       </Card>
 
-      {/* ── Entreprises selon moeType ─────────────────────────────────────────── */}
+      {/* ── Row 3 : Entreprises selon moeType ─────────────────────────────────── */}
       {moeType === 'seul' && (
-        <EntrepriseCard title="MOE — Mandataire" data={draft.mandataire} dataKey="mandataire" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <EntrepriseCard title="MOE — Mandataire" data={draft.mandataire} dataKey="mandataire" />
+        </div>
       )}
 
       {moeType === 'mandataire' && (
-        <>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
           <EntrepriseCard title="MOE — Mandataire du groupement" data={draft.mandataire} dataKey="mandataire" accent="bg-amber-400" />
 
           <Card title="Co-traitants" accent="bg-blue-400">
@@ -287,14 +292,14 @@ export default function DevisMoeInfoTab({ draft, onChange }) {
               )}
             </div>
           </Card>
-        </>
+        </div>
       )}
 
       {moeType === 'cotraitant' && (
-        <>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
           <EntrepriseCard title="Mandataire du groupement" data={draft.mandataire} dataKey="mandataire" accent="bg-amber-400" />
           <EntrepriseCard title="Notre entreprise (co-traitant)" data={draft.notreEntreprise} dataKey="notreEntreprise" accent="bg-blue-400" />
-        </>
+        </div>
       )}
     </div>
   );
