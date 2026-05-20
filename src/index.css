@@ -101,3 +101,74 @@ button {
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8; /* slate-400 */
 }
+
+/* ── Animation de surbrillance des items RAO incomplets ──
+   Déclenchée par TabAlertBanner.handleItemClick(item) qui ajoute
+   temporairement la classe .rao-highlight-pulse à l'élément cible. */
+@keyframes rao-highlight-pulse {
+  0%   { box-shadow: 0 0 0 0   rgba(245, 158, 11, 0.0); background-color: transparent; }
+  20%  { box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.40); background-color: rgba(254, 243, 199, 0.6); }
+  60%  { box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.25); background-color: rgba(254, 243, 199, 0.4); }
+  100% { box-shadow: 0 0 0 0   rgba(245, 158, 11, 0.0); background-color: transparent; }
+}
+.rao-highlight-pulse {
+  animation: rao-highlight-pulse 2s ease-out;
+  border-radius: 12px;
+}
+
+/* Marquage des inputs/cellules vides à compléter dans les onglets RAO */
+.rao-empty {
+  border-color: #fb923c !important; /* orange-400 */
+  background-color: #fff7ed !important; /* orange-50 */
+}
+.rao-empty:focus {
+  border-color: #f59e0b !important; /* amber-500 */
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15) !important;
+}
+
+/* ── Aperçu courrier négociation : simulation papier A4 fidèle au PDF ──
+   Utilisé dans TabNegociation.jsx pour rendre l'éditeur Quill comme
+   une feuille A4 centrée (210×297mm), marges PDF respectées (18/24mm),
+   barre verticale décorative à gauche (≈ bande primary du PDF). */
+.nego-paper-preview .ql-toolbar.ql-snow {
+  background: #ffffff;
+  border: 0;
+  border-bottom: 1px solid #e2e8f0; /* slate-200 */
+}
+.nego-paper-preview .ql-container.ql-snow {
+  border: 0;
+  background: #e2e8f0; /* slate-200 — fond gris autour du papier */
+  font-family: inherit;
+  padding: 32px 16px;
+  overflow-x: auto;
+}
+.nego-paper-preview .ql-editor {
+  background: #ffffff;
+  width: 210mm;          /* Largeur A4 */
+  min-height: 297mm;     /* Hauteur A4 */
+  margin: 0 auto;
+  padding: 12mm 18mm 18mm 24mm;  /* marges PDF ; +6mm à gauche pour la barre */
+  position: relative;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.08);
+  font-size: 11pt;
+  line-height: 1.5;
+  color: #000;
+}
+.nego-paper-preview .ql-editor::before {
+  /* Bande verticale décorative simulant la barre primary du PDF */
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 6mm;
+  background: #1d4ed8; /* blue-700 — couleur primary par défaut */
+  pointer-events: none;
+}
+/* Placeholder Quill discret */
+.nego-paper-preview .ql-editor.ql-blank::before {
+  font-style: normal;
+  color: #94a3b8;
+  left: 24mm;
+  top: 12mm;
+}

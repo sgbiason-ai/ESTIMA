@@ -218,6 +218,16 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
   const updateNegotiation = (companyName, field, value) =>
     patchCompany(companyName, 'negotiation', { [field]: value });
 
+  // Config courrier négociation au niveau projet (signataire, ville). Les champs
+  // par entreprise (deadline, adresseEntreprise) restent dans nego.* via updateNegotiation.
+  const letterConfig = {
+    signatoryName: '',
+    city: '',
+    ...(rao.letterConfig || {}),
+  };
+  const updateLetterConfig = (field, value) =>
+    updateRao(r => ({ letterConfig: { ...(r.letterConfig || {}), [field]: value } }));
+
   // ── TRANCHES ──────────────────────────────────────────────────────────────
   const hasTranches = tranches?.length > 0;
   const raoTrancheId = rao.raoTrancheId || 'global';
@@ -395,6 +405,7 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
     adminPieces, offerPieces, setAdminPieces, setOfferPieces,
     updateTechnical,
     updateNegotiation,
+    letterConfig, updateLetterConfig,
     computeScores, getRanking,
     // Tranches
     hasTranches, tranches, raoTrancheId, setRaoTrancheId,

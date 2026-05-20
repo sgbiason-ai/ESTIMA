@@ -1,9 +1,9 @@
 // src/components/rao/tabs/TabNegociation.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   MessageSquare, CheckCircle2, FileOutput, Copy,
   Calendar, User, MapPin, Edit3, X, Save, Settings, Maximize, Minimize,
-  Wand2, SlidersHorizontal, Info
+  Wand2, SlidersHorizontal, Info, ChevronDown, ChevronUp, RotateCcw, FileText
 } from 'lucide-react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
@@ -12,8 +12,9 @@ import { Textarea } from '../RaoUI';
 import { COMPANY_UI_COLORS } from '../RaoConstants';
 import CompanySidebar from '../CompanySidebar';
 import { toast } from '../../../utils/globalUI';
+import { useNegoTemplate } from '../../../hooks/useNegoTemplate';
 
-// ── 1. MODÈLE GLOBAL PAR DÉFAUT (AVEC TOUTES LES VARIABLES) ──────────────────
+// ── 1. MODÈLE GLOBAL PAR DÉFAUT ──────────────────────────────────────────────
 
 const DEFAULT_TEMPLATE = `
 <div style="font-family: 'Aptos Light', 'Segoe UI', Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.5; color: #000;">
@@ -24,31 +25,71 @@ const DEFAULT_TEMPLATE = `
 <div style="padding:8px 6px; font-size:10pt; min-height:60px;"><strong>{{NOM_ENTREPRISE}}</strong><br/>{{ADRESSE_ENTREPRISE}}</div>
 </div>
 <div style="flex:45; border:1px solid #000;">
-<div style="border-bottom:1px solid #000; text-align:center; padding:4px 6px; font-size:10pt;">EXP\u00c9DITEUR :</div>
+<div style="border-bottom:1px solid #000; text-align:center; padding:4px 6px; font-size:10pt;">EXPÉDITEUR :</div>
 <div style="padding:8px 6px; font-size:10pt; min-height:60px;"><strong>{{CLIENT}}</strong><br/>{{ADRESSE_EXPEDITEUR}}</div>
 </div>
 </div>
 <p style="margin:6px 0 2px 0;"><strong>OBJET :</strong>  <strong>{{OBJET_MARCHE}}</strong></p>
-<p style="margin:0 0 6px 0;"><strong>N\u00e9gociation avec les candidats</strong></p>
+<p style="margin:0 0 6px 0;"><strong>Négociation avec les candidats</strong></p>
 <div style="border:1px solid #000; padding:10px 12px;">
 <p style="margin:0 0 10px 0;">Monsieur,</p>
-<p style="margin:0 0 10px 0; text-align:justify;">Dans le cadre de la consultation relative au march\u00e9 de travaux {{OBJET_MARCHE}} \u00e0 {{LIEU}}, votre entreprise a pr\u00e9sent\u00e9 une offre, laquelle a fait l\u2019objet d\u2019une analyse conform\u00e9ment aux crit\u00e8res et modalit\u00e9s d\u00e9finis au r\u00e8glement de consultation.</p>
-<p style="margin:0 0 10px 0; text-align:justify;">Afin de permettre au pouvoir adjudicateur de v\u00e9rifier la coh\u00e9rence \u00e9conomique de votre offre au regard des prestations pr\u00e9vues au march\u00e9, et sans pr\u00e9juger de la conformit\u00e9 ni du caract\u00e8re de votre proposition, nous vous remercions de bien vouloir nous confirmer les prix des prestations suivantes :</p>
+<p style="margin:0 0 10px 0; text-align:justify;">Dans le cadre de la consultation relative au marché de travaux {{OBJET_MARCHE}} à {{LIEU}}, votre entreprise a présenté une offre, laquelle a fait l’objet d’une analyse conformément aux critères et modalités définis au règlement de consultation.</p>
+<p style="margin:0 0 10px 0; text-align:justify;">Afin de permettre au pouvoir adjudicateur de vérifier la cohérence économique de votre offre au regard des prestations prévues au marché, et sans préjuger de la conformité ni du caractère de votre proposition, nous vous remercions de bien vouloir nous confirmer les prix des prestations suivantes :</p>
 {{QUESTIONS}}
-<p style="margin:12px 0 10px 0; text-align:justify;">Par ailleurs, conform\u00e9ment aux r\u00e8gles applicables aux march\u00e9s pass\u00e9s selon une <strong>proc\u00e9dure adapt\u00e9e</strong>, le pouvoir adjudicateur a d\u00e9cid\u00e9 d\u2019engager une <strong>phase de n\u00e9gociation portant sur les aspects financiers</strong> de votre offre.</p>
-<p style="margin:0 0 10px 0; text-align:justify;">Dans ce cadre, nous vous invitons \u00e0 bien vouloir <strong>r\u00e9examiner le montant de votre proposition financi\u00e8re</strong> et \u00e0 nous faire parvenir, le cas \u00e9ch\u00e9ant, une <strong>offre financi\u00e8re r\u00e9vis\u00e9e</strong>, int\u00e9grant une <strong>remise sur le prix initialement propos\u00e9</strong>, tout en maintenant le niveau de prestations et les dispositions techniques d\u00e9crites dans votre m\u00e9moire technique.</p>
-<p style="margin:0 0 10px 0; text-align:justify;">Cette phase de n\u00e9gociation a pour objet de permettre l\u2019optimisation de l\u2019\u00e9conomie g\u00e9n\u00e9rale du march\u00e9, sans modification des caract\u00e9ristiques essentielles du lot ni des exigences du dossier de consultation.</p>
-<p style="margin:0 0 10px 0; text-align:justify;">Les \u00e9l\u00e9ments demand\u00e9s devront \u00eatre transmis <strong>sur la plateforme</strong> au plus tard le <strong><span style="background:#FF0;padding:1px 4px;">{{DATE_LIMITE}}</span></strong>, et seront int\u00e9gr\u00e9s \u00e0 l\u2019analyse des offres avant toute d\u00e9cision d\u2019attribution.</p>
-<p style="margin:0 0 10px 0; text-align:justify;">Nous vous prions d\u2019agr\u00e9er, Monsieur, l\u2019expression de nos salutations distingu\u00e9es.</p>
+<p style="margin:12px 0 10px 0; text-align:justify;">Par ailleurs, conformément aux règles applicables aux marchés passés selon une <strong>procédure adaptée</strong>, le pouvoir adjudicateur a décidé d’engager une <strong>phase de négociation portant sur les aspects financiers</strong> de votre offre.</p>
+<p style="margin:0 0 10px 0; text-align:justify;">Dans ce cadre, nous vous invitons à bien vouloir <strong>réexaminer le montant de votre proposition financière</strong> et à nous faire parvenir, le cas échéant, une <strong>offre financière révisée</strong>, intégrant une <strong>remise sur le prix initialement proposé</strong>, tout en maintenant le niveau de prestations et les dispositions techniques décrites dans votre mémoire technique.</p>
+<p style="margin:0 0 10px 0; text-align:justify;">Cette phase de négociation a pour objet de permettre l’optimisation de l’économie générale du marché, sans modification des caractéristiques essentielles du lot ni des exigences du dossier de consultation.</p>
+<p style="margin:0 0 10px 0; text-align:justify;">Les éléments demandés devront être transmis <strong>sur la plateforme</strong> au plus tard le <strong><span style="background:#FF0;padding:1px 4px;">{{DATE_LIMITE}}</span></strong>, et seront intégrés à l’analyse des offres avant toute décision d’attribution.</p>
+<p style="margin:0 0 10px 0; text-align:justify;">Nous vous prions d’agréer, Monsieur, l’expression de nos salutations distinguées.</p>
 <p style="margin:20px 0 16px 0; padding-left:55%;">{{SIGNATAIRE}}</p>
 </div>
 <p style="margin:8px 0 0 0; font-size:9pt;">NOMBRE DE PAGES (y compris celle-ci) : 1</p>
 </div>
 `;
 
-// ── 2. FONCTION D'INJECTION DES VARIABLES ────────────────────────────────────
+// ── 2. BUILDERS HTML (sections prix atypiques wrappées data-anomaly) ─────────
 
-const applyTemplate = (templateHtml, companyName, questions, letterConfig, consultation) => {
+const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+}[c]));
+
+const buildAnomalySectionHtml = (type, templateText, items) => {
+  const rawLines = (templateText || '').split('\n').map(l => l.trim()).filter(Boolean);
+  let html = '';
+  let inList = false;
+
+  rawLines.forEach((line, idx) => {
+    // Première ligne = titre (commence par ➡️ ou non, on le met en strong)
+    if (idx === 0) {
+      const title = line.replace(/^➡️\s*/, '');
+      html += `<p style="margin:10px 0 4px 0; text-align:justify;"><strong>${escapeHtml(title)}</strong></p>`;
+      return;
+    }
+    // Bullet manuel dans le template ("- ...")
+    if (line.startsWith('- ')) {
+      if (!inList) { html += '<ul style="margin:4px 0; padding-left:24px; text-align:justify;">'; inList = true; }
+      html += `<li style="margin-bottom:3px;">${escapeHtml(line.substring(2))}</li>`;
+      return;
+    }
+    if (inList) { html += '</ul>'; inList = false; }
+    html += `<p style="margin:0 0 4px 0; text-align:justify;">${escapeHtml(line)}</p>`;
+  });
+  if (inList) html += '</ul>';
+
+  if (items && items.length > 0) {
+    html += `<p style="margin:6px 0 2px 0; text-align:justify;"><strong>Articles concernés :</strong></p>`;
+    html += `<ul style="margin:4px 0; padding-left:24px; text-align:justify;">`;
+    items.forEach(item => {
+      html += `<li style="margin-bottom:3px;">${escapeHtml(item)}</li>`;
+    });
+    html += `</ul>`;
+  }
+  return `<div data-anomaly="${type}">${html}</div>`;
+};
+
+// ── 3. FONCTION D'INJECTION DES VARIABLES DANS LA TRAME ──────────────────────
+
+const applyTemplate = (templateHtml, companyName, questionsHtml, letterConfig, consultation) => {
   const today = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
   const city = letterConfig.city || '[Ville]';
   const deadline = letterConfig.deadline
@@ -57,49 +98,6 @@ const applyTemplate = (templateHtml, companyName, questions, letterConfig, consu
   const signatory = letterConfig.signatoryName || '[Nom du signataire]';
   const adresseEntreprise = letterConfig.adresseEntreprise || '';
   const adresseExpediteur = letterConfig.adresseExpediteur || '';
-
-  // Formater les questions en HTML structuré
-  const formattedQuestions = questions
-    ? (() => {
-        const lines = questions.split('\n').filter(l => l.trim());
-        let html = '';
-        let inList = false;
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-
-          // Titre de section (➡️ SUSPICION... ou ➡️ PRIX PARAISSANT...)
-          if (trimmed.startsWith('➡️') || trimmed.match(/^(SUSPICION|PRIX PARAISSANT)/)) {
-            if (inList) { html += '</ul>'; inList = false; }
-            const title = trimmed.replace(/^➡️\s*/, '');
-            html += `<p style="margin:10px 0 4px 0; text-align:justify;"><strong>${title}</strong></p>`;
-          }
-          // Ligne de prix (- Prix n°... ou Prix n°...)
-          else if (trimmed.match(/^-?\s*Prix\s+n°/)) {
-            if (!inList) { html += '<ul style="margin:4px 0; padding-left:24px; text-align:justify;">'; inList = true; }
-            const cleaned = trimmed.replace(/^-\s*/, '');
-            html += `<li style="margin-bottom:3px;">${cleaned}</li>`;
-          }
-          // Sous-item avec tiret (- Le mode opératoire...)
-          else if (trimmed.startsWith('- ')) {
-            if (!inList) { html += '<ul style="margin:4px 0; padding-left:24px; text-align:justify;">'; inList = true; }
-            html += `<li style="margin-bottom:3px;">${trimmed.substring(2)}</li>`;
-          }
-          // Texte de paragraphe (articles concernés, explicatif...)
-          else if (trimmed.startsWith('Articles concernés')) {
-            if (inList) { html += '</ul>'; inList = false; }
-            html += `<p style="margin:6px 0 2px 0; text-align:justify;"><strong>${trimmed}</strong></p>`;
-          }
-          // Paragraphe normal
-          else {
-            if (inList) { html += '</ul>'; inList = false; }
-            html += `<p style="margin:0 0 4px 0; text-align:justify;">${trimmed}</p>`;
-          }
-        }
-        if (inList) html += '</ul>';
-        return html;
-      })()
-    : '';
 
   return templateHtml
     .replace(/{{VILLE}}/g, city)
@@ -112,14 +110,14 @@ const applyTemplate = (templateHtml, companyName, questions, letterConfig, consu
     .replace(/{{CODE_AFFAIRE}}/g, consultation?.code || '[Code Affaire]')
     .replace(/{{LIEU}}/g, consultation?.lieu || '[Lieu]')
     .replace(/{{PHASE}}/g, consultation?.phase || '[Phase]')
-    .replace(/{{QUESTIONS}}/g, formattedQuestions)
+    .replace(/{{QUESTIONS}}/g, questionsHtml || '')
     .replace(/{{DATE_LIMITE}}/g, deadline)
     .replace(/{{SIGNATAIRE}}/g, signatory)
     .replace(/{{ADRESSE_ENTREPRISE}}/g, adresseEntreprise.replace(/\n/g, '<br/>'))
     .replace(/{{ADRESSE_EXPEDITEUR}}/g, adresseExpediteur.replace(/\n/g, '<br/>'));
 };
 
-// ── 3. MODALE D'ÉDITION WYSIWYG (PLEIN ÉCRAN & VARIABLES) ─────────────────────
+// ── 4. MODALE D'ÉDITION TRAME GLOBALE (variables + WYSIWYG) ──────────────────
 
 const AVAILABLE_VARIABLES = [
   { label: 'Nom Entreprise', tag: '{{NOM_ENTREPRISE}}' },
@@ -139,7 +137,7 @@ const AVAILABLE_VARIABLES = [
   { label: 'Signataire', tag: '{{SIGNATAIRE}}' },
 ];
 
-const LetterEditorModal = ({ isOpen, onClose, mode, initialHtml, companyName, onSaveTemplate, onDownloadJsPDF }) => {
+const TemplateEditorModal = ({ isOpen, onClose, initialHtml, onSaveTemplate }) => {
   const [editorHtml, setEditorHtml] = useState(initialHtml);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [copiedVar, setCopiedVar] = useState(null);
@@ -153,16 +151,7 @@ const LetterEditorModal = ({ isOpen, onClose, mode, initialHtml, companyName, on
 
   if (!isOpen) return null;
 
-  const isTemplateMode = mode === 'template';
-
-  const handleDownloadPDF = async () => {
-    if (onDownloadJsPDF) {
-      await onDownloadJsPDF();
-      onClose();
-    }
-  };
-
-  const handleSaveGlobalTemplate = () => {
+  const handleSave = () => {
     onSaveTemplate(editorHtml);
     onClose();
   };
@@ -184,25 +173,18 @@ const LetterEditorModal = ({ isOpen, onClose, mode, initialHtml, companyName, on
   return (
     <div className={containerClasses}>
       <div className={modalClasses}>
-
-        {/* Header Modale */}
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 shrink-0">
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${isTemplateMode ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
-              {isTemplateMode ? <Settings size={18} /> : <Edit3 size={18} />}
+            <div className="p-2 rounded-lg bg-amber-100 text-amber-600">
+              <Settings size={18} />
             </div>
             <div>
-              <h3 className="font-black text-slate-900">
-                {isTemplateMode ? "Éditer le Modèle Global" : "Aperçu & Édition du courrier final"}
-              </h3>
+              <h3 className="font-black text-slate-900">Éditer le Modèle Global</h3>
               <p className="text-sm font-medium text-slate-600">
-                {isTemplateMode
-                  ? "Modifiez la trame et intégrez les variables du projet."
-                  : `Destinataire : ${companyName}`}
+                Modifiez la trame et intégrez les variables du projet.
               </p>
             </div>
           </div>
-
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsFullscreen(!isFullscreen)}
@@ -218,10 +200,7 @@ const LetterEditorModal = ({ isOpen, onClose, mode, initialHtml, companyName, on
           </div>
         </div>
 
-        {/* Body */}
         <div className="flex-1 flex overflow-hidden bg-slate-50">
-
-          {/* Zone Quill */}
           <div className="flex-1 flex flex-col bg-white [&_.ql-editor]:text-black [&_.ql-editor]:text-[15px] [&_.ql-editor]:leading-relaxed overflow-hidden">
             <ReactQuill
               theme="snow"
@@ -240,70 +219,55 @@ const LetterEditorModal = ({ isOpen, onClose, mode, initialHtml, companyName, on
             />
           </div>
 
-          {/* Panneau Latéral Variables */}
-          {isTemplateMode && (
-            <div className="w-72 bg-slate-50 border-l border-slate-200 p-5 overflow-y-auto shrink-0 shadow-inner">
-              <h4 className="text-xs font-black uppercase tracking-widest text-slate-800 mb-1">Insérer une variable</h4>
-              <p className="text-[10px] text-slate-500 mb-6 leading-tight">
-                Cliquez sur une étiquette pour la copier, puis collez-la (Ctrl+V) dans votre texte.
-              </p>
-
-              <div className="flex flex-col gap-2">
-                {AVAILABLE_VARIABLES.map(v => (
-                  <button
-                    key={v.tag}
-                    onClick={() => copyVariable(v.tag)}
-                    className="flex flex-col text-left px-3 py-2 bg-white border border-slate-200 rounded-xl hover:border-amber-400 hover:shadow-sm focus:bg-amber-50 focus:border-amber-500 transition-all group"
-                  >
-                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 group-hover:text-amber-600 transition-colors">
-                      {v.label}
-                    </span>
-                    <div className="flex items-center justify-between mt-0.5">
-                      <span className="text-xs font-mono font-bold text-slate-700">{v.tag}</span>
-                      {copiedVar === v.tag ? (
-                        <CheckCircle2 size={14} className="text-emerald-500" />
-                      ) : (
-                        <Copy size={14} className="text-slate-300 opacity-0 group-hover:opacity-100" />
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
+          <div className="w-72 bg-slate-50 border-l border-slate-200 p-5 overflow-y-auto shrink-0 shadow-inner">
+            <h4 className="text-xs font-black uppercase tracking-widest text-slate-800 mb-1">Insérer une variable</h4>
+            <p className="text-[10px] text-slate-500 mb-6 leading-tight">
+              Cliquez sur une étiquette pour la copier, puis collez-la (Ctrl+V) dans votre texte.
+            </p>
+            <div className="flex flex-col gap-2">
+              {AVAILABLE_VARIABLES.map(v => (
+                <button
+                  key={v.tag}
+                  onClick={() => copyVariable(v.tag)}
+                  className="flex flex-col text-left px-3 py-2 bg-white border border-slate-200 rounded-xl hover:border-amber-400 hover:shadow-sm focus:bg-amber-50 focus:border-amber-500 transition-all group"
+                >
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 group-hover:text-amber-600 transition-colors">
+                    {v.label}
+                  </span>
+                  <div className="flex items-center justify-between mt-0.5">
+                    <span className="text-xs font-mono font-bold text-slate-700">{v.tag}</span>
+                    {copiedVar === v.tag ? (
+                      <CheckCircle2 size={14} className="text-emerald-500" />
+                    ) : (
+                      <Copy size={14} className="text-slate-300 opacity-0 group-hover:opacity-100" />
+                    )}
+                  </div>
+                </button>
+              ))}
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Footer Modale */}
         <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between shrink-0">
           <p className="text-sm text-slate-600 font-medium">
-            {isTemplateMode
-              ? "Ce modèle sera sauvegardé et utilisé pour générer tous les futurs courriers."
-              : "Vos modifications de dernière minute seront appliquées sur le PDF de cette entreprise."}
+            Ce modèle sera sauvegardé et utilisé pour générer tous les futurs courriers.
           </p>
           <div className="flex gap-3">
             <button onClick={onClose} className="px-5 py-2.5 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-200 transition-colors">
               Annuler
             </button>
-            {isTemplateMode ? (
-              <button onClick={handleSaveGlobalTemplate} className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-md transition-all active:scale-95">
-                <Save size={16} />
-                Enregistrer la trame
-              </button>
-            ) : (
-              <button onClick={handleDownloadPDF} className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold bg-slate-900 hover:bg-slate-800 text-white shadow-md transition-all active:scale-95">
-                <FileOutput size={16} />
-                Télécharger le PDF final
-              </button>
-            )}
+            <button onClick={handleSave} className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-md transition-all active:scale-95">
+              <Save size={16} />
+              Enregistrer la trame
+            </button>
           </div>
         </div>
-
       </div>
     </div>
   );
 };
 
-// ── 4. VUE PRINCIPALE DU TAB ──────────────────────────────────────────────────
+// ── 5. VUE PRINCIPALE DU TAB ──────────────────────────────────────────────────
 
 const TabNegociation = ({
   companyNames,
@@ -315,128 +279,261 @@ const TabNegociation = ({
   analysisCompanies = [],
   chaptersData = [],
   analysisStats = null,
-  bpuRefMap = new Map()
+  bpuRefMap = new Map(),
+  branding = null,
+  project = null,
+  raoLetterConfig = null,
+  updateRaoLetterConfig = () => {},
 }) => {
-  const [masterTemplate, setMasterTemplate] = useState(DEFAULT_TEMPLATE);
-  const [editorData, setEditorData] = useState({ isOpen: false, mode: 'company', html: '', companyName: '' });
+  // Trame globale persistée au niveau utilisateur (users/{uid}/preferences/negotiation_template)
+  const { template: masterTemplate, saveTemplate } = useNegoTemplate(DEFAULT_TEMPLATE);
+  const [templateEditorOpen, setTemplateEditorOpen] = useState(false);
 
-  const [letterConfig, setLetterConfig] = useState({
-    deadline: '',
-    signatoryName: consultation.client || '',
-    city: consultation.lieu || '',
-    adresseEntreprise: '',
+  // Config courrier reconstituée à partir de :
+  //  - signatoryName + city : niveau projet (rao.letterConfig)
+  //  - deadline + adresseEntreprise : niveau entreprise (nego.deadline / nego.adresseEntreprise)
+  const negoCurrent = companiesData[selectedCompany]?.negotiation || {};
+  const letterConfig = {
+    signatoryName: raoLetterConfig?.signatoryName ?? consultation.client ?? '',
+    city: raoLetterConfig?.city ?? consultation.lieu ?? '',
+    deadline: negoCurrent.deadline || '',
+    adresseEntreprise: negoCurrent.adresseEntreprise || '',
     adresseExpediteur: '',
-  });
+  };
   const [anomalyThresholds, setAnomalyThresholds] = useState({ ecart: 15, impact: 1 });
   const [showThresholdSettings, setShowThresholdSettings] = useState(false);
 
-  const updateConfig = (key, value) => setLetterConfig(prev => ({ ...prev, [key]: value }));
+  // ── Templates de texte "Prix atypiques" ──
+  const ANOMALY_TPL_KEY = 'estima_rao_anomaly_templates';
+  const DEFAULT_LOW_TEMPLATE =
+    "➡️ SUSPICION DE PRIX ANORMALEMENT BAS (art. L.2152-6 et R.2152-3 du Code de la commande publique) :\n" +
+    "Conformément aux articles L.2152-6 et R.2152-3 du Code de la commande publique, l'acheteur a l'obligation de détecter les offres qui paraissent anormalement basses et d'exiger des justifications avant tout rejet éventuel.\n" +
+    "Les prix unitaires suivants paraissent anormalement bas au regard de l'estimation du maître d'œuvre et ont une incidence significative sur le montant global de votre proposition. Nous vous demandons de bien vouloir fournir, pour chacun de ces prix, les justifications prévues à l'article R.2152-3, notamment :\n" +
+    "- Le mode opératoire et les procédés de construction retenus ;\n" +
+    "- Les conditions exceptionnellement favorables dont vous disposez (approvisionnement, moyens propres, etc.) ;\n" +
+    "- Les sous-détails de prix complets (fournitures, main-d'œuvre, matériel, frais généraux et marge).\n" +
+    "À défaut de justifications satisfaisantes, l'acheteur pourra rejeter votre offre comme anormalement basse en application de l'article L.2152-6.";
+  const DEFAULT_HIGH_TEMPLATE =
+    "➡️ PRIX PARAISSANT EXCESSIFS (art. R.2152-3 du Code de la commande publique) :\n" +
+    "Les prix unitaires suivants se situent nettement au-dessus de l'estimation du maître d'œuvre et pèsent significativement sur le montant global de votre proposition. Conformément à l'article R.2152-3, nous vous invitons à :\n" +
+    "- Vérifier qu'il ne s'agit pas d'une erreur matérielle de chiffrage ;\n" +
+    "- Fournir les sous-détails de prix justifiant ces montants ;\n" +
+    "- Le cas échéant, dans le cadre de la négociation, reconsidérer ces prix afin d'améliorer la compétitivité de votre offre.";
+  const [anomalyTemplates, setAnomalyTemplates] = useState(() => {
+    try {
+      const saved = localStorage.getItem(ANOMALY_TPL_KEY);
+      if (saved) return { low: DEFAULT_LOW_TEMPLATE, high: DEFAULT_HIGH_TEMPLATE, ...JSON.parse(saved) };
+    } catch {}
+    return { low: DEFAULT_LOW_TEMPLATE, high: DEFAULT_HIGH_TEMPLATE };
+  });
+  const saveAnomalyTemplates = (next) => {
+    setAnomalyTemplates(next);
+    try { localStorage.setItem(ANOMALY_TPL_KEY, JSON.stringify(next)); } catch {}
+  };
+  const [showTemplateEditor, setShowTemplateEditor] = useState(false);
 
-  const openTemplateEditor = () => {
-    setEditorData({ isOpen: true, mode: 'template', html: masterTemplate, companyName: 'Modèle Global' });
+  // Dispatche la mise à jour vers la bonne source :
+  //  - signatoryName / city → niveau projet (rao.letterConfig)
+  //  - deadline / adresseEntreprise → niveau entreprise (nego.*)
+  const updateConfig = (key, value) => {
+    if (key === 'signatoryName' || key === 'city') {
+      updateRaoLetterConfig(key, value);
+    } else if (key === 'deadline' || key === 'adresseEntreprise') {
+      if (selectedCompany) updateNegotiation(selectedCompany, key, value);
+    }
   };
 
-  const openCompanyEditor = (companyName, questions) => {
-    const injectedHtml = applyTemplate(masterTemplate, companyName, questions, letterConfig, consultation);
-    setEditorData({ isOpen: true, mode: 'company', html: injectedHtml, companyName });
+  // ── État aperçu courrier (volatile, jamais persisté) ────────────────────
+  // L'aperçu Quill est regénéré depuis la trame quand :
+  //  - l'entreprise sélectionnée change → reset complet (sections oubliées)
+  //  - la trame globale (masterTemplate) est rechargée/modifiée
+  //  - une variable de letterConfig change (signataire, ville, deadline, adresse entreprise)
+  // Les sections Prix atypiques injectées (data-anomaly="low|high") sont conservées
+  // dans un ref pour survivre aux régénérations dues à un changement de variable.
+  const [letterHtml, setLetterHtml] = useState('');
+  const anomalySectionsRef = useRef({ low: null, high: null });
+
+  // Injecte les sections data-anomaly dans un HTML de trame fraîche
+  const injectSectionsIntoHtml = (html, lowSection, highSection) => {
+    if (!lowSection && !highSection) return html;
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(`<div id="__estima_root">${html}</div>`, 'text/html');
+    const root = doc.getElementById('__estima_root');
+    if (!root) return html;
+    const findAnchor = () => {
+      for (const p of root.querySelectorAll('p')) {
+        if (p.textContent && p.textContent.includes('vous remercions de bien vouloir nous confirmer')) {
+          return p;
+        }
+      }
+      return null;
+    };
+    const anchor = findAnchor();
+    if (!anchor) return html;
+    if (lowSection) {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = lowSection;
+      const node = tmp.firstElementChild;
+      if (node) anchor.after(node);
+    }
+    if (highSection) {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = highSection;
+      const node = tmp.firstElementChild;
+      if (node) {
+        const lowEl = root.querySelector('[data-anomaly="low"]');
+        if (lowEl) lowEl.after(node);
+        else anchor.after(node);
+      }
+    }
+    return root.innerHTML;
   };
+
+  // Reset des sections quand on change d'entreprise (les sections sont per company)
+  useEffect(() => {
+    anomalySectionsRef.current = { low: null, high: null };
+  }, [selectedCompany]);
+
+  // Regénération de la trame + réinjection des sections préservées
+  useEffect(() => {
+    if (!selectedCompany) {
+      setLetterHtml('');
+      return;
+    }
+    const generated = applyTemplate(masterTemplate, selectedCompany, '', letterConfig, consultation);
+    const { low, high } = anomalySectionsRef.current;
+    setLetterHtml((low || high) ? injectSectionsIntoHtml(generated, low, high) : generated);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCompany, masterTemplate, letterConfig.signatoryName, letterConfig.city, letterConfig.deadline, letterConfig.adresseEntreprise]);
 
   // ── Logique complétion pour sidebar ──
   const getNegoCompletion = (companyName) => {
     const nego = companiesData[companyName]?.negotiation || {};
-    const hasQuestions = !!nego.questions;
+    const hasContent = !!nego.questions;
     const hasResponses = !!nego.responses;
-    if (hasQuestions && hasResponses) return 'complete';
-    if (hasQuestions || hasResponses) return 'partial';
+    if (hasContent && hasResponses) return 'complete';
+    if (hasContent || hasResponses) return 'partial';
     return 'empty';
   };
 
   // ── DÉTECTION DES PRIX ATYPIQUES (HAUTS ET BAS) ────────────────────────
-  const generateAnomaliesText = (companyName) => {
+  const detectAnomalies = (companyName) => {
     const company = analysisCompanies.find(c => c.name === companyName);
-
     if (!company) {
       toast.warning(`Entreprise "${companyName}" introuvable dans les données d'analyse. Vérifiez que l'import est bien effectué.`);
-      return;
+      return null;
     }
     if (!chaptersData?.length || !analysisStats) {
       toast.warning("Les données d'analyse financière ne sont pas disponibles. Veuillez d'abord importer les offres dans l'onglet Analyse.");
-      return;
+      return null;
     }
 
-    let lowPrices = [];
-    let highPrices = [];
+    const lowItems = [];
+    const highItems = [];
     const companyGrandTotal = analysisStats.companiesTotals?.[company.id] || 0;
     if (companyGrandTotal === 0) {
       toast.warning(`Aucune offre chiffrée trouvée pour "${companyName}". Vérifiez que l'import Excel est complet.`);
-      return;
+      return null;
     }
 
     chaptersData.forEach(chapter => {
       chapter.items.forEach(item => {
         const cd = item.companyData?.[company.id];
         if (!cd) return;
-
-        const companyPU   = cd.pu || 0;
-        const activeQty   = item.activeQty || 0;
-        const lineTotal   = cd.lineTotal || (companyPU * activeQty);
+        const companyPU = cd.pu || 0;
+        const activeQty = item.activeQty || 0;
+        const lineTotal = cd.lineTotal || (companyPU * activeQty);
         if (companyPU === 0) return;
-
         const allPUs = analysisCompanies
           .map(co => Number(co.offers?.[item.id] ?? 0))
           .filter(p => p !== 0);
         if (allPUs.length < 2) return;
         const averagePU = allPUs.reduce((a, b) => a + b, 0) / allPUs.length;
-
-        const diffRatio  = (companyPU - averagePU) / averagePU;
+        const diffRatio = (companyPU - averagePU) / averagePU;
         const impactRatio = lineTotal / companyGrandTotal;
-
         if (Math.abs(diffRatio) > (anomalyThresholds.ecart / 100) && impactRatio > (anomalyThresholds.impact / 100)) {
-          const diffPercent  = Math.abs(Math.round(diffRatio * 100));
-          const puFormatted  = companyPU.toLocaleString('fr-FR', { minimumFractionDigits: 2 }).replace(/[\u202F\u00A0\u2009]/g, ' ');
-          const refLabel     = bpuRefMap?.get?.(item.id) || item.bpuNum || item.ref || '—';
-          const label        = item.designation || item.name || '';
-          const itemText = `- Prix n°${refLabel} — ${label} : PU proposé de ${puFormatted} € HT.`;
-
-          if (diffRatio > 0) highPrices.push(itemText);
-          else               lowPrices.push(itemText);
+          const puFormatted = companyPU.toLocaleString('fr-FR', { minimumFractionDigits: 2 }).replace(/[   ]/g, ' ');
+          const refLabel = bpuRefMap?.get?.(item.id) || item.bpuNum || item.ref || '—';
+          const label = item.designation || item.name || '';
+          const unit = item.unit || item.unite || '';
+          const unitSuffix = unit ? `/${unit}` : '';
+          const itemText = `Prix n°${refLabel} — ${label} : PU proposé de ${puFormatted} € HT${unitSuffix}.`;
+          if (diffRatio > 0) highItems.push(itemText);
+          else lowItems.push(itemText);
         }
       });
     });
 
-    let finalAdditions = [];
+    return { lowItems, highItems };
+  };
 
-    if (lowPrices.length > 0) {
-      finalAdditions.push(
-        "➡️ SUSPICION DE PRIX ANORMALEMENT BAS (art. L.2152-6 et R.2152-3 du Code de la commande publique) :\n" +
-        "Conformément aux articles L.2152-6 et R.2152-3 du Code de la commande publique, l'acheteur a l'obligation de détecter les offres qui paraissent anormalement basses et d'exiger des justifications avant tout rejet éventuel.\n" +
-        "Les prix unitaires suivants paraissent anormalement bas au regard de l'estimation du maître d'œuvre et ont une incidence significative sur le montant global de votre proposition. Nous vous demandons de bien vouloir fournir, pour chacun de ces prix, les justifications prévues à l'article R.2152-3, notamment :\n" +
-        "- Le mode opératoire et les procédés de construction retenus ;\n" +
-        "- Les conditions exceptionnellement favorables dont vous disposez (approvisionnement, moyens propres, etc.) ;\n" +
-        "- Les sous-détails de prix complets (fournitures, main-d'œuvre, matériel, frais généraux et marge).\n\n" +
-        "À défaut de justifications satisfaisantes, l'acheteur pourra rejeter votre offre comme anormalement basse en application de l'article L.2152-6.\n\n" +
-        "Articles concernés :\n" +
-        lowPrices.join('\n')
-      );
-    }
+  // ── INJECTION DES SECTIONS PRIX ATYPIQUES DANS L'APERÇU ────────────────
+  // Toujours partir d'une trame fraîche pour garantir l'ordre :
+  // intro → low → high → suite de la lettre. Les sections sont stockées dans
+  // anomalySectionsRef pour survivre aux régénérations dues aux changements de variables.
+  const injectAnomalies = () => {
+    if (!selectedCompany) return;
+    const result = detectAnomalies(selectedCompany);
+    if (!result) return; // toast déjà émis
 
-    if (highPrices.length > 0) {
-      finalAdditions.push(
-        "➡️ PRIX PARAISSANT EXCESSIFS (art. R.2152-3 du Code de la commande publique) :\n" +
-        "Les prix unitaires suivants se situent nettement au-dessus de l'estimation du maître d'œuvre et pèsent significativement sur le montant global de votre proposition. Conformément à l'article R.2152-3, nous vous invitons à :\n" +
-        "- Vérifier qu'il ne s'agit pas d'une erreur matérielle de chiffrage ;\n" +
-        "- Fournir les sous-détails de prix justifiant ces montants ;\n" +
-        "- Le cas échéant, dans le cadre de la négociation, reconsidérer ces prix afin d'améliorer la compétitivité de votre offre.\n\n" +
-        "Articles concernés :\n" +
-        highPrices.join('\n')
-      );
-    }
-
-    if (finalAdditions.length > 0) {
-      updateNegotiation(companyName, 'questions', finalAdditions.join('\n\n'));
-    } else {
+    const { lowItems, highItems } = result;
+    if (lowItems.length === 0 && highItems.length === 0) {
       toast.info(`Aucun prix atypique détecté (seuils : écart > ${anomalyThresholds.ecart}% de la moyenne ET impact > ${anomalyThresholds.impact}% de l'offre totale).`);
+      return;
     }
+
+    const lowSection = lowItems.length > 0
+      ? buildAnomalySectionHtml('low', anomalyTemplates.low, lowItems)
+      : null;
+    const highSection = highItems.length > 0
+      ? buildAnomalySectionHtml('high', anomalyTemplates.high, highItems)
+      : null;
+
+    // Stocker dans le ref pour persister à travers les régénérations
+    anomalySectionsRef.current = { low: lowSection, high: highSection };
+
+    // Regénérer depuis la trame propre + injecter les sections (ordre garanti)
+    const generated = applyTemplate(masterTemplate, selectedCompany, '', letterConfig, consultation);
+    setLetterHtml(injectSectionsIntoHtml(generated, lowSection, highSection));
+
+    // Synchronise nego.questions (string brut) pour rester compatible avec le générateur PDF
+    const questionsString = [
+      lowItems.length > 0 ? anomalyTemplates.low + '\n\nArticles concernés :\n' + lowItems.map(i => '- ' + i).join('\n') : null,
+      highItems.length > 0 ? anomalyTemplates.high + '\n\nArticles concernés :\n' + highItems.map(i => '- ' + i).join('\n') : null,
+    ].filter(Boolean).join('\n\n');
+    updateNegotiation(selectedCompany, 'questions', questionsString);
+
+    const total = lowItems.length + highItems.length;
+    toast.success(`${total} prix atypique${total > 1 ? 's' : ''} injecté${total > 1 ? 's' : ''} dans l'aperçu.`);
+  };
+
+  // ── RÉINITIALISATION DEPUIS LA TRAME ───────────────────────────────────
+  const resetFromTemplate = () => {
+    if (!selectedCompany) return;
+    if (!window.confirm("Effacer toutes vos modifications et repartir de la trame de base ?\n\nLes prix atypiques injectés et les éditions manuelles seront perdus.")) return;
+    anomalySectionsRef.current = { low: null, high: null };
+    const generated = applyTemplate(masterTemplate, selectedCompany, '', letterConfig, consultation);
+    setLetterHtml(generated);
+    updateNegotiation(selectedCompany, 'questions', '');
+    toast.success("Aperçu réinitialisé depuis la trame.");
+  };
+
+  // ── TÉLÉCHARGEMENT PDF ─────────────────────────────────────────────────
+  const handleDownloadPDF = async () => {
+    if (!selectedCompany) return;
+    const { generateNegoLetterPDF } = await import('../../../utils/pdf/pdfNegoLetterGenerator');
+    await generateNegoLetterPDF({
+      companyName: selectedCompany,
+      questions: companiesData[selectedCompany]?.negotiation?.questions || '',
+      letterConfig,
+      consultation,
+      branding,
+      project,
+      analysisCompanies,
+      masterTemplate,
+      chaptersData,
+      bpuRefMap,
+    });
   };
 
   if (!selectedCompany || !companyNames.includes(selectedCompany)) return null;
@@ -460,21 +557,13 @@ const TabNegociation = ({
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-7xl mx-auto space-y-6 pb-24">
 
-          <LetterEditorModal
-            isOpen={editorData.isOpen}
-            mode={editorData.mode}
-            onClose={() => setEditorData({ ...editorData, isOpen: false })}
-            initialHtml={editorData.html}
-            companyName={editorData.companyName}
-            onSaveTemplate={(newHtml) => setMasterTemplate(newHtml)}
-            onDownloadJsPDF={async () => {
-              const { generateNegoLetterPDF } = await import('../../../utils/pdf/pdfNegoLetterGenerator');
-              await generateNegoLetterPDF({
-                companyName: editorData.companyName,
-                questions: companiesData[editorData.companyName]?.negotiation?.questions || '',
-                letterConfig,
-                consultation,
-              });
+          <TemplateEditorModal
+            isOpen={templateEditorOpen}
+            onClose={() => setTemplateEditorOpen(false)}
+            initialHtml={masterTemplate}
+            onSaveTemplate={(newHtml) => {
+              saveTemplate(newHtml);
+              toast.success("Trame de courrier sauvegardée.");
             }}
           />
 
@@ -489,28 +578,12 @@ const TabNegociation = ({
                   </div>
                   <div>
                     <h3 className="text-lg font-black tracking-tight text-white">Générateur de Courriers & Négociation</h3>
-                    <p className="text-sm text-slate-300 mt-0.5 font-medium">Paramétrez les variables globales et votre trame de courrier.</p>
+                    <p className="text-sm text-slate-300 mt-0.5 font-medium">Paramétrez les variables globales utilisées par la trame.</p>
                   </div>
                 </div>
-                <button
-                  onClick={openTemplateEditor}
-                  className="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm active:scale-95 backdrop-blur-sm"
-                >
-                  <Settings size={18} />
-                  Personnaliser la trame (Modèle)
-                </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-300">
-                    <MapPin size={14} /> Ville d'émission
-                  </label>
-                  <input
-                    type="text" value={letterConfig.city} onChange={e => updateConfig('city', e.target.value)} placeholder="Ex: Sieurac"
-                    className="w-full bg-slate-800/50 border border-white/20 rounded-xl px-4 py-3 text-sm text-white font-semibold placeholder:text-slate-400 focus:outline-none focus:bg-slate-800 focus:ring-2 focus:ring-emerald-500/80 transition-all"
-                  />
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-300">
                     <Calendar size={14} /> Date & Heure limite
@@ -531,18 +604,21 @@ const TabNegociation = ({
                 </div>
               </div>
 
-              {/* Ligne 2 : Adresses */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-300">
-                    <MapPin size={14} /> Adresse expéditeur (Client/MOA)
+                    <MapPin size={14} /> Expéditeur (auto)
                   </label>
-                  <textarea
-                    value={letterConfig.adresseExpediteur} onChange={e => updateConfig('adresseExpediteur', e.target.value)}
-                    placeholder={"Ex:\nPlace Georges Tournier\nBP 545\n81209 MAZAMET CEDEX"}
-                    rows={3}
-                    className="w-full bg-slate-800/50 border border-white/20 rounded-xl px-4 py-3 text-sm text-white font-semibold placeholder:text-slate-400 focus:outline-none focus:bg-slate-800 focus:ring-2 focus:ring-emerald-500/80 transition-all resize-none"
-                  />
+                  <div className="px-4 py-3 bg-slate-800/30 border border-white/10 rounded-xl text-xs text-slate-300 leading-relaxed">
+                    <div className="font-bold text-white">{project?.client || '—'}</div>
+                    {project?.clientAddress && <div>{project.clientAddress}</div>}
+                    {(project?.clientZip || project?.clientCity) && (
+                      <div>{[project?.clientZip, project?.clientCity].filter(Boolean).join(' ')}</div>
+                    )}
+                    <div className="mt-2 text-[10px] text-slate-400 italic">
+                      📝 Pour modifier ces informations, éditez la fiche affaire.
+                    </div>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-300">
@@ -572,143 +648,236 @@ const TabNegociation = ({
             )}
           </div>
 
-          {/* ── Contenu : Questions + Réponses ── */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* ── Toolbar Aperçu ── */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-3 flex flex-wrap items-center justify-between gap-3 sticky top-0 z-10">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h4 className="text-base font-black uppercase tracking-widest text-slate-900 flex items-center gap-2 mr-3">
+                <FileText size={18} className="text-blue-600" /> Aperçu du courrier
+              </h4>
+              <div className="flex items-center gap-1.5 relative">
+                <button
+                  onClick={injectAnomalies}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all shadow-sm active:scale-95"
+                  title="Détecter et injecter les prix atypiques (hauts et bas) dans l'aperçu"
+                >
+                  <Wand2 size={14} />
+                  Prix atypiques
+                </button>
+                <button
+                  onClick={() => setShowThresholdSettings(v => !v)}
+                  className={`p-1.5 rounded-lg border transition-all ${showThresholdSettings ? 'bg-indigo-100 border-indigo-300 text-indigo-700' : 'bg-white border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-200'}`}
+                  title="Réglages des seuils de détection et modèles de texte"
+                >
+                  <SlidersHorizontal size={14} />
+                </button>
 
-            {/* Colonne 1 : Saisie Questions & Génération */}
-            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
-              <div className="p-6 flex flex-col">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-                  <h4 className="text-base font-black uppercase tracking-widest text-slate-900 flex items-center gap-2">
-                    <MessageSquare size={20} className="text-blue-600" /> Questions spécifiques
-                  </h4>
+                {/* Popover réglages anomalies */}
+                {showThresholdSettings && (
+                  <div className={`absolute top-full left-0 mt-2 ${showTemplateEditor ? 'w-[520px]' : 'w-80'} bg-white rounded-2xl border border-slate-200 shadow-xl z-50 p-5 space-y-4 transition-all`}>
+                    <div className="flex items-center justify-between">
+                      <h5 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                        <SlidersHorizontal size={16} className="text-indigo-500" />
+                        Paramètres « Prix atypiques »
+                      </h5>
+                      <button onClick={() => setShowThresholdSettings(false)} className="p-1 text-slate-400 hover:text-slate-600 rounded">
+                        <X size={14} />
+                      </button>
+                    </div>
 
-                  <div className="flex items-center gap-1.5 relative">
-                    <button
-                      onClick={() => generateAnomaliesText(name)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all shadow-sm active:scale-95"
-                      title="Détecter les prix atypiques (hauts et bas) qui influencent fortement l'offre"
-                    >
-                      <Wand2 size={14} />
-                      Prix atypiques
-                    </button>
-                    <button
-                      onClick={() => setShowThresholdSettings(!showThresholdSettings)}
-                      className={`p-1.5 rounded-lg border transition-all ${showThresholdSettings ? 'bg-indigo-100 border-indigo-300 text-indigo-700' : 'bg-white border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-200'}`}
-                      title="Réglages des seuils de détection"
-                    >
-                      <SlidersHorizontal size={14} />
-                    </button>
+                    <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3">
+                      <div className="flex items-start gap-2">
+                        <Info size={14} className="text-indigo-500 mt-0.5 shrink-0" />
+                        <p className="text-[11px] text-indigo-700 leading-relaxed">
+                          Un prix est signalé comme <strong>atypique</strong> si les <strong>2 conditions</strong> sont remplies simultanément :
+                          le PU s'écarte de plus de <strong>{anomalyThresholds.ecart}%</strong> de la moyenne des offres,
+                          ET le montant de la ligne représente plus de <strong>{anomalyThresholds.impact}%</strong> du total HT de l'entreprise.
+                        </p>
+                      </div>
+                    </div>
 
-                    {/* Popover réglages */}
-                    {showThresholdSettings && (
-                      <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 p-5 space-y-4">
-                        <div className="flex items-center justify-between">
-                          <h5 className="text-sm font-black text-slate-800 flex items-center gap-2">
-                            <SlidersHorizontal size={16} className="text-indigo-500" />
-                            Seuils de détection
-                          </h5>
-                          <button onClick={() => setShowThresholdSettings(false)} className="p-1 text-slate-400 hover:text-slate-600 rounded">
-                            <X size={14} />
-                          </button>
+                    <div className="space-y-3">
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="text-xs font-bold text-slate-700">Écart par rapport à la moyenne</label>
+                          <span className="text-xs font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg">{anomalyThresholds.ecart}%</span>
                         </div>
+                        <input
+                          type="range" min={5} max={50} step={1}
+                          value={anomalyThresholds.ecart}
+                          onChange={e => setAnomalyThresholds(prev => ({ ...prev, ecart: Number(e.target.value) }))}
+                          className="w-full h-1.5 bg-slate-200 rounded-full appearance-none cursor-pointer accent-indigo-500"
+                        />
+                        <div className="flex justify-between text-[9px] text-slate-400 mt-0.5">
+                          <span>5% (sensible)</span>
+                          <span>50% (tolérant)</span>
+                        </div>
+                      </div>
 
-                        <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3">
-                          <div className="flex items-start gap-2">
-                            <Info size={14} className="text-indigo-500 mt-0.5 shrink-0" />
-                            <p className="text-[11px] text-indigo-700 leading-relaxed">
-                              Un prix est signalé comme <strong>atypique</strong> si les <strong>2 conditions</strong> sont remplies simultanément :
-                              le PU s'écarte de plus de <strong>{anomalyThresholds.ecart}%</strong> de la moyenne des offres,
-                              ET le montant de la ligne représente plus de <strong>{anomalyThresholds.impact}%</strong> du total HT de l'entreprise.
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="text-xs font-bold text-slate-700">Impact sur l'offre totale</label>
+                          <span className="text-xs font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg">{anomalyThresholds.impact}%</span>
+                        </div>
+                        <input
+                          type="range" min={0.25} max={5} step={0.25}
+                          value={anomalyThresholds.impact}
+                          onChange={e => setAnomalyThresholds(prev => ({ ...prev, impact: Number(e.target.value) }))}
+                          className="w-full h-1.5 bg-slate-200 rounded-full appearance-none cursor-pointer accent-indigo-500"
+                        />
+                        <div className="flex justify-between text-[9px] text-slate-400 mt-0.5">
+                          <span>0.25% (sensible)</span>
+                          <span>5% (tolérant)</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => { setAnomalyThresholds({ ecart: 15, impact: 1 }); }}
+                      className="w-full text-[11px] font-bold text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 py-1.5 rounded-lg transition-colors"
+                    >
+                      Réinitialiser seuils (15% / 1%)
+                    </button>
+
+                    <div className="border-t border-slate-100 pt-3">
+                      <button
+                        onClick={() => setShowTemplateEditor(v => !v)}
+                        className="w-full flex items-center justify-between text-xs font-bold text-slate-700 hover:text-indigo-600 py-1.5 rounded-lg transition-colors"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Edit3 size={13} className="text-indigo-500" />
+                          Modèles de texte injectés
+                        </span>
+                        <span className="text-[10px] font-normal text-slate-400">{showTemplateEditor ? 'Masquer' : 'Éditer'}</span>
+                      </button>
+
+                      {showTemplateEditor && (
+                        <div className="mt-2 space-y-3">
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-[11px] font-bold text-slate-700">Texte « Prix anormalement bas »</label>
+                              <button
+                                onClick={() => saveAnomalyTemplates({ ...anomalyTemplates, low: DEFAULT_LOW_TEMPLATE })}
+                                className="text-[10px] font-bold text-slate-400 hover:text-indigo-600"
+                                title="Restaurer le texte par défaut"
+                              >
+                                Réinitialiser
+                              </button>
+                            </div>
+                            <textarea
+                              rows={8}
+                              value={anomalyTemplates.low}
+                              onChange={e => saveAnomalyTemplates({ ...anomalyTemplates, low: e.target.value })}
+                              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-[11px] font-mono text-slate-700 leading-snug focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 outline-none resize-y"
+                              spellCheck="false"
+                            />
+                          </div>
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-[11px] font-bold text-slate-700">Texte « Prix excessifs »</label>
+                              <button
+                                onClick={() => saveAnomalyTemplates({ ...anomalyTemplates, high: DEFAULT_HIGH_TEMPLATE })}
+                                className="text-[10px] font-bold text-slate-400 hover:text-indigo-600"
+                                title="Restaurer le texte par défaut"
+                              >
+                                Réinitialiser
+                              </button>
+                            </div>
+                            <textarea
+                              rows={6}
+                              value={anomalyTemplates.high}
+                              onChange={e => saveAnomalyTemplates({ ...anomalyTemplates, high: e.target.value })}
+                              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-[11px] font-mono text-slate-700 leading-snug focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 outline-none resize-y"
+                              spellCheck="false"
+                            />
+                          </div>
+                          <div className="flex items-start gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
+                            <CheckCircle2 size={13} className="text-emerald-500 shrink-0 mt-0.5" />
+                            <p className="text-[10px] text-emerald-700 leading-relaxed">
+                              Sauvegarde automatique dans le navigateur. La liste des articles concernés est ajoutée à la fin de chaque texte lors de l'injection.
                             </p>
                           </div>
                         </div>
-
-                        <div className="space-y-3">
-                          <div>
-                            <div className="flex items-center justify-between mb-1.5">
-                              <label className="text-xs font-bold text-slate-700">Écart par rapport à la moyenne</label>
-                              <span className="text-xs font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg">{anomalyThresholds.ecart}%</span>
-                            </div>
-                            <input
-                              type="range" min={5} max={50} step={1}
-                              value={anomalyThresholds.ecart}
-                              onChange={e => setAnomalyThresholds(prev => ({ ...prev, ecart: Number(e.target.value) }))}
-                              className="w-full h-1.5 bg-slate-200 rounded-full appearance-none cursor-pointer accent-indigo-500"
-                            />
-                            <div className="flex justify-between text-[9px] text-slate-400 mt-0.5">
-                              <span>5% (sensible)</span>
-                              <span>50% (tolérant)</span>
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="flex items-center justify-between mb-1.5">
-                              <label className="text-xs font-bold text-slate-700">Impact sur l'offre totale</label>
-                              <span className="text-xs font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg">{anomalyThresholds.impact}%</span>
-                            </div>
-                            <input
-                              type="range" min={0.25} max={5} step={0.25}
-                              value={anomalyThresholds.impact}
-                              onChange={e => setAnomalyThresholds(prev => ({ ...prev, impact: Number(e.target.value) }))}
-                              className="w-full h-1.5 bg-slate-200 rounded-full appearance-none cursor-pointer accent-indigo-500"
-                            />
-                            <div className="flex justify-between text-[9px] text-slate-400 mt-0.5">
-                              <span>0.25% (sensible)</span>
-                              <span>5% (tolérant)</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <button
-                          onClick={() => { setAnomalyThresholds({ ecart: 15, impact: 1 }); }}
-                          className="w-full text-[11px] font-bold text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 py-1.5 rounded-lg transition-colors"
-                        >
-                          Réinitialiser (15% / 1%)
-                        </button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
+              </div>
+            </div>
 
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={() => setTemplateEditorOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all shadow-sm active:scale-95"
+                title="Modifier la trame globale partagée par toutes les entreprises"
+              >
+                <Settings size={14} />
+                Trame
+              </button>
+              <button
+                onClick={resetFromTemplate}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all shadow-sm active:scale-95"
+                title="Effacer toutes les modifications et repartir de la trame de base"
+              >
+                <RotateCcw size={14} />
+                Réinitialiser
+              </button>
+              <button
+                onClick={handleDownloadPDF}
+                className="flex items-center gap-1.5 px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-[11px] font-black uppercase tracking-wider transition-all shadow-md active:scale-95"
+                title="Télécharger le courrier au format PDF"
+              >
+                <FileOutput size={14} />
+                Télécharger PDF
+              </button>
+            </div>
+          </div>
+
+          {/* ── Aperçu Quill (simulation papier A4 fidèle au PDF) ── */}
+          <div className="rounded-3xl border border-slate-300 shadow-sm overflow-hidden bg-white nego-paper-preview">
+            <ReactQuill
+              theme="snow"
+              value={letterHtml}
+              onChange={setLetterHtml}
+              modules={{
+                toolbar: [
+                  [{ 'header': [1, 2, 3, false] }],
+                  ['bold', 'italic', 'underline', 'strike'],
+                  [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                  [{ 'align': [] }],
+                  ['clean']
+                ],
+              }}
+            />
+          </div>
+
+          {/* ── Accordéon Réponses & Engagements ── */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <button
+              onClick={() => updateNegotiation(name, '__responsesOpen', !nego.__responsesOpen)}
+              className="w-full flex items-center justify-between px-6 py-4 hover:bg-slate-50 transition-colors text-left"
+            >
+              <div className="flex items-center gap-3">
+                <CheckCircle2 size={20} className="text-emerald-600" />
+                <div>
+                  <h4 className="text-base font-black uppercase tracking-widest text-slate-900">Réponses & Engagements</h4>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {nego.responses ? `${nego.responses.length} caractère${nego.responses.length > 1 ? 's' : ''} saisi${nego.responses.length > 1 ? 's' : ''}` : 'Consignez ici les retours après envoi du courrier'}
+                  </p>
+                </div>
+              </div>
+              {nego.__responsesOpen ? <ChevronUp size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
+            </button>
+            {nego.__responsesOpen && (
+              <div className="px-6 pb-6 border-t border-slate-100 pt-4">
                 <Textarea
-                  value={nego.questions}
-                  onChange={v => updateNegotiation(name, 'questions', v)}
-                  placeholder="Listez ici les questions spécifiques à cette entreprise.&#10;Ex:&#10;- Pouvez-vous justifier le PU du bordereau n°4 ?&#10;- Votre variante est irrecevable..."
-                  rows={4}
-                  className="bg-white border-slate-300 shadow-sm rounded-2xl text-slate-900 font-medium text-[15px] leading-relaxed placeholder:text-slate-400 focus:ring-blue-500/20 min-h-[120px]"
+                  value={nego.responses}
+                  onChange={v => updateNegotiation(name, 'responses', v)}
+                  placeholder="Consignez ici les retours de l'entreprise après l'envoi du courrier."
+                  rows={6}
+                  className="bg-white border-slate-300 shadow-sm rounded-2xl text-slate-900 font-medium text-[15px] leading-relaxed placeholder:text-slate-400 focus:ring-emerald-500/20 min-h-[140px]"
                 />
               </div>
-
-              <div className="bg-slate-100/50 border-t border-slate-200 px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <span className="text-xs font-bold text-slate-600 max-w-[200px] leading-snug">
-                  La trame officielle sera injectée avec vos questions spécifiques.
-                </span>
-
-                <button
-                  onClick={() => openCompanyEditor(name, nego.questions)}
-                  className="flex items-center gap-2 px-6 py-3.5 rounded-xl text-sm font-black transition-all shadow-md active:scale-95 bg-slate-900 hover:bg-slate-800 text-white"
-                >
-                  <Edit3 size={18} />
-                  Aperçu & Téléchargement
-                </button>
-              </div>
-            </div>
-
-            {/* Colonne 2 : Suivi des réponses */}
-            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col">
-              <h4 className="text-base font-black uppercase tracking-widest text-slate-900 mb-4 flex items-center gap-2">
-                <CheckCircle2 size={20} className="text-emerald-600" /> Réponses & Engagements
-              </h4>
-              <Textarea
-                value={nego.responses}
-                onChange={v => updateNegotiation(name, 'responses', v)}
-                placeholder="Consignez ici les retours de l'entreprise après l'envoi du courrier."
-                rows={4}
-                className="bg-white border-slate-300 shadow-sm rounded-2xl text-slate-900 font-medium text-[15px] leading-relaxed placeholder:text-slate-400 focus:ring-emerald-500/20 min-h-[120px]"
-              />
-            </div>
-
+            )}
           </div>
 
         </div>

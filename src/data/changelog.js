@@ -2,9 +2,24 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.5.27';
+export const APP_VERSION = '2.5.28';
 
 export const CHANGELOG = [
+  {
+    version: '2.5.28',
+    date: '2026-05-20',
+    title: 'RAO Négociation : refonte aperçu A4 inline + persistance trame & config',
+    highlights: [
+      'RAO Négociation : refonte complète de l\'onglet — suppression de la grille "Questions spécifiques / Réponses & Engagements", aperçu Quill éditable inline en simulation A4 fidèle au PDF (210×297mm, marges, barre verticale décorative, ombre douce)',
+      'RAO Négociation : toolbar avec actions [Prix atypiques] [Seuils] [Trame] [Réinitialiser] [Télécharger PDF] au-dessus de l\'aperçu',
+      'RAO Négociation : "Réponses & Engagements" en accordéon repliable en bas (plus discret)',
+      'RAO Négociation : trame globale du courrier persistée au niveau utilisateur (Firestore users/{uid}/preferences/negotiation_template) — partagée entre tous les projets du même utilisateur',
+      'RAO Négociation : signataire et ville persistés par projet (rao.letterConfig), date limite et adresse entreprise par entreprise (nego.deadline, nego.adresseEntreprise)',
+      'RAO Négociation : bouton "Prix atypiques" idempotent — sections low/high injectées au bon endroit (intro → low → high → suite), conservées à travers les changements de variables (signataire, deadline...) via ref',
+      'PDF Négociation : correction du doublon d\'adresse expéditeur dans le corps de la lettre — les paragraphes Quill avec <br/> sont désormais correctement filtrés par le skip-list',
+      'PDF Négociation : saut de ligne explicite après chaque tableau de prix atypiques (4mm → 8mm) pour la lisibilité',
+    ],
+  },
   {
     version: '2.5.27',
     date: '2026-05-19',
