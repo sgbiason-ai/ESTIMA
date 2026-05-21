@@ -18,6 +18,9 @@ export const CHANGELOG = [
       'RAO Négociation : bouton "Prix atypiques" idempotent — sections low/high injectées au bon endroit (intro → low → high → suite), conservées à travers les changements de variables (signataire, deadline...) via ref',
       'PDF Négociation : correction du doublon d\'adresse expéditeur dans le corps de la lettre — les paragraphes Quill avec <br/> sont désormais correctement filtrés par le skip-list',
       'PDF Négociation : saut de ligne explicite après chaque tableau de prix atypiques (4mm → 8mm) pour la lisibilité',
+      'RAO mobile : affichage du régime des variantes (autorisées / obligatoires + exigences) dans l\'onglet Infos',
+      'RAO mobile : liste des variantes par entreprise dans l\'onglet Technique avec badge Retenue/Rejetée et justification',
+      'RAO mobile : bandeau d\'alerte dans le Récap listant les variantes retenues sans justification d\'acceptation',
     ],
   },
   {

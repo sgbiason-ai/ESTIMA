@@ -333,6 +333,36 @@ export default function RAOView({ project, companyId, calcHook }) {
             </div>
           </div>
 
+          {/* Alerte variantes retenues sans justification */}
+          {(() => {
+            const issues = [];
+            companies.forEach(c => {
+              (c.variants || []).forEach((v, vi) => {
+                if (v.retained && !(v.justification || '').trim()) {
+                  issues.push({ company: c.name, label: v.label || `V${vi + 1}` });
+                }
+              });
+            });
+            if (!issues.length) return null;
+            return (
+              <div className="bg-amber-50 border border-amber-300 rounded-xl p-3">
+                <div className="flex items-start gap-2">
+                  <span className="text-amber-600 text-base leading-none">⚠</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] font-black text-amber-700 uppercase mb-1">
+                      {issues.length} variante{issues.length > 1 ? 's' : ''} retenue{issues.length > 1 ? 's' : ''} sans justification
+                    </p>
+                    <ul className="text-[10px] text-amber-800 leading-snug space-y-0.5">
+                      {issues.map((it, i) => (
+                        <li key={i} className="truncate">• <strong>{it.company}</strong> — {it.label}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Classement final */}
           {ranking.map((c, i) => {
             const ui = getUI(companies.findIndex(co => co.name === c.name));
@@ -595,6 +625,50 @@ export default function RAOView({ project, companyId, calcHook }) {
                           );
                         })}
 
+                        {/* Variantes proposées */}
+                        {(c.variants || []).length > 0 && (
+                          <div className="bg-purple-50 rounded-lg p-2.5 border border-purple-100">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-[10px] font-black text-purple-700 uppercase">
+                                Variantes ({c.variants.length})
+                              </span>
+                              <span className="text-[9px] font-bold text-purple-600">
+                                {c.variants.filter(v => v.retained).length} retenue{c.variants.filter(v => v.retained).length > 1 ? 's' : ''}
+                              </span>
+                            </div>
+                            <div className="space-y-2">
+                              {c.variants.map((v, vi) => {
+                                const justifMissing = v.retained && !(v.justification || '').trim();
+                                return (
+                                  <div key={v.id || vi} className={`rounded-lg p-2 ${v.retained ? 'bg-white border border-emerald-200' : 'bg-white/60 border border-gray-200'}`}>
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                      <span className="w-5 h-5 rounded-md bg-purple-600 text-white text-[9px] font-black flex items-center justify-center shrink-0">
+                                        V{vi + 1}
+                                      </span>
+                                      <span className="flex-1 text-[11px] font-bold text-gray-800 truncate">
+                                        {v.label || `Variante ${vi + 1}`}
+                                      </span>
+                                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${
+                                        v.retained ? 'bg-emerald-500 text-white' : 'bg-gray-300 text-gray-700'
+                                      }`}>
+                                        {v.retained ? 'Retenue' : 'Rejetée'}
+                                      </span>
+                                    </div>
+                                    {v.total > 0 && (
+                                      <div className="text-[10px] text-gray-500 mb-1">{fmt(v.total)} HT</div>
+                                    )}
+                                    {v.justification ? (
+                                      <p className="text-[10px] text-gray-600 italic leading-snug">{v.justification}</p>
+                                    ) : justifMissing ? (
+                                      <p className="text-[10px] text-amber-700 font-bold italic">⚠ Justification d'acceptation requise</p>
+                                    ) : null}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
                         {/* Note prix */}
                         <div className="bg-emerald-50 rounded-lg p-2.5">
                           <div className="flex items-center justify-between">
@@ -728,6 +802,27 @@ export default function RAOView({ project, companyId, calcHook }) {
                 {consultation.ref && <div><span className="text-gray-500 font-bold">Réf. :</span> {consultation.ref}</div>}
                 {consultation.code && <div><span className="text-gray-500 font-bold">Code affaire :</span> {consultation.code}</div>}
               </div>
+            </div>
+          )}
+
+          {/* Régime des variantes */}
+          {consultation.variantsAllowed && consultation.variantsAllowed !== 'forbidden' && (
+            <div className="bg-white rounded-xl border border-purple-200 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-black text-purple-600 uppercase">Régime des variantes</span>
+                <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase ${
+                  consultation.variantsAllowed === 'mandatory'
+                    ? 'bg-red-100 text-red-700'
+                    : 'bg-purple-100 text-purple-700'
+                }`}>
+                  {consultation.variantsAllowed === 'mandatory' ? 'Obligatoires' : 'Autorisées'}
+                </span>
+              </div>
+              {consultation.variantsRequirements && (
+                <p className="text-[11px] text-gray-700 leading-snug whitespace-pre-wrap">
+                  {consultation.variantsRequirements}
+                </p>
+              )}
             </div>
           )}
 
