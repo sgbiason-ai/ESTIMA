@@ -8,7 +8,7 @@ import {
   ArrowLeft, ClipboardList, Plus, Trash2, Copy,
   Building2, Users, ListTree, Edit3, Eye, FileDown, Mail, FolderOpen,
   HelpCircle, Compass, Archive, UploadCloud, ArrowLeftRight,
-  FileText as FileWord, X, MapPin, Minimize2,
+  FileText as FileWord, X, MapPin, Minimize2, Send,
 } from 'lucide-react';
 import { doc, getDoc, setDoc, collection, getDocs, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -45,10 +45,12 @@ import CrcDuplicateModal from './CrcDuplicateModal';
 import CrcLibraryModal from './CrcLibraryModal';
 import CrcAuditModal from './CrcAuditModal';
 import CrcTerrainView from './CrcTerrainView';
+import CrcSendMailModal from '../../components/crr/CrcSendMailModal';
+import { useSmtpConfig } from '../../hooks/useSmtpConfig';
 
 // ── VUE PRINCIPALE ──────────────────────────────────────────────────────────
 
-export default function CrcView({ onBackToHub, user, companyId }) {
+export default function CrcView({ onBackToHub, user, companyId, onNavigateModule }) {
   const [chantiers, setChantiers] = useState([]);
   const [crrDoc, setCrrDoc] = useState(null);
   const [branding, setBranding] = useState(DEFAULT_BRANDING);
@@ -278,6 +280,8 @@ export default function CrcView({ onBackToHub, user, companyId }) {
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [showHelpPanel, setShowHelpPanel] = useState(false);
   const [showGuidedTour, setShowGuidedTour] = useState(false);
+  const [showSendMailModal, setShowSendMailModal] = useState(false);
+  const { config: smtpConfig, isConfigured: smtpConfigured } = useSmtpConfig();
   const [showLibraryModal, setShowLibraryModal] = useState(false);
   const [showChantierPicker, setShowChantierPicker] = useState(false);
   const [importModal, setImportModal] = useState(null);
@@ -668,7 +672,17 @@ export default function CrcView({ onBackToHub, user, companyId }) {
           <RibbonGroup label="Exports" dataTour="exports">
             <RibbonButton icon={FileDown} label="Export PDF" onClick={handleExportPdf} disabled={!hasMeeting} variant="primary" title="Telecharger le compte rendu en PDF" />
             <RibbonButton icon={FileWord} label="Export Word" onClick={handleExportWord} disabled={!hasMeeting} variant="accent" title="Telecharger le compte rendu en Word (.doc)" />
-            <RibbonButton icon={Mail} label="Envoyer" onClick={handleSendMail} disabled={!hasMeeting} variant="accent" title="Envoyer le CR par email aux participants" />
+            <RibbonButton icon={Mail} label="Outlook" onClick={handleSendMail} disabled={!hasMeeting} variant="accent" title="Envoi via Outlook (telecharge un script .vbs)" />
+            <RibbonButton
+              icon={Send}
+              label={smtpConfigured ? 'Envoyer (web)' : 'Envoyer (web)'}
+              onClick={() => setShowSendMailModal(true)}
+              disabled={!hasMeeting}
+              variant="primary"
+              title={smtpConfigured
+                ? 'Envoyer le CR par email via le serveur (SMTP)'
+                : 'Configuration SMTP requise — cliquez pour configurer'}
+            />
           </RibbonGroup>
 
           <RibbonDivider />
@@ -922,6 +936,25 @@ export default function CrcView({ onBackToHub, user, companyId }) {
       {showGuidedTour && (
         <CrcGuidedTour onClose={() => setShowGuidedTour(false)} />
       )}
+
+      <CrcSendMailModal
+        open={showSendMailModal}
+        onClose={() => setShowSendMailModal(false)}
+        meeting={manager.activeMeeting}
+        crrConfig={manager.crrConfig}
+        projectName={chantierName}
+        branding={branding}
+        sortDate={sortDate}
+        sortCat={sortCat}
+        companyId={companyId}
+        crrId={crrDoc?.id}
+        smtpConfig={smtpConfig}
+        defaultRecipients={manager.diffusionEmails}
+        onOpenSmtpSettings={() => {
+          setShowSendMailModal(false);
+          onNavigateModule?.('rgpd');
+        }}
+      />
     </div>
   );
 }

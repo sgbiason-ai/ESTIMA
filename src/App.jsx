@@ -51,6 +51,7 @@ const TeslaModeView      = lazyWithReload(() => import('./views/TeslaModeView'))
 const DevisMoeView       = lazyWithReload(() => import('./views/devisMoe/DevisMoeView'));
 const ExpenseNotesView   = lazyWithReload(() => import('./views/expenseNotes/ExpenseNotesView'));
 const AccountSection     = lazyWithReload(() => import('./components/settings/AccountSection'));
+const SmtpSection        = lazyWithReload(() => import('./components/settings/SmtpSection'));
 
 // ─── VUE MOBILE (lazy — chargée seulement sur mobile) ────────────────────────
 const MobileApp          = lazyWithReload(() => import('./components/mobile/MobileApp'));
@@ -87,14 +88,15 @@ export default function App() {
   const { user, companyId, isAdmin, userModules, authLoading, handleLogout } = useAppAuth();
 
   // Helper : un user a-t-il accès à ce module ?
-  // - admin global → toujours oui
-  // - module 'admin' → uniquement isAdmin
-  // - userModules défini (array) → filtrage strict
-  // - userModules absent → fallback legacy (true, le hub gère access)
+  // - 'admin' → toujours gated par isAdmin
+  // - userModules défini → source de vérité (override les flags legacy)
+  // - userModules absent → fallback legacy : devis_moe et expense_notes restent admin_only
+  const LEGACY_ADMIN_ONLY = ['devis_moe', 'expense_notes'];
   const hasModuleAccess = (modId) => {
     if (modId === 'admin') return isAdmin;
-    if (!Array.isArray(userModules)) return true;
-    return userModules.includes(modId);
+    if (Array.isArray(userModules)) return userModules.includes(modId);
+    if (LEGACY_ADMIN_ONLY.includes(modId)) return isAdmin;
+    return true;
   };
 
   // ── Masquer le splash HTML une fois l'auth résolu ─────────────────────────
@@ -249,7 +251,7 @@ export default function App() {
 
   // Module : Compte Rendu de Chantier
   if (activeModule === 'crc') {
-    return <Lazy><CrcView onBackToHub={handleBackToHub} user={user} companyId={companyId} /></Lazy>;
+    return <Lazy><CrcView onBackToHub={handleBackToHub} user={user} companyId={companyId} onNavigateModule={setActiveModule} /></Lazy>;
   }
 
   // Module : Document Administratif
@@ -257,15 +259,13 @@ export default function App() {
     return <Lazy><DocAdminView onBackToHub={handleBackToHub} user={user} companyId={companyId} /></Lazy>;
   }
 
-  // Module : Devis MOE
+  // Module : Devis MOE — accès via permissions par module (matrice super-admin)
   if (activeModule === 'devis_moe') {
-    if (!isAdmin) { setActiveModule(null); return null; }
     return <Lazy><DevisMoeView onBackToHub={handleBackToHub} user={user} companyId={companyId} /></Lazy>;
   }
 
-  // Module : Notes de Frais Kilometriques (admin uniquement)
+  // Module : Notes de Frais Kilometriques — accès via permissions par module
   if (activeModule === 'expense_notes') {
-    if (!isAdmin) { setActiveModule(null); return null; }
     return <Lazy><ExpenseNotesModule onBackToHub={handleBackToHub} user={user} companyId={companyId} /></Lazy>;
   }
 
@@ -827,7 +827,8 @@ function RgpdModule({ user, companyId, onBackToHub }) {
         <h1 className="font-bold text-lg text-gray-900 tracking-tight">Mon Compte & Données Personnelles</h1>
       </header>
       <div className="flex-1 overflow-y-auto p-8 bg-[#f5f5f7]">
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-3xl mx-auto space-y-8">
+          <SmtpSection user={user} />
           <AccountSection user={user} companyId={companyId} />
         </div>
       </div>

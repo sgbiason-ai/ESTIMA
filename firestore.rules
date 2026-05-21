@@ -24,6 +24,13 @@ service cloud.firestore {
       return request.auth != null && getUserData().isAdmin == true;
     }
 
+    // True if the caller is the application-level super-admin (by email).
+    // Used for cross-tenant operations like creating new companies.
+    function isAppSuperAdmin() {
+      return request.auth != null
+             && request.auth.token.email == 'samuel.biason@papyrus-be.fr';
+    }
+
     // True if the incoming write does NOT touch the isAdmin field
     function doesNotModifyAdminField() {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin']);
@@ -64,10 +71,20 @@ service cloud.firestore {
                     && resource.data.companyId != null
                     && isCompanyAdmin(resource.data.companyId);
 
+      // Application super-admin can create / update / delete any user doc
+      // (cross-tenant assignment from the Administration module)
+      allow create, update, delete: if isAppSuperAdmin();
+
       // Préférences utilisateur (dernier projet/chantier/fiche/devis/visite par module)
       // Lecture et écriture réservées au propriétaire uniquement.
       match /preferences/{prefId} {
         allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+
+      // Données privées (ex: mot de passe SMTP chiffré).
+      // Aucun accès direct côté client — seules les Cloud Functions (admin SDK) y accèdent.
+      match /private/{docId} {
+        allow read, write: if false;
       }
     }
 
@@ -81,6 +98,9 @@ service cloud.firestore {
 
       // Only company admins can write
       allow write: if isCompanyAdmin(companyId);
+
+      // Application super-admin can create / delete companies (cross-tenant)
+      allow create, delete: if isAppSuperAdmin();
 
       // ─── Sub-collections ────────────────────────────────────────
       // projects, bpu, categories, units, resources
@@ -140,12 +160,18 @@ service cloud.firestore {
       match /crr/{crrId} {
         allow read: if isCompanyMember(companyId);
         allow write: if isCompanyMember(companyId);
+
+        // Logs d'envoi mail — lecture par les membres, écriture par Cloud Function uniquement
+        match /emails/{emailId} {
+          allow read: if isCompanyMember(companyId);
+          allow write: if false;
+        }
       }
 
-      // Devis MOE — lecture membres, écriture admins uniquement
+      // Devis MOE — lecture + écriture par tous les membres
+      // (l'accès UI est contrôlé par les permissions par module dans /users/{uid})
       match /devisMoe/{devisId} {
-        allow read: if isCompanyMember(companyId);
-        allow write: if isCompanyAdmin(companyId);
+        allow read, write: if isCompanyMember(companyId);
       }
 
       // Fiches marché (Documents Administratifs)
@@ -165,29 +191,31 @@ service cloud.firestore {
                      && request.auth.uid == presenceId;
       }
 
-      // Notes de frais kilométriques — admins uniquement
-      match /expenseNotes/{noteId} {
-        allow read, write: if isCompanyAdmin(companyId);
+      // Notes de frais — données ISOLÉES par utilisateur sous /users/{uid}/
+      // Chaque user voit uniquement ses propres notes / véhicules / adresses / réglages annuels.
+      match /users/{uid}/expenseNotes/{noteId} {
+        allow read, write: if isCompanyMember(companyId) && request.auth.uid == uid;
+      }
+      match /users/{uid}/vehicles/{vehicleId} {
+        allow read, write: if isCompanyMember(companyId) && request.auth.uid == uid;
+      }
+      match /users/{uid}/expenseLocations/{locationId} {
+        allow read, write: if isCompanyMember(companyId) && request.auth.uid == uid;
+      }
+      match /users/{uid}/expenseYearSettings/{year} {
+        allow read, write: if isCompanyMember(companyId) && request.auth.uid == uid;
       }
 
-      // Véhicules (pour calcul barème fiscal) — admins uniquement
-      match /vehicles/{vehicleId} {
-        allow read, write: if isCompanyAdmin(companyId);
-      }
-
-      // Adresses favorites pour notes de frais — admins uniquement
-      match /expenseLocations/{locationId} {
-        allow read, write: if isCompanyAdmin(companyId);
-      }
-
-      // Reglages annuels (forcedTranche, customBareme...) — admins uniquement
-      match /expenseYearSettings/{year} {
-        allow read, write: if isCompanyAdmin(companyId);
-      }
-
-      // Reglages globaux (majorations distances, etc.) — admins uniquement
+      // Réglages globaux notes de frais (majorations distances) — partagés, admin only
       match /expenseSettings/{docId} {
-        allow read, write: if isCompanyAdmin(companyId);
+        allow read: if isCompanyMember(companyId);
+        allow write: if isCompanyAdmin(companyId);
+      }
+
+      // Application super-admin : accès complet sur toute subcollection
+      // (suppression cascade d'une entreprise, support, audit cross-tenant)
+      match /{document=**} {
+        allow read, write: if isAppSuperAdmin();
       }
     }
   }

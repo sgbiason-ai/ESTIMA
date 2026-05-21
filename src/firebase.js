@@ -45,5 +45,5 @@ if (isTeslaBrowser) {
   setPersistence(auth, browserLocalPersistence).catch(() => {});
 }
 
-export { db };
+export { db, app };
 export const storage = getStorage(app);

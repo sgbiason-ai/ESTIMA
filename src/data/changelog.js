@@ -2,9 +2,22 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.5.28';
+export const APP_VERSION = '2.6.0';
 
 export const CHANGELOG = [
+  {
+    version: '2.6.0',
+    date: '2026-05-21',
+    title: 'CRC : envoi du compte rendu par email via serveur (sans Outlook)',
+    highlights: [
+      'CRC : nouveau bouton "Envoyer (web)" dans le ruban — envoi du CR par email directement depuis l\'app, sans script VBS Outlook, multi-plateforme (Mac, Linux, mobile compatibles)',
+      'CRC : modale d\'envoi avec destinataires/CC/CCi en chips éditables, sujet personnalisable, message personnel optionnel, aperçu HTML, PDF auto-attaché',
+      'Compte : nouvelle section "Configuration Email (SMTP)" — presets Gmail, Outlook 365, OVH, Free, Orange et personnalisé, bouton "Tester la connexion", indications mot de passe d\'application Gmail',
+      'Sécurité : mot de passe SMTP chiffré côté serveur (AES-256-GCM avec clé en Firebase Secret Manager), jamais accessible en clair côté client',
+      'Logs : chaque envoi mail tracé dans Firestore (date, destinataires, sujet, statut, messageId) pour audit',
+      'L\'ancien bouton "Outlook" (script VBS) reste disponible en parallèle pour les utilisateurs Windows attachés à Outlook',
+    ],
+  },
   {
     version: '2.5.28',
     date: '2026-05-20',
