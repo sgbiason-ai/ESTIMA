@@ -120,19 +120,21 @@ export const buildCoverPageCanvas = async (project, docLabel, branding = null) =
   renderLogo(logoMoe, true);
   renderLogo(logoClient, false);
 
-  // ── 3. Type de document (droite) ────────────────────────────────────────────
-  ctx.font = `bold ${ptpx(10)}px Helvetica, Arial, sans-serif`;
-  ctx.fillStyle = rgb(THEME.lightText);
-  ctx.textAlign = 'right';
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillText(docLabel.toUpperCase(), px(PW - 18), px(52));
+  // ── 3. Type de document (droite) ─ zone vide tolérée → cover générique ─────
+  if (docLabel) {
+    ctx.font = `bold ${ptpx(10)}px Helvetica, Arial, sans-serif`;
+    ctx.fillStyle = rgb(THEME.lightText);
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(docLabel.toUpperCase(), px(PW - 18), px(52));
 
-  ctx.strokeStyle = rgb(THEME.borders);
-  ctx.lineWidth   = px(0.5);
-  ctx.beginPath();
-  ctx.moveTo(px(PW - 95), px(57));
-  ctx.lineTo(px(PW - 18), px(57));
-  ctx.stroke();
+    ctx.strokeStyle = rgb(THEME.borders);
+    ctx.lineWidth   = px(0.5);
+    ctx.beginPath();
+    ctx.moveTo(px(PW - 95), px(57));
+    ctx.lineTo(px(PW - 18), px(57));
+    ctx.stroke();
+  }
 
   // ── 4. Titre projet ─────────────────────────────────────────────────────────
   const titleFontSize = ptpx(32);

@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { 
+import {
   X, FileSignature, MapPin, Calendar, Building2,
   Ruler, Briefcase, Clock, Hash, CheckCircle2,
   Hourglass, Navigation, Move, AlertTriangle, Upload, Trash2, ImageIcon,
   FileText, Globe2, ShieldAlert, Layers, PenLine, ToggleLeft, ToggleRight,
-  Eye, RefreshCw, Link, Plus
+  Eye, RefreshCw, Link, Plus, Download
 } from 'lucide-react';
 import { buildCoverPageCanvas } from '../../utils/coverPageCanvas';
 
@@ -170,7 +170,21 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewDocType, setPreviewDocType] = useState('CCTP');
   const [previewOpen, setPreviewOpen] = useState(true);
+  const [exportingCover, setExportingCover] = useState(false);
   const debounceRef = useRef(null);
+
+  const handleExportCoverPdf = async () => {
+    if (exportingCover) return;
+    setExportingCover(true);
+    try {
+      const { generateCoverPagePDF } = await import('../../utils/pdfCoverPageGenerator');
+      await generateCoverPagePDF(formData, branding);
+    } catch (e) {
+      console.error('Export page de garde PDF échoué:', e);
+    } finally {
+      setExportingCover(false);
+    }
+  };
 
   const refreshPreview = useCallback(async (data, docType, brand) => {
     setPreviewLoading(true);
@@ -718,8 +732,27 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
               </div>
             </div>
 
-            {/* Info bas */}
+            {/* Footer volet : export + infos */}
             <div className="px-4 py-2.5 border-t border-slate-700 shrink-0 min-w-[320px]">
+              <button
+                type="button"
+                onClick={handleExportCoverPdf}
+                disabled={exportingCover}
+                className="w-full mb-2 flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-[10px] font-black uppercase tracking-wider px-3 py-2 rounded-lg transition-all"
+                title="Télécharger un PDF A4 avec seulement la page de garde (sans CCTP/RC)"
+              >
+                {exportingCover ? (
+                  <>
+                    <RefreshCw size={11} className="animate-spin" />
+                    Génération…
+                  </>
+                ) : (
+                  <>
+                    <Download size={11} />
+                    Télécharger la page de garde
+                  </>
+                )}
+              </button>
               <p className="text-[9px] text-slate-500 text-center leading-relaxed">
                 Mis à jour en temps réel · 150 DPI · Format A4
               </p>

@@ -293,13 +293,15 @@ export const drawCoverPage = (doc, config, theme, logos) => {
     renderLogo(doc, logoClient, pageWidth - 18 - w, 18, maxW, maxH);
   }
 
-  // Type de document
-  doc.setFont('Helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(...theme.lightText);
-  doc.text(docType, pageWidth - 18, 52, { align: 'right' });
-  doc.setDrawColor(...theme.borders); doc.setLineWidth(0.5);
-  doc.line(pageWidth - 95, 57, pageWidth - 18, 57);
+  // Type de document (zone vide tolérée → page de garde générique)
+  if (docType) {
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...theme.lightText);
+    doc.text(docType, pageWidth - 18, 52, { align: 'right' });
+    doc.setDrawColor(...theme.borders); doc.setLineWidth(0.5);
+    doc.line(pageWidth - 95, 57, pageWidth - 18, 57);
+  }
 
   // Titre projet
   doc.setFontSize(32);
