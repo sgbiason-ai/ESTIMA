@@ -1316,4 +1316,263 @@ export const helpContent = {
       },
     ],
   },
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // SMTP — CONFIGURATION EMAIL
+  // ──────────────────────────────────────────────────────────────────────────
+  smtp: {
+    title: 'Guide — Configuration Email (SMTP)',
+    subtitle: 'Envoyer le CR depuis EstimaVRD sans Outlook',
+    tabs: [
+      {
+        id: 'overview', label: "Vue d'ensemble", icon: 'BookOpen',
+        sections: [
+          {
+            type: 'intro',
+            text: "EstimaVRD peut envoyer vos comptes rendus de chantier directement par email depuis le serveur, sans passer par Outlook. Vous configurez une seule fois votre serveur SMTP (Gmail, Outlook, OVH, etc.), puis chaque envoi part avec votre propre adresse comme expéditeur.",
+          },
+          {
+            type: 'card', icon: 'Send', color: 'emerald', title: 'Pourquoi cette feature ?', badge: 'Nouveau',
+            description: "L'ancien workflow Outlook (script .vbs) n'est compatible qu'avec Windows + Outlook installé. Le nouvel envoi serveur marche partout : Mac, Linux, mobile, tablette, navigateur quelconque.",
+            steps: [
+              "Vos identifiants restent les vôtres — l'email part de votre adresse",
+              "Le PDF du CR est généré et joint automatiquement",
+              "Le destinataire voit votre nom et adresse, comme un envoi classique",
+              "Chaque envoi est tracé dans Firestore pour audit (date, sujet, destinataires)",
+            ],
+          },
+          {
+            type: 'card', icon: 'Settings', color: 'blue', title: 'Étapes de configuration',
+            steps: [
+              "1. Choisir votre fournisseur dans le menu déroulant (Gmail, Outlook, OVH...)",
+              "2. Le serveur, port et chiffrement sont auto-remplis par le preset",
+              "3. Saisir votre identifiant (= votre email dans la plupart des cas)",
+              "4. Saisir votre mot de passe (parfois un mot de passe d'application — voir onglet Fournisseurs)",
+              "5. Renseigner l'adresse expéditeur (From) — généralement la même que l'identifiant",
+              "6. Cliquer 'Tester la connexion' pour valider",
+              "7. Cliquer 'Enregistrer' une fois le test OK",
+            ],
+            tip: "Le test envoie une commande de vérification au serveur sans envoyer de mail. Sans risque.",
+          },
+          {
+            type: 'card', icon: 'ClipboardList', color: 'purple', title: "Comment l'utiliser ensuite",
+            steps: [
+              "Aller dans le module CRC, ouvrir un chantier et un CR",
+              "Dans le ruban, cliquer le bouton 'Envoyer (web)' (icône avion en papier)",
+              "Une modale s'ouvre avec les destinataires pré-remplis depuis la liste de diffusion",
+              "Ajuster sujet/destinataires si besoin, ajouter un message personnel optionnel",
+              "Cliquer 'Envoyer' — le PDF se génère et part automatiquement",
+            ],
+          },
+        ],
+      },
+      {
+        id: 'providers', label: 'Fournisseurs', icon: 'Cloud',
+        sections: [
+          {
+            type: 'intro',
+            text: "Chaque fournisseur a ses propres règles. Sélectionnez le vôtre dans le menu déroulant pour pré-remplir host/port/chiffrement, puis suivez les instructions ci-dessous.",
+          },
+          {
+            type: 'card', icon: 'CheckCircle2', color: 'emerald', title: 'Gmail / Google Workspace', badge: 'Le plus simple',
+            description: "smtp.gmail.com:465 (SSL/TLS). Nécessite la double authentification et un mot de passe d'application.",
+            steps: [
+              "1. Vérifier que la validation en 2 étapes est active sur votre compte Google",
+              "2. Aller sur la page des mots de passe d'application",
+              "3. Créer un mot de passe 'EstimaVRD' (16 caractères, affichés en 4 groupes de 4)",
+              "4. Coller ce mot de passe (avec ou sans espaces — Estima les supprime)",
+              "5. Identifiant = votre email Gmail complet (ex: nom@gmail.com)",
+            ],
+            link: "https://myaccount.google.com/apppasswords",
+            warning: "N'utilisez JAMAIS votre mot de passe Gmail principal — Google le refusera systématiquement.",
+          },
+          {
+            type: 'card', icon: 'Shield', color: 'blue', title: 'Activer la validation en 2 étapes (préalable Gmail)',
+            description: "Sans 2FA, Google ne vous laisse pas créer de mots de passe d'application.",
+            link: "https://myaccount.google.com/security",
+          },
+          {
+            type: 'card', icon: 'AlertTriangle', color: 'amber', title: 'Outlook 365 / Microsoft', badge: 'Complexe',
+            description: "smtp.office365.com:587 (STARTTLS). Microsoft désactive SMTP AUTH par défaut depuis 2022 — votre administrateur doit l'autoriser explicitement.",
+            steps: [
+              "1. Demander à votre admin Microsoft 365 d'activer 'Authenticated SMTP'",
+              "2. Soit au niveau du tenant entier (admin.microsoft.com → Paramètres organisation → Authentification moderne → cocher 'SMTP authentifié')",
+              "3. Soit au niveau d'un mailbox via PowerShell : Set-CASMailbox -Identity user@domain -SmtpClientAuthenticationDisabled $false",
+              "4. Mot de passe d'application Microsoft généralement requis aussi (si MFA active)",
+              "5. Identifiant = votre adresse email professionnelle",
+            ],
+            link: "https://aka.ms/smtp_auth_disabled",
+            warning: "Si vous obtenez l'erreur '535 5.7.139 SmtpClientAuthentication is disabled', c'est ce point qu'il faut résoudre côté admin.",
+          },
+          {
+            type: 'card', icon: 'Cloud', color: 'purple', title: 'OVH Mail Pro / OVH Mail',
+            description: "ssl0.ovh.net:465 (SSL/TLS). Identifiants standards de votre messagerie OVH, sans configuration spéciale.",
+            steps: [
+              "Identifiant = adresse email complète OVH (ex: nom@votredomaine.fr)",
+              "Mot de passe = celui de votre messagerie OVH",
+              "Aucune activation ou mot de passe d'app nécessaire",
+            ],
+            link: "https://www.ovhcloud.com/fr/mail/parameters/",
+          },
+          {
+            type: 'card', icon: 'Cloud', color: 'slate', title: 'Free.fr',
+            description: "smtp.free.fr:465 (SSL/TLS). Identifiants standards Free.",
+            steps: [
+              "Identifiant = votre identifiant Free (sans @free.fr en général)",
+              "Mot de passe = mot de passe de votre messagerie Free",
+              "Doit être un abonné Free actif",
+            ],
+            link: "https://assistance.free.fr/articles/175",
+          },
+          {
+            type: 'card', icon: 'Cloud', color: 'rose', title: 'Orange',
+            description: "smtp.orange.fr:465 (SSL/TLS). Nécessite parfois un mot de passe applicatif Orange.",
+            steps: [
+              "Identifiant = votre adresse @orange.fr ou @wanadoo.fr",
+              "Si SMTP refuse votre mot de passe principal, générer un mot de passe spécifique sur l'espace client Orange",
+            ],
+            link: "https://assistance.orange.fr/ordinateurs-peripheriques/installer-et-utiliser/la-suite-logicielle/le-mail-orange/parametrer-le-logiciel-de-messagerie/parametres-pop-imap-et-smtp-pour-configurer-votre-messagerie-orange_12110-12117",
+          },
+          {
+            type: 'card', icon: 'Settings', color: 'indigo', title: 'Autre / Personnalisé',
+            description: "Si votre fournisseur n'est pas listé, choisissez 'Autre / Personnalisé' et saisissez les paramètres fournis par votre hébergeur ou administrateur.",
+            steps: [
+              "Demander à votre admin/hébergeur : host SMTP, port (souvent 465 ou 587), chiffrement (SSL/TLS ou STARTTLS)",
+              "Vérifier dans la doc de votre fournisseur — c'est souvent dans 'Configuration client mail' ou 'POP/IMAP/SMTP'",
+              "Ports courants : 465 = SSL implicite, 587 = STARTTLS, 25 = sans chiffrement (à éviter)",
+            ],
+            tip: "La plupart des hébergeurs web (Gandi, Infomaniak, IONOS, Hostinger...) fournissent un SMTP avec leur offre mail.",
+          },
+        ],
+      },
+      {
+        id: 'security', label: 'Sécurité', icon: 'Shield',
+        sections: [
+          {
+            type: 'intro',
+            text: "Votre mot de passe SMTP est l'identifiant le plus sensible que vous saisirez dans EstimaVRD. Voici comment il est protégé.",
+          },
+          {
+            type: 'card', icon: 'Shield', color: 'emerald', title: 'Chiffrement AES-256-GCM côté serveur', badge: 'Robuste',
+            description: "Quand vous enregistrez, le mot de passe est immédiatement chiffré avec une clé AES-256 stockée dans Firebase Secret Manager. Ni vous, ni l'admin EstimaVRD, ni quelqu'un qui aurait accès en lecture à la base de données ne peut le lire.",
+            steps: [
+              "Le chiffrement utilise un IV (vecteur d'initialisation) aléatoire à chaque écriture",
+              "Le tag d'authentification empêche toute altération du ciphertext",
+              "Seules les Cloud Functions (avec accès au secret) peuvent déchiffrer pour envoyer un mail",
+            ],
+          },
+          {
+            type: 'card', icon: 'Cloud', color: 'blue', title: 'Stockage Firestore en deux documents',
+            description: "Configuration publique et mot de passe sont séparés pour limiter l'exposition.",
+            steps: [
+              "users/{uid}/preferences/smtp — config 'publique' (host, port, fromEmail, fromName) — lisible par vous uniquement",
+              "users/{uid}/private/smtpPassword — ciphertext du mot de passe — invisible côté client (règles Firestore = deny)",
+              "Seul le backend (admin SDK) peut lire le doc /private/ via les Cloud Functions",
+            ],
+          },
+          {
+            type: 'card', icon: 'Send', color: 'purple', title: "Trace d'envoi (audit)",
+            description: "Chaque envoi laisse une trace dans Firestore pour pouvoir prouver et auditer.",
+            steps: [
+              "Sous-collection : companies/{cid}/crr/{crrId}/emails/{emailId}",
+              "Champs : date d'envoi, expéditeur (uid), destinataires (to/cc/bcc), sujet, statut, messageId SMTP",
+              "Visible par tous les membres de l'entreprise — pas modifiable côté client",
+            ],
+          },
+          {
+            type: 'card', icon: 'AlertTriangle', color: 'amber', title: 'Ce que vous voyez quand même',
+            description: "Le destinataire de l'email voit toujours votre adresse comme expéditeur (c'est l'objectif). Reply-To est aussi votre adresse, donc les réponses arrivent dans votre boite.",
+          },
+          {
+            type: 'tip',
+            title: "Bonne pratique",
+            text: "Pour Gmail, créez un mot de passe d'application dédié à EstimaVRD plutôt que de réutiliser celui d'une autre app. En cas de fuite, vous le supprimez sans impacter le reste.",
+          },
+        ],
+      },
+      {
+        id: 'troubleshoot', label: 'Dépannage', icon: 'AlertTriangle',
+        sections: [
+          {
+            type: 'intro',
+            text: "Les erreurs les plus fréquentes lors de la configuration ou de l'envoi, et comment les résoudre.",
+          },
+          {
+            type: 'card', icon: 'AlertTriangle', color: 'red', title: 'Gmail : 535-5.7.8 Username and Password not accepted',
+            description: "Gmail refuse les identifiants. Les causes les plus fréquentes :",
+            steps: [
+              "Vous avez utilisé votre mot de passe Gmail principal — il faut un mot de passe d'application",
+              "La double authentification n'est pas active — pré-requis pour les app passwords",
+              "Le mot de passe d'application a été supprimé ou recopié avec une erreur — régénérez-en un",
+              "Le compte est suspendu pour activité inhabituelle — vérifiez via Google Security",
+            ],
+            link: "https://support.google.com/mail/?p=BadCredentials",
+          },
+          {
+            type: 'card', icon: 'AlertTriangle', color: 'red', title: 'Outlook : 535 5.7.139 SmtpClientAuthentication is disabled',
+            description: "Microsoft 365 a désactivé SMTP AUTH au niveau tenant (défaut depuis 2022). L'admin doit l'autoriser.",
+            steps: [
+              "Solution propre (par mailbox) : PowerShell Set-CASMailbox -Identity user@domain -SmtpClientAuthenticationDisabled $false",
+              "Solution rapide (tout le tenant) : admin.microsoft.com → Paramètres organisation → Authentification moderne → 'SMTP authentifié'",
+              "Si pas d'accès admin, demandez-leur ou passez par Gmail comme contournement",
+            ],
+            link: "https://aka.ms/smtp_auth_disabled",
+          },
+          {
+            type: 'card', icon: 'AlertTriangle', color: 'amber', title: 'Connection timeout / ETIMEDOUT',
+            description: "Le serveur SMTP est inaccessible depuis EstimaVRD.",
+            steps: [
+              "Vérifier l'orthographe du host (smtp.gmail.com, pas smpt.gmail.com)",
+              "Vérifier le port — 465 pour SSL/TLS, 587 pour STARTTLS",
+              "Si vous êtes derrière un firewall d'entreprise, ports 465/587 peuvent être bloqués sortants",
+              "Tester depuis un autre réseau (4G/partage de connexion)",
+            ],
+          },
+          {
+            type: 'card', icon: 'AlertTriangle', color: 'amber', title: 'Self-signed certificate / Certificate has expired',
+            description: "Problème de chiffrement TLS — le serveur SMTP a un certificat invalide ou expiré.",
+            steps: [
+              "Cocher/décocher la case 'Chiffrement' pour passer entre SSL/TLS et STARTTLS",
+              "Vérifier que le port correspond bien au mode de chiffrement",
+              "Contacter votre admin SMTP — le certificat doit être renouvelé",
+            ],
+          },
+          {
+            type: 'card', icon: 'AlertTriangle', color: 'amber', title: 'Relay denied / 550 5.7.1',
+            description: "Le serveur accepte l'auth mais refuse de relayer le message.",
+            steps: [
+              "L'adresse 'From' ne correspond pas à votre identifiant — ils doivent matcher",
+              "Vous tentez d'envoyer depuis un domaine que le serveur ne gère pas",
+              "Solution : mettre identifiant et adresse expéditeur identiques",
+            ],
+          },
+          {
+            type: 'card', icon: 'AlertTriangle', color: 'amber', title: 'Daily quota exceeded',
+            description: "Vous avez atteint la limite quotidienne d'envoi de votre fournisseur.",
+            steps: [
+              "Gmail gratuit : 500 emails/jour ; Workspace : 2000/jour",
+              "Outlook : 10 000/jour mais 30/minute",
+              "OVH : variable selon offre",
+              "Attendre 24h ou passer à une offre supérieure",
+            ],
+          },
+          {
+            type: 'card', icon: 'Info', color: 'blue', title: 'Vérifier les statuts fournisseurs',
+            description: "Si tout semble correct mais l'envoi échoue, vérifier que votre fournisseur n'a pas un incident en cours.",
+            steps: [
+              "Google : https://www.google.com/appsstatus",
+              "Microsoft : https://status.cloud.microsoft",
+              "OVH : https://www.status-ovhcloud.com",
+            ],
+            link: "https://www.google.com/appsstatus",
+          },
+          {
+            type: 'tip',
+            title: "Tester rapidement avec un Gmail perso",
+            text: "Si votre SMTP pro coince, créez temporairement un compte Gmail perso, activez 2FA, générez un mot de passe d'application et utilisez-le pour valider que le flow EstimaVRD est OK. Une fois validé, repassez sur votre SMTP pro avec l'admin.",
+          },
+        ],
+      },
+    ],
+  },
 };

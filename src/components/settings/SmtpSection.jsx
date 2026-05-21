@@ -6,13 +6,14 @@
 import React, { useEffect, useState } from 'react';
 import {
   Mail, Loader2, Eye, EyeOff, Check, Trash2, Send,
-  Info, AlertTriangle, Server, Lock,
+  Info, AlertTriangle, Server, Lock, HelpCircle,
 } from 'lucide-react';
 import { confirm, toast } from '../../utils/globalUI';
 import { useSmtpConfig } from '../../hooks/useSmtpConfig';
 import {
   saveSmtpConfig, testSmtpConnection, deleteSmtpConfig, PWD_SENTINEL,
 } from '../../services/mailService';
+import HelpPanel from '../help/HelpPanel';
 
 // ─── Presets fournisseurs ──────────────────────────────────────────────────
 
@@ -70,6 +71,7 @@ const SmtpSection = ({ user }) => {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   // Initialise le form depuis la config Firestore
   useEffect(() => {
@@ -198,11 +200,21 @@ const SmtpSection = ({ user }) => {
             </p>
           </div>
         </div>
-        {isConfigured && (
-          <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-            <Check size={12} /> Configure
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {isConfigured && (
+            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <Check size={12} /> Configure
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowHelp(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
+            title="Guide complet de configuration SMTP"
+          >
+            <HelpCircle size={12} /> Aide
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -403,6 +415,12 @@ const SmtpSection = ({ user }) => {
           </div>
         </div>
       )}
+
+      <HelpPanel
+        isOpen={showHelp}
+        onClose={() => setShowHelp(false)}
+        moduleId="smtp"
+      />
     </section>
   );
 };

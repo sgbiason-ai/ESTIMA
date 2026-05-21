@@ -2,9 +2,21 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.6.0';
+export const APP_VERSION = '2.6.1';
 
 export const CHANGELOG = [
+  {
+    version: '2.6.1',
+    date: '2026-05-21',
+    title: 'Aide complète configuration SMTP (4 onglets + liens fournisseurs)',
+    highlights: [
+      'Configuration SMTP : nouveau bouton "Aide" dans la section "Mon Compte" qui ouvre un panneau latéral complet',
+      'Aide SMTP — onglet "Vue d\'ensemble" : pourquoi cette feature, étapes de configuration, utilisation dans CRC',
+      'Aide SMTP — onglet "Fournisseurs" : guides détaillés Gmail (avec lien myaccount.google.com/apppasswords), Outlook 365 (avec aka.ms/smtp_auth_disabled), OVH, Free, Orange, Personnalisé',
+      'Aide SMTP — onglet "Sécurité" : explication du chiffrement AES-256-GCM, séparation publique/privé en Firestore, audit log des envois',
+      'Aide SMTP — onglet "Dépannage" : 7 erreurs courantes (535-5.7.8 Gmail, 535-5.7.139 Outlook, timeout, certificat, relay denied, quotas) avec causes + solutions + liens status pages',
+    ],
+  },
   {
     version: '2.6.0',
     date: '2026-05-21',
