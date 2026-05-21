@@ -23,6 +23,7 @@ const ProjectManagerView = ({
   project, setProject, resetProject, onSaveProject,
   bpuConfig, clientPercent, setBpuConfig, setClientPercent,
   companyId, currentUserUid, onNavigateModule, setActiveTab,
+  masterBranding = null,
 }) => {
   const [historyTab, setHistoryTab] = useState('cloud');
   const [showHelp,   setShowHelp]   = useState(false);
@@ -121,6 +122,7 @@ const ProjectManagerView = ({
         onClose={() => setDetailsProject(null)}
         project={detailsProject || {}}
         onSave={handleSaveDetails}
+        branding={masterBranding}
       />
       {fm.movingProject && (
         <MoveFolderModal

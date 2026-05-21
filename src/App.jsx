@@ -545,6 +545,7 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub }) {
         onClose={modals.closeProjectModal}
         project={project || {}}
         onSave={modals.handleSaveProjectDetails}
+        branding={resources.masterBranding}
       />
 
       <DeleteModal
