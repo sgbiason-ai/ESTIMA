@@ -79,11 +79,51 @@ export const formatNumberFr = (value) => {
 
 // ─── LOGOS ─────────────────────────────────────────────────────────────────
 
+/** Détecte si une source d'image est un SVG (data URL ou extension). */
+const isSvgSource = (source) => {
+  if (!source || typeof source !== 'string') return false;
+  return /^data:image\/svg/i.test(source) || /\.svg(\?|#|$)/i.test(source);
+};
+
+/**
+ * Rasterise une image SVG (HTMLImageElement) vers un PNG raster compatible jsPDF.
+ * jsPDF.addImage ne supporte pas le SVG nativement — on convertit via canvas.
+ * Fond blanc forcé pour rester compatible avec le format JPEG utilisé par renderLogo.
+ */
+const rasterizeSvgToPng = (img) => new Promise((resolve) => {
+  const targetW = 1024;
+  const naturalRatio = (img.naturalWidth && img.naturalHeight)
+    ? img.naturalWidth / img.naturalHeight
+    : 1;
+  const w = targetW;
+  const h = Math.max(1, Math.round(targetW / naturalRatio));
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(img, 0, 0, w, h);
+  const out = new Image();
+  out.onload = () => resolve(out);
+  out.onerror = () => resolve(img);
+  out.src = canvas.toDataURL('image/png');
+});
+
+/** Charge une image en la rasterisant si c'est un SVG (compatibilité jsPDF). */
+const loadImageForPdf = async (source) => {
+  if (!source) return null;
+  const img = await loadImage(source);
+  if (!img) return null;
+  if (isSvgSource(source)) return rasterizeSvgToPng(img);
+  return img;
+};
+
 /** Charge le logo MOE + logo client en parallèle. Retourne { logoMoe, logoClient }. */
 export const loadLogos = async (branding, project) => {
   const [logoMoe, logoClient] = await Promise.all([
-    loadImage(branding?.logo || '/logo.jpg').catch(() => null),
-    project?.clientLogo ? loadImage(project.clientLogo).catch(() => null) : Promise.resolve(null),
+    loadImageForPdf(branding?.logo || '/logo.jpg').catch(() => null),
+    project?.clientLogo ? loadImageForPdf(project.clientLogo).catch(() => null) : Promise.resolve(null),
   ]);
   return { logoMoe, logoClient };
 };

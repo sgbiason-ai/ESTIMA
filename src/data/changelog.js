@@ -15,6 +15,7 @@ export const CHANGELOG = [
       'Aide SMTP — onglet "Fournisseurs" : guides détaillés Gmail (avec lien myaccount.google.com/apppasswords), Outlook 365 (avec aka.ms/smtp_auth_disabled), OVH, Free, Orange, Personnalisé',
       'Aide SMTP — onglet "Sécurité" : explication du chiffrement AES-256-GCM, séparation publique/privé en Firestore, audit log des envois',
       'Aide SMTP — onglet "Dépannage" : 7 erreurs courantes (535-5.7.8 Gmail, 535-5.7.139 Outlook, timeout, certificat, relay denied, quotas) avec causes + solutions + liens status pages',
+      'PDF (Estima / CCTP / RAO) : correction du logo Maître d\'Ouvrage au format SVG — rastérisation auto en PNG via canvas avant injection jsPDF (le logo apparaît désormais sur la page de garde)',
     ],
   },
   {
