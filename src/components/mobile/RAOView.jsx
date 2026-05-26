@@ -149,19 +149,68 @@ export default function RAOView({ project, companyId, calcHook }) {
     }, 0);
   }, [allItems, qtyMap]);
 
-  // ─── Totaux par entreprise + scores ──────────────────────────────────
+  // ─── Helper : total d'une variante (matched + new items, removed exclus) ──
+  // Recalcule a la volee depuis offers/quantities de la variante (au cas ou v.total
+  // est obsolete ou absent) — meme logique que usePriceAnalysis.handleImportVariant.
+  const computeVariantTotal = (base, variant, items, qtyM) => {
+    const mergedOffers = { ...(base.offers || {}), ...(variant.offers || {}) };
+    const mergedQty    = variant.quantities || {};
+    const removed      = new Set((variant.removedItems || []).map(it => it.itemId));
+    let totalMatched = 0;
+    items.forEach(it => {
+      if (removed.has(it.id)) return;
+      const pu = Number(mergedOffers[it.id] ?? 0);
+      const qty = Number(mergedQty[it.id] ?? qtyM[it.id] ?? it.qty ?? 0);
+      totalMatched += qty * pu;
+    });
+    const totalNew = (variant.newItems || []).reduce((s, it) => s + Number(it.lineTotal || 0), 0);
+    return totalMatched + totalNew;
+  };
+
+  // ─── Totaux par entreprise (avec variantes retenues comme entrees additionnelles) ──
+  // Reproduit la logique desktop pdfRaoGenerator synthRows : base ajoutee si reguliere,
+  // chaque variante retenue ajoutee si reguliere.
+  const NON_REGULAR = ['irreguliere', 'inacceptable', 'inappropriee'];
+
   const companyStats = useMemo(() => {
-    const totals = companies.map(c => {
-      let total = 0;
+    const entries = [];
+    companies.forEach((c, ci) => {
+      const admin = raoCompanies[c.name]?.admin || {};
+      const baseIrregular = !!(admin.conclusion && NON_REGULAR.includes(admin.conclusion));
+      // Base (toujours ajoutee — la regularite est juste un marqueur visuel)
+      let baseTotal = 0;
       allItems.forEach(item => {
         const qty = Number(qtyMap[item.id] || item.qty || 0);
-        const pu = Number(c.offers?.[item.id] ?? 0);
-        total += qty * pu;
+        const pu  = Number(c.offers?.[item.id] ?? 0);
+        baseTotal += qty * pu;
       });
-      return { ...c, total };
+      entries.push({
+        ...c, kind: 'base', total: baseTotal, baseTotal,
+        companyIndex: ci, displayName: c.name, irregular: baseIrregular,
+      });
+      // Variantes retenues (filtrees si elles-memes irregulieres)
+      (c.variants || []).filter(v => v.retained).forEach((v, vi) => {
+        if (v.adminConclusion && NON_REGULAR.includes(v.adminConclusion)) return;
+        const vTotal = computeVariantTotal(c, v, allItems, qtyMap);
+        entries.push({
+          ...c, // herite id/name pour technique/admin lookup
+          kind: 'variant',
+          id: `${c.id}_${v.id}`,
+          variantId: v.id,
+          variantIndex: vi + 1,
+          variantLabel: v.label || `V${vi + 1}`,
+          displayName: `${c.name} · ${v.label || `V${vi + 1}`}`,
+          baseCompanyName: c.name,
+          baseCompanyId: c.id,
+          companyIndex: ci,
+          total: vTotal,
+          baseTotal,
+          irregular: false,
+        });
+      });
     });
 
-    const validTotals = totals.filter(c => c.total > 0).map(c => c.total);
+    const validTotals = entries.filter(e => e.total > 0).map(e => e.total);
     const Pmin = validTotals.length ? Math.min(...validTotals) : 0;
     const Pmax = validTotals.length ? Math.max(...validTotals) : 0;
     const Pmoy = validTotals.length ? validTotals.reduce((a, b) => a + b, 0) / validTotals.length : 0;
@@ -169,18 +218,18 @@ export default function RAOView({ project, companyId, calcHook }) {
     const N = scoringConfig.maxScore || 40;
     const mode = scoringConfig.mode || 'f1';
 
-    const ranked = totals
-      .map(c => ({
-        ...c,
-        score: calcScore(c.total, Pmin, Pmax, Pmoy, N, mode),
-        ecart: totalEstimation ? ((c.total - totalEstimation) / totalEstimation * 100) : 0,
-        isOAB: c.total > 0 && c.total < oabThreshold,
+    const ranked = entries
+      .map(e => ({
+        ...e,
+        score: calcScore(e.total, Pmin, Pmax, Pmoy, N, mode),
+        ecart: totalEstimation ? ((e.total - totalEstimation) / totalEstimation * 100) : 0,
+        isOAB: e.total > 0 && e.total < oabThreshold,
       }))
       .sort((a, b) => a.total - b.total)
-      .map((c, i) => ({ ...c, rank: i + 1 }));
+      .map((e, i) => ({ ...e, rank: i + 1 }));
 
     return { ranked, Pmin, Pmax, Pmoy, oabThreshold, N, mode };
-  }, [companies, allItems, qtyMap, totalEstimation, scoringConfig]);
+  }, [companies, allItems, qtyMap, totalEstimation, scoringConfig, raoCompanies]);
 
   // ─── Notes techniques par entreprise ─────────────────────────────────
   const techScoresMap = useMemo(() => {
@@ -365,9 +414,10 @@ export default function RAOView({ project, companyId, calcHook }) {
 
           {/* Classement final */}
           {ranking.map((c, i) => {
-            const ui = getUI(companies.findIndex(co => co.name === c.name));
+            const ui = getUI(c.companyIndex ?? companies.findIndex(co => co.name === c.name));
+            const isVariant = c.kind === 'variant';
             return (
-              <div key={c.id} className={`bg-white rounded-xl border overflow-hidden ${c.isOAB ? 'border-amber-400 ring-1 ring-amber-200' : 'border-gray-200'}`}>
+              <div key={c.id} className={`bg-white rounded-xl border overflow-hidden ${c.isOAB ? 'border-amber-400 ring-1 ring-amber-200' : isVariant ? 'border-purple-200' : 'border-gray-200'}`}>
                 <div className="flex items-center gap-2.5 p-3">
                   {/* Rang */}
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${i < 3 ? RANK_COLORS[i] : 'bg-gray-100'}`}>
@@ -377,7 +427,14 @@ export default function RAOView({ project, companyId, calcHook }) {
 
                   {/* Nom + badges */}
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-bold text-gray-900 truncate">{c.name}</div>
+                    <div className="flex items-center gap-1.5">
+                      {isVariant && (
+                        <span className="text-[8px] font-black px-1 py-0.5 rounded bg-purple-200 text-purple-800 uppercase shrink-0">VAR</span>
+                      )}
+                      <div className="text-sm font-bold text-gray-900 truncate">
+                        {isVariant ? `${c.baseCompanyName} · ${c.variantLabel}` : c.name}
+                      </div>
+                    </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       {renderDelta(c.ecart)}
                       {c.isOAB && (
@@ -428,7 +485,11 @@ export default function RAOView({ project, companyId, calcHook }) {
             <div className="bg-emerald-600 rounded-xl p-3 mt-2">
               <p className="text-[9px] font-black uppercase tracking-wider text-emerald-200 mb-1">Recommandation</p>
               <p className="text-sm text-white leading-snug">
-                L'entreprise <strong>{ranking[0].name}</strong> est classée 1ère avec {ranking[0].totalNote.toFixed(2)}/100.
+                {ranking[0].kind === 'variant' ? (
+                  <>L'entreprise <strong>{ranking[0].baseCompanyName}</strong> avec sa <strong>{ranking[0].variantLabel}</strong> est classée 1ère avec {ranking[0].totalNote.toFixed(2)}/100.</>
+                ) : (
+                  <>L'entreprise <strong>{ranking[0].name}</strong> est classée 1ère avec {ranking[0].totalNote.toFixed(2)}/100.</>
+                )}
               </p>
               <p className="text-[10px] text-emerald-200 mt-1">
                 {fmt(ranking[0].total)} HT — {fmt(ranking[0].total * 1.2)} TTC
@@ -639,6 +700,12 @@ export default function RAOView({ project, companyId, calcHook }) {
                             <div className="space-y-2">
                               {c.variants.map((v, vi) => {
                                 const justifMissing = v.retained && !(v.justification || '').trim();
+                                // Total recalcule a la volee (v.total stocke peut etre obsolete ou absent)
+                                const vTotalComputed = computeVariantTotal(c, v, allItems, qtyMap);
+                                const baseTot = companyStats.ranked.find(r => r.kind === 'base' && r.id === c.id)?.baseTotal
+                                             ?? companyStats.ranked.find(r => r.kind === 'variant' && r.baseCompanyId === c.id)?.baseTotal
+                                             ?? 0;
+                                const deltaVsBase = baseTot ? ((vTotalComputed - baseTot) / baseTot * 100) : 0;
                                 return (
                                   <div key={v.id || vi} className={`rounded-lg p-2 ${v.retained ? 'bg-white border border-emerald-200' : 'bg-white/60 border border-gray-200'}`}>
                                     <div className="flex items-center gap-1.5 mb-1">
@@ -654,9 +721,14 @@ export default function RAOView({ project, companyId, calcHook }) {
                                         {v.retained ? 'Retenue' : 'Rejetée'}
                                       </span>
                                     </div>
-                                    {v.total > 0 && (
-                                      <div className="text-[10px] text-gray-500 mb-1">{fmt(v.total)} HT</div>
-                                    )}
+                                    <div className="flex items-center justify-between mb-1">
+                                      <span className="text-[10px] font-bold text-gray-700 tabular-nums">{fmt(vTotalComputed)} HT</span>
+                                      {baseTot > 0 && Math.abs(deltaVsBase) >= 0.1 && (
+                                        <span className={`text-[9px] font-extrabold ${deltaVsBase > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                                          {deltaVsBase > 0 ? '+' : ''}{deltaVsBase.toFixed(1)}% vs base
+                                        </span>
+                                      )}
+                                    </div>
                                     {v.justification ? (
                                       <p className="text-[10px] text-gray-600 italic leading-snug">{v.justification}</p>
                                     ) : justifMissing ? (
@@ -674,11 +746,11 @@ export default function RAOView({ project, companyId, calcHook }) {
                           <div className="flex items-center justify-between">
                             <span className="text-[11px] font-bold text-emerald-800">C1. Prix</span>
                             <span className="text-[10px] font-black text-emerald-700">
-                              {(companyStats.ranked.find(r => r.name === c.name)?.score || 0).toFixed(2)} / {companyStats.N}
+                              {(companyStats.ranked.find(r => r.kind === 'base' && r.name === c.name)?.score || 0).toFixed(2)} / {companyStats.N}
                             </span>
                           </div>
                           <div className="text-[10px] text-emerald-600 mt-0.5">
-                            Montant : {fmt(companyStats.ranked.find(r => r.name === c.name)?.total || 0)}
+                            Montant : {fmt(companyStats.ranked.find(r => r.kind === 'base' && r.name === c.name)?.total || 0)}
                           </div>
                         </div>
 
@@ -686,7 +758,7 @@ export default function RAOView({ project, companyId, calcHook }) {
                         <div className="bg-gray-900 rounded-lg p-2.5 flex items-center justify-between">
                           <span className="text-[11px] font-bold text-white">TOTAL</span>
                           <span className="text-sm font-black text-white">
-                            {((companyStats.ranked.find(r => r.name === c.name)?.score || 0) / companyStats.N * (scoringConfig.maxScore || 40) + totalScore).toFixed(2)} / 100
+                            {((companyStats.ranked.find(r => r.kind === 'base' && r.name === c.name)?.score || 0) / companyStats.N * (scoringConfig.maxScore || 40) + totalScore).toFixed(2)} / 100
                           </span>
                         </div>
                       </div>
@@ -704,81 +776,152 @@ export default function RAOView({ project, companyId, calcHook }) {
       )}
 
       {/* ═══ ONGLET DÉTAIL ═══ */}
-      {tab === 'detail' && (
-        <div>
-          {/* Sélecteur entreprise */}
-          <div className="px-4 pb-2 overflow-x-auto">
-            <div className="flex gap-1.5 min-w-max">
-              {companies.map((c, i) => (
-                <button
-                  key={c.id}
-                  onClick={() => setSelectedCompanyIdx(i)}
-                  className={`px-3 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap transition-all ${
-                    selectedCompanyIdx === i
-                      ? 'bg-gray-900 text-white shadow-sm'
-                      : 'bg-white text-gray-600 border border-gray-200'
-                  }`}
-                >
-                  {c.name}
-                </button>
-              ))}
+      {tab === 'detail' && (() => {
+        // ── Liste plate base + variantes pour le sélecteur ──
+        const detailEntries = [];
+        companies.forEach((c, ci) => {
+          detailEntries.push({
+            key: c.id, kind: 'base', companyId: c.id, companyIndex: ci,
+            label: c.name, offers: c.offers || {}, quantities: {},
+            removedIds: new Set(), newItems: [],
+          });
+          (c.variants || []).forEach((v, vi) => {
+            detailEntries.push({
+              key: `${c.id}_${v.id}`, kind: 'variant', companyId: c.id, companyIndex: ci,
+              variantIndex: vi, variantLabel: v.label || `V${vi + 1}`,
+              label: `${c.name} · ${v.label || `V${vi + 1}`}`,
+              offers: { ...(c.offers || {}), ...(v.offers || {}) },
+              quantities: v.quantities || {},
+              removedIds: new Set((v.removedItems || []).map(it => it.itemId)),
+              newItems: v.newItems || [],
+              retained: !!v.retained,
+              adminConclusion: v.adminConclusion || null,
+            });
+          });
+        });
+
+        const selectedEntry = detailEntries[selectedCompanyIdx] || detailEntries[0];
+        if (!selectedEntry) return null;
+        const isVariant = selectedEntry.kind === 'variant';
+        const baseColor = getUI(selectedEntry.companyIndex);
+        const getQty = (item) => Number(selectedEntry.quantities[item.id] ?? qtyMap[item.id] ?? item.qty ?? 0);
+
+        return (
+          <div>
+            {/* Sélecteur entreprise/variante */}
+            <div className="px-4 pb-2 overflow-x-auto">
+              <div className="flex gap-1.5 min-w-max">
+                {detailEntries.map((e, i) => {
+                  const active = selectedCompanyIdx === i;
+                  const isVar = e.kind === 'variant';
+                  return (
+                    <button
+                      key={e.key}
+                      onClick={() => setSelectedCompanyIdx(i)}
+                      className={`px-3 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                        active
+                          ? 'bg-gray-900 text-white shadow-sm'
+                          : isVar
+                            ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                            : 'bg-white text-gray-600 border border-gray-200'
+                      }`}
+                    >
+                      {isVar && <span className={`text-[8px] font-black px-1 rounded ${active ? 'bg-white/20' : 'bg-purple-200 text-purple-800'}`}>VAR</span>}
+                      {e.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
 
-          {/* Items par chapitre */}
-          <div className="px-4 space-y-2">
-            {chapterStats.map(chap => {
-              const selectedCompany = companies[selectedCompanyIdx];
-              if (!selectedCompany) return null;
-              const chapTotal = chap.companyTotals.find(ct => ct.id === selectedCompany.id)?.total || 0;
-              const ecart = chap.estTotal ? ((chapTotal - chap.estTotal) / chap.estTotal * 100) : 0;
+            {/* Bandeau info variante */}
+            {isVariant && (
+              <div className="px-4 pb-2">
+                <div className="bg-purple-50 border border-purple-200 rounded-xl px-3 py-2 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-purple-200 text-purple-800 uppercase shrink-0">Variante</span>
+                    <span className="text-[11px] font-bold text-purple-900 truncate">{selectedEntry.variantLabel}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {selectedEntry.retained && (
+                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 uppercase">Retenue</span>
+                    )}
+                    {selectedEntry.adminConclusion && (
+                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase ${CONCL_COLORS[selectedEntry.adminConclusion] || 'bg-gray-100 text-gray-700'}`}>
+                        {CONCL_LABELS[selectedEntry.adminConclusion] || selectedEntry.adminConclusion}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
-              return (
-                <div key={chap.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                  <button
-                    onClick={() => setOpenChapter(openChapter === chap.id ? null : chap.id)}
-                    className="w-full bg-gray-50 px-3 py-2 border-b border-gray-100 flex items-center justify-between active:bg-gray-100"
-                  >
-                    <span className="text-[11px] font-black text-gray-700 uppercase truncate flex-1 text-left">{chap.title}</span>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-xs font-bold text-gray-900 tabular-nums">{fmtShort(chapTotal)}</span>
-                      {renderDelta(ecart)}
-                    </div>
-                  </button>
-                  {openChapter === chap.id && (
-                    <div className="divide-y divide-gray-50">
-                      {chap.items.map(item => {
-                        const qty = Number(qtyMap[item.id] || item.qty || 0);
-                        const puEst = Number(item.price || 0);
-                        const puOffer = Number(selectedCompany.offers?.[item.id] ?? 0);
-                        const ecartItem = puEst ? ((puOffer - puEst) / puEst * 100) : 0;
-                        if (qty === 0 && puOffer === 0) return null;
+            {/* Items par chapitre */}
+            <div className="px-4 space-y-2">
+              {chapterStats.map(chap => {
+                // Items base filtrés (variantes peuvent supprimer des items)
+                const baseItems = chap.items.filter(it => !selectedEntry.removedIds.has(it.id));
+                // Items "new" de la variante : on rattache ceux dont chapterId correspond (sinon tous au 1er chap)
+                const variantNewItems = isVariant
+                  ? selectedEntry.newItems.filter(ni => !ni.chapterId || ni.chapterId === chap.id)
+                  : [];
+                const allItems = [...baseItems, ...variantNewItems];
 
-                        return (
-                          <div key={item.id} className="px-3 py-2">
-                            <div className="text-[12px] font-medium text-gray-900 leading-tight">{item.designation}</div>
-                            <div className="flex items-center justify-between mt-1">
-                              <span className="text-[10px] text-gray-500">
-                                {qty} {item.unit} · Est. {fmt(puEst)}
-                              </span>
-                              <div className="flex items-center gap-2">
-                                <span className={`text-[12px] font-bold tabular-nums ${puOffer === 0 ? 'text-gray-300' : 'text-gray-900'}`}>
-                                  {puOffer === 0 ? '—' : fmt(puOffer)}
+                const chapTotal = allItems.reduce((s, it) => s + getQty(it) * Number(selectedEntry.offers[it.id] ?? 0), 0);
+                const chapEstTotal = baseItems.reduce((s, it) => s + Number(qtyMap[it.id] ?? it.qty ?? 0) * Number(it.price || 0), 0);
+                const ecart = chapEstTotal ? ((chapTotal - chapEstTotal) / chapEstTotal * 100) : 0;
+
+                return (
+                  <div key={chap.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                    <button
+                      onClick={() => setOpenChapter(openChapter === chap.id ? null : chap.id)}
+                      className="w-full bg-gray-50 px-3 py-2 border-b border-gray-100 flex items-center justify-between active:bg-gray-100"
+                    >
+                      <span className="text-[11px] font-black text-gray-700 uppercase truncate flex-1 text-left">{chap.title}</span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-xs font-bold text-gray-900 tabular-nums">{fmtShort(chapTotal)}</span>
+                        {renderDelta(ecart)}
+                      </div>
+                    </button>
+                    {openChapter === chap.id && (
+                      <div className="divide-y divide-gray-50">
+                        {allItems.map(item => {
+                          const isNew = isVariant && selectedEntry.newItems.includes(item);
+                          const qty = getQty(item);
+                          const puEst = Number(item.price || 0);
+                          const puOffer = Number(selectedEntry.offers[item.id] ?? 0);
+                          const ecartItem = puEst ? ((puOffer - puEst) / puEst * 100) : 0;
+                          if (qty === 0 && puOffer === 0 && !isNew) return null;
+
+                          return (
+                            <div key={item.id} className={`px-3 py-2 ${isNew ? 'bg-emerald-50/40' : ''}`}>
+                              <div className="flex items-start gap-1.5">
+                                {isNew && <span className="text-[8px] font-black px-1 py-0.5 rounded bg-emerald-200 text-emerald-800 uppercase shrink-0 mt-0.5">Nouveau</span>}
+                                <div className="text-[12px] font-medium text-gray-900 leading-tight flex-1">{item.designation}</div>
+                              </div>
+                              <div className="flex items-center justify-between mt-1">
+                                <span className="text-[10px] text-gray-500">
+                                  {qty} {item.unit}{!isNew && ` · Est. ${fmt(puEst)}`}
                                 </span>
-                                {puOffer > 0 && renderDelta(ecartItem)}
+                                <div className="flex items-center gap-2">
+                                  <span className={`text-[12px] font-bold tabular-nums ${puOffer === 0 ? 'text-gray-300' : isVariant ? baseColor.text : 'text-gray-900'}`}>
+                                    {puOffer === 0 ? '—' : fmt(puOffer)}
+                                  </span>
+                                  {puOffer > 0 && !isNew && renderDelta(ecartItem)}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ═══ ONGLET INFOS (RAO) ═══ */}
       {tab === 'rao' && (

@@ -4,12 +4,13 @@ import { Brain, MessageSquare, AlertCircle, GitBranch, Check, X } from 'lucide-r
 import { ScoreBadge } from '../RaoUI';
 import { COMPANY_UI_COLORS, FORMULA_LABELS_CONSULT } from '../RaoConstants';
 import CompanySidebar from '../CompanySidebar';
+import TabAlertBanner from '../TabAlertBanner';
 
-const AutoTextarea = ({ value, onChange, className, placeholder, rows }) => {
+const AutoTextarea = ({ value, onChange, className, placeholder, rows, id }) => {
   const ref = useRef(null);
   const resize = () => { if (!ref.current) return; ref.current.style.height = 'auto'; ref.current.style.height = ref.current.scrollHeight + 'px'; };
   useEffect(resize, [value]);
-  return <textarea ref={ref} value={value} onChange={e => { onChange(e); resize(); }} onFocus={resize} rows={rows || 1} className={`resize-none overflow-hidden ${className}`} placeholder={placeholder} />;
+  return <textarea id={id} ref={ref} value={value} onChange={e => { onChange(e); resize(); }} onFocus={resize} rows={rows || 1} className={`resize-none overflow-hidden ${className}`} placeholder={placeholder} />;
 };
 
 const TabTechnique = ({
@@ -17,6 +18,7 @@ const TabTechnique = ({
   analysisStats, scoringConfig, analysisCompanies = [],
   selectedCompany, onSelectCompany,
   onUpdateVariantJustification = null,
+  missing = [], // items à compléter dans cet onglet (alimente le banner)
 }) => {
   const nonAuto = criteria.filter(c => !c.auto);
   const autoCrit = criteria.find(c => c.auto);
@@ -83,6 +85,14 @@ const TabTechnique = ({
       {/* ── Contenu entreprise sélectionnée ── */}
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-7xl mx-auto space-y-8 pb-32">
+
+          {/* Banner d'alerte items à compléter */}
+          <TabAlertBanner
+            missing={missing}
+            onItemClick={(item) => {
+              if (item.companyName && item.companyName !== name) onSelectCompany(item.companyName);
+            }}
+          />
 
           {/* Header entreprise */}
           <div className={`flex items-center gap-5 px-6 py-4 bg-white rounded-2xl border ${uiColor.border} border-l-[5px] shadow-sm`}>
@@ -211,13 +221,20 @@ const TabTechnique = ({
                       <span className="px-2 py-0.5 bg-purple-50 text-purple-600 rounded-full text-[10px] font-bold tracking-widest uppercase">PDF</span>
                     </div>
                     <AutoTextarea
+                      id={`tech-var-${name}-${v.id}`}
                       value={v.justification || ''}
                       onChange={e => onUpdateVariantJustification && onUpdateVariantJustification(companyObj.id, v.id, e.target.value)}
-                      placeholder={v.retained
-                        ? "Pourquoi cette variante est-elle retenue ? (avantages technique/économique/délai, conformité aux exigences min, etc.)"
-                        : "Pourquoi cette variante n'est-elle pas retenue ? (non-conformité, désintérêt technique, surcoût, etc.)"
+                      placeholder={v.retained && !(v.justification || '').trim()
+                        ? "⚠ Justification requise pour le PDF — variante RETENUE : pourquoi est-elle retenue ? (avantages technique/économique/délai, etc.)"
+                        : v.retained
+                          ? "Pourquoi cette variante est-elle retenue ? (avantages technique/économique/délai, conformité aux exigences min, etc.)"
+                          : "Pourquoi cette variante n'est-elle pas retenue ? (non-conformité, désintérêt technique, surcoût, etc.)"
                       }
-                      className="w-full bg-white border-2 border-purple-100 rounded-xl p-4 text-sm font-medium text-slate-700 leading-relaxed shadow-inner focus:border-purple-400 focus:ring-4 focus:ring-purple-500/10 outline-none transition-all min-h-[60px]"
+                      className={`w-full rounded-xl p-4 text-sm font-medium text-slate-700 leading-relaxed shadow-inner focus:ring-4 outline-none transition-all min-h-[60px] ${
+                        v.retained && !(v.justification || '').trim()
+                          ? 'rao-empty border-2 placeholder:text-amber-600 placeholder:italic focus:ring-amber-500/10'
+                          : 'bg-white border-2 border-purple-100 focus:border-purple-400 focus:ring-purple-500/10'
+                      }`}
                       rows={2}
                     />
                   </div>
@@ -275,10 +292,11 @@ const TabTechnique = ({
                         <div className="flex flex-col items-center px-2">
                           <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Note</span>
                           <input
+                            id={`tech-note-${name}-${crit.id}`}
                             type="number" step={0.5} min={0} max={noteMax}
                             value={note}
                             onChange={e => updateTechnical(name, crit.id, 'note', Number(e.target.value))}
-                            className="w-20 bg-emerald-50 border border-emerald-200 rounded-lg py-1 text-center font-black text-emerald-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all shadow-inner"
+                            className={`w-20 rounded-lg py-1 text-center font-black focus:ring-2 outline-none transition-all shadow-inner ${note > 0 ? 'bg-emerald-50 border border-emerald-200 text-emerald-600 focus:ring-emerald-500' : 'rao-empty border text-emerald-700 focus:ring-amber-400'}`}
                           />
                         </div>
                         <div className="pl-2">
@@ -304,10 +322,11 @@ const TabTechnique = ({
                                 <span className="text-[9px] font-bold text-blue-500 uppercase shrink-0">Poids : {sc.weight || 0}%</span>
                                 <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-xl border border-blue-200 shrink-0">
                                   <input
+                                    id={`tech-note-${name}-${sc.id}`}
                                     type="number" step={0.5} min={0} max={sc.noteMax}
                                     value={sc.note}
                                     onChange={e => updateTechnical(name, sc.id, 'note', Number(e.target.value))}
-                                    className="w-12 bg-emerald-50 border border-emerald-200 rounded-lg py-0.5 text-center text-xs font-black text-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none"
+                                    className={`w-12 rounded-lg py-0.5 text-center text-xs font-black focus:ring-1 outline-none ${sc.note > 0 ? 'bg-emerald-50 border border-emerald-200 text-emerald-600 focus:ring-emerald-500' : 'rao-empty border text-emerald-700 focus:ring-amber-400'}`}
                                   />
                                   <span className="text-[10px] text-slate-400 font-bold">/</span>
                                   <input
@@ -320,10 +339,11 @@ const TabTechnique = ({
                                 </div>
                               </div>
                               <AutoTextarea
+                                id={`tech-comm-${name}-${sc.id}`}
                                 value={sd.text || ''}
                                 onChange={e => updateTechnical(name, sc.id, 'text', e.target.value)}
-                                placeholder={`Synthèse pour ${sc.label || 'ce sous-critère'}…`}
-                                className="w-full bg-white border border-blue-100 rounded-xl px-4 py-3 text-xs font-medium text-slate-600 leading-relaxed focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all min-h-[40px]"
+                                placeholder={(sd.text || '').trim() ? `Synthèse pour ${sc.label || 'ce sous-critère'}…` : `⚠ Commentaire requis pour le PDF — ${sc.label || 'sous-critère'}…`}
+                                className={`w-full rounded-xl px-4 py-3 text-xs font-medium text-slate-600 leading-relaxed focus:ring-2 focus:ring-blue-500/10 outline-none transition-all min-h-[40px] ${(sd.text || '').trim() ? 'bg-white border border-blue-100 focus:border-blue-300' : 'rao-empty border placeholder:text-amber-600 placeholder:italic'}`}
                                 rows={1}
                               />
                             </div>
@@ -341,10 +361,14 @@ const TabTechnique = ({
                         <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold tracking-widest uppercase">PDF</span>
                       </div>
                       <AutoTextarea
+                        id={hasSubs ? undefined : `tech-comm-${name}-${crit.id}`}
                         value={d.text || ''}
                         onChange={e => updateTechnical(name, crit.id, 'text', e.target.value)}
-                        placeholder="Conclusion de l'analyse technique pour ce critère..."
-                        className="w-full bg-white border-2 border-slate-100 rounded-2xl p-5 text-sm font-medium text-slate-700 leading-relaxed shadow-sm focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all min-h-[40px]"
+                        placeholder={(d.text || '').trim()
+                          ? "Conclusion de l'analyse technique pour ce critère..."
+                          : "⚠ Commentaire requis pour le PDF — conclusion de l'analyse pour ce critère…"
+                        }
+                        className={`w-full rounded-2xl p-5 text-sm font-medium text-slate-700 leading-relaxed shadow-sm focus:ring-4 focus:ring-blue-500/10 outline-none transition-all min-h-[40px] ${(d.text || '').trim() || hasSubs ? 'bg-white border-2 border-slate-100 focus:border-blue-400' : 'rao-empty border-2 placeholder:text-amber-600 placeholder:italic'}`}
                         rows={1}
                       />
                     </div>

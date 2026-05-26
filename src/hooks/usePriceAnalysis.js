@@ -1140,6 +1140,7 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
 
   return {
     chaptersData, companies, stats, scoringConfig, setScoringConfig,
+    firestoreLoaded,
     canUndoObservatory: history.length > 0, lastSaved,
     handleAddManualCompany, handleImportExcel, updateCompanyOffer,
     renameCompany, removeCompany, handleClearAll,

@@ -20,6 +20,10 @@ export const CHANGELOG = [
       'Fiche Projet : correction de l\'aperçu page de garde — le logo MOE (votre société) s\'affiche désormais correctement dans la prévisualisation depuis tous les modules (Hub, Gestion de Projets, Estima, RAO)',
       'Exports mobile : refonte de la vue Exports — regroupement en 4 sections (Projet / Marché / Estimation / Analyse des Offres) et ajout de 3 nouveaux exports : Fiche Projet (PDF), Analyse Excel et Lettre de négociation (PDF) avec picker entreprise',
       'Exports mobile : correction du crash sur les exports Analyse / RAO — recalcul local des chaptersData et stats (companiesTotals, Pmin/Pmax/Pmoy, scores) qui ne sont pas stockés en Firestore. Extraction de la logique de calcul dans src/utils/analysisCompute.js, partagé entre usePriceAnalysis (desktop) et MobileApp (mobile)',
+      'RAO mobile : variantes affichées dans l\'onglet Récap (classement enrichi des variantes retenues, comme synthRows desktop) et dans l\'onglet Détail (sélecteur entreprise + variantes avec bandeau). Onglet Technique : total variante toujours affiché avec recalcul à la volée et delta vs base',
+      'RAO desktop : refonte de l\'écran landing (RaoAnalysisView) — container élargi en max-w-7xl et grille 1/2/3 colonnes responsive pour les cartes projets (au lieu d\'une colonne unique style mobile)',
+      'RAO desktop : la modale Dépouillement ne s\'auto-ouvre plus si le dépouillement est déjà fait — corrige le bug où la modale apparaissait pendant le chargement Firestore avant que les entreprises soient connues',
+      'Mobile : correction d\'un warning DOM (button-in-button) sur la liste des projets — la card projet devient un div role="button" avec support clavier (Enter / Espace)',
     ],
   },
   {

@@ -1,16 +1,17 @@
 // src/views/RaoView.jsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  FileDown, Loader2, Users, Save, CheckCircle2,
-  ScrollText, FileSignature
+  FileDown, Loader2, Users, Save, CheckCircle2, FileSignature, 
+  FileText, ScrollText as ScrollIcon, CheckSquare, Brain, MessageSquare, 
+  BarChart2, CheckCircle2 as CheckIcon, Download, FileUp, ChevronDown, 
+  ChevronRight, Menu 
 } from 'lucide-react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db as fireDb } from '../firebase';
 import { useRao } from '../hooks/useRao';
 import { useRaoCompletion } from '../hooks/useRaoCompletion';
 import { toast } from '../utils/globalUI';
-
-// Imports de l'UI et des Onglets
+import { useIsMobile } from '../hooks/useIsMobile';
 import TabConsultation from '../components/rao/tabs/TabConsultation';
 import TabAdministrative from '../components/rao/tabs/TabAdministrative';
 import TabTechnique from '../components/rao/tabs/TabTechnique';
@@ -19,16 +20,14 @@ import TabRecap from '../components/rao/tabs/TabRecap';
 import TabDepouillement from '../components/rao/tabs/TabDepouillement';
 import DepouillementModal from '../components/rao/DepouillementModal';
 import ProjectDetailsModal from '../components/modals/ProjectDetailsModal';
-// RaoStepper retiré : le stepper est désormais intégré au RibbonContainer (style Office)
 import PreExportChecklistModal from '../components/rao/PreExportChecklistModal';
-
-// La navigation entre onglets est désormais assurée par RaoStepper —
-// les boutons d'onglets du ribbon ont été supprimés pour gagner en hauteur.
-
-// HelpPanel/HelpButton supprimés ici : l'aide est centralisée dans RaoAnalysisView
-// (bouton AIDE en haut à droite, contextuel selon le sous-onglet actif).
-import { RibbonContainer, RibbonGroup, RibbonBtnLarge, RibbonBtnSmall, RibbonSpacer } from '../components/common/RibbonParts';
-import { FileText, ScrollText as ScrollIcon, CheckSquare, Brain, MessageSquare, BarChart2, CheckCircle2 as CheckIcon, Download, FileUp } from 'lucide-react';
+import {
+  RibbonContainer,
+  RibbonGroup,
+  RibbonBtnLarge,
+  RibbonBtnSmall,
+  RibbonSpacer
+} from '../components/common/RibbonParts';
 
 const RAO_STEPS = [
   { id: 'consultation',  label: 'Consultation',   icon: FileText },
@@ -44,6 +43,7 @@ const RaoView = ({
   setProject,
   companyId,
   analysisCompanies = [],
+  analysisLoaded = true,
   analysisStats = null,
   scoringConfig = null,
   masterBranding = null,
@@ -63,6 +63,7 @@ const RaoView = ({
   onExportJson = null,
   onImportJson = null,
 }) => {
+  const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState('depouillement');
   const [selectedCompany, setSelectedCompany] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -175,16 +176,19 @@ const RaoView = ({
 
   // Auto-ouverture de la modale Dépouillement si aucune entreprise saisie
   // (une seule fois par session, ne se réouvre pas après fermeture)
+  // Attend que les donnees Firestore soient chargees avant de decider :
+  // sinon on s'auto-ouvre toujours puisque analysisCompanies = [] au mount initial.
   useEffect(() => {
     if (autoOpenedRef.current) return;
     if (!onApplyDepouillement) return;
+    if (!analysisLoaded) return; // attendre fin chargement Firestore
     if (analysisCompanies.length === 0) {
       autoOpenedRef.current = true;
       setDepouillementOpen(true);
     } else {
-      autoOpenedRef.current = true; // déjà des entreprises → ne pas auto-ouvrir plus tard
+      autoOpenedRef.current = true; // depouillement deja fait → ne pas auto-ouvrir
     }
-  }, [analysisCompanies.length, onApplyDepouillement]);
+  }, [analysisLoaded, analysisCompanies.length, onApplyDepouillement]);
 
   // Sync selectedCompany avec la liste des entreprises
   useEffect(() => {
@@ -234,149 +238,167 @@ const RaoView = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#f8fafc] overflow-hidden">
+    <div className={`flex flex-col h-full bg-[#f8fafc] overflow-hidden ${isMobile ? 'pb-16' : ''}`}>
 
-      {/* ═══════ RIBBON RAO — style Office (cohérent avec les autres modules) ═══════ */}
-      <RibbonContainer>
-        {/* Groupe Étapes — chaque step est un RibbonBtnLarge avec son état */}
-        <RibbonGroup label="Étapes">
-          {RAO_STEPS.map(step => {
-            const state = completion.tabStates[step.id];
-            const ratio = state?.ratio;
-            const isDone = state?.done;
-            const isOptional = state?.optional;
-            const hasWarn = state?.items?.some(it => it.warn);
-            // accent : ordre = optional > active > done > warn
-            const accent = isOptional
-              ? 'text-slate-300'
-              : activeTab === step.id
-                ? 'text-emerald-600'
-                : isDone
-                  ? 'text-emerald-500'
-                  : hasWarn
-                    ? 'text-amber-500'
-                    : 'text-slate-500';
-            return (
-              <RibbonBtnLarge
-                key={step.id}
-                icon={isDone && !isOptional ? CheckIcon : step.icon}
-                label={
-                  <span className="flex flex-col items-center leading-none gap-0.5">
-                    <span>{step.label}</span>
-                    {ratio && (
-                      <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${isOptional ? 'bg-slate-100 text-slate-500' : isDone ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                        {ratio}
-                      </span>
-                    )}
-                  </span>
-                }
-                onClick={() => setActiveTab(step.id)}
-                active={activeTab === step.id}
-                accent={accent}
-                title={`${step.label} — ${isDone ? 'Complet' : hasWarn ? 'À compléter' : isOptional ? 'Optionnel' : 'Vide'}`}
-              />
-            );
-          })}
-        </RibbonGroup>
+      {/* Input JSON invisible pour import (utilisé par desktop et mobile) */}
+      <input
+        type="file"
+        ref={jsonInputRef}
+        accept=".json"
+        onChange={(e) => { onImportJson?.(e); e.target.value = ''; }}
+        className="hidden"
+      />
 
-        {/* Groupe Fiche affaire */}
-        <RibbonGroup label="Affaire">
-          <RibbonBtnLarge
-            icon={FileSignature}
-            label="Fiche affaire"
-            onClick={() => setDetailsOpen(true)}
-            accent="text-purple-500"
-            title="Éditer les informations du projet (client, MOE, lieu, dates…)"
-          />
-        </RibbonGroup>
-
-        {/* Avancement global */}
-        <RibbonGroup label="Avancement">
-          <div className="flex flex-col items-center justify-center gap-1 px-3 py-1.5 min-w-[88px]">
-            <div className={`text-lg font-black leading-none ${completion.overallProgress === 100 ? 'text-emerald-600' : completion.overallProgress >= 50 ? 'text-amber-600' : 'text-slate-600'}`}>
-              {completion.overallProgress}<span className="text-xs font-normal text-slate-400 ml-0.5">%</span>
-            </div>
-            <div className="w-16 h-1 bg-slate-200 rounded-full overflow-hidden">
-              <div
-                className={`h-full transition-all duration-500 ${completion.overallProgress === 100 ? 'bg-emerald-500' : 'bg-gradient-to-r from-blue-500 to-emerald-500'}`}
-                style={{ width: `${completion.overallProgress}%` }}
-              />
-            </div>
-            {completion.overallProgress === 100 && (
-              <span className="flex items-center gap-0.5 text-[9px] font-black text-emerald-700 leading-none">
-                <CheckCircle2 size={9} strokeWidth={3} /> PRÊT
-              </span>
-            )}
-          </div>
-        </RibbonGroup>
-
-        {/* Indicateur entreprises */}
-        <RibbonGroup label="Entreprises">
-          <div className="flex flex-col items-center justify-center gap-1 px-3 py-1.5 min-w-[60px]">
-            <Users size={20} strokeWidth={1.6} className={companyNames.length === 0 ? 'text-amber-500' : 'text-slate-500'} />
-            <div className={`text-base font-black leading-none ${companyNames.length === 0 ? 'text-amber-600' : 'text-slate-700'}`}>
-              {companyNames.length}
-            </div>
-          </div>
-        </RibbonGroup>
-
-        <RibbonSpacer />
-
-        {/* Sauvegarde */}
-        <RibbonGroup label="Sauvegarde">
-          <RibbonBtnLarge
-            icon={lastSaved ? CheckCircle2 : Save}
-            label={lastSaved ? 'Sauvegardé' : 'Sauvegarder'}
-            onClick={saveRaoToFirestore}
-            accent={lastSaved ? 'text-emerald-500' : 'text-blue-500'}
-            title="Sauvegarder le rapport dans Firestore"
-          />
-        </RibbonGroup>
-
-        {/* Export — PDF RAO + Export/Import JSON (même groupe, comme dans Analyse financière) */}
-        <RibbonGroup label="Export" noBorder>
-          <RibbonBtnLarge
-            icon={isExporting ? Loader2 : FileDown}
-            label="PDF RAO"
-            onClick={() => setPreExportOpen(true)}
-            disabled={isExporting}
-            accent={completion.isReadyForExport ? 'text-emerald-600' : 'text-red-500'}
-            title={completion.isReadyForExport ? 'Exporter le rapport (toutes sections complètes)' : 'Vérifier la complétude avant export'}
-          />
-          {(onExportJson || onImportJson) && (
-            <div className="flex flex-col gap-[3px] justify-center">
-              {onExportJson && (
-                <RibbonBtnSmall
-                  icon={Download}
-                  label="Export JSON"
-                  onClick={onExportJson}
-                  accent="text-amber-600"
-                  title="Exporter l'analyse en JSON (backup)"
-                  disabled={(analysisCompanies || []).length === 0}
+      {/* ═══════ NAVIGATION : RIBBON (Desktop) ou COMPACT (Mobile) ═══════ */}
+      {!isMobile ? (
+        <RibbonContainer>
+          <RibbonGroup label="Étapes">
+            {RAO_STEPS.map(step => {
+              const state = completion.tabStates[step.id];
+              const isDone = state?.done;
+              const isOptional = state?.optional;
+              const hasWarn = state?.items?.some(it => it.warn);
+              const accent = isOptional ? 'text-slate-300' : activeTab === step.id ? 'text-emerald-600' : isDone ? 'text-emerald-500' : hasWarn ? 'text-amber-500' : 'text-slate-500';
+              return (
+                <RibbonBtnLarge
+                  key={step.id}
+                  icon={isDone && !isOptional ? CheckIcon : step.icon}
+                  label={
+                    <span className="flex flex-col items-center leading-none gap-0.5">
+                      <span>{step.label}</span>
+                      {state?.ratio && (
+                        <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${isOptional ? 'bg-slate-100 text-slate-500' : isDone ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                          {state.ratio}
+                        </span>
+                      )}
+                    </span>
+                  }
+                  onClick={() => setActiveTab(step.id)}
+                  active={activeTab === step.id}
+                  accent={accent}
                 />
-              )}
-              {onImportJson && (
-                <>
+              );
+            })}
+          </RibbonGroup>
+
+          <RibbonGroup label="Affaire">
+            <RibbonBtnLarge
+              icon={FileSignature}
+              label="Fiche affaire"
+              onClick={() => setDetailsOpen(true)}
+              accent="text-purple-500"
+            />
+          </RibbonGroup>
+
+          <RibbonGroup label="Avancement">
+            <div className="flex flex-col items-center justify-center gap-1 px-3 py-1.5 min-w-[88px]">
+              <div className={`text-lg font-black leading-none ${completion.overallProgress === 100 ? 'text-emerald-600' : 'text-slate-600'}`}>
+                {completion.overallProgress}<span className="text-xs font-normal text-slate-400 ml-0.5">%</span>
+              </div>
+              <div className="w-16 h-1 bg-slate-200 rounded-full overflow-hidden">
+                <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${completion.overallProgress}%` }} />
+              </div>
+            </div>
+          </RibbonGroup>
+
+          <RibbonSpacer />
+
+          <RibbonGroup label="Sauvegarde">
+            <RibbonBtnLarge
+              icon={lastSaved ? CheckCircle2 : Save}
+              label={lastSaved ? 'Sauvegardé' : 'Sauvegarder'}
+              onClick={() => saveRaoToFirestore()}
+              accent={lastSaved ? 'text-emerald-500' : 'text-blue-500'}
+            />
+          </RibbonGroup>
+
+          <RibbonGroup label="Export" noBorder>
+            <RibbonBtnLarge
+              icon={isExporting ? Loader2 : FileDown}
+              label="PDF RAO"
+              onClick={() => setPreExportOpen(true)}
+              disabled={isExporting}
+              accent={completion.isReadyForExport ? 'text-emerald-600' : 'text-red-500'}
+            />
+            {(onExportJson || onImportJson) && (
+              <div className="flex flex-col gap-[3px] justify-center">
+                {onExportJson && (
+                  <RibbonBtnSmall
+                    icon={Download}
+                    label="Export JSON"
+                    onClick={onExportJson}
+                    accent="text-amber-600"
+                    disabled={(analysisCompanies || []).length === 0}
+                  />
+                )}
+                {onImportJson && (
                   <RibbonBtnSmall
                     icon={FileUp}
                     label="Import JSON"
                     onClick={() => jsonInputRef.current?.click()}
                     accent="text-amber-600"
-                    title="Restaurer une analyse depuis un fichier JSON"
                   />
-                  <input
-                    type="file"
-                    ref={jsonInputRef}
-                    accept=".json"
-                    onChange={(e) => { onImportJson(e); e.target.value = ''; }}
-                    className="hidden"
-                  />
-                </>
-              )}
+                )}
+              </div>
+            )}
+          </RibbonGroup>
+        </RibbonContainer>
+      ) : (
+        /* EN-TÊTE MOBILE COMPACT */
+        <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm shrink-0">
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-1 bg-slate-200 rounded-full overflow-hidden relative">
+                <div className="absolute inset-0 bg-emerald-500 transition-all" style={{ width: `${completion.overallProgress}%` }} />
+              </div>
+              <span className="text-[10px] font-black text-slate-400 uppercase">{completion.overallProgress}%</span>
             </div>
-          )}
-        </RibbonGroup>
-      </RibbonContainer>
+            <div className="relative mt-1">
+              <select 
+                value={activeTab}
+                onChange={(e) => setActiveTab(e.target.value)}
+                className="appearance-none bg-transparent border-none font-black text-xs uppercase tracking-widest text-emerald-600 pr-6 focus:ring-0 outline-none"
+              >
+                {RAO_STEPS.map(s => (
+                  <option key={s.id} value={s.id}>{s.label}</option>
+                ))}
+              </select>
+              <ChevronDown size={12} className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => saveRaoToFirestore()}
+              className={`p-2 rounded-lg border ${lastSaved ? 'bg-emerald-50 border-emerald-100 text-emerald-500' : 'bg-slate-50 border-slate-200 text-slate-400'}`}
+            >
+              <Save size={18} />
+            </button>
+            {onExportJson && (
+               <button 
+                onClick={onExportJson}
+                className="p-2 rounded-lg bg-amber-50 border border-amber-100 text-amber-600"
+              >
+                <Download size={18} />
+              </button>
+            )}
+            {onImportJson && (
+               <button 
+                onClick={() => jsonInputRef.current?.click()}
+                className="p-2 rounded-lg bg-amber-50 border border-amber-100 text-amber-600"
+              >
+                <FileUp size={18} />
+              </button>
+            )}
+            <button 
+              onClick={() => setPreExportOpen(true)}
+              className="p-2 rounded-lg bg-emerald-600 text-white shadow-sm"
+            >
+              <FileDown size={18} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modale Dépouillement */}
       <DepouillementModal
@@ -413,7 +435,7 @@ const RaoView = ({
         branding={masterBranding}
       />
 
-      <div className={`flex-1 relative ${activeTab === 'admin' || activeTab === 'technique' || activeTab === 'negociation' || activeTab === 'depouillement' ? 'overflow-hidden' : 'overflow-y-auto p-6'}`}>
+      <div className={`flex-1 relative ${activeTab === 'admin' || activeTab === 'technique' || activeTab === 'negociation' || activeTab === 'depouillement' ? 'overflow-hidden' : `overflow-y-auto ${isMobile ? 'p-3' : 'p-6'}`}`}>
         <div className={activeTab === 'admin' || activeTab === 'technique' || activeTab === 'negociation' || activeTab === 'depouillement' ? 'h-full' : ''}>
           {activeTab === 'depouillement' && (
             <TabDepouillement

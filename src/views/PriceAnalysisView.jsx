@@ -4,21 +4,29 @@ import usePriceAnalysis from '../hooks/usePriceAnalysis';
 import AnalysisToolbar from '../components/analysis/AnalysisToolbar';
 import AnalysisTable from '../components/analysis/AnalysisTable';
 import RaoView from './RaoView';
-import HelpPanel from '../components/help/HelpPanel';
-import HelpButton from '../components/help/HelpButton';
 import OcrProgressModal from '../components/rao/OcrProgressModal';
 
 // MAGIE : On importe le moteur de calcul du projet !
 import { useProjectCalculations } from '../hooks/useProjectCalculations';
 
-const PriceAnalysisView = ({ project, companyId, setProject, handleSaveProject = null, bpuConfig, clientPercent, masterBranding = null, bpu = [], updateBpuItem = null }) => {
+const PriceAnalysisView = ({
+  project, companyId, setProject, handleSaveProject = null,
+  bpuConfig, clientPercent, masterBranding = null,
+  bpu = [], updateBpuItem = null,
+  // Contrôlés en option par le parent (RaoAnalysisView) pour que le bouton AIDE
+  // en haut à droite affiche la bonne aide selon le sous-onglet actif.
+  activeMainTab: activeMainTabProp,
+  setActiveMainTab: setActiveMainTabProp,
+}) => {
   // --- ÉTATS ---
-  // RAO en premier (point d'entrée du module — workflow dépouillement → analyses)
-  const [activeMainTab, setActiveMainTab] = useState('rao');
+  // Fallback local si le parent ne contrôle pas activeMainTab
+  const [localActiveMainTab, setLocalActiveMainTab] = useState('rao');
+  const activeMainTab = activeMainTabProp ?? localActiveMainTab;
+  const setActiveMainTab = setActiveMainTabProp ?? setLocalActiveMainTab;
   const [activeTrancheId, setActiveTrancheId] = useState('global');
   const [analysisMode, setAnalysisMode] = useState('none'); // 'none', 'heatmap' ou 'oab'
-  const [showHelp, setShowHelp] = useState(false);
-  
+  // Note : HelpPanel local supprimé — l'aide est gérée par RaoAnalysisView (bouton AIDE en haut à droite)
+
   const tranches = project?.tranches || [];
   const hasTranches = tranches.length > 0;
 
@@ -86,14 +94,12 @@ const PriceAnalysisView = ({ project, companyId, setProject, handleSaveProject =
   return (
     <div className="flex-1 flex flex-col h-full bg-slate-50 overflow-hidden">
 
-      <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="priceAnalysis" />
-
       {/* Modale globale de progression OCR (PDF scannés) */}
       <OcrProgressModal open={!!analysis.ocrProgress} progress={analysis.ocrProgress} />
 
       {/* ── ONGLETS PRINCIPAUX ── */}
+      {/* AIDE retirée ici : le bouton AIDE en haut à droite (RaoAnalysisView) sert d'unique point d'entrée à l'aide. */}
       <div className="shrink-0 flex items-center gap-1 px-4 pt-3 bg-white border-b border-slate-100">
-        <HelpButton onClick={() => setShowHelp(true)} />
         {/* Ordre : RAO (1) → Analyse financière (2)
             Les variantes sont désormais intégrées directement dans le tableau d'analyse. */}
         {[
@@ -123,6 +129,7 @@ const PriceAnalysisView = ({ project, companyId, setProject, handleSaveProject =
           setProject={setProject}
           companyId={companyId}
           analysisCompanies={analysis.companies || []}
+          analysisLoaded={analysis.firestoreLoaded}
           analysisStats={analysis.stats}
           scoringConfig={analysis.scoringConfig}
           masterBranding={masterBranding}
@@ -143,6 +150,8 @@ const PriceAnalysisView = ({ project, companyId, setProject, handleSaveProject =
             analysis.handleImportPdfOffer(file, companyName)
           }
           handleSaveProject={handleSaveProject}
+          onExportJson={analysis.handleExportJson}
+          onImportJson={analysis.handleImportJson}
         />
       )}
 

@@ -6,6 +6,7 @@ import { Field, Textarea, OuiNonToggle } from '../RaoUI';
 import { COMPANY_UI_COLORS, CONCLUSION_OPTIONS } from '../RaoConstants';
 import CompanySidebar from '../CompanySidebar';
 import AddVariantModal from '../AddVariantModal';
+import TabAlertBanner from '../TabAlertBanner';
 
 const ROLES = ['Mandataire', 'Cotraitant'];
 
@@ -81,6 +82,7 @@ const TabAdministrative = ({
   onImportVariant = null,
   onRemoveVariant = null,
   onToggleVariantRetained = null,
+  missing = [], // items à compléter dans cet onglet
 }) => {
   const [variantModalOpen, setVariantModalOpen] = useState(false);
 
@@ -173,6 +175,14 @@ const TabAdministrative = ({
       {/* ── Contenu entreprise sélectionnée ── */}
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-7xl mx-auto space-y-6 pb-24">
+          {/* Banner d'alerte items à compléter */}
+          <TabAlertBanner
+            missing={missing}
+            onItemClick={(item) => {
+              if (item.companyName && item.companyName !== name) onSelectCompany(item.companyName);
+            }}
+          />
+
 
           {/* Header entreprise */}
           <div className={`flex items-center gap-4 px-5 py-3 bg-white rounded-2xl border ${uiColor.border} border-l-[5px] shadow-sm`}>
@@ -407,9 +417,14 @@ const TabAdministrative = ({
           </DragDropContext>
 
           {/* ── Conclusion ── */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div id={`admin-concl-${name}`} className={`p-6 rounded-2xl border shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 ${!admin.conclusion ? 'rao-empty border-2' : 'bg-white border-slate-200'}`}>
             <div>
-              <h4 className="text-sm font-black uppercase tracking-widest text-slate-800 mb-1">Conclusion de l'analyse</h4>
+              <h4 className="text-sm font-black uppercase tracking-widest text-slate-800 mb-1">
+                Conclusion de l'analyse
+                {!admin.conclusion && (
+                  <span className="ml-2 text-[10px] font-black text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md uppercase tracking-wide">⚠ Requise</span>
+                )}
+              </h4>
               <p className="text-xs text-slate-500">Statut officiel de la candidature pour la suite de l'analyse.</p>
             </div>
             <div className="flex flex-wrap gap-2 p-1.5 bg-slate-50 rounded-xl border border-slate-100 shadow-inner">
@@ -418,7 +433,7 @@ const TabAdministrative = ({
                   key={opt.value}
                   onClick={() => updateAdminField(name, 'conclusion', opt.value)}
                   className={`px-5 py-2.5 rounded-lg text-xs font-black transition-all duration-300 ${
-                    concl === opt.value
+                    concl === opt.value && admin.conclusion
                       ? opt.color === 'emerald' ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30'
                       : opt.color === 'orange'  ? 'bg-orange-500 text-white shadow-md shadow-orange-500/30'
                       :                           'bg-red-500 text-white shadow-md shadow-red-500/30'

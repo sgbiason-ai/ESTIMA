@@ -1,6 +1,6 @@
 // src/views/RaoAnalysisView.jsx
 import React, { useState, useRef, useCallback } from 'react';
-import { ArrowLeft, BarChart3, FolderOpen } from 'lucide-react';
+import { ArrowLeft, BarChart3 } from 'lucide-react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db as fireDb } from '../firebase';
 import { useDatabase } from '../hooks/useDatabase';
@@ -21,6 +21,14 @@ export default function RaoAnalysisView({ user, companyId, onBackToHub }) {
   const [importing, setImporting] = useState(false);
   // Mode : 'landing' (écran d'accueil RAO) | 'analysis' (vue d'analyse)
   const [mode, setMode] = useState('landing');
+  // Sous-onglet actif dans la vue d'analyse — lift up pour que le bouton AIDE
+  // en haut à droite affiche la bonne aide contextuelle (rao vs priceAnalysis)
+  const [activeMainTab, setActiveMainTab] = useState('rao');
+
+  // moduleId d'aide en fonction du contexte courant
+  const helpModuleId = mode === 'landing'
+    ? 'raoAnalysis'
+    : (activeMainTab === 'rao' ? 'rao' : 'priceAnalysis');
   // État de la modale de structuration post-import DQE
   const [pendingImport, setPendingImport] = useState(null); // { chapters, fileName, projectName, warnings, stats }
   // Nom de projet pré-saisi (flux "Nouveau RAO" qui demande le nom avant le fichier)
@@ -183,7 +191,7 @@ export default function RaoAnalysisView({ user, companyId, onBackToHub }) {
   return (
     <div className="flex flex-col h-screen bg-[#f5f5f7] text-gray-900 overflow-hidden">
 
-      <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="raoAnalysis" />
+      <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId={helpModuleId} />
 
       {/* Modale de validation de la structure post-import DQE */}
       <RaoStructureModal
@@ -225,15 +233,7 @@ export default function RaoAnalysisView({ user, companyId, onBackToHub }) {
           </div>
         </div>
 
-        {!isLanding && (
-          <button
-            onClick={handleBackToLanding}
-            className="ml-2 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs text-blue-600 hover:bg-blue-50 transition-all"
-          >
-            <FolderOpen size={14} />
-            Changer de projet
-          </button>
-        )}
+        {/* Bouton "Changer de projet" supprimé — le bouton "← Projets" en haut à gauche assure le retour à la landing */}
 
         <div className="ml-auto">
           <HelpButton onClick={() => setShowHelp(true)} />
@@ -270,6 +270,8 @@ export default function RaoAnalysisView({ user, companyId, onBackToHub }) {
             masterBranding={resources.masterBranding}
             bpu={db.bpu}
             updateBpuItem={db.updateBpuItem}
+            activeMainTab={activeMainTab}
+            setActiveMainTab={setActiveMainTab}
           />
         )}
       </div>

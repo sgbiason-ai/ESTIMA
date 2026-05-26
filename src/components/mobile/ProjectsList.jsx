@@ -155,8 +155,12 @@ export default function ProjectsList({ projects, folders, loading, search, onSea
       {!loading && currentProjects.length > 0 && (
       <div className={isLandscape ? 'grid grid-cols-2 gap-2 px-4' : 'contents'}>
       {currentProjects.map((p) => (
-        <button key={p.id} onClick={() => onSelect(p)}
-          className={`block p-4 rounded-xl border text-left transition hover:shadow-md active:scale-[0.98] ${
+        <div key={p.id}
+          role="button"
+          tabIndex={0}
+          onClick={() => onSelect(p)}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(p); } }}
+          className={`block p-4 rounded-xl border text-left transition hover:shadow-md active:scale-[0.98] cursor-pointer ${
             selectedId === p.id
               ? 'bg-blue-50 border-blue-300 ring-2 ring-blue-200'
               : 'bg-white border-gray-200/60'
@@ -192,7 +196,7 @@ export default function ProjectsList({ projects, folders, loading, search, onSea
             <span className="ml-auto text-xs text-gray-300">{dateFr(p.lastSaved)}</span>
             <Icon name="chevron" size={14} color="#d1d5db" />
           </div>
-        </button>
+        </div>
       ))}
       </div>
       )}

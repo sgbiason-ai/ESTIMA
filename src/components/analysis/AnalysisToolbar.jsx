@@ -39,22 +39,7 @@ const AnalysisToolbar = ({
   return (
     <div className="font-[system-ui,'Segoe_UI',sans-serif] select-none relative">
 
-      {/* ═══════ BARRE TITRE ═══════ */}
-      <div className="flex items-center h-[30px] px-3 bg-white border-b border-slate-200">
-        <div className="flex-1 flex items-center justify-center gap-2.5">
-          <span className="text-[11.5px] font-semibold text-slate-700 tracking-wide">
-            Analyse Financière
-          </span>
-        </div>
-        <div className="flex items-center pr-2">
-          {lastSaved && (
-            <div className="flex items-center gap-1 text-[10px] font-normal text-emerald-500">
-              <CheckCircle2 size={11} />
-              <span>Sauvegardé</span>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Bandeau titre "Analyse Financière" supprimé — le sous-onglet en haut suffit comme repère */}
 
       {/* ═══════ CONTENU DU RIBBON ═══════ */}
       <div className="flex items-stretch bg-[#f3f3f3] border-b border-slate-200 min-h-[78px]">
@@ -166,7 +151,14 @@ const AnalysisToolbar = ({
             <RibbonBtnSmall icon={Plus} label="Ajouter" onClick={onAddManualCompany} accent="text-emerald-500" title="Ajouter une entreprise" />
           </div>
           <div className="flex flex-col gap-[3px] justify-center">
-            <RibbonBtnSmall icon={Save} label="Sauvegarder" onClick={onManualSave} accent="text-blue-500" title="Sauvegarder les offres dans le projet" disabled={companiesCount === 0} />
+            <RibbonBtnSmall
+              icon={lastSaved ? CheckCircle2 : Save}
+              label={lastSaved ? 'Sauvegardé' : 'Sauvegarder'}
+              onClick={onManualSave}
+              accent={lastSaved ? 'text-emerald-500' : 'text-blue-500'}
+              title={lastSaved ? 'Sauvegardé dans le projet' : 'Sauvegarder les offres dans le projet'}
+              disabled={companiesCount === 0}
+            />
             {canUndoObservatory && (
               <RibbonBtnSmall icon={History} label="Annuler" onClick={onUndoObservatory} accent="text-slate-500" title="Annuler la dernière action" />
             )}
