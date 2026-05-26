@@ -85,7 +85,7 @@ export default function MobileHubView({ userEmail, userModules, onSelectModule, 
             Estima Suite
           </span>
           <div className="flex items-center gap-3">
-            {isTablet && onSwitchToDesktop && (
+            {onSwitchToDesktop && (
               <button
                 onClick={onSwitchToDesktop}
                 className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition"

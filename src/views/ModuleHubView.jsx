@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Calculator, BarChart3, ClipboardList, FileStack, ShieldCheck,
   Folder, LogOut, Lock, Briefcase, Wrench, Receipt, Car,
-  Layers, Settings, Palette, Shield,
+  Layers, Settings, Palette, Shield, Smartphone,
   Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudDrizzle, CloudFog, MapPin, ChevronRight, Sparkles
 } from 'lucide-react';
 import { APP_VERSION } from '../data/changelog';
@@ -181,20 +181,21 @@ const ROW_LABELS = {
 
 // ─── COMPOSANT PRINCIPAL ────────────────────────────────────────────────────
 
-export default function ModuleHubView({ isAdmin, userEmail, userModules, onSelectModule, onLogout }) {
+export default function ModuleHubView({ isAdmin, userEmail, userModules, onSelectModule, onLogout, onSwitchToMobile = null }) {
   const [mounted, setMounted] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
-  // Si userModules est défini (array Firestore), filtrage strict par module
-  // (le module 'admin' reste exclusivement contrôlé par isAdmin).
+  // Modèle de permissions :
+  // - Module 'admin' : exclusivement gated par isAdmin (toujours)
+  // - userModules défini (array Firestore) : source de vérité, override le flag access legacy
+  // - userModules absent : fallback legacy basé sur mod.access
   const hasModuleRestriction = Array.isArray(userModules);
-  const isAllowedByRestriction = (mod) =>
-    !hasModuleRestriction || mod.id === 'admin' || userModules.includes(mod.id);
 
   const canAccess = (mod) => {
-    if (!isAllowedByRestriction(mod)) return false;
+    if (mod.id === 'admin') return isAdmin;
+    if (hasModuleRestriction) return userModules.includes(mod.id);
     if (mod.access === 'all') return true;
     if (mod.access === 'admin_only') return isAdmin;
     if (mod.access === 'admin_or_unlocked') return isAdmin;
@@ -202,7 +203,8 @@ export default function ModuleHubView({ isAdmin, userEmail, userModules, onSelec
   };
 
   const isVisible = (mod) => {
-    if (!isAllowedByRestriction(mod)) return false;
+    if (mod.id === 'admin') return isAdmin;
+    if (hasModuleRestriction) return userModules.includes(mod.id);
     if (mod.access === 'admin_only') return isAdmin;
     return true;
   };
@@ -240,6 +242,16 @@ export default function ModuleHubView({ isAdmin, userEmail, userModules, onSelec
             </div>
             <span className="text-sm font-medium text-gray-700 hidden md:block">{displayName}</span>
           </div>
+          {onSwitchToMobile && (
+            <button
+              onClick={onSwitchToMobile}
+              className="flex items-center justify-center w-8 h-8 rounded-full text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200"
+              title="Passer en vue mobile"
+              aria-label="Passer en vue mobile"
+            >
+              <Smartphone size={15} strokeWidth={2} />
+            </button>
+          )}
           <HelpButton onClick={() => setShowHelp(true)} />
           <button
             onClick={onLogout}

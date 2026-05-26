@@ -24,6 +24,8 @@ export const CHANGELOG = [
       'RAO desktop : refonte de l\'écran landing (RaoAnalysisView) — container élargi en max-w-7xl et grille 1/2/3 colonnes responsive pour les cartes projets (au lieu d\'une colonne unique style mobile)',
       'RAO desktop : la modale Dépouillement ne s\'auto-ouvre plus si le dépouillement est déjà fait — corrige le bug où la modale apparaissait pendant le chargement Firestore avant que les entreprises soient connues',
       'Mobile : correction d\'un warning DOM (button-in-button) sur la liste des projets — la card projet devient un div role="button" avec support clavier (Enter / Espace)',
+      'Hub : nouveau toggle bidirectionnel mobile ↔ desktop dans le header (icône Smartphone en desktop, icône Monitor en mobile) — visible sur tous les devices, persistance via localStorage.estima_force_layout',
+      'RAO Négociation : fix de l\'injection des sections "Prix atypiques" — l\'ancrage utilise désormais un marker invisible posé à la place de {{QUESTIONS}} (robuste à toute personnalisation de la trame), avec fallback sur l\'ancienne recherche par texte pour compatibilité',
     ],
   },
   {

@@ -110,7 +110,9 @@ const applyTemplate = (templateHtml, companyName, questionsHtml, letterConfig, c
     .replace(/{{CODE_AFFAIRE}}/g, consultation?.code || '[Code Affaire]')
     .replace(/{{LIEU}}/g, consultation?.lieu || '[Lieu]')
     .replace(/{{PHASE}}/g, consultation?.phase || '[Phase]')
-    .replace(/{{QUESTIONS}}/g, questionsHtml || '')
+    // Si questionsHtml vide, on laisse un marker invisible pour l'ancrage
+    // des sections "Prix atypiques" injectees apres coup.
+    .replace(/{{QUESTIONS}}/g, questionsHtml || '<div data-questions-marker style="display:none"></div>')
     .replace(/{{DATE_LIMITE}}/g, deadline)
     .replace(/{{SIGNATAIRE}}/g, signatory)
     .replace(/{{ADRESSE_ENTREPRISE}}/g, adresseEntreprise.replace(/\n/g, '<br/>'))
@@ -360,7 +362,11 @@ const TabNegociation = ({
     const doc = parser.parseFromString(`<div id="__estima_root">${html}</div>`, 'text/html');
     const root = doc.getElementById('__estima_root');
     if (!root) return html;
+    // Ancre prioritaire : marker laisse par {{QUESTIONS}} (robuste a toute personnalisation
+    // de trame). Fallback : recherche d'un texte connu (pour compatibilite).
     const findAnchor = () => {
+      const marker = root.querySelector('[data-questions-marker]');
+      if (marker) return marker;
       for (const p of root.querySelectorAll('p')) {
         if (p.textContent && p.textContent.includes('vous remercions de bien vouloir nous confirmer')) {
           return p;

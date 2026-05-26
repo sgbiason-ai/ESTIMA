@@ -178,7 +178,7 @@ export default function App() {
           userModules={userModules}
           onLogout={handleLogout}
           isTablet={isTablet}
-          onSwitchToDesktop={isTablet ? () => forceLayout('desktop') : null}
+          onSwitchToDesktop={() => forceLayout('desktop')}
         />
       </Suspense>
     );
@@ -197,6 +197,7 @@ export default function App() {
         userModules={userModules}
         onSelectModule={setActiveModule}
         onLogout={handleLogout}
+        onSwitchToMobile={() => forceLayout('mobile')}
       />
     );
   }
@@ -320,6 +321,7 @@ export default function App() {
       userModules={userModules}
       onSelectModule={setActiveModule}
       onLogout={handleLogout}
+      onSwitchToMobile={() => forceLayout('mobile')}
     />
   );
 }
