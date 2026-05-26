@@ -10,22 +10,32 @@ import { doc, updateDoc, deleteField } from 'firebase/firestore';
 import { db } from '../../firebase';
 import {
   CheckCircle2, Circle, RotateCcw, CheckSquare, Square,
-  Users, AlertCircle, Loader2,
+  Users, AlertCircle, Loader2, Lock,
 } from 'lucide-react';
-import { ASSIGNABLE_MODULES, ASSIGNABLE_MODULE_IDS } from '../../config/superAdmin';
+import {
+  ASSIGNABLE_MODULES, ASSIGNABLE_MODULE_IDS,
+  ASSIGNABLE_MOBILE_MODULES, ASSIGNABLE_MOBILE_MODULE_IDS,
+  satisfiesDesktopGate,
+} from '../../config/superAdmin';
 
 /**
- * Renvoie la liste des modules auxquels un user a accès aujourd'hui.
- * - Si user.modules est défini → c'est cette liste qui fait foi.
- * - Sinon → fallback "tout autorisé" pour les modules non admin_only,
- *           + les admin_only seulement si user.isAdmin.
+ * Renvoie la liste des modules DESKTOP auxquels un user a accès.
+ *  - Si user.modules est défini → c'est cette liste qui fait foi.
+ *  - Sinon → fallback "tout autorisé" pour les modules assignables.
  */
 const computeEffectiveModules = (user) => {
   if (Array.isArray(user.modules)) return user.modules;
-  // Fallback legacy
-  return ASSIGNABLE_MODULES
-    .filter(m => true) // tous les modules assignables sont accessibles par défaut
-    .map(m => m.id);
+  return ASSIGNABLE_MODULES.map(m => m.id);
+};
+
+/**
+ * Renvoie la liste des modules MOBILE auxquels un user a accès (avant
+ * application du desktopGate). C'est le contenu brut du champ `mobileModules`,
+ * ou tous les modules si le champ est absent (défaut = tout autoriser).
+ */
+const computeEffectiveMobileModules = (user) => {
+  if (Array.isArray(user.mobileModules)) return user.mobileModules;
+  return ASSIGNABLE_MOBILE_MODULE_IDS;
 };
 
 const PermissionsMatrix = ({ companies, users, onRefresh, showFeedback }) => {
@@ -39,7 +49,7 @@ const PermissionsMatrix = ({ companies, users, onRefresh, showFeedback }) => {
     return users.filter(u => u.companyId === selectedCompanyId);
   }, [users, selectedCompanyId]);
 
-  // Groupes de modules pour structurer le tableau (3 sections du Hub)
+  // Groupes de modules pour structurer le tableau (3 sections du Hub desktop + 1 section Mobile)
   const moduleGroups = useMemo(() => {
     const groups = {};
     ASSIGNABLE_MODULES.forEach(m => {
@@ -49,7 +59,7 @@ const PermissionsMatrix = ({ companies, users, onRefresh, showFeedback }) => {
     return groups;
   }, []);
 
-  /** Toggle d'un module pour un user — persistance immédiate */
+  /** Toggle d'un module DESKTOP pour un user — persistance immédiate */
   const handleToggleModule = async (user, modId) => {
     const current = computeEffectiveModules(user);
     const isOn = current.includes(modId);
@@ -69,11 +79,34 @@ const PermissionsMatrix = ({ companies, users, onRefresh, showFeedback }) => {
     }
   };
 
-  /** Tout cocher pour un user (= tous les modules assignables) */
+  /** Toggle d'un module MOBILE pour un user — persistance immédiate */
+  const handleToggleMobileModule = async (user, modId) => {
+    const current = computeEffectiveMobileModules(user);
+    const isOn = current.includes(modId);
+    const next = isOn
+      ? current.filter(id => id !== modId)
+      : [...current, modId];
+
+    setPendingModuleKey(`${user.uid}:mobile:${modId}`);
+    try {
+      await updateDoc(doc(db, 'users', user.uid), { mobileModules: next });
+      onRefresh && onRefresh({ silent: true });
+    } catch (e) {
+      console.error('Toggle mobile module failed', e);
+      showFeedback && showFeedback('error', `Erreur : ${e.message}`);
+    } finally {
+      setPendingModuleKey(null);
+    }
+  };
+
+  /** Tout cocher (desktop + mobile) */
   const handleSelectAll = async (user) => {
     setSavingUid(user.uid);
     try {
-      await updateDoc(doc(db, 'users', user.uid), { modules: [...ASSIGNABLE_MODULE_IDS] });
+      await updateDoc(doc(db, 'users', user.uid), {
+        modules: [...ASSIGNABLE_MODULE_IDS],
+        mobileModules: [...ASSIGNABLE_MOBILE_MODULE_IDS],
+      });
       onRefresh && onRefresh({ silent: true });
     } catch (e) {
       showFeedback && showFeedback('error', `Erreur : ${e.message}`);
@@ -82,11 +115,14 @@ const PermissionsMatrix = ({ companies, users, onRefresh, showFeedback }) => {
     }
   };
 
-  /** Tout décocher pour un user (=  aucun module accessible) */
+  /** Tout décocher (desktop + mobile) */
   const handleSelectNone = async (user) => {
     setSavingUid(user.uid);
     try {
-      await updateDoc(doc(db, 'users', user.uid), { modules: [] });
+      await updateDoc(doc(db, 'users', user.uid), {
+        modules: [],
+        mobileModules: [],
+      });
       onRefresh && onRefresh({ silent: true });
     } catch (e) {
       showFeedback && showFeedback('error', `Erreur : ${e.message}`);
@@ -95,11 +131,14 @@ const PermissionsMatrix = ({ companies, users, onRefresh, showFeedback }) => {
     }
   };
 
-  /** Reset = supprime le champ modules → retour comportement par défaut */
+  /** Reset = supprime les champs modules + mobileModules (retour défaut) */
   const handleReset = async (user) => {
     setSavingUid(user.uid);
     try {
-      await updateDoc(doc(db, 'users', user.uid), { modules: deleteField() });
+      await updateDoc(doc(db, 'users', user.uid), {
+        modules: deleteField(),
+        mobileModules: deleteField(),
+      });
       onRefresh && onRefresh({ silent: true });
     } catch (e) {
       showFeedback && showFeedback('error', `Erreur : ${e.message}`);
@@ -119,6 +158,11 @@ const PermissionsMatrix = ({ companies, users, onRefresh, showFeedback }) => {
         <p className="text-gray-400 text-xs mb-4">
           Cochez/décochez pour autoriser ou masquer un module dans le Hub de chaque utilisateur.
           Le module « Administration » est contrôlé séparément par le statut Admin.
+          <br />
+          <span className="text-gray-500">
+            <Lock size={10} className="inline -mt-0.5" /> Les permissions <strong>desktop prévalent</strong> :
+            une case mobile est verrouillée si le module desktop équivalent n'est pas autorisé.
+          </span>
         </p>
 
         <div className="flex items-center gap-3">
@@ -140,7 +184,7 @@ const PermissionsMatrix = ({ companies, users, onRefresh, showFeedback }) => {
       </div>
 
       {/* Légende */}
-      <div className="flex items-center gap-4 text-[11px] text-gray-500">
+      <div className="flex flex-wrap items-center gap-4 text-[11px] text-gray-500">
         <span className="flex items-center gap-1.5">
           <CheckCircle2 size={14} className="text-emerald-500" /> Accès autorisé
         </span>
@@ -148,7 +192,10 @@ const PermissionsMatrix = ({ companies, users, onRefresh, showFeedback }) => {
           <Circle size={14} className="text-gray-300" /> Masqué du Hub
         </span>
         <span className="flex items-center gap-1.5">
-          <AlertCircle size={14} className="text-amber-500" /> Configuration par défaut (aucun champ <code className="text-[10px] bg-gray-100 px-1 rounded">modules</code>)
+          <Lock size={14} className="text-gray-400" /> Verrouillé (desktop refusé)
+        </span>
+        <span className="flex items-center gap-1.5">
+          <AlertCircle size={14} className="text-amber-500" /> Configuration par défaut
         </span>
       </div>
 
@@ -172,6 +219,10 @@ const PermissionsMatrix = ({ companies, users, onRefresh, showFeedback }) => {
                       {groupName}
                     </th>
                   ))}
+                  <th colSpan={ASSIGNABLE_MOBILE_MODULES.length}
+                    className="text-center px-2 py-2 text-[10px] font-bold text-blue-600 uppercase tracking-wider border-l-2 border-blue-200 bg-blue-50/60">
+                    📱 Mobile
+                  </th>
                   <th className="text-center px-3 py-3 font-semibold text-gray-700 border-l border-gray-200/60 min-w-[180px]">
                     Actions rapides
                   </th>
@@ -186,13 +237,22 @@ const PermissionsMatrix = ({ companies, users, onRefresh, showFeedback }) => {
                       <div className="leading-tight">{mod.label}</div>
                     </th>
                   ))}
+                  {ASSIGNABLE_MOBILE_MODULES.map((mod, idx) => (
+                    <th key={`mobile-${mod.id}`}
+                      className={`px-2 py-3 text-[10px] font-medium text-blue-700 text-center bg-blue-50/40 ${idx === 0 ? 'border-l-2 border-blue-200' : 'border-l border-blue-100'}`}
+                      style={{ minWidth: '90px', maxWidth: '110px' }}
+                      title={`Mobile : ${mod.label}`}>
+                      <div className="leading-tight">{mod.label}</div>
+                    </th>
+                  ))}
                   <th className="border-l border-gray-200/60"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {filteredUsers.map(user => {
                   const effective = computeEffectiveModules(user);
-                  const usingDefault = !Array.isArray(user.modules);
+                  const effectiveMobile = computeEffectiveMobileModules(user);
+                  const usingDefault = !Array.isArray(user.modules) && !Array.isArray(user.mobileModules);
                   const isSaving = savingUid === user.uid;
                   const company = companies.find(c => c.id === user.companyId);
 
@@ -224,7 +284,7 @@ const PermissionsMatrix = ({ companies, users, onRefresh, showFeedback }) => {
                         </div>
                       </td>
 
-                      {/* Cellules modules */}
+                      {/* Cellules modules DESKTOP */}
                       {ASSIGNABLE_MODULES.map(mod => {
                         const isOn = effective.includes(mod.id);
                         const isPending = pendingModuleKey === `${user.uid}:${mod.id}`;
@@ -241,6 +301,45 @@ const PermissionsMatrix = ({ companies, users, onRefresh, showFeedback }) => {
                               {isPending ? (
                                 <Loader2 size={18} className="text-blue-400 animate-spin" />
                               ) : isOn ? (
+                                <CheckCircle2 size={18} className="text-emerald-500" />
+                              ) : (
+                                <Circle size={18} className="text-gray-300" />
+                              )}
+                            </button>
+                          </td>
+                        );
+                      })}
+
+                      {/* Cellules modules MOBILE */}
+                      {ASSIGNABLE_MOBILE_MODULES.map((mod, idx) => {
+                        const isOn = effectiveMobile.includes(mod.id);
+                        const gateOk = satisfiesDesktopGate(mod, effective);
+                        const isPending = pendingModuleKey === `${user.uid}:mobile:${mod.id}`;
+                        const visuallyOn = gateOk && isOn;
+                        return (
+                          <td key={`mobile-${mod.id}`}
+                            className={`text-center bg-blue-50/30 ${idx === 0 ? 'border-l-2 border-blue-200' : 'border-l border-blue-100'}`}>
+                            <button
+                              onClick={() => gateOk && handleToggleMobileModule(user, mod.id)}
+                              disabled={!gateOk || isPending || isSaving}
+                              className={`p-2 rounded-lg transition-all ${
+                                !gateOk
+                                  ? 'opacity-50 cursor-not-allowed'
+                                  : isPending || isSaving
+                                    ? 'opacity-40 cursor-wait'
+                                    : 'hover:bg-blue-100 active:scale-90'
+                              }`}
+                              title={
+                                !gateOk
+                                  ? `Verrouillé — le module desktop équivalent (${mod.desktopGate.join(' ou ')}) doit être autorisé`
+                                  : `${isOn ? 'Retirer' : 'Donner'} l'accès mobile à "${mod.label}"`
+                              }
+                            >
+                              {!gateOk ? (
+                                <Lock size={16} className="text-gray-400" />
+                              ) : isPending ? (
+                                <Loader2 size={18} className="text-blue-400 animate-spin" />
+                              ) : visuallyOn ? (
                                 <CheckCircle2 size={18} className="text-emerald-500" />
                               ) : (
                                 <Circle size={18} className="text-gray-300" />

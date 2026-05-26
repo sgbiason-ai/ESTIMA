@@ -85,7 +85,7 @@ export default function App() {
   const [activeModule, setActiveModule] = useState(null);
 
   // ── 1. Auth ─────────────────────────────────────────────────────────────────
-  const { user, companyId, isAdmin, userModules, authLoading, handleLogout } = useAppAuth();
+  const { user, companyId, isAdmin, userModules, userMobileModules, authLoading, handleLogout } = useAppAuth();
 
   // Helper : un user a-t-il accès à ce module ?
   // - 'admin' → toujours gated par isAdmin
@@ -176,6 +176,7 @@ export default function App() {
           user={user}
           companyId={companyId}
           userModules={userModules}
+          userMobileModules={userMobileModules}
           onLogout={handleLogout}
           isTablet={isTablet}
           onSwitchToDesktop={() => forceLayout('desktop')}

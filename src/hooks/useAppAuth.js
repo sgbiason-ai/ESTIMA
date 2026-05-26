@@ -11,6 +11,10 @@ export const useAppAuth = () => {
   // userModules : array d'IDs de modules autorisés. null = pas de restriction
   // (fallback comportement legacy basé sur isAdmin + access).
   const [userModules, setUserModules] = useState(null);
+  // userMobileModules : array d'IDs de modules MOBILE autorisés (champ
+  // `mobileModules` du doc user). null = pas de restriction explicite côté
+  // mobile (défaut : tout autoriser, sous réserve du desktopGate).
+  const [userMobileModules, setUserMobileModules] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const hadUserRef = useRef(false);
   const logoutTimerRef = useRef(null);
@@ -30,6 +34,7 @@ export const useAppAuth = () => {
           setCompanyId(null);
           setIsAdmin(false);
           setUserModules(null);
+          setUserMobileModules(null);
           setAuthLoading(false);
           hadUserRef.current = false;
           intentionalLogoutRef.current = false;
@@ -55,18 +60,21 @@ export const useAppAuth = () => {
           setCompanyId(data.companyId || null);
           setIsAdmin(data.isAdmin === true);
           setUserModules(Array.isArray(data.modules) ? data.modules : null);
+          setUserMobileModules(Array.isArray(data.mobileModules) ? data.mobileModules : null);
         } else {
           // Utilisateur authentifié mais pas encore assigné à une entreprise
           console.warn('Profil utilisateur introuvable dans Firestore (/users/' + currentUser.uid + ')');
           setCompanyId(null);
           setIsAdmin(false);
           setUserModules(null);
+          setUserMobileModules(null);
         }
       } catch (e) {
         console.error('Erreur lecture profil utilisateur :', e);
         setCompanyId(null);
         setIsAdmin(false);
         setUserModules(null);
+        setUserMobileModules(null);
       }
 
       setUser(currentUser);
@@ -89,5 +97,5 @@ export const useAppAuth = () => {
     }
   };
 
-  return { user, companyId, isAdmin, userModules, authLoading, handleLogout };
+  return { user, companyId, isAdmin, userModules, userMobileModules, authLoading, handleLogout };
 };

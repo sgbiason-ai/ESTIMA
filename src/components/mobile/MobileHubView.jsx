@@ -4,16 +4,19 @@ import React, { useState, useEffect } from 'react';
 import Icon from './Icon';
 import { APP_VERSION } from '../../data/changelog';
 import ChangelogModal from '../ChangelogModal';
+import { satisfiesDesktopGate } from '../../config/superAdmin';
 
 // ─── MODULES MOBILES ───────────────────────────────────────────────────────
 //
-// `desktopGate` mappe l'ID mobile vers les IDs desktop équivalents.
-// Si `userModules` est défini (restriction Firestore activée), le module mobile
-// est masqué si AUCUN de ses desktopGate n'est dans la liste autorisée.
-// Si `desktopGate` est absent ou vide → toujours visible (ex : pdf_reader).
+// Visibilité d'un module mobile :
+//   1. desktopGate doit être satisfait par `userModules` (les permissions
+//      desktop PRÉVALENT — un module mobile ne peut pas être visible si son
+//      équivalent desktop est interdit).
+//   2. ET si `userMobileModules` est défini, l'ID doit y figurer.
+//      Sinon (champ absent) → autorisé par défaut.
 const MOBILE_MODULES = [
   { id: 'projects',    label: 'Projets & RAO',    description: 'Devis, DQE et analyse des offres', icon: 'folder',    tag: 'Core',    row: 1, desktopGate: ['projects_manager', 'estima', 'rao_analysis'] },
-  { id: 'pdf_reader',  label: 'Serveur Papyrus',  description: 'Plans, documents et fichiers PDF', icon: 'file',      tag: 'Cloud',   row: 1 },
+  { id: 'pdf_reader',  label: 'Serveur Papyrus',  description: 'Plans, documents et fichiers PDF', icon: 'file',      tag: 'Cloud',   row: 1, desktopGate: [] },
   { id: 'site_visits', label: 'Visites de Site',  description: 'Notes terrain, photos et GPS',     icon: 'camera',    tag: 'Terrain', row: 2, desktopGate: ['site_visits'] },
   { id: 'crc',         label: 'Comptes Rendus',   description: 'CR de chantier',                   icon: 'clipboard', tag: 'CRC',     row: 2, desktopGate: ['crc'] },
   { id: 'moe',         label: 'Devis MOE',        description: 'Honoraires maîtrise d\'œuvre',     icon: 'euro',      tag: 'MOE',     row: 3, desktopGate: ['devis_moe'] },
@@ -54,7 +57,7 @@ const ROW_THEMES = {
 
 // ─── COMPOSANT ─────────────────────────────────────────────────────────────
 
-export default function MobileHubView({ userEmail, userModules, onSelectModule, onLogout, isLandscape, isTablet = false, onSwitchToDesktop = null }) {
+export default function MobileHubView({ userEmail, userModules, userMobileModules, onSelectModule, onLogout, isLandscape, isTablet = false, onSwitchToDesktop = null }) {
   const [mounted, setMounted] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -64,13 +67,13 @@ export default function MobileHubView({ userEmail, userModules, onSelectModule, 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
 
-  // Filtrage par permissions : si userModules est défini, on masque les modules
-  // mobiles dont aucun desktopGate n'est autorisé (modules sans gate restent visibles).
-  const hasRestriction = Array.isArray(userModules);
+  // Filtrage : (desktopGate satisfait) ET (mobileModules contient l'id OU
+  // userMobileModules absent → tout autorisé par défaut).
+  const hasMobileRestriction = Array.isArray(userMobileModules);
   const visibleModules = MOBILE_MODULES.filter(mod => {
-    if (!hasRestriction) return true;
-    if (!mod.desktopGate || mod.desktopGate.length === 0) return true;
-    return mod.desktopGate.some(id => userModules.includes(id));
+    if (!satisfiesDesktopGate(mod, userModules)) return false;
+    if (!hasMobileRestriction) return true;
+    return userMobileModules.includes(mod.id);
   });
 
   return (

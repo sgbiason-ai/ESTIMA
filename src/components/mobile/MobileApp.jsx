@@ -77,7 +77,7 @@ const SplitView = ({ List, Detail, hasSelection, loading, emptyIcon = 'list', em
 );
 
 // ─── MAIN MOBILE APP ────────────────────────────────────────────────────────
-export default function MobileApp({ user, companyId, userModules = null, onLogout, isTablet = false, onSwitchToDesktop = null }) {
+export default function MobileApp({ user, companyId, userModules = null, userMobileModules = null, onLogout, isTablet = false, onSwitchToDesktop = null }) {
   const { isLandscape } = useOrientation();
 
   // ── Données ──
@@ -566,6 +566,7 @@ export default function MobileApp({ user, companyId, userModules = null, onLogou
           <MobileHubView
             userEmail={user?.email}
             userModules={userModules}
+            userMobileModules={userMobileModules}
             onSelectModule={handleSelectModule}
             onLogout={onLogout}
             isLandscape={isLandscape}
