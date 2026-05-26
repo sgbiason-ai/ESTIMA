@@ -18,6 +18,7 @@ export const CHANGELOG = [
       'PDF (Estima / CCTP / RAO) : correction du logo Maître d\'Ouvrage au format SVG — rastérisation auto en PNG via canvas avant injection jsPDF (le logo apparaît désormais sur la page de garde)',
       'Fiche Projet : nouveau bouton "Télécharger la page de garde" sous l\'aperçu — exporte un PDF A4 contenant uniquement la couverture du projet (sans mention CCTP / RC / DQE), idéal pour transmission rapide',
       'Fiche Projet : correction de l\'aperçu page de garde — le logo MOE (votre société) s\'affiche désormais correctement dans la prévisualisation depuis tous les modules (Hub, Gestion de Projets, Estima, RAO)',
+      'Exports mobile : refonte de la vue Exports — regroupement en 4 sections (Projet / Marché / Estimation / Analyse des Offres) et ajout de 3 nouveaux exports : Fiche Projet (PDF), Analyse Excel et Lettre de négociation (PDF) avec picker entreprise',
     ],
   },
   {

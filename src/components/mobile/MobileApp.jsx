@@ -16,7 +16,10 @@ const loadExcelGenerator    = () => import('../../utils/excelGenerator');
 const loadPdfGenerator      = () => import('../../utils/pdfGenerator');
 const loadPdfCctpRc         = () => import('../../utils/pdfCctpRcGenerator');
 const loadAnalysisPdf       = () => import('../../utils/pdfAnalysisGenerator');
+const loadAnalysisExcel     = () => import('../../utils/excelAnalysisGenerator');
 const loadRaoPdf            = () => import('../../utils/pdfRaoGenerator');
+const loadCoverPagePdf      = () => import('../../utils/pdfCoverPageGenerator');
+const loadNegoLetterPdf     = () => import('../../utils/pdf/pdfNegoLetterGenerator');
 
 // ─── PARTAGE NATIF ──────────────────────────────────────────────────────────
 import { setShareMode } from '../../utils/fileSaver';
@@ -48,6 +51,7 @@ import { useMobileSiteVisits } from '../../hooks/useMobileSiteVisits';
 import { useCrrManager }     from '../../hooks/useCrrManager';
 import { useOrientation }   from '../../hooks/useOrientation';
 import { useRobustSave, loadDraft, clearDraft } from '../../hooks/useRobustSave';
+import { useNegoTemplate }  from '../../hooks/useNegoTemplate';
 
 // ─── SPLIT-VIEW HELPER (tablette paysage) ───────────────────────────────────
 const SplitView = ({ List, Detail, hasSelection, loading, emptyIcon = 'list', emptyLabel = 'Sélectionnez un élément à gauche' }) => (
@@ -83,6 +87,8 @@ export default function MobileApp({ user, companyId, userModules = null, onLogou
   const { visits: siteVisits, isLoading: visitsLoading, refetch: visitsRefetch, loadVisit, saveVisit, createVisit, deleteVisit } = useMobileSiteVisits(user, companyId);
   const dbHook = useDatabase(user, companyId);
   const resources = useAppResources(user, companyId);
+  // Template lettre négo (user pref Firestore) — null = fallback dans le générateur
+  const { template: negoTemplate } = useNegoTemplate(null);
 
   // ── Navigation ──
   const [activeModule, setActiveModule]       = useState(null); // null = hub
@@ -293,7 +299,7 @@ export default function MobileApp({ user, companyId, userModules = null, onLogou
   }, []);
 
   // ── Export handler (share = true → partage natif, false → téléchargement) ──
-  const handleExport = useCallback(async (exportType, share = false) => {
+  const handleExport = useCallback(async (exportType, share = false, opts = {}) => {
     if (!fullProject) return;
     const branding = resources.masterBranding;
     const bpuCfg = { numberingMode: fullProject?.bpuConfig?.numberingMode || 'auto' };
@@ -391,6 +397,62 @@ export default function MobileApp({ user, companyId, userModules = null, onLogou
           });
           break;
         }
+        case 'CoverPage': {
+          const { generateCoverPagePDF } = await loadCoverPagePdf();
+          await generateCoverPagePDF(fullProject, branding);
+          break;
+        }
+        case 'AnalyseExcel': {
+          const { generateAnalysisExcel } = await loadAnalysisExcel();
+          const analysis = fullProject.analysis || {};
+          const companies = analysis.companies || [];
+          if (companies.length === 0) { setToast('Aucune analyse disponible'); return; }
+          await generateAnalysisExcel({
+            project: fullProject,
+            companies,
+            chaptersData: analysis.chaptersData || [],
+            stats: analysis.stats || {},
+            scoringConfig: fullProject.scoringConfig || null,
+            bpuRefMap: calcHook.refMap,
+            activeTrancheId: tranchesHook.activeTrancheId || 'global',
+            tranches: tranchesList,
+            branding,
+            clientQtyMaps: calcHook.clientQtyMaps,
+          });
+          break;
+        }
+        case 'NegoLetter': {
+          const { generateNegoLetterPDF } = await loadNegoLetterPdf();
+          const analysis = fullProject.analysis || {};
+          const companies = analysis.companies || [];
+          if (companies.length === 0) { setToast('Aucune analyse disponible'); return; }
+          const companyName = opts.companyName || companies[0]?.name;
+          if (!companyName) { setToast('Entreprise introuvable'); return; }
+          const companiesData = fullProject.rao?.companies || {};
+          const nego = companiesData[companyName]?.negotiation || {};
+          const consultation = fullProject.consultation || {};
+          const raoLetterConfig = fullProject.rao?.letterConfig || {};
+          const letterConfig = {
+            signatoryName: raoLetterConfig.signatoryName ?? consultation.client ?? '',
+            city:          raoLetterConfig.city          ?? consultation.lieu   ?? '',
+            deadline:          nego.deadline          || '',
+            adresseEntreprise: nego.adresseEntreprise || '',
+            adresseExpediteur: '',
+          };
+          await generateNegoLetterPDF({
+            companyName,
+            questions: nego.questions || '',
+            letterConfig,
+            consultation,
+            branding,
+            project: fullProject,
+            masterTemplate: negoTemplate,
+            analysisCompanies: companies,
+            chaptersData: analysis.chaptersData || [],
+            bpuRefMap: calcHook.refMap,
+          });
+          break;
+        }
         default:
           setToast(`Export ${exportType} non disponible`);
           return;
@@ -405,7 +467,7 @@ export default function MobileApp({ user, companyId, userModules = null, onLogou
     } finally {
       setShareMode(false);
     }
-  }, [fullProject, calcHook, tranchesHook, resources]);
+  }, [fullProject, calcHook, tranchesHook, resources, negoTemplate]);
 
   const currentTitle = useMemo(() => {
     if (subView === 'bpu') return 'Bordereau des Prix';
@@ -606,7 +668,10 @@ export default function MobileApp({ user, companyId, userModules = null, onLogou
           <PlansListView project={fullProject} />
         )}
         {subView === 'exports' && (
-          <ExportsView onExport={handleExport} />
+          <ExportsView
+            onExport={handleExport}
+            companies={fullProject?.analysis?.companies || []}
+          />
         )}
 
         {/* Module CRC — split-view sur tablette paysage */}
