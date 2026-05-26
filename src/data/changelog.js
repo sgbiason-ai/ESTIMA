@@ -38,6 +38,7 @@ export const CHANGELOG = [
       'RAO Négociation : les variables de la trame ({{NOM_ENTREPRISE}}, {{CLIENT}}, {{MOE}}, {{CODE_AFFAIRE}}, {{LIEU}}, {{OBJET_MARCHE}}, etc.) sont désormais sourcées depuis la fiche projet (ProjectDetailsModal) en priorité, avec fallback sur la consultation RAO',
       'RAO Négociation : la modale "Trame du courrier" affiche maintenant la valeur résolue actuelle de chaque variable dans la sidebar des tags — l\'utilisateur voit immédiatement ce que produira chaque {{...}} avant de l\'insérer',
       'RAO Négociation : {{PHASE}} forcée à "ACT" (Assistance aux Contrats de Travaux) dans le RAO, indépendamment de la phase de la fiche projet (qui peut être DCE / AVP / etc. pour les autres modules)',
+      'RAO Import/Export JSON : export désormais auto-suffisant (schema v2) — inclut la fiche projet complète (nom, client, code, MOE, lieu, phase, signataires…), la structure DQE/BPU (chapters + tranches), bpuConfig, clientPercent, scoringConfig, branding, analyse (companies + variantes) et toutes les données RAO (consultation, critères, admin, technique, négociation, letterConfig, recommendation, sections "Prix atypiques"). Import compatible avec l\'ancien schema v1',
     ],
   },
   {

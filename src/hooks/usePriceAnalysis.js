@@ -136,12 +136,49 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
         if (snap.exists() && snap.data().rao) raoData = snap.data().rao;
       } catch (e) { console.warn('[Analysis] RAO fetch for export:', e); }
     }
+    // Export complet auto-suffisant : fiche projet + structure DQE + analyse + RAO
     const data = {
-      companies,
-      scoringConfig,
-      rao: raoData,
+      schemaVersion: 2,
       exportedAt: new Date().toISOString(),
       projectName: project?.name,
+      // ── Fiche projet (ProjectDetailsModal) ─────────────────────────────
+      project: {
+        name:                project?.name || '',
+        subtitle1:           project?.subtitle1 || '',
+        subtitle2:           project?.subtitle2 || '',
+        client:              project?.client || '',
+        clientAddress:       project?.clientAddress || '',
+        clientZip:           project?.clientZip || '',
+        clientCity:          project?.clientCity || '',
+        clientLogo:          project?.clientLogo || null,
+        moe:                 project?.moe || '',
+        code:                project?.code || '',
+        location:            project?.location || '',
+        marketType:          project?.marketType || '',
+        phase:               project?.phase || '',
+        dateRemise:          project?.dateRemise || '',
+        timeRemise:          project?.timeRemise || '',
+        duration:            project?.duration || '',
+        prepPeriod:          project?.prepPeriod || '',
+        projectDescription:  project?.projectDescription || '',
+        hasPSE:              project?.hasPSE || '',
+        department:          project?.department || '',
+        signatories:         project?.signatories || [],
+        showSignatures:      project?.showSignatures,
+        // Structure DQE / BPU + tranches
+        chapters:            project?.chapters || [],
+        tranches:            project?.tranches || [],
+        bpuConfig:           project?.bpuConfig || null,
+        clientPercent:       project?.clientPercent ?? null,
+        scoringConfig:       project?.scoringConfig || null,
+        branding:            project?.branding || null,
+      },
+      // ── Analyse financiere (offres + variantes par entreprise) ─────────
+      companies,
+      scoringConfig,
+      // ── RAO (consultation, criteres, admin, technique, negociation,
+      //   letterConfig, recommendation, anomalySections, etc.) ────────────
+      rao: raoData,
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -150,24 +187,67 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
     a.download = `RAO_${(project?.name || 'export').replace(/[^a-z0-9_-]/gi, '_')}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success('Export JSON téléchargé.');
-  }, [companies, scoringConfig, project?.rao, project?.id, project?.name, companyId, toast]);
+    toast.success('Export JSON complet téléchargé.');
+  }, [companies, scoringConfig, project, companyId, toast]);
 
   // ─── IMPORT JSON ──────────────────────────────────────────────────────────
+  // Supporte les 2 schemas :
+  //  - v1 (ancien) : { companies, scoringConfig, rao }
+  //  - v2 (complet) : v1 + { project: { name, client, code, chapters, tranches, ... } }
   const handleImportJson = useCallback(async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
     try {
       const text = await file.text();
       const data = JSON.parse(text);
-      if (data.companies) setCompanies(data.companies);
+      const parts = [];
+
+      // Fiche projet (v2)
+      if (data.project && setProject) {
+        const p = data.project;
+        setProject(prev => ({
+          ...prev,
+          // Conserve l'id existant (ne pas ecraser)
+          id: prev?.id,
+          // Champs fiche projet
+          name: p.name ?? prev?.name,
+          subtitle1: p.subtitle1, subtitle2: p.subtitle2,
+          client: p.client, clientAddress: p.clientAddress,
+          clientZip: p.clientZip, clientCity: p.clientCity,
+          clientLogo: p.clientLogo,
+          moe: p.moe, code: p.code, location: p.location,
+          marketType: p.marketType, phase: p.phase,
+          dateRemise: p.dateRemise, timeRemise: p.timeRemise,
+          duration: p.duration, prepPeriod: p.prepPeriod,
+          projectDescription: p.projectDescription, hasPSE: p.hasPSE,
+          department: p.department, signatories: p.signatories,
+          showSignatures: p.showSignatures,
+          chapters: p.chapters || prev?.chapters || [],
+          tranches: p.tranches || prev?.tranches || [],
+          bpuConfig: p.bpuConfig ?? prev?.bpuConfig,
+          clientPercent: p.clientPercent ?? prev?.clientPercent,
+          scoringConfig: p.scoringConfig ?? prev?.scoringConfig,
+          branding: p.branding ?? prev?.branding,
+        }));
+        parts.push('fiche projet');
+        if (p.chapters?.length) parts.push(`${p.chapters.length} chapitre(s)`);
+        if (p.tranches?.length) parts.push(`${p.tranches.length} tranche(s)`);
+      }
+
+      // Analyse (companies + scoring)
+      if (data.companies) {
+        setCompanies(data.companies);
+        parts.push(`${data.companies.length} entreprise(s)`);
+      }
       if (data.scoringConfig) setScoringConfig(data.scoringConfig);
+
+      // RAO (criteres, admin, technique, nego, letterConfig, recommendation, anomalySections...)
       if (data.rao && setProject) {
         setProject(prev => ({ ...prev, rao: { ...(prev?.rao || {}), ...data.rao } }));
+        parts.push('analyse technique RAO');
       }
-      const parts = [`${data.companies?.length || 0} entreprise(s)`];
-      if (data.rao) parts.push('analyse technique');
-      toast.success(`RAO restauré : ${parts.join(' + ')}`);
+
+      toast.success(`RAO restauré : ${parts.join(' + ') || 'aucune donnée'}`);
     } catch (e) {
       toast.error('Fichier JSON invalide.');
       console.error('[Analysis] Import JSON error:', e);
