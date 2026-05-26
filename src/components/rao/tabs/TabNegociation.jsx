@@ -53,36 +53,99 @@ const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 }[c]));
 
-const buildAnomalySectionHtml = (type, templateText, items) => {
-  const rawLines = (templateText || '').split('\n').map(l => l.trim()).filter(Boolean);
-  let html = '';
-  let inList = false;
+// Detecte si une chaine contient du HTML (issu de ReactQuill) ou du texte brut (ancien format)
+const looksLikeHtml = (s) => /<\/?(p|div|ul|ol|li|strong|em|u|br|h\d)\b/i.test(s || '');
 
-  rawLines.forEach((line, idx) => {
-    // Première ligne = titre (commence par ➡️ ou non, on le met en strong)
-    if (idx === 0) {
-      const title = line.replace(/^➡️\s*/, '');
-      html += `<p style="margin:10px 0 4px 0; text-align:justify;"><strong>${escapeHtml(title)}</strong></p>`;
-      return;
+// Convertit HTML Quill (bold, underline, italic, lists) en texte brut compatible
+// avec parseQuestionsBlocks du PDF de negociation. Preserve les puces "- " et sauts de ligne.
+const htmlToPlainText = (html) => {
+  if (!looksLikeHtml(html)) return html || '';
+  if (typeof document === 'undefined') return html.replace(/<[^>]+>/g, '');
+  const container = document.createElement('div');
+  container.innerHTML = html;
+  const walk = (node) => {
+    let out = '';
+    for (const child of Array.from(node.childNodes)) {
+      if (child.nodeType === 3) { out += child.textContent; continue; }
+      if (child.nodeType !== 1) continue;
+      const tag = child.tagName.toLowerCase();
+      if (tag === 'br') out += '\n';
+      else if (tag === 'li') out += '- ' + walk(child).trim() + '\n';
+      else if (tag === 'ul' || tag === 'ol') out += walk(child);
+      else if (tag === 'p' || tag === 'div' || /^h\d$/.test(tag)) out += walk(child).trim() + '\n';
+      else out += walk(child);
     }
-    // Bullet manuel dans le template ("- ...")
-    if (line.startsWith('- ')) {
-      if (!inList) { html += '<ul style="margin:4px 0; padding-left:24px; text-align:justify;">'; inList = true; }
-      html += `<li style="margin-bottom:3px;">${escapeHtml(line.substring(2))}</li>`;
-      return;
-    }
-    if (inList) { html += '</ul>'; inList = false; }
-    html += `<p style="margin:0 0 4px 0; text-align:justify;">${escapeHtml(line)}</p>`;
-  });
-  if (inList) html += '</ul>';
+    return out;
+  };
+  return walk(container).replace(/\n{3,}/g, '\n\n').trim();
+};
+
+const buildAnomalySectionHtml = (type, templateText, items) => {
+  let html;
+
+  if (looksLikeHtml(templateText)) {
+    // Editeur riche (ReactQuill) → on prend le HTML tel quel, en injectant les
+    // styles d'alignement / marges au passage pour rester coherent avec la trame.
+    html = (templateText || '')
+      // Quill genere <p> sans style → ajouter le style justify + marges
+      .replace(/<p(\s[^>]*)?>/gi, (m, attrs) => {
+        const a = attrs || '';
+        if (/style=/.test(a)) return m; // deja style
+        return `<p style="margin:6px 0; text-align:justify;"${a}>`;
+      })
+      .replace(/<ul>/gi, '<ul style="margin:4px 0; padding-left:24px; text-align:justify;">')
+      .replace(/<ol>/gi, '<ol style="margin:4px 0; padding-left:24px; text-align:justify;">')
+      .replace(/<li>/gi, '<li style="margin-bottom:3px;">');
+  } else {
+    // Ancien format texte brut : premiere ligne = titre, "- " = bullet, autre = paragraphe
+    const rawLines = (templateText || '').split('\n').map(l => l.trim()).filter(Boolean);
+    html = '';
+    let inList = false;
+    rawLines.forEach((line, idx) => {
+      if (idx === 0) {
+        const title = line.replace(/^➡️\s*/, '');
+        html += `<p style="margin:10px 0 4px 0; text-align:justify;"><strong>${escapeHtml(title)}</strong></p>`;
+        return;
+      }
+      if (line.startsWith('- ')) {
+        if (!inList) { html += '<ul style="margin:4px 0; padding-left:24px; text-align:justify;">'; inList = true; }
+        html += `<li style="margin-bottom:3px;">${escapeHtml(line.substring(2))}</li>`;
+        return;
+      }
+      if (inList) { html += '</ul>'; inList = false; }
+      html += `<p style="margin:0 0 4px 0; text-align:justify;">${escapeHtml(line)}</p>`;
+    });
+    if (inList) html += '</ul>';
+  }
 
   if (items && items.length > 0) {
-    html += `<p style="margin:6px 0 2px 0; text-align:justify;"><strong>Articles concernés :</strong></p>`;
-    html += `<ul style="margin:4px 0; padding-left:24px; text-align:justify;">`;
-    items.forEach(item => {
-      html += `<li style="margin-bottom:3px;">${escapeHtml(item)}</li>`;
+    // Items peuvent etre des chaines (ancien format) OU des objets {ref,label,pu,unit}
+    const structured = items.map(it => {
+      if (typeof it === 'object' && it !== null) return it;
+      // Parse chaine "Prix n°XXX — Label : PU proposé de YY € HT[/UNIT]."
+      const m = String(it).match(/^Prix\s*n[°o]?\s*([^\s—\-]+)\s*[—\-]\s*(.+?)\s*:\s*PU\s*(?:proposé\s+)?de\s*([\d\s.,]+)\s*€\s*HT(?:\s*\/\s*([^\s.]+))?\s*\.?\s*$/i);
+      return m ? { ref: m[1], label: m[2], pu: m[3].trim(), unit: m[4] || '' } : { ref: '—', label: String(it), pu: '', unit: '' };
     });
-    html += `</ul>`;
+    const hasAnyUnit = structured.some(it => (it.unit || '').trim());
+    const headBg   = type === 'low' ? '#dc2626' : '#d97706'; // red-600 / amber-600 (match PDF)
+    const headText = '#ffffff';
+    html += `<p style="margin:6px 0 4px 0; text-align:justify;"><strong>Articles concernés :</strong></p>`;
+    html += `<table style="width:100%; border-collapse:collapse; margin:4px 0 8px 0; font-size:10pt;">`;
+    html += `<thead><tr>`;
+    html += `<th style="background:${headBg}; color:${headText}; padding:4px 6px; border:1px solid ${headBg}; text-align:left; font-weight:bold;">Réf.</th>`;
+    html += `<th style="background:${headBg}; color:${headText}; padding:4px 6px; border:1px solid ${headBg}; text-align:left; font-weight:bold;">Désignation</th>`;
+    if (hasAnyUnit) html += `<th style="background:${headBg}; color:${headText}; padding:4px 6px; border:1px solid ${headBg}; text-align:center; font-weight:bold;">Unité</th>`;
+    html += `<th style="background:${headBg}; color:${headText}; padding:4px 6px; border:1px solid ${headBg}; text-align:right; font-weight:bold;">PU proposé (HT)</th>`;
+    html += `</tr></thead><tbody>`;
+    structured.forEach(it => {
+      html += `<tr>`;
+      html += `<td style="padding:3px 6px; border:1px solid #d1d5db;">${escapeHtml(it.ref || '—')}</td>`;
+      html += `<td style="padding:3px 6px; border:1px solid #d1d5db;">${escapeHtml(it.label || '')}</td>`;
+      if (hasAnyUnit) html += `<td style="padding:3px 6px; border:1px solid #d1d5db; text-align:center;">${escapeHtml(it.unit || '—')}</td>`;
+      html += `<td style="padding:3px 6px; border:1px solid #d1d5db; text-align:right;">${it.pu ? escapeHtml(it.pu) + ' €' : '—'}</td>`;
+      html += `</tr>`;
+    });
+    html += `</tbody></table>`;
   }
   return `<div data-anomaly="${type}">${html}</div>`;
 };
@@ -306,8 +369,32 @@ const TabNegociation = ({
   const [showThresholdSettings, setShowThresholdSettings] = useState(false);
 
   // ── Templates de texte "Prix atypiques" ──
+  // Format : HTML (Quill). Si l'utilisateur a un ancien format texte brut sauvegarde,
+  // il reste compatible cote rendu (buildAnomalySectionHtml detecte les deux formats).
   const ANOMALY_TPL_KEY = 'estima_rao_anomaly_templates';
   const DEFAULT_LOW_TEMPLATE =
+    "<p><strong>➡️ PRIX ANORMALEMENT BAS (art. L.2152-6 et R.2152-3 du Code de la commande publique)</strong></p>" +
+    "<p>L'analyse de votre proposition révèle que les prix listés ci-dessous se situent très en deçà de l'estimation du maître d'œuvre. Ce niveau de prix interroge sur la bonne appréhension des contraintes techniques du chantier et des exigences quantitatives du cahier des charges.</p>" +
+    "<p>Dans le cadre de la présente négociation, et afin de nous assurer de la faisabilité technique de votre proposition, nous vous demandons de :</p>" +
+    "<ul>" +
+      "<li>Vérifier qu'il ne s'agit pas d'une erreur matérielle ou d'une omission dans votre chiffrage ;</li>" +
+      "<li>Le cas échéant, réviser ces prix à la hausse pour garantir la bonne exécution des prestations dans les règles de l'art.</li>" +
+    "</ul>" +
+    "<p>Si vous confirmez ces montants en l'état, nous vous demandons de nous fournir les sous-détails de prix correspondants ainsi que le mode opératoire envisagé, afin de nous démontrer que ces tarifs permettent techniquement la réalisation complète des travaux exigés.</p>";
+  const DEFAULT_HIGH_TEMPLATE =
+    "<p><strong>➡️ PRIX PARAISSANT EXCESSIFS (art. R.2152-3 du Code de la commande publique)</strong></p>" +
+    "<p>L'analyse comparative de votre proposition indique que les prix listés ci-dessous se situent au-dessus de notre estimation prévisionnelle. Cet écart pèse sur le classement global de votre offre.</p>" +
+    "<p>Dans l'optique d'optimiser votre proposition et d'améliorer sa compétitivité dans le cadre de cette négociation, nous vous invitons à :</p>" +
+    "<ul>" +
+      "<li>Vérifier qu'il ne s'agit pas d'une erreur d'interprétation du cahier des charges ou d'une erreur d'unité lors de votre chiffrage ;</li>" +
+      "<li>Étudier la possibilité d'un effort commercial sur ces postes spécifiques pour vous rapprocher des standards du marché.</li>" +
+    "</ul>" +
+    "<p>Dans l'hypothèse où vous souhaiteriez maintenir ces tarifs initiaux, nous vous serions reconnaissants de nous transmettre les éléments de décomposition (sous-détails de prix) nous permettant de mieux comprendre l'approche technique et les contraintes qui justifient cette valorisation.</p>";
+
+  // Anciens defauts — utilises pour migrer automatiquement les utilisateurs qui
+  // avaient sauvegarde les anciens textes sans les modifier (sinon ils ne verraient
+  // jamais les nouveaux defauts).
+  const OLD_LOW_TEMPLATE =
     "➡️ SUSPICION DE PRIX ANORMALEMENT BAS (art. L.2152-6 et R.2152-3 du Code de la commande publique) :\n" +
     "Conformément aux articles L.2152-6 et R.2152-3 du Code de la commande publique, l'acheteur a l'obligation de détecter les offres qui paraissent anormalement basses et d'exiger des justifications avant tout rejet éventuel.\n" +
     "Les prix unitaires suivants paraissent anormalement bas au regard de l'estimation du maître d'œuvre et ont une incidence significative sur le montant global de votre proposition. Nous vous demandons de bien vouloir fournir, pour chacun de ces prix, les justifications prévues à l'article R.2152-3, notamment :\n" +
@@ -315,16 +402,24 @@ const TabNegociation = ({
     "- Les conditions exceptionnellement favorables dont vous disposez (approvisionnement, moyens propres, etc.) ;\n" +
     "- Les sous-détails de prix complets (fournitures, main-d'œuvre, matériel, frais généraux et marge).\n" +
     "À défaut de justifications satisfaisantes, l'acheteur pourra rejeter votre offre comme anormalement basse en application de l'article L.2152-6.";
-  const DEFAULT_HIGH_TEMPLATE =
+  const OLD_HIGH_TEMPLATE =
     "➡️ PRIX PARAISSANT EXCESSIFS (art. R.2152-3 du Code de la commande publique) :\n" +
     "Les prix unitaires suivants se situent nettement au-dessus de l'estimation du maître d'œuvre et pèsent significativement sur le montant global de votre proposition. Conformément à l'article R.2152-3, nous vous invitons à :\n" +
     "- Vérifier qu'il ne s'agit pas d'une erreur matérielle de chiffrage ;\n" +
     "- Fournir les sous-détails de prix justifiant ces montants ;\n" +
     "- Le cas échéant, dans le cadre de la négociation, reconsidérer ces prix afin d'améliorer la compétitivité de votre offre.";
+
   const [anomalyTemplates, setAnomalyTemplates] = useState(() => {
     try {
       const saved = localStorage.getItem(ANOMALY_TPL_KEY);
-      if (saved) return { low: DEFAULT_LOW_TEMPLATE, high: DEFAULT_HIGH_TEMPLATE, ...JSON.parse(saved) };
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Migration : si l'utilisateur a juste les anciens defauts, basculer vers les nouveaux
+        return {
+          low:  (!parsed.low  || parsed.low  === OLD_LOW_TEMPLATE)  ? DEFAULT_LOW_TEMPLATE  : parsed.low,
+          high: (!parsed.high || parsed.high === OLD_HIGH_TEMPLATE) ? DEFAULT_HIGH_TEMPLATE : parsed.high,
+        };
+      }
     } catch {}
     return { low: DEFAULT_LOW_TEMPLATE, high: DEFAULT_HIGH_TEMPLATE };
   });
@@ -395,10 +490,15 @@ const TabNegociation = ({
     return root.innerHTML;
   };
 
-  // Reset des sections quand on change d'entreprise (les sections sont per company)
+  // Restauration des sections persistees quand on change d'entreprise
+  // (les sections HTML sont stockees dans nego.anomalySections par entreprise)
   useEffect(() => {
-    anomalySectionsRef.current = { low: null, high: null };
-  }, [selectedCompany]);
+    const persisted = companiesData[selectedCompany]?.negotiation?.anomalySections || null;
+    anomalySectionsRef.current = {
+      low:  persisted?.low  || null,
+      high: persisted?.high || null,
+    };
+  }, [selectedCompany, companiesData]);
 
   // Regénération de la trame + réinjection des sections préservées
   useEffect(() => {
@@ -410,7 +510,7 @@ const TabNegociation = ({
     const { low, high } = anomalySectionsRef.current;
     setLetterHtml((low || high) ? injectSectionsIntoHtml(generated, low, high) : generated);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCompany, masterTemplate, letterConfig.signatoryName, letterConfig.city, letterConfig.deadline, letterConfig.adresseEntreprise]);
+  }, [selectedCompany, masterTemplate, letterConfig.signatoryName, letterConfig.city, letterConfig.deadline, letterConfig.adresseEntreprise, companiesData]);
 
   // ── Logique complétion pour sidebar ──
   const getNegoCompletion = (companyName) => {
@@ -462,10 +562,10 @@ const TabNegociation = ({
           const refLabel = bpuRefMap?.get?.(item.id) || item.bpuNum || item.ref || '—';
           const label = item.designation || item.name || '';
           const unit = item.unit || item.unite || '';
-          const unitSuffix = unit ? `/${unit}` : '';
-          const itemText = `Prix n°${refLabel} — ${label} : PU proposé de ${puFormatted} € HT${unitSuffix}.`;
-          if (diffRatio > 0) highItems.push(itemText);
-          else lowItems.push(itemText);
+          // Item structure : utilise par buildAnomalySectionHtml (table) + plain-text (PDF)
+          const structuredItem = { ref: refLabel, label, pu: puFormatted, unit };
+          if (diffRatio > 0) highItems.push(structuredItem);
+          else lowItems.push(structuredItem);
         }
       });
     });
@@ -497,15 +597,25 @@ const TabNegociation = ({
 
     // Stocker dans le ref pour persister à travers les régénérations
     anomalySectionsRef.current = { low: lowSection, high: highSection };
+    // Persistance Firestore (par entreprise) : sections HTML completes survivront
+    // au rechargement de page / reouverture du projet
+    updateNegotiation(selectedCompany, 'anomalySections', { low: lowSection, high: highSection });
 
     // Regénérer depuis la trame propre + injecter les sections (ordre garanti)
     const generated = applyTemplate(masterTemplate, selectedCompany, '', letterConfig, consultation);
     setLetterHtml(injectSectionsIntoHtml(generated, lowSection, highSection));
 
-    // Synchronise nego.questions (string brut) pour rester compatible avec le générateur PDF
+    // Synchronise nego.questions (string brut) pour rester compatible avec le générateur PDF.
+    // Items structures → reconstruit la chaine au format attendu par parseQuestionsBlocks.
+    const itemToString = (it) => {
+      const unitSuffix = it.unit ? `/${it.unit}` : '';
+      return `- Prix n°${it.ref} — ${it.label} : PU proposé de ${it.pu} € HT${unitSuffix}.`;
+    };
+    const lowPlain = htmlToPlainText(anomalyTemplates.low);
+    const highPlain = htmlToPlainText(anomalyTemplates.high);
     const questionsString = [
-      lowItems.length > 0 ? anomalyTemplates.low + '\n\nArticles concernés :\n' + lowItems.map(i => '- ' + i).join('\n') : null,
-      highItems.length > 0 ? anomalyTemplates.high + '\n\nArticles concernés :\n' + highItems.map(i => '- ' + i).join('\n') : null,
+      lowItems.length > 0 ? lowPlain + '\n\nArticles concernés :\n' + lowItems.map(itemToString).join('\n') : null,
+      highItems.length > 0 ? highPlain + '\n\nArticles concernés :\n' + highItems.map(itemToString).join('\n') : null,
     ].filter(Boolean).join('\n\n');
     updateNegotiation(selectedCompany, 'questions', questionsString);
 
@@ -521,6 +631,7 @@ const TabNegociation = ({
     const generated = applyTemplate(masterTemplate, selectedCompany, '', letterConfig, consultation);
     setLetterHtml(generated);
     updateNegotiation(selectedCompany, 'questions', '');
+    updateNegotiation(selectedCompany, 'anomalySections', null);
     toast.success("Aperçu réinitialisé depuis la trame.");
   };
 
@@ -679,7 +790,7 @@ const TabNegociation = ({
 
                 {/* Popover réglages anomalies */}
                 {showThresholdSettings && (
-                  <div className={`absolute top-full left-0 mt-2 ${showTemplateEditor ? 'w-[520px]' : 'w-80'} bg-white rounded-2xl border border-slate-200 shadow-xl z-50 p-5 space-y-4 transition-all`}>
+                  <div className={`absolute top-full left-0 mt-2 ${showTemplateEditor ? 'w-[720px]' : 'w-80'} bg-white rounded-2xl border border-slate-200 shadow-xl z-50 p-5 space-y-4 transition-all ${showTemplateEditor ? 'max-h-[85vh] overflow-y-auto' : ''}`}>
                     <div className="flex items-center justify-between">
                       <h5 className="text-sm font-black text-slate-800 flex items-center gap-2">
                         <SlidersHorizontal size={16} className="text-indigo-500" />
@@ -757,7 +868,7 @@ const TabNegociation = ({
                       </button>
 
                       {showTemplateEditor && (
-                        <div className="mt-2 space-y-3">
+                        <div className="mt-2 space-y-3 [&_.ql-editor]:min-h-[240px] [&_.ql-editor]:max-h-[360px] [&_.ql-editor]:overflow-y-auto [&_.ql-editor]:text-[12px] [&_.ql-editor]:leading-relaxed [&_.ql-editor]:p-3 [&_.ql-container]:bg-slate-50 [&_.ql-toolbar]:bg-slate-50 [&_.ql-toolbar]:rounded-t-lg [&_.ql-container]:rounded-b-lg [&_.ql-toolbar]:border-slate-200 [&_.ql-container]:border-slate-200">
                           <div>
                             <div className="flex items-center justify-between mb-1">
                               <label className="text-[11px] font-bold text-slate-700">Texte « Prix anormalement bas »</label>
@@ -769,12 +880,11 @@ const TabNegociation = ({
                                 Réinitialiser
                               </button>
                             </div>
-                            <textarea
-                              rows={8}
+                            <ReactQuill
+                              theme="snow"
                               value={anomalyTemplates.low}
-                              onChange={e => saveAnomalyTemplates({ ...anomalyTemplates, low: e.target.value })}
-                              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-[11px] font-mono text-slate-700 leading-snug focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 outline-none resize-y"
-                              spellCheck="false"
+                              onChange={(html) => saveAnomalyTemplates({ ...anomalyTemplates, low: html })}
+                              modules={{ toolbar: [['bold', 'italic', 'underline'], [{ list: 'bullet' }, { list: 'ordered' }], ['clean']] }}
                             />
                           </div>
                           <div>
@@ -788,12 +898,11 @@ const TabNegociation = ({
                                 Réinitialiser
                               </button>
                             </div>
-                            <textarea
-                              rows={6}
+                            <ReactQuill
+                              theme="snow"
                               value={anomalyTemplates.high}
-                              onChange={e => saveAnomalyTemplates({ ...anomalyTemplates, high: e.target.value })}
-                              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-[11px] font-mono text-slate-700 leading-snug focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 outline-none resize-y"
-                              spellCheck="false"
+                              onChange={(html) => saveAnomalyTemplates({ ...anomalyTemplates, high: html })}
+                              modules={{ toolbar: [['bold', 'italic', 'underline'], [{ list: 'bullet' }, { list: 'ordered' }], ['clean']] }}
                             />
                           </div>
                           <div className="flex items-start gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
@@ -838,23 +947,134 @@ const TabNegociation = ({
             </div>
           </div>
 
-          {/* ── Aperçu Quill (simulation papier A4 fidèle au PDF) ── */}
-          <div className="rounded-3xl border border-slate-300 shadow-sm overflow-hidden bg-white nego-paper-preview">
-            <ReactQuill
-              theme="snow"
-              value={letterHtml}
-              onChange={setLetterHtml}
-              modules={{
-                toolbar: [
-                  [{ 'header': [1, 2, 3, false] }],
-                  ['bold', 'italic', 'underline', 'strike'],
-                  [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-                  [{ 'align': [] }],
-                  ['clean']
-                ],
-              }}
-            />
-          </div>
+          {/* ── Apercu A4 read-only (fidele au PDF) ── */}
+          {(() => {
+            const primaryColor = branding?.colors?.primary || '#286e55'; // vert papyrus par defaut
+            // Extraction des elements structurels depuis letterHtml :
+            // on les rend nous-meme pour garantir la mise en page (dest/exp cote a cote, etc.)
+            // Le reste (corps de lettre) est rendu via dangerouslySetInnerHTML.
+            const stripStructuralFromHtml = (html) => {
+              if (!html || typeof DOMParser === 'undefined') return html || '';
+              const doc = new DOMParser().parseFromString(`<div id="__root">${html}</div>`, 'text/html');
+              const root = doc.getElementById('__root');
+              if (!root) return html;
+
+              // Strategie : extraire le body en commencant au paragraphe "Monsieur,"
+              // (ou "Madame," / "Dans le cadre de la consultation"). Tout ce qui precede
+              // est structurel (date, dest/exp, OBJET, Negociation) — rendu separement.
+              // S'il existe un cadre <div style="border..."> englobant le corps, on prend
+              // son contenu. Sinon on flatten tous les <p>/<ul>/<table>/<div> a partir de
+              // "Monsieur,".
+              const bodyBox = Array.from(root.querySelectorAll('div')).find(d => {
+                const s = d.getAttribute('style') || '';
+                return /border\s*:\s*\d+px\s+solid/i.test(s)
+                  && !/display\s*:\s*flex/i.test(s)
+                  && /Monsieur|Madame|Dans le cadre/i.test(d.textContent || '');
+              });
+              if (bodyBox) {
+                // Retire le footer "NOMBRE DE PAGES" s'il est dans le bodyBox
+                Array.from(bodyBox.querySelectorAll('p'))
+                  .filter(p => /NOMBRE\s+DE\s+PAGES/i.test(p.textContent || ''))
+                  .forEach(p => p.remove());
+                return bodyBox.innerHTML;
+              }
+
+              // Pas de bodyBox detecte (Quill a tout aplati) : on cherche le 1er paragraphe
+              // commencant par Monsieur/Madame/"Dans le cadre" et on prend tout depuis lui
+              const allBlocks = Array.from(root.children);
+              let startIdx = -1;
+              const isBodyStart = (el) => {
+                const t = (el.textContent || '').trim();
+                return /^(monsieur|madame)[\s,\.]|^Dans\s+le\s+cadre\s+de\s+la\s+consultation/i.test(t);
+              };
+              for (let i = 0; i < allBlocks.length; i++) {
+                if (isBodyStart(allBlocks[i])) { startIdx = i; break; }
+                // Cherche aussi dans les enfants directs (cas div imbriques)
+                const inner = Array.from(allBlocks[i].children || []).find(isBodyStart);
+                if (inner) { startIdx = i; break; }
+              }
+              if (startIdx < 0) {
+                // Fallback : on retire juste les markers connus
+                root.querySelector('p[style*="text-align:right"]')?.remove();
+                const flexDiv = Array.from(root.querySelectorAll('div')).find(d => /display\s*:\s*flex/i.test(d.getAttribute('style') || ''));
+                if (flexDiv) flexDiv.remove();
+                Array.from(root.querySelectorAll('p'))
+                  .filter(p => /NOMBRE\s+DE\s+PAGES/i.test(p.textContent || ''))
+                  .forEach(p => p.remove());
+                return root.innerHTML;
+              }
+              const bodyOnly = allBlocks.slice(startIdx)
+                .map(el => el.outerHTML)
+                .join('');
+              // Retire le NOMBRE DE PAGES s'il a ete inclus
+              const bodyDoc = new DOMParser().parseFromString(`<div id="__b">${bodyOnly}</div>`, 'text/html');
+              const bRoot = bodyDoc.getElementById('__b');
+              Array.from(bRoot.querySelectorAll('p'))
+                .filter(p => /NOMBRE\s+DE\s+PAGES/i.test(p.textContent || ''))
+                .forEach(p => p.remove());
+              return bRoot.innerHTML;
+            };
+            const bodyHtml = stripStructuralFromHtml(letterHtml);
+            const today = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+            const ville = letterConfig.city || consultation?.lieu || '[Ville]';
+            const objet = consultation?.objet || '[Objet du marché]';
+            const adresseEnt = letterConfig.adresseEntreprise || '';
+            const adresseExp = letterConfig.adresseExpediteur || '';
+            return (
+              <div className="rounded-3xl border border-slate-300 shadow-sm overflow-hidden nego-paper-preview-wrapper">
+                <div className="nego-paper-preview-page">
+                  {/* Bande verticale primary (gauche) — couleur dynamique branding */}
+                  <div className="nego-paper-preview-band" style={{ background: primaryColor }} />
+                  {/* Logo en haut a gauche — prioritairement MOA (client), fallback MOE */}
+                  <img
+                    src={project?.clientLogo || branding?.logo || '/logo.jpg'}
+                    alt="Logo MOA / MOE"
+                    className="nego-paper-preview-logo"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                  {/* Date alignee a droite */}
+                  <p style={{ textAlign: 'right', margin: '0 0 12px 0', fontSize: '10pt' }}>
+                    {ville}, le {today}
+                  </p>
+                  {/* Destinataire (gauche) + Expediteur (droite) */}
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                    <div style={{ flex: 55, border: '1px solid #000', fontSize: '10pt' }}>
+                      <div style={{ borderBottom: '1px solid #000', textAlign: 'center', padding: '4px 6px' }}>DESTINATAIRE :</div>
+                      <div style={{ padding: '8px 6px', minHeight: '60px', whiteSpace: 'pre-line' }}>
+                        <strong>{selectedCompany || '[Entreprise]'}</strong>{adresseEnt && (<>{'\n'}{adresseEnt}</>)}
+                      </div>
+                    </div>
+                    <div style={{ flex: 45, border: '1px solid #000', fontSize: '10pt' }}>
+                      <div style={{ borderBottom: '1px solid #000', textAlign: 'center', padding: '4px 6px' }}>EXPÉDITEUR :</div>
+                      <div style={{ padding: '8px 6px', minHeight: '60px', whiteSpace: 'pre-line' }}>
+                        <strong>{consultation?.client || '[Client / MOA]'}</strong>{adresseExp && (<>{'\n'}{adresseExp}</>)}
+                      </div>
+                    </div>
+                  </div>
+                  {/* Objet */}
+                  <p style={{ margin: '6px 0 2px 0', fontSize: '10pt' }}>
+                    <strong>OBJET :</strong>  <strong>{objet}</strong>
+                  </p>
+                  <p style={{ margin: '0 0 6px 0', fontSize: '10pt' }}>
+                    <strong>Négociation avec les candidats</strong>
+                  </p>
+                  {/* Cadre corps de lettre */}
+                  <div style={{ border: '1px solid #000', padding: '10px 12px' }}>
+                    <div
+                      className="nego-paper-preview-body"
+                      dangerouslySetInnerHTML={{ __html: bodyHtml || '<p style="color:#94a3b8; font-style:italic;">Sélectionnez une entreprise puis cliquez sur « Prix atypiques » pour générer le courrier.</p>' }}
+                    />
+                  </div>
+                  {/* Footer fidele au PDF */}
+                  <div className="nego-paper-preview-footer">
+                    <span>{consultation?.client || 'Maître d\'œuvre'}</span>
+                    <span>Document confidentiel — usage strictement professionnel</span>
+                    <span>Page 1 / 1</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* ── Accordéon Réponses & Engagements ── */}
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">

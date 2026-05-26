@@ -29,6 +29,10 @@ export const CHANGELOG = [
       'RAO Récap : nouveau bloc "Conclusion finale (export PDF)" — texte éditable libre (avec auto-fill du gagnant base ou variante), badge "Personnalisé" + bouton "Réinitialiser", persisté dans rao.recommendation, utilisé par le PDF RAO (rectangle adapté en hauteur selon la longueur du texte)',
       'RAO Récap : le bandeau "Recommandation du Maître d\'Œuvre" affiche désormais le montant et le nom de l\'entreprise correspondant au gagnant réel — si une variante retenue est moins-disante, c\'est son montant qui s\'inscrit (et la phrase devient "L\'entreprise X avec sa Vn est classée 1ère"). Avant : toujours le montant de la base, même si une variante était classée première',
       'PDF RAO : suppression de la ligne CONCLUSION dans le tableau administratif (la conclusion apparaissait déjà dans le bloc Recommandation finale et le récapitulatif — évite la redondance)',
+      'RAO Négociation : nouveaux textes par défaut pour les sections "Prix atypiques" (low/high) avec migration auto depuis les anciens textes — moins juridiques, plus orientés négociation',
+      'RAO Négociation : éditeurs ReactQuill pour les templates « Prix atypiques » — gras, italique, souligné, listes à puces et numérotées. Compat ancien format texte brut conservée',
+      'RAO Négociation : refonte complète de l\'aperçu A4 read-only — fidélité 100% PDF (logo MOA prioritaire, bandeau primary depuis branding, boîtes destinataire/expéditeur structurelles côte à côte, cadre corps de lettre, footer "Document confidentiel — Page 1/1", tableaux Prix atypiques colorés red/amber comme PDF). Extraction intelligente du corps de lettre même si Quill a aplati la trame',
+      'RAO Négociation : persistance Firestore des sections "Prix atypiques" injectées (par entreprise) — les sections HTML survivent désormais au rechargement de la page',
     ],
   },
   {
