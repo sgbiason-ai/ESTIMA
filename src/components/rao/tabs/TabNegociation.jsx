@@ -152,9 +152,12 @@ const buildAnomalySectionHtml = (type, templateText, items) => {
 
 // ── 3. FONCTION D'INJECTION DES VARIABLES DANS LA TRAME ──────────────────────
 
-const applyTemplate = (templateHtml, companyName, questionsHtml, letterConfig, consultation) => {
+const applyTemplate = (templateHtml, companyName, questionsHtml, letterConfig, consultation, project = null) => {
   const today = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
-  const city = letterConfig.city || '[Ville]';
+  // Sources : project (fiche projet) prioritaire, fallback consultation rao
+  const get = (projectField, consultationField, fallback) =>
+    project?.[projectField] || consultation?.[consultationField] || fallback;
+  const city = letterConfig.city || project?.clientCity || '[Ville]';
   const deadline = letterConfig.deadline
     ? new Date(letterConfig.deadline).toLocaleString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     : '[Date limite]';
@@ -166,13 +169,14 @@ const applyTemplate = (templateHtml, companyName, questionsHtml, letterConfig, c
     .replace(/{{VILLE}}/g, city)
     .replace(/{{DATE_EMISSION}}/g, today)
     .replace(/{{NOM_ENTREPRISE}}/g, companyName)
-    .replace(/{{OBJET_MARCHE}}/g, consultation?.objet || '[Objet du marché]')
+    .replace(/{{OBJET_MARCHE}}/g, get('name', 'objet', '[Objet du marché]'))
     .replace(/{{LOT}}/g, consultation?.lot || '[Lot concerné]')
-    .replace(/{{CLIENT}}/g, consultation?.client || '[Nom du Client]')
-    .replace(/{{MOE}}/g, consultation?.moe || '[Maître d\'Œuvre]')
-    .replace(/{{CODE_AFFAIRE}}/g, consultation?.code || '[Code Affaire]')
-    .replace(/{{LIEU}}/g, consultation?.lieu || '[Lieu]')
-    .replace(/{{PHASE}}/g, consultation?.phase || '[Phase]')
+    .replace(/{{CLIENT}}/g, get('client', 'client', '[Nom du Client]'))
+    .replace(/{{MOE}}/g, get('moe', 'moe', '[Maître d\'Œuvre]'))
+    .replace(/{{CODE_AFFAIRE}}/g, get('code', 'code', '[Code Affaire]'))
+    .replace(/{{LIEU}}/g, get('location', 'lieu', '[Lieu]'))
+    // Phase forcee a ACT dans le RAO (Assistance aux Contrats de Travaux)
+    .replace(/{{PHASE}}/g, 'ACT')
     // Si questionsHtml vide, on laisse un marker invisible pour l'ancrage
     // des sections "Prix atypiques" injectees apres coup.
     .replace(/{{QUESTIONS}}/g, questionsHtml || '<div data-questions-marker style="display:none"></div>')
@@ -202,7 +206,7 @@ const AVAILABLE_VARIABLES = [
   { label: 'Signataire', tag: '{{SIGNATAIRE}}' },
 ];
 
-const TemplateEditorModal = ({ isOpen, onClose, initialHtml, onSaveTemplate }) => {
+const TemplateEditorModal = ({ isOpen, onClose, initialHtml, onSaveTemplate, variableValues = {} }) => {
   const [editorHtml, setEditorHtml] = useState(initialHtml);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [copiedVar, setCopiedVar] = useState(null);
@@ -290,25 +294,38 @@ const TemplateEditorModal = ({ isOpen, onClose, initialHtml, onSaveTemplate }) =
               Cliquez sur une étiquette pour la copier, puis collez-la (Ctrl+V) dans votre texte.
             </p>
             <div className="flex flex-col gap-2">
-              {AVAILABLE_VARIABLES.map(v => (
-                <button
-                  key={v.tag}
-                  onClick={() => copyVariable(v.tag)}
-                  className="flex flex-col text-left px-3 py-2 bg-white border border-slate-200 rounded-xl hover:border-amber-400 hover:shadow-sm focus:bg-amber-50 focus:border-amber-500 transition-all group"
-                >
-                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 group-hover:text-amber-600 transition-colors">
-                    {v.label}
-                  </span>
-                  <div className="flex items-center justify-between mt-0.5">
-                    <span className="text-xs font-mono font-bold text-slate-700">{v.tag}</span>
-                    {copiedVar === v.tag ? (
-                      <CheckCircle2 size={14} className="text-emerald-500" />
-                    ) : (
-                      <Copy size={14} className="text-slate-300 opacity-0 group-hover:opacity-100" />
-                    )}
-                  </div>
-                </button>
-              ))}
+              {AVAILABLE_VARIABLES.map(v => {
+                const value = variableValues[v.tag];
+                const hasValue = value != null && String(value).trim() !== '';
+                return (
+                  <button
+                    key={v.tag}
+                    onClick={() => copyVariable(v.tag)}
+                    className={`flex flex-col text-left px-3 py-2 bg-white border rounded-xl hover:border-amber-400 hover:shadow-sm focus:bg-amber-50 focus:border-amber-500 transition-all group ${
+                      hasValue ? 'border-slate-200' : 'border-slate-200 opacity-70'
+                    }`}
+                  >
+                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 group-hover:text-amber-600 transition-colors">
+                      {v.label}
+                    </span>
+                    {/* Valeur actuelle resolue (ou tiret si non renseigne) */}
+                    <span className={`text-[12px] font-bold mt-0.5 leading-snug whitespace-pre-line ${
+                      hasValue ? 'text-slate-900' : 'text-slate-300 italic'
+                    }`}>
+                      {hasValue ? String(value) : '— non renseigné —'}
+                    </span>
+                    {/* Tag mono en dessous */}
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-[10px] font-mono text-slate-400">{v.tag}</span>
+                      {copiedVar === v.tag ? (
+                        <CheckCircle2 size={12} className="text-emerald-500" />
+                      ) : (
+                        <Copy size={12} className="text-slate-300 opacity-0 group-hover:opacity-100" />
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -353,15 +370,17 @@ const TabNegociation = ({
   // Trame globale persistée au niveau utilisateur (users/{uid}/preferences/negotiation_template)
   const { template: masterTemplate, saveTemplate } = useNegoTemplate(DEFAULT_TEMPLATE);
   const [templateEditorOpen, setTemplateEditorOpen] = useState(false);
+  // Sidebar config courrier : collapsable pour gagner de la place sur l'apercu
+  const [configCollapsed, setConfigCollapsed] = useState(false);
 
   // Config courrier reconstituée à partir de :
-  //  - signatoryName + city : niveau projet (rao.letterConfig)
-  //  - deadline + adresseEntreprise : niveau entreprise (nego.deadline / nego.adresseEntreprise)
+  //  - signatoryName + city + deadline : niveau projet (rao.letterConfig) — partage entre toutes les entreprises
+  //  - adresseEntreprise : niveau entreprise (nego.adresseEntreprise)
   const negoCurrent = companiesData[selectedCompany]?.negotiation || {};
   const letterConfig = {
     signatoryName: raoLetterConfig?.signatoryName ?? consultation.client ?? '',
     city: raoLetterConfig?.city ?? consultation.lieu ?? '',
-    deadline: negoCurrent.deadline || '',
+    deadline: raoLetterConfig?.deadline ?? negoCurrent.deadline ?? '', // fallback nego pour migration ancienne data
     adresseEntreprise: negoCurrent.adresseEntreprise || '',
     adresseExpediteur: '',
   };
@@ -430,12 +449,12 @@ const TabNegociation = ({
   const [showTemplateEditor, setShowTemplateEditor] = useState(false);
 
   // Dispatche la mise à jour vers la bonne source :
-  //  - signatoryName / city → niveau projet (rao.letterConfig)
-  //  - deadline / adresseEntreprise → niveau entreprise (nego.*)
+  //  - signatoryName / city / deadline → niveau projet (rao.letterConfig) — partage entre entreprises
+  //  - adresseEntreprise → niveau entreprise (nego.*)
   const updateConfig = (key, value) => {
-    if (key === 'signatoryName' || key === 'city') {
+    if (key === 'signatoryName' || key === 'city' || key === 'deadline') {
       updateRaoLetterConfig(key, value);
-    } else if (key === 'deadline' || key === 'adresseEntreprise') {
+    } else if (key === 'adresseEntreprise') {
       if (selectedCompany) updateNegotiation(selectedCompany, key, value);
     }
   };
@@ -506,7 +525,7 @@ const TabNegociation = ({
       setLetterHtml('');
       return;
     }
-    const generated = applyTemplate(masterTemplate, selectedCompany, '', letterConfig, consultation);
+    const generated = applyTemplate(masterTemplate, selectedCompany, '', letterConfig, consultation, project);
     const { low, high } = anomalySectionsRef.current;
     setLetterHtml((low || high) ? injectSectionsIntoHtml(generated, low, high) : generated);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -602,7 +621,7 @@ const TabNegociation = ({
     updateNegotiation(selectedCompany, 'anomalySections', { low: lowSection, high: highSection });
 
     // Regénérer depuis la trame propre + injecter les sections (ordre garanti)
-    const generated = applyTemplate(masterTemplate, selectedCompany, '', letterConfig, consultation);
+    const generated = applyTemplate(masterTemplate, selectedCompany, '', letterConfig, consultation, project);
     setLetterHtml(injectSectionsIntoHtml(generated, lowSection, highSection));
 
     // Synchronise nego.questions (string brut) pour rester compatible avec le générateur PDF.
@@ -628,7 +647,7 @@ const TabNegociation = ({
     if (!selectedCompany) return;
     if (!window.confirm("Effacer toutes vos modifications et repartir de la trame de base ?\n\nLes prix atypiques injectés et les éditions manuelles seront perdus.")) return;
     anomalySectionsRef.current = { low: null, high: null };
-    const generated = applyTemplate(masterTemplate, selectedCompany, '', letterConfig, consultation);
+    const generated = applyTemplate(masterTemplate, selectedCompany, '', letterConfig, consultation, project);
     setLetterHtml(generated);
     updateNegotiation(selectedCompany, 'questions', '');
     updateNegotiation(selectedCompany, 'anomalySections', null);
@@ -672,87 +691,43 @@ const TabNegociation = ({
 
       {/* ── Contenu entreprise sélectionnée ── */}
       <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-7xl mx-auto space-y-6 pb-24">
+        <div className="max-w-[1400px] mx-auto pb-24">
 
           <TemplateEditorModal
             isOpen={templateEditorOpen}
             onClose={() => setTemplateEditorOpen(false)}
             initialHtml={masterTemplate}
+            variableValues={{
+              // Donnees venant de la fiche projet (ProjectDetailsModal) en priorite,
+              // fallback consultation rao si l'utilisateur a edite manuellement
+              '{{NOM_ENTREPRISE}}':     selectedCompany || '',
+              '{{ADRESSE_ENTREPRISE}}': letterConfig.adresseEntreprise || '',
+              '{{OBJET_MARCHE}}':       project?.name || consultation?.objet || '',
+              '{{CODE_AFFAIRE}}':       project?.code || consultation?.code || '',
+              '{{CLIENT}}':             project?.client || consultation?.client || '',
+              '{{ADRESSE_EXPEDITEUR}}': [project?.client, project?.clientAddress, [project?.clientZip, project?.clientCity].filter(Boolean).join(' ')].filter(Boolean).join('\n'),
+              '{{MOE}}':                project?.moe || consultation?.moe || '',
+              '{{LIEU}}':               project?.location || consultation?.lieu || '',
+              '{{PHASE}}':              'ACT', // forcee dans le RAO
+              '{{LOT}}':                consultation?.lot || '',
+              '{{QUESTIONS}}':          '(injectées automatiquement)',
+              '{{DATE_EMISSION}}':      new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }),
+              '{{DATE_LIMITE}}':        letterConfig.deadline ? new Date(letterConfig.deadline).toLocaleString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '',
+              '{{VILLE}}':              letterConfig.city || project?.clientCity || '',
+              '{{SIGNATAIRE}}':         letterConfig.signatoryName || '',
+            }}
             onSaveTemplate={(newHtml) => {
               saveTemplate(newHtml);
               toast.success("Trame de courrier sauvegardée.");
             }}
           />
 
-          {/* ── Bloc config global ── */}
-          <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-3xl p-8 text-white shadow-lg relative overflow-hidden">
-            <FileOutput size={160} className="absolute -right-10 -bottom-10 text-white opacity-5 rotate-12" />
-            <div className="relative z-10">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-white/10 rounded-xl border border-white/10">
-                    <FileOutput size={20} className="text-emerald-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-black tracking-tight text-white">Générateur de Courriers & Négociation</h3>
-                    <p className="text-sm text-slate-300 mt-0.5 font-medium">Paramétrez les variables globales utilisées par la trame.</p>
-                  </div>
-                </div>
-              </div>
+          <div className="flex gap-5">
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-300">
-                    <Calendar size={14} /> Date & Heure limite
-                  </label>
-                  <input
-                    type="datetime-local" value={letterConfig.deadline} onChange={e => updateConfig('deadline', e.target.value)}
-                    className="w-full bg-slate-800/50 border border-white/20 rounded-xl px-4 py-3 text-sm text-white font-semibold placeholder:text-slate-400 focus:outline-none focus:bg-slate-800 focus:ring-2 focus:ring-emerald-500/80 transition-all [color-scheme:dark]"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-300">
-                    <User size={14} /> Signataire
-                  </label>
-                  <input
-                    type="text" value={letterConfig.signatoryName} onChange={e => updateConfig('signatoryName', e.target.value)} placeholder="Ex: Fabrice Marcuzzo, Maire"
-                    className="w-full bg-slate-800/50 border border-white/20 rounded-xl px-4 py-3 text-sm text-white font-semibold placeholder:text-slate-400 focus:outline-none focus:bg-slate-800 focus:ring-2 focus:ring-emerald-500/80 transition-all"
-                  />
-                </div>
-              </div>
+            {/* ── Colonne principale : courrier + accordeon ── */}
+            <div className="flex-1 min-w-0 space-y-6">
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-300">
-                    <MapPin size={14} /> Expéditeur (auto)
-                  </label>
-                  <div className="px-4 py-3 bg-slate-800/30 border border-white/10 rounded-xl text-xs text-slate-300 leading-relaxed">
-                    <div className="font-bold text-white">{project?.client || '—'}</div>
-                    {project?.clientAddress && <div>{project.clientAddress}</div>}
-                    {(project?.clientZip || project?.clientCity) && (
-                      <div>{[project?.clientZip, project?.clientCity].filter(Boolean).join(' ')}</div>
-                    )}
-                    <div className="mt-2 text-[10px] text-slate-400 italic">
-                      📝 Pour modifier ces informations, éditez la fiche affaire.
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-300">
-                    <MapPin size={14} /> Adresse entreprise (optionnel)
-                  </label>
-                  <textarea
-                    value={letterConfig.adresseEntreprise} onChange={e => updateConfig('adresseEntreprise', e.target.value)}
-                    placeholder={"Renseignée automatiquement par entreprise\nsi laissé vide"}
-                    rows={3}
-                    className="w-full bg-slate-800/50 border border-white/20 rounded-xl px-4 py-3 text-sm text-white font-semibold placeholder:text-slate-400 focus:outline-none focus:bg-slate-800 focus:ring-2 focus:ring-emerald-500/80 transition-all resize-none"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* ── Header entreprise ── */}
+              {/* ── Header entreprise ── */}
           <div className={`flex items-center gap-5 px-6 py-4 bg-white rounded-2xl border ${uiColor.border} border-l-[5px] shadow-sm`}>
             <div className={`w-12 h-12 rounded-2xl ${uiColor.bg} ${uiColor.text} flex items-center justify-center font-black text-xl shadow-inner`}>
               {name.substring(0, 2).toUpperCase()}
@@ -1105,6 +1080,93 @@ const TabNegociation = ({
               </div>
             )}
           </div>
+
+            </div> {/* /flex-1 main column */}
+
+            {/* ── Sidebar config laterale (sticky) ── */}
+            <aside className={`shrink-0 transition-all duration-200 ${configCollapsed ? 'w-12' : 'w-80'}`}>
+              <div className="sticky top-2">
+                {configCollapsed ? (
+                  <button
+                    onClick={() => setConfigCollapsed(false)}
+                    className="w-12 h-12 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl flex items-center justify-center shadow-md transition"
+                    title="Afficher le panneau de configuration"
+                  >
+                    <FileOutput size={18} />
+                  </button>
+                ) : (
+                  <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-4 text-white shadow-md relative overflow-hidden">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="p-1.5 bg-white/10 rounded-lg border border-white/10 shrink-0">
+                          <FileOutput size={14} className="text-emerald-400" />
+                        </div>
+                        <h3 className="text-[12px] font-black tracking-tight text-white truncate">Paramètres courrier</h3>
+                      </div>
+                      <button
+                        onClick={() => setConfigCollapsed(true)}
+                        className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/10 transition shrink-0"
+                        title="Masquer le panneau"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <label className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-300">
+                          <Calendar size={11} /> Date & Heure limite
+                        </label>
+                        <input
+                          type="datetime-local" value={letterConfig.deadline} onChange={e => updateConfig('deadline', e.target.value)}
+                          className="w-full bg-slate-800/50 border border-white/20 rounded-lg px-2.5 py-2 text-[12px] text-white font-semibold focus:outline-none focus:bg-slate-800 focus:ring-2 focus:ring-emerald-500/80 transition-all [color-scheme:dark]"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-300">
+                          <User size={11} /> Signataire
+                        </label>
+                        <input
+                          type="text" value={letterConfig.signatoryName} onChange={e => updateConfig('signatoryName', e.target.value)} placeholder="Ex: Fabrice Marcuzzo, Maire"
+                          className="w-full bg-slate-800/50 border border-white/20 rounded-lg px-2.5 py-2 text-[12px] text-white font-semibold placeholder:text-slate-500 focus:outline-none focus:bg-slate-800 focus:ring-2 focus:ring-emerald-500/80 transition-all"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-300">
+                          <MapPin size={11} /> Expéditeur (auto)
+                        </label>
+                        <div className="px-2.5 py-2 bg-slate-800/30 border border-white/10 rounded-lg text-[11px] text-slate-300 leading-relaxed">
+                          <div className="font-bold text-white truncate">{project?.client || '—'}</div>
+                          {project?.clientAddress && <div className="truncate">{project.clientAddress}</div>}
+                          {(project?.clientZip || project?.clientCity) && (
+                            <div className="truncate">{[project?.clientZip, project?.clientCity].filter(Boolean).join(' ')}</div>
+                          )}
+                          <div className="mt-1 text-[9px] text-slate-400 italic leading-tight">
+                            📝 Modifiable via la fiche affaire.
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-300">
+                          <MapPin size={11} /> Adresse entreprise
+                        </label>
+                        <textarea
+                          value={letterConfig.adresseEntreprise} onChange={e => updateConfig('adresseEntreprise', e.target.value)}
+                          placeholder={"Auto si vide"}
+                          rows={3}
+                          className="w-full bg-slate-800/50 border border-white/20 rounded-lg px-2.5 py-2 text-[12px] text-white font-semibold placeholder:text-slate-500 focus:outline-none focus:bg-slate-800 focus:ring-2 focus:ring-emerald-500/80 transition-all resize-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </aside>
+
+          </div> {/* /flex */}
 
         </div>
       </div>

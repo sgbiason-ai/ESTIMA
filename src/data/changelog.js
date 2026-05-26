@@ -33,6 +33,11 @@ export const CHANGELOG = [
       'RAO Négociation : éditeurs ReactQuill pour les templates « Prix atypiques » — gras, italique, souligné, listes à puces et numérotées. Compat ancien format texte brut conservée',
       'RAO Négociation : refonte complète de l\'aperçu A4 read-only — fidélité 100% PDF (logo MOA prioritaire, bandeau primary depuis branding, boîtes destinataire/expéditeur structurelles côte à côte, cadre corps de lettre, footer "Document confidentiel — Page 1/1", tableaux Prix atypiques colorés red/amber comme PDF). Extraction intelligente du corps de lettre même si Quill a aplati la trame',
       'RAO Négociation : persistance Firestore des sections "Prix atypiques" injectées (par entreprise) — les sections HTML survivent désormais au rechargement de la page',
+      'RAO Négociation : bandeau de paramètres "Générateur de Courriers" converti en sidebar latérale droite sticky (collapsable via icône), libère la largeur pour l\'aperçu du courrier',
+      'RAO Négociation : "Date & Heure limite" est désormais au niveau projet (partagée entre toutes les entreprises) au lieu d\'être par entreprise — fallback vers l\'ancienne donnée par entreprise pour migration douce',
+      'RAO Négociation : les variables de la trame ({{NOM_ENTREPRISE}}, {{CLIENT}}, {{MOE}}, {{CODE_AFFAIRE}}, {{LIEU}}, {{OBJET_MARCHE}}, etc.) sont désormais sourcées depuis la fiche projet (ProjectDetailsModal) en priorité, avec fallback sur la consultation RAO',
+      'RAO Négociation : la modale "Trame du courrier" affiche maintenant la valeur résolue actuelle de chaque variable dans la sidebar des tags — l\'utilisateur voit immédiatement ce que produira chaque {{...}} avant de l\'insérer',
+      'RAO Négociation : {{PHASE}} forcée à "ACT" (Assistance aux Contrats de Travaux) dans le RAO, indépendamment de la phase de la fiche projet (qui peut être DCE / AVP / etc. pour les autres modules)',
     ],
   },
   {
