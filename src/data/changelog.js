@@ -26,6 +26,8 @@ export const CHANGELOG = [
       'Mobile : correction d\'un warning DOM (button-in-button) sur la liste des projets — la card projet devient un div role="button" avec support clavier (Enter / Espace)',
       'Hub : nouveau toggle bidirectionnel mobile ↔ desktop dans le header (icône Smartphone en desktop, icône Monitor en mobile) — visible sur tous les devices, persistance via localStorage.estima_force_layout',
       'RAO Négociation : fix de l\'injection des sections "Prix atypiques" — l\'ancrage utilise désormais un marker invisible posé à la place de {{QUESTIONS}} (robuste à toute personnalisation de la trame), avec fallback sur l\'ancienne recherche par texte pour compatibilité',
+      'RAO Récap : nouveau bloc "Conclusion finale (export PDF)" — texte éditable libre (avec auto-fill du gagnant base ou variante), badge "Personnalisé" + bouton "Réinitialiser", persisté dans rao.recommendation, utilisé par le PDF RAO (rectangle adapté en hauteur selon la longueur du texte)',
+      'RAO Récap : le bandeau "Recommandation du Maître d\'Œuvre" affiche désormais le montant et le nom de l\'entreprise correspondant au gagnant réel — si une variante retenue est moins-disante, c\'est son montant qui s\'inscrit (et la phrase devient "L\'entreprise X avec sa Vn est classée 1ère"). Avant : toujours le montant de la base, même si une variante était classée première',
     ],
   },
   {

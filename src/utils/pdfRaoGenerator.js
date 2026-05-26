@@ -2190,16 +2190,28 @@ export const generateRaoPDF = async (optionsParams) => {
     const winnerLabel = isVariantWinner
       ? `${winner.name.toUpperCase()} — VARIANTE V${winner.variantIndex}${winner.variantLabel ? ` (${cleanText(winner.variantLabel)})` : ''}`
       : winner.name.toUpperCase();
+    // Texte personnalise si l'utilisateur l'a edite dans TabRecap, sinon texte par defaut.
+    // Le texte custom est stocke dans rao.recommendation (string).
+    const customText = (rao?.recommendation || '').trim();
+    const recoText = customText || `Au regard des critères d'attribution définis dans les documents de consultation, l'offre de l'entreprise ${winnerLabel} est l'offre économiquement la plus avantageuse.`;
+    // Mesurer la hauteur pour adapter le rectangle (wrap auto)
+    const textWidth = W - 2 * M - 8;
+    const lines = doc.splitTextToSize(cleanText(recoText), textWidth);
+    const lineH = 4.5;
+    const padTop = 6;
+    const padBottom = 10;
+    const scoreLineH = 6;
+    const rectH = padTop + lines.length * lineH + scoreLineH + padBottom;
     doc.setFillColor(...THEME.primary);
-    doc.roundedRect(M, y, W - 2 * M, 22, 3, 3, 'F');
+    doc.roundedRect(M, y, W - 2 * M, rectH, 3, 3, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(10);
-    doc.text(`Au regard des critères d'attribution définis dans les documents de consultation,`, W / 2, y + 6, { align: 'center' });
-    doc.text(`l'offre de l'entreprise ${winnerLabel} est l'offre économiquement la plus avantageuse.`, W / 2, y + 12, { align: 'center' });
+    let textY = y + padTop;
+    lines.forEach(ln => { doc.text(ln, W / 2, textY, { align: 'center' }); textY += lineH; });
     doc.setFont('Helvetica', 'normal');
     doc.setFontSize(8);
-    doc.text(`Score : ${fmtScore(winner.totalScore)} / 100  —  Montant : ${fmt(winner.price)} € HT  —  ${fmt(winner.price * 1.2)} € TTC`, W / 2, y + 18, { align: 'center' });
+    doc.text(`Score : ${fmtScore(winner.totalScore)} / 100  —  Montant : ${fmt(winner.price)} € HT  —  ${fmt(winner.price * 1.2)} € TTC`, W / 2, textY + 2, { align: 'center' });
   }
 
   // ─────────────────────────────────────────────────────────────────────────

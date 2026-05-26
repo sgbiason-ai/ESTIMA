@@ -13,6 +13,7 @@ const TabRecap = ({
   scoringConfig, hasTranches, raoTrancheId, tranches,
   optionChapters = [], includedOptions = {},
   analysisCompanies = [],
+  recommendation = '', updateRecommendation = () => {},
 }) => {
   const priceC  = criteria.find(c => c.auto) || criteria[0];
   const techCs  = criteria.filter(c => !c.auto);
@@ -107,6 +108,18 @@ const TabRecap = ({
   // PSE incluses dans la base notée
   const includedPSE = optionChapters.filter(c => !!includedOptions[c.id]);
   const hasOptions  = optionChapters.length > 0;
+
+  // ─── Texte de conclusion finale (utilise par le PDF) ──────────────────
+  // Calcule un libelle d'entreprise enrichi pour le winner (base ou variante)
+  const winner = extendedRanking.find(r => r.rank === 1) || ranking?.[0];
+  const winnerLabel = winner
+    ? (winner.kind === 'variant'
+        ? `${winner.name.toUpperCase()} — VARIANTE V${winner.variantIndex}${winner.variantLabel ? ` (${winner.variantLabel})` : ''}`
+        : winner.name.toUpperCase())
+    : '[ENTREPRISE]';
+  const defaultRecommendation = `Au regard des critères d'attribution définis dans les documents de consultation, l'offre de l'entreprise ${winnerLabel} est l'offre économiquement la plus avantageuse.`;
+  const effectiveRecommendation = recommendation || defaultRecommendation;
+  const isCustomRecommendation = !!recommendation && recommendation !== defaultRecommendation;
 
   // Libellé colonne Prix (précise ce qui est noté)
   const prixLabel = includedPSE.length > 0
@@ -319,27 +332,31 @@ const TabRecap = ({
       </div>
 
       {/* ── Recommandation MOE ────────────────────────────────────────────── */}
-      {ranking[0] && (
+      {winner && (
         <div className="bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-[32px] p-10 text-white shadow-[0_20px_40px_-10px_rgba(16,185,129,0.3)] relative overflow-hidden">
           <Award size={160} className="absolute -right-10 -bottom-10 text-white opacity-10 rotate-12" />
           <div className="relative z-10">
             <p className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-100 mb-3">Recommandation du Maître d'Œuvre</p>
             <p className="text-3xl font-light leading-tight">
-              L'entreprise <span className="font-black text-white">{ranking[0].name}</span> est classée <strong className="font-black">1ère</strong>.
+              {winner.kind === 'variant' ? (
+                <>L'entreprise <span className="font-black text-white">{winner.name}</span> avec sa <span className="font-black text-white">{winner.variantLabel || `Variante ${winner.variantIndex}`}</span> est classée <strong className="font-black">1ère</strong>.</>
+              ) : (
+                <>L'entreprise <span className="font-black text-white">{winner.name}</span> est classée <strong className="font-black">1ère</strong>.</>
+              )}
             </p>
             <div className="flex flex-wrap gap-6 mt-6">
               <div className="bg-white/10 rounded-2xl px-6 py-4 backdrop-blur-md border border-white/20 shadow-inner">
                 <p className="text-[10px] uppercase tracking-widest text-emerald-100 mb-1">Score global</p>
                 <p className="text-2xl font-black">
-                  {ranking[0].totalScore?.toFixed(2)} <span className="text-base font-normal opacity-80">/ 100</span>
+                  {winner.totalScore?.toFixed(2)} <span className="text-base font-normal opacity-80">/ 100</span>
                 </p>
               </div>
               <div className="bg-white/10 rounded-2xl px-6 py-4 backdrop-blur-md border border-white/20 shadow-inner">
                 <p className="text-[10px] uppercase tracking-widest text-emerald-100 mb-1">
-                  Montant {includedPSE.length > 0 ? 'Base + PSE notées' : 'Base seule'}
+                  Montant {winner.kind === 'variant' ? 'variante retenue' : (includedPSE.length > 0 ? 'Base + PSE notées' : 'Base seule')}
                 </p>
                 <p className="text-2xl font-black font-mono">
-                  {fmtPrice(ranking[0].price)} <span className="text-base font-normal opacity-80 font-sans">HT</span>
+                  {fmtPrice(winner.price)} <span className="text-base font-normal opacity-80 font-sans">HT</span>
                 </p>
               </div>
               {includedPSE.length > 0 && (
@@ -352,6 +369,41 @@ const TabRecap = ({
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── Conclusion finale (PDF) — editable ──────────────────────────── */}
+      {winner && (
+        <div className="bg-white rounded-2xl border border-gray-200/60 p-5">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500">
+                Conclusion finale (export PDF)
+              </p>
+              {isCustomRecommendation && (
+                <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[9px] font-bold uppercase tracking-wide">Personnalisé</span>
+              )}
+            </div>
+            {isCustomRecommendation && (
+              <button
+                onClick={() => updateRecommendation('')}
+                className="text-[11px] text-gray-500 hover:text-blue-600 font-medium transition"
+                title="Restaurer le texte automatique"
+              >
+                Réinitialiser
+              </button>
+            )}
+          </div>
+          <p className="text-[10px] text-gray-400 mb-2">
+            Ce texte s'affiche dans le bloc de recommandation du PDF RAO. Modifiez-le si besoin (mentions légales, nuances, etc.).
+          </p>
+          <textarea
+            value={effectiveRecommendation}
+            onChange={(e) => updateRecommendation(e.target.value === defaultRecommendation ? '' : e.target.value)}
+            rows={3}
+            className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 leading-relaxed focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition resize-none"
+            placeholder={defaultRecommendation}
+          />
         </div>
       )}
 

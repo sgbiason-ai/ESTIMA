@@ -228,6 +228,12 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
   const updateLetterConfig = (field, value) =>
     updateRao(r => ({ letterConfig: { ...(r.letterConfig || {}), [field]: value } }));
 
+  // Texte de recommandation finale (Record) — editable par l'utilisateur dans TabRecap,
+  // utilise par pdfRaoGenerator. Si vide, le PDF utilise le texte par defaut auto-genere.
+  const recommendation = rao.recommendation || '';
+  const updateRecommendation = (value) =>
+    updateRao(() => ({ recommendation: value }));
+
   // ── TRANCHES ──────────────────────────────────────────────────────────────
   const hasTranches = tranches?.length > 0;
   const raoTrancheId = rao.raoTrancheId || 'global';
@@ -406,6 +412,7 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
     updateTechnical,
     updateNegotiation,
     letterConfig, updateLetterConfig,
+    recommendation, updateRecommendation,
     computeScores, getRanking,
     // Tranches
     hasTranches, tranches, raoTrancheId, setRaoTrancheId,

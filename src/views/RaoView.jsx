@@ -479,7 +479,7 @@ const RaoView = ({
             />
           )}
           {activeTab === 'recap' && (
-            <TabRecap criteria={rao.criteria} ranking={ranking} companyNames={companyNames} onExportPDF={handleExportPDF} isExporting={isExporting} scoringConfig={scoringConfig} hasTranches={rao.hasTranches} raoTrancheId={rao.raoTrancheId} tranches={rao.tranches} analysisCompanies={analysisCompanies} optionChapters={rao.optionChapters} includedOptions={rao.includedOptions} />
+            <TabRecap criteria={rao.criteria} ranking={ranking} companyNames={companyNames} onExportPDF={handleExportPDF} isExporting={isExporting} scoringConfig={scoringConfig} hasTranches={rao.hasTranches} raoTrancheId={rao.raoTrancheId} tranches={rao.tranches} analysisCompanies={analysisCompanies} optionChapters={rao.optionChapters} includedOptions={rao.includedOptions} recommendation={rao.recommendation} updateRecommendation={rao.updateRecommendation} />
           )}
         </div>
       </div>
