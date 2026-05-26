@@ -825,16 +825,8 @@ export const generateRaoPDF = async (optionsParams) => {
       adminBody.push(row);
     });
 
-    // Ligne conclusion (span si groupement)
-    const conclRow = [{ content: 'CONCLUSION', styles: { fontStyle: 'bold' } }];
-    companyNames.forEach(name => {
-      const admin = companiesData[name]?.admin || {};
-      const concl = admin.conclusion || 'reguliere';
-      const label = conclLabelsA[concl] || 'RÉGULIÈRE';
-      const memberCount = (admin.isGroupement && admin.groupementMembers?.length > 0) ? admin.groupementMembers.length : 1;
-      conclRow.push(memberCount > 1 ? { content: label, colSpan: memberCount, styles: { halign: 'center' } } : label);
-    });
-    adminBody.push(conclRow);
+    // Ligne CONCLUSION supprimee (la conclusion admin apparait deja dans le bloc
+    // Recommandation finale + ailleurs dans le PDF — eviter la redondance).
 
     // Observations admin (si saisies)
     const hasObs = companyNames.some(n => companiesData[n]?.admin?.obsAdmin || companiesData[n]?.admin?.obsOffre);

@@ -28,6 +28,7 @@ export const CHANGELOG = [
       'RAO Négociation : fix de l\'injection des sections "Prix atypiques" — l\'ancrage utilise désormais un marker invisible posé à la place de {{QUESTIONS}} (robuste à toute personnalisation de la trame), avec fallback sur l\'ancienne recherche par texte pour compatibilité',
       'RAO Récap : nouveau bloc "Conclusion finale (export PDF)" — texte éditable libre (avec auto-fill du gagnant base ou variante), badge "Personnalisé" + bouton "Réinitialiser", persisté dans rao.recommendation, utilisé par le PDF RAO (rectangle adapté en hauteur selon la longueur du texte)',
       'RAO Récap : le bandeau "Recommandation du Maître d\'Œuvre" affiche désormais le montant et le nom de l\'entreprise correspondant au gagnant réel — si une variante retenue est moins-disante, c\'est son montant qui s\'inscrit (et la phrase devient "L\'entreprise X avec sa Vn est classée 1ère"). Avant : toujours le montant de la base, même si une variante était classée première',
+      'PDF RAO : suppression de la ligne CONCLUSION dans le tableau administratif (la conclusion apparaissait déjà dans le bloc Recommandation finale et le récapitulatif — évite la redondance)',
     ],
   },
   {
