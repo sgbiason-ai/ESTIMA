@@ -52,6 +52,7 @@ import { useCrrManager }     from '../../hooks/useCrrManager';
 import { useOrientation }   from '../../hooks/useOrientation';
 import { useRobustSave, loadDraft, clearDraft } from '../../hooks/useRobustSave';
 import { useNegoTemplate }  from '../../hooks/useNegoTemplate';
+import { computeChaptersData, computeAnalysisStats } from '../../utils/analysisCompute';
 
 // ─── SPLIT-VIEW HELPER (tablette paysage) ───────────────────────────────────
 const SplitView = ({ List, Detail, hasSelection, loading, emptyIcon = 'list', emptyLabel = 'Sélectionnez un élément à gauche' }) => (
@@ -306,6 +307,21 @@ export default function MobileApp({ user, companyId, userModules = null, onLogou
     const tranchesList = tranchesHook.tranches;
     const trancheIds = tranchesHook.hasTranches ? tranchesList.map(t => t.id) : ['global'];
 
+    // chaptersData + stats sont des calculs derives (non stockes en Firestore) :
+    // on les recalcule a la demande pour les exports analyse/RAO
+    const analysisData = fullProject.analysis || {};
+    const analysisCompanies = analysisData.companies || [];
+    const activeTrancheId = tranchesHook.activeTrancheId || 'global';
+    const currentQtyMap = calcHook.clientQtyMaps?.[activeTrancheId] || {};
+    const computedChapters = (exportType === 'Analyse' || exportType === 'AnalyseExcel'
+                              || exportType === 'RAO' || exportType === 'NegoLetter')
+      ? computeChaptersData(fullProject, analysisCompanies, currentQtyMap)
+      : [];
+    const computedStats = (exportType === 'Analyse' || exportType === 'AnalyseExcel'
+                           || exportType === 'RAO')
+      ? computeAnalysisStats(computedChapters, analysisCompanies, fullProject.scoringConfig)
+      : null;
+
     try {
       setToast(share ? `Partage ${exportType}…` : `Export ${exportType}…`);
       setShareMode(share);
@@ -357,18 +373,16 @@ export default function MobileApp({ user, companyId, userModules = null, onLogou
         }
         case 'Analyse': {
           const { generateAnalysisPDF } = await loadAnalysisPdf();
-          const analysis = fullProject.analysis || {};
-          const companies = analysis.companies || [];
-          if (companies.length === 0) { setToast('Aucune analyse disponible'); return; }
+          if (analysisCompanies.length === 0) { setToast('Aucune analyse disponible'); return; }
           await generateAnalysisPDF({
             project: fullProject,
-            companies,
-            chaptersData: analysis.chaptersData || [],
-            stats: analysis.stats || {},
+            companies: analysisCompanies,
+            chaptersData: computedChapters,
+            stats: computedStats,
             bpuRefMap: calcHook.refMap,
-            activeTrancheId: tranchesHook.activeTrancheId || 'global',
+            activeTrancheId,
             tranches: tranchesList,
-            analysisMode: analysis.analysisMode || 'global',
+            analysisMode: analysisData.analysisMode || 'global',
             scoringConfig: fullProject.scoringConfig || null,
             branding,
           });
@@ -376,23 +390,22 @@ export default function MobileApp({ user, companyId, userModules = null, onLogou
         }
         case 'RAO': {
           const { generateRaoPDF } = await loadRaoPdf();
-          const analysis = fullProject.analysis || {};
-          if (!analysis.companies?.length) { setToast('Aucune analyse disponible'); return; }
+          if (analysisCompanies.length === 0) { setToast('Aucune analyse disponible'); return; }
           await generateRaoPDF({
             project: fullProject,
             consultation: fullProject.consultation || {},
             criteria: fullProject.criteria || [],
-            rao: analysis.rao || {},
-            analysisCompanies: analysis.companies || [],
-            scores: analysis.scores || {},
-            ranking: analysis.ranking || [],
+            rao: fullProject.rao || {},
+            analysisCompanies,
+            scores: analysisData.scores || {},
+            ranking: analysisData.ranking || [],
             branding,
-            analysisStats: analysis.stats || {},
-            chaptersData: analysis.chaptersData || [],
+            analysisStats: computedStats,
+            chaptersData: computedChapters,
             bpuRefMap: calcHook.refMap,
-            activeTrancheId: tranchesHook.activeTrancheId || 'global',
+            activeTrancheId,
             tranches: tranchesList,
-            analysisMode: analysis.analysisMode || 'global',
+            analysisMode: analysisData.analysisMode || 'global',
             scoringConfig: fullProject.scoringConfig || null,
           });
           break;
@@ -404,17 +417,15 @@ export default function MobileApp({ user, companyId, userModules = null, onLogou
         }
         case 'AnalyseExcel': {
           const { generateAnalysisExcel } = await loadAnalysisExcel();
-          const analysis = fullProject.analysis || {};
-          const companies = analysis.companies || [];
-          if (companies.length === 0) { setToast('Aucune analyse disponible'); return; }
+          if (analysisCompanies.length === 0) { setToast('Aucune analyse disponible'); return; }
           await generateAnalysisExcel({
             project: fullProject,
-            companies,
-            chaptersData: analysis.chaptersData || [],
-            stats: analysis.stats || {},
+            companies: analysisCompanies,
+            chaptersData: computedChapters,
+            stats: computedStats,
             scoringConfig: fullProject.scoringConfig || null,
             bpuRefMap: calcHook.refMap,
-            activeTrancheId: tranchesHook.activeTrancheId || 'global',
+            activeTrancheId,
             tranches: tranchesList,
             branding,
             clientQtyMaps: calcHook.clientQtyMaps,
@@ -423,10 +434,8 @@ export default function MobileApp({ user, companyId, userModules = null, onLogou
         }
         case 'NegoLetter': {
           const { generateNegoLetterPDF } = await loadNegoLetterPdf();
-          const analysis = fullProject.analysis || {};
-          const companies = analysis.companies || [];
-          if (companies.length === 0) { setToast('Aucune analyse disponible'); return; }
-          const companyName = opts.companyName || companies[0]?.name;
+          if (analysisCompanies.length === 0) { setToast('Aucune analyse disponible'); return; }
+          const companyName = opts.companyName || analysisCompanies[0]?.name;
           if (!companyName) { setToast('Entreprise introuvable'); return; }
           const companiesData = fullProject.rao?.companies || {};
           const nego = companiesData[companyName]?.negotiation || {};
@@ -447,8 +456,8 @@ export default function MobileApp({ user, companyId, userModules = null, onLogou
             branding,
             project: fullProject,
             masterTemplate: negoTemplate,
-            analysisCompanies: companies,
-            chaptersData: analysis.chaptersData || [],
+            analysisCompanies,
+            chaptersData: computedChapters,
             bpuRefMap: calcHook.refMap,
           });
           break;

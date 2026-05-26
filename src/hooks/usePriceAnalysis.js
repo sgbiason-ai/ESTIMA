@@ -4,6 +4,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db as fireDb } from '../firebase';
 import { useDialog } from '../contexts/DialogContext';
 import { useToast } from '../contexts/ToastContext';
+import { computeChaptersData, computeAnalysisStats } from '../utils/analysisCompute';
 
 // --- ALGORITHME OAB (Double Moyenne) ---
 const calculateOABThreshold = (values) => {
@@ -176,126 +177,17 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
   }, [toast, setProject]);
 
   // ─── DONNÉES PAR CHAPITRE ─────────────────────────────────────────────────
+  // Calcul deporte dans src/utils/analysisCompute.js (reutilise par les exports mobile)
   const chaptersData = useMemo(() => {
-    if (!project?.chapters) return [];
-
-    // On isole le dictionnaire des quantités correspondant à la tranche active
     const currentQtyMap = clientQtyMaps[activeTrancheId || 'global'] || {};
-
-    return project.chapters.map(chapter => {
-      const items = [];
-
-      const extractItems = (nodes) => {
-        nodes.forEach(node => {
-          if (node.type === 'item') {
-            
-            // LECTURE DIRECTE DEPUIS LE MOTEUR DU MODE RENDU
-            const activeQty        = currentQtyMap[node.id] || 0;
-            
-            const estimationPU     = Number(node.price || 0);
-            const estimationTotal  = activeQty * estimationPU;
-
-            const companyData = {};
-            let minPU = Infinity, maxPU = -Infinity, minTotal = Infinity, maxTotal = -Infinity;
-
-            companies.forEach(company => {
-              const pu        = Number(company.offers?.[node.id] ?? 0);
-              const lineTotal = activeQty * pu;
-              const ecartAbs  = lineTotal - estimationTotal;
-              const ecartPct  = estimationTotal !== 0 ? (ecartAbs / estimationTotal) * 100 : 0;
-              companyData[company.id] = { pu, lineTotal, ecartAbs, ecartPct };
-              
-              if (pu > 0) {
-                if (pu < minPU) minPU = pu;
-                if (pu > maxPU) maxPU = pu;
-                if (lineTotal < minTotal) minTotal = lineTotal;
-                if (lineTotal > maxTotal) maxTotal = lineTotal;
-              }
-            });
-
-            items.push({
-              ...node,
-              activeQty,
-              estimationPU,
-              estimationTotal,
-              companyData,
-              minPU:    minPU === Infinity ? 0 : minPU,
-              maxPU:    maxPU === -Infinity ? 0 : maxPU,
-              minTotal: minTotal === Infinity ? 0 : minTotal,
-              maxTotal: maxTotal === -Infinity ? 0 : maxTotal,
-              chapterId:    chapter.id,
-              chapterTitle: chapter.title,
-            });
-          } else if (node.children) {
-            extractItems(node.children);
-          }
-        });
-      };
-
-      extractItems(chapter.children || []);
-      return { id: chapter.id, title: chapter.title, isOption: chapter.isOption, items };
-    });
+    return computeChaptersData(project, companies, currentQtyMap);
   }, [project, activeTrancheId, companies, clientQtyMaps]);
 
   // ─── STATISTIQUES GLOBALES ───────────────────────────────────────────────
-  const stats = useMemo(() => {
-    const report = {
-      totalEstimation:  0,
-      companiesTotals:  {},
-      companyScores:    {},
-      companyEcarts:    {},
-      Pmin: 0, Pmax: 0, Pmoy: 0,
-    };
-
-    chaptersData.forEach(chap => {
-      if (chap.isOption) return;
-      chap.items.forEach(item => {
-        report.totalEstimation += item.estimationTotal;
-        companies.forEach(company => {
-          if (!report.companiesTotals[company.id]) report.companiesTotals[company.id] = 0;
-          report.companiesTotals[company.id] += item.companyData[company.id]?.lineTotal ?? 0;
-        });
-      });
-    });
-
-    const totals = Object.values(report.companiesTotals).filter(t => t > 0);
-    if (totals.length === 0) return report;
-
-    const Pmin = Math.min(...totals);
-    const Pmax = Math.max(...totals);
-    const Pmoy = totals.reduce((a, b) => a + b, 0) / totals.length;
-    const N    = Number(scoringConfig.maxScore);
-
-    report.Pmin = Pmin;
-    report.Pmax = Pmax;
-    report.Pmoy = Pmoy;
-
-    companies.forEach(company => {
-      const P = report.companiesTotals[company.id] || 0;
-      const ecartAbs = P - report.totalEstimation;
-      const ecartPct = report.totalEstimation !== 0 ? (ecartAbs / report.totalEstimation) * 100 : 0;
-      report.companyEcarts[company.id] = { abs: ecartAbs, pct: ecartPct };
-
-      let score = 0;
-      if (P > 0) {
-        switch (scoringConfig.mode) {
-          case 'f1': score = N * (Pmin / P); break;
-          case 'f2': score = N * Math.pow(Pmin / P, 2); break;
-          case 'f3': score = N * Math.pow(Pmin / P, 3); break;
-          case 'f4': score = N * (1 - (P - Pmin) / Pmin); break;
-          case 'f5': score = N * (1 - (P - Pmin) / Pmoy); break;
-          case 'f6': score = P <= Pmoy ? N * Math.sqrt(Pmin / P) : N * Math.pow(Pmin / P, 2); break;
-          case 'f7': score = Pmax === Pmin ? N : N * (1 - (P - Pmin) / (Pmax - Pmin)); break;
-          case 'f8': score = (N * Pmoy) / (Pmoy + P); break;
-          case 'f9': score = N * ((2 * Pmin) / (Pmin + P)); break;
-          default:   score = 0;
-        }
-      }
-      report.companyScores[company.id] = Math.max(0, Math.min(N, score));
-    });
-
-    return report;
-  }, [chaptersData, companies, scoringConfig]);
+  const stats = useMemo(
+    () => computeAnalysisStats(chaptersData, companies, scoringConfig),
+    [chaptersData, companies, scoringConfig]
+  );
 
   // ─── ACTIONS ──────────────────────────────────────────────────────────────
   const handleAddManualCompany = async () => {
