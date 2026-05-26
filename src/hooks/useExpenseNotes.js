@@ -1,21 +1,24 @@
 // src/hooks/useExpenseNotes.js
-// CRUD + temps reel pour le module Notes de Frais Kilometriques (admin uniquement).
+// CRUD + temps reel pour le module Notes de Frais Kilometriques.
+// Donnees ISOLEES par utilisateur (chaque user ne voit que ses propres notes).
 //
 // Stockage Firestore :
-//   /companies/{cId}/expenseNotes/{YYYY-MM}      — un doc par mois (trips[])
-//   /companies/{cId}/vehicles/{vehicleId}        — vehicules avec puissance fiscale
-//   /companies/{cId}/expenseLocations/{id}       — adresses favorites (incl. domicile)
+//   /companies/{cId}/users/{uid}/expenseNotes/{YYYY-MM}      — un doc par mois (trips[])
+//   /companies/{cId}/users/{uid}/vehicles/{vehicleId}        — vehicules personnels
+//   /companies/{cId}/users/{uid}/expenseLocations/{id}       — adresses favorites perso
+//   /companies/{cId}/users/{uid}/expenseYearSettings/{YYYY}  — reglages annuels perso
+//   /companies/{cId}/expenseSettings/main                    — reglages globaux (admin only)
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  collection, doc, setDoc, addDoc, updateDoc, deleteDoc,
+  collection, doc, setDoc, addDoc, updateDoc, deleteDoc, getDocs,
   onSnapshot, query, where, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
 const monthId = (year, monthIdx0) => `${year}-${String(monthIdx0 + 1).padStart(2, '0')}`;
 
-export function useExpenseNotes(companyId, year) {
+export function useExpenseNotes(companyId, year, uid) {
   const [notes, setNotes] = useState({});       // { 'YYYY-MM': { id, trips, totalKm, ... } }
   const [vehicles, setVehicles] = useState([]);
   const [vehiclesLoaded, setVehiclesLoaded] = useState(false);
@@ -26,7 +29,7 @@ export function useExpenseNotes(companyId, year) {
 
   // ── Sub : notes du mois pour l'annee selectionnee ─────────────────────────
   useEffect(() => {
-    if (!companyId || !year) {
+    if (!companyId || !year || !uid) {
       setNotes({});
       setLoading(false);
       return;
@@ -34,7 +37,7 @@ export function useExpenseNotes(companyId, year) {
     setLoading(true);
     const yearStr = String(year);
     const q = query(
-      collection(db, 'companies', companyId, 'expenseNotes'),
+      collection(db, 'companies', companyId, 'users', uid, 'expenseNotes'),
       where('month', '>=', `${yearStr}-01`),
       where('month', '<=', `${yearStr}-12`),
     );
@@ -48,38 +51,38 @@ export function useExpenseNotes(companyId, year) {
       setLoading(false);
     });
     return () => unsub();
-  }, [companyId, year]);
+  }, [companyId, year, uid]);
 
   // ── Sub : vehicules ───────────────────────────────────────────────────────
   useEffect(() => {
-    if (!companyId) { setVehicles([]); setVehiclesLoaded(false); return; }
+    if (!companyId || !uid) { setVehicles([]); setVehiclesLoaded(false); return; }
     setVehiclesLoaded(false);
-    const unsub = onSnapshot(collection(db, 'companies', companyId, 'vehicles'), (snap) => {
+    const unsub = onSnapshot(collection(db, 'companies', companyId, 'users', uid, 'vehicles'), (snap) => {
       setVehicles(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       setVehiclesLoaded(true);
     }, (err) => console.error('[ExpenseNotes] vehicles snapshot error', err));
     return () => unsub();
-  }, [companyId]);
+  }, [companyId, uid]);
 
   // ── Sub : adresses favorites ──────────────────────────────────────────────
   useEffect(() => {
-    if (!companyId) { setLocations([]); return; }
-    const unsub = onSnapshot(collection(db, 'companies', companyId, 'expenseLocations'), (snap) => {
+    if (!companyId || !uid) { setLocations([]); return; }
+    const unsub = onSnapshot(collection(db, 'companies', companyId, 'users', uid, 'expenseLocations'), (snap) => {
       setLocations(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     }, (err) => console.error('[ExpenseNotes] locations snapshot error', err));
     return () => unsub();
-  }, [companyId]);
+  }, [companyId, uid]);
 
   // ── Sub : reglages par annee (priorKm pour cumul initial) ─────────────────
   useEffect(() => {
-    if (!companyId) { setYearSettings({}); return; }
-    const unsub = onSnapshot(collection(db, 'companies', companyId, 'expenseYearSettings'), (snap) => {
+    if (!companyId || !uid) { setYearSettings({}); return; }
+    const unsub = onSnapshot(collection(db, 'companies', companyId, 'users', uid, 'expenseYearSettings'), (snap) => {
       const map = {};
       snap.forEach((d) => { map[d.id] = d.data(); });
       setYearSettings(map);
     }, (err) => console.error('[ExpenseNotes] yearSettings snapshot error', err));
     return () => unsub();
-  }, [companyId]);
+  }, [companyId, uid]);
 
   // ── Sub : reglages globaux (majorations distances, etc.) ──────────────────
   useEffect(() => {
@@ -114,24 +117,24 @@ export function useExpenseNotes(companyId, year) {
   }, [yearSettings, year]);
 
   const setForcedTranche = useCallback(async (yr, value) => {
-    if (!companyId) return;
-    const ref = doc(db, 'companies', companyId, 'expenseYearSettings', String(yr));
+    if (!companyId || !uid) return;
+    const ref = doc(db, 'companies', companyId, 'users', uid, 'expenseYearSettings', String(yr));
     // null pour reinitialiser
     await setDoc(ref, { forcedTranche: value === null ? null : Number(value), updatedAt: serverTimestamp() }, { merge: true });
-  }, [companyId]);
+  }, [companyId, uid]);
 
   const setCustomBareme = useCallback(async (yr, bareme) => {
-    if (!companyId) return;
-    const ref = doc(db, 'companies', companyId, 'expenseYearSettings', String(yr));
+    if (!companyId || !uid) return;
+    const ref = doc(db, 'companies', companyId, 'users', uid, 'expenseYearSettings', String(yr));
     await setDoc(ref, { customBareme: bareme, updatedAt: serverTimestamp() }, { merge: true });
-  }, [companyId]);
+  }, [companyId, uid]);
 
   // ── Helpers note (trajets) ────────────────────────────────────────────────
   const upsertNote = useCallback(async (month, patch) => {
-    if (!companyId) return;
-    const ref = doc(db, 'companies', companyId, 'expenseNotes', month);
+    if (!companyId || !uid) return;
+    const ref = doc(db, 'companies', companyId, 'users', uid, 'expenseNotes', month);
     await setDoc(ref, { ...patch, month, updatedAt: serverTimestamp() }, { merge: true });
-  }, [companyId]);
+  }, [companyId, uid]);
 
   const recomputeTotals = (trips) => {
     const totalKm = trips.reduce((s, t) => s + (Number(t.km) || 0), 0);
@@ -194,41 +197,41 @@ export function useExpenseNotes(companyId, year) {
   // Alias historique
   const yearTotalKm = yearLoggedKm;
 
-  // ── CRUD Vehicules ────────────────────────────────────────────────────────
+  // ── CRUD Vehicules (per-user) ─────────────────────────────────────────────
   const addVehicle = useCallback(async (data) => {
-    if (!companyId) return;
-    return addDoc(collection(db, 'companies', companyId, 'vehicles'), {
+    if (!companyId || !uid) return;
+    return addDoc(collection(db, 'companies', companyId, 'users', uid, 'vehicles'), {
       ...data, createdAt: serverTimestamp(),
     });
-  }, [companyId]);
+  }, [companyId, uid]);
 
   const updateVehicle = useCallback(async (id, patch) => {
-    if (!companyId) return;
-    return updateDoc(doc(db, 'companies', companyId, 'vehicles', id), patch);
-  }, [companyId]);
+    if (!companyId || !uid) return;
+    return updateDoc(doc(db, 'companies', companyId, 'users', uid, 'vehicles', id), patch);
+  }, [companyId, uid]);
 
   const deleteVehicle = useCallback(async (id) => {
-    if (!companyId) return;
-    return deleteDoc(doc(db, 'companies', companyId, 'vehicles', id));
-  }, [companyId]);
+    if (!companyId || !uid) return;
+    return deleteDoc(doc(db, 'companies', companyId, 'users', uid, 'vehicles', id));
+  }, [companyId, uid]);
 
-  // ── CRUD Adresses favorites ───────────────────────────────────────────────
+  // ── CRUD Adresses favorites (per-user) ────────────────────────────────────
   const addLocation = useCallback(async (data) => {
-    if (!companyId) return;
-    return addDoc(collection(db, 'companies', companyId, 'expenseLocations'), {
+    if (!companyId || !uid) return;
+    return addDoc(collection(db, 'companies', companyId, 'users', uid, 'expenseLocations'), {
       ...data, createdAt: serverTimestamp(),
     });
-  }, [companyId]);
+  }, [companyId, uid]);
 
   const updateLocation = useCallback(async (id, patch) => {
-    if (!companyId) return;
-    return updateDoc(doc(db, 'companies', companyId, 'expenseLocations', id), patch);
-  }, [companyId]);
+    if (!companyId || !uid) return;
+    return updateDoc(doc(db, 'companies', companyId, 'users', uid, 'expenseLocations', id), patch);
+  }, [companyId, uid]);
 
   const deleteLocation = useCallback(async (id) => {
-    if (!companyId) return;
-    return deleteDoc(doc(db, 'companies', companyId, 'expenseLocations', id));
-  }, [companyId]);
+    if (!companyId || !uid) return;
+    return deleteDoc(doc(db, 'companies', companyId, 'users', uid, 'expenseLocations', id));
+  }, [companyId, uid]);
 
   // Vehicule par defaut (premier marque isDefault, sinon premier de la liste)
   const defaultVehicle = useMemo(() => {
@@ -237,6 +240,36 @@ export function useExpenseNotes(companyId, year) {
 
   // Domicile (premiere adresse marquee isHome)
   const homeLocation = useMemo(() => locations.find((l) => l.isHome) || null, [locations]);
+
+  // ── Migration des donnees legacy (chemins partages -> per-user) ──────────
+  // Lit les anciens chemins /companies/{cId}/{collection}/... (donnees partagees
+  // avant V2.5.x) et copie chaque doc sous /companies/{cId}/users/{uid}/...
+  // Ne supprime PAS les originaux (backup). setDoc avec { merge:true } pour
+  // ne pas ecraser des donnees per-user existantes plus recentes.
+  const migrateLegacyData = useCallback(async () => {
+    if (!companyId || !uid) throw new Error('companyId ou uid manquant');
+    const result = { notes: 0, vehicles: 0, locations: 0, yearSettings: 0 };
+
+    const migrateCollection = async (collName, counterKey) => {
+      const snap = await getDocs(collection(db, 'companies', companyId, collName));
+      for (let i = 0; i < snap.docs.length; i += 10) {
+        const batch = snap.docs.slice(i, i + 10);
+        await Promise.all(batch.map((d) => setDoc(
+          doc(db, 'companies', companyId, 'users', uid, collName, d.id),
+          d.data(),
+          { merge: true },
+        )));
+        result[counterKey] += batch.length;
+      }
+    };
+
+    await migrateCollection('expenseNotes', 'notes');
+    await migrateCollection('vehicles', 'vehicles');
+    await migrateCollection('expenseLocations', 'locations');
+    await migrateCollection('expenseYearSettings', 'yearSettings');
+
+    return result;
+  }, [companyId, uid]);
 
   // ── Trajets recurrents : creation en lot a partir d'un trajet template ────
   // Genere un id unique pour chaque trajet, regroupe par mois pour minimiser
@@ -281,6 +314,7 @@ export function useExpenseNotes(companyId, year) {
     getCumulBeforeMonth, getCumulToMonth,
     addVehicle, updateVehicle, deleteVehicle,
     addLocation, updateLocation, deleteLocation,
+    migrateLegacyData,
   };
 }
 

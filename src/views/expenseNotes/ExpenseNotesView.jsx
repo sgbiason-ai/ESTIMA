@@ -3,7 +3,7 @@
 // Affiche la grille des 12 mois de l'annee courante OU le detail d'un mois selectionne.
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Car, Plus, Settings, Zap, Sliders, MapPin } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Car, Plus, Settings, Zap, Sliders, MapPin, AlertCircle, Download, Check } from 'lucide-react';
 import { useExpenseNotes } from '../../hooks/useExpenseNotes';
 import { useBranding } from '../../hooks/useBranding';
 import { calculateAnnualAmount, getActiveTranche, getMarginalRate, getRateForTranche, getTrancheLabel, PUISSANCES, DEFAULT_TRANCHE_BREAKS } from '../../data/baremeFiscal2025';
@@ -34,7 +34,14 @@ const ExpenseNotesView = ({ user, companyId, onBackToHub, masterBranding }) => {
   const [showLocations, setShowLocations] = useState(false);
   const [showMargins, setShowMargins] = useState(false);
 
-  const expense = useExpenseNotes(companyId, year);
+  // Migration des anciennes donnees partagees (chemins pre-V2.5.x) vers per-user.
+  // Le bandeau s'affiche tant que l'utilisateur n'a aucune note ni adresse,
+  // ou apres declenchement, jusqu'a dismiss.
+  const [migrationStatus, setMigrationStatus] = useState('idle'); // idle | running | done | error
+  const [migrationResult, setMigrationResult] = useState(null);
+  const [migrationDismissed, setMigrationDismissed] = useState(false);
+
+  const expense = useExpenseNotes(companyId, year, user?.uid);
 
   // Bootstrap : creer un vehicule par defaut UNIQUEMENT apres le 1er snapshot
   // Firestore (sinon on cree des doublons en boucle a chaque reload pendant
@@ -119,6 +126,29 @@ const ExpenseNotesView = ({ user, companyId, onBackToHub, masterBranding }) => {
       await expense.setForcedTranche(year, Number(v));
     }
   };
+
+  const handleMigrate = async () => {
+    if (migrationStatus === 'running' || migrationStatus === 'done') return;
+    setMigrationStatus('running');
+    try {
+      const result = await expense.migrateLegacyData();
+      setMigrationResult(result);
+      setMigrationStatus('done');
+    } catch (e) {
+      console.error('[ExpenseNotes] Migration echouee:', e);
+      setMigrationResult({ error: e?.code || e?.message || 'erreur inconnue' });
+      setMigrationStatus('error');
+    }
+  };
+
+  const notesCount = Object.keys(expense.notes || {}).length;
+  const locationsCount = expense.locations?.length || 0;
+  // Affiche le bandeau si l'utilisateur n'a encore rien (cas perte donnees),
+  // ou pendant/apres une migration, jusqu'a dismiss.
+  const showMigrationBanner = !migrationDismissed && (
+    migrationStatus !== 'idle' ||
+    (notesCount === 0 && locationsCount === 0)
+  );
 
   // Montant par mois (utilise km effectif avec A/R + majoration)
   const monthlyAmounts = useMemo(() => {
@@ -208,6 +238,61 @@ const ExpenseNotesView = ({ user, companyId, onBackToHub, masterBranding }) => {
       </header>
 
       <div className="flex-1 overflow-y-auto p-6">
+        {/* Bandeau migration anciennes donnees partagees -> per-user */}
+        {showMigrationBanner && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 flex items-start gap-3 shadow-sm">
+            <AlertCircle size={20} className="text-amber-600 shrink-0 mt-0.5" strokeWidth={2} />
+            <div className="flex-1 min-w-0">
+              <div className="font-bold text-amber-900 text-sm">Anciennes donnees disponibles</div>
+              <div className="text-xs text-amber-800 mt-1">
+                Les notes de frais sont maintenant isolees par utilisateur. Tes trajets,
+                vehicules et adresses saisis avant cette mise a jour sont toujours stockes
+                au niveau de l'entreprise. Clique sur <strong>Recuperer</strong> pour les
+                copier vers ton compte personnel (les originaux sont conserves).
+              </div>
+              {migrationStatus === 'done' && migrationResult && (
+                <div className="mt-3 text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 flex items-start gap-2">
+                  <Check size={14} className="text-emerald-600 shrink-0 mt-0.5" strokeWidth={2.5} />
+                  <div>
+                    <strong>Migration reussie.</strong> Recuperes : {migrationResult.notes} note(s) mensuelle(s),
+                    {' '}{migrationResult.vehicles} vehicule(s), {migrationResult.locations} adresse(s),
+                    {' '}{migrationResult.yearSettings} reglage(s) annuel(s).
+                    {(migrationResult.notes + migrationResult.vehicles + migrationResult.locations + migrationResult.yearSettings) === 0 && (
+                      <span className="block mt-1 italic">Aucune donnee a l'ancien emplacement — rien a recuperer.</span>
+                    )}
+                  </div>
+                </div>
+              )}
+              {migrationStatus === 'error' && migrationResult?.error && (
+                <div className="mt-3 text-xs text-red-800 bg-red-50 border border-red-200 rounded-xl p-2.5">
+                  <strong>Erreur :</strong> {migrationResult.error}
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col gap-2 shrink-0">
+              <button
+                onClick={handleMigrate}
+                disabled={migrationStatus === 'running' || migrationStatus === 'done'}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 text-white rounded-xl text-xs font-bold hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {migrationStatus === 'running' ? (
+                  <>Migration...</>
+                ) : migrationStatus === 'done' ? (
+                  <><Check size={12} strokeWidth={3} /> Termine</>
+                ) : (
+                  <><Download size={12} strokeWidth={2.5} /> Recuperer</>
+                )}
+              </button>
+              <button
+                onClick={() => setMigrationDismissed(true)}
+                className="px-3 py-1.5 text-amber-700 rounded-xl text-xs font-medium hover:bg-amber-100 transition-colors"
+              >
+                {migrationStatus === 'done' ? 'Fermer' : 'Masquer'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Header annuel */}
         <div className="bg-white rounded-2xl border border-gray-200/60 p-6 mb-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">

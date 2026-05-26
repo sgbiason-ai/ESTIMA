@@ -79,8 +79,10 @@ const AdminView = ({ currentUserEmail }) => {
       setCompanies(prev => [...prev, company]);
       setNewCompanyName('');
       showFeedback('success', `Entreprise "${company.name}" créée.`);
-    } catch {
-      showFeedback('error', "Impossible de créer l'entreprise.");
+    } catch (e) {
+      console.error('[AdminView] Création entreprise échouée:', e);
+      const detail = e?.code || e?.message || 'erreur inconnue';
+      showFeedback('error', `Impossible de créer l'entreprise : ${detail}`);
     }
   };
 
@@ -88,13 +90,34 @@ const AdminView = ({ currentUserEmail }) => {
     const company = companyToDelete;
     setCompanyToDelete(null);
     setDeletingId(company.id);
+
+    const deleteAllInCollection = async (collRef) => {
+      const snap = await getDocs(collRef);
+      for (let i = 0; i < snap.docs.length; i += 20) {
+        await Promise.all(snap.docs.slice(i, i + 20).map(d => deleteDoc(d.ref)));
+      }
+    };
+
     try {
-      for (const colName of ['bpu', 'categories', 'units', 'projects', 'resources']) {
-        const snap = await getDocs(collection(db, 'companies', company.id, colName));
-        for (let i = 0; i < snap.docs.length; i += 20) {
-          await Promise.all(snap.docs.slice(i, i + 20).map(d => deleteDoc(d.ref)));
+      // Pour chaque projet, vider d'abord les sous-sous-collections
+      // (Firestore ne cascade pas la suppression).
+      const projectsSnap = await getDocs(collection(db, 'companies', company.id, 'projects'));
+      for (const projectDoc of projectsSnap.docs) {
+        for (const nested of ['history', 'archives', 'analysis', 'rao']) {
+          await deleteAllInCollection(collection(projectDoc.ref, nested));
         }
       }
+
+      const subcollections = [
+        'projects', 'bpu', 'categories', 'units', 'resources',
+        'folders', 'crr', 'devisMoe', 'fichesMarche', 'site_visits',
+        'presence', 'expenseNotes', 'vehicles', 'expenseLocations',
+        'expenseYearSettings', 'expenseSettings',
+      ];
+      for (const colName of subcollections) {
+        await deleteAllInCollection(collection(db, 'companies', company.id, colName));
+      }
+
       await deleteDoc(doc(db, 'companies', company.id));
       const members = users.filter(u => u.companyId === company.id);
       await Promise.all(members.map(u => deleteDoc(doc(db, 'users', u.uid))));
@@ -103,7 +126,9 @@ const AdminView = ({ currentUserEmail }) => {
       if (expandedId === company.id) setExpandedId(null);
       showFeedback('success', `Entreprise "${company.name}" supprimée.`);
     } catch (e) {
-      showFeedback('error', `Erreur : ${e.message}`);
+      console.error('[AdminView] Suppression entreprise échouée:', e);
+      const detail = e?.code || e?.message || 'erreur inconnue';
+      showFeedback('error', `Erreur : ${detail}`);
     } finally {
       setDeletingId(null);
     }
@@ -120,8 +145,10 @@ const AdminView = ({ currentUserEmail }) => {
       setAssignForm({ uid: '', companyId: '', isAdmin: false });
       await loadData();
       showFeedback('success', `Utilisateur assigné à "${companyId}".`);
-    } catch {
-      showFeedback('error', "Impossible d'assigner l'utilisateur.");
+    } catch (e) {
+      console.error('[AdminView] Assignation utilisateur échouée:', e);
+      const detail = e?.code || e?.message || 'erreur inconnue';
+      showFeedback('error', `Impossible d'assigner l'utilisateur : ${detail}`);
     }
   };
 
@@ -132,8 +159,10 @@ const AdminView = ({ currentUserEmail }) => {
       await deleteDoc(doc(db, 'users', uid));
       setUsers(prev => prev.filter(u => u.uid !== uid));
       showFeedback('success', 'Accès retiré.');
-    } catch {
-      showFeedback('error', 'Erreur lors de la suppression.');
+    } catch (e) {
+      console.error('[AdminView] Suppression utilisateur échouée:', e);
+      const detail = e?.code || e?.message || 'erreur inconnue';
+      showFeedback('error', `Erreur lors de la suppression : ${detail}`);
     }
   };
 
