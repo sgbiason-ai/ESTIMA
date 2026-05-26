@@ -43,6 +43,7 @@ export const CHANGELOG = [
       'Notes de Frais : isolation des données par utilisateur — chaque user ne voit que ses propres trajets, véhicules, adresses favorites et réglages annuels (stockage Firestore /companies/{cId}/users/{uid}/...). Réglages globaux (majorations distances) restent partagés au niveau entreprise',
       'Notes de Frais : bandeau de récupération automatique — si l\'utilisateur n\'a aucune donnée personnelle au chargement, un bandeau ambré propose de migrer en un clic les anciennes données partagées vers son compte. La migration copie sans supprimer (backup conservé) et confirme le détail des éléments récupérés (notes mensuelles, véhicules, adresses, réglages annuels)',
       'Administration : suppression d\'une entreprise — la cascade vide désormais toutes les subcollections (folders, crr, devisMoe, fichesMarche, site_visits, presence, notes de frais per-user) ainsi que les sous-sous-collections imbriquées des projets (history, archives, analysis, rao). Messages d\'erreur enrichis avec le code Firestore exact en cas d\'échec',
+      'Notes de Frais : tableau du mois plus compact — la date est désormais une colonne inline sur chaque ligne de trajet (format "Lun. 5 Mai"), au lieu d\'une ligne d\'en-tête séparée par jour. Une pastille rouge signale un jour férié et une pastille ambre un samedi/dimanche, avec tooltip détaillé. Vue tableur plus dense, scan vertical plus rapide',
     ],
   },
   {

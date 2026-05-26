@@ -1,8 +1,8 @@
 // src/views/expenseNotes/ExpenseNotesMonthView.jsx
 // Detail d'une note de frais mensuelle : tableau des trajets + ajout/edition.
 
-import React, { useState, useMemo, useEffect, useRef, Fragment } from 'react';
-import { Plus, Trash2, ArrowLeft, FileDown, Search, Copy, X, Calendar, Car as CarIcon, Map as MapIcon, ChevronDown } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Plus, Trash2, ArrowLeft, FileDown, Search, Copy, X, Car as CarIcon, Map as MapIcon, ChevronDown } from 'lucide-react';
 import { calculateMonthAmount, calculateAnnualAmount, getActiveTranche, getMarginalRate, getRateForTranche, getTrancheLabel, PUISSANCES } from '../../data/baremeFiscal2025';
 import { getTripTotalKm } from '../../utils/distanceMargin';
 import { getHolidayLabel, getWeekendName } from '../../utils/frenchHolidays';
@@ -34,6 +34,14 @@ const formatDateLong = (iso) => {
   const date = new Date(iso + 'T00:00:00');
   if (Number.isNaN(date.getTime())) return iso;
   return new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).format(date);
+};
+
+// "lun. 5 mai" — format compact pour la colonne Date inline.
+const formatDateCompact = (iso) => {
+  if (!iso) return '-';
+  const date = new Date(iso + 'T00:00:00');
+  if (Number.isNaN(date.getTime())) return iso;
+  return new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }).format(date);
 };
 
 const todayIso = () => {
@@ -153,17 +161,6 @@ const ExpenseNotesMonthView = ({ month, expense, branding, user, onBack, onBackT
       return haystack.includes(q);
     });
   }, [tripsWithAmount, searchQuery, activeMotifFilter]);
-
-  // Groupement par date (Lundi 5 mai → [trajets...])
-  const groupedByDate = useMemo(() => {
-    const map = new Map();
-    for (const t of filteredTrips) {
-      const d = t.date || '';
-      if (!map.has(d)) map.set(d, []);
-      map.get(d).push(t);
-    }
-    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [filteredTrips]);
 
   const filteredKm = useMemo(
     () => filteredTrips.reduce((s, t) => s + (t.effectiveKm || 0), 0),
@@ -474,7 +471,8 @@ const ExpenseNotesMonthView = ({ month, expense, branding, user, onBack, onBackT
         {/* Tableau trajets — groupes par date */}
         <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm overflow-hidden">
           {tripsWithAmount.length > 0 && (
-            <div className="grid grid-cols-[1fr_1.2fr_1.2fr_80px_50px_95px_72px] gap-3 px-4 py-3 bg-gray-50 border-b border-gray-200 text-[10px] font-bold uppercase tracking-widest text-gray-500">
+            <div className="grid grid-cols-[120px_1fr_1.2fr_1.2fr_80px_50px_95px_72px] gap-3 px-4 py-3 bg-gray-50 border-b border-gray-200 text-[10px] font-bold uppercase tracking-widest text-gray-500">
+              <span>Date</span>
               <span>Motif</span>
               <span>Départ</span>
               <span>Arrivée</span>
@@ -515,125 +513,113 @@ const ExpenseNotesMonthView = ({ month, expense, branding, user, onBack, onBackT
               </button>
             </div>
           ) : (
-            groupedByDate.map(([dateStr, dateTrips]) => {
-              const dateKm = dateTrips.reduce((s, t) => s + (t.effectiveKm || 0), 0);
-              const dateAmount = dateTrips.reduce((s, t) => s + (t.amount || 0), 0);
-              const holiday = getHolidayLabel(dateStr);
-              const weekendName = !holiday ? getWeekendName(dateStr) : null;
-              const headerBg = holiday
-                ? 'bg-rose-50/60 border-rose-100'
+            filteredTrips.map((trip) => {
+              const holiday = getHolidayLabel(trip.date);
+              const weekendName = !holiday ? getWeekendName(trip.date) : null;
+              const dateBg = holiday
+                ? 'bg-rose-50/40'
                 : weekendName
-                  ? 'bg-amber-50/60 border-amber-100'
-                  : 'bg-gray-50/60 border-gray-100';
+                  ? 'bg-amber-50/40'
+                  : '';
+              const dateColor = holiday
+                ? 'text-rose-700'
+                : weekendName
+                  ? 'text-amber-700'
+                  : 'text-gray-700';
               return (
-                <Fragment key={dateStr}>
-                  <div className={`flex items-center gap-3 px-4 py-3 border-b-2 ${headerBg} ${holiday ? 'border-l-4 border-l-rose-400' : weekendName ? 'border-l-4 border-l-amber-400' : ''}`}>
-                    <Calendar size={14} className={`shrink-0 ${holiday ? 'text-rose-500' : weekendName ? 'text-amber-600' : 'text-gray-500'}`} />
-                    <span className="text-sm font-bold text-gray-900 capitalize tracking-tight">{formatDateLong(dateStr)}</span>
+                <div
+                  key={trip.id}
+                  onDoubleClick={() => { setEditingTrip(trip); setShowForm(true); }}
+                  className={`grid grid-cols-[120px_1fr_1.2fr_1.2fr_80px_50px_95px_72px] gap-3 px-4 py-3 border-b border-gray-100 hover:bg-gray-50/50 transition-colors group items-center cursor-pointer select-none ${
+                    recentlyTouchedId === trip.id
+                      ? 'bg-emerald-50 ring-2 ring-emerald-300/80 animate-[pulse_1s_ease-in-out_2]'
+                      : dateBg
+                  }`}
+                  title={`${formatDateLong(trip.date)}${holiday ? ` — ${holiday}` : weekendName ? ` — ${weekendName}` : ''}\nDouble-cliquer pour modifier`}
+                >
+                  <span className={`text-xs font-semibold tabular-nums capitalize truncate flex items-center gap-1.5 ${dateColor}`}>
+                    {formatDateCompact(trip.date)}
                     {holiday && (
                       <span
-                        className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200"
+                        className="shrink-0 w-1.5 h-1.5 rounded-full bg-rose-500"
                         title={`Jour férié : ${holiday}`}
-                      >
-                        🎉 {holiday}
-                      </span>
+                      />
                     )}
                     {weekendName && (
                       <span
-                        className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200"
-                        title={`${weekendName} (weekend)`}
+                        className="shrink-0 w-1.5 h-1.5 rounded-full bg-amber-500"
+                        title={weekendName}
+                      />
+                    )}
+                  </span>
+                  <span className="min-w-0 truncate" title={trip.motif}>
+                    {trip.motif ? (
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border ${getMotifColor(trip.motif).tag}`}>
+                        {trip.motif}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-300 italic">aucun motif</span>
+                    )}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-xs text-gray-700 truncate" title={trip.departure}>{trip.departure || '-'}</span>
+                    {trip.waypoints?.length > 0 && (
+                      <span
+                        className="block text-[10px] text-blue-600 truncate"
+                        title={trip.waypoints.map((w) => w.label).join(' → ')}
                       >
-                        🟡 {weekendName}
+                        via {trip.waypoints.map((w) => w.label).join(', ')}
                       </span>
                     )}
-                    <span className="text-[10px] text-gray-500 font-medium">
-                      {dateTrips.length} trajet{dateTrips.length > 1 ? 's' : ''}
-                    </span>
-                    <span className="ml-auto text-[11px] text-gray-700 tabular-nums font-bold">
-                      {formatKm(dateKm)} · {formatEur(dateAmount)}
-                    </span>
-                  </div>
-                  {dateTrips.map((trip) => (
-                    <div
-                      key={trip.id}
-                      onDoubleClick={() => { setEditingTrip(trip); setShowForm(true); }}
-                      className={`grid grid-cols-[1fr_1.2fr_1.2fr_80px_50px_95px_72px] gap-3 px-4 py-3 border-b border-gray-100 hover:bg-gray-50/50 transition-colors group items-center cursor-pointer select-none ${
-                        recentlyTouchedId === trip.id
-                          ? 'bg-emerald-50 ring-2 ring-emerald-300/80 animate-[pulse_1s_ease-in-out_2]'
-                          : ''
-                      }`}
-                      title="Double-cliquer pour modifier"
+                  </span>
+                  <span className="text-xs text-gray-700 truncate" title={trip.arrival}>{trip.arrival || '-'}</span>
+                  {editingKmTripId === trip.id ? (
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      autoFocus
+                      value={editingKmValue}
+                      onChange={(e) => setEditingKmValue(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      onBlur={() => commitEditKm(trip)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') { e.preventDefault(); commitEditKm(trip); }
+                        else if (e.key === 'Escape') { e.preventDefault(); cancelEditKm(); }
+                      }}
+                      className="px-1.5 py-1 text-xs font-bold text-right text-gray-900 tabular-nums bg-blue-50 border border-blue-300 rounded outline-none focus:ring-2 focus:ring-blue-200"
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); startEditKm(trip); }}
+                      className="text-xs font-bold text-gray-900 tabular-nums text-right hover:bg-blue-50 rounded px-1 py-0.5 -my-0.5 transition-colors"
+                      title="Cliquer pour modifier le km (saisie manuelle)"
                     >
-                      <span className="min-w-0 truncate" title={trip.motif}>
-                        {trip.motif ? (
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border ${getMotifColor(trip.motif).tag}`}>
-                            {trip.motif}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-gray-300 italic">aucun motif</span>
-                        )}
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-xs text-gray-700 truncate" title={trip.departure}>{trip.departure || '-'}</span>
-                        {trip.waypoints?.length > 0 && (
-                          <span
-                            className="block text-[10px] text-blue-600 truncate"
-                            title={trip.waypoints.map((w) => w.label).join(' → ')}
-                          >
-                            via {trip.waypoints.map((w) => w.label).join(', ')}
-                          </span>
-                        )}
-                      </span>
-                      <span className="text-xs text-gray-700 truncate" title={trip.arrival}>{trip.arrival || '-'}</span>
-                      {editingKmTripId === trip.id ? (
-                        <input
-                          type="number"
-                          step="0.1"
-                          min="0"
-                          autoFocus
-                          value={editingKmValue}
-                          onChange={(e) => setEditingKmValue(e.target.value)}
-                          onClick={(e) => e.stopPropagation()}
-                          onBlur={() => commitEditKm(trip)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') { e.preventDefault(); commitEditKm(trip); }
-                            else if (e.key === 'Escape') { e.preventDefault(); cancelEditKm(); }
-                          }}
-                          className="px-1.5 py-1 text-xs font-bold text-right text-gray-900 tabular-nums bg-blue-50 border border-blue-300 rounded outline-none focus:ring-2 focus:ring-blue-200"
-                        />
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); startEditKm(trip); }}
-                          className="text-xs font-bold text-gray-900 tabular-nums text-right hover:bg-blue-50 rounded px-1 py-0.5 -my-0.5 transition-colors"
-                          title="Cliquer pour modifier le km (saisie manuelle)"
-                        >
-                          {formatKm(trip.effectiveKm)}
-                        </button>
-                      )}
-                      <span className="text-center">
-                        {trip.roundTrip && <span className="text-[9px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">A/R</span>}
-                      </span>
-                      <span className="text-xs font-bold text-emerald-700 tabular-nums text-right">{formatEur(trip.amount)}</span>
-                      <span className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleDuplicateTrip(trip); }}
-                          className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors"
-                          title="Dupliquer ce trajet (date du jour)"
-                        >
-                          <Copy size={12} />
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleDeleteTrip(trip); }}
-                          className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
-                          title="Supprimer"
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      </span>
-                    </div>
-                  ))}
-                </Fragment>
+                      {formatKm(trip.effectiveKm)}
+                    </button>
+                  )}
+                  <span className="text-center">
+                    {trip.roundTrip && <span className="text-[9px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">A/R</span>}
+                  </span>
+                  <span className="text-xs font-bold text-emerald-700 tabular-nums text-right">{formatEur(trip.amount)}</span>
+                  <span className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDuplicateTrip(trip); }}
+                      className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors"
+                      title="Dupliquer ce trajet (date du jour)"
+                    >
+                      <Copy size={12} />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDeleteTrip(trip); }}
+                      className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
+                      title="Supprimer"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </span>
+                </div>
               );
             })
           )}
