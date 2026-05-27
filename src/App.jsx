@@ -237,6 +237,7 @@ export default function App() {
           isAdmin={isAdmin}
           handleLogout={handleLogout}
           onBackToHub={handleBackToHub}
+          onNavigateModule={setActiveModule}
         />
       </Lazy>
     );
@@ -379,7 +380,7 @@ function ProjectManagerModule({ user, companyId, onBackToHub, onOpenEstima, onNa
 }
 
 // ─── DESKTOP APP (tout le code actuel, extrait dans un composant) ────────────
-function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub }) {
+function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNavigateModule }) {
 
   // ── 2. Base de données Cloud ────────────────────────────────────────────────
   const db = useDatabase(user, companyId);
@@ -575,6 +576,7 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub }) {
         saveStatus={saveStatus}
         projectName={project?.name || ''}
         onBackToHub={onBackToHub}
+        onBackToWorkspace={onNavigateModule ? () => onNavigateModule('projects_manager') : undefined}
       />
 
       {/* ── Contenu principal ─────────────────────────────────────────────── */}

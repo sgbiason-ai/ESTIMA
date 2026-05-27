@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import {
   LayoutDashboard, Database, Settings, FileText, Calculator, Folder,
   LineChart, LogOut, User, PanelLeftClose, PanelLeftOpen, BookOpen,
-  FileCheck, ArrowLeft, Cloud, CheckCircle2, AlertCircle, Loader
+  FileCheck, ArrowLeft, Cloud, CheckCircle2, AlertCircle, Loader, Layers
 } from 'lucide-react';
 
-const Sidebar = ({ activeTab, setActiveTab, onLogout, userEmail, onOpenCalculator, onToggle, isAdmin, saveStatus, projectName, onBackToHub }) => {
+const Sidebar = ({ activeTab, setActiveTab, onLogout, userEmail, onOpenCalculator, onToggle, isAdmin, saveStatus, projectName, onBackToHub, onBackToWorkspace }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const toggleSidebar = () => {
@@ -69,14 +69,23 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout, userEmail, onOpenCalculato
     >
       {/* HEADER */}
       <div className="p-4 mb-1 flex flex-col gap-3">
-        <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
-          {onBackToHub && (
-            <button onClick={onBackToHub} title="Retour aux modules"
-              className={`flex items-center gap-1.5 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all ${isCollapsed ? 'p-1.5' : 'px-2.5 py-1.5'}`}>
-              <ArrowLeft size={15} />
-              {!isCollapsed && <span className="text-[10px] font-medium">Hub</span>}
-            </button>
-          )}
+        <div className={`flex items-center ${isCollapsed ? 'flex-col gap-1' : 'justify-between'}`}>
+          <div className={`flex items-center ${isCollapsed ? 'flex-col gap-1' : 'gap-1'}`}>
+            {onBackToHub && (
+              <button onClick={onBackToHub} title="Retour aux modules"
+                className={`flex items-center gap-1.5 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all ${isCollapsed ? 'p-1.5' : 'px-2.5 py-1.5'}`}>
+                <ArrowLeft size={15} />
+                {!isCollapsed && <span className="text-[10px] font-medium">Hub</span>}
+              </button>
+            )}
+            {onBackToWorkspace && (
+              <button onClick={onBackToWorkspace} title="Retour à la Gestion de Projets"
+                className={`flex items-center gap-1.5 rounded-xl text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all ${isCollapsed ? 'p-1.5' : 'px-2.5 py-1.5'}`}>
+                <Layers size={15} />
+                {!isCollapsed && <span className="text-[10px] font-medium">Workspace</span>}
+              </button>
+            )}
+          </div>
           <button onClick={toggleSidebar} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
             {isCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
           </button>
