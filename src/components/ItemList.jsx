@@ -1,5 +1,5 @@
 // src/components/ItemList.jsx
-import React, { useContext, memo, useEffect, useRef, useState, useCallback } from 'react';
+import React, { useContext, memo, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Draggable, Droppable } from '@hello-pangea/dnd'; 
 import { GripVertical, Layers, Trash2, Plus, ShieldCheck, AlertCircle, FunctionSquare, Check } from 'lucide-react';
 
@@ -11,12 +11,43 @@ import { safeEvalMathExpr } from '../utils/projectCalculations';
 // --------------------
 // FORMULA INPUT — calculatrice PM + formules style Excel
 // --------------------
-const FormulaInput = ({ value, formula, formulaMode, setFormulaMode, onCommit, disabled, className, placeholder }) => {
+const FormulaInput = ({ value, formula, formulaMode, setFormulaMode, onCommit, disabled, className, placeholder, refMap, sourceItemId }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState(value);
   const inputRef = useRef(null);
   const inputValueRef = useRef(String(value));
   const savedCursorPos = useRef(null); // Position curseur sauvegardée avant blur
+
+  // Map inverse label → id (node.id) pour ré-encoder la formule au commit.
+  // refMap insère dans l'ordre {designation → label, uid → label, id → label}.
+  // recalculateProject travaille avec contextMap[node.id], donc on veut le DERNIER set (id).
+  // On ne fait pas de check `!m.has` pour laisser l'écrasement aller jusqu'au id.
+  const reverseRefMap = useMemo(() => {
+    const m = new Map();
+    if (!refMap) return m;
+    refMap.forEach((label, key) => {
+      if (label) m.set(label, key); // l'overwrite final = la clé node.id (insérée en dernier dans refMap)
+    });
+    return m;
+  }, [refMap]);
+
+  // {uid} → {P.01} pour l'affichage utilisateur
+  const uidToLabel = useCallback((s) => {
+    if (!s || !refMap) return s;
+    return String(s).replace(/\{([^}]+)\}/g, (match, id) => {
+      const lbl = refMap.get(id) || refMap.get(String(id));
+      return lbl ? `{${lbl}}` : match;
+    });
+  }, [refMap]);
+
+  // {P.01} → {uid} pour le stockage interne (recalculateProject travaille en uid)
+  const labelToUid = useCallback((s) => {
+    if (!s || !reverseRefMap?.size) return s;
+    return String(s).replace(/\{([^}]+)\}/g, (match, label) => {
+      const uid = reverseRefMap.get(label);
+      return uid ? `{${uid}}` : match;
+    });
+  }, [reverseRefMap]);
 
   useEffect(() => {
     if (!isEditing) {
@@ -27,7 +58,9 @@ const FormulaInput = ({ value, formula, formulaMode, setFormulaMode, onCommit, d
 
   // --- Insertion d'une référence à la position du curseur ---
   const handleInsertRef = useCallback((refId) => {
-    const ref = `{${refId}}`;
+    // Insérer directement le label lisible si dispo (sinon fallback sur l'uid brut)
+    const label = refMap?.get(refId) || refMap?.get(String(refId)) || refId;
+    const ref = `{${label}}`;
     const currentVal = inputValueRef.current;
     // On préfère la position sauvegardée (avant que le focus parte vers l'autre ligne)
     const pos = savedCursorPos.current ?? currentVal.length;
@@ -36,7 +69,7 @@ const FormulaInput = ({ value, formula, formulaMode, setFormulaMode, onCommit, d
     setInputValue(newVal);
     inputValueRef.current = newVal;
     savedCursorPos.current = pos + ref.length; // curseur après la ref
-    setFormulaMode({ isActive: true, onInsert: handleInsertRef });
+    setFormulaMode({ isActive: true, onInsert: handleInsertRef, sourceItemId });
 
     setTimeout(() => {
       if (inputRef.current) {
@@ -44,7 +77,7 @@ const FormulaInput = ({ value, formula, formulaMode, setFormulaMode, onCommit, d
         inputRef.current.setSelectionRange(savedCursorPos.current, savedCursorPos.current);
       }
     }, 0);
-  }, []); // eslint-disable-line
+  }, [refMap]); // eslint-disable-line
 
   // --- Focus ---
   const handleFocus = () => {
@@ -53,11 +86,12 @@ const FormulaInput = ({ value, formula, formulaMode, setFormulaMode, onCommit, d
     // Si on est déjà en mode formule (ex: on vient d'insérer une ref via clic),
     // on ne réinitialise PAS l'input — la formule en cours doit être conservée.
     if (formulaMode?.isActive) return;
-    const displayVal = formula ? formula : (Number(value) === 0 ? '' : String(value));
+    // Afficher les références sous leur forme lisible (P.01) plutôt que l'uid interne
+    const displayVal = formula ? uidToLabel(formula) : (Number(value) === 0 ? '' : String(value));
     setInputValue(displayVal);
     inputValueRef.current = displayVal;
     if (displayVal.startsWith('=')) {
-      setFormulaMode({ isActive: true, onInsert: handleInsertRef });
+      setFormulaMode({ isActive: true, onInsert: handleInsertRef, sourceItemId });
     }
   };
 
@@ -67,7 +101,7 @@ const FormulaInput = ({ value, formula, formulaMode, setFormulaMode, onCommit, d
     setInputValue(val);
     inputValueRef.current = val;
     if (val.startsWith('=')) {
-      setFormulaMode({ isActive: true, onInsert: handleInsertRef });
+      setFormulaMode({ isActive: true, onInsert: handleInsertRef, sourceItemId });
     } else {
       setFormulaMode({ isActive: false, onInsert: null });
     }
@@ -94,7 +128,8 @@ const FormulaInput = ({ value, formula, formulaMode, setFormulaMode, onCommit, d
     const textVal = String(inputValue).trim();
     if (textVal === '') { onCommit(0); setInputValue(0); return; }
     if (textVal.startsWith('=')) {
-      onCommit(textVal);
+      // Ré-encoder les labels lisibles ({P.01}) en uid pour que recalculateProject puisse résoudre
+      onCommit(labelToUid(textVal));
     } else {
       const calculated = calculate(textVal);
       onCommit(calculated);
@@ -141,7 +176,7 @@ const FormulaInput = ({ value, formula, formulaMode, setFormulaMode, onCommit, d
         onKeyDown={handleKeyDown}
         disabled={disabled}
         placeholder={placeholder}
-        title={hasFormula ? formula : undefined}
+        title={hasFormula ? uidToLabel(formula) : undefined}
       />
       {/* Badge ƒ sur les cellules avec formule */}
       {hasFormula && !isEditing && (
@@ -287,7 +322,7 @@ const ItemRow = memo(
               ${isMultiSelected ? 'bg-red-50/60 ring-1 ring-inset ring-red-200' : isSelected ? 'bg-emerald-50 ring-1 ring-inset ring-emerald-200' : 'bg-white'}
               ${hasFormula && !isSelected && !isMultiSelected ? 'bg-emerald-50/30' : ''}
               ${isSource && !isSelected && !isMultiSelected ? 'bg-blue-50/30' : ''}
-              ${formulaMode?.isActive ? 'cursor-crosshair hover:bg-amber-50 hover:ring-1 hover:ring-inset hover:ring-amber-300' : 'cursor-default hover:bg-emerald-50'}
+              ${formulaMode?.isActive && formulaMode.sourceItemId !== el.id ? 'cursor-crosshair hover:bg-amber-50 hover:ring-1 hover:ring-inset hover:ring-amber-300' : (formulaMode?.isActive ? '' : 'cursor-default hover:bg-emerald-50')}
               ${snapshot.isDragging ? 'shadow-lg z-50 rotate-1 scale-[1.01]' : ''}`}
             onClick={(e) => {
               if (formulaMode?.isActive) return;
@@ -300,8 +335,10 @@ const ItemRow = memo(
               onEditItem?.(el);
             }}
             onMouseDown={(e) => {
-              if (formulaMode?.isActive && formulaMode.onInsert) {
-                e.preventDefault(); 
+              // En mode formule, on déclenche l'insertion via clic — sauf si c'est la ligne en cours d'édition
+              // (sinon on créerait une référence circulaire et on perdrait le focus de l'input)
+              if (formulaMode?.isActive && formulaMode.onInsert && formulaMode.sourceItemId !== el.id) {
+                e.preventDefault();
                 e.stopPropagation();
                 formulaMode.onInsert(el.id);
               }
@@ -396,6 +433,8 @@ const ItemRow = memo(
                   formula={currentFormula}
                   formulaMode={formulaMode}
                   setFormulaMode={setFormulaMode}
+                  refMap={refMap}
+                  sourceItemId={el.id}
                   onCommit={(val) => onUpdate(parentId, el.id, qtyFieldToUpdate, val)}
                   disabled={isReadOnly || isGlobalMode} 
                   className={`w-full border rounded py-0.5 px-1 text-right text-xs font-mono font-black outline-none transition-all
