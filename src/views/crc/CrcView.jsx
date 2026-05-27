@@ -3,12 +3,12 @@
 // Module Compte Rendu de Reunion — orchestrateur principal.
 // Interface avec ruban style Office en haut.
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   ArrowLeft, ClipboardList, Plus, Trash2, Copy,
   Building2, Users, ListTree, Edit3, Eye, FileDown, Mail, FolderOpen,
   HelpCircle, Compass, Archive, UploadCloud, ArrowLeftRight,
-  FileText as FileWord, X, MapPin, Minimize2, Send,
+  FileText as FileWord, X, MapPin, Minimize2, Send, AlertCircle,
 } from 'lucide-react';
 import { doc, getDoc, setDoc, collection, getDocs, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -306,6 +306,21 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
         .sort((a, b) => b.number - a.number)[0] || null
     : null;
 
+  // Compteur d'actions en retard sur le CR actif (echeance passee + statut != done)
+  const overdueCount = useMemo(() => {
+    const obc = manager.observationsByCategory;
+    if (!obc) return 0;
+    const t = new Date();
+    const todayISO = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+    let n = 0;
+    Object.values(obc).forEach((arr) => {
+      arr.forEach((o) => {
+        if (o.actionDeadline && o.actionDeadline < todayISO && o.status !== 'done') n++;
+      });
+    });
+    return n;
+  }, [manager.observationsByCategory]);
+
   // Date par defaut pour la duplication : date de prochaine reunion du CR actif
   const defaultDuplicateDate = (() => {
     const nextDate = manager.activeMeeting?.nextMeeting?.date;
@@ -425,19 +440,33 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
     if (!crrDoc) return;
     const { exportCrcArchive } = await import('../../utils/crcArchive');
     const { loadDirHandle, saveToDirectory } = await import('../../utils/exportHelpers');
-    const { blob, filename } = exportCrcArchive(crrDoc, user?.email);
+
+    toast.info('Preparation de l\'archive (telechargement des photos)...');
+    let result;
+    try {
+      result = await exportCrcArchive(crrDoc, user?.email);
+    } catch (err) {
+      console.error('[CRC] Export archive:', err);
+      toast.error('Erreur pendant l\'export de l\'archive.');
+      return;
+    }
+    const { blob, filename, stats } = result;
+
+    const statsMsg = stats.total > 0
+      ? ` — ${stats.embedded}/${stats.total} photos embarquees${stats.failed ? ` (${stats.failed} inaccessibles)` : ''}`
+      : '';
 
     const dirKey = `${companyId}_${crrDoc.id || 'default'}`;
     const dirHandle = await loadDirHandle(dirKey);
     if (dirHandle) {
       const saved = await saveToDirectory(dirHandle, filename, blob);
-      if (saved) { toast.success(`Archive : ${filename}`); return; }
+      if (saved) { toast.success(`Archive : ${filename}${statsMsg}`); return; }
     }
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = filename; a.click();
     URL.revokeObjectURL(url);
-    toast.success(`Archive : ${filename}`);
+    toast.success(`Archive : ${filename}${statsMsg}`);
   }, [crrDoc, user, companyId]);
 
   // ── Archive import (.crcestima) ──
@@ -607,6 +636,15 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
           <div className="flex items-center gap-2">
             <ClipboardList size={16} className="text-gray-500" />
             <span className="text-sm font-bold text-gray-900 tracking-tight">Compte Rendu de Réunion</span>
+            {overdueCount > 0 && (
+              <span
+                className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[10px] font-bold border border-red-200"
+                title={`${overdueCount} action${overdueCount > 1 ? 's' : ''} en retard sur ce CR (échéance dépassée + statut non résolu)`}
+              >
+                <AlertCircle size={10} />
+                {overdueCount} en retard
+              </span>
+            )}
           </div>
         </div>
 

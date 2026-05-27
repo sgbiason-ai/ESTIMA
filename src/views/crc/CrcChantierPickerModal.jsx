@@ -97,10 +97,23 @@ export default function CrcChantierPickerModal({
   const handleDelete = async (e, chantier) => {
     e.stopPropagation();
     const nom = chantier.crrConfig?.chantierInfo?.nom || 'Sans nom';
-    const ok = await confirm(
-      `Supprimer le chantier "${nom}" et tous ses comptes rendus ?`,
-      { danger: true }
+
+    const meetings = chantier.crrMeetings || [];
+    const meetingCount = meetings.length;
+    const obsCount = meetings.reduce((s, m) => s + (m.observations?.length || 0), 0);
+    const photoCount = meetings.reduce(
+      (s, m) => s + (m.observations || []).reduce((ss, o) => ss + (o.images?.length || 0), 0),
+      0
     );
+
+    let msg = `Supprimer le chantier "${nom}" ?\n\nContenu : ${meetingCount} compte-rendu${meetingCount > 1 ? 's' : ''}, ${obsCount} observation${obsCount > 1 ? 's' : ''}`;
+    if (photoCount > 0) {
+      msg += `, ${photoCount} photo${photoCount > 1 ? 's' : ''}.\n\nATTENTION : les photos seront DEFINITIVEMENT supprimees du serveur. Pour les conserver, exportez d'abord l'affaire en .crcestima (bouton Archiver) — l'export embarque les photos en base64.`;
+    } else {
+      msg += '.';
+    }
+
+    const ok = await confirm(msg, { danger: true });
     if (ok) onDelete(chantier.id);
   };
 

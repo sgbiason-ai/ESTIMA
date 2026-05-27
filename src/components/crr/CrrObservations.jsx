@@ -384,6 +384,14 @@ const ObservationRow = memo(({ obs, onUpdate, onDelete, meetingDate, participant
     onEditorFocus({ obsId: obs.id, editorRef, execFormat, handleHighlight, fileRef, cameraRef });
   }, [obs.id, onEditorFocus, execFormat, handleHighlight]);
 
+  // Échéance dépassée : date d'action passée + statut différent de "done"
+  const today = new Date();
+  const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const isOverdue = obs.actionDeadline && obs.actionDeadline < todayISO && obs.status !== 'done';
+  const daysLate = isOverdue
+    ? Math.floor((Date.parse(todayISO) - Date.parse(obs.actionDeadline)) / 86400000)
+    : 0;
+
   return (
     <div
       className={`border rounded-lg transition-all overflow-hidden ${
@@ -528,8 +536,14 @@ const ObservationRow = memo(({ obs, onUpdate, onDelete, meetingDate, participant
               type="date"
               value={obs.actionDeadline || ''}
               onChange={(e) => onUpdate(obs.id, { actionDeadline: e.target.value })}
-              className={`w-full text-[11px] px-1 xl:px-2 py-1 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 ${obs.actionDeadline ? 'text-slate-800' : 'text-slate-300'}`}
-              title="Pour le"
+              className={`w-full text-[11px] px-1 xl:px-2 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 ${
+                isOverdue
+                  ? 'text-red-700 bg-red-50 border-red-300 font-semibold'
+                  : obs.actionDeadline
+                  ? 'text-slate-800 border-slate-200'
+                  : 'text-slate-300 border-slate-200'
+              }`}
+              title={isOverdue ? `En retard de ${daysLate} jour${daysLate > 1 ? 's' : ''}` : 'Pour le'}
             />
             {obs.actionDeadline && (
               <button onClick={() => onUpdate(obs.id, { actionDeadline: '' })} className="p-0.5 text-slate-300 hover:text-red-400 transition-colors" title="Effacer la date">

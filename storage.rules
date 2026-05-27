@@ -5,8 +5,11 @@ rules_version = '2';
 //   companies/{companyId}/crr/{crrId}/{obsId}/{fileName}  → photos d'observations CRC
 //
 // Securite multi-tenant :
-// - Ecriture : verifie que le user appartient bien a la company via Firestore
-// - Lecture : auth requise (URL avec token = non listable sans connaissance du path)
+// - Ecriture : auth requise + verification taille + content-type
+// - Lecture : publique (necessaire car les <img src> ne portent pas le token d'auth
+//   Firebase, et depuis 2026 le download URL token Storage ne bypass plus les rules).
+//   Securite assuree par l'imprevisibilite des paths (companyId / crrId / obsId / fileName
+//   contiennent tous des UUIDs non-devinables, non-listables, non-indexes).
 // - Limite taille : 5 Mo par image (les photos compressees font ~30-150 Ko)
 // - Content-type : image/* uniquement
 
@@ -14,12 +17,11 @@ service firebase.storage {
   match /b/{bucket}/o {
 
     // Photos CRC
-    // Securite : auth requise + size + content-type. Le cloisonnement
-    // multi-tenant est garanti cote client par le path derive du companyId
-    // du user (lui-meme valide par les Firestore rules sur /companies/{id}/crr).
-    // Les URLs Storage incluent un token non-devinable (pas de listing public).
+    // Lecture publique : les <img src=...> doivent pouvoir charger sans auth.
+    // Le cloisonnement multi-tenant est garanti par l'imprevisibilite des paths
+    // (4 segments d'UUIDs random) et l'absence de listing public.
     match /companies/{companyId}/crr/{crrId}/{obsId}/{fileName} {
-      allow read: if request.auth != null;
+      allow read: if true;
       allow write: if request.auth != null
                    && request.resource.size < 5 * 1024 * 1024
                    && request.resource.contentType.matches('image/.*');
