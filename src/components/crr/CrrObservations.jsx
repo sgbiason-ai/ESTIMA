@@ -5,7 +5,7 @@ import {
   Plus, Trash2, ChevronDown, ChevronRight,
   MinusCircle, Circle, Loader, CheckCircle2,
   ImagePlus, Camera, X, Bold, Underline, Highlighter, List, GripVertical,
-  ArrowUp, ArrowDown,
+  ArrowUp, ArrowDown, TextSelect,
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { OBSERVATION_STATUSES, getGroupColor, abbreviateGroup } from '../../data/crrData';
@@ -192,63 +192,57 @@ const StatusBadge = memo(({ status, onChange }) => {
   );
 }, (prev, next) => prev.status === next.status && prev.onChange === next.onChange);
 
-// ── Barre flottante formatage + photo (apparait au focus editeur) ──────────
+// ── Barre formatage + photo intégrée en haut du bloc en cours d'édition ────
 
-const FloatingToolbar = ({ editorRef, onExecFormat, onHighlight, fileRef, cameraRef }) => {
-  const [kbOffset, setKbOffset] = useState(0);
-
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const sync = () => setKbOffset(Math.max(0, window.innerHeight - vv.height - vv.offsetTop));
-    vv.addEventListener('resize', sync);
-    vv.addEventListener('scroll', sync);
-    sync();
-    return () => { vv.removeEventListener('resize', sync); vv.removeEventListener('scroll', sync); };
-  }, []);
-
-  if (!editorRef) return null;
-  return ReactDOM.createPortal(
+const InlineToolbar = ({ onExecFormat, onHighlight, onSelectAll, fileRef, cameraRef }) => {
+  return (
     <div
-      className="fixed left-0 right-0 z-[9999] flex items-center justify-center gap-1 px-4 py-2.5 bg-white/95 backdrop-blur-xl border-t border-gray-200/80 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]"
-      style={{ bottom: kbOffset }}
+      className="flex items-center gap-1 px-2 py-1.5 bg-gradient-to-b from-blue-50 to-white border-b border-blue-200/60 rounded-t-lg"
       onMouseDown={(e) => e.preventDefault()}
+      onTouchStart={(e) => {
+        // Empêche le doigt qui touche un bouton de faire perdre le focus à l'éditeur
+        // (sans bloquer le clic lui-même)
+        if (e.target.closest('button')) e.preventDefault();
+      }}
     >
-      <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
+      <div className="flex items-center gap-0.5 bg-white rounded-lg p-0.5 border border-gray-200/60">
         <button type="button" onClick={() => onExecFormat('bold')} title="Gras (Ctrl+B)"
-          className="p-2 rounded-lg hover:bg-white hover:shadow-sm text-gray-500 hover:text-gray-900 transition-all">
-          <Bold size={16} strokeWidth={2.5} />
+          className="p-1.5 [@media(pointer:coarse)]:p-2.5 rounded-md hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-all">
+          <Bold size={14} strokeWidth={2.5} />
         </button>
         <button type="button" onClick={() => onExecFormat('underline')} title="Souligné (Ctrl+U)"
-          className="p-2 rounded-lg hover:bg-white hover:shadow-sm text-gray-500 hover:text-gray-900 transition-all">
-          <Underline size={16} strokeWidth={2.5} />
+          className="p-1.5 [@media(pointer:coarse)]:p-2.5 rounded-md hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-all">
+          <Underline size={14} strokeWidth={2.5} />
         </button>
         <button type="button" onClick={onHighlight} title="Fluo (Ctrl+H)"
-          className="p-2 rounded-lg hover:bg-amber-50 hover:shadow-sm text-gray-500 hover:text-amber-600 transition-all">
-          <Highlighter size={16} strokeWidth={2.5} />
+          className="p-1.5 [@media(pointer:coarse)]:p-2.5 rounded-md hover:bg-amber-50 text-gray-500 hover:text-amber-600 transition-all">
+          <Highlighter size={14} strokeWidth={2.5} />
         </button>
         <button type="button" onClick={() => onExecFormat('insertUnorderedList')} title="Liste à puces (Ctrl+L)"
-          className="p-2 rounded-lg hover:bg-white hover:shadow-sm text-gray-500 hover:text-gray-900 transition-all">
-          <List size={16} strokeWidth={2.5} />
+          className="p-1.5 [@media(pointer:coarse)]:p-2.5 rounded-md hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-all">
+          <List size={14} strokeWidth={2.5} />
+        </button>
+        <button type="button" onClick={onSelectAll} title="Tout sélectionner (Ctrl+A)"
+          className="p-1.5 [@media(pointer:coarse)]:p-2.5 rounded-md hover:bg-blue-50 text-gray-500 hover:text-blue-600 transition-all">
+          <TextSelect size={14} strokeWidth={2.5} />
         </button>
       </div>
 
-      <div className="w-px h-6 bg-gray-200 mx-1" />
+      <div className="w-px h-5 bg-gray-200 mx-0.5" />
 
-      <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
+      <div className="flex items-center gap-0.5 bg-white rounded-lg p-0.5 border border-gray-200/60">
         <button type="button" onClick={() => fileRef.current?.click()} title="Ajouter une photo"
-          className="p-2 rounded-lg hover:bg-white hover:shadow-sm text-gray-500 hover:text-emerald-600 transition-all flex items-center gap-1.5">
-          <ImagePlus size={16} />
-          <span className="text-xs font-medium hidden sm:inline">Photo</span>
+          className="p-1.5 [@media(pointer:coarse)]:p-2.5 rounded-md hover:bg-gray-100 text-gray-500 hover:text-emerald-600 transition-all flex items-center gap-1">
+          <ImagePlus size={14} />
+          <span className="text-[11px] font-medium hidden sm:inline">Photo</span>
         </button>
         <button type="button" onClick={() => cameraRef.current?.click()} title="Prendre une photo (tablette/mobile)"
-          className="p-2 rounded-lg hover:bg-white hover:shadow-sm text-gray-500 hover:text-emerald-600 transition-all flex items-center gap-1.5">
-          <Camera size={16} />
-          <span className="text-xs font-medium hidden sm:inline">Caméra</span>
+          className="p-1.5 [@media(pointer:coarse)]:p-2.5 rounded-md hover:bg-gray-100 text-gray-500 hover:text-emerald-600 transition-all flex items-center gap-1">
+          <Camera size={14} />
+          <span className="text-[11px] font-medium hidden sm:inline">Caméra</span>
         </button>
       </div>
-    </div>,
-    document.body
+    </div>
   );
 };
 
@@ -336,6 +330,17 @@ const ObservationRow = memo(({ obs, onUpdate, onDelete, meetingDate, participant
     handleEditorInput();
   }, [handleEditorInput]);
 
+  const handleSelectAll = useCallback(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }, []);
+
   const handleKeyDown = useCallback((e) => {
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
       if (e.key === 'b') { e.preventDefault(); execFormat('bold'); }
@@ -381,7 +386,7 @@ const ObservationRow = memo(({ obs, onUpdate, onDelete, meetingDate, participant
 
   return (
     <div
-      className={`border rounded-lg transition-all ${
+      className={`border rounded-lg transition-all overflow-hidden ${
         isEditing
           ? 'ring-2 ring-blue-200 border-blue-300 bg-blue-50/20'
           : obs.status === 'done'
@@ -391,6 +396,15 @@ const ObservationRow = memo(({ obs, onUpdate, onDelete, meetingDate, participant
           : 'border-slate-200 bg-white'
       }`}
     >
+      {isEditing && (
+        <InlineToolbar
+          onExecFormat={execFormat}
+          onHighlight={handleHighlight}
+          onSelectAll={handleSelectAll}
+          fileRef={fileRef}
+          cameraRef={cameraRef}
+        />
+      )}
       <div className="px-3 py-2">
         <div className="grid grid-cols-[24px_48px_100px_1fr_72px_48px_100px_24px] xl:grid-cols-[30px_80px_120px_1fr_86px_80px_120px_30px] gap-x-2 items-center">
           {/* Col 1 — Drag */}
@@ -447,8 +461,14 @@ const ObservationRow = memo(({ obs, onUpdate, onDelete, meetingDate, participant
               spellCheck
               lang="fr"
               data-placeholder="Observation..."
-              className="w-full text-xs px-2 py-1 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 min-h-[28px] text-slate-800 whitespace-pre-wrap empty:before:content-[attr(data-placeholder)] empty:before:text-slate-300"
-              style={{ outline: 'none' }}
+              className="w-full text-xs [@media(pointer:coarse)]:text-[15px] [@media(pointer:coarse)]:leading-relaxed px-2 py-1 [@media(pointer:coarse)]:px-3 [@media(pointer:coarse)]:py-2.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 min-h-[28px] [@media(pointer:coarse)]:min-h-[44px] text-slate-800 whitespace-pre-wrap select-text empty:before:content-[attr(data-placeholder)] empty:before:text-slate-300"
+              style={{
+                outline: 'none',
+                WebkitUserSelect: 'text',
+                userSelect: 'text',
+                WebkitTouchCallout: 'default',
+                WebkitTapHighlightColor: 'rgba(59, 130, 246, 0.15)',
+              }}
             />
 
             {images.length > 0 && (
@@ -622,7 +642,7 @@ const CrrObservations = ({
 
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
-    <div className={`space-y-3 ${activeEdit ? 'pb-16' : ''}`}>
+    <div className="space-y-3">
       {/* Texte legal */}
       <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
         <p className="text-[11px] text-amber-800 leading-relaxed italic">
@@ -734,15 +754,6 @@ const CrrObservations = ({
       })}
     </div>
 
-    {activeEdit && (
-      <FloatingToolbar
-        editorRef={activeEdit.editorRef}
-        onExecFormat={activeEdit.execFormat}
-        onHighlight={activeEdit.handleHighlight}
-        fileRef={activeEdit.fileRef}
-        cameraRef={activeEdit.cameraRef}
-      />
-    )}
     </DragDropContext>
   );
 };
