@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
-import { collection, getDocs, deleteDoc, doc as fsDoc } from 'firebase/firestore';
+import { collection, getDocs, deleteDoc, setDoc, doc as fsDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { toast, confirm } from '../../../utils/globalUI';
+import { getActiveLocalLibrary } from '../../../utils/localLibrary';
 
 /**
  * usePmCloudProjects
@@ -61,9 +62,13 @@ export const usePmCloudProjects = ({
   }, [historyTab, loadCloudProjects]);
 
   // ── Ouvrir un projet cloud ─────────────────────────────────────────────────
-  const handleLoadCloudProject = async (proj) => {
-    const ok = await confirm(`Ouvrir "${proj.name || 'Sans nom'}" ?`);
-    if (!ok) return;
+  // Le paramètre { silent } permet de sauter la modale de confirmation
+  // (utilisé par le double-clic qui ouvre directement le projet dans Estima VRD).
+  const handleLoadCloudProject = async (proj, { silent = false } = {}) => {
+    if (!silent) {
+      const ok = await confirm(`Ouvrir "${proj.name || 'Sans nom'}" ?`);
+      if (!ok) return false;
+    }
     setProject(proj);
     // Persister l'ID du projet actif pour que les autres modules (ESTIMA VRD)
     // chargent le bon projet via useProjectManager
@@ -77,6 +82,51 @@ export const usePmCloudProjects = ({
     const loadedBpuConfig = proj.bpuConfig || proj.__bpuConfig;
     if (loadedBpuConfig && typeof setBpuConfig === 'function') setBpuConfig(loadedBpuConfig);
     if (proj.__clientPercent !== undefined && typeof setClientPercent === 'function') setClientPercent(proj.__clientPercent);
+    return true;
+  };
+
+  // ── Dupliquer un projet cloud ──────────────────────────────────────────────
+  // Génère un nom auto-incrémenté du style "Nom (1)", "Nom (2)"... si "Nom" existe déjà.
+  // Si le nom source se termine déjà par "(N)", on prend le préfixe et on continue l'incrément.
+  const generateCopyName = (baseName, existingNames) => {
+    const trimmed = String(baseName || 'Projet sans nom').trim();
+    const match = trimmed.match(/^(.+?)\s*\((\d+)\)\s*$/);
+    const root = (match ? match[1] : trimmed).trim();
+    let n = 1;
+    while (existingNames.includes(`${root} (${n})`)) n++;
+    return `${root} (${n})`;
+  };
+
+  const handleDuplicateCloudProject = async (proj, e) => {
+    e?.stopPropagation?.();
+    if (!companyId || !proj) return;
+
+    const existingNames = cloudProjects.map(p => p.name || '');
+    const newName = generateCopyName(proj.name, existingNames);
+    const ok = await confirm(`Dupliquer "${proj.name || 'Sans nom'}" sous le nom "${newName}" ?`);
+    if (!ok) return;
+
+    const now = new Date().toISOString();
+    const newId = `clone_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    // Copie deep, on remplace id / name / lastSaved / saveHistory.
+    // Le périmètre couvre le document projet (chapitres, BPU, fiche projet, branding, DCE, priceAnalysisData).
+    // Les sous-collections (CRC, Visites, RAO) ne sont pas dupliquées.
+    const clone = {
+      ...JSON.parse(JSON.stringify(proj)),
+      id: newId,
+      name: newName,
+      lastSaved: now,
+      saveHistory: [now],
+    };
+
+    try {
+      await setDoc(fsDoc(db, 'companies', companyId, 'projects', newId), clone);
+      setCloudProjects(prev => [clone, ...prev]);
+      toast.success(`Projet "${newName}" créé.`);
+    } catch (err) {
+      console.error('[handleDuplicateCloudProject] erreur Firestore:', err);
+      toast.error('Impossible de dupliquer le projet sur le Cloud.');
+    }
   };
 
   // ── Supprimer un projet cloud ──────────────────────────────────────────────
@@ -142,12 +192,27 @@ export const usePmCloudProjects = ({
         catch { localStorage.removeItem(snapshotsKey); }
       }
 
+      // Si le mode local est actif, on rattache un snapshot de la bibliothèque au projet
+      // (id + name + importedAt + bpu + categories). Permet de proposer le rechargement
+      // de cette même biblio quand le projet sera réouvert plus tard.
+      const activeLib = getActiveLocalLibrary();
+      const linkedLibrary = activeLib
+        ? {
+            id: activeLib.id || null,
+            name: activeLib.name || '',
+            importedAt: activeLib.importedAt || null,
+            bpu: activeLib.bpu,
+            categories: activeLib.categories || [],
+          }
+        : undefined;
+
       const updatedProject = {
         ...project,
         bpuConfig: bpuConfig || { numberingMode: 'auto' },
         priceAnalysisData: analysisData,
         lastSaved: now,
         saveHistory,
+        ...(linkedLibrary ? { linkedLibrary } : {}),
       };
 
       await onSaveProject(updatedProject);
@@ -208,6 +273,7 @@ export const usePmCloudProjects = ({
     handleRestoreSnapshot,
     handleLoadCloudProject,
     handleDeleteCloudProject,
+    handleDuplicateCloudProject,
     handleCloudSave,
   };
 };

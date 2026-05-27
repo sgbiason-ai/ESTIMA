@@ -343,14 +343,16 @@ const DatabaseView = ({
       <input type="file" ref={fileInputRef} onChange={(e) => {
           const file = e.target.files[0];
           if (!file) return;
+          // Nom de la biblio par défaut = nom du fichier sans extension
+          const fileName = file.name.replace(/\.json$/i, '');
           const reader = new FileReader();
           reader.onload = (ev) => {
               try {
                   const json = JSON.parse(ev.target.result);
                   if (Array.isArray(json)) {
-                    onImportData({ bpu: json });
+                    onImportData({ bpu: json }, { name: fileName });
                   } else {
-                    onImportData(json);
+                    onImportData(json, { name: fileName });
                   }
               } catch (err) { showToast("Fichier JSON invalide.", 'error'); }
           };

@@ -2,6 +2,7 @@ import React from 'react';
 import {
   Upload, Save, FolderOpen, Copy, CheckCheck, RefreshCw, Cpu, Cloud, CheckCircle2, FileText, Layers, PlusCircle, HelpCircle
 } from 'lucide-react';
+import { APP_VERSION } from '../../data/changelog';
 
 const RibbonGroup = ({ label, children, noBorder }) => (
   <div className="flex flex-col h-full relative">
@@ -161,8 +162,8 @@ const PmLeftColumn = ({
         <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
         <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Connecté</span>
       </div>
-      <div className="flex items-center gap-1.5 text-[10px] font-mono text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
-        <Cpu size={10} /> v2.0.0
+      <div className="flex items-center gap-1.5 text-[10px] font-mono text-gray-400 bg-gray-100 px-2 py-0.5 rounded" title="Version installée d'EstimaVRD">
+        <Cpu size={10} /> v{APP_VERSION}
       </div>
     </div>
   </div>

@@ -12,6 +12,11 @@ import { useToast } from '../contexts/ToastContext';
 const col  = (companyId, name)     => collection(db, 'companies', companyId, name);
 const dref = (companyId, name, id) => doc(db, 'companies', companyId, name, id);
 
+// Firestore interdit le caractère '/' dans les Document IDs (séparateur de chemin).
+// On l'encode en '∕' (U+2215, division slash) pour permettre des symboles type "1/2 J".
+// Le champ `symbol` dans le document conserve la valeur exacte tapée par l'utilisateur.
+const unitDocId = (symbol) => String(symbol).replace(/\//g, '∕');
+
 export const useDatabase = (user, companyId) => {
   const { confirm } = useDialog();
   const toast = useToast();
@@ -301,9 +306,10 @@ export const useDatabase = (user, companyId) => {
       return exists ? prev.map(u => u.symbol === newItem.symbol ? newItem : u) : [...prev, newItem];
     });
     try {
-      await setDoc(dref(companyId, 'units', newItem.symbol), newItem);
+      await setDoc(dref(companyId, 'units', unitDocId(newItem.symbol)), newItem);
       toast.success(`Unité "${symb}" sauvegardée.`);
-    } catch {
+    } catch (e) {
+      console.error('[saveUnit] erreur Firestore:', e);
       setUnits(prevUnits);
       toast.error('Unité non sauvegardée sur le Cloud.', { title: 'Erreur' });
     }
@@ -314,7 +320,7 @@ export const useDatabase = (user, companyId) => {
     const prevUnits = units;
     setUnits(prev => prev.filter(u => u.symbol !== symbol));
     try {
-      await deleteDoc(dref(companyId, 'units', symbol));
+      await deleteDoc(dref(companyId, 'units', unitDocId(symbol)));
       toast.success(`Unité "${symbol}" supprimée.`);
     } catch {
       setUnits(prevUnits);

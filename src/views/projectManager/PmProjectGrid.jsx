@@ -1,5 +1,5 @@
-import React from 'react';
-import { Cloud, Folder, Clock, RefreshCw, CloudOff, Trash2, RotateCcw, Info, ClipboardList, BarChart3 } from 'lucide-react';
+import React, { useRef } from 'react';
+import { Cloud, Folder, Clock, RefreshCw, CloudOff, Trash2, RotateCcw, Info, ClipboardList, BarChart3, Copy } from 'lucide-react';
 import { NEUTRAL_COLOR } from './folderColors';
 
 const PmProjectGrid = ({
@@ -8,8 +8,24 @@ const PmProjectGrid = ({
   selectedFolderId, setSelectedFolderId,
   project, folders, folderColorMap = {},
   presenceByProject, deletingId,
-  onLoadProject, onDeleteProject, onMoveProject, onRestoreSnapshot, onInfoProject, linkedCrcMap = {}, raoProjectIds = new Set(), onNavigateModule,
+  onLoadProject, onOpenInEstima, onDeleteProject, onDuplicateProject, onMoveProject, onRestoreSnapshot, onInfoProject, linkedCrcMap = {}, raoProjectIds = new Set(), onNavigateModule,
 }) => {
+
+  // Distinguer simple clic (sélection + confirmation) du double-clic (ouverture directe dans Estima).
+  // Le simple clic est différé de 220ms pour laisser au navigateur le temps de détecter un éventuel double-clic.
+  const clickTimerRef = useRef(null);
+  const handleCardClick = (proj) => {
+    if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+    clickTimerRef.current = setTimeout(() => {
+      clickTimerRef.current = null;
+      onLoadProject?.(proj);
+    }, 220);
+  };
+  const handleCardDoubleClick = (proj) => {
+    if (clickTimerRef.current) { clearTimeout(clickTimerRef.current); clickTimerRef.current = null; }
+    if (onOpenInEstima) onOpenInEstima(proj);
+    else onLoadProject?.(proj);
+  };
 
   // ── Empty states (Apple-style) ───────────────────────────────────────────
   if (cloudLoading) return (
@@ -82,7 +98,9 @@ const PmProjectGrid = ({
           return (
             <div
               key={proj.id}
-              onClick={() => onLoadProject(proj)}
+              onClick={() => handleCardClick(proj)}
+              onDoubleClick={() => handleCardDoubleClick(proj)}
+              title="Cliquer pour aperçu • Double-clic pour ouvrir dans Estima VRD"
               className={`group relative grid grid-cols-[1fr_100px_80px_80px_140px_70px] gap-2 items-center px-4 pl-6 py-2.5 cursor-pointer transition-all border-b border-gray-100 ${
                 isActive ? fc.card : 'hover:bg-gray-50'
               }`}
@@ -129,6 +147,7 @@ const PmProjectGrid = ({
               </div>
               <div className="flex items-center justify-end gap-1">
                 <button onClick={e => { e.stopPropagation(); onInfoProject?.(proj); }} className="p-1 rounded-lg text-gray-300 hover:text-indigo-500 hover:bg-indigo-50 transition-colors opacity-0 group-hover:opacity-100" title="Fiche projet"><Info size={13} /></button>
+                <button onClick={e => onDuplicateProject?.(proj, e)} className="p-1 rounded-lg text-gray-300 hover:text-violet-500 hover:bg-violet-50 transition-colors opacity-0 group-hover:opacity-100" title="Dupliquer"><Copy size={13} /></button>
                 <button onClick={e => { e.stopPropagation(); onMoveProject(proj); }} className="p-1 rounded-lg text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-colors opacity-0 group-hover:opacity-100" title="Déplacer"><Folder size={13} /></button>
                 <button onClick={e => onDeleteProject(proj, e)} disabled={deletingId === proj.id} className="p-1 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100" title="Supprimer">
                   {deletingId === proj.id ? <RefreshCw size={13} className="animate-spin" /> : <Trash2 size={13} />}
@@ -151,7 +170,9 @@ const PmProjectGrid = ({
         return (
           <div
             key={proj.id}
-            onClick={() => onLoadProject(proj)}
+            onClick={() => handleCardClick(proj)}
+            onDoubleClick={() => handleCardDoubleClick(proj)}
+            title="Cliquer pour aperçu • Double-clic pour ouvrir dans Estima VRD"
             className={`group relative cursor-pointer border-2 rounded-2xl p-5 transition-all duration-200 flex flex-col h-full overflow-hidden ${
               isActive ? fc.cardActive : `${fc.card} ${fc.cardHover} hover:shadow-lg hover:-translate-y-0.5`
             }`}
@@ -242,6 +263,7 @@ const PmProjectGrid = ({
                   <span><strong>{elemCount}</strong> el.</span>
                 </div>
                 <button onClick={e => { e.stopPropagation(); onInfoProject?.(proj); }} className="p-1 rounded-lg text-gray-300 hover:text-indigo-500 hover:bg-indigo-50 transition-colors opacity-0 group-hover:opacity-100" title="Fiche projet"><Info size={13} /></button>
+                <button onClick={e => onDuplicateProject?.(proj, e)} className="p-1 rounded-lg text-gray-300 hover:text-violet-500 hover:bg-violet-50 transition-colors opacity-0 group-hover:opacity-100" title="Dupliquer"><Copy size={13} /></button>
                 <button onClick={e => { e.stopPropagation(); onMoveProject(proj); }} className="p-1 rounded-lg text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-colors opacity-0 group-hover:opacity-100" title="Déplacer"><Folder size={13} /></button>
                 <button onClick={e => onDeleteProject(proj, e)} disabled={deletingId === proj.id} className="p-1 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100" title="Supprimer">
                   {deletingId === proj.id ? <RefreshCw size={13} className="animate-spin" /> : <Trash2 size={13} />}

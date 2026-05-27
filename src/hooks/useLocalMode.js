@@ -12,6 +12,9 @@ const STORAGE_KEYS = {
   active: 'bpu_local_active',
   data: 'bpu_local_data',
   categories: 'bpu_local_categories',
+  id: 'bpu_local_id',
+  name: 'bpu_local_name',
+  importedAt: 'bpu_local_imported_at',
 };
 
 export const useLocalMode = ({
@@ -31,6 +34,10 @@ export const useLocalMode = ({
   const [isLocalMode, setIsLocalMode] = useState(false);
   const [localBpu, setLocalBpu] = useState([]);
   const [localCategories, setLocalCategories] = useState([]);
+  // Métadonnées de la biblio (permettent à un projet de garder un lien vers sa biblio source)
+  const [localLibraryId, setLocalLibraryId] = useState(null);
+  const [localLibraryName, setLocalLibraryName] = useState('');
+  const [localLibraryImportedAt, setLocalLibraryImportedAt] = useState(null);
 
   // ─── RESTAURATION SESSION AU DÉMARRAGE ───────────────────────────────────
 
@@ -45,6 +52,9 @@ export const useLocalMode = ({
 
       setLocalBpu(JSON.parse(savedBpu));
       setLocalCategories(savedCats ? JSON.parse(savedCats) : []);
+      setLocalLibraryId(localStorage.getItem(STORAGE_KEYS.id) || null);
+      setLocalLibraryName(localStorage.getItem(STORAGE_KEYS.name) || '');
+      setLocalLibraryImportedAt(localStorage.getItem(STORAGE_KEYS.importedAt) || null);
       setIsLocalMode(true);
     } catch {
       // Données corrompues → on ignore silencieusement
@@ -59,20 +69,33 @@ export const useLocalMode = ({
         localStorage.setItem(STORAGE_KEYS.active, 'true');
         localStorage.setItem(STORAGE_KEYS.data, JSON.stringify(localBpu));
         localStorage.setItem(STORAGE_KEYS.categories, JSON.stringify(localCategories));
+        if (localLibraryId) localStorage.setItem(STORAGE_KEYS.id, localLibraryId);
+        else localStorage.removeItem(STORAGE_KEYS.id);
+        if (localLibraryName) localStorage.setItem(STORAGE_KEYS.name, localLibraryName);
+        else localStorage.removeItem(STORAGE_KEYS.name);
+        if (localLibraryImportedAt) localStorage.setItem(STORAGE_KEYS.importedAt, localLibraryImportedAt);
+        else localStorage.removeItem(STORAGE_KEYS.importedAt);
       } else {
         localStorage.setItem(STORAGE_KEYS.active, 'false');
       }
     } catch {
       // Quota dépassé → silencieux
     }
-  }, [localBpu, localCategories, isLocalMode]);
+  }, [localBpu, localCategories, isLocalMode, localLibraryId, localLibraryName, localLibraryImportedAt]);
 
   // ─── IMPORTATION D'UN FICHIER LOCAL ──────────────────────────────────────
 
-  const handleLocalImport = (json) => {
+  const handleLocalImport = (json, meta = {}) => {
     if (!json?.bpu) return;
     setLocalBpu(json.bpu);
     setLocalCategories(json.categories || []);
+    // Métadonnées : priorité au JSON, sinon meta (filename), sinon valeurs auto
+    const id = json.id || meta.id || `lib_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const name = json.name || meta.name || 'Bibliothèque locale';
+    const importedAt = new Date().toISOString();
+    setLocalLibraryId(id);
+    setLocalLibraryName(name);
+    setLocalLibraryImportedAt(importedAt);
     setIsLocalMode(true);
     setActiveTab('database');
   };
@@ -99,11 +122,17 @@ export const useLocalMode = ({
     try {
       localStorage.removeItem(STORAGE_KEYS.data);
       localStorage.removeItem(STORAGE_KEYS.categories);
+      localStorage.removeItem(STORAGE_KEYS.id);
+      localStorage.removeItem(STORAGE_KEYS.name);
+      localStorage.removeItem(STORAGE_KEYS.importedAt);
       localStorage.setItem(STORAGE_KEYS.active, 'false');
     } catch { /* silencieux */ }
 
     setLocalBpu([]);
     setLocalCategories([]);
+    setLocalLibraryId(null);
+    setLocalLibraryName('');
+    setLocalLibraryImportedAt(null);
     setIsLocalMode(false);
   };
 
@@ -177,6 +206,9 @@ export const useLocalMode = ({
     isLocalMode,
     currentBpu,
     currentCategories,
+    localLibraryId,
+    localLibraryName,
+    localLibraryImportedAt,
 
     // Actions mode local
     handleLocalImport,

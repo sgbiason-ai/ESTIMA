@@ -4,9 +4,10 @@ import * as XLSX from 'xlsx';
 import {
   Settings, Ruler, Trash2, Upload, FileSpreadsheet,
   AlertTriangle, Edit2, X, Check, ListOrdered, Hash,
-  HelpCircle, Info, AlertCircle, FileJson, ArrowRight, Save,
-  MousePointer2
+  HelpCircle, Info, AlertCircle, FileJson, FileText, ArrowRight, Save,
+  MousePointer2, Loader2
 } from 'lucide-react';
+import { parsePdfBpu } from '../utils/parsePdfBpu';
 import HelpPanel from '../components/help/HelpPanel';
 import { APP_VERSION } from '../data/changelog';
 
@@ -29,13 +30,16 @@ const SettingsView = ({
   const [showHelp, setShowHelp] = useState(false);
   
   // --- ÉTATS POUR LA CONVERSION JSON & MAPPING ---
-  const [pendingJsonData, setPendingJsonData] = useState(null); 
-  const [showUnitMapModal, setShowUnitMapModal] = useState(false); 
-  const [missingUnits, setMissingUnits] = useState([]); 
-  const [unitMap, setUnitMap] = useState({}); 
+  const [pendingJsonData, setPendingJsonData] = useState(null);
+  const [showUnitMapModal, setShowUnitMapModal] = useState(false);
+  const [missingUnits, setMissingUnits] = useState([]);
+  const [unitMap, setUnitMap] = useState({});
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfFileName, setPdfFileName] = useState('');
 
   const fileInputRef = useRef(null);
   const jsonInputRef = useRef(null);
+  const pdfInputRef = useRef(null);
 
   // --- ACTIONS ---
   const handleSubmit = (e) => {
@@ -72,7 +76,27 @@ const SettingsView = ({
     }
   };
 
-  // --- 1. LECTURE ET ANALYSE DU FICHIER ---
+  // --- Pipeline commun : vérifie unités inconnues, ouvre modale ou télécharge ---
+  const processRawData = (rawData, sourceName = 'bpu') => {
+    const knownSymbols = units.map(u => u.symbol);
+    const unknownSet = new Set();
+    rawData.forEach(item => {
+      if (!knownSymbols.includes(item.unit)) unknownSet.add(item.unit);
+    });
+
+    if (unknownSet.size > 0) {
+      setMissingUnits(Array.from(unknownSet));
+      setPendingJsonData({ data: rawData, source: sourceName });
+      const initialMap = {};
+      unknownSet.forEach(u => initialMap[u] = "");
+      setUnitMap(initialMap);
+      setShowUnitMapModal(true);
+    } else {
+      downloadJson(rawData, sourceName);
+    }
+  };
+
+  // --- 1. LECTURE ET ANALYSE DU FICHIER EXCEL ---
   const handleConvertXlsxToJson = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -83,14 +107,14 @@ const SettingsView = ({
       const wb = XLSX.read(bstr, { type: 'binary' });
       const wsname = wb.SheetNames[0];
       const ws = wb.Sheets[wsname];
-      
+
       const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
-      
+
       const rawData = data.slice(1).map(row => {
         if (!row[0]) return null;
         return {
           id: row[0],
-          bpuNum: row[0], 
+          bpuNum: row[0],
           designation: row[1] || "",
           description: row[2] || "",
           unit: (row[3] || "u").trim(),
@@ -98,39 +122,50 @@ const SettingsView = ({
         };
       }).filter(item => item !== null);
 
-      const knownSymbols = units.map(u => u.symbol);
-      const unknownSet = new Set();
-
-      rawData.forEach(item => {
-        if (!knownSymbols.includes(item.unit)) {
-          unknownSet.add(item.unit);
-        }
-      });
-
-      if (unknownSet.size > 0) {
-        setMissingUnits(Array.from(unknownSet));
-        setPendingJsonData(rawData); 
-        const initialMap = {};
-        unknownSet.forEach(u => initialMap[u] = ""); 
-        setUnitMap(initialMap);
-        setShowUnitMapModal(true);
-      } else {
-        downloadJson(rawData);
-      }
+      processRawData(rawData, 'bpu');
       e.target.value = null;
     };
     reader.readAsBinaryString(file);
   };
 
+  // --- 1bis. LECTURE ET ANALYSE D'UN PDF BPU ---
+  const handleConvertPdfToJson = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setPdfLoading(true);
+    setPdfFileName(file.name);
+    try {
+      const { articles, stats, warnings } = await parsePdfBpu(file);
+      if (warnings.length) console.warn('[PDF→JSON]', warnings);
+      console.log(`[PDF→JSON] ${stats.articleCount} prix extraits sur ${stats.pageCount} pages`);
+      if (articles.length === 0) {
+        alert(
+          "Aucun prix n'a pu être extrait du PDF.\n\n" +
+          "Le format attendu est : colonnes N° / Désignation / Unité / PU HT.\n" +
+          "Vérifiez la console (F12) pour plus de détails."
+        );
+      } else {
+        processRawData(articles, 'pdf');
+      }
+    } catch (err) {
+      console.error('[PDF→JSON] Erreur:', err);
+      alert(`Erreur lors de la lecture du PDF :\n${err.message || err}`);
+    } finally {
+      setPdfLoading(false);
+      setPdfFileName('');
+      e.target.value = null;
+    }
+  };
+
   // --- 2. FONCTION DE TÉLÉCHARGEMENT ---
-  const downloadJson = (data) => {
+  const downloadJson = (data, sourceName = 'bpu') => {
     const jsonString = JSON.stringify(data, null, 2);
     const blob = new Blob([jsonString], { type: "application/json" });
     const url = URL.createObjectURL(blob);
-    
+
     const link = document.createElement('a');
     link.href = url;
-    link.download = `bpu_converted_${new Date().toISOString().slice(0,10)}.json`;
+    link.download = `${sourceName}_converted_${new Date().toISOString().slice(0,10)}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -139,13 +174,14 @@ const SettingsView = ({
   // --- 3. APPLICATION DU MAPPING ET VALIDATION ---
   const handleConfirmMapping = () => {
     if (!pendingJsonData) return;
-    const correctedData = pendingJsonData.map(item => {
+    const { data, source } = pendingJsonData;
+    const correctedData = data.map(item => {
       if (unitMap[item.unit]) {
         return { ...item, unit: unitMap[item.unit] };
       }
       return item;
     });
-    downloadJson(correctedData);
+    downloadJson(correctedData, source);
     setShowUnitMapModal(false);
     setPendingJsonData(null);
     setMissingUnits([]);
@@ -314,15 +350,16 @@ const SettingsView = ({
                 <span className="bg-slate-200 px-2 py-0.5 rounded">4. Unite</span>
                 <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded">5. Prix</span>
               </div>
-              
+
               {/* INPUTS CACHÉS */}
               <input type="file" accept=".xlsx, .xls" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
               <input type="file" accept=".xlsx, .xls" ref={jsonInputRef} onChange={handleConvertXlsxToJson} className="hidden" />
+              <input type="file" accept="application/pdf,.pdf" ref={pdfInputRef} onChange={handleConvertPdfToJson} className="hidden" />
 
               <div className="flex flex-col md:flex-row gap-4 w-full justify-center">
                 {/* BOUTON IMPORT PRINCIPAL */}
                 <div className="flex flex-col items-center gap-2">
-                    <button 
+                    <button
                     onClick={() => fileInputRef.current.click()}
                     title="Charge le fichier Excel directement dans la base de données actuelle (navigateur)"
                     className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-lg shadow-lg text-[11px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3 active:scale-95"
@@ -332,9 +369,9 @@ const SettingsView = ({
                     <span className="text-[9px] text-emerald-700 font-bold bg-emerald-100 px-2 py-0.5 rounded">Usage Direct</span>
                 </div>
 
-                {/* BOUTON CONVERSION JSON */}
+                {/* BOUTON CONVERSION JSON (Excel) */}
                 <div className="flex flex-col items-center gap-2">
-                    <button 
+                    <button
                     onClick={() => jsonInputRef.current.click()}
                     title="Convertit un fichier Excel en JSON propre et télécharge le résultat (sans modifier la base)"
                     className="bg-white hover:bg-blue-50 text-blue-600 border border-blue-200 px-6 py-3 rounded-lg shadow text-[11px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3 active:scale-95"
@@ -342,6 +379,25 @@ const SettingsView = ({
                     <FileJson size={18} /> Convertir XLS en JSON
                     </button>
                     <span className="text-[9px] text-blue-700 font-bold bg-blue-100 px-2 py-0.5 rounded">Outil de Conversion</span>
+                </div>
+
+                {/* BOUTON CONVERSION JSON (PDF) */}
+                <div className="flex flex-col items-center gap-2">
+                    <button
+                    onClick={() => pdfInputRef.current.click()}
+                    disabled={pdfLoading}
+                    title="Convertit un BPU au format PDF (marché public) en JSON. Colonnes attendues : N° / Désignation / Unité / PU HT."
+                    className="bg-white hover:bg-indigo-50 text-indigo-600 border border-indigo-200 disabled:opacity-60 disabled:cursor-wait px-6 py-3 rounded-lg shadow text-[11px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3 active:scale-95"
+                    >
+                    {pdfLoading ? (
+                      <><Loader2 size={18} className="animate-spin" /> Analyse en cours…</>
+                    ) : (
+                      <><FileText size={18} /> Convertir PDF en JSON</>
+                    )}
+                    </button>
+                    <span className="text-[9px] text-indigo-700 font-bold bg-indigo-100 px-2 py-0.5 rounded">
+                      {pdfLoading && pdfFileName ? pdfFileName : 'BPU marché public'}
+                    </span>
                 </div>
               </div>
             </div>

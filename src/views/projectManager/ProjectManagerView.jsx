@@ -3,7 +3,7 @@ import { HelpCircle, PlusCircle, Clock, Cloud, RefreshCw, Trash2, ArrowUpDown, S
 import { buildFolderColorMap } from './folderColors';
 import { toast, confirm } from '../../utils/globalUI';
 import { generateId } from '../../utils/helpers';
-import { collection, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 
 import { usePresenceReader }     from '../../hooks/usePresence';
@@ -18,6 +18,8 @@ import PmFolderSidebar   from './PmFolderSidebar';
 import PmProjectGrid     from './PmProjectGrid';
 import ProjectDetailsModal from '../../components/modals/ProjectDetailsModal';
 import PmLocalHistory    from './PmLocalHistory';
+import LinkedLibraryModal from '../../components/modals/LinkedLibraryModal';
+import { getActiveLocalLibrary, backupActiveLocalLibrary, setActiveLocalLibrary, librariesMatch, compareProjectVsLibrary, deactivateLocalLibrary } from '../../utils/localLibrary';
 
 const ProjectManagerView = ({
   project, setProject, resetProject, onSaveProject,
@@ -33,6 +35,10 @@ const ProjectManagerView = ({
   const [detailsProject, setDetailsProject] = useState(null);
   const [linkedCrcMap, setLinkedCrcMap] = useState({});
   const [raoProjectIds, setRaoProjectIds] = useState(new Set());
+  // Modale de gestion de la bibliothèque locale liée à un projet
+  // pendingOpen = { proj, mode: 'load' | 'openInEstima' } | null
+  const [pendingOpen, setPendingOpen] = useState(null);
+  const [libModalCurrent, setLibModalCurrent] = useState(null);
 
   // Charger les CRC liés + projets avec RAO
   useEffect(() => {
@@ -91,6 +97,134 @@ const ProjectManagerView = ({
 
   const folderColorMap = useMemo(() => buildFolderColorMap(fm.folders), [fm.folders]);
 
+  // ── Bibliothèque locale liée au projet ───────────────────────────────────
+  // Décide si on doit afficher la modale avant d'ouvrir l'affaire.
+  // Si le projet a un linkedLibrary qui diffère de la biblio active → modale.
+  // Sinon → ouverture directe via le mode demandé ('load' | 'openInEstima').
+  const executeOpen = async (proj, mode, { silent = false } = {}) => {
+    if (mode === 'openInEstima') {
+      const ok = await cloud.handleLoadCloudProject(proj, { silent: true });
+      if (!ok) return;
+      if (currentUserUid && proj?.id) {
+        try {
+          await setDoc(
+            doc(db, 'users', currentUserUid, 'preferences', 'modules'),
+            { estima: proj.id, updatedAt: serverTimestamp() },
+            { merge: true }
+          );
+        } catch (e) {
+          console.warn('[ProjectManagerView] Persistance pref estima échouée:', e?.message);
+        }
+      }
+      onNavigateModule?.('estima');
+    } else {
+      // En mode 'load' silent (sortie de la modale linkedLibrary), on saute la confirmation
+      // "Ouvrir X ?" — l'utilisateur a déjà manifesté son intention via la modale précédente.
+      await cloud.handleLoadCloudProject(proj, { silent });
+    }
+  };
+
+  const handleProjectIntent = async (proj, mode) => {
+    // 1. Récupérer la biblio active : mode local OU base Cloud
+    let activeLibrary = getActiveLocalLibrary();
+    if (!activeLibrary && companyId) {
+      try {
+        const bpuSnap = await getDocs(collection(db, 'companies', companyId, 'bpu'));
+        const items = bpuSnap.docs.map(d => d.data());
+        activeLibrary = { id: null, name: 'Base Cloud', importedAt: null, bpu: items, categories: [], isCloud: true };
+      } catch (e) {
+        console.warn('[handleProjectIntent] Chargement base Cloud échoué:', e?.message);
+      }
+    }
+
+    // 2. Comparer items du projet vs biblio active
+    const comparison = activeLibrary
+      ? compareProjectVsLibrary(proj, activeLibrary.bpu || [])
+      : { hasDifferences: false, itemsChecked: 0, missingIds: [], divergentPrices: [] };
+
+    // 3. Cas linkedLibrary explicite (snapshot dans le projet, différent de l'actif)
+    const linked = proj?.linkedLibrary;
+    const linkedDiffers = linked && Array.isArray(linked.bpu) && linked.bpu.length > 0
+      && !(activeLibrary && librariesMatch(activeLibrary, linked));
+
+    if (linkedDiffers || comparison.hasDifferences) {
+      setPendingOpen({ proj, mode, comparison });
+      setLibModalCurrent(activeLibrary);
+      return;
+    }
+    executeOpen(proj, mode);
+  };
+
+  const handleLibLoadLinked = () => {
+    if (!pendingOpen) return;
+    const { proj, mode } = pendingOpen;
+    try {
+      backupActiveLocalLibrary();
+      setActiveLocalLibrary(proj.linkedLibrary);
+      toast.success(`Bibliothèque « ${proj.linkedLibrary.name || 'liée'} » activée.`);
+    } catch (e) {
+      toast.error('Impossible d\'activer la bibliothèque liée.');
+      console.error('[LinkedLibrary] activation:', e);
+      return;
+    }
+    setPendingOpen(null);
+    setLibModalCurrent(null);
+    executeOpen(proj, mode, { silent: true });
+  };
+
+  const handleLibKeepCurrent = () => {
+    if (!pendingOpen) return;
+    const { proj, mode } = pendingOpen;
+    setPendingOpen(null);
+    setLibModalCurrent(null);
+    executeOpen(proj, mode, { silent: true });
+  };
+
+  const handleLibUseCloud = () => {
+    if (!pendingOpen) return;
+    const { proj, mode } = pendingOpen;
+    try {
+      // Sauvegarder l'éventuelle biblio locale active avant de la désactiver
+      backupActiveLocalLibrary();
+      deactivateLocalLibrary();
+      toast.success('Base BPU Firebase activée.');
+    } catch (e) {
+      console.warn('[LinkedLibrary] désactivation locale échouée:', e?.message);
+    }
+    setPendingOpen(null);
+    setLibModalCurrent(null);
+    executeOpen(proj, mode, { silent: true });
+  };
+
+  const handleLibImportOther = (lib, meta) => {
+    if (!pendingOpen) return;
+    const { proj, mode } = pendingOpen;
+    try {
+      backupActiveLocalLibrary();
+      const id = lib.id || `lib_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      setActiveLocalLibrary({
+        id,
+        name: lib.name || meta?.name || 'Bibliothèque importée',
+        importedAt: new Date().toISOString(),
+        bpu: lib.bpu || [],
+        categories: lib.categories || [],
+      });
+      toast.success('Bibliothèque importée et activée.');
+    } catch (e) {
+      toast.error('Import JSON invalide.');
+      console.error('[LinkedLibrary] import:', e);
+      return;
+    }
+    setPendingOpen(null);
+    setLibModalCurrent(null);
+    executeOpen(proj, mode, { silent: true });
+  };
+
+  const handleLibClose = () => {
+    setPendingOpen(null);
+    setLibModalCurrent(null);
+  };
+
   // ── Fiche projet (info modale) ──
   const handleSaveDetails = useCallback(async (details) => {
     if (!detailsProject || !companyId) return;
@@ -132,6 +266,19 @@ const ProjectManagerView = ({
           onClose={() => fm.setMovingProject(null)}
         />
       )}
+      <LinkedLibraryModal
+        isOpen={!!pendingOpen}
+        projectName={pendingOpen?.proj?.name}
+        linkedLibrary={pendingOpen?.proj?.linkedLibrary}
+        currentLibrary={libModalCurrent}
+        comparison={pendingOpen?.comparison}
+        onLoadLinked={handleLibLoadLinked}
+        onUseCloudBase={handleLibUseCloud}
+        onKeepCurrent={handleLibKeepCurrent}
+        onImportOther={handleLibImportOther}
+        onClose={handleLibClose}
+      />
+
 
       {/* ── Toolbar ───────────────────────────────────────────────────────── */}
       <PmLeftColumn
@@ -318,8 +465,10 @@ const ProjectManagerView = ({
                   folderColorMap={folderColorMap}
                   presenceByProject={presenceByProject}
                   deletingId={cloud.deletingId}
-                  onLoadProject={cloud.handleLoadCloudProject}
+                  onLoadProject={(proj) => handleProjectIntent(proj, 'load')}
+                  onOpenInEstima={(proj) => handleProjectIntent(proj, 'openInEstima')}
                   onDeleteProject={cloud.handleDeleteCloudProject}
+                  onDuplicateProject={cloud.handleDuplicateCloudProject}
                   onMoveProject={fm.setMovingProject}
                   onRestoreSnapshot={cloud.handleRestoreSnapshot}
                   onInfoProject={setDetailsProject}

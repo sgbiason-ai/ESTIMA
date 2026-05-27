@@ -2,9 +2,23 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.6.1';
+export const APP_VERSION = '2.7.0';
 
 export const CHANGELOG = [
+  {
+    version: '2.7.0',
+    date: '2026-05-27',
+    title: 'Détection des écarts bibliothèque ↔ projet + import PDF BPU + dupliquer affaire',
+    highlights: [
+      'Gestion de Projets : détection automatique des écarts bibliothèque ↔ projet — à l\'ouverture d\'une affaire, comparaison des items utilisés (uid) et de leurs prix avec la bibliothèque active (Cloud ou mode Local). Modale détaillée affichant 2 sections : "Absents de la base" (désignation, plus le N° BPU si numérotation manuelle) et "Prix divergents (projet → base)" (tableau Désignation / Projet / Base / Écart € et %). En mode Cloud actif, la liste complète est scrollable ; en mode Local, les 3 premiers + "… et N autres". Boutons adaptatifs : "Base Firebase" (si mode local actif) OU "Continuer quand même" (si Cloud déjà actif), plus "Importer JSON" toujours présent. Si le projet a un snapshot linkedLibrary, bouton supplémentaire "Charger la biblio liée"',
+      'Gestion de Projets : bibliothèque locale associée — un projet sauvegardé en mode "Travail Local" mémorise désormais un snapshot de la bibliothèque utilisée (linkedLibrary). Préserve la traçabilité de la source des prix pour les futures réouvertures',
+      'Gestion de Projets : double-clic sur une tuile ouvre directement le projet dans Estima VRD (sans modale de confirmation) — le simple clic conserve son comportement habituel (modale "Ouvrir X ?"). Tooltip "Cliquer pour aperçu • Double-clic pour ouvrir dans Estima VRD"',
+      'Gestion de Projets : nouveau bouton "Dupliquer" sur chaque tuile de projet (icône Copy violet entre Fiche projet et Déplacer) — clone le document cloud avec auto-incrément du nom ("Carrefour Rd 10" → "Carrefour Rd 10 (1)", puis "(2)", etc.). Périmètre : estimation, BPU, fiche projet, branding, DCE, données d\'analyse de prix. Les sous-collections (CRC / Visites / RAO) ne sont pas dupliquées',
+      'Gestion de Projets : numéro de version du ribbon "Workspace" désormais dynamique (lu depuis APP_VERSION) — auparavant figé à v2.0.0',
+      'Paramètres : nouveau bouton "Convertir PDF en JSON" — extrait les BPU au format marché public (colonnes N° / Désignation / Unité / PU HT) en JSON prêt pour la bibliothèque, avec détection automatique des unités multi-lignes ("le mètre carré", "Le kilogramme") et filtrage des montants en lettres. Réutilise la modale de mapping des unités existante',
+      'Paramètres : dictionnaire des unités — autorisation des symboles contenant un "/" (ex: "1/2 J" pour demi-journée). Le caractère est désormais encodé dans l\'ID Firestore sans altérer le symbole affiché',
+    ],
+  },
   {
     version: '2.6.1',
     date: '2026-05-21',
