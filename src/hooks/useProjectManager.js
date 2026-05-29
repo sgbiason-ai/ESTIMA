@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { generateId } from '../utils/helpers';
-import { safeEvalMathExpr } from '../utils/projectCalculations';
+import { recalculateProject } from '../utils/projectCalculations';
 
 // Legacy localStorage key — conservé pour migration one-shot vers Firestore prefs.
 const lastProjectKey = (companyId) => `last_active_project_id__${companyId}`;
@@ -249,83 +249,9 @@ export const useProjectManager = (user, companyId) => {
 
   // ─── MOTEUR DE CALCUL ─────────────────────────────────────────────────────
 
-  const recalculateProject = (chapters, tranches) => {
-    let hasChanges = true;
-    let passes = 0;
-    const MAX_PASSES = 5;
-    let currentChapters = JSON.parse(JSON.stringify(chapters));
-    let detectedSourceIds = new Set();
-
-    while (hasChanges && passes < MAX_PASSES) {
-      hasChanges = false;
-      passes++;
-
-      const qtyMaps = { global: {} };
-      tranches?.forEach(t => { qtyMaps[t.id] = {}; });
-
-      const extractQtys = (nodes) => {
-        nodes.forEach(it => {
-          if (it.type === 'item') {
-            qtyMaps.global[it.id] = Number(it.qty) || 0;
-            if (it.quantities) {
-              Object.keys(it.quantities).forEach(tId => {
-                if (!qtyMaps[tId]) qtyMaps[tId] = {};
-                qtyMaps[tId][it.id] = Number(it.quantities[tId]) || 0;
-              });
-            }
-          }
-          if (it.children) extractQtys(it.children);
-        });
-      };
-      extractQtys(currentChapters);
-
-      const evaluateFormula = (formulaStr, contextMap) => {
-        try {
-          if (!formulaStr || typeof formulaStr !== 'string' || !formulaStr.startsWith('=')) return null;
-          let expr = formulaStr.substring(1).replace(/\{([^}]+)\}/g, (match, id) => {
-            detectedSourceIds.add(id);
-            return contextMap[id] !== undefined ? contextMap[id] : 0;
-          });
-          const result = safeEvalMathExpr(expr);
-          return Number.isFinite(result) ? result : 0;
-        } catch { return 0; }
-      };
-
-      const applyCalculations = (nodes) => {
-        nodes.forEach(it => {
-          if (it.type === 'item') {
-            let trancheSum = 0;
-            const hasExistingTranches = tranches && tranches.length > 0;
-
-            if (it.quantitiesFormula) {
-              if (!it.quantities) it.quantities = {};
-              for (const [trancheId, formulaStr] of Object.entries(it.quantitiesFormula)) {
-                if (formulaStr && formulaStr.startsWith('=')) {
-                  const tMap = qtyMaps[trancheId] || {};
-                  const newVal = evaluateFormula(formulaStr, tMap);
-                  if (newVal !== null && newVal !== it.quantities[trancheId]) {
-                    it.quantities[trancheId] = newVal;
-                    hasChanges = true;
-                  }
-                }
-                trancheSum += Number(it.quantities[trancheId] || 0);
-              }
-            }
-
-            if (hasExistingTranches) {
-              if (it.qty !== trancheSum) { it.qty = trancheSum; hasChanges = true; }
-            } else if (it.formula && it.formula.startsWith('=')) {
-              const newVal = evaluateFormula(it.formula, qtyMaps.global);
-              if (newVal !== null && newVal !== it.qty) { it.qty = newVal; hasChanges = true; }
-            }
-          }
-          if (it.children) applyCalculations(it.children);
-        });
-      };
-      applyCalculations(currentChapters);
-    }
-    return { updatedChapters: currentChapters, sourceIds: Array.from(detectedSourceIds) };
-  };
+  // Moteur de recalcul (résolution des formules + somme des tranches) :
+  // fonction pure importée depuis projectCalculations.js, testée via
+  // projectCalculations.test.js. Utilisée au call site plus bas (updateProjectItem).
 
   // ─── UPDATE ITEM ──────────────────────────────────────────────────────────
 

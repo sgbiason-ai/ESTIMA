@@ -1,6 +1,6 @@
 // src/hooks/useProjectCalculations.js
 import { useMemo, useEffect } from 'react';
-import { evaluateFormula } from '../utils/projectCalculations';
+import { computeQtyMaps } from '../utils/projectCalculations';
 
 export const useProjectCalculations = ({
   project,
@@ -18,9 +18,6 @@ export const useProjectCalculations = ({
   
   // --- CALCUL DES MAPS (QUANTITÉS) ---
   const { studyQtyMaps, clientQtyMaps } = useMemo(() => {
-    const sMaps = {};
-    const cMaps = {};
-    const trancheIds = hasTranches ? tranches.map(t => t.id) : [];
     const getItems = (chapters) => {
       const items = [];
       const traverse = (nodes) => {
@@ -33,86 +30,9 @@ export const useProjectCalculations = ({
       return items;
     };
     const allItems = getItems(project?.chapters);
-    const calculateMapsForContext = (tid = null) => {
-      const sMap = {};
-      const cMap = {};
-      const coeff = 1 + (effectiveClientPercent / 100);
-
-      // --- PASSE 1 : valeurs brutes (non-formule) ---
-      allItems.forEach(item => {
-        if (!item.id) return;
-        const rawVal = tid
-          ? item.quantities?.[tid]
-          : item.qty;
-        // Si c'est une formule, on initialise à 0 provisoirement
-        const isFormula = typeof rawVal === 'string' && rawVal.startsWith('=');
-        sMap[item.id] = isFormula ? 0 : Number(rawVal || 0);
-      });
-
-      // --- PASSE 2 : résolution des formules (jusqu'à 5 itérations pour les dépendances chaînées) ---
-      for (let pass = 0; pass < 5; pass++) {
-        let changed = false;
-        // Construit un map désignation → quantité pour le fallback [Nom]
-        const nameMap = {};
-        allItems.forEach(item => {
-          if (item.id && item.designation) nameMap[item.designation] = sMap[item.id] ?? 0;
-        });
-        allItems.forEach(item => {
-          if (!item.id) return;
-          const rawVal = tid ? item.quantities?.[tid] : item.qty;
-          if (typeof rawVal === 'string' && rawVal.startsWith('=')) {
-            const resolved = evaluateFormula(rawVal, sMap, nameMap);
-            if (resolved !== null) {
-              let rounded = resolved;
-              if (!item.isFixed && (resolved <= -20 || resolved >= 20)) {
-                rounded = resolved > 0 ? Math.ceil(resolved) : Math.floor(resolved);
-              }
-              if (rounded !== sMap[item.id]) {
-                sMap[item.id] = rounded;
-                changed = true;
-              }
-            }
-          }
-        });
-        if (!changed) break;
-      }
-
-      // --- CALCUL DES QUANTITÉS CLIENT ---
-      allItems.forEach(item => {
-        if (!item.id) return;
-        const baseQty = sMap[item.id] ?? 0;
-        if (item.isFixed || (baseQty >= -20 && baseQty <= 20)) {
-          cMap[item.id] = baseQty;
-        } else {
-          const val = baseQty * coeff;
-          cMap[item.id] = val > 0 ? Math.ceil(val) : Math.floor(val);
-        }
-      });
-
-      return { sMap, cMap };
-    };
-    if (!hasTranches) {
-      const { sMap, cMap } = calculateMapsForContext();
-      sMaps.global = sMap;
-      cMaps.global = cMap;
-    } else {
-      trancheIds.forEach(tid => {
-        const { sMap, cMap } = calculateMapsForContext(tid);
-        sMaps[tid] = sMap;
-        cMaps[tid] = cMap;
-      });
-      const sGlobal = {};
-      const cGlobal = {};
-      allItems.forEach(item => {
-        if (item.id) {
-          sGlobal[item.id] = trancheIds.reduce((sum, tid) => sum + (sMaps[tid][item.id] || 0), 0);
-          cGlobal[item.id] = trancheIds.reduce((sum, tid) => sum + (cMaps[tid][item.id] || 0), 0);
-        }
-      });
-      sMaps.global = sGlobal;
-      cMaps.global = cGlobal;
-    }
-    return { studyQtyMaps: sMaps, clientQtyMaps: cMaps };
+    // Calcul délégué à la fonction pure testée (projectCalculations.js) —
+    // résolution des formules, arrondi étude ≥|20|, majoration client ±20, tranches.
+    return computeQtyMaps(allItems, hasTranches, tranches, effectiveClientPercent);
   }, [project, hasTranches, tranches, effectiveClientPercent]);
 
   const clientQtyMap = useMemo(() => {
