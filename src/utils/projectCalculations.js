@@ -345,9 +345,16 @@ export function computeQtyMaps(items, hasTranches, tranches, effectiveClientPerc
         const rawVal = tid ? item.quantities?.[tid] : item.qty;
         if (typeof rawVal === 'string' && rawVal.startsWith('=')) {
           const resolved = evaluateFormula(rawVal, sMap, nameMap);
-          if (resolved !== null && resolved !== sMap[item.id]) {
-            sMap[item.id] = resolved;
-            changed = true;
+          if (resolved !== null) {
+            // Les qtés d'étude issues d'une formule ≥ |20| sont arrondies au
+            // plafond/plancher (les forfaits et petites qtés gardent leur valeur).
+            const rounded = (!item.isFixed && shouldScaleQty(resolved))
+              ? roundDirectional(resolved)
+              : resolved;
+            if (rounded !== sMap[item.id]) {
+              sMap[item.id] = rounded;
+              changed = true;
+            }
           }
         }
       });

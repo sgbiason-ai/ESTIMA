@@ -219,6 +219,66 @@ describe('recalculateProject', () => {
   });
 });
 
+// ── computeQtyMaps ─────────────────────────────────────────────────────────
+describe('computeQtyMaps', () => {
+  const item = (id, qty, extra = {}) => ({
+    type: 'item', id, designation: 'Art ' + id, qty,
+    quantities: {}, quantitiesFormula: {}, price: 100, unit: 'm', isFixed: false, ...extra,
+  });
+
+  it('valeurs brutes sans tranches (study + client)', () => {
+    const { studyQtyMaps, clientQtyMaps } = computeQtyMaps([item('i1', 10), item('i2', 100)], false, [], 10);
+    expect(studyQtyMaps.global.i1).toBe(10);
+    expect(studyQtyMaps.global.i2).toBe(100);
+    expect(clientQtyMaps.global.i1).toBe(10);   // ≤20 → non majoré
+    expect(clientQtyMaps.global.i2).toBe(111);  // 100*1.1=110.00…1 → ceil 111
+  });
+
+  it('borne ±20 : 20 non majoré, 21 majoré', () => {
+    const { clientQtyMaps } = computeQtyMaps([item('a', 20), item('b', 21)], false, [], 10);
+    expect(clientQtyMaps.global.a).toBe(20);
+    expect(clientQtyMaps.global.b).toBe(24);    // 21*1.1=23.1 → ceil 24
+  });
+
+  it('isFixed jamais majoré', () => {
+    const { clientQtyMaps } = computeQtyMaps([item('f', 100, { isFixed: true })], false, [], 10);
+    expect(clientQtyMaps.global.f).toBe(100);
+  });
+
+  it('formule simple résolue', () => {
+    const { studyQtyMaps, clientQtyMaps } = computeQtyMaps([item('i1', '=50+30')], false, [], 10);
+    expect(studyQtyMaps.global.i1).toBe(80);
+    expect(clientQtyMaps.global.i1).toBe(88);   // 80*1.1=88
+  });
+
+  it('formule décimale ≥|20| arrondie au plafond (ceil #3)', () => {
+    const { studyQtyMaps, clientQtyMaps } = computeQtyMaps([item('i1', '=100/3')], false, [], 10);
+    expect(studyQtyMaps.global.i1).toBe(34);    // 33.33 → ceil 34
+    expect(clientQtyMaps.global.i1).toBe(38);   // 34*1.1=37.4 → ceil 38
+  });
+
+  it('formule décimale <20 NON arrondie', () => {
+    const { studyQtyMaps } = computeQtyMaps([item('i1', '=10/3')], false, [], 10);
+    expect(studyQtyMaps.global.i1).toBeCloseTo(3.333, 2);
+  });
+
+  it('formule référençant un autre article', () => {
+    const { studyQtyMaps } = computeQtyMaps([item('i1', 100), item('i2', '={i1}*2')], false, [], 10);
+    expect(studyQtyMaps.global.i2).toBe(200);
+  });
+
+  it('agrégation tranches : somme study + client par tranche', () => {
+    const it1 = item('x', 0, { quantities: { t1: 30, t2: 20 } });
+    const { studyQtyMaps, clientQtyMaps } = computeQtyMaps([it1], true, [{ id: 't1' }, { id: 't2' }], 10);
+    expect(studyQtyMaps.t1.x).toBe(30);
+    expect(studyQtyMaps.t2.x).toBe(20);
+    expect(studyQtyMaps.global.x).toBe(50);
+    expect(clientQtyMaps.t1.x).toBe(33);        // 30*1.1=33
+    expect(clientQtyMaps.t2.x).toBe(20);        // ≤20 → non majoré
+    expect(clientQtyMaps.global.x).toBe(53);    // 33 + 20 (somme des clients par tranche)
+  });
+});
+
 // ── computePriceScore ──────────────────────────────────────────────────────
 describe('computePriceScore', () => {
   const N    = 40;
