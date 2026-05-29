@@ -2,9 +2,18 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.7.0';
+export const APP_VERSION = '2.8.0';
 
 export const CHANGELOG = [
+  {
+    version: '2.8.0',
+    date: '2026-05-29',
+    title: 'Photos dans les descriptions d\'articles BPU (glisser-déposer)',
+    highlights: [
+      'Bibliothèque & Devis BPU : ajout de photos dans la description des articles par glisser-déposer, copier-coller (Ctrl+V) ou bouton 📷. Disposition automatique et cohérente — le texte reste en haut, les photos sont regroupées en bas : 1 photo en pleine largeur, 2 côte à côte (50/50), 3 = une paire + une pleine largeur, 4 en grille 2×2. Maximum 4 photos par article',
+      'Photos BPU : suppression d\'une photo par survol (bouton ✕), compression automatique (~800px) pour limiter le poids, et intégration directe aux exports PDF et Word — la mise en page ne peut jamais déborder de la colonne',
+    ],
+  },
   {
     version: '2.7.0',
     date: '2026-05-27',

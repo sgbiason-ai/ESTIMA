@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { Bold, Italic, Underline, List, ListOrdered, Strikethrough, Undo2 } from 'lucide-react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { Bold, Italic, Underline, List, ListOrdered, Strikethrough, Undo2, ImagePlus } from 'lucide-react';
 
 // ── ACTIONS DE LA BARRE ───────────────────────────────────────────────────────
 const TOOLBAR_ACTIONS = [
@@ -22,10 +22,12 @@ const FloatingRichToolbar = ({
   itemLabel,
   onSave,
   onReset,
+  onInsertImage,
   hasOverride,
   primary,
 }) => {
   const [activeFormats, setActiveFormats] = useState({});
+  const fileRef = useRef(null);
 
   const updateActiveFormats = useCallback(() => {
     const formats = {};
@@ -106,6 +108,30 @@ const FloatingRichToolbar = ({
             ))}
           </React.Fragment>
         ))}
+
+        {/* Insérer une image (glisser-déposer / coller fonctionnent aussi directement) */}
+        {onInsertImage && (
+          <>
+            <div className="w-px h-4 bg-slate-700 mx-0.5" />
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => fileRef.current?.click()}
+              title="Ajouter une photo (ou glisser-déposer / coller) — regroupées en bas"
+              className="p-1.5 rounded-lg transition-colors text-slate-400 hover:text-white hover:bg-white/10"
+            >
+              <ImagePlus size={13} />
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => { if (e.target.files?.length) onInsertImage(e.target.files); e.target.value = ''; }}
+            />
+          </>
+        )}
 
         <div className="w-px h-4 bg-slate-700 mx-1" />
 

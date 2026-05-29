@@ -119,6 +119,8 @@ export const useBpuPdfExport = ({ project, pages }) => {
         stripOverrideStyles(clone);
         // Convertir les puces natives en texte (fix rendu html2canvas)
         convertListsForPdf(clone);
+        // Retirer les éléments d'UI non imprimables (boutons ✕ des photos)
+        clone.querySelectorAll('[data-ui]').forEach((n) => n.remove());
 
         Object.assign(clone.style, {
           position: 'fixed', top: '0', left: '0', zIndex: '-9999',

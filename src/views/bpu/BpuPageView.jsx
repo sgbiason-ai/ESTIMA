@@ -2,6 +2,9 @@ import React, { useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { cleanText, normalizeUnitSymbol } from '../../utils/helpers';
 import { lighten } from './utils/bpuBrandingUtils';
+import {
+  extractImageFiles, addPhotos, getCleanDescriptionHtml, decoratePhotoGrid, tryDeletePhoto,
+} from '../../utils/editorImages';
 import FloatingRichToolbar from './FloatingRichToolbar';
 import {
   PAGE_WIDTH_PX, PAGE_HEIGHT_PX,
@@ -30,9 +33,63 @@ const BpuPageView = ({
 }) => {
   const [activeDescItemId, setActiveDescItemId] = useState(null);
   const [activeDescItem, setActiveDescItem]     = useState(null);
+  const [dragOverId, setDragOverId]             = useState(null);
   const activeDescRef = useRef(null);
 
   const today = new Date().toLocaleDateString('fr-FR');
+
+  // ── Photos dans une description (drag-drop / coller / bouton toolbar) ──────────
+  // Grille épinglée en bas (texte au-dessus), base64 inline, sauvegarde immédiate.
+  const addPhotosAndSave = async (el, files) => {
+    if (!el || !files?.length) return;
+    const itemId = el.closest('[data-bpu-item-id]')?.getAttribute('data-bpu-item-id');
+    await addPhotos(el, files);
+    if (itemId) saveOverride(itemId, 'description', getCleanDescriptionHtml(el));
+  };
+
+  const handleDescDrop = (e) => {
+    if (!setProject) return;
+    const files = extractImageFiles(e);
+    setDragOverId(null);
+    if (!files.length) return;
+    e.preventDefault();
+    addPhotosAndSave(e.currentTarget, files);
+  };
+
+  const handleDescDragOver = (e, itemId) => {
+    if (!setProject || !e.dataTransfer?.types?.includes('Files')) return;
+    e.preventDefault();
+    if (dragOverId !== itemId) setDragOverId(itemId);
+  };
+
+  const handleDescDragLeave = (e) => {
+    if (e.currentTarget.contains(e.relatedTarget)) return;
+    setDragOverId(null);
+  };
+
+  const handleDescPaste = (e) => {
+    if (!setProject) return;
+    const files = extractImageFiles(e);
+    if (!files.length) return;
+    e.preventDefault();
+    addPhotosAndSave(e.currentTarget, files);
+  };
+
+  // Clic sur ✕ d'une photo → suppression + sauvegarde.
+  const handleDescClick = (e) => {
+    if (!setProject) return;
+    const el = e.currentTarget;
+    if (tryDeletePhoto(e.target, el)) {
+      e.preventDefault();
+      const itemId = el.closest('[data-bpu-item-id]')?.getAttribute('data-bpu-item-id');
+      if (itemId) saveOverride(itemId, 'description', getCleanDescriptionHtml(el));
+    }
+  };
+
+  // Bouton image de la toolbar flottante → ajoute dans la description active.
+  const handleToolbarInsertImage = (files) => {
+    if (activeDescRef.current) addPhotosAndSave(activeDescRef.current, files);
+  };
 
   return (
     <div className="flex-1 overflow-auto bg-slate-200/50 print:p-0 print:overflow-visible">
@@ -175,7 +232,7 @@ const BpuPageView = ({
                               const toolbarEl = document.getElementById('bpu-floating-toolbar');
                               if (toolbarEl && toolbarEl.contains(active)) return;
 
-                              const val      = descEl.innerHTML.trim();
+                              const val      = getCleanDescriptionHtml(descEl);
                               const original = item._overrideDescription ?? item.displayDescription ?? '';
                               if (val !== original) saveOverride(item.id, 'description', val);
                               else if (item._overrideDescription !== undefined) resetOverride(item.id, 'description');
@@ -184,17 +241,25 @@ const BpuPageView = ({
                               setActiveDescItem(null);
                             }, 160);
                           }}
+                          onClick={handleDescClick}
+                          onDrop={handleDescDrop}
+                          onDragOver={(e) => handleDescDragOver(e, item.id)}
+                          onDragLeave={handleDescDragLeave}
+                          onPaste={handleDescPaste}
                           className={`html-content text-slate-600 leading-relaxed mb-2 font-medium outline-none rounded px-0.5 -mx-0.5 transition-colors ${
-                            item._overrideDescription !== undefined
-                              ? 'bg-amber-50 ring-1 ring-amber-300'
-                              : setProject ? 'hover:bg-slate-50 focus:bg-white focus:ring-1 focus:ring-blue-300' : ''
+                            dragOverId === item.id
+                              ? 'ring-2 ring-emerald-400 bg-emerald-50'
+                              : item._overrideDescription !== undefined
+                                ? 'bg-amber-50 ring-1 ring-amber-300'
+                                : setProject ? 'hover:bg-slate-50 focus:bg-white focus:ring-1 focus:ring-blue-300' : ''
                           }`}
-                          title={setProject ? 'Cliquer pour modifier — utilisez la barre de formatage' : undefined}
+                          title={setProject ? 'Cliquer pour modifier — glisser-déposer ou coller une image' : undefined}
                           ref={(el) => {
                             if (activeDescItemId === item.id) activeDescRef.current = el;
                             if (el && el !== document.activeElement) {
                               const html = item._overrideDescription ?? item.displayDescription ?? '';
-                              if (el.innerHTML !== html) el.innerHTML = html;
+                              if (getCleanDescriptionHtml(el) !== html) el.innerHTML = html;
+                              decoratePhotoGrid(el);
                             }
                           }}
                         />
@@ -256,6 +321,7 @@ const BpuPageView = ({
           itemLabel={activeDescItem ? cleanText(activeDescItem._overrideDesignation ?? activeDescItem.designation ?? '') : ''}
           hasOverride={activeDescItem?._overrideDescription !== undefined}
           primary={branding.colors.primary}
+          onInsertImage={handleToolbarInsertImage}
           onSave={() => { if (activeDescRef.current) activeDescRef.current.blur(); }}
           onReset={() => {
             if (activeDescItem) {
@@ -278,6 +344,19 @@ const BpuPageView = ({
         .html-content p { margin-bottom: 0.3em; }
         .html-content strong { font-weight: 900; color: #1e293b; }
         .html-content em { font-style: italic; color: #64748b; }
+        .html-content img { max-width: 100% !important; height: auto !important; }
+        .html-content .bpu-photo-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+        .html-content .bpu-photo { position: relative; flex: 1 1 calc(50% - 3px); min-width: 0; margin: 0; }
+        .html-content .bpu-photo img { width: 100% !important; height: auto !important; display: block; border-radius: 4px; }
+        .html-content .bpu-photo-del {
+          position: absolute; top: 4px; right: 4px;
+          width: 20px; height: 20px; border-radius: 9999px; padding: 0;
+          background: rgba(15,23,42,.72); color: #fff !important; border: none; cursor: pointer;
+          line-height: 1 !important; display: flex; align-items: center; justify-content: center;
+          opacity: 0; transition: opacity .15s; z-index: 2;
+        }
+        .html-content .bpu-photo:hover .bpu-photo-del { opacity: 1; }
+        .html-content .bpu-photo-del:hover { background: #ef4444; }
       `}</style>
     </div>
   );
