@@ -390,7 +390,7 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
               </h3>
               <div className="grid grid-cols-2 gap-3">
                 <ModernSelect label="Phase" name="phase" value={formData.phase} onChange={handleChange} icon={CheckCircle2}
-                  options={[{ value: 'ESQ', label: 'ESQ' }, { value: 'AVP', label: 'AVP' }, { value: 'PRO', label: 'PRO' }, { value: 'DCE', label: 'DCE' }, { value: 'DCE+', label: 'DCE+' }, { value: 'EXE', label: 'EXE' }]} />
+                  options={[{ value: 'ESQ', label: 'ESQ' }, { value: 'AVP', label: 'AVP' }, { value: 'PRO', label: 'PRO' }, { value: 'DCE', label: 'DCE' }, { value: 'DCE+', label: 'DCE+' }, { value: 'ACT', label: 'ACT' }, { value: 'EXE', label: 'EXE' }]} />
                 <ModernInput label="Code Affaire" name="code" value={formData.code} onChange={handleChange} icon={Hash} placeholder="Ex: 26-0001" required error={errors.code} />
               </div>
               <div className="grid grid-cols-2 gap-3">

@@ -26,6 +26,7 @@ export const CHANGELOG = [
       'Estima VRD : formules de quantité — en mode insertion (après "="), la ligne actuellement en cours d\'édition n\'affiche plus le curseur croix et ne peut plus être cliquée pour s\'auto-référencer. L\'utilisateur garde le focus dans son input pour éditer la formule librement',
       'Paramètres : nouveau bouton "Convertir PDF en JSON" — extrait les BPU au format marché public (colonnes N° / Désignation / Unité / PU HT) en JSON prêt pour la bibliothèque, avec détection automatique des unités multi-lignes ("le mètre carré", "Le kilogramme") et filtrage des montants en lettres. Réutilise la modale de mapping des unités existante',
       'Paramètres : dictionnaire des unités — autorisation des symboles contenant un "/" (ex: "1/2 J" pour demi-journée). Le caractère est désormais encodé dans l\'ID Firestore sans altérer le symbole affiché',
+      'Fiche projet : ajout de la phase "ACT" (Assistance Contrat de Travaux) dans le sélecteur de phase, entre DCE+ et EXE',
     ],
   },
   {
