@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Calculator, BarChart3, ClipboardList, FileStack, ShieldCheck,
   Folder, LogOut, Lock, Briefcase, Wrench, Receipt, Car,
-  Layers, Settings, Palette, Shield, Smartphone,
+  Layers, Settings, Palette, Shield, Smartphone, RefreshCw,
   Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudDrizzle, CloudFog, MapPin, ChevronRight, Sparkles
 } from 'lucide-react';
 import { APP_VERSION } from '../data/changelog';
@@ -185,7 +185,22 @@ export default function ModuleHubView({ isAdmin, userEmail, userModules, onSelec
   const [mounted, setMounted] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [cacheClearing, setCacheClearing] = useState(false);
   useEffect(() => { setMounted(true); }, []);
+
+  const handleClearCache = async () => {
+    if (cacheClearing) return;
+    setCacheClearing(true);
+    try {
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(k => caches.delete(k)));
+      }
+    } catch (e) {
+      console.error('Cache clear failed', e);
+    }
+    setTimeout(() => window.location.reload(), 900);
+  };
 
   // Modèle de permissions :
   // - Module 'admin' : exclusivement gated par isAdmin (toujours)
@@ -252,6 +267,15 @@ export default function ModuleHubView({ isAdmin, userEmail, userModules, onSelec
               <Smartphone size={15} strokeWidth={2} />
             </button>
           )}
+          <button
+            onClick={handleClearCache}
+            disabled={cacheClearing}
+            className={`flex items-center justify-center w-8 h-8 rounded-full transition-all duration-200 ${cacheClearing ? 'text-blue-600 bg-blue-50' : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50'}`}
+            title="Vider le cache et recharger"
+            aria-label="Vider le cache et recharger"
+          >
+            <RefreshCw size={15} strokeWidth={2} className={cacheClearing ? 'animate-spin' : ''} />
+          </button>
           <HelpButton onClick={() => setShowHelp(true)} />
           <button
             onClick={onLogout}

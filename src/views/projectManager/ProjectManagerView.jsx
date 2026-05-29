@@ -147,7 +147,10 @@ const ProjectManagerView = ({
     const linkedDiffers = linked && Array.isArray(linked.bpu) && linked.bpu.length > 0
       && !(activeLibrary && librariesMatch(activeLibrary, linked));
 
-    if (linkedDiffers || comparison.hasDifferences) {
+    // Seuls une biblio liée différente OU des items manquants ouvrent la modale.
+    // Un simple écart de prix unitaire (divergentPrices) ne la déclenche plus —
+    // il reste affiché en info dans la modale si celle-ci s'ouvre pour une autre raison.
+    if (linkedDiffers || comparison.missingIds.length > 0) {
       setPendingOpen({ proj, mode, comparison });
       setLibModalCurrent(activeLibrary);
       return;
