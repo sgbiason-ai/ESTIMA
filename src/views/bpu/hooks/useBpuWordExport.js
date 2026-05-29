@@ -221,10 +221,10 @@ export const useBpuWordExport = ({
       const coverSection = { properties: { type: 'nextPage' }, children: coverParagraphs };
 
       // ── LIGNES DU TABLEAU ─────────────────────────────────────────────────
-      const tableRows = sortedCatalog.map((item) => {
+      const tableRows = await Promise.all(sortedCatalog.map(async (item) => {
         const rawDesc      = getRawDescription(item, articlesDb);
         const htmlDesc     = normalizeToHtml(rawDesc);
-        const descParagraphs = processHtmlToDocx(htmlDesc);
+        const descParagraphs = await processHtmlToDocx(htmlDesc);
         const unitLong     = unitResolver(item.unit);
         const displayNum   = item._displayNum || '';
         const prefix = ['A', 'E', 'I', 'O', 'U', 'Y'].includes(unitLong.charAt(0).toUpperCase()) ? "L'" : 'LE ';
@@ -271,7 +271,7 @@ export const useBpuWordExport = ({
             }),
           ],
         });
-      });
+      }));
 
       // ── EN-TÊTE DE COLONNE ────────────────────────────────────────────────
       const headerRow = new TableRow({
