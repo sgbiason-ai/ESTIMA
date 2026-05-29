@@ -34,6 +34,7 @@ export const CHANGELOG = [
       'PDF RAO : le bloc "LOT" de la page de garde ne s\'affiche plus que si un lot est renseigné dans la consultation (auparavant toujours présent avec un tiret)',
       'BPU : correction de l\'export Word qui échouait (descriptions d\'articles non générées)',
       'Travail collaboratif : bannière d\'alerte si un collègue édite déjà le même élément (estimation, RAO, CRC, devis MOE, doc admin, visite) — sur desktop et mobile. Prévient le risque d\'écrasement mutuel des modifications (la dernière sauvegarde l\'emporte). La bannière disparaît seule dès que le collègue quitte (présence temps réel)',
+      'Estima VRD : mode Rendu — correction de la majoration "% à valoir" à la borne exacte ±20. Une ligne dont la quantité d\'étude valait exactement 20 (ou -20) était majorée à tort, alors que la règle affichée est « quantités supérieures à 20 ou inférieures à -20 ». La règle est désormais strictement respectée (20 et -20 ne sont plus majorés)',
     ],
   },
   {

@@ -546,7 +546,7 @@ const ProjectView = ({
                 const qty = sMap ? (sMap[node.id] || 0) : Number(node.qty || 0);
                 const lineTotal = qty * Number(node.price || 0);
                 if (node.isFixed) fixedSum += lineTotal;
-                else if (qty > -20 && qty < 20) smallQtySum += lineTotal;
+                else if (qty >= -20 && qty <= 20) smallQtySum += lineTotal;
             } else if (node.children) traverse(node.children);
         });
     };

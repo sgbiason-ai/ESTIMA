@@ -81,7 +81,7 @@ export const useProjectCalculations = ({
       allItems.forEach(item => {
         if (!item.id) return;
         const baseQty = sMap[item.id] ?? 0;
-        if (item.isFixed || (baseQty > -20 && baseQty < 20)) {
+        if (item.isFixed || (baseQty >= -20 && baseQty <= 20)) {
           cMap[item.id] = baseQty;
         } else {
           const val = baseQty * coeff;
