@@ -133,6 +133,11 @@ const CrrParticipants = ({
 
   if (!meeting) return null;
 
+  // Les groupes sont stockes par reunion (fallback config globale pour anciens CR).
+  // Doit refleter la meme source que useCrrManager.activeParticipantGroups,
+  // sinon addParticipantGroup ecrit dans meeting mais l'UI lit crrConfig → rien ne s'affiche.
+  const participantGroups = meeting.participantGroups || crrConfig.participantGroups;
+
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       {/* En-tete */}
@@ -143,15 +148,15 @@ const CrrParticipants = ({
           <Users size={14} className="text-emerald-500" />
           PARTICIPANTS
           <span className="text-[10px] font-normal text-slate-400">
-            ({crrConfig.participantGroups.reduce((n, g) => n + (g.contacts?.length || 0), 0)})
+            ({participantGroups.reduce((n, g) => n + (g.contacts?.length || 0), 0)})
           </span>
         </button>
 
         {!collapsed && (
           <div className="flex items-center gap-1.5">
             {/* Toggle tout déplier / tout replier */}
-            {crrConfig.participantGroups.length > 0 && (() => {
-              const allIds = crrConfig.participantGroups.map((g) => g.id);
+            {participantGroups.length > 0 && (() => {
+              const allIds = participantGroups.map((g) => g.id);
               const allExpanded = allIds.length > 0 && allIds.every((id) => expandedGroups.has(id));
               return (
                 <button
@@ -191,7 +196,7 @@ const CrrParticipants = ({
           </div>
 
       {/* Groupes */}
-      {crrConfig.participantGroups.map((group, groupIdx) => {
+      {participantGroups.map((group, groupIdx) => {
         const isExpanded = expandedGroups.has(group.id);
         const isEditing = editingGroup === group.id;
         const isDragOver = dragOverIdx === groupIdx;
