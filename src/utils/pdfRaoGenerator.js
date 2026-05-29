@@ -170,18 +170,22 @@ const drawCoverPageRao = (doc, project, consultation, logoMoe, logoClient, today
     signatories: project?.signatories || ['', '', '', ''],
     branding,
     today,
-    extraBlocks: [{
-      height: 30,
-      rows: [
-        { label: 'PROCÉDURE', value: consultation?.procedure || '—', col: 1 },
-        { label: 'DATE LIMITE REMISE', value: remiseStr, col: 2 },
-      ],
-    }, {
-      height: 30,
-      rows: [
-        { label: 'LOT', value: consultation?.lot || '—', col: 1 },
-      ],
-    }],
+    extraBlocks: [
+      {
+        height: 30,
+        rows: [
+          { label: 'PROCÉDURE', value: consultation?.procedure || '—', col: 1 },
+          { label: 'DATE LIMITE REMISE', value: remiseStr, col: 2 },
+        ],
+      },
+      // Bloc LOT affiché uniquement si un lot est renseigné
+      ...((consultation?.lot || '').trim() ? [{
+        height: 30,
+        rows: [
+          { label: 'LOT', value: consultation.lot.trim(), col: 1 },
+        ],
+      }] : []),
+    ],
   }, THEME, { logoMoe, logoClient });
 };
 

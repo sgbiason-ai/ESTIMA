@@ -8,6 +8,17 @@ import {
 } from 'lucide-react';
 import { buildCoverPageCanvas } from '../../utils/coverPageCanvas';
 
+// ─── APERÇUS PAGE DE GARDE PAR TYPE DE DOCUMENT ───────────────────────────────
+// label = libellé affiché en haut à droite de la page de garde (uppercase auto)
+// overrides = couleurs de thème spécifiques (RAO = vert Papyrus, comme le PDF réel)
+const RAO_VERT = [45, 138, 78]; // #2d8a4e — identique à pdfRaoGenerator.js
+const DOC_PREVIEWS = {
+  'CCTP':      { label: 'CCTP',      overrides: {} },
+  'RC':        { label: 'RC',        overrides: {} },
+  'BPU / DQE': { label: 'BPU / DQE', overrides: {} },
+  'RAO':       { label: "RAPPORT D'ANALYSE DES OFFRES", overrides: { primary: RAO_VERT, accent: RAO_VERT } },
+};
+
 // ─── SOUS-COMPOSANTS UI ───────────────────────────────────────────────────────
 
 const ModernInput = ({ label, name, value, onChange, icon: Icon, type = "text", placeholder, disabled = false, required = false, className = "", error }) => (
@@ -189,7 +200,8 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
   const refreshPreview = useCallback(async (data, docType, brand) => {
     setPreviewLoading(true);
     try {
-      const url = await buildCoverPageCanvas(data, docType, brand);
+      const cfg = DOC_PREVIEWS[docType] || { label: docType, overrides: {} };
+      const url = await buildCoverPageCanvas(data, cfg.label, brand, cfg.overrides);
       setPreviewUrl(url);
     } catch (e) {
       console.warn('Preview error:', e);
@@ -691,7 +703,7 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
                 {previewLoading && <RefreshCw size={10} className="text-indigo-400 animate-spin ml-auto" />}
               </div>
               <div className="flex gap-1">
-                {['CCTP', 'RC', 'BPU / DQE'].map(type => (
+                {['CCTP', 'RC', 'BPU / DQE', 'RAO'].map(type => (
                   <button
                     key={type}
                     type="button"

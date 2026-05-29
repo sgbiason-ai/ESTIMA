@@ -27,6 +27,8 @@ export const CHANGELOG = [
       'Paramètres : nouveau bouton "Convertir PDF en JSON" — extrait les BPU au format marché public (colonnes N° / Désignation / Unité / PU HT) en JSON prêt pour la bibliothèque, avec détection automatique des unités multi-lignes ("le mètre carré", "Le kilogramme") et filtrage des montants en lettres. Réutilise la modale de mapping des unités existante',
       'Paramètres : dictionnaire des unités — autorisation des symboles contenant un "/" (ex: "1/2 J" pour demi-journée). Le caractère est désormais encodé dans l\'ID Firestore sans altérer le symbole affiché',
       'Fiche projet : ajout de la phase "ACT" (Assistance Contrat de Travaux) dans le sélecteur de phase, entre DCE+ et EXE',
+      'Fiche projet : nouvel aperçu "RAO" dans le volet page de garde — reproduit fidèlement la page de garde du Rapport d\'Analyse des Offres (vert Papyrus + libellé "RAPPORT D\'ANALYSE DES OFFRES"), aux côtés des aperçus CCTP / RC / BPU / DQE',
+      'PDF RAO : le bloc "LOT" de la page de garde ne s\'affiche plus que si un lot est renseigné dans la consultation (auparavant toujours présent avec un tiret)',
     ],
   },
   {

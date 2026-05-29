@@ -70,8 +70,8 @@ const loadImage = sharedLoadImage;
  * @param {object} branding – objet branding
  * @returns {Promise<string>} data-URL PNG haute résolution
  */
-export const buildCoverPageCanvas = async (project, docLabel, branding = null) => {
-  const THEME = buildTheme(branding);
+export const buildCoverPageCanvas = async (project, docLabel, branding = null, themeOverrides = {}) => {
+  const THEME = buildTheme(branding, themeOverrides);
 
   const canvas = document.createElement('canvas');
   canvas.width  = px(PW);
