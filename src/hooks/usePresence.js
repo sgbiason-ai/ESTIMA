@@ -17,7 +17,16 @@ const HEARTBEAT_MS = 25_000;
 const STALE_MS     = 70_000;
 
 // ─── HOOK ÉMETTEUR ────────────────────────────────────────────────────────────
-export function usePresence({ user, companyId, projectId, projectName, activeTab }) {
+// Diffuse la présence de l'utilisateur. En plus du couple projectId/projectName
+// (consommé par les tuiles de la Gestion de Projets, comportement inchangé), on
+// publie une "entité" générique { entityType, entityId, entityName } qui désigne
+// l'élément réellement ouvert dans n'importe quel module (estimation, RAO, CRC,
+// devis MOE, doc admin, visite…). C'est cette entité que lit useCoEditors pour
+// afficher la bannière d'alerte de co-édition.
+export function usePresence({
+  user, companyId, projectId, projectName, activeTab,
+  entityType = null, entityId = null, entityName = null,
+}) {
   const intervalRef = useRef(null);
 
   useEffect(() => {
@@ -25,6 +34,7 @@ export function usePresence({ user, companyId, projectId, projectName, activeTab
 
     const ref = doc(db, 'companies', companyId, 'presence', user.uid);
     const isOnProject = activeTab === 'project' && !!projectId;
+    const hasEntity = !!entityType && !!entityId;
 
     const write = async () => {
       try {
@@ -34,6 +44,9 @@ export function usePresence({ user, companyId, projectId, projectName, activeTab
           displayName: user.displayName || user.email?.split('@')[0] || 'Utilisateur',
           projectId:   isOnProject ? projectId   : null,
           projectName: isOnProject ? projectName : null,
+          entityType:  hasEntity ? entityType : null,
+          entityId:    hasEntity ? entityId   : null,
+          entityName:  hasEntity ? entityName : null,
           activeTab:   activeTab || null,
           lastSeen:    serverTimestamp(),
         }, { merge: true });
@@ -51,7 +64,43 @@ export function usePresence({ user, companyId, projectId, projectName, activeTab
       window.removeEventListener('beforeunload', handleUnload);
       deleteDoc(ref).catch(() => {});
     };
-  }, [user?.uid, companyId, projectId, projectName, activeTab]);
+  }, [user?.uid, companyId, projectId, projectName, activeTab, entityType, entityId, entityName]);
+}
+
+// ─── HOOK LECTEUR : CO-ÉDITEURS D'UNE ENTITÉ ──────────────────────────────────
+// Retourne la liste des AUTRES utilisateurs actuellement sur la même entité
+// (même entityType + entityId). Utilisé pour la bannière d'alerte d'écrasement.
+export function useCoEditors({ companyId, currentUserId, entityType, entityId }) {
+  const [editors, setEditors] = useState([]);
+
+  useEffect(() => {
+    if (!companyId || !entityType || !entityId) {
+      setEditors([]);
+      return;
+    }
+
+    const unsub = onSnapshot(
+      collection(db, 'companies', companyId, 'presence'),
+      (snap) => {
+        const now = Date.now();
+        const active = snap.docs
+          .map(d => ({ ...d.data(), _id: d.id }))
+          .filter(p => {
+            if (!p.lastSeen) return false;
+            const ms = p.lastSeen instanceof Timestamp ? p.lastSeen.toMillis() : now;
+            return (now - ms) < STALE_MS;
+          })
+          .filter(p => p.uid !== currentUserId)
+          .filter(p => p.entityType === entityType && p.entityId === entityId);
+        setEditors(active);
+      },
+      () => {}
+    );
+
+    return () => unsub();
+  }, [companyId, currentUserId, entityType, entityId]);
+
+  return editors;
 }
 
 // ─── HOOK LECTEUR ─────────────────────────────────────────────────────────────

@@ -11,7 +11,8 @@ import { useProjectManager } from './hooks/useProjectManager';
 import { useLocalMode }     from './hooks/useLocalMode';
 import { useAppResources }  from './hooks/useAppResources';
 import { useAppModals }     from './hooks/useAppModals';
-import { usePresence }      from './hooks/usePresence';
+import { usePresence, useCoEditors } from './hooks/usePresence';
+import CoEditBanner        from './components/common/CoEditBanner';
 import { useDeviceMode }    from './hooks/useDeviceMode';
 import { useIsTesla }       from './hooks/useIsTesla';
 import { useProjectArchives } from './hooks/useProjectArchives';
@@ -468,6 +469,17 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNav
     projectId:   project?.id,
     projectName: project?.name,
     activeTab,
+    entityType:  project?.id ? 'estima' : null,
+    entityId:    project?.id || null,
+    entityName:  project?.name || null,
+  });
+
+  // Co-éditeurs du même projet (bannière d'alerte d'écrasement)
+  const coEditors = useCoEditors({
+    companyId,
+    currentUserId: user?.uid,
+    entityType: 'estima',
+    entityId: project?.id || null,
   });
 
   // ── 8. Modales ──────────────────────────────────────────────────────────────
@@ -580,7 +592,9 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNav
       />
 
       {/* ── Contenu principal ─────────────────────────────────────────────── */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <CoEditBanner editors={coEditors} />
+        <div className="flex-1 flex overflow-hidden">
         {db.isLoading && !localMode.isLocalMode ? (
           <div className="flex-1 flex items-center justify-center text-gray-500 gap-3">
             <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -761,6 +775,7 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNav
             {/* Admin est maintenant accessible depuis le Hub */}
           </Suspense>
         )}
+        </div>
       </div>
     </div>
   );

@@ -17,6 +17,8 @@ import ExeReceptionForm from '../components/docAdmin/ExeReceptionForm';
 import ExeLeveeForm from '../components/docAdmin/ExeLeveeForm';
 import Exe10Form from '../components/docAdmin/Exe10Form';
 import FicheRecap from '../components/docAdmin/FicheRecap';
+import { usePresence, useCoEditors } from '../hooks/usePresence';
+import CoEditBanner from '../components/common/CoEditBanner';
 // Generators chargés dynamiquement pour le code-splitting
 const loadExeGenerator = (n) => import(`../utils/docAdmin/generateExe${n}.js`);
 
@@ -124,6 +126,18 @@ export default function DocAdminView({ onBackToHub, user, companyId }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+
+  // ── Présence + co-édition (alerte d'écrasement) ───────────────────────────
+  usePresence({
+    user, companyId, activeTab: 'doc_admin',
+    entityType: selectedFicheId ? 'doc_admin' : null,
+    entityId: selectedFicheId || null,
+    entityName: selectedFiche?.sectionA?.designation || selectedFiche?.nom || null,
+  });
+  const coEditors = useCoEditors({
+    companyId, currentUserId: user?.uid,
+    entityType: 'doc_admin', entityId: selectedFicheId || null,
+  });
 
   const dateFinRevisee = useMemo(() => getDateFinRevisee(selectedFiche), [selectedFiche]);
 
@@ -608,6 +622,10 @@ export default function DocAdminView({ onBackToHub, user, companyId }) {
 
         <HelpButton onClick={() => setShowHelp(true)} />
       </header>
+
+      <div className="relative z-10">
+        <CoEditBanner editors={coEditors} />
+      </div>
 
       {/* Corps principal : sidebar liste + contenu */}
       <div className="relative z-10 flex-1 flex overflow-hidden">

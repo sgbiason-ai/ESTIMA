@@ -36,6 +36,8 @@ import {
   FollowPosition, UserInteractionDetector, FitBoundsOnce,
 } from './siteVisits/MapSubComponents';
 import { VisitInfoModal, ObsEditModal } from './siteVisits/SiteVisitModals';
+import { usePresence, useCoEditors } from '../hooks/usePresence';
+import CoEditBanner from '../components/common/CoEditBanner';
 
 // PROVISOIRE — Mode Tesla depuis le desktop
 const TeslaModeView = lazyWithReload(() => import('./TeslaModeView'));
@@ -64,6 +66,18 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
   const [teslaMode, setTeslaMode] = useState(false);
 
   const [fullVisit, setFullVisit] = useState(null);
+
+  // ── Présence + co-édition (alerte d'écrasement) ───────────────────────────
+  usePresence({
+    user, companyId, activeTab: 'site_visits',
+    entityType: selectedId ? 'site_visit' : null,
+    entityId: selectedId || null,
+    entityName: fullVisit?.nom || null,
+  });
+  const coEditors = useCoEditors({
+    companyId, currentUserId: user?.uid,
+    entityType: 'site_visit', entityId: selectedId || null,
+  });
   const [detailLoading, setDetailLoading] = useState(false);
   const [fullscreenMap, setFullscreenMap] = useState(false);
   const [highlightedObs, setHighlightedObs] = useState(null);
@@ -536,11 +550,15 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
   );
 
   return (
-    <div className="flex h-full bg-[#f5f5f7]">
+    <div className="flex flex-col h-full bg-[#f5f5f7]">
 
       <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="siteVisits" />
       <VisitInfoModal isOpen={showInfoModal} onClose={() => setShowInfoModal(false)} visit={fullVisit} onSave={handleSaveInfo} />
       <ObsEditModal isOpen={!!editingObs} onClose={() => setEditingObs(null)} obs={editingObs} onSave={handleSaveObsText} />
+
+      <CoEditBanner editors={coEditors} />
+
+      <div className="flex flex-1 min-h-0">
 
       {/* ── Sidebar liste ── */}
       <div className="w-64 shrink-0 border-r border-gray-200/60 bg-white/80 backdrop-blur-xl flex flex-col overflow-hidden">
@@ -974,6 +992,7 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
           {toast}
         </div>
       )}
+      </div>
     </div>
   );
 }

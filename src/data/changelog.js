@@ -31,6 +31,7 @@ export const CHANGELOG = [
       'Fiche projet : nouvel aperçu "RAO" dans le volet page de garde — reproduit fidèlement la page de garde du Rapport d\'Analyse des Offres (vert Papyrus + libellé "RAPPORT D\'ANALYSE DES OFFRES"), aux côtés des aperçus CCTP / RC / BPU / DQE',
       'PDF RAO : le bloc "LOT" de la page de garde ne s\'affiche plus que si un lot est renseigné dans la consultation (auparavant toujours présent avec un tiret)',
       'BPU : correction de l\'export Word qui échouait (descriptions d\'articles non générées)',
+      'Travail collaboratif : bannière d\'alerte si un collègue édite déjà le même élément (estimation, RAO, CRC, devis MOE, doc admin, visite) — sur desktop et mobile. Prévient le risque d\'écrasement mutuel des modifications (la dernière sauvegarde l\'emporte). La bannière disparaît seule dès que le collègue quitte (présence temps réel)',
     ],
   },
   {

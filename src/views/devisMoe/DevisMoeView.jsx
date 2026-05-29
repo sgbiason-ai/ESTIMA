@@ -20,10 +20,24 @@ import DevisMoeInfoTab from './DevisMoeInfoTab';
 import DevisMoeHonorairesTab from './DevisMoeHonorairesTab';
 import DevisMoeRecapTab from './DevisMoeRecapTab';
 import TacheTypeModal from './TacheTypeModal';
+import { usePresence, useCoEditors } from '../../hooks/usePresence';
+import CoEditBanner from '../../components/common/CoEditBanner';
 
 export default function DevisMoeView({ onBackToHub, user, companyId }) {
   const { devisList, isLoading, selected, selectedId, setSelectedId,
     createDevis, saveDevis, duplicateDevis, deleteDevis } = useDevisMoe(user, companyId);
+
+  // ── Présence + co-édition (alerte d'écrasement) ───────────────────────────
+  usePresence({
+    user, companyId, activeTab: 'devis_moe',
+    entityType: selectedId ? 'devis_moe' : null,
+    entityId: selectedId || null,
+    entityName: selected?.nom || null,
+  });
+  const coEditors = useCoEditors({
+    companyId, currentUserId: user?.uid,
+    entityType: 'devis_moe', entityId: selectedId || null,
+  });
 
   const [searchTerm, setSearchTerm]       = useState('');
   const [activeTab, setActiveTab]         = useState('infos');
@@ -257,6 +271,8 @@ export default function DevisMoeView({ onBackToHub, user, companyId }) {
 
         </RibbonContainer>
       </header>
+
+      <CoEditBanner editors={coEditors} />
 
       {/* ══════════════════════ BODY ══════════════════════ */}
       <div className="flex-1 flex min-h-0">

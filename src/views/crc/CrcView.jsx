@@ -47,6 +47,8 @@ import CrcAuditModal from './CrcAuditModal';
 import CrcTerrainView from './CrcTerrainView';
 import CrcSendMailModal from '../../components/crr/CrcSendMailModal';
 import { useSmtpConfig } from '../../hooks/useSmtpConfig';
+import { usePresence, useCoEditors } from '../../hooks/usePresence';
+import CoEditBanner from '../../components/common/CoEditBanner';
 
 // ── VUE PRINCIPALE ──────────────────────────────────────────────────────────
 
@@ -259,6 +261,18 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
   });
 
   const chantierName = manager.crrConfig.chantierInfo?.nom || '';
+
+  // ── Présence + co-édition (alerte d'écrasement) ───────────────────────────
+  usePresence({
+    user, companyId, activeTab: 'crc',
+    entityType: crrDoc?.id ? 'crc' : null,
+    entityId: crrDoc?.id || null,
+    entityName: chantierName || null,
+  });
+  const coEditors = useCoEditors({
+    companyId, currentUserId: user?.uid,
+    entityType: 'crc', entityId: crrDoc?.id || null,
+  });
 
   const [viewMode, setViewMode] = useState('edit');
   const [sortDate, setSortDate] = useState(() => localStorage.getItem('crc_sort_date') || null);
@@ -742,6 +756,8 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
 
         </div>
       </div>
+
+      <CoEditBanner editors={coEditors} />
 
       {/* ═══════════════════════════════════════════════════════════════════════
           CONTENU PRINCIPAL

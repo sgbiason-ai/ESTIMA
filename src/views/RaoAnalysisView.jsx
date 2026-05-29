@@ -15,6 +15,8 @@ import RaoLandingView from './rao/RaoLandingView';
 import RaoStructureModal from '../components/rao/RaoStructureModal';
 import HelpPanel from '../components/help/HelpPanel';
 import HelpButton from '../components/help/HelpButton';
+import { usePresence, useCoEditors } from '../hooks/usePresence';
+import CoEditBanner from '../components/common/CoEditBanner';
 
 export default function RaoAnalysisView({ user, companyId, onBackToHub }) {
   const [showHelp, setShowHelp] = useState(false);
@@ -188,6 +190,23 @@ export default function RaoAnalysisView({ user, companyId, onBackToHub }) {
 
   const isLanding = mode === 'landing';
 
+  // ── Présence + co-édition (alerte d'écrasement) ───────────────────────────
+  const raoEntityId = (!isLanding && project?.id) ? project.id : null;
+  usePresence({
+    user,
+    companyId,
+    activeTab: 'rao',
+    entityType: raoEntityId ? 'rao' : null,
+    entityId: raoEntityId,
+    entityName: project?.name || null,
+  });
+  const coEditors = useCoEditors({
+    companyId,
+    currentUserId: user?.uid,
+    entityType: 'rao',
+    entityId: raoEntityId,
+  });
+
   return (
     <div className="flex flex-col h-screen bg-[#f5f5f7] text-gray-900 overflow-hidden">
 
@@ -251,6 +270,7 @@ export default function RaoAnalysisView({ user, companyId, onBackToHub }) {
 
       {/* Contenu */}
       <div className="flex-1 overflow-hidden flex flex-col">
+        <CoEditBanner editors={coEditors} />
         {isLanding ? (
           <RaoLandingView
             companyId={companyId}

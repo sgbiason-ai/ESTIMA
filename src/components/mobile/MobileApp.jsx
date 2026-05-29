@@ -53,6 +53,8 @@ import { useOrientation }   from '../../hooks/useOrientation';
 import { useRobustSave, loadDraft, clearDraft } from '../../hooks/useRobustSave';
 import { useNegoTemplate }  from '../../hooks/useNegoTemplate';
 import { computeChaptersData, computeAnalysisStats } from '../../utils/analysisCompute';
+import { usePresence, useCoEditors } from '../../hooks/usePresence';
+import CoEditBanner from '../common/CoEditBanner';
 
 // ─── SPLIT-VIEW HELPER (tablette paysage) ───────────────────────────────────
 const SplitView = ({ List, Detail, hasSelection, loading, emptyIcon = 'list', emptyLabel = 'Sélectionnez un élément à gauche' }) => (
@@ -538,6 +540,28 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
     ? (isLandscape ? 'max-w-6xl mx-auto' : 'max-w-2xl mx-auto')
     : (isLandscape ? 'w-full' : 'max-w-md mx-auto');
 
+  // ── Entité active pour la présence / co-édition (alerte d'écrasement) ─────
+  // entityType aligné sur le desktop pour une détection cross-device.
+  const activeEntity = useMemo(() => {
+    if (selectedProject?.id)  return { type: 'estima',     id: selectedProject.id,  name: selectedProject.name };
+    if (selectedChantier?.id) return { type: 'crc',        id: selectedChantier.id, name: fullChantier?.crrConfig?.chantierInfo?.nom || selectedChantier.nom };
+    if (selectedMoeDevis?.id) return { type: 'devis_moe',  id: selectedMoeDevis.id, name: selectedMoeDevis.nom };
+    if (selectedFiche?.id)    return { type: 'doc_admin',  id: selectedFiche.id,    name: selectedFiche.nom };
+    if (selectedVisit?.id)    return { type: 'site_visit', id: selectedVisit.id,    name: fullVisit?.nom || selectedVisit.nom };
+    return { type: null, id: null, name: null };
+  }, [selectedProject, selectedChantier, fullChantier, selectedMoeDevis, selectedFiche, selectedVisit, fullVisit]);
+
+  usePresence({
+    user, companyId, activeTab: activeModule || null,
+    entityType: activeEntity.type,
+    entityId: activeEntity.id,
+    entityName: activeEntity.name,
+  });
+  const coEditors = useCoEditors({
+    companyId, currentUserId: user?.uid,
+    entityType: activeEntity.type, entityId: activeEntity.id,
+  });
+
   return (
     <div className={`flex flex-col h-dvh bg-[#f5f5f7] font-sans ${containerWidth}`}
       style={{ height: '100dvh' }}>
@@ -558,6 +582,8 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
           <div className="w-10" />
         </header>
       )}
+
+      {activeModule && <CoEditBanner editors={coEditors} variant="mobile" />}
 
       {/* ── Content ── */}
       <main className={`flex-1 overflow-y-auto ${isLandscape ? 'pb-2' : 'pb-2'}`}>
