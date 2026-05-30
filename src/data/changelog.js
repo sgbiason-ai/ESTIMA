@@ -12,6 +12,10 @@ export const CHANGELOG = [
     highlights: [
       'Bibliothèque & Devis BPU : ajout de photos dans la description des articles par glisser-déposer, copier-coller (Ctrl+V) ou bouton 📷. Disposition automatique et cohérente — le texte reste en haut, les photos sont regroupées en bas : 1 photo en pleine largeur, 2 côte à côte (50/50), 3 = une paire + une pleine largeur, 4 en grille 2×2. Maximum 4 photos par article',
       'Photos BPU : suppression d\'une photo par survol (bouton ✕), compression automatique (~800px) pour limiter le poids, et intégration directe aux exports PDF et Word — la mise en page ne peut jamais déborder de la colonne',
+      'Workspace (Gestion de Projets) : classer une affaire dans un dossier par simple glisser-déposer de sa tuile (vue dalles ou liste) sur le dossier cible dans le volet de gauche — la modale "Déplacer" reste disponible',
+      'Workspace : la recherche couvre désormais le numéro d\'affaire et la localisation en plus du nom du projet',
+      'Workspace : barre d\'outils du haut allégée et plus compacte (indicateur de connexion et version regroupés), laissant plus de place à la liste des projets',
+      'Workspace : bouton "Ouvrir" explicite au survol d\'une tuile (vue dalles ou liste) pour ouvrir le projet dans Estima VRD. Le simple clic sélectionne/charge le projet instantanément (plus de délai ni de modale de confirmation), le double-clic ouvre toujours dans Estima',
     ],
   },
   {

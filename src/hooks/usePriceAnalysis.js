@@ -79,6 +79,8 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
   useEffect(() => { projectIdRef.current = projectId; }, [projectId]);
   const companyIdRef = useRef(companyId);
   useEffect(() => { companyIdRef.current = companyId; }, [companyId]);
+  // Dernier état écrit du flag `hasRao` (évite les écritures redondantes)
+  const lastHasRaoRef = useRef(undefined);
 
   // ─── SAUVEGARDE directe dans le document dédié (avec retry) ─────────────
   const saveAnalysis = useCallback(async () => {
@@ -99,6 +101,15 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
       try {
         await setDoc(docRef, payload);
         setLastSaved(new Date());
+        // Dénormaliser un flag `hasRao` sur le doc projet : lu par le Workspace
+        // pour afficher le badge RAO sans 1 getDoc/projet. Écrit seulement au changement.
+        const hasRao = (companiesRef.current?.length || 0) > 0;
+        if (lastHasRaoRef.current !== hasRao) {
+          lastHasRaoRef.current = hasRao;
+          try {
+            await setDoc(doc(fireDb, 'companies', cid, 'projects', pid), { hasRao }, { merge: true });
+          } catch (e) { console.warn('[Analysis] flag hasRao non écrit:', e?.message); }
+        }
         return; // Succès
       } catch (e) {
         console.warn(`[Analysis] Tentative ${attempt + 1}/${maxRetries + 1} échouée:`, e.message);

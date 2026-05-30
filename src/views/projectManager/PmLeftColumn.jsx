@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  Upload, Save, FolderOpen, Copy, CheckCheck, RefreshCw, Cpu, Cloud, CheckCircle2, FileText, Layers, PlusCircle, HelpCircle
+  Upload, Save, FolderOpen, Copy, CheckCheck, RefreshCw, Cpu, Cloud, CheckCircle2, Layers, PlusCircle, HelpCircle
 } from 'lucide-react';
 import { APP_VERSION } from '../../data/changelog';
 
@@ -26,7 +26,7 @@ const RibbonBtnLarge = ({ icon: Icon, label, onClick, title, active, accent, dis
     disabled={disabled}
     title={title || label}
     className={`
-      group flex flex-col items-center justify-center gap-1.5 px-4 py-2 rounded-xl min-w-[72px]
+      group flex flex-col items-center justify-center gap-1 px-4 py-1.5 rounded-xl min-w-[72px]
       transition-all duration-150
       ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer active:scale-95'}
       ${active
@@ -36,7 +36,7 @@ const RibbonBtnLarge = ({ icon: Icon, label, onClick, title, active, accent, dis
     `}
   >
     <div className={`transition-colors ${accent || 'text-gray-400'} ${!disabled && !active ? 'group-hover:text-gray-700' : ''}`}>
-      <Icon size={22} strokeWidth={1.5} className={loading ? 'animate-spin' : ''} />
+      <Icon size={20} strokeWidth={1.5} className={loading ? 'animate-spin' : ''} />
     </div>
     <span className={`text-[10px] leading-tight text-center font-semibold transition-colors
       ${active ? 'text-blue-600' : 'text-gray-400'}
@@ -53,7 +53,7 @@ const RibbonBtnSmall = ({ icon: Icon, label, onClick, title, active, accent, dis
     disabled={disabled}
     title={title || label}
     className={`
-      group flex items-center gap-2 px-3 py-1.5 rounded-lg w-full
+      group flex items-center gap-2 px-3 py-1 rounded-lg w-full
       transition-all duration-150
       ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer active:scale-95'}
       ${active
@@ -80,12 +80,12 @@ const RibbonBtnSmall = ({ icon: Icon, label, onClick, title, active, accent, dis
  * PmLeftColumn — Ribbon Apple-style (fond clair, même structure)
  */
 const PmLeftColumn = ({
-  project, chapCount, itemCount, lastSaved,
+  project, lastSaved,
   cloudSaving, cloudSaved,
   onCloudSave, onExport, onImportClick, onClone,
   fileInputRef, onImportChange, onNewProject, onShowHelp,
 }) => (
-  <div className="flex-none flex items-stretch bg-white/80 backdrop-blur-xl border-b border-gray-200/60 h-[88px] select-none z-20 overflow-x-auto"
+  <div className="flex-none flex items-stretch bg-white/80 backdrop-blur-xl border-b border-gray-200/60 h-[80px] select-none z-20 overflow-x-auto"
     >
 
     {/* ── App Branding ── */}
@@ -112,15 +112,13 @@ const PmLeftColumn = ({
           {project?.name || 'Nouveau Projet'}
         </span>
       </div>
-      <div className="flex items-center gap-3 text-[10px] font-medium text-gray-400">
-        <span className="flex items-center gap-1 bg-gray-100 px-1.5 py-0.5 rounded"><Layers size={10} /> {chapCount} chapitres</span>
-        <span className="flex items-center gap-1 bg-gray-100 px-1.5 py-0.5 rounded"><FileText size={10} /> {itemCount} éléments</span>
-        {lastSaved && (
-          <span className="flex items-center gap-1 text-gray-300 ml-auto" title={`Dernière sauvegarde : ${lastSaved}`}>
+      {lastSaved && (
+        <div className="flex items-center gap-3 text-[10px] font-medium text-gray-400">
+          <span className="flex items-center gap-1 text-gray-300" title={`Dernière sauvegarde : ${lastSaved}`}>
             <Cloud size={10} /> Sync
           </span>
-        )}
-      </div>
+        </div>
+      )}
     </div>
 
     {/* ── Général ── */}
@@ -156,13 +154,11 @@ const PmLeftColumn = ({
 
     <div className="flex-1 min-w-[16px]" />
 
-    {/* ── Status ── */}
-    <div className="flex flex-col justify-center items-end px-6 border-l border-gray-200/60 text-right bg-gray-50/50 min-w-[160px]">
-      <div className="flex items-center gap-2 mb-2">
-        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-        <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Connecté</span>
-      </div>
-      <div className="flex items-center gap-1.5 text-[10px] font-mono text-gray-400 bg-gray-100 px-2 py-0.5 rounded" title="Version installée d'EstimaVRD">
+    {/* ── Status (compact : connexion + version fusionnés) ── */}
+    <div className="flex flex-col justify-center items-end px-5 border-l border-gray-200/60 bg-gray-50/50">
+      <div className="flex items-center gap-1.5 text-[10px] font-mono text-gray-400 bg-gray-100 px-2 py-1 rounded-lg"
+        title="EstimaVRD — connecté au Cloud">
+        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
         <Cpu size={10} /> v{APP_VERSION}
       </div>
     </div>

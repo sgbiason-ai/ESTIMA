@@ -1,10 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import {
   FolderPlus, RefreshCw, Layers, Folder,
   FolderOpen as FolderOpenIcon,
   ChevronRight, ChevronDown, Edit2, Trash2,
 } from 'lucide-react';
-import { buildFolderColorMap, NEUTRAL_COLOR } from './folderColors';
+import { NEUTRAL_COLOR } from './folderColors';
 
 /**
  * PmFolderSidebar
@@ -19,10 +19,9 @@ const PmFolderSidebar = ({
   expandedFolders, creatingFolder, setCreatingFolder, newFolderName, setNewFolderName,
   editingFolder, setEditingFolder, cloudProjects, rootFolders, getSubfolders,
   toggleExpand, handleCreateFolder, handleRenameFolder, handleDeleteFolder,
-  onProjectDrop,
+  onProjectDrop, colorMap = {},
 }) => {
 
-  const colorMap = useMemo(() => buildFolderColorMap(folders), [folders]);
   const dndEnabled = typeof onProjectDrop === 'function';
   // Cible de drop courante : id du dossier ou '__none__' pour "Sans dossier"
   const [dropTargetId, setDropTargetId] = useState(null);

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { HelpCircle, PlusCircle, Clock, Cloud, RefreshCw, Trash2, ArrowUpDown, Search, LayoutGrid, List } from 'lucide-react';
 import { buildFolderColorMap } from './folderColors';
 import { toast, confirm } from '../../utils/globalUI';
@@ -69,25 +69,41 @@ const ProjectManagerView = ({
   const fm = usePmFolders({ companyId, cloudProjects: cloud.cloudProjects, setCloudProjects: cloud.setCloudProjects, project, setProject });
   const { presenceByProject } = usePresenceReader({ companyId, currentUserId: currentUserUid });
 
-  // RAO : checker les subcollections analysis/data pour chaque projet
+  // RAO : détecter les projets ayant une analyse de prix.
+  // Priorité au flag dénormalisé `hasRao` (écrit par usePriceAnalysis) → 0 lecture.
+  // Fallback `getDoc` sur analysis/data uniquement pour les projets non encore
+  // migrés (flag absent), une seule fois par session (raoCheckedRef).
+  const raoCheckedRef = useRef(new Set());
   useEffect(() => {
     if (!companyId || cloud.cloudProjects.length === 0) return;
-    const checkRao = async () => {
-      const ids = new Set();
-      await Promise.all(cloud.cloudProjects.map(async (proj) => {
+    const flagged = cloud.cloudProjects.filter(p => p.hasRao === true).map(p => p.id);
+    const toCheck = cloud.cloudProjects.filter(p => p.hasRao === undefined && !raoCheckedRef.current.has(p.id));
+    if (toCheck.length === 0) {
+      if (flagged.length) setRaoProjectIds(prev => new Set([...prev, ...flagged]));
+      return;
+    }
+    (async () => {
+      const found = new Set(flagged);
+      await Promise.all(toCheck.map(async (proj) => {
+        raoCheckedRef.current.add(proj.id);
         try {
           const snap = await getDoc(doc(db, 'companies', companyId, 'projects', proj.id, 'analysis', 'data'));
-          if (snap.exists() && snap.data()?.companies?.length > 0) ids.add(proj.id);
+          if (snap.exists() && snap.data()?.companies?.length > 0) found.add(proj.id);
         } catch { /* ignore */ }
       }));
-      setRaoProjectIds(ids);
-    };
-    checkRao();
+      setRaoProjectIds(prev => new Set([...prev, ...found]));
+    })();
   }, [companyId, cloud.cloudProjects]);
 
   const removeAccents = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const sortedProjects = [...fm.filteredProjects]
-    .filter(p => !search.trim() || removeAccents(p.name).includes(removeAccents(search)))
+    .filter(p => {
+      if (!search.trim()) return true;
+      const q = removeAccents(search);
+      return removeAccents(p.name).includes(q)
+          || removeAccents(p.code).includes(q)
+          || removeAccents(p.location).includes(q);
+    })
     .sort((a, b) => {
       if (sortBy === 'date') return new Date(b.lastSaved || 0) - new Date(a.lastSaved || 0);
       if (sortBy === 'code') return (a.code || '').localeCompare(b.code || '', 'fr', { numeric: true });
@@ -124,7 +140,7 @@ const ProjectManagerView = ({
     }
   };
 
-  const handleProjectIntent = async (proj, mode) => {
+  const handleProjectIntent = async (proj, mode, { silent = false } = {}) => {
     // 1. Récupérer la biblio active : mode local OU base Cloud
     let activeLibrary = getActiveLocalLibrary();
     if (!activeLibrary && companyId) {
@@ -155,7 +171,7 @@ const ProjectManagerView = ({
       setLibModalCurrent(activeLibrary);
       return;
     }
-    executeOpen(proj, mode);
+    executeOpen(proj, mode, { silent });
   };
 
   const handleLibLoadLinked = () => {
@@ -245,8 +261,6 @@ const ProjectManagerView = ({
     }
   }, [detailsProject, companyId, cloud]);
 
-  const chapCount = (project?.chapters || []).length;
-  const itemCount = (project?.chapters || []).reduce((acc, c) => acc + (c.children || c.items || c.rows || []).length, 0);
   const lastSaved = project?.lastSaved ? new Date(project.lastSaved).toLocaleString('fr-FR') : null;
 
   return (
@@ -285,7 +299,7 @@ const ProjectManagerView = ({
 
       {/* ── Toolbar ───────────────────────────────────────────────────────── */}
       <PmLeftColumn
-        project={project} chapCount={chapCount} itemCount={itemCount} lastSaved={lastSaved}
+        project={project} lastSaved={lastSaved}
         cloudSaving={cloud.cloudSaving} cloudSaved={cloud.cloudSaved}
         onCloudSave={cloud.handleCloudSave} onExport={local.handleExport}
         onImportClick={() => local.fileInputRef.current?.click()} onClone={local.handleClone}
@@ -330,7 +344,7 @@ const ProjectManagerView = ({
                     type="text"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
-                    placeholder="Rechercher…"
+                    placeholder="Nom, n° ou lieu…"
                     className="pl-7 pr-3 py-1.5 bg-gray-100 border border-gray-200/60 hover:border-gray-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 rounded-xl text-xs text-gray-700 placeholder-gray-400 outline-none transition-all w-44 focus:w-56"
                     style={{ transition: 'width 0.2s ease, border-color 0.15s' }}
                   />
@@ -436,6 +450,8 @@ const ProjectManagerView = ({
             <div className="flex-1 flex min-h-0">
               <PmFolderSidebar
                 folders={fm.folders}
+                colorMap={folderColorMap}
+                onProjectDrop={(targetFolderId, projectId) => fm.handleMoveProject(projectId, targetFolderId)}
                 foldersLoading={fm.foldersLoading}
                 selectedFolderId={fm.selectedFolderId}
                 setSelectedFolderId={fm.setSelectedFolderId}
@@ -468,7 +484,7 @@ const ProjectManagerView = ({
                   folderColorMap={folderColorMap}
                   presenceByProject={presenceByProject}
                   deletingId={cloud.deletingId}
-                  onLoadProject={(proj) => handleProjectIntent(proj, 'load')}
+                  onLoadProject={(proj) => handleProjectIntent(proj, 'load', { silent: true })}
                   onOpenInEstima={(proj) => handleProjectIntent(proj, 'openInEstima')}
                   onDeleteProject={cloud.handleDeleteCloudProject}
                   onDuplicateProject={cloud.handleDuplicateCloudProject}
