@@ -11,8 +11,8 @@ import HelpPanel from '../components/help/HelpPanel';
 import HelpButton from '../components/help/HelpButton';
 
 const CctpGeneratorView = ({ 
-  project, masterCctp, onSaveMasterCctp, masterBranding, 
-  onSaveMasterBranding, onEditProject, onUpdateProject, onSaveProject,
+  project, masterCctp, onSaveMasterCctp, masterBranding,
+  onEditProject, onUpdateProject, onSaveProject,
   onEditBranding,
 }) => {
   

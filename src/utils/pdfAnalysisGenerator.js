@@ -81,7 +81,7 @@ const getHeatmapStyle = (value, reference) => {
   if (delta < -0.50) return { fill: [52, 211, 153], text: [255, 255, 255] };
   if (delta < -0.25) return { fill: [110, 231, 183], text: [30, 41, 59] };
   if (delta < -0.10) return { fill: [167, 243, 208], text: [30, 41, 59] };
-  if (delta < -0.00) return { fill: [209, 250, 229], text: [30, 41, 59] };
+  if (delta < 0) return { fill: [209, 250, 229], text: [30, 41, 59] };
   return null;
 };
 
@@ -281,7 +281,6 @@ export const generateAnalysisPDF = async ({
 
   // Passage A3 paysage
   doc.addPage('a3', 'l');
-  const pageWidthA3 = doc.internal.pageSize.getWidth();
 
   const scoringMode = scoringConfig?.mode || 'f1';
   const maxScore = Number(scoringConfig?.maxScore || 40);

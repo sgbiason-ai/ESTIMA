@@ -4,8 +4,7 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
 import Icon from './Icon';
-import { dateFr, fmt } from './formatters';
-import { setShareMode, canNativeShare } from '../../utils/fileSaver';
+import { dateFr } from './formatters';
 
 // ─── OS type labels ────────────────────────────────────────────────────────
 const OS_LABELS = {
@@ -118,7 +117,7 @@ const SectionCard = ({ title, icon, color, children }) => (
 );
 
 // ─── Composant principal ───────────────────────────────────────────────────
-export default function DocAdminDetailView({ fiche, branding, onToast, isLandscape }) {
+export default function DocAdminDetailView({ fiche, onToast, isLandscape }) {
   const [activeTab, setActiveTab] = useState('resume');
   const [exporting, setExporting] = useState(null);
 

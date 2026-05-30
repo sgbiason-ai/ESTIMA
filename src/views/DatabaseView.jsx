@@ -31,7 +31,6 @@ const DatabaseView = ({
   onReorderItems,
   units,
   onUpdateItem,
-  setItemToDuplicate,
   isLocalMode = false,
   onExitLocalMode = null,
   onFullResetLocal = null,
@@ -241,17 +240,6 @@ const DatabaseView = ({
     setSelectedIds(newSelection);
   };
 
-  const handleBulkMove = async (targetCatId) => {
-    if (selectedIds.size === 0) return;
-    const ok = await confirm(`Affecter ${selectedIds.size} articles à ce dossier ?`);
-    if(ok) {
-        for (const id of selectedIds) {
-            await assignCategoryToItem(id, targetCatId);
-        }
-        setSelectedIds(new Set());
-    }
-  };
-
   const handleExport = () => {
     const activeDbName = (dbProfiles && activeDbId) ? (dbProfiles.find(d => d.id === activeDbId)?.name || activeDbId) : "complet";
     const dataToExport = { 
@@ -354,7 +342,7 @@ const DatabaseView = ({
                   } else {
                     onImportData(json, { name: fileName });
                   }
-              } catch (err) { showToast("Fichier JSON invalide.", 'error'); }
+              } catch { showToast("Fichier JSON invalide.", 'error'); }
           };
           reader.readAsText(file);
       }} className="hidden" accept=".json" />

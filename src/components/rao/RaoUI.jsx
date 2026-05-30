@@ -1,7 +1,7 @@
 // src/components/rao/RaoUI.jsx
 import React, { useRef, useEffect } from 'react';
 
-export const TabBtn = ({ id, active, onClick, icon: Icon, label, count }) => (
+export const TabBtn = ({ id, active, onClick, label, count }) => (
   <button
     onClick={() => onClick(id)}
     className={`flex items-center gap-2 px-5 py-2.5 text-xs font-bold rounded-lg transition-all duration-300 whitespace-nowrap relative ${

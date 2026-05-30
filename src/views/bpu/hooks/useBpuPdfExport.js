@@ -18,7 +18,7 @@ import { PAGE_WIDTH_PX, PAGE_HEIGHT_PX } from '../constants/bpuLayout';
 // quasi nul à l'impression A4 et un coût temps ~+70%.
 const PDF_CAPTURE_SCALE = 1.5;
 
-export const useBpuPdfExport = ({ project, pages }) => {
+export const useBpuPdfExport = ({ project }) => {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [pdfProgress, setPdfProgress] = useState({ current: 0, total: 0 });
 

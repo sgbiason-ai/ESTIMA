@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { RibbonGroup, RibbonBtnLarge, RibbonContainer, RibbonHeader, RibbonSpacer } from '../common/RibbonParts';
 import {
-  createEmptyReceptionData, getDateFinRevisee,
+  createEmptyReceptionData,
   PdfDocumentHeader, PdfSectionHeader, ReadOnlySectionsAD,
   Field, ChoiceGroup, PdfCheckItem
 } from './ExeReceptionForm';
@@ -16,7 +16,7 @@ import {
 // ═══════════════════════════════════════════════════════════════════════════
 // Sous-composant — Maintien des réserves (5 checkboxes)
 // ═══════════════════════════════════════════════════════════════════════════
-const MaintienSubItems = ({ prefix, data, update, formatDateFR }) => (
+const MaintienSubItems = ({ prefix, data, update }) => (
   <div className="space-y-3 p-3 rounded-md bg-amber-50 border border-amber-200 ml-4">
     <p className="text-[10px] font-bold uppercase tracking-widest text-amber-700">Il est proposé de maintenir les réserves suivantes :</p>
     <PdfCheckItem checked={data[`${prefix}MaintienEpreuves`]} onChange={() => update(`${prefix}MaintienEpreuves`, !data[`${prefix}MaintienEpreuves`])} label="4.1 l'exécution des épreuves (annexe ci-jointe)" indent={1} />

@@ -32,7 +32,7 @@ const PmLocalHistory = ({ recentProjects, onLoadFromHistory }) => {
           const raw  = localStorage.getItem(`project_backup_${item.id}`);
           const full = raw ? JSON.parse(raw) : null;
           if (full?.code || full?.location) extraInfo = full;
-        } catch {}
+        } catch { /* ignore */ }
 
         return (
           <div

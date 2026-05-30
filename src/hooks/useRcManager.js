@@ -124,8 +124,6 @@ export const useRcManager = ({
   const [activeNodeId, setActiveNodeId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
-  const [variableModalOpen, setVariableModalOpen] = useState(false);
-  const [detectedVariables, setDetectedVariables] = useState([]);
   const [nodeToEdit, setNodeToEdit] = useState(null);
   const isAutoScrolling = useRef(false);
 
@@ -254,23 +252,6 @@ export const useRcManager = ({
 
   const collapseAll = () => setExpandedIds(new Set());
 
-  const handleOpenVariables = () => {
-      const keys = new Set();
-      const regex = /{{([\s\S]+?)}}/g;
-      const scanRecursive = (nodes) => {
-          nodes.forEach(node => {
-              if (selectedIds.has(node.id)) {
-                  let match;
-                  while ((match = regex.exec(node.content || "")) !== null) keys.add(match[1].trim()); 
-              }
-              if (node.children) scanRecursive(node.children);
-          });
-      };
-      scanRecursive(rcData);
-      setDetectedVariables(Array.from(keys));
-      setVariableModalOpen(true);
-  };
-
   const handleExportMaster = () => {
     const blob = new Blob([JSON.stringify(rcData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -291,7 +272,7 @@ export const useRcManager = ({
           setTimeout(() => setSelectedIds(new Set()), 500);
           toast.success("Structure RC importée avec succès");
         } else toast.error("Erreur import : Structure vide.");
-      } catch (error) { toast.error("Erreur lors de l'importation."); }
+      } catch { toast.error("Erreur lors de l'importation."); }
     }
     e.target.value = null;
   };

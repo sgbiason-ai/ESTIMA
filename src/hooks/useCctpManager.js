@@ -100,8 +100,6 @@ export const useCctpManager = ({
   const [activeNodeId, setActiveNodeId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
-  const [variableModalOpen, setVariableModalOpen] = useState(false);
-  const [detectedVariables, setDetectedVariables] = useState([]);
   const [nodeToEdit, setNodeToEdit] = useState(null);
   const isAutoScrolling = useRef(false);
 
@@ -241,7 +239,7 @@ export const useCctpManager = ({
   const buildCctpIndex = (nodes, path = []) => {
     const index = new Map();
     const traverse = (nodes, currentPath) => {
-      nodes.forEach((node, i) => {
+      nodes.forEach((node) => {
         const nodePath = [...currentPath, node.id];
         index.set(String(node.id), { node, path: nodePath });
         if (node.children) traverse(node.children, nodePath);
@@ -429,23 +427,6 @@ export const useCctpManager = ({
 
   const collapseAll = () => setExpandedIds(new Set());
 
-  const handleOpenVariables = () => {
-      const keys = new Set();
-      const regex = /{{([\s\S]+?)}}/g;
-      const scanRecursive = (nodes) => {
-          nodes.forEach(node => {
-              if (selectedIds.has(node.id)) {
-                  let match;
-                  while ((match = regex.exec(node.content || "")) !== null) keys.add(match[1].trim()); 
-              }
-              if (node.children) scanRecursive(node.children);
-          });
-      };
-      scanRecursive(cctpData);
-      setDetectedVariables(Array.from(keys));
-      setVariableModalOpen(true);
-  };
-
   const handleExportMaster = () => {
     const blob = new Blob([JSON.stringify(cctpData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -466,7 +447,7 @@ export const useCctpManager = ({
           setTimeout(() => setSelectedIds(new Set()), 500);
           toast.success("Structure CCTP importée avec succès");
         } else toast.error("Erreur import : Structure vide.");
-      } catch (error) { toast.error("Erreur lors de l'importation."); }
+      } catch { toast.error("Erreur lors de l'importation."); }
     }
     e.target.value = null;
   };

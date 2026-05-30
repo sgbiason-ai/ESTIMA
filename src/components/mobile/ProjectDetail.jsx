@@ -1,9 +1,9 @@
 import React from 'react';
 import Icon from './Icon';
-import { fmt, fmtShort, dateFr } from './formatters';
+import { fmt, dateFr } from './formatters';
 import { flattenItems } from './helpers';
 
-export default function ProjectDetail({ project, projectMeta, calcHook, onNavigate, onNavigateModule, onExport, isLandscape }) {
+export default function ProjectDetail({ project, projectMeta, calcHook, onNavigate, onNavigateModule, isLandscape }) {
   const totalClient = calcHook.projectStats?.client?.base + calcHook.projectStats?.client?.option || 0;
   const totalStudy  = calcHook.projectStats?.study?.base + calcHook.projectStats?.study?.option || 0;
   const nbTranches  = (project.tranches || []).length;

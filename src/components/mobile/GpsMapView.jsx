@@ -234,7 +234,7 @@ function UserInteractionDetector({ onInteraction }) {
 
 // ─── Outil de mesure ────────────────────────────────────────────────────────
 
-function MeasureTool({ active, points, onAddPoint, onReset }) {
+function MeasureTool({ active, points, onAddPoint }) {
   const map = useMap();
 
   useEffect(() => {
@@ -303,7 +303,7 @@ function MeasureTool({ active, points, onAddPoint, onReset }) {
 function RouteOverlay({ from, to }) {
   const [routeCoords, setRouteCoords] = useState([]);
   const [routeDist, setRouteDist] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [, setLoading] = useState(false);
 
   useEffect(() => {
     if (!from || !to) { setRouteCoords([]); setRouteDist(null); return; }

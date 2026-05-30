@@ -8,9 +8,8 @@ import {
 const CctpSidebar = ({
   searchQuery, setSearchQuery,
   collapseAll, expandAll, autoSelectChapters,
-  saveStatus,
   filteredCctpData, cctpDataLength,
-  onEditProject, addChapter, handleFileUpload, handleExportMaster, handleExportPdf, saveToCloud,
+  addChapter, handleFileUpload, handleExportMaster,
   expandedIds, selectedIds, activeNodeId,
   toggleExpand, toggleSelection, openEditor, deleteNode,
   isFavorite, toggleFavorite, favoritesCount = 0, onOpenFavorites,

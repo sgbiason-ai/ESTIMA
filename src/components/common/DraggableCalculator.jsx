@@ -17,7 +17,7 @@ const safeCalculate = (expression) => {
     if (!isFinite(result) || isNaN(result)) return 'Erreur';
 
     return result;
-  } catch (error) {
+  } catch {
     return 'Erreur';
   }
 };
@@ -98,7 +98,7 @@ const DraggableCalculator = ({ isOpen, onClose }) => {
         const result = (currentVal * factor).toFixed(2);
         setDisplay(result.toString());
         setEquation(`${currentVal} x ${factor} (${label}) = `);
-    } catch (e) {
+    } catch {
         setDisplay('Erreur');
     }
   };

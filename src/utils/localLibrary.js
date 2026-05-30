@@ -83,7 +83,7 @@ export function setActiveLocalLibrary(lib) {
  * réactiver plus tard via le toggle DatabaseView, comme aujourd'hui).
  */
 export function deactivateLocalLibrary() {
-  try { localStorage.setItem(KEYS.active, 'false'); } catch {}
+  try { localStorage.setItem(KEYS.active, 'false'); } catch { /* ignore */ }
 }
 
 /**

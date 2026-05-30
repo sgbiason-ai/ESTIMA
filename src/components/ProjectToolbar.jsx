@@ -8,7 +8,6 @@ import {
   Cloud, PanelLeftOpen, FileDown, Archive, ShieldCheck, ClipboardCheck, Undo2
 } from 'lucide-react';
 
-import { formatPrice } from '../utils/helpers';
 import { RibbonGroup, RibbonBtnLarge, RibbonBtnSmall } from './common/RibbonParts';
 
 /* ════════════════════════════════════════════════════════════════════
@@ -17,7 +16,6 @@ import { RibbonGroup, RibbonBtnLarge, RibbonBtnSmall } from './common/RibbonPart
 
 const ProjectToolbar = ({
   project,
-  updateProjectName,
   saveStatus,
   onSaveProject,
   isReadOnly,
@@ -27,8 +25,6 @@ const ProjectToolbar = ({
   setViewMode,
   showComparison,
   setShowComparison,
-  totalBase,
-  activeTrancheId,
   onExport,
   onOpenCalculation,
   onOpenDetails,

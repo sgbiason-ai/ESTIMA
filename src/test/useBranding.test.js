@@ -4,22 +4,11 @@
 // useBranding lui-même (hook React) n'est pas testé ici — il nécessite
 // @testing-library/react, prévu dans la phase de tests de hooks.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { DEFAULT_BRANDING } from '../hooks/useBranding';
 
 // Importer deepMerge via un contournement : on réexporte depuis le module
 // En attendant : tester le comportement de useBranding via ses effets observables
-
-// ─── Helpers pour simuler localStorage ───────────────────────────────────────
-const mockLocalStorage = (() => {
-  let store = {};
-  return {
-    getItem:    (k) => store[k] ?? null,
-    setItem:    (k, v) => { store[k] = v; },
-    removeItem: (k) => { delete store[k]; },
-    clear:      () => { store = {}; },
-  };
-})();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DEFAULT_BRANDING

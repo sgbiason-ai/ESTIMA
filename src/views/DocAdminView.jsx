@@ -372,10 +372,6 @@ export default function DocAdminView({ onBackToHub, user, companyId }) {
     // Barre entreprises + formulaire EXE
     const exeViews = { exe1: 'exe1', reception: 'reception', levee: 'levee', exe10: 'exe10' };
     if (exeViews[activeView]) {
-      const activeGroupe = isAlloti ? groupesAttributaires.find((g) => g.groupeId === effectiveGroupeId) : null;
-      const activeLotsLabels = activeGroupe
-        ? (activeGroupe.lotIndices || []).map((i) => lots[i] ? `Lot ${lots[i].numero || i + 1}` : null).filter(Boolean).join(', ')
-        : '';
 
       let ExeFormComponent = null;
       let exeFormProps = {};

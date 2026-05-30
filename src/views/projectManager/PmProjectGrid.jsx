@@ -5,7 +5,7 @@ import { NEUTRAL_COLOR } from './folderColors';
 const PmProjectGrid = ({
   viewMode = 'grid',
   cloudLoading, cloudError, cloudProjects, filteredProjects,
-  selectedFolderId, setSelectedFolderId,
+  setSelectedFolderId,
   project, folders, folderColorMap = {},
   presenceByProject, deletingId,
   onLoadProject, onOpenInEstima, onDeleteProject, onDuplicateProject, onMoveProject, onRestoreSnapshot, onInfoProject, linkedCrcMap = {}, raoProjectIds = new Set(), onNavigateModule,

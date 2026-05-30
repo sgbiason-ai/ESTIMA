@@ -119,12 +119,12 @@ const getHeatmapColor = (value, reference) => {
   if (delta < -0.50) return 'bg-emerald-400 text-white';
   if (delta < -0.25) return 'bg-emerald-300 text-slate-900';
   if (delta < -0.10) return 'bg-emerald-200 text-slate-900';
-  if (delta < -0.00) return 'bg-emerald-100 text-slate-900';
+  if (delta < 0) return 'bg-emerald-100 text-slate-900';
   return 'bg-slate-50 text-slate-600';
 };
 
 const AnalysisTable = ({
-  chaptersData, companies, stats, updateCompanyOffer, renameCompany, removeCompany, activeTrancheId, project, bpuConfig, scoringConfig,
+  chaptersData, companies, stats, updateCompanyOffer, renameCompany, removeCompany, project, bpuConfig, scoringConfig,
   analysisMode, averagesHorsOAB = {}
 }) => {
 
@@ -265,11 +265,6 @@ const AnalysisTable = ({
   // Largeur sub-colonnes par "displayColumn" : 3 pour base, 4 pour variante (Qté var en plus)
   const subColsCount = (col) => (col.kind === 'variant' ? 4 : 3);
 
-  // Sub-colonnes totales pour le compteur
-  const totalSubCols = useMemo(
-    () => displayColumns.reduce((acc, col) => acc + subColsCount(col), 0),
-    [displayColumns]
-  );
 
   // Total recalculé par displayColumn (utilisé pour totaux footer + scoring)
   const columnTotals = useMemo(() => {

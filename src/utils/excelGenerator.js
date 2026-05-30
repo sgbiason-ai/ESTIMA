@@ -53,7 +53,7 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
   const workbook = new ExcelJS.Workbook();
 
   let projectRefMap = new Map();
-  try { if (project?.chapters) projectRefMap = getItemRefMap(project); } catch (e) {}
+  try { if (project?.chapters) projectRefMap = getItemRefMap(project); } catch { /* ignore */ }
 
   const getTrancheName = (id) => id === 'global' ? 'GLOBAL' : tranches.find(t => t.id === id)?.name || id;
 
@@ -373,6 +373,6 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
 
   const xlsxBuffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([xlsxBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  const safeName = (project.name || 'Projet').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_\-]/g, '').replace(/_+/g, '_');
+  const safeName = (project.name || 'Projet').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '').replace(/_+/g, '_');
   await saveFileWithPicker(blob, `${safeName}_${type}.xlsx`, FILE_TYPES.excel, PICKER_IDS.exportExcel);
 };

@@ -27,7 +27,7 @@ const VariableManagerModal = ({ isOpen, onClose, currentVariables, onUpdate, det
       errs.clientZip = "Doit contenir 5 chiffres.";
     }
 
-    const specialCharRegex = /[<>{}\[\]$|\\^~]/;
+    const specialCharRegex = /[<>{}[\]$|\\^~]/;
     ['clientCity', 'location', 'clientAddress', 'moe'].forEach(field => {
       if (data[field] && specialCharRegex.test(data[field])) {
         errs[field] = "Caractères < > { } [ ] $ interdits.";

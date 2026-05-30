@@ -9,7 +9,7 @@ const fmtPrice = (v) =>
 
 // ─── Composant ────────────────────────────────────────────────────────────────
 const TabRecap = ({
-  criteria, ranking, companyNames, onExportPDF, isExporting,
+  criteria, ranking, onExportPDF, isExporting,
   scoringConfig, hasTranches, raoTrancheId, tranches,
   optionChapters = [], includedOptions = {},
   analysisCompanies = [],
@@ -246,7 +246,7 @@ const TabRecap = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {extendedRanking.map((r, i) => {
+              {extendedRanking.map((r) => {
                 const isIrregular = !!r.irregular;
                 const isVariant = r.kind === 'variant';
                 const isWinner = r.rank === 1 && !isIrregular;

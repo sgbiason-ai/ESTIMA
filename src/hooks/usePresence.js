@@ -50,7 +50,7 @@ export function usePresence({
           activeTab:   activeTab || null,
           lastSeen:    serverTimestamp(),
         }, { merge: true });
-      } catch {}
+      } catch { /* ignore */ }
     };
 
     write();

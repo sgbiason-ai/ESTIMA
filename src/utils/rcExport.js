@@ -19,6 +19,7 @@ const cleanColor = (hex) => hex ? hex.replace(/^#/, "").toUpperCase() : "000000"
 
 const sanitizeText = (str) => {
   if (str === null || str === undefined) return "";
+  // eslint-disable-next-line no-control-regex -- strip caracteres de controle invalides en XML
   return String(str).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "").replace(/\u200B/g, ""); 
 };
 
@@ -59,7 +60,7 @@ const getCellParagraphs = (htmlContent, isHeader) => {
 };
 
 // --- PARSING HTML VERS DOCX ---
-const parseHtmlToDocx = (htmlContent, branding) => {
+const parseHtmlToDocx = (htmlContent) => {
   if (!htmlContent) return [];
   const parser = new DOMParser();
   const doc = parser.parseFromString(`<div>${htmlContent}</div>`, "text/html");
@@ -182,7 +183,7 @@ export const generateWordRC = async (selectedNodes, variables, masterData, brand
           const regex = new RegExp(`{{${key}}}`, "g");
           text = text.replace(regex, String(variables[key] || ""));
         });
-        docChildren.push(...parseHtmlToDocx(text, branding));
+        docChildren.push(...parseHtmlToDocx(text));
       }
 
       if (node.children) processNodes(node.children, currentNumber);

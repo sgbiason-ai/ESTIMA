@@ -286,8 +286,6 @@ export default function RAOView({ project, companyId, calcHook }) {
 
   // ─── Classement final (prix + technique) ─────────────────────────────
   const ranking = useMemo(() => {
-    const nonAuto = raoCriteria.filter(c => !c.auto);
-    const priceCrit = raoCriteria.find(c => c.auto);
     const priceWeight = scoringConfig.maxScore || 40;
 
     return companyStats.ranked.map(c => {
@@ -414,7 +412,6 @@ export default function RAOView({ project, companyId, calcHook }) {
 
           {/* Classement final */}
           {ranking.map((c, i) => {
-            const ui = getUI(c.companyIndex ?? companies.findIndex(co => co.name === c.name));
             const isVariant = c.kind === 'variant';
             return (
               <div key={c.id} className={`bg-white rounded-xl border overflow-hidden ${c.isOAB ? 'border-amber-400 ring-1 ring-amber-200' : isVariant ? 'border-purple-200' : 'border-gray-200'}`}>

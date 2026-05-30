@@ -80,14 +80,6 @@ const roundedRect = (doc, x, y, w, h, r, style) => {
   doc.roundedRect(x, y, w, h, r, r, style);
 };
 
-// Dessine un petit cercle rempli (pastille) au centre de la cellule
-const drawDot = (doc, cell, color, radius = 1.2) => {
-  const cx = cell.x + cell.width / 2;
-  const cy = cell.y + cell.height / 2;
-  doc.setFillColor(...color);
-  doc.circle(cx, cy, radius, 'F');
-};
-
 // Dessine un badge arrondi avec texte au centre de la cellule
 const drawBadge = (doc, cell, text, bgColor, txtColor, font) => {
   const textW = doc.getTextWidth(text);
@@ -705,7 +697,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
     // ne sont jamais séparés par un saut de page.
     const pageBottom = PH - M.bottom;
 
-    catObs.forEach((obs, obsIdx) => {
+    catObs.forEach((obs) => {
       let rawText = obs.text || '';
       // Report CR nXX uniquement dans l'aperçu, pas dans le PDF
       const plainText = stripHtml(rawText);
@@ -956,7 +948,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
               if (imgH > maxH) { imgH = maxH; imgW = imgH * aspect; }
               const imgX = data.cell.x + (colW - imgW) / 2;
               const imgY = cellTop + (cellBottom - cellTop - imgH - 4) / 2;
-              try { doc.addImage(cached.uri, 'JPEG', imgX, imgY, imgW, imgH); } catch {}
+              try { doc.addImage(cached.uri, 'JPEG', imgX, imgY, imgW, imgH); } catch { /* ignore */ }
               addGpsLink(imgs[0], imgX, imgY + imgH + 2, imgW);
             }
           } else {
@@ -979,7 +971,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
                 const imgX = data.cell.x + 2 + j * (slotW + 2);
                 const imgY = drawY + (rowH - p.imgH - 3) / 2;
                 if (imgY + p.imgH <= cellBottom + 0.5) {
-                  try { doc.addImage(p.cached.uri, 'JPEG', imgX, imgY, p.imgW, p.imgH); } catch {}
+                  try { doc.addImage(p.cached.uri, 'JPEG', imgX, imgY, p.imgW, p.imgH); } catch { /* ignore */ }
                   addGpsLink(p.src, imgX, imgY + p.imgH + 1.5, p.imgW);
                 }
               });
@@ -1036,15 +1028,11 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
                   activeIndent = seg.indent * bulletIndent;
                 }
 
-                // Largeur dispo pour cette ligne (réduite si indenté, sauf pour le bullet lui-même)
-                const segMaxW = seg.bullet ? maxW : maxW - activeIndent;
-
                 // Decouper le segment en lignes puis en mots pour le word-wrap
                 const lines = seg.text.split('\n');
                 for (let li = 0; li < lines.length; li++) {
                   if (overflow) break;
                   if (li > 0) { curX = c.x + padL + activeIndent; curY += lineH; }
-                  const lineMaxW = segMaxW;
                   const words = lines[li].split(/(\s+)/);
                   for (const word of words) {
                     const ww = doc.getTextWidth(word);

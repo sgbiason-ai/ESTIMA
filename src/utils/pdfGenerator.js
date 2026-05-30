@@ -4,9 +4,9 @@
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { cleanText, formatPrice, getItemRefMap, normalizeUnitSymbol } from './helpers';
+import { getItemRefMap, normalizeUnitSymbol } from './helpers';
 import { saveFileWithPicker, FILE_TYPES, PICKER_IDS } from './fileSaver';
-import { sanitizeFilename, loadLogos, renderLogo, drawCoverPage as _drawCoverPage } from './pdf/pdfSharedHelpers';
+import { sanitizeFilename, loadLogos, drawCoverPage as _drawCoverPage } from './pdf/pdfSharedHelpers';
 import { buildTheme } from './pdf/buildTheme';
 
 const cleanFormat = (num) => {
@@ -120,9 +120,9 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
   }
 
   let projectRefMap = new Map();
-  try { if (project?.chapters) projectRefMap = getItemRefMap(project); } catch (e) {}
+  try { if (project?.chapters) projectRefMap = getItemRefMap(project); } catch { /* ignore */ }
 
-  const drawHeader = (data) => {
+  const drawHeader = () => {
     if (includeCover && doc.internal.getCurrentPageInfo().pageNumber === 1) return;
     const pageWidth = doc.internal.pageSize.width;
     const marginX = 10;

@@ -64,7 +64,7 @@ const CrrParticipants = ({
   // mais pas la liste des contacts). Meilleur scan visuel a l'ouverture d'un CRC.
   const [expandedGroups, setExpandedGroups] = useState(new Set());
   const [editingGroup, setEditingGroup] = useState(null);
-  const [editingContact, setEditingContact] = useState(null);
+  const [editingContact] = useState(null);
 
   // Drag & drop state pour reordonner les groupes
   const dragIdx = useRef(null);

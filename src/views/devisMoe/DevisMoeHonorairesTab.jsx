@@ -1,15 +1,14 @@
 // src/views/devisMoe/DevisMoeHonorairesTab.jsx
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Trash2, Search, ChevronRight, ChevronDown, CheckCircle2, Layers, AlertTriangle, PanelLeftClose, PanelLeftOpen, BookOpen, GripVertical, Pencil, X } from 'lucide-react';
 import HonorairesConfigPanel from './HonorairesConfigPanel';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { PHASES_LOI_MOP, createEmptyLot, TACHE_TEMPLATES, COTRAITANT_COLORS, MANDATAIRE_COLOR, getCategoriesForAssignee, buildCategoriesMap, createEmptyTache } from '../../hooks/useDevisMoe';
-import { calcHonByAssignee, getAssigneeName, isNestedTemps, getAssigneeKeys, tacheTotalBudget, tacheBudgetByAssignee, phaseBudgetByAssignee, grandTotalByAssignee, phaseHoursByAssignee, grandHoursByAssignee } from '../../utils/devisMoeCalculations';
-import { pct, honPhasePct, honPhaseTemps, newSousTache, totalRep, fmt, fmtE, iSmCls } from './devisMoeHelpers';
+import { PHASES_LOI_MOP, TACHE_TEMPLATES, COTRAITANT_COLORS, MANDATAIRE_COLOR, getCategoriesForAssignee, buildCategoriesMap, createEmptyTache } from '../../hooks/useDevisMoe';
+import { getAssigneeName, isNestedTemps, getAssigneeKeys, tacheTotalBudget, phaseBudgetByAssignee, grandTotalByAssignee, grandHoursByAssignee } from '../../utils/devisMoeCalculations';
+import { pct, newSousTache, fmt, fmtE } from './devisMoeHelpers';
 import TacheTypeEditModal from './TacheTypeEditModal';
 
 export default function DevisMoeHonorairesTab({ draft, onChange, templatesOpen, setTemplatesOpen, configOpen, setConfigOpen }) {
-  const [expandedLots, setExpandedLots] = useState(new Set());
   const [uniteTemps, setUniteTemps] = useState('j');
   const [selectedPhaseId, setSelectedPhaseId] = useState(null);
   const [showPhaseMenu, setShowPhaseMenu] = useState(false);
@@ -48,95 +47,12 @@ export default function DevisMoeHonorairesTab({ draft, onChange, templatesOpen, 
     onChange({ ...draft, phases, lots });
   };
 
-  const addLot = () => {
-    const cats = draft.categories || [];
-    const newLot = createEmptyLot((draft.lots?.length || 0) + 1, draft.phases || PHASES_LOI_MOP, cats);
-    newLot.phasesTemps = newLot.phasesTemps.map(pt => ({ phaseId: pt.phaseId, sousTaches: [newSousTache(cats)] }));
-    onChange({ ...draft, lots: [...(draft.lots || []), newLot] });
-    setExpandedLots(prev => new Set([...prev, newLot.id]));
-  };
-
-  const removeLot = (id) => onChange({ ...draft, lots: (draft.lots || []).filter(l => l.id !== id) });
-
-  const updateLot = (id, field, val) =>
-    onChange({ ...draft, lots: (draft.lots || []).map(l => l.id === id ? { ...l, [field]: val } : l) });
-
-  const updateRep = (lotId, phaseId, val) =>
-    onChange({
-      ...draft,
-      lots: (draft.lots || []).map(l => l.id !== lotId ? l : {
-        ...l,
-        repartitionPhases: (l.repartitionPhases || []).map(r =>
-          r.phaseId === phaseId ? { ...r, pourcentage: val } : r
-        ),
-      }),
-    });
-
-  const addSousTache = (lotId, phaseId) => {
-    const cats = draft.categories || [];
-    onChange({
-      ...draft,
-      lots: (draft.lots || []).map(l => l.id !== lotId ? l : {
-        ...l,
-        phasesTemps: (l.phasesTemps || []).map(pt =>
-          pt.phaseId !== phaseId ? pt : { ...pt, sousTaches: [...(pt.sousTaches || []), newSousTache(cats)] }
-        ),
-      }),
-    });
-  };
-
-  const removeSousTache = (lotId, phaseId, stId) =>
-    onChange({
-      ...draft,
-      lots: (draft.lots || []).map(l => l.id !== lotId ? l : {
-        ...l,
-        phasesTemps: (l.phasesTemps || []).map(pt =>
-          pt.phaseId !== phaseId ? pt : { ...pt, sousTaches: (pt.sousTaches || []).filter(st => st.id !== stId) }
-        ),
-      }),
-    });
-
-  const updateSousTache = (lotId, phaseId, stId, field, val) =>
-    onChange({
-      ...draft,
-      lots: (draft.lots || []).map(l => l.id !== lotId ? l : {
-        ...l,
-        phasesTemps: (l.phasesTemps || []).map(pt =>
-          pt.phaseId !== phaseId ? pt : {
-            ...pt,
-            sousTaches: (pt.sousTaches || []).map(st => st.id !== stId ? st : { ...st, [field]: val }),
-          }
-        ),
-      }),
-    });
-
-  const updateSousTacheTemps = (lotId, phaseId, stId, catId, val) =>
-    onChange({
-      ...draft,
-      lots: (draft.lots || []).map(l => l.id !== lotId ? l : {
-        ...l,
-        phasesTemps: (l.phasesTemps || []).map(pt =>
-          pt.phaseId !== phaseId ? pt : {
-            ...pt,
-            sousTaches: (pt.sousTaches || []).map(st =>
-              st.id !== stId ? st : { ...st, temps: { ...st.temps, [catId]: val } }
-            ),
-          }
-        ),
-      }),
-    });
-
-  const toggleLot = (id) =>
-    setExpandedLots(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-
   const cats = draft.categories || [];
   const lots = draft.lots || [];
-  const isPct = draft.methode === 'pourcentage';
 
   const tva = parseFloat(draft.tva) || 20;
   const isGrp = draft.moeType === 'mandataire' || draft.moeType === 'cotraitant';
   const catsMap = isGrp ? buildCategoriesMap(draft) : null;
-  const totalTravauxHT = lots.reduce((s, l) => s + (parseFloat(l.montantTravauxHT) || 0), 0);
   const totalHonTaches = (() => {
     const taches = draft.taches || [];
     if (isGrp && catsMap) {
@@ -418,7 +334,7 @@ export default function DevisMoeHonorairesTab({ draft, onChange, templatesOpen, 
                         <div className="flex items-center px-4 py-1.5 bg-gradient-to-r from-slate-100 to-slate-50">
                           <div className="w-8 shrink-0" />
                           <div className="flex-1 min-w-0 px-2" />
-                          {assigneeKeys.map((aKey, ai) => {
+                          {assigneeKeys.map((aKey) => {
                             const color = aKey === 'mandataire' ? MANDATAIRE_COLOR : aKey === 'notreEntreprise' ? COTRAITANT_COLORS[0] : (COTRAITANT_COLORS[(draft.cotraitants || []).findIndex(c => c.id === aKey)] || COTRAITANT_COLORS[0]);
                             const name = getAssigneeName(aKey, draft);
                             return (
@@ -510,7 +426,7 @@ export default function DevisMoeHonorairesTab({ draft, onChange, templatesOpen, 
                                           <span className="text-[11px] font-black uppercase tracking-widest truncate">{phase.label}</span>
                                         </div>
                                         {/* Pastilles par assignee — centrées sur les colonnes catégories */}
-                                        {(assigneeKeys && assigneeKeys.length > 1 ? assigneeKeys : [null]).map((aKey, aIdx) => {
+                                        {(assigneeKeys && assigneeKeys.length > 1 ? assigneeKeys : [null]).map((aKey) => {
                                           const color = aKey === 'mandataire' ? MANDATAIRE_COLOR : aKey === 'notreEntreprise' ? COTRAITANT_COLORS[0] : aKey ? (COTRAITANT_COLORS[(draft.cotraitants || []).findIndex(c => c.id === aKey)] || COTRAITANT_COLORS[0]) : null;
                                           const groupW = cats.length * (assigneeKeys && assigneeKeys.length > 2 ? 44 : assigneeKeys && assigneeKeys.length > 1 ? 48 : 56);
                                           const aTotal = phaseBudgetByA ? (phaseBudgetByA[aKey] || 0) : null;
@@ -582,7 +498,7 @@ export default function DevisMoeHonorairesTab({ draft, onChange, templatesOpen, 
                                                       value={t.label} onChange={handleTacheLabelChange(t.id)} placeholder="Description de la tâche…" />
                                                   </div>
                                                   {/* Heures par cat — groupées par assignee si mode groupement */}
-                                                  {(assigneeKeys && assigneeKeys.length > 1 ? assigneeKeys : [null]).map((aKey, aIdx) => {
+                                                  {(assigneeKeys && assigneeKeys.length > 1 ? assigneeKeys : [null]).map((aKey) => {
                                                     const color = aKey === 'mandataire' ? MANDATAIRE_COLOR : aKey === 'notreEntreprise' ? COTRAITANT_COLORS[0] : aKey ? (COTRAITANT_COLORS[(draft.cotraitants || []).findIndex(c => c.id === aKey)] || COTRAITANT_COLORS[0]) : null;
                                                     const tempsData = aKey
                                                       ? (isNestedTemps(t.temps, catIds) ? (t.temps?.[aKey] || {}) : (aKey === 'mandataire' ? (t.temps || {}) : {}))
@@ -652,8 +568,7 @@ export default function DevisMoeHonorairesTab({ draft, onChange, templatesOpen, 
                         <div className="flex-1 min-w-0 px-2">
                           <span className="text-[10px] font-black uppercase tracking-wider text-slate-700">Total général</span>
                         </div>
-                        {(assigneeKeys && assigneeKeys.length > 1 ? assigneeKeys : [null]).map((aKey, aIdx) => {
-                          const color = aKey === 'mandataire' ? MANDATAIRE_COLOR : aKey === 'notreEntreprise' ? COTRAITANT_COLORS[0] : aKey ? (COTRAITANT_COLORS[(draft.cotraitants || []).findIndex(c => c.id === aKey)] || COTRAITANT_COLORS[0]) : null;
+                        {(assigneeKeys && assigneeKeys.length > 1 ? assigneeKeys : [null]).map((aKey) => {
                           return (
                             <React.Fragment key={aKey || 'solo'}>
                               {cats.map(cat => {

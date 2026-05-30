@@ -30,7 +30,7 @@ const load = () => {
 const save = (favorites) => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(favorites));
-  } catch {}
+  } catch { /* ignore */ }
 };
 
 export const useFavorites = () => {

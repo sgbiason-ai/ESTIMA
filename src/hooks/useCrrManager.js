@@ -97,7 +97,7 @@ export const useCrrManager = ({
   const syncDraft = (data) => {
     const key = draftKeyRef.current;
     if (!key || !data) return;
-    try { localStorage.setItem(key, JSON.stringify({ ...data, _draftAt: Date.now() })); } catch {}
+    try { localStorage.setItem(key, JSON.stringify({ ...data, _draftAt: Date.now() })); } catch { /* ignore */ }
   };
 
   const updateProject = useCallback(
@@ -847,6 +847,85 @@ export const useCrrManager = ({
     };
   }, [meetings, updateMeetings, project?.id]);
 
+  // ── Scan & nettoyage des photos cassees (URLs Storage qui retournent 404) ──
+  // Detecte les images dont l'URL http(s) ne repond plus (fichier supprime du
+  // bucket Storage) et les retire des observations. Cas typique : ancienne
+  // archive .crcestima v1 (sans embed base64) re-importee apres delete cascade.
+  // @param {{ onProgress?: (p:{done:number,total:number,broken:number}) => void }} opts
+  // @returns {Promise<{scanned:number, broken:number, removed:number}>}
+  const cleanBrokenImages = useCallback(async ({ onProgress } = {}) => {
+    // 1. Recense toutes les images avec URL http(s)
+    const refs = []; // [{ mIdx, oIdx, iIdx, url }]
+    meetings.forEach((m, mIdx) => {
+      (m.observations || []).forEach((obs, oIdx) => {
+        (obs.images || []).forEach((img, iIdx) => {
+          const src = typeof img === 'object' && img ? img.src : img;
+          if (typeof src === 'string' && /^https?:\/\//i.test(src)) {
+            refs.push({ mIdx, oIdx, iIdx, url: src });
+          }
+        });
+      });
+    });
+
+    if (refs.length === 0) {
+      return { scanned: 0, broken: 0, removed: 0 };
+    }
+
+    // 2. Teste chaque URL en parallele (pool de 6), dedup
+    let done = 0;
+    let brokenCount = 0;
+    const cache = new Map(); // url → bool isBroken
+    onProgress?.({ done, total: refs.length, broken: brokenCount });
+
+    const testOne = async (ref) => {
+      try {
+        let isBroken = cache.get(ref.url);
+        if (isBroken === undefined) {
+          const resp = await fetch(ref.url, { method: 'GET', cache: 'no-store' });
+          isBroken = !resp.ok;
+          cache.set(ref.url, isBroken);
+        }
+        ref.broken = isBroken;
+      } catch {
+        ref.broken = true;
+        cache.set(ref.url, true);
+      }
+      if (ref.broken) brokenCount += 1;
+      done += 1;
+      onProgress?.({ done, total: refs.length, broken: brokenCount });
+    };
+
+    const POOL = 6;
+    for (let i = 0; i < refs.length; i += POOL) {
+      await Promise.all(refs.slice(i, i + POOL).map(testOne));
+    }
+
+    // 3. Retire les images cassees du tableau images de chaque observation
+    const brokenKeys = new Set(
+      refs.filter((r) => r.broken).map((r) => `${r.mIdx}_${r.oIdx}_${r.iIdx}`)
+    );
+    if (brokenKeys.size === 0) {
+      return { scanned: refs.length, broken: 0, removed: 0 };
+    }
+
+    const newMeetings = meetings.map((m, mIdx) => {
+      if (!m.observations?.length) return m;
+      return {
+        ...m,
+        observations: m.observations.map((obs, oIdx) => {
+          if (!obs.images?.length) return obs;
+          const newImages = obs.images.filter((_, iIdx) => !brokenKeys.has(`${mIdx}_${oIdx}_${iIdx}`));
+          if (newImages.length === obs.images.length) return obs;
+          return { ...obs, images: newImages };
+        }),
+      };
+    });
+
+    updateMeetings(newMeetings);
+
+    return { scanned: refs.length, broken: brokenKeys.size, removed: brokenKeys.size };
+  }, [meetings, updateMeetings]);
+
   // ── RETURN ────────────────────────────────────────────────────────────
 
   return {
@@ -906,5 +985,6 @@ export const useCrrManager = ({
     saveStatus,
     forceSave,
     optimizeAllImages,
+    cleanBrokenImages,
   };
 };

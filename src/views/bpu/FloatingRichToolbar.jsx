@@ -32,7 +32,7 @@ const FloatingRichToolbar = ({
   const updateActiveFormats = useCallback(() => {
     const formats = {};
     TOOLBAR_ACTIONS.forEach((a) => {
-      try { formats[a.cmd] = document.queryCommandState(a.cmd); } catch {}
+      try { formats[a.cmd] = document.queryCommandState(a.cmd); } catch { /* ignore */ }
     });
     setActiveFormats(formats);
   }, []);

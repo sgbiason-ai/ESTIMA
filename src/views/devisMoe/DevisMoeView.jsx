@@ -9,7 +9,6 @@ import {
   BookOpen, SlidersHorizontal
 } from 'lucide-react';
 import { useDevisMoe, PHASES_LOI_MOP } from '../../hooks/useDevisMoe';
-import { formatPrice } from '../../utils/helpers';
 import {
   RibbonGroup, RibbonBtnLarge, RibbonHeader, RibbonContainer
 } from '../../components/common/RibbonParts';

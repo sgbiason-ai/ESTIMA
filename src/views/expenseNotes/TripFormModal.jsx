@@ -4,7 +4,6 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { X, Save, Calendar, Repeat, FileText, Hash, Loader2, MapPin, Home as HomeIcon, TrendingUp, Plus, Trash2, RotateCcw, AlertTriangle, CalendarRange } from 'lucide-react';
-import { toast } from '../../utils/globalUI';
 import AddressAutocomplete from '../../components/expenseNotes/AddressAutocomplete';
 import TripMapPreview from '../../components/expenseNotes/TripMapPreview';
 import { calculateRouteDistance, formatDuration } from '../../utils/expenseGeo';

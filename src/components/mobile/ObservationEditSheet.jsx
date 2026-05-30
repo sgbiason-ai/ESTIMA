@@ -9,7 +9,7 @@ import { uploadCrrImage, deleteCrrImage } from '../../utils/crrImageStorage';
 import { useOrientation } from '../../hooks/useOrientation';
 import { sanitizeHtml } from '../../utils/helpers';
 import { toast } from '../../utils/globalUI';
-import { getGroupColor, abbreviateGroup } from '../../data/crrData';
+import { getGroupColor } from '../../data/crrData';
 
 // ─── STATUS CONFIG ─────────────────────────────────────────────────────────
 const STATUSES = [
@@ -42,7 +42,7 @@ export default function ObservationEditSheet({
   companyId,
   crrId,
 }) {
-  const { isLandscape } = useOrientation();
+  useOrientation();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const cameraRef = useRef(null);
   const galleryRef = useRef(null);

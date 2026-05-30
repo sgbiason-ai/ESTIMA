@@ -10,7 +10,6 @@ import {
   Layers, Trash2, ArrowUp, ArrowDown, Pencil, Check, AlertTriangle
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { generateId } from '../../utils/helpers';
 
 const formatEUR = (n) =>
   (Number(n) || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
@@ -279,7 +278,6 @@ export default function RaoStructureModal({
       // Valider la destination en fonction du type
       const destId = destination.droppableId;
       const destIsRoot = destId === '__root__';
-      const destNode = destIsRoot ? null : findNode(afterRemove, destId);
 
       // Règles :
       // - Un chapitre (type='chapter' avec children potentiels) peut aller en racine OU sous un chapter racine

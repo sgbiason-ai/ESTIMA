@@ -3,7 +3,7 @@
 // Collection: companies/{companyId}/fichesMarche/{ficheId}
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { collection, getDocs, doc, getDoc, setDoc, deleteDoc, onSnapshot, query, orderBy, limit, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, setDoc, deleteDoc, onSnapshot, query, orderBy, limit, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { generateId } from '../utils/helpers';
 import { useToast } from '../contexts/ToastContext';
@@ -125,7 +125,7 @@ export const useFichesMarche = (user, companyId) => {
             if (lastId && data.some((f) => f.id === lastId)) {
               setSelectedFicheIdRaw(lastId);
             }
-          } catch {}
+          } catch { /* ignore */ }
         }
       },
       (error) => {

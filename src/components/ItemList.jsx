@@ -227,7 +227,6 @@ const ItemRow = memo(
     bpuConfig,
     onUpdate,
     onSelect,
-    onModal,
     stableKey,
     formulaMode,
     setFormulaMode,
@@ -503,7 +502,7 @@ const ItemRow = memo(
 // --------------------
 // SUBCHAPTER ROW
 // --------------------
-const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly, viewMode, clientQtyMap, bpuConfig, onUpdate, onSelect, onModal, onAddSub, stableKey }) => {
+const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly, viewMode, clientQtyMap, bpuConfig, onUpdate, onSelect, onModal, stableKey }) => {
   const draggableId = `chapter:${stableKey}`;
   const total = sumNodeTotal(el, viewMode === 'client', clientQtyMap);
 

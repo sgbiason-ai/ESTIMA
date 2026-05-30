@@ -27,7 +27,6 @@ export const usePmCloudProjects = ({
   setProject,
   bpuConfig,
   setBpuConfig,
-  clientPercent,
   setClientPercent,
   onSaveProject,
   addToHistory,

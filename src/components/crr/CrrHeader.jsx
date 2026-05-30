@@ -11,8 +11,6 @@ const CrrHeader = ({
 }) => {
   if (!meeting) return null;
 
-  const typeObj = MEETING_TYPES.find((t) => t.value === meeting.type);
-
   return (
     <div className="space-y-4">
       {/* Bandeau titre */}

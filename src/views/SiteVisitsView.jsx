@@ -46,7 +46,7 @@ const TeslaModeView = lazyWithReload(() => import('./TeslaModeView'));
 // ─── Composant Principal ─────────────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export default function SiteVisitsView({ companyId, masterBranding, onBackToHub }) {
+export default function SiteVisitsView({ companyId, masterBranding }) {
   const user = auth.currentUser;
   const { visits, isLoading: listLoading, refetch, loadVisit, saveVisit, createVisit } = useMobileSiteVisits(user, companyId);
 
@@ -56,7 +56,7 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
     await saveVisit(data.id, data);
   }, [saveVisit]);
   const [selectedId, setSelectedId] = useState(null);
-  const { saveStatus, triggerSave, forceSave, hasPendingChanges } = useRobustSave({
+  const { saveStatus, triggerSave, forceSave } = useRobustSave({
     saveFn: visitSaveFn,
     draftKey: selectedId ? `draft_svd_${selectedId}` : null,
     debounceMs: 1500,
@@ -127,7 +127,7 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
           const snap = await getDoc(doc(db, 'users', user.uid, 'preferences', 'modules'));
           const lastId = snap.exists() ? snap.data().visites : null;
           if (lastId && visits.some((v) => v.id === lastId)) target = lastId;
-        } catch {}
+        } catch { /* ignore */ }
       }
       handleLoadDetail(target);
     })();
@@ -524,7 +524,7 @@ export default function SiteVisitsView({ companyId, masterBranding, onBackToHub 
       })}
 
       {/* Obs markers (sans segment) */}
-      {obsMarkers.filter((_, i) => !observations[i]?.segmentFrom).map((m, i) => (
+      {obsMarkers.filter((_, i) => !observations[i]?.segmentFrom).map((m) => (
         <Marker key={`obs-${m.number}`} position={[m.lat, m.lng]} icon={createObsIcon(m.number, highlightedObs === m.number)}
           eventHandlers={{ click: () => setHighlightedObs(m.number) }}>
           <Popup><div className="text-xs max-w-[180px]">{m.text || `Observation ${m.number}`}</div></Popup>

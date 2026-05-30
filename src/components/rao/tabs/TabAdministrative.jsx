@@ -11,7 +11,7 @@ import TabAlertBanner from '../TabAlertBanner';
 const ROLES = ['Mandataire', 'Cotraitant'];
 
 // ── Composant pièce éditable ──
-const EditablePiece = ({ piece, pieceKey, pieceValue, onToggle, onRename, onRemove, dragHandleProps = null, isDragging = false }) => {
+const EditablePiece = ({ piece, pieceValue, onToggle, onRename, onRemove, dragHandleProps = null, isDragging = false }) => {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(piece.label);
 

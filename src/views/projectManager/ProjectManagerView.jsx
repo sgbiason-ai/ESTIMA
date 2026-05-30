@@ -22,7 +22,7 @@ import LinkedLibraryModal from '../../components/modals/LinkedLibraryModal';
 import { getActiveLocalLibrary, backupActiveLocalLibrary, setActiveLocalLibrary, librariesMatch, compareProjectVsLibrary, deactivateLocalLibrary } from '../../utils/localLibrary';
 
 const ProjectManagerView = ({
-  project, setProject, resetProject, onSaveProject,
+  project, setProject, onSaveProject,
   bpuConfig, clientPercent, setBpuConfig, setClientPercent,
   companyId, currentUserUid, onNavigateModule, setActiveTab,
   masterBranding = null,

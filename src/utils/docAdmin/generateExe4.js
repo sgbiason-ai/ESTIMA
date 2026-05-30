@@ -3,7 +3,7 @@
 // Conforme au formulaire officiel (DAJ - mise à jour 01/04/2019)
 import { saveAs } from 'file-saver';
 import { generateAnnexeReservesPdf, generateAnnexeReservesDocx } from './annexeReserves.js';
-import { loadMoeSignatureWithDimensions, loadMoeSignature } from './moeDefaults.js';
+import { loadMoeSignatureWithDimensions } from './moeDefaults.js';
 import { formatDateLocale } from '../dateHelpers';
 
 const dots = (n = 40) => '.'.repeat(n);

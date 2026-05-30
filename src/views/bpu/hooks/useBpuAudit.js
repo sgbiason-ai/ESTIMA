@@ -32,7 +32,6 @@ export const useBpuAudit = ({ sortedCatalog, articlesDb, bpuOverrides, setProjec
 
   // Analyse complète
   const audit = useMemo(() => {
-    // eslint-disable-next-line no-unused-vars
     const _v = auditVersion; // force recalcul au refresh
 
     const issues = [];
@@ -140,7 +139,7 @@ export const useBpuAudit = ({ sortedCatalog, articlesDb, bpuOverrides, setProjec
       // Les descriptions seront résolues à la volée depuis articlesDb par getRawDescription()
       const cleanOverrides = {};
       Object.entries(prev?.bpuOverrides || {}).forEach(([id, ov]) => {
-        const { description, ...rest } = ov; // eslint-disable-line no-unused-vars
+        const { description, ...rest } = ov;
         if (Object.keys(rest).length > 0) cleanOverrides[id] = rest;
       });
 

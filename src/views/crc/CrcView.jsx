@@ -91,7 +91,7 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
               try {
                 await setDoc(prefsRef, { crc: legacyId, updatedAt: serverTimestamp() }, { merge: true });
                 localStorage.removeItem(`crr_active_chantier__${companyId}`);
-              } catch {}
+              } catch { /* ignore */ }
             }
           }
         }
@@ -296,7 +296,6 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
   const [showGuidedTour, setShowGuidedTour] = useState(false);
   const [showSendMailModal, setShowSendMailModal] = useState(false);
   const { config: smtpConfig, isConfigured: smtpConfigured } = useSmtpConfig();
-  const [showLibraryModal, setShowLibraryModal] = useState(false);
   const [showChantierPicker, setShowChantierPicker] = useState(false);
   const [importModal, setImportModal] = useState(null);
   const importFileRef = useRef(null);

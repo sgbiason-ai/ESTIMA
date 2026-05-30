@@ -25,9 +25,9 @@ const UNITS = ['ft', 'm', 'ml', 'm2', 'm²', 'm3', 'm³', 'u', 'unit', 't', 'ton
 // Pattern de référence DQE : "1 005", "1.005", "1-005", "P.01", "P01", "100", etc.
 const REF_PATTERNS = [
   /^\d{1,3}\s\d{2,4}$/,        // "1 005"
-  /^\d{1,3}[.\-]\d{2,4}$/,     // "1.005" ou "1-005"
+  /^\d{1,3}[.-]\d{2,4}$/,     // "1.005" ou "1-005"
   /^\d{3,6}$/,                 // "2086", "4012" — refs collées (OCR sans espace)
-  /^P[.\-]?\d{1,4}$/i,         // "P.01" ou "P01"
+  /^P[.-]?\d{1,4}$/i,         // "P.01" ou "P01"
   /^[A-Z]\d{1,4}$/,            // "A1", "B12"
 ];
 
@@ -50,7 +50,7 @@ function aggressiveCleanOcr(text) {
     s = s.replace(new RegExp(`\\b${u}\\b`, 'gi'), `§${u}§`);
   }
   // Retirer le bruit
-  s = s.replace(/[…\.]{3,}/g, ' ');             // points multiples "..."
+  s = s.replace(/[….]{3,}/g, ' ');             // points multiples "..."
   s = s.replace(/\bT{2,4}\b/g, ' ');
   s = s.replace(/\b[A-Z]{2,3}\b/g, ' ');         // "ET", "RE", "TT"…
   s = s.replace(/\b[a-z]{1}\b/g, ' ');           // lettres isolées
@@ -63,7 +63,7 @@ function aggressiveCleanOcr(text) {
 const parseFrNumber = (s) => {
   if (s == null) return NaN;
   const cleaned = String(s)
-    .replace(/[\s  ]/g, '')  // espaces insécables / fines
+    .replace(/[\s\u00A0\u202F]/g, '')  // espaces insécables / fines
     .replace(/€/g, '')
     .replace(/,/g, '.')
     .trim();

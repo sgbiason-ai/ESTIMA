@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import Icon from './Icon';
 import { fmt } from './formatters';
-import { flattenItems } from './helpers';
 import { normalizeUnitSymbol } from '../../utils/helpers';
 
 export default function DQEView({ project, calcHook, tranchesHook }) {
@@ -9,14 +8,12 @@ export default function DQEView({ project, calcHook, tranchesHook }) {
   const [activeTranche, setActiveTranche] = useState('global');
   const [expandedChap, setExpandedChap]   = useState({});
 
-  const items = useMemo(() => flattenItems(project.chapters), [project]);
-
   const dqeData = useMemo(() => {
     const qtyMap = calcHook.clientQtyMaps?.[activeTranche] || calcHook.clientQtyMaps?.global || {};
     const chapters = [];
     let total = 0;
 
-    const processChapter = (node, depth = 0) => {
+    const processChapter = (node) => {
       if (node.type === 'chapter') {
         const lignes = [];
         let sousTotal = 0;

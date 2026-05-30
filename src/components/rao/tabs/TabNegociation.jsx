@@ -123,7 +123,7 @@ const buildAnomalySectionHtml = (type, templateText, items) => {
     const structured = items.map(it => {
       if (typeof it === 'object' && it !== null) return it;
       // Parse chaine "Prix n°XXX — Label : PU proposé de YY € HT[/UNIT]."
-      const m = String(it).match(/^Prix\s*n[°o]?\s*([^\s—\-]+)\s*[—\-]\s*(.+?)\s*:\s*PU\s*(?:proposé\s+)?de\s*([\d\s.,]+)\s*€\s*HT(?:\s*\/\s*([^\s.]+))?\s*\.?\s*$/i);
+      const m = String(it).match(/^Prix\s*n[°o]?\s*([^\s—-]+)\s*[—-]\s*(.+?)\s*:\s*PU\s*(?:proposé\s+)?de\s*([\d\s.,]+)\s*€\s*HT(?:\s*\/\s*([^\s.]+))?\s*\.?\s*$/i);
       return m ? { ref: m[1], label: m[2], pu: m[3].trim(), unit: m[4] || '' } : { ref: '—', label: String(it), pu: '', unit: '' };
     });
     const hasAnyUnit = structured.some(it => (it.unit || '').trim());
@@ -439,12 +439,12 @@ const TabNegociation = ({
           high: (!parsed.high || parsed.high === OLD_HIGH_TEMPLATE) ? DEFAULT_HIGH_TEMPLATE : parsed.high,
         };
       }
-    } catch {}
+    } catch { /* ignore */ }
     return { low: DEFAULT_LOW_TEMPLATE, high: DEFAULT_HIGH_TEMPLATE };
   });
   const saveAnomalyTemplates = (next) => {
     setAnomalyTemplates(next);
-    try { localStorage.setItem(ANOMALY_TPL_KEY, JSON.stringify(next)); } catch {}
+    try { localStorage.setItem(ANOMALY_TPL_KEY, JSON.stringify(next)); } catch { /* ignore */ }
   };
   const [showTemplateEditor, setShowTemplateEditor] = useState(false);
 
@@ -577,7 +577,7 @@ const TabNegociation = ({
         const diffRatio = (companyPU - averagePU) / averagePU;
         const impactRatio = lineTotal / companyGrandTotal;
         if (Math.abs(diffRatio) > (anomalyThresholds.ecart / 100) && impactRatio > (anomalyThresholds.impact / 100)) {
-          const puFormatted = companyPU.toLocaleString('fr-FR', { minimumFractionDigits: 2 }).replace(/[   ]/g, ' ');
+          const puFormatted = companyPU.toLocaleString('fr-FR', { minimumFractionDigits: 2 }).replace(/[\u202F\u00A0\u2009]/g, ' ');
           const refLabel = bpuRefMap?.get?.(item.id) || item.bpuNum || item.ref || '—';
           const label = item.designation || item.name || '';
           const unit = item.unit || item.unite || '';
@@ -960,7 +960,7 @@ const TabNegociation = ({
               let startIdx = -1;
               const isBodyStart = (el) => {
                 const t = (el.textContent || '').trim();
-                return /^(monsieur|madame)[\s,\.]|^Dans\s+le\s+cadre\s+de\s+la\s+consultation/i.test(t);
+                return /^(monsieur|madame)[\s,.]|^Dans\s+le\s+cadre\s+de\s+la\s+consultation/i.test(t);
               };
               for (let i = 0; i < allBlocks.length; i++) {
                 if (isBodyStart(allBlocks[i])) { startIdx = i; break; }

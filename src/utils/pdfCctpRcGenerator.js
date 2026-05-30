@@ -6,7 +6,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { DEFAULT_BRANDING } from '../data/branding';
-import { loadImage, sanitizeFilename, loadLogos } from './pdf/pdfSharedHelpers';
+import { sanitizeFilename, loadLogos } from './pdf/pdfSharedHelpers';
 import { buildTheme as _buildTheme } from './pdf/buildTheme';
 
 // ─── COULEURS ────────────────────────────────────────────────────────────────

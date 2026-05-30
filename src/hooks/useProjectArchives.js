@@ -85,7 +85,7 @@ export const useProjectArchives = (user, companyId, project) => {
     const now = new Date().toISOString();
 
     // Snapshot complet du projet (sans les méta internes)
-    const { __isNew, lastSaved, updatedBy, ...projectSnapshot } = project;
+    const { __isNew, lastSaved: _lastSaved, updatedBy: _updatedBy, ...projectSnapshot } = project;
 
     const archiveDoc = {
       id: archiveId,

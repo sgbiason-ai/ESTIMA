@@ -6,11 +6,10 @@
 import React, { useState, useMemo } from 'react';
 import Icon from './Icon';
 import { dateFr } from './formatters';
-import { formatPrice } from '../../utils/helpers';
-import { PHASES_LOI_MOP, getCategoriesForAssignee, buildCategoriesMap } from '../../hooks/useDevisMoe';
+import { PHASES_LOI_MOP, buildCategoriesMap } from '../../hooks/useDevisMoe';
 import {
   pct, honPhasePct, honPhaseTemps, fmt, fmtE,
-  isNestedTemps, getAssigneeKeys, getAssigneeName,
+  getAssigneeKeys, getAssigneeName,
   tacheTotalBudget, grandTotalByAssignee, calcHonByAssignee,
 } from '../../utils/devisMoeCalculations';
 

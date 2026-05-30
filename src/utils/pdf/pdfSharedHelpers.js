@@ -59,7 +59,7 @@ export const sanitizeFilename = (name) => {
   return name
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // é→e, è→e, à→a, etc.
     .replace(/\s+/g, '_')                               // espaces → _
-    .replace(/[^a-zA-Z0-9_\-]/g, '')                    // retire les caractères spéciaux
+    .replace(/[^a-zA-Z0-9_-]/g, '')                    // retire les caractères spéciaux
     .replace(/_+/g, '_').replace(/^_|_$/g, '')
     .substring(0, 60);
 };

@@ -102,7 +102,7 @@ export default function TeslaModeView({ user, companyId, onExit }) {
   const [gettingPosition, setGettingPosition] = useState(false); // loading state
 
   // GPS tracking
-  const [gpsEnabled, setGpsEnabled] = useState(false);
+  const [, setGpsEnabled] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [liveCoords, setLiveCoords] = useState([]);
   const [gpsElapsed, setGpsElapsed] = useState(0);

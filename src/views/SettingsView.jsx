@@ -19,8 +19,6 @@ const SettingsView = ({
   clearBpu,
   bpuConfig,
   setBpuConfig,
-  importWarnings = [],
-  setImportWarnings,
 }) => {
   // --- ÉTATS LOCAUX ---
   const [symb, setSymb] = useState("");

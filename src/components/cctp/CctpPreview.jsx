@@ -1,5 +1,5 @@
 // src/components/cctp/CctpPreview.jsx
-import React, { useCallback } from 'react';
+import React from 'react';
 import { Eye, Palette, Download, Edit3, FileText, FileSignature, Cloud, RefreshCw, CheckSquare } from 'lucide-react';
 import { generateWordCCTP } from '../../utils/cctpExport';
 import { sanitizeHtml } from '../../utils/helpers';

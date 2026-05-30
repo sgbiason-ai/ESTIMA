@@ -5,7 +5,7 @@
 
 import { DEFAULT_CRITERIA, DEFAULT_ADMIN_PIECES, DEFAULT_OFFER_PIECES } from '../hooks/useRao';
 import { normalizeUnitSymbol } from './helpers';
-import { formatNumberFr, cleanText, loadLogos, renderLogo, drawCoverPage as _drawCoverPage } from './pdf/pdfSharedHelpers';
+import { formatNumberFr, cleanText, loadLogos, drawCoverPage as _drawCoverPage } from './pdf/pdfSharedHelpers';
 import { buildTheme as _buildTheme } from './pdf/buildTheme';
 
 // ─── COULEUR PRIMAIRE RAO : VERT PAPYRUS ────────────────────────────────────
@@ -76,7 +76,7 @@ const getHeatmapStyle = (value, reference) => {
   if (delta < -0.50) return { fill: [52, 211, 153], text: [255, 255, 255] };
   if (delta < -0.25) return { fill: [110, 231, 183], text: [30, 41, 59] };
   if (delta < -0.10) return { fill: [167, 243, 208], text: [30, 41, 59] };
-  if (delta < -0.00) return { fill: [209, 250, 229], text: [30, 41, 59] };
+  if (delta < 0) return { fill: [209, 250, 229], text: [30, 41, 59] };
   return null;
 };
 
@@ -152,7 +152,7 @@ const drawCoverPageRao = (doc, project, consultation, logoMoe, logoClient, today
       if (parts.length === 3) remiseStr = `${parts[2]}/${parts[1]}/${parts[0]}`;
       else remiseStr = consultation.dateRemise;
       if (consultation.timeRemise) remiseStr += ` à ${consultation.timeRemise}`;
-    } catch(e) {}
+    } catch { /* ignore */ }
   }
 
   _drawCoverPage(doc, {
@@ -293,8 +293,8 @@ const sectionTitle = (doc, text, y, colorArr) => {
 // ── GÉNÉRATION PRINCIPALE DU RAO ───────────────────────────────────────────
 export const generateRaoPDF = async (optionsParams) => {
   const {
-    project, consultation, criteria, rao, analysisCompanies, scores, ranking, branding,
-    analysisStats, chaptersData, bpuRefMap, activeTrancheId, tranches, analysisMode, scoringConfig,
+    project, consultation, criteria, rao, analysisCompanies, ranking, branding,
+    analysisStats, chaptersData, bpuRefMap, tranches, analysisMode, scoringConfig,
     // Nouvelles props refonte complète
     optionChapters = [], includedOptions = {},
   } = optionsParams;
@@ -401,7 +401,6 @@ export const generateRaoPDF = async (optionsParams) => {
 
   // ── PAGE 2 : SOMMAIRE ──
   // On insère une page placeholder pour le sommaire — on la remplira à la fin
-  const sommairePage = pageNum + 1;
   doc.addPage('a4', 'portrait');
   pageNum++;
   drawHeader(doc, 'Sommaire', consultation, project, THEME, logoMoe);
@@ -463,7 +462,7 @@ export const generateRaoPDF = async (optionsParams) => {
           if(parts.length === 3) remiseStr = `${parts[2]}/${parts[1]}/${parts[0]}`;
           else remiseStr = consultation.dateRemise;
           if (consultation.timeRemise) remiseStr += ` à ${consultation.timeRemise}`;
-      } catch(e) {}
+      } catch { /* ignore */ }
   }
   doc.text(remiseStr, W / 2, y + 10, { align: 'center' });
   y += 18;
@@ -682,7 +681,7 @@ export const generateRaoPDF = async (optionsParams) => {
       const parts = dateOuverture.split('-');
       if (parts.length === 3) dateOuvStr = `${parts[2]}/${parts[1]}/${parts[0]}`;
       else dateOuvStr = dateOuverture;
-    } catch (e) {}
+    } catch { /* ignore */ }
   }
 
   doc.setFont('Helvetica', 'bold');
@@ -1212,7 +1211,7 @@ export const generateRaoPDF = async (optionsParams) => {
       const subCount = (col) => col.kind === 'variant' ? 4 : 3;
       const totalSubCols = detailColumns.reduce((a, c) => a + subCount(c), 0);
 
-      trancheList.forEach((tranche, trancheIdx) => {
+      trancheList.forEach((tranche) => {
         const trLabel = hasTr ? tranche.name : 'Détail des Prix Unitaires';
         y = addPage(`Analyse financière — ${trLabel}`, 'a3', 'landscape');
         if (!tocAdded) {
@@ -1995,7 +1994,6 @@ export const generateRaoPDF = async (optionsParams) => {
   tocEntries.push({ label: '9. Récapitulatif général', page: pageNum });
   y = sectionTitle(doc, 'RÉCAPITULATIF GÉNÉRAL', y, THEME.primary);
 
-  const priceC = criteria.find(c => c.auto) || criteria[0];
   const techCs = criteria.filter(c => !c.auto);
 
   // extendedRanking est déjà calculé en haut du générateur (cohérence Synthèse + Récap)
@@ -2402,6 +2400,6 @@ export const generateRaoPDF = async (optionsParams) => {
     tocY += 8;
   });
 
-  const safeName = (consultation?.objet || project?.name || 'RAO').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_\-]/g, '').replace(/_+/g, '_').replace(/^_|_$/g, '').slice(0, 60);
+  const safeName = (consultation?.objet || project?.name || 'RAO').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '').replace(/_+/g, '_').replace(/^_|_$/g, '').slice(0, 60);
   doc.save(`RAO_${safeName}_${new Date().toISOString().slice(0, 10)}.pdf`);
 };

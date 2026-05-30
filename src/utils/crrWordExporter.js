@@ -25,7 +25,7 @@ const sanitizeFilename = (name) => {
   return name
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, '_')
-    .replace(/[^a-zA-Z0-9_\-]/g, '')
+    .replace(/[^a-zA-Z0-9_-]/g, '')
     .replace(/_+/g, '_').replace(/^_|_$/g, '')
     .substring(0, 60);
 };
@@ -128,7 +128,6 @@ export const generateWordCrr = (meeting, crrConfig, projectName = '', branding =
       group.contacts.forEach((contact, ci) => {
         const att = meeting.attendance?.[contact.id] || 'absent';
         const diff = meeting.diffusion?.[contact.id] || false;
-        const presClass = att === 'present' ? 'present' : att === 'excused' ? 'excused' : '';
         html += `<tr style="background-color:${rowBg}">`;
         if (ci === 0) {
           html += `<td rowspan="${group.contacts.length}" style="font-weight:bold;vertical-align:middle">${group.name}${group.subLabel ? `<br><span style="font-size:8pt;color:#64748b">${group.subLabel}</span>` : ''}</td>`;

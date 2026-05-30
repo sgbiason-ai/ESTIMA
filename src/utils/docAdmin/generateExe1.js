@@ -634,7 +634,7 @@ export const exportExe1Pdf = async (fiche, exe1Data) => {
     const maxW = contentW - indent;
     const lines = pdf.splitTextToSize(content, maxW);
 
-    lines.forEach((line, i) => {
+    lines.forEach((line) => {
       checkPage(LINE_H + 2);
       pdf.text(line, marginL + indent, y);
       y += LINE_H;
@@ -859,8 +859,6 @@ export const exportExe1Pdf = async (fiche, exe1Data) => {
 
   // Lignes récapitulatives HT / TVA / TTC
   const summaryStartY = pdf.lastAutoTable.finalY;
-  const summaryColX = marginL + contentW - 60;  // aligné sur les 2 dernières colonnes
-  const summaryValX = marginL + contentW;
 
   autoTable(pdf, {
     startY: summaryStartY,

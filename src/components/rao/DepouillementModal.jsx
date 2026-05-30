@@ -35,7 +35,7 @@ const newVariantDraft = (n = 1) => ({
 
 const parseAmount = (v) => {
   if (v === '' || v == null) return null;
-  const cleaned = String(v).replace(/[\s €]/g, '').replace(',', '.');
+  const cleaned = String(v).replace(/[\s\u00A0€]/g, '').replace(',', '.');
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : null;
 };

@@ -9,9 +9,8 @@ import {
 const RcSidebar = ({
   searchQuery, setSearchQuery,
   collapseAll, expandAll,
-  saveStatus,
   filteredRcData, rcDataLength,
-  onEditProject, addChapter, handleFileUpload, handleExportMaster, handleExportPdf, saveToCloud,
+  addChapter, handleFileUpload, handleExportMaster,
   expandedIds, selectedIds, activeNodeId,
   toggleExpand, toggleSelection, openEditor, deleteNode,
   isFavorite, toggleFavorite, favoritesCount = 0, onOpenFavorites,

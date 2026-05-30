@@ -49,7 +49,6 @@ const RaoView = ({
   masterBranding = null,
   chaptersData = [],
   bpuRefMap = new Map(),
-  activeTrancheId = 'global',
   tranches = [],
   analysisMode = 'standard',
   onImportVariant = null,

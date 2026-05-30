@@ -46,7 +46,7 @@ const AMOUNT_IN_WORDS_RE = new RegExp(
 function trimTrailingNumberWords(text) {
   const words = String(text || '').split(/\s+/).filter(Boolean);
   while (words.length > 0) {
-    const last = words[words.length - 1].toUpperCase().replace(/[,;:\.]+$/, '');
+    const last = words[words.length - 1].toUpperCase().replace(/[,;:.]+$/, '');
     if (!last) { words.pop(); continue; }
     const parts = last.split('-');
     if (parts.length > 0 && parts.every(p => p && NUMBER_WORDS_FR.includes(p))) {

@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FileText, FileSpreadsheet, X, Check, Eye, Download, ArrowLeft, Loader2, ZoomIn, ZoomOut, RotateCw } from 'lucide-react';
 import { toast } from '../../utils/globalUI';
 
 // Étape 1 : Options d'export
-const OptionsStep = ({ isPdf, type, hasTranches, tranches, includeCover, setIncludeCover, includeSummary, setIncludeSummary, includePM, setIncludePM, selectedExports, handleToggleExport, onClose, onGenerate, isGenerating }) => {
+const OptionsStep = ({ isPdf, hasTranches, tranches, includeCover, setIncludeCover, includeSummary, setIncludeSummary, includePM, setIncludePM, selectedExports, handleToggleExport, onClose, onGenerate, isGenerating }) => {
   const allOptions = [{ id: 'global', name: 'Global' }, ...(tranches || [])];
   const canGenerate = !hasTranches || selectedExports.length > 0;
 

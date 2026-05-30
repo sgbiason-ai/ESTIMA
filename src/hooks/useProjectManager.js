@@ -60,7 +60,7 @@ export const useProjectManager = (user, companyId) => {
 
         // Projet mémorisé supprimé → clear pref + fallback draft
         if (lastActiveId) {
-          try { await setDoc(prefsRef, { estima: null }, { merge: true }); } catch {}
+          try { await setDoc(prefsRef, { estima: null }, { merge: true }); } catch { /* ignore */ }
           const fallbackRef  = doc(db, 'companies', companyId, 'projects', 'draft_project');
           const fallbackSnap = await getDoc(fallbackRef);
           if (fallbackSnap.exists()) {

@@ -246,7 +246,7 @@ const InlineToolbar = ({ onExecFormat, onHighlight, onSelectAll, fileRef, camera
   );
 };
 
-const ObservationRow = memo(({ obs, onUpdate, onDelete, meetingDate, participantGroups, dragHandleProps, companyId, crrId, isEditing, onEditorFocus, onEditorBlur }) => {
+const ObservationRow = memo(({ obs, onUpdate, onDelete, participantGroups, dragHandleProps, companyId, crrId, isEditing, onEditorFocus, onEditorBlur }) => {
   const fileRef = useRef(null);
   const cameraRef = useRef(null);
   const editorRef = useRef(null);

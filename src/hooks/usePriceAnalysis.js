@@ -20,8 +20,8 @@ const calculateOABThreshold = (values) => {
 
 const safeStorage = {
   get: (key) => { try { return localStorage.getItem(key); } catch { return null; } },
-  set: (key, value) => { try { localStorage.setItem(key, value); } catch {} },
-  remove: (key) => { try { localStorage.removeItem(key); } catch {} },
+  set: (key, value) => { try { localStorage.setItem(key, value); } catch { /* ignore */ } },
+  remove: (key) => { try { localStorage.removeItem(key); } catch { /* ignore */ } },
 };
 
 const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', clientQtyMaps = {}, companyId = null, setProject = null) => {
@@ -359,7 +359,7 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
           try {
             const v = ws.getRow(r).getCell(2).value;
             if (v && DESIG_PATTERN.test(String(v).trim())) return r;
-          } catch {}
+          } catch { /* ignore */ }
         }
         return 0;
       };
@@ -383,7 +383,7 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
         return (s || '')
           .normalize('NFD').replace(/[̀-ͯ]/g, '') // accents
           .replace(/['"]/g, '')                              // apostrophes
-          .replace(/[.,;:()\[\]]/g, ' ')                     // ponctuation → espace
+          .replace(/[.,;:()[\]]/g, ' ')                     // ponctuation → espace
           .replace(/\s+/g, ' ')                              // espaces multiples
           .trim()
           .toUpperCase();
@@ -436,8 +436,8 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
 
       // Lecture sûre d'une cellule (gère les cellules fusionnées MergeValue)
       const safeCellStr = (cell) => {
-        try { const v = cell?.value; if (v !== null && v !== undefined) return typeof v === 'object' && 'result' in v ? String(v.result ?? '') : String(v); } catch {}
-        try { return String(cell?.text ?? ''); } catch {}
+        try { const v = cell?.value; if (v !== null && v !== undefined) return typeof v === 'object' && 'result' in v ? String(v.result ?? '') : String(v); } catch { /* ignore */ }
+        try { return String(cell?.text ?? ''); } catch { /* ignore */ }
         return '';
       };
       const safeCellNum = (cell) => {
@@ -729,7 +729,7 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
           try {
             const v = ws.getRow(r).getCell(2).value;
             if (v && DESIG_PATTERN.test(String(v).trim())) return r;
-          } catch {}
+          } catch { /* ignore */ }
         }
         return 0;
       };
@@ -749,7 +749,7 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
         return (s || '')
           .normalize('NFD').replace(/[̀-ͯ]/g, '')
           .replace(/['"]/g, '')
-          .replace(/[.,;:()\[\]]/g, ' ')
+          .replace(/[.,;:()[\]]/g, ' ')
           .replace(/\s+/g, ' ')
           .trim()
           .toUpperCase();
@@ -799,8 +799,8 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
       const round = (n) => Math.round(Number(n || 0) * 1e6) / 1e6;
 
       const safeCellStr = (cell) => {
-        try { const v = cell?.value; if (v !== null && v !== undefined) return typeof v === 'object' && 'result' in v ? String(v.result ?? '') : String(v); } catch {}
-        try { return String(cell?.text ?? ''); } catch {}
+        try { const v = cell?.value; if (v !== null && v !== undefined) return typeof v === 'object' && 'result' in v ? String(v.result ?? '') : String(v); } catch { /* ignore */ }
+        try { return String(cell?.text ?? ''); } catch { /* ignore */ }
         return '';
       };
       const safeCellNum = (cell) => {
@@ -1199,7 +1199,7 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
     let updated = 0;
     const now = new Date().toISOString();
     // Nom du projet pour traçabilité (passé en 3e argument optionnel)
-    for (const [itemId, data] of entries) {
+    for (const [, data] of entries) {
       const key = data.designation?.trim().toUpperCase();
       const bpuItem = bpuByDesignation.get(key);
       if (bpuItem) {

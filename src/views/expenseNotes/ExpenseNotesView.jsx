@@ -113,7 +113,7 @@ const ExpenseNotesView = ({ user, companyId, onBackToHub, masterBranding }) => {
     return calculateAnnualAmount(effectiveYearKm, puissance, customBareme, isElectric);
   }, [forcedTranche, effectiveYearKm, ratePerKm, puissance, customBareme, isElectric]);
 
-  const trancheLabel = useMemo(() => {
+  useMemo(() => {
     if (forcedTranche !== null) return getTrancheLabel(forcedTranche, customBareme);
     return getActiveTranche(effectiveYearKm, customBareme).label;
   }, [forcedTranche, effectiveYearKm, customBareme]);

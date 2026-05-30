@@ -115,7 +115,7 @@ export const generateCrrId = () =>
   `crr_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
 
 // Cree une reunion vide
-export const createEmptyMeeting = (number, categories = DEFAULT_CATEGORIES) => ({
+export const createEmptyMeeting = (number) => ({
   id: generateCrrId(),
   number,
   type: 'preparation',

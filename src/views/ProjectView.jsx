@@ -202,7 +202,7 @@ const ProjectView = ({
     if (!project) return;
     const json = JSON.stringify(project, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
-    const safeName = (project.name || 'affaire').replace(/[^a-z0-9_\-]/gi, '_');
+    const safeName = (project.name || 'affaire').replace(/[^a-z0-9_-]/gi, '_');
     await saveFileWithPicker(blob, `${safeName}_${new Date().toISOString().slice(0, 10)}.json`, FILE_TYPES.json, PICKER_IDS.affaireSave);
   };
 
@@ -403,7 +403,7 @@ const ProjectView = ({
           return dropId;
         }
       }
-    } catch (e) {} return null;
+    } catch { /* ignore */ } return null;
   };
 
   const getIndexInDroppable = (droppableId, y) => {
@@ -417,7 +417,7 @@ const ProjectView = ({
         if (y > rect.top + rect.height / 2) index++;
       }
       return index;
-    } catch (e) { return 0; }
+    } catch { return 0; }
   };
 
   const handleDragEndFixed = (result) => {
@@ -458,7 +458,7 @@ const ProjectView = ({
           setSaveStatus('saved');
           if (onSaveStatusChange) onSaveStatusChange('saved');
           lastSavedHashRef.current = projectHash;
-        } catch (error) { setSaveStatus('error'); if (onSaveStatusChange) onSaveStatusChange('error'); }
+        } catch { setSaveStatus('error'); if (onSaveStatusChange) onSaveStatusChange('error'); }
       }
     }, 2000);
     return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
@@ -476,7 +476,7 @@ const ProjectView = ({
       setSaveStatus('saved');
       if (onSaveStatusChange) onSaveStatusChange('saved');
       lastSavedHashRef.current = projectHash;
-    } catch (error) {
+    } catch {
       setSaveStatus('error');
       if (onSaveStatusChange) onSaveStatusChange('error');
     }
@@ -831,7 +831,7 @@ const ProjectView = ({
         activeArchive={activeArchive}
         onViewArchive={(archive) => { onViewArchive(archive); setShowArchiveManager(false); }}
         onDeleteArchive={onDeleteArchive}
-        onOpenAudit={(archive) => { setShowArchiveManager(false); setShowAuditModal(true); }}
+        onOpenAudit={() => { setShowArchiveManager(false); setShowAuditModal(true); }}
       />
       <ArchiveAuditModal
         show={showAuditModal}

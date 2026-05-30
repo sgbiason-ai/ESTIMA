@@ -4,7 +4,7 @@ import {
   hexToRgbArray, lightenRgb, darkenRgb,
   formatDateFr, formatDateLong, sanitizeFilename,
   cleanText, formatNumberFr,
-  loadLogos, renderLogo, drawSignatureBoxes, drawMoeFooter, drawCoverPage,
+  renderLogo, drawSignatureBoxes, drawMoeFooter, drawCoverPage,
 } from '../utils/pdf/pdfSharedHelpers';
 
 // ─── hexToRgbArray ──────────────────────────────────────────────────────────

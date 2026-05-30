@@ -5,7 +5,7 @@ import {
   FileCheck, ArrowLeft, Cloud, CheckCircle2, AlertCircle, Loader, Layers
 } from 'lucide-react';
 
-const Sidebar = ({ activeTab, setActiveTab, onLogout, userEmail, onOpenCalculator, onToggle, isAdmin, saveStatus, projectName, onBackToHub, onBackToWorkspace }) => {
+const Sidebar = ({ activeTab, setActiveTab, onLogout, userEmail, onOpenCalculator, onToggle, saveStatus, projectName, onBackToHub, onBackToWorkspace }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const toggleSidebar = () => {

@@ -195,7 +195,7 @@ export const useDevisMoe = (user, companyId) => {
           if (lastId && data.some((d) => d.id === lastId)) {
             setSelectedIdRaw(lastId);
           }
-        } catch {}
+        } catch { /* ignore */ }
       }
     }, (err) => {
       console.error('Erreur chargement devis MOE:', err);

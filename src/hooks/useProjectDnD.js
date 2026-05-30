@@ -115,7 +115,7 @@ export const useProjectDnD = (project, setProject) => {
       setDraggingType(null);
     },
 
-    onDrop: (e, toPosFallback) => {
+    onDrop: (e) => {
       e.preventDefault();
       const raw = e.dataTransfer.getData('source');
       if (!raw) return;

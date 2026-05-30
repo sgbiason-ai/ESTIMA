@@ -4,7 +4,7 @@
 
 import jsPDF from 'jspdf';
 import { buildTheme } from './pdf/buildTheme';
-import { loadImage, formatDateFr, formatDateLong, lightenRgb, hexToRgbArray, loadLogos } from './pdf/pdfSharedHelpers';
+import { loadImage, formatDateFr, formatDateLong, lightenRgb, loadLogos } from './pdf/pdfSharedHelpers';
 
 const PW = 210, PH = 297;
 const M = { top: 18, left: 15, right: 15, bottom: 18 };
@@ -186,8 +186,6 @@ const drawCoverPage = (doc, visit, THEME, logoMoe, branding) => {
 const deg2rad = (d) => d * Math.PI / 180;
 const lat2tileY = (lat, z) => Math.floor((1 - Math.log(Math.tan(deg2rad(lat)) + 1 / Math.cos(deg2rad(lat))) / Math.PI) / 2 * (1 << z));
 const lng2tileX = (lng, z) => Math.floor((lng + 180) / 360 * (1 << z));
-const tileX2lng = (x, z) => x / (1 << z) * 360 - 180;
-const tileY2lat = (y, z) => { const n = Math.PI - 2 * Math.PI * y / (1 << z); return 180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n))); };
 
 // Convertit lat/lng vers pixel dans le systeme de tuiles mondial
 const latLng2px = (lat, lng, z) => {
@@ -337,7 +335,7 @@ const buildMapCanvas = async (visit, THEME) => {
   const toY = (lat) => latLng2px(lat, 0, zoom).y - worldOriginY;
 
   // Dessiner le trace GPS (segments séparés par les breaks)
-  const drawGpsSegments = (points, style, width) => {
+  const drawGpsSegments = (points) => {
     let drawing = false;
     for (let i = 0; i < points.length; i++) {
       if (points[i].break) { if (drawing) { ctx.stroke(); drawing = false; } continue; }
@@ -507,7 +505,7 @@ const drawMapPage = async (doc, mapImage, visit, THEME) => {
       if (legendItems.length) {
         doc.text(legendItems.join('   •   '), PW / 2, legendY + 9, { align: 'center' });
       }
-    } catch (e) {
+    } catch {
       doc.setFont('Helvetica', 'italic');
       doc.setFontSize(9);
       doc.setTextColor(...THEME.lightText);

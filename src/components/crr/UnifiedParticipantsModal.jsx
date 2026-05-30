@@ -11,7 +11,7 @@ import {
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import * as XLSX from 'xlsx';
 import { toast } from '../../utils/globalUI';
-import { getGroupColor, abbreviateGroup, generateCrrId } from '../../data/crrData';
+import { getGroupColor, abbreviateGroup } from '../../data/crrData';
 import { confirm } from '../../utils/globalUI';
 
 // ── PANNEAU GAUCHE : ARBORESCENCE GROUPES ──────────────────────────────────
@@ -556,7 +556,6 @@ const UnifiedParticipantsModal = ({
   addParticipantGroup,
   updateParticipantGroup,
   deleteParticipantGroup,
-  reorderParticipantGroups,
   importContactsFromLibrary,
   moveContactBetweenGroups,
   // Library

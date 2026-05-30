@@ -288,7 +288,7 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
     if (!data.client || data.client.trim().length < 3) errs.client = "Minimum 3 caractères.";
     if (data.code && !/^\d{2}-\d{3,4}$/.test(data.code.trim())) errs.code = "Format requis : AA-XXXX (ex: 26-0001).";
     if (data.clientZip && !/^\d{5}$/.test(data.clientZip.trim())) errs.clientZip = "Doit contenir 5 chiffres.";
-    const specialCharRegex = /[<>{}\[\]$|\\^~]/;
+    const specialCharRegex = /[<>{}[\]$|\\^~]/;
     ['clientCity', 'location', 'clientAddress', 'moe'].forEach(field => {
       if (data[field] && specialCharRegex.test(data[field])) errs[field] = "Caractères < > { } [ ] $ interdits.";
     });

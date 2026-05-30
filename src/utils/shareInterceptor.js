@@ -61,7 +61,7 @@ export const startShareCapture = () => {
  * @returns {Promise<boolean>} true si partagé, false sinon
  */
 export const stopShareCapture = () => {
-  return new Promise(async (resolve) => {
+  return new Promise((resolve) => {
     // Restaure le comportement normal
     HTMLAnchorElement.prototype.click = _originalClick;
 
@@ -83,7 +83,7 @@ export const stopShareCapture = () => {
       }, 5000);
     } else {
       _capturing = false;
-      await shareAndResolve(_capturedFile, resolve);
+      shareAndResolve(_capturedFile, resolve);
     }
   });
 };

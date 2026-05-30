@@ -16,76 +16,6 @@ export const formatDateFR = (dateStr) => {
   return `${d}/${m}/${y}`;
 };
 
-// ─── IndexedDB : retenir le dossier d'export ────────────────────────────────
-
-const DB_NAME = 'estima-crr';
-const STORE = 'handles';
-const DIR_KEY = 'export-dir';
-
-const idbOpen = () =>
-  new Promise((resolve, reject) => {
-    const r = indexedDB.open(DB_NAME, 1);
-    r.onupgradeneeded = () => r.result.createObjectStore(STORE);
-    r.onsuccess = () => resolve(r.result);
-    r.onerror = () => reject(r.error);
-  });
-
-const idbSave = async (handle) => {
-  const db = await idbOpen();
-  const tx = db.transaction(STORE, 'readwrite');
-  tx.objectStore(STORE).put(handle, DIR_KEY);
-  await new Promise((res, rej) => {
-    tx.oncomplete = res;
-    tx.onerror = () => rej(tx.error);
-  });
-};
-
-const idbLoad = async () => {
-  try {
-    const db = await idbOpen();
-    const tx = db.transaction(STORE, 'readonly');
-    const req = tx.objectStore(STORE).get(DIR_KEY);
-    return new Promise((res) => {
-      req.onsuccess = () => res(req.result || null);
-      req.onerror = () => res(null);
-    });
-  } catch {
-    return null;
-  }
-};
-
-// ─── Obtenir le dossier d'export (reutilise ou picker) ──────────────────────
-
-const getExportDir = async () => {
-  // Tenter de reutiliser le handle sauvegarde dans IndexedDB
-  const saved = await idbLoad();
-  if (saved) {
-    try {
-      const perm = await saved.requestPermission({ mode: 'readwrite' });
-      if (perm === 'granted') return saved;
-    } catch {
-      /* handle invalide, on passe au picker */
-    }
-  }
-  // Picker de dossier
-  const handle = await window.showDirectoryPicker({
-    id: 'crr-export',
-    mode: 'readwrite',
-    startIn: 'documents',
-  });
-  await idbSave(handle);
-  return handle;
-};
-
-// ─── Ecriture fichier dans le dossier ───────────────────────────────────────
-
-const writeFile = async (dirHandle, filename, content) => {
-  const fh = await dirHandle.getFileHandle(filename, { create: true });
-  const w = await fh.createWritable();
-  await w.write(content);
-  await w.close();
-};
-
 // ─── HTML du mail (entities ASCII-safe pour le VBS) ─────────────────────────
 
 const htmlEsc = (s) =>
@@ -334,7 +264,7 @@ Set fso = Nothing
  *
  * @returns {{ pdfSaved: boolean, pdfArchived?: boolean, vbsDownloaded?: boolean, fallback?: boolean }}
  */
-export const openOutlookMail = async (meeting, crrConfig, projectName, emails, pdfData, options = {}) => {
+export const openOutlookMail = async (meeting, crrConfig, projectName, emails, pdfData) => {
   // ── Fallback : navigateur sans File System Access (Firefox, mobile) ──
   if (!window.showDirectoryPicker) {
     const url = URL.createObjectURL(pdfData.blob);

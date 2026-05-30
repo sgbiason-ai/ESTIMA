@@ -16,7 +16,7 @@ import { getHolidayLabel, getWeekendName } from '../frenchHolidays';
 //   Intl.NumberFormat), U+200B ZWSP, U+2060 word joiner, U+3000 idéographique.
 // Sans ça jsPDF rend "20 000" comme "20 /000".
 const clean = (s) => String(s || '')
-  .replace(/[   ​⁠　]/g, ' ')
+  .replace(/[\u00A0\u2009\u202F\u200B\u2060\u3000]/g, ' ')
   .replace(/[‘’′]/g, "'")
   .replace(/[“”]/g, '"')
   .replace(/…/g, '...');

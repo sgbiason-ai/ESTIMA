@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Check, X } from 'lucide-react';
 
 // --- LE COMPOSANT MANQUANT (A AJOUTER) ---
-export const FormattedInput = ({ value, onChange, onBlur, className, placeholder, isPrice, ...props }) => {
+export const FormattedInput = ({ value, onChange, onBlur, className, placeholder, ...props }) => {
   const [localValue, setLocalValue] = useState(value);
 
   useEffect(() => {

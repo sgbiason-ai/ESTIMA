@@ -48,7 +48,7 @@ const statusColorMobile = (value) => {
 
 // ─── COMPOSANT PRINCIPAL ────────────────────────────────────────────────────
 
-export default function CrcDetailView({ chantier, onSelectMeeting, branding, onToast, manager, isLandscape, companyId }) {
+export default function CrcDetailView({ chantier, branding, onToast, manager, isLandscape, companyId }) {
   const config = chantier.crrConfig || {};
   const meetings = chantier.crrMeetings || [];
   const groups = config.participantGroups || [];
@@ -684,7 +684,7 @@ function ObservationsSection({ obsByCategory, allContacts, groupColorMap, canEdi
   );
 }
 
-function ObservationCard({ obs, contactName, groupColorMap, canEdit, onEdit, onTap, onViewImage }) {
+function ObservationCard({ obs, groupColorMap, canEdit, onTap, onViewImage }) {
   const st = statusMeta(obs.status);
   const text = stripHtml(obs.text);
   const images = obs.images || [];
@@ -762,15 +762,11 @@ function ObservationCard({ obs, contactName, groupColorMap, canEdit, onEdit, onT
 
 // ─── OBSERVATION SWIPER (carrousel plein écran) ────────────────────────────
 
-function SwiperSlide({ obs, allContacts, groupColorMap, onViewImage }) {
+function SwiperSlide({ obs, groupColorMap, onViewImage }) {
   if (!obs) return <div className="w-full shrink-0" />;
   const st = statusMeta(obs.status);
   const text = obs.text || '';
   const images = obs.images || [];
-  const contactName = (id) => {
-    const c = allContacts.find(ct => ct.id === id);
-    return c ? c.name || `${c.prenom || ''} ${c.nom || ''}`.trim() || c.email || id : id;
-  };
 
   return (
     <div className="px-5 py-4" style={{ scrollbarWidth: 'none', height: '100%', overflowY: 'auto' }}>

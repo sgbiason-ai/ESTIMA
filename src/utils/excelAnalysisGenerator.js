@@ -419,12 +419,9 @@ export async function generateAnalysisExcel({
   stats,
   scoringConfig,
   bpuRefMap,
-  activeTrancheId,
   tranches,
-  branding,
   // Pour générer tous les onglets, on a besoin des données brutes + clientQtyMaps
   clientQtyMaps = {},
-  allChaptersData = null, // si fourni, utilisé pour les onglets tranches
 }) {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'EstimaVRD';
@@ -513,7 +510,7 @@ export async function generateAnalysisExcel({
   }
 
   // ── Génération du fichier ─────────────────────────────────────────────────
-  const projectName = (project?.name || 'projet').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_\-]/g, '').replace(/_+/g, '_');
+  const projectName = (project?.name || 'projet').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '').replace(/_+/g, '_');
   const date        = new Date().toISOString().slice(0, 10);
   const filename    = `ANALYSE_${projectName}_${date}.xlsx`;
 

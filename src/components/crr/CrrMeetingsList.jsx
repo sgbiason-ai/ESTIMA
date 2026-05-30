@@ -1,5 +1,5 @@
 // src/components/crr/CrrMeetingsList.jsx
-import React, { useState } from 'react';
+import React from 'react';
 import { Plus, Trash2, FileText, ChevronRight, Calendar, Hash, Settings, X, GripVertical, Building2 } from 'lucide-react';
 import { MEETING_TYPES } from '../../data/crrData';
 import { confirm } from '../../utils/globalUI';
@@ -11,10 +11,6 @@ const CrrMeetingsList = ({
   setActiveMeetingId,
   createMeeting,
   deleteMeeting,
-  crrConfig,
-  onManageCategories,
-  onManageParticipants,
-  onManageInfoChantier,
   saveStatus,
 }) => {
   const formatDate = formatDateFr;

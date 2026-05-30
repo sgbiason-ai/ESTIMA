@@ -27,6 +27,7 @@ const cleanColor = (hex) => {
 const sanitizeText = (str) => {
   if (str === null || str === undefined) return "";
   return String(str)
+    // eslint-disable-next-line no-control-regex -- strip caracteres de controle invalides en XML/Word
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "") 
     .replace(/\u200B/g, ""); 
 };
@@ -103,7 +104,7 @@ const getCellParagraphs = (htmlContent, isHeader) => {
 };
 
 // --- 2. MOTEUR DE PARSING HTML VERS DOCX ---
-const parseHtmlToDocx = (htmlContent, branding) => {
+const parseHtmlToDocx = (htmlContent) => {
   if (!htmlContent) return [];
 
   const parser = new DOMParser();

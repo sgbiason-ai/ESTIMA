@@ -5,7 +5,7 @@
  */
 import { useState, useEffect } from 'react';
 
-export const useAppModals = ({ project, setProject, clientPercent, setClientPercent, setViewMode, handleSaveProject }) => {
+export const useAppModals = ({ project, setProject, setClientPercent, setViewMode }) => {
 
   // ─── MODAL ADD BPU ────────────────────────────────────────────────────────
   const [showAddBpuModal, setShowAddBpuModal] = useState(false);

@@ -11,7 +11,7 @@ const PHASE_COLORS = {
   EXE: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', dot: 'bg-red-400' },
 };
 
-const ArchiveBar = ({ archives, activeArchive, onViewArchive, onCloseArchive, onOpenAudit, loading }) => {
+const ArchiveBar = ({ archives, activeArchive, onViewArchive, onCloseArchive, onOpenAudit }) => {
   const [expanded, setExpanded] = useState(false);
 
   if (!archives || archives.length === 0) return null;

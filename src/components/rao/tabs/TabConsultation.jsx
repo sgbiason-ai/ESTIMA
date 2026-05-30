@@ -183,8 +183,6 @@ const TabConsultation = ({
   addCriterion, removeCriterion, addSubCriterion, removeSubCriterion, updateSubCriterion,
   scoringConfig, hasTranches,
   tranches, raoTrancheId, setRaoTrancheId,
-  optionChapters = [], includedOptions = {}, updateIncludedOption,
-  offersLocked = false,
 }) => {
   return (
     <SplitPanel

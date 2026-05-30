@@ -12,7 +12,7 @@ import HelpButton from '../components/help/HelpButton';
 
 const RcGeneratorView = ({ 
   project, masterRc, onSaveMasterRc, masterBranding, 
-  onSaveMasterBranding, onEditProject, onUpdateProject, onSaveProject,
+  onEditProject, onUpdateProject, onSaveProject,
   onEditBranding,
 }) => {
   

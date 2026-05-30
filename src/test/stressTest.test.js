@@ -138,7 +138,7 @@ describe('Stress — Volume élevé (gros projet)', () => {
   it('filtre une BPU de 5 000 items avec recherche en < 20ms', () => {
     const bpu = generateBpu(5000);
     const start = performance.now();
-    const filtered = filterBpu(bpu, 'DN300', 'cat_5');
+    filterBpu(bpu, 'DN300', 'cat_5');
     const elapsed = performance.now() - start;
 
     expect(elapsed).toBeLessThan(20);
@@ -259,7 +259,7 @@ describe('Stress — Empreinte mémoire', () => {
       const M1 = values.reduce((a, b) => a + b, 0) / values.length;
       const upper = M1 * 1.20;
       const filtered = values.filter(v => v <= upper);
-      const threshold = filtered.length > 0
+      filtered.length > 0
         ? (filtered.reduce((a, b) => a + b, 0) / filtered.length) * 0.90
         : M1 * 0.90;
     });

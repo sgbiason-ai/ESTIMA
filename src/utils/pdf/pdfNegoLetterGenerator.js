@@ -94,7 +94,7 @@ export async function generateNegoLetterPDF({
 
   // ─── Helpers ──────────────────────────────────────────────────────
   const clean = (text) => String(text == null ? '' : text)
-    .replace(/[  ​]/g, ' ')
+    .replace(/[  \u200B]/g, ' ')
     .replace(/ /g, ' ')
     .replace(/[‘’′]/g, "'")
     .replace(/[“”]/g, '"')
@@ -602,7 +602,7 @@ function parseQuestionsBlocks(text, unitByRef = null) {
   };
   const parseItemLine = (line) => {
     // Format : "- Prix n°XXX — Désignation : PU proposé de YY € HT[/UNIT].")
-    const m = line.match(/^-?\s*Prix\s*n[°o]?\s*([^\s—\-]+)\s*[—\-]\s*(.+?)\s*:\s*PU\s*(?:proposé\s+)?de\s*([\d\s.,]+)\s*€\s*HT(?:\s*\/\s*([^\s.]+))?\s*\.?\s*$/i);
+    const m = line.match(/^-?\s*Prix\s*n[°o]?\s*([^\s—-]+)\s*[—-]\s*(.+?)\s*:\s*PU\s*(?:proposé\s+)?de\s*([\d\s.,]+)\s*€\s*HT(?:\s*\/\s*([^\s.]+))?\s*\.?\s*$/i);
     if (m) {
       const pu = m[3].replace(/\s/g, '').trim();
       const ref = m[1].trim();
