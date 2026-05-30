@@ -85,7 +85,7 @@ const PmLeftColumn = ({
   onCloudSave, onExport, onImportClick, onClone,
   fileInputRef, onImportChange, onNewProject, onShowHelp,
 }) => (
-  <div className="flex-none flex items-stretch bg-white/80 backdrop-blur-xl border-b border-gray-200/60 h-[80px] select-none z-20 overflow-x-auto"
+  <div className="flex-none flex items-stretch bg-white/80 backdrop-blur-xl border-b border-gray-200/60 h-[80px] select-none z-20 overflow-x-hidden"
     >
 
     {/* ── App Branding ── */}
@@ -102,7 +102,7 @@ const PmLeftColumn = ({
     </div>
 
     {/* ── Session en cours ── */}
-    <div className="flex flex-col justify-center px-6 border-r border-gray-200/60 min-w-[240px] max-w-[320px]">
+    <div className="flex flex-col justify-center px-6 border-r border-gray-200/60 min-w-[180px] max-w-[300px]">
       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Session en cours</p>
       <div className="flex items-center gap-2 mb-2">
         <span className="flex items-center gap-1 bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border border-emerald-200/60">

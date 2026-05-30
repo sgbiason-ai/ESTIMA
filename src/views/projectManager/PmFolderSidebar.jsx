@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   FolderPlus, RefreshCw, Layers, Folder,
-  FolderOpen as FolderOpenIcon,
   ChevronRight, ChevronDown, Edit2, Trash2,
 } from 'lucide-react';
 import { NEUTRAL_COLOR } from './folderColors';
@@ -75,9 +74,7 @@ const PmFolderSidebar = ({
             {hasSubs ? (isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />) : <ChevronRight size={12} />}
           </button>
 
-          {isSelected
-            ? <FolderOpenIcon size={14} className={`${fc.sidebarIcon} shrink-0`} />
-            : <Folder size={14} className="text-gray-400 shrink-0 group-hover:text-gray-500" />}
+          <span className={`w-2.5 h-2.5 rounded-full shrink-0 transition-all ${fc.dot} ${isSelected ? 'scale-110 opacity-100' : 'opacity-70 group-hover:opacity-100'}`} />
 
           {isEditing ? (
             <input
