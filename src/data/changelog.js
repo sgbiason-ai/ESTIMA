@@ -10,6 +10,8 @@ export const CHANGELOG = [
     date: '2026-05-29',
     title: 'Photos dans les descriptions d\'articles BPU (glisser-déposer)',
     highlights: [
+      'Feedback utilisateur : nouveau bouton flottant "Donner un avis" (bug, idée, amélioration, question) présent sur tous les écrans. Le retour est envoyé avec la version de l\'app, le module en cours, le navigateur et une capture d\'écran optionnelle. Le super-administrateur retrouve, classe et priorise tous les feedbacks dans un nouvel onglet "Feedback" de l\'Administration',
+      'Assistance écran en direct : depuis le widget de feedback, l\'utilisateur peut demander une aide en direct et partager son écran. Le super-administrateur reçoit la demande dans l\'onglet Feedback et visionne l\'écran en temps réel (WebRTC), avec un pointeur pour guider l\'utilisateur ("regardez ici"). Vue seule, consentement navigateur obligatoire, arrêt possible à tout moment, rien n\'est enregistré',
       'Bibliothèque & Devis BPU : ajout de photos dans la description des articles par glisser-déposer, copier-coller (Ctrl+V) ou bouton 📷. Disposition automatique et cohérente — le texte reste en haut, les photos sont regroupées en bas : 1 photo en pleine largeur, 2 côte à côte (50/50), 3 = une paire + une pleine largeur, 4 en grille 2×2. Maximum 4 photos par article',
       'Photos BPU : suppression d\'une photo par survol (bouton ✕), compression automatique (~800px) pour limiter le poids, et intégration directe aux exports PDF et Word — la mise en page ne peut jamais déborder de la colonne',
       'Workspace (Gestion de Projets) : classer une affaire dans un dossier par simple glisser-déposer de sa tuile (vue dalles ou liste) sur le dossier cible dans le volet de gauche — la modale "Déplacer" reste disponible',

@@ -218,5 +218,42 @@ service cloud.firestore {
         allow read, write: if isAppSuperAdmin();
       }
     }
+
+    // ─── Feedback utilisateurs (/feedback/{id}) — collection GLOBALE ────
+    // Collection top-level (hors /companies) pour que le super-admin voie
+    // tous les retours d'un coup, toutes entreprises confondues.
+    //  - create : tout utilisateur authentifié, pour lui-même uniquement
+    //  - read / update / delete : super-admin applicatif uniquement
+    match /feedback/{feedbackId} {
+      allow create: if request.auth != null
+                    && request.resource.data.userUid == request.auth.uid;
+      allow read, update, delete: if isAppSuperAdmin();
+    }
+
+    // ─── Assistance écran en direct (/supportSessions/{id}) — GLOBALE ───
+    // Signalisation WebRTC. Accessible au propriétaire de la session (celui
+    // qui partage son écran) ET au super-admin applicatif (le visionneur).
+    match /supportSessions/{sessionId} {
+      function ownsSession() {
+        return request.auth != null
+               && resource.data.userUid == request.auth.uid;
+      }
+      function ownsParentSession() {
+        return request.auth != null
+               && get(/databases/$(database)/documents/supportSessions/$(sessionId)).data.userUid == request.auth.uid;
+      }
+
+      allow create: if request.auth != null
+                    && request.resource.data.userUid == request.auth.uid;
+      allow read, update, delete: if isAppSuperAdmin() || ownsSession();
+
+      // Candidats ICE (échange réseau WebRTC)
+      match /callerCandidates/{cid} {
+        allow read, write: if isAppSuperAdmin() || ownsParentSession();
+      }
+      match /calleeCandidates/{cid} {
+        allow read, write: if isAppSuperAdmin() || ownsParentSession();
+      }
+    }
   }
 }

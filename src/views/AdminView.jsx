@@ -8,7 +8,7 @@ import { generateId } from '../utils/helpers';
 import {
   Building2, UserPlus, Trash2, RefreshCw,
   ChevronDown, ChevronRight, Copy, Check,
-  HelpCircle, TrendingUp, BarChart2, Plus, ShieldCheck,
+  HelpCircle, TrendingUp, BarChart2, Plus, ShieldCheck, MessageSquare,
 } from 'lucide-react';
 import { confirm } from '../utils/globalUI';
 
@@ -17,6 +17,7 @@ import HelpPanel from '../components/help/HelpPanel';
 import FirebaseSimulatorModal from './admin/FirebaseSimulatorModal';
 import FirebaseStatsPanel from './admin/FirebaseStatsPanel';
 import PermissionsMatrix from './admin/PermissionsMatrix';
+import FeedbackPanel from './admin/FeedbackPanel';
 import { isSuperAdmin } from '../config/superAdmin';
 
 const slugify = (str) =>
@@ -28,11 +29,14 @@ const BASE_TABS = [
   { id: 'capacity',  label: 'Capacités',           icon: BarChart2 },
 ];
 
-const SUPER_ADMIN_TAB = { id: 'permissions', label: 'Permissions', icon: ShieldCheck };
+const SUPER_ADMIN_TABS = [
+  { id: 'permissions', label: 'Permissions', icon: ShieldCheck },
+  { id: 'feedback',    label: 'Feedback',    icon: MessageSquare },
+];
 
 const AdminView = ({ currentUserEmail }) => {
   const isSuper = isSuperAdmin(currentUserEmail);
-  const TABS = isSuper ? [...BASE_TABS, SUPER_ADMIN_TAB] : BASE_TABS;
+  const TABS = isSuper ? [...BASE_TABS, ...SUPER_ADMIN_TABS] : BASE_TABS;
   const [companies, setCompanies]   = useState([]);
   const [users, setUsers]           = useState([]);
   const [loading, setLoading]       = useState(false);
@@ -61,7 +65,7 @@ const AdminView = ({ currentUserEmail }) => {
       ]);
       setCompanies(compSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setUsers(usersSnap.docs.map(d => ({ uid: d.id, ...d.data() })));
-    } catch (e) {
+    } catch {
       showFeedback('error', 'Erreur de chargement.');
     } finally {
       if (!opts.silent) setLoading(false);
@@ -394,6 +398,9 @@ const AdminView = ({ currentUserEmail }) => {
           showFeedback={showFeedback}
         />
       )}
+
+      {/* ─── TAB : Feedback utilisateurs (super-admin uniquement) ────────── */}
+      {activeTab === 'feedback' && isSuper && <FeedbackPanel />}
     </div>
   );
 };

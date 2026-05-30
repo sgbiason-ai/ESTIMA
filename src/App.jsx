@@ -1,5 +1,5 @@
 // src/App.jsx
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import lazyWithReload from './utils/lazyWithReload';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db as fireDb } from './firebase';
@@ -32,6 +32,7 @@ import ProjectDetailsModal  from './components/modals/ProjectDetailsModal';
 import LoginView            from './views/LoginView';
 import LegalView            from './views/LegalView';
 import ModuleHubView        from './views/ModuleHubView';
+import FeedbackWidget       from './components/feedback/FeedbackWidget';
 
 // ─── VUES (lazy-loaded — code-splitting par module) ──────────────────────────
 const ProjectManagerView = lazyWithReload(() => import('./views/projectManager/ProjectManagerView'));
@@ -190,6 +191,7 @@ export default function App() {
 
   const handleBackToHub = () => setActiveModule(null);
 
+  const renderDesktop = () => {
   // Hub de sélection des modules
   if (!activeModule) {
     return (
@@ -220,7 +222,7 @@ export default function App() {
           companyId={companyId}
           onBackToHub={handleBackToHub}
           onNavigateModule={setActiveModule}
-          onOpenEstima={(project) => {
+          onOpenEstima={() => {
             setActiveModule('estima');
           }}
         />
@@ -327,6 +329,19 @@ export default function App() {
       onSwitchToMobile={() => forceLayout('mobile')}
     />
   );
+  };
+
+  return (
+    <>
+      {renderDesktop()}
+      <FeedbackWidget
+        user={user}
+        companyId={companyId}
+        activeModule={activeModule}
+        isTablet={isTablet}
+      />
+    </>
+  );
 }
 
 // ─── MODULE GESTION DE PROJETS (autonome, hors ESTIMA) ──────────────────────
@@ -389,7 +404,7 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNav
   // ── 3. Gestion projet ───────────────────────────────────────────────────────
   const {
     project, setProject,
-    handleSaveProject, resetProject, updateProjectName,
+    handleSaveProject, updateProjectName,
     addChapter, addSubChapter, addItemToProject,
     updateProjectItem, handleDragEnd,
   } = useProjectManager(user, companyId);
