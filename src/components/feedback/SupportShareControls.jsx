@@ -14,7 +14,17 @@ const SupportShareControls = ({ mode, share }) => {
 
   // ── Bloc dans la modale feedback ─────────────────────────────────────────
   if (mode === 'modal') {
-    if (!canShareScreen()) return null;
+    // Partage d'écran indisponible (mobile/tablette : getDisplayMedia non supporté)
+    if (!canShareScreen()) {
+      return (
+        <div className="rounded-xl border border-gray-200/60 bg-gray-50 px-3 py-3">
+          <p className="flex items-start gap-2 text-[11px] text-gray-400 leading-snug">
+            <MonitorUp size={14} className="text-gray-300 shrink-0 mt-0.5" />
+            L'assistance écran en direct n'est disponible que sur ordinateur (Chrome, Edge, Firefox). Les navigateurs mobiles ne permettent pas le partage d'écran.
+          </p>
+        </div>
+      );
+    }
     return (
       <div className="rounded-xl border border-gray-200/60 bg-gray-50 px-3 py-3">
         {!sharing ? (
