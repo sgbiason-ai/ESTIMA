@@ -1,20 +1,20 @@
 // src/views/ged/gedConstants.js
 // Constantes partagées de la GED (Gestion Électronique des Documents émis).
+//
+// Les phases sont désormais propres à chaque affaire (voir utils/phaseModel.js).
+// Ce fichier conserve des helpers de compatibilité basés sur les codes de phase
+// standard, utilisés là où on n'a qu'un code (ex: badge d'une archive).
 
-// Phases d'un projet, dans l'ordre chronologique.
-export const PHASES = ['ESQ', 'AVP', 'PRO', 'DCE', 'DCE+', 'EXE'];
+import { DEFAULT_PHASE_DEFS, phaseColorFor, styleForColor } from '../../utils/phaseModel';
 
-// Styles Tailwind par phase (badges, pastilles).
-export const PHASE_STYLES = {
-  ESQ:    { bg: 'bg-purple-500',  light: 'bg-purple-50',  text: 'text-purple-700',  border: 'border-purple-200' },
-  AVP:    { bg: 'bg-amber-500',   light: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200' },
-  PRO:    { bg: 'bg-blue-500',    light: 'bg-blue-50',    text: 'text-blue-700',    border: 'border-blue-200' },
-  DCE:    { bg: 'bg-emerald-500', light: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
-  'DCE+': { bg: 'bg-teal-500',    light: 'bg-teal-50',    text: 'text-teal-700',    border: 'border-teal-200' },
-  EXE:    { bg: 'bg-red-500',     light: 'bg-red-50',     text: 'text-red-700',     border: 'border-red-200' },
+// Liste des codes de phase standard (rétrocompat ; ordre chronologique).
+export const PHASES = DEFAULT_PHASE_DEFS.map((d) => d.code);
+
+// Style d'un code de phase standard (couleur dédiée si connu, rotation sinon).
+export const getPhaseStyle = (phase) => {
+  const idx = PHASES.indexOf(phase);
+  return styleForColor(phaseColorFor(phase, idx >= 0 ? idx : 0));
 };
-
-export const getPhaseStyle = (phase) => PHASE_STYLES[phase] || PHASE_STYLES.DCE;
 
 // Format date FR long (ex: "lundi 28 mai 2026 à 14:32").
 export const formatDateLong = (iso) => {

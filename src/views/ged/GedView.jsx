@@ -12,27 +12,35 @@
 import React, { useState, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import {
-  FileStack, Archive, Eye, BarChart3, Trash2, Clock, User, Plus, Lock, Send, FileEdit, Mail,
+  FileStack, Archive, Eye, BarChart3, Trash2, Clock, User, Plus, Lock, Send, FileEdit, Mail, ArrowRightCircle,
 } from 'lucide-react';
 import { formatPrice } from '../../utils/helpers';
 import { toast, confirm } from '../../utils/globalUI';
-import { PHASES, getPhaseStyle, formatDateShort } from './gedConstants';
+import { getProjectPhases, getCurrentPhase, getNextPhase } from '../../utils/phaseModel';
+import { getPhaseStyle, formatDateShort } from './gedConstants';
 import GedVersionViewer from './GedVersionViewer';
 import GedCompareModal from './GedCompareModal';
 import FreezeVersionModal from './FreezeVersionModal';
+import GedLifecycle from './GedLifecycle';
 import HelpButton from '../../components/help/HelpButton';
 import HelpPanel from '../../components/help/HelpPanel';
 import { gedHelp } from './gedHelp';
 
-const GedView = ({ project, archives = [], onCreateArchive, onDeleteArchive, masterBranding = null }) => {
+const GedView = ({ project, archives = [], onCreateArchive, onDeleteArchive, onUpdateProject, masterBranding = null }) => {
   const [viewingArchive, setViewingArchive] = useState(null); // archive consultée (viewer plein écran)
   const [compareSource, setCompareSource] = useState(null);   // archive source de la comparaison (modal)
   const [filterPhase, setFilterPhase] = useState(null);
   const [freezing, setFreezing] = useState(false);
+  const [freezeMode, setFreezeMode] = useState('freeze'); // 'freeze' | 'transition'
   const [showFreeze, setShowFreeze] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
 
-  const currentPhase = project?.phase || 'DCE';
+  // Phases de l'affaire + phase courante (modèle phaseModel, rétrocompat).
+  const phases = useMemo(() => getProjectPhases(project), [project]);
+  const currentPhaseObj = useMemo(() => getCurrentPhase(project), [project]);
+  const currentPhase = currentPhaseObj?.code || 'DCE';
+  const nextPhaseObj = useMemo(() => getNextPhase(project), [project]);
+  const phaseList = phases.map((p) => p.code);
 
   // Regroupement par phase, trié par indice.
   const grouped = useMemo(() => {
@@ -46,16 +54,41 @@ const GedView = ({ project, archives = [], onCreateArchive, onDeleteArchive, mas
     return map;
   }, [archives, filterPhase]);
 
-  const sortedPhases = PHASES.filter((p) => grouped[p]);
+  // Phases présentes dans les archives mais pas dans la liste (legacy) → affichées quand même.
+  const sortedPhases = [...phaseList, ...Object.keys(grouped).filter((p) => !phaseList.includes(p))]
+    .filter((p) => grouped[p]);
   const total = archives?.length || 0;
 
-  // ── Figer la version actuelle (depuis la modal) ──
+  const openFreeze = (mode) => { setFreezeMode(mode); setShowFreeze(true); };
+
+  // ── Figer (mode libre) OU clôturer la phase + avancer (mode transition) ──
   const handleFreezeConfirm = async ({ phase, subject, recipient, status, note }) => {
     if (!onCreateArchive) return;
     setFreezing(true);
     try {
       const archive = await onCreateArchive(phase, { subject, recipient, status, note });
-      toast.success(`Version « ${archive.label} » figée avec succès`);
+
+      // Mode transition : avancer la phase courante + journaliser le jalon.
+      if (freezeMode === 'transition' && nextPhaseObj && onUpdateProject) {
+        const now = new Date().toISOString();
+        const entry = {
+          from: currentPhaseObj?.code || phase,
+          to: nextPhaseObj.code,
+          at: now,
+          archiveId: archive.id,
+          archiveLabel: archive.label,
+          totalHT: archive.totalHT,
+        };
+        onUpdateProject({
+          ...project,
+          phase: nextPhaseObj.id,
+          phaseStartedAt: now,
+          phaseLog: [...(project.phaseLog || []), entry],
+        });
+        toast.success(`Phase clôturée (${archive.label}) → passage en « ${nextPhaseObj.code} »`);
+      } else {
+        toast.success(`Version « ${archive.label} » figée avec succès`);
+      }
       setShowFreeze(false);
     } catch (e) {
       toast.error('Erreur lors du gel : ' + e.message);
@@ -102,13 +135,23 @@ const GedView = ({ project, archives = [], onCreateArchive, onDeleteArchive, mas
           <div className="ml-auto flex items-center gap-2">
             <HelpButton onClick={() => setHelpOpen(true)} />
             <button
-              onClick={() => setShowFreeze(true)}
+              onClick={() => openFreeze('freeze')}
               disabled={freezing}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-[12px] font-bold rounded-xl hover:bg-gray-700 transition-colors active:scale-95 disabled:opacity-50"
+              className="flex items-center gap-2 px-3 py-2 bg-white text-gray-700 border border-gray-200 text-[12px] font-bold rounded-xl hover:bg-gray-50 transition-colors active:scale-95 disabled:opacity-50"
             >
               <Plus size={15} />
-              Figer la version
+              Figer
             </button>
+            {nextPhaseObj && onUpdateProject && (
+              <button
+                onClick={() => openFreeze('transition')}
+                disabled={freezing}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-[12px] font-bold rounded-xl hover:bg-gray-700 transition-colors active:scale-95 disabled:opacity-50"
+              >
+                <ArrowRightCircle size={15} />
+                Clôturer {currentPhase} → {nextPhaseObj.code}
+              </button>
+            )}
           </div>
         </div>
 
@@ -121,7 +164,7 @@ const GedView = ({ project, archives = [], onCreateArchive, onDeleteArchive, mas
             >
               Toutes
             </button>
-            {PHASES.map((phase) => {
+            {sortedPhases.map((phase) => {
               const count = (archives || []).filter((a) => a.phase === phase).length;
               if (count === 0) return null;
               const s = getPhaseStyle(phase);
@@ -138,6 +181,14 @@ const GedView = ({ project, archives = [], onCreateArchive, onDeleteArchive, mas
           </div>
         )}
       </div>
+
+      {/* Frise cycle de vie */}
+      <GedLifecycle
+        phases={phases}
+        currentPhaseId={currentPhaseObj?.id}
+        archives={archives}
+        phaseLog={project?.phaseLog || []}
+      />
 
       {/* Liste */}
       <div className="flex-1 overflow-y-auto px-6 py-6">
@@ -222,15 +273,18 @@ const GedView = ({ project, archives = [], onCreateArchive, onDeleteArchive, mas
         currentProject={project}
       />
 
-      {/* Modal de gel */}
+      {/* Modal de gel / transition */}
       <FreezeVersionModal
         show={showFreeze}
         onClose={() => setShowFreeze(false)}
         onConfirm={handleFreezeConfirm}
-        defaultPhase={currentPhase}
+        phases={phases}
+        defaultPhaseCode={currentPhase}
         archives={archives}
         projectName={project?.name}
         busy={freezing}
+        mode={freezeMode}
+        nextPhase={nextPhaseObj}
       />
 
       {/* Aide contextuelle */}
@@ -269,6 +323,7 @@ GedView.propTypes = {
   archives: PropTypes.array,
   onCreateArchive: PropTypes.func,
   onDeleteArchive: PropTypes.func,
+  onUpdateProject: PropTypes.func,
   masterBranding: PropTypes.object,
 };
 

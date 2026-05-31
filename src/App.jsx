@@ -676,6 +676,7 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNav
                 archives={archives}
                 onCreateArchive={createArchive}
                 onDeleteArchive={deleteArchive}
+                onUpdateProject={(data) => { setProject(data); handleSaveProject(data); }}
                 masterBranding={resources.masterBranding}
               />
             )}

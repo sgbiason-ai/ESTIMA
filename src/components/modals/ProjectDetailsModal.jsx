@@ -7,6 +7,8 @@ import {
   Eye, RefreshCw, Link, Plus, Download
 } from 'lucide-react';
 import { buildCoverPageCanvas } from '../../utils/coverPageCanvas';
+import { getProjectPhases, getCurrentPhase } from '../../utils/phaseModel';
+import PhaseEditorModal from '../../views/ged/PhaseEditorModal';
 
 // ─── APERÇUS PAGE DE GARDE PAR TYPE DE DOCUMENT ───────────────────────────────
 // label = libellé affiché en haut à droite de la page de garde (uppercase auto)
@@ -158,7 +160,7 @@ const LogoUpload = ({ label, value, onChange, hint }) => {
 
 // ─── COMPOSANT PRINCIPAL ──────────────────────────────────────────────────────
 
-const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null }) => {
+const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null, archives = [] }) => {
   const [formData, setFormData] = useState({
     name: '', subtitle1: '', subtitle2: '',
     client: '', clientAddress: '', clientZip: '', clientCity: '',
@@ -169,7 +171,9 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
     signatories: ['', '', '', ''],
     sharepointUrl: '',
     sharepointPlans: [],
+    phases: [],
   });
+  const [showPhaseEditor, setShowPhaseEditor] = useState(false);
 
   const modalRef = useRef(null);
   const position = useRef({ x: 0, y: 0 });
@@ -258,7 +262,9 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
         clientAddress: project.clientAddress || '', clientZip: project.clientZip || '',
         clientCity: project.clientCity || '', moe: project.moe || 'PAPYRUS',
         code: project.code || '', location: project.location || '',
-        marketType: project.marketType || 'Privé', phase: project.phase || 'DCE',
+        marketType: project.marketType || 'Privé',
+        phases: getProjectPhases(project),
+        phase: getCurrentPhase(project)?.id || project.phase || 'DCE',
         dateRemise: project.dateRemise || today, timeRemise: project.timeRemise || '',
         duration: project.duration || '',
         prepPeriod: project.prepPeriod || '1 mois',
@@ -401,10 +407,14 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
                 <Calendar size={12}/> Planning & Admin
               </h3>
               <div className="grid grid-cols-2 gap-3">
-                <ModernSelect label="Phase" name="phase" value={formData.phase} onChange={handleChange} icon={CheckCircle2}
-                  options={[{ value: 'ESQ', label: 'ESQ' }, { value: 'AVP', label: 'AVP' }, { value: 'PRO', label: 'PRO' }, { value: 'DCE', label: 'DCE' }, { value: 'DCE+', label: 'DCE+' }, { value: 'ACT', label: 'ACT' }, { value: 'EXE', label: 'EXE' }]} />
+                <ModernSelect label="Phase courante" name="phase" value={formData.phase} onChange={handleChange} icon={CheckCircle2}
+                  options={(formData.phases || []).map((p) => ({ value: p.id, label: p.label ? `${p.code} — ${p.label}` : p.code }))} />
                 <ModernInput label="Code Affaire" name="code" value={formData.code} onChange={handleChange} icon={Hash} placeholder="Ex: 26-0001" required error={errors.code} />
               </div>
+              <button type="button" onClick={() => setShowPhaseEditor(true)}
+                className="-mt-1 self-start flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-700 hover:underline">
+                <Layers size={11} /> Gérer les phases de l'affaire
+              </button>
               <div className="grid grid-cols-2 gap-3">
                 <ModernDurationInput label="Préparation" name="prepPeriod" value={formData.prepPeriod} onChange={handleChange} icon={Hourglass} />
                 <ModernDurationInput label="Durée Trx" name="duration" value={formData.duration} onChange={handleChange} icon={Clock} />
@@ -773,6 +783,19 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
 
         </div>{/* fin BODY */}
       </div>
+
+      <PhaseEditorModal
+        show={showPhaseEditor}
+        onClose={() => setShowPhaseEditor(false)}
+        phases={formData.phases}
+        archives={archives}
+        onSave={(newPhases) => {
+          setFormData(prev => {
+            const stillExists = newPhases.some(p => p.id === prev.phase);
+            return { ...prev, phases: newPhases, phase: stillExists ? prev.phase : (newPhases[0]?.id || '') };
+          });
+        }}
+      />
     </div>
   );
 };

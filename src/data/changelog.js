@@ -14,7 +14,11 @@ export const CHANGELOG = [
       'Chaque version figée se consulte en lecture seule (visualiseur dédié) et peut être ré-imprimée à l\'identique en PDF et Excel (DQE ou Estimation) — les quantités, tranches et majorations sont recalculées fidèlement au moment du gel',
       'Audit comparatif entre deux versions (ou avec le travail en cours) : synthèse des écarts (total HT, articles, chapitres), comparaison par chapitre et détail article par article (ajoutés, supprimés, quantités/prix modifiés)',
       'Au gel d\'une version : saisie de l\'objet du document, du destinataire, d\'un statut (émis au client / brouillon interne) et d\'une note. Ces informations s\'affichent sur la liste des versions et dans le visualiseur',
-      'Badge phase + dernier indice émis directement dans l\'en-tête du projet : un clic ouvre la liste des documents émis',
+      'Visualiseur d\'une version figée : tableau clair avec colonnes N° · Désignation · Unité · Quantité · Prix unitaire · Total, et sélecteur de tranche (Global / TF / TC1…) quand l\'affaire est découpée en tranches',
+      'Cycle de vie de l\'affaire : chaque projet possède ses propres phases (modèle standard ESQ·AVP·PRO·DCE·EXE pré-rempli, entièrement personnalisable à la création ou via la fiche projet — ajouter, renommer, réordonner)',
+      'Frise « Cycle de vie » dans les Documents émis : visualisation de la progression du projet, avec pour chaque phase franchie son indice figé, son montant et sa date',
+      'Bouton « Clôturer la phase & passer à la suivante » : fige la version officielle de fin de phase puis fait avancer l\'affaire dans la phase suivante, en un seul geste',
+      'Mini-frise des phases cliquable dans l\'en-tête du projet : un coup d\'œil sur l\'avancement, un clic pour ouvrir les documents émis',
     ],
   },
   {

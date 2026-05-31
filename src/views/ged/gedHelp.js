@@ -39,6 +39,45 @@ export const gedHelp = {
       ],
     },
 
+    // ─── Onglet : Cycle de vie ──────────────────────────────────────────
+    {
+      id: 'cycle',
+      label: 'Cycle de vie',
+      icon: 'GitBranch',
+      sections: [
+        {
+          type: 'intro',
+          text: 'La frise « Cycle de vie » en haut de la page retrace la progression de l\'affaire à travers ses phases. Chaque phase franchie affiche son indice figé, son montant et sa date.',
+        },
+        {
+          type: 'card',
+          icon: 'ArrowRight',
+          color: 'indigo',
+          title: 'Clôturer une phase & passer à la suivante',
+          description: 'Le bouton « Clôturer X → Y » fige la version officielle de la phase qui se termine PUIS bascule l\'affaire dans la phase suivante — en un seul geste.',
+          steps: [
+            'Renseignez objet / destinataire / statut comme pour un gel normal',
+            'La version est figée (document officiel de fin de phase)',
+            'L\'affaire avance automatiquement dans la phase suivante',
+            'Le jalon est tracé (date, indice, montant) dans la frise',
+          ],
+        },
+        {
+          type: 'card',
+          icon: 'Settings',
+          color: 'emerald',
+          title: 'Définir ses propres phases',
+          description: 'Les phases sont propres à chaque affaire. À la création (ou via la fiche projet → « Gérer les phases »), ajoutez, renommez ou réordonnez les phases selon votre marché.',
+          tip: 'Une phase déjà figée ne peut pas être supprimée — ses versions émises sont conservées.',
+        },
+        {
+          type: 'tip',
+          title: 'Progression souple',
+          text: 'Le bouton propose la phase suivante par défaut, mais vous restez libre de figer dans n\'importe quelle phase via le bouton « Figer ».',
+        },
+      ],
+    },
+
     // ─── Onglet : Figer & consulter ─────────────────────────────────────
     {
       id: 'versions',
@@ -48,7 +87,7 @@ export const gedHelp = {
         {
           type: 'steps',
           items: [
-            { title: 'Figer la version', description: 'Bouton « Figer la version » en haut à droite. Choisissez la phase, renseignez l\'objet, le destinataire, le statut et une note éventuelle.', color: 'indigo' },
+            { title: 'Figer la version', description: 'Bouton « Figer » en haut à droite. Choisissez la phase, renseignez l\'objet, le destinataire, le statut et une note éventuelle.', color: 'indigo' },
             { title: 'Statut du document', description: 'Émis au client = version officiellement transmise. Brouillon interne = version de travail conservée pour mémoire.', color: 'amber' },
             { title: 'Consulter', description: 'Bouton œil sur une version : ouvre le contenu figé en lecture seule (chapitres, articles, montants).', color: 'blue' },
             { title: 'Supprimer', description: 'Bouton corbeille : supprime définitivement une version figée. Action irréversible.', color: 'red' },
