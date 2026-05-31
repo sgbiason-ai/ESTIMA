@@ -120,6 +120,18 @@ export const usePmCloudProjects = ({
 
     try {
       await setDoc(fsDoc(db, 'companies', companyId, 'projects', newId), clone);
+
+      // Firestore ne copie pas les sous-collections avec le document parent :
+      // on recopie explicitement les versions figées (archives) vers la copie.
+      try {
+        const archSnap = await getDocs(collection(db, 'companies', companyId, 'projects', proj.id, 'archives'));
+        await Promise.all(archSnap.docs.map(d =>
+          setDoc(fsDoc(db, 'companies', companyId, 'projects', newId, 'archives', d.id), d.data())
+        ));
+      } catch (errArch) {
+        console.warn('[handleDuplicateCloudProject] copie des versions figées échouée:', errArch.message);
+      }
+
       setCloudProjects(prev => [clone, ...prev]);
       toast.success(`Projet "${newName}" créé.`);
     } catch (err) {
@@ -129,12 +141,24 @@ export const usePmCloudProjects = ({
   };
 
   // ── Supprimer un projet cloud ──────────────────────────────────────────────
+  // Firestore ne supprime pas les sous-collections en cascade : on les vide
+  // explicitement pour éviter des documents orphelins (versions figées, audit…).
+  const PROJECT_SUBCOLLECTIONS = ['archives', 'history', 'analysis', 'rao'];
+
   const handleDeleteCloudProject = async (proj, e) => {
     e.stopPropagation();
     const ok2 = await confirm(`Supprimer définitivement "${proj.name || 'Sans nom'}" du cloud ?`, { danger: true });
     if (!ok2) return;
     setDeletingId(proj.id);
     try {
+      for (const sub of PROJECT_SUBCOLLECTIONS) {
+        try {
+          const subSnap = await getDocs(collection(db, 'companies', companyId, 'projects', proj.id, sub));
+          await Promise.all(subSnap.docs.map(d => deleteDoc(d.ref)));
+        } catch (errSub) {
+          console.warn(`[handleDeleteCloudProject] purge ${sub} échouée:`, errSub.message);
+        }
+      }
       await deleteDoc(fsDoc(db, 'companies', companyId, 'projects', proj.id));
       setCloudProjects(prev => prev.filter(p => p.id !== proj.id));
     } catch {
