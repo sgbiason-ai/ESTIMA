@@ -5,7 +5,7 @@ import {
   CheckCircle2, CloudOff, FileSignature, Bookmark, ListOrdered, Hash,
   FolderOpen, Save, Upload, Eye, Pencil, PlusCircle,
   BarChart3, Download, Info, Table2, FileOutput,
-  Cloud, PanelLeftOpen, FileDown, Archive, ShieldCheck, ClipboardCheck, Undo2
+  Cloud, PanelLeftOpen, FileDown, ShieldCheck, ClipboardCheck, Undo2, FileStack
 } from 'lucide-react';
 
 import { RibbonGroup, RibbonBtnLarge, RibbonBtnSmall } from './common/RibbonParts';
@@ -35,19 +35,23 @@ const ProjectToolbar = ({
   onOpenAffaire,
   onNewProject,
   onOpenCloudProject,
-  onArchive,
-  archiveCount = 0,
-  onOpenArchiveManager,
   onOpenPriceAudit,
   onOpenBpuAudit,
   bpuAuditActive = false,
   onUndo,
   canUndo = false,
+  archives = [],
+  onOpenGed,
 }) => {
   const [activeTab, setActiveTab] = useState('accueil');
 
   const currentPhase = project?.phase || 'DCE';
   const isAutoNumbering = bpuConfig?.numberingMode !== 'manual';
+
+  // Dernière version figée de la phase courante (pour le badge GED).
+  const lastArchive = (archives || [])
+    .filter(a => a.phase === currentPhase)
+    .sort((a, b) => (b.index || 0) - (a.index || 0))[0] || null;
 
   const toggleNumberingMode = () => {
     if (typeof setBpuConfig !== 'function') return;
@@ -108,14 +112,28 @@ const ProjectToolbar = ({
           })}
         </div>
 
-        {/* Nom + phase centré */}
+        {/* Nom + badge phase/indice (cliquable → GED) centré */}
         <div className="flex-1 flex items-center justify-center gap-2.5">
           <span className="text-[11.5px] font-semibold text-slate-700 tracking-wide truncate max-w-[300px]">
             {project?.name || 'Projet sans nom'}
           </span>
-          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 tracking-wide border border-slate-200">
-            {currentPhase}
-          </span>
+          <button
+            onClick={onOpenGed}
+            title={lastArchive
+              ? `Dernière version émise : ${lastArchive.label} le ${new Date(lastArchive.createdAt).toLocaleDateString('fr-FR')} — Ouvrir les documents émis`
+              : 'Aucune version figée — Ouvrir les documents émis'}
+            className="group flex items-center gap-1.5 px-2 py-0.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-200 transition-colors"
+          >
+            <span className="text-[9px] font-bold text-slate-600 tracking-wide">{currentPhase}</span>
+            {lastArchive ? (
+              <span className="text-[9px] font-bold px-1 py-px rounded bg-indigo-100 text-indigo-700 tracking-wide">
+                Ind. {lastArchive.label.split('-')[1] || lastArchive.label}
+              </span>
+            ) : (
+              <span className="text-[9px] font-medium text-slate-400 tracking-wide">non figé</span>
+            )}
+            <FileStack size={11} className="text-slate-400 group-hover:text-indigo-500 transition-colors" />
+          </button>
         </div>
 
         {/* Indicateur de sauvegarde à droite */}
@@ -282,26 +300,6 @@ const ProjectToolbar = ({
                 />
               </RibbonGroup>
             )}
-
-            {/* Archives */}
-            <RibbonGroup label="Archives">
-              {currentMode === 'client' && onArchive && (
-                <RibbonBtnLarge
-                  icon={Archive}
-                  label="Figer"
-                  onClick={onArchive}
-                  accent="text-indigo-500"
-                  title="Archiver cette version"
-                />
-              )}
-              <RibbonBtnLarge
-                icon={Eye}
-                label={archiveCount > 0 ? `Gérer (${archiveCount})` : 'Gérer'}
-                onClick={onOpenArchiveManager}
-                accent="text-slate-500"
-                title="Ouvrir le gestionnaire d'archives"
-              />
-            </RibbonGroup>
 
             {/* Exports rapides (mode client) */}
             {currentMode === 'client' && (

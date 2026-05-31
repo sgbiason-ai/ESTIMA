@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { useStableHash } from '../hooks/useStableHash';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { Plus, Trash2, GripVertical, Layers, HelpCircle, Archive, BarChart3 } from 'lucide-react';
+import { Plus, Trash2, GripVertical, Layers, HelpCircle } from 'lucide-react';
 
 import { ProjectContext } from '../context/ProjectContext';
 import { EditableTitle, OptionToggle } from '../components/ProjectUI';
@@ -25,8 +25,6 @@ import ProjectFooterStats from '../components/ProjectFooterStats';
 import ProjectFormulaBar from '../components/project/ProjectFormulaBar'; 
 import FormulaHelpModal from '../components/modals/FormulaHelpModal';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
-import ArchiveManagerModal from '../components/modals/ArchiveManagerModal';
-import ArchiveAuditModal from '../components/modals/ArchiveAuditModal';
 import PriceAuditModal from '../components/modals/PriceAuditModal';
 import CloudProjectPicker from '../components/modals/CloudProjectPicker';
 import BpuAuditPanel from './bpu/BpuAuditPanel';
@@ -69,28 +67,22 @@ const ProjectView = ({
   allBpuItems = [],
   companyId,
   onLoadCloudProject,
-  // Archives
-  archives = [],
-  activeArchive = null,
-  onCreateArchive,
-  onDeleteArchive,
-  onViewArchive,
-  onCloseArchive,
   onUndo,
   canUndo = false,
+  archives = [],
+  onOpenGed,
   multiSelection,
   toggleMultiSelection,
   clearMultiSelection,
   openMultiDeleteModal,
 }) => {
   const currentMode = viewMode || 'study';
-  // En mode archive, toujours read-only
-  const isReadOnly = currentMode === 'client' || !!activeArchive;
-  // Le projet affiché : soit l'archive, soit le projet courant
-  const viewedProject = activeArchive ? activeArchive.projectSnapshot : project;
+  // Mode Rendu (client) = lecture seule.
+  const isReadOnly = currentMode === 'client';
+  // Le projet affiché est toujours le projet courant (la consultation des
+  // versions figées se fait désormais dans la vue dédiée « Documents émis »).
+  const viewedProject = project;
 
-  const [showAuditModal, setShowAuditModal] = useState(false);
-  const [showArchiveManager, setShowArchiveManager] = useState(false);
   const [showPriceAudit, setShowPriceAudit] = useState(false);
   const [showCloudPicker, setShowCloudPicker] = useState(false);
   const [showBpuAudit, setShowBpuAudit] = useState(false);
@@ -118,17 +110,6 @@ const ProjectView = ({
     bpuOverrides: project?.bpuOverrides,
     setProject: setProjectForBpuAudit,
   });
-
-  const handleArchive = async () => {
-    if (!onCreateArchive) return;
-    const phase = project?.phase || 'DCE';
-    try {
-      const archive = await onCreateArchive(phase);
-      toast.success(`Archive "${archive.label}" créée avec succès`);
-    } catch (e) {
-      toast.error('Erreur lors de la création de l\'archive : ' + e.message);
-    }
-  };
 
   // ── Handlers Audit Prix ──
   const handleRestorePrice = (itemId, bpuPrice) => {
@@ -671,14 +652,13 @@ const ProjectView = ({
             onOpenAffaire={() => handleOpenAffaire(null)}
             onNewProject={handleNewProject}
             onOpenCloudProject={() => setShowCloudPicker(v => !v)}
-            onArchive={handleArchive}
-            archiveCount={archives.length}
-            onOpenArchiveManager={() => setShowArchiveManager(true)}
             onOpenPriceAudit={() => setShowPriceAudit(true)}
             onOpenBpuAudit={() => { refreshBpuAudit(); setShowBpuAudit(v => !v); }}
             bpuAuditActive={showBpuAudit}
             onUndo={onUndo}
             canUndo={canUndo}
+            archives={archives}
+            onOpenGed={onOpenGed}
           />
           <input ref={loadAffaireRef} type="file" accept=".json" className="hidden" onChange={handleOpenAffaireFallback} />
 
@@ -693,35 +673,6 @@ const ProjectView = ({
               }}
               onClose={() => setShowCloudPicker(false)}
             />
-          )}
-
-          {/* Bandeau archive active */}
-          {activeArchive && (
-            <div className="flex items-center gap-3 px-4 py-2 bg-amber-50 border-b border-amber-200 shrink-0">
-              <Archive size={15} className="text-amber-600 shrink-0" />
-              <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wide">Archive</span>
-              <span className="text-[11px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded border border-amber-200">
-                {activeArchive.label}
-              </span>
-              <span className="text-[11px] text-amber-600">
-                {activeArchive.projectName} — {formatPrice(activeArchive.totalHT)} HT — {new Date(activeArchive.createdAt).toLocaleDateString('fr-FR')}
-              </span>
-              <div className="ml-auto flex items-center gap-2">
-                <button
-                  onClick={() => setShowAuditModal(true)}
-                  className="flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold uppercase tracking-wide bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors active:scale-95"
-                >
-                  <BarChart3 size={13} />
-                  Audit
-                </button>
-                <button
-                  onClick={onCloseArchive}
-                  className="flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold uppercase tracking-wide bg-white text-amber-700 border border-amber-300 rounded hover:bg-amber-100 transition-colors active:scale-95"
-                >
-                  Fermer
-                </button>
-              </div>
-            </div>
           )}
 
           <ProjectStatsBar projectStats={projectStats} bpuConfig={bpuConfig} isReadOnly={isReadOnly} handleAutoSort={handleAutoSort} />
@@ -824,22 +775,6 @@ const ProjectView = ({
       <ExportModal isOpen={exportModalState.show} onClose={() => setExportModalState(prev => ({ ...prev, show: false }))} onConfirm={handleConfirmExport} onPreviewPdf={handlePreviewPdf} format={exportModalState.format} type={exportModalState.type} hasTranches={hasTranches} tranches={tranches} activeTrancheId={activeTrancheId} />
       <ConfirmDeleteModal isOpen={deleteConfirm.show} onClose={() => setDeleteConfirm({ show: false, itemId: null })} onConfirm={() => { if(deleteConfirm.itemId) { handleRemoveItem(deleteConfirm.itemId); setDeleteConfirm({ show: false, itemId: null }); } }} />
       <FormulaHelpModal isOpen={showFormulaHelp} onClose={() => setShowFormulaHelp(false)} />
-      <ArchiveManagerModal
-        show={showArchiveManager}
-        onClose={() => setShowArchiveManager(false)}
-        archives={archives}
-        activeArchive={activeArchive}
-        onViewArchive={(archive) => { onViewArchive(archive); setShowArchiveManager(false); }}
-        onDeleteArchive={onDeleteArchive}
-        onOpenAudit={() => { setShowArchiveManager(false); setShowAuditModal(true); }}
-      />
-      <ArchiveAuditModal
-        show={showAuditModal}
-        onClose={() => setShowAuditModal(false)}
-        sourceArchive={activeArchive}
-        archives={archives}
-        currentProject={project}
-      />
       <PriceAuditModal
         show={showPriceAudit}
         onClose={() => setShowPriceAudit(false)}
@@ -919,12 +854,14 @@ ProjectView.propTypes = {
   allBpuItems: PropTypes.array,
   companyId: PropTypes.string,
   onLoadCloudProject: PropTypes.func,
+  onUndo: PropTypes.func,
+  canUndo: PropTypes.bool,
   archives: PropTypes.array,
-  activeArchive: PropTypes.object,
-  onCreateArchive: PropTypes.func,
-  onDeleteArchive: PropTypes.func,
-  onViewArchive: PropTypes.func,
-  onCloseArchive: PropTypes.func,
+  onOpenGed: PropTypes.func,
+  multiSelection: PropTypes.object,
+  toggleMultiSelection: PropTypes.func,
+  clearMultiSelection: PropTypes.func,
+  openMultiDeleteModal: PropTypes.func,
 };
 
 export default ProjectView;

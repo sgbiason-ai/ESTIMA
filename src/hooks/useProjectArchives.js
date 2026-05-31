@@ -45,6 +45,18 @@ export const useProjectArchives = (user, companyId, project) => {
     return maxIdx + 1;
   };
 
+  // Indice lettre cartouche BTP : 1→A, 2→B, … 26→Z, 27→AA.
+  const indexToLetter = (index) => {
+    let n = Math.max(1, Number(index) || 1);
+    let label = '';
+    while (n > 0) {
+      const rem = (n - 1) % 26;
+      label = String.fromCharCode(65 + rem) + label;
+      n = Math.floor((n - 1) / 26);
+    }
+    return label;
+  };
+
   // ─── CALCULER LE TOTAL HT ─────────────────────────────────────────
   const computeTotalHT = (chapters) => {
     let total = 0;
@@ -74,13 +86,15 @@ export const useProjectArchives = (user, companyId, project) => {
   };
 
   // ─── CRÉER UNE ARCHIVE ────────────────────────────────────────────
-  const createArchive = async (phase) => {
+  // meta (optionnel) : { subject, recipient, status, note } — métadonnées d'émission.
+  const createArchive = async (phase, meta = {}) => {
     if (!companyId || !projectId || !project || !user) {
       throw new Error('Données manquantes pour créer l\'archive');
     }
 
     const index = getNextIndex(phase);
-    const label = `${phase}-${String(index).padStart(2, '0')}`;
+    // Indice lettre (cartouche BTP) : DCE-A, DCE-B, EXE-A…
+    const label = `${phase}-${indexToLetter(index)}`;
     const archiveId = `archive_${generateId()}`;
     const now = new Date().toISOString();
 
@@ -98,6 +112,12 @@ export const useProjectArchives = (user, companyId, project) => {
       totalHT: computeTotalHT(project.chapters),
       itemsCount: countItems(project.chapters),
       chaptersCount: (project.chapters || []).length,
+      // ── Métadonnées d'émission ──
+      subject: (meta.subject || '').trim(),
+      recipient: (meta.recipient || '').trim(),
+      status: meta.status || 'emis', // 'emis' | 'brouillon'
+      note: (meta.note || '').trim(),
+      emittedAt: now,
       projectSnapshot,
     };
 

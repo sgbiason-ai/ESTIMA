@@ -6,13 +6,15 @@ import { X, BookOpen } from 'lucide-react';
 import { helpContent } from '../../data/helpContent';
 import HelpSections, { getIcon } from './HelpSections';
 
-const HelpPanel = ({ isOpen, onClose, moduleId, headerActions }) => {
+const HelpPanel = ({ isOpen, onClose, moduleId, content: contentProp, headerActions }) => {
   const [activeTab, setActiveTab] = useState(0);
 
-  const content = helpContent[moduleId];
+  // Le contenu peut être fourni en prop (aide co-localisée dans un module)
+  // ou résolu depuis le registre central via moduleId.
+  const content = contentProp || helpContent[moduleId];
 
   // Reset tab quand on change de module
-  useEffect(() => { setActiveTab(0); }, [moduleId]);
+  useEffect(() => { setActiveTab(0); }, [moduleId, contentProp]);
 
   if (!isOpen || !content) return null;
 

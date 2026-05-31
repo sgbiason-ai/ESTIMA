@@ -37,6 +37,7 @@ import FeedbackWidget       from './components/feedback/FeedbackWidget';
 // ─── VUES (lazy-loaded — code-splitting par module) ──────────────────────────
 const ProjectManagerView = lazyWithReload(() => import('./views/projectManager/ProjectManagerView'));
 const ProjectView        = lazyWithReload(() => import('./views/ProjectView'));
+const GedView            = lazyWithReload(() => import('./views/ged/GedView'));
 const DatabaseView       = lazyWithReload(() => import('./views/DatabaseView'));
 const PriceAnalysisView  = lazyWithReload(() => import('./views/PriceAnalysisView'));
 const CctpGeneratorView  = lazyWithReload(() => import('./views/CctpGeneratorView'));
@@ -409,19 +410,18 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNav
     updateProjectItem, handleDragEnd,
   } = useProjectManager(user, companyId);
 
-  // ── 3b. Archives projet ───────────────────────────────────────────────────
+  // ── 3b. Archives projet (versions figées — consultées via la vue GED) ─────
   const {
-    archives, activeArchive,
-    createArchive, deleteArchive, viewArchive, closeArchive,
+    archives, createArchive, deleteArchive,
   } = useProjectArchives(user, companyId, project);
 
   // ── 3c. Undo (annuler la dernière action sur Estima) ─────────────────────
   const { undo: undoProject, canUndo: canUndoProject, reset: resetUndoHistory } = useProjectUndo(project, setProject);
 
-  // Reset historique quand le projet change (ouverture/nouveau projet/archive)
+  // Reset historique quand le projet change (ouverture/nouveau projet)
   useEffect(() => {
     resetUndoHistory();
-  }, [project?.id, !!activeArchive, resetUndoHistory]);
+  }, [project?.id, resetUndoHistory]);
 
   // Raccourci clavier Ctrl+Z (hors champs de saisie où l'undo natif s'applique)
   useEffect(() => {
@@ -663,14 +663,20 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNav
                     ).catch(() => {});
                   }
                 }}
-                archives={archives}
-                activeArchive={activeArchive}
-                onCreateArchive={createArchive}
-                onDeleteArchive={deleteArchive}
-                onViewArchive={viewArchive}
-                onCloseArchive={closeArchive}
                 onUndo={undoProject}
                 canUndo={canUndoProject}
+                archives={archives}
+                onOpenGed={() => setActiveTab('ged')}
+              />
+            )}
+
+            {activeTab === 'ged' && (
+              <GedView
+                project={project}
+                archives={archives}
+                onCreateArchive={createArchive}
+                onDeleteArchive={deleteArchive}
+                masterBranding={resources.masterBranding}
               />
             )}
 

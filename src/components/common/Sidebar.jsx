@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   LayoutDashboard, Database, Settings, FileText, Calculator, Folder,
   LineChart, LogOut, User, PanelLeftClose, PanelLeftOpen, BookOpen,
-  FileCheck, ArrowLeft, Cloud, CheckCircle2, AlertCircle, Loader, Layers
+  FileCheck, ArrowLeft, Cloud, CheckCircle2, AlertCircle, Loader, Layers, FileStack
 } from 'lucide-react';
 
 const Sidebar = ({ activeTab, setActiveTab, onLogout, userEmail, onOpenCalculator, onToggle, saveStatus, projectName, onBackToHub, onBackToWorkspace }) => {
@@ -15,7 +15,10 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout, userEmail, onOpenCalculato
   };
 
   const sections = [
-    { id: 'travail_section', items: [{ id: 'project', label: 'Projet en cours', icon: LayoutDashboard }] },
+    { id: 'travail_section', items: [
+      { id: 'project', label: 'Projet en cours', icon: LayoutDashboard },
+      { id: 'ged', label: 'Documents émis', icon: FileStack },
+    ]},
     { id: 'documents_section', items: [
       { id: 'bpu_export', label: 'Bordereau de prix', icon: FileText },
       { id: 'cctp', label: 'CCTP', icon: BookOpen },
