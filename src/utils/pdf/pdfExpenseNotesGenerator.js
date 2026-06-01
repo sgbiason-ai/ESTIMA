@@ -76,6 +76,8 @@ const groupHeaderBg = (dateStr, theme) => {
  * @param {boolean} opts.forcedTranche
  * @param {object} opts.branding
  * @param {string} opts.userName
+ * @param {boolean} [opts.returnBlob] - si true, retourne { blob, filename } sans declencher le telechargement (pour envoi mail).
+ * @returns {Promise<void|{blob: Blob, filename: string}>}
  */
 export async function generateExpenseNotesPdf(opts) {
   const {
@@ -89,6 +91,7 @@ export async function generateExpenseNotesPdf(opts) {
     forcedTranche,
     branding = {},
     userName,
+    returnBlob = false,
   } = opts;
 
   const theme = buildTheme(branding);
@@ -332,7 +335,10 @@ export async function generateExpenseNotesPdf(opts) {
     { align: 'center' }
   );
 
-  // ── Sauvegarde ─────────────────────────────────────────────────────────────
+  // ── Sortie : blob (envoi mail) ou telechargement direct ─────────────────────
   const fileName = `note-frais-${monthLabel.replace(/\s+/g, '-').toLowerCase()}.pdf`;
+  if (returnBlob) {
+    return { blob: doc.output('blob'), filename: fileName };
+  }
   doc.save(fileName);
 }

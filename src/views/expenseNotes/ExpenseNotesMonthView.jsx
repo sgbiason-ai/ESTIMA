@@ -2,7 +2,7 @@
 // Detail d'une note de frais mensuelle : tableau des trajets + ajout/edition.
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Plus, Trash2, ArrowLeft, FileDown, Search, Copy, X, Car as CarIcon, Map as MapIcon, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, ArrowLeft, FileDown, Mail, Search, Copy, X, Car as CarIcon, Map as MapIcon, ChevronDown } from 'lucide-react';
 import { calculateMonthAmount, calculateAnnualAmount, getActiveTranche, getMarginalRate, getRateForTranche, getTrancheLabel, PUISSANCES } from '../../data/baremeFiscal2025';
 import { getTripTotalKm } from '../../utils/distanceMargin';
 import { getHolidayLabel, getWeekendName } from '../../utils/frenchHolidays';
@@ -11,6 +11,8 @@ import TripFormModal from './TripFormModal';
 import MonthTripsMap from '../../components/expenseNotes/MonthTripsMap';
 import { confirm, toast } from '../../utils/globalUI';
 import { generateExpenseNotesPdf } from '../../utils/pdf/pdfExpenseNotesGenerator';
+import { useSmtpConfig } from '../../hooks/useSmtpConfig';
+import ExpenseNotesSendMailModal from '../../components/expenseNotes/ExpenseNotesSendMailModal';
 
 const MONTH_LABELS_FR = [
   'Janvier', 'Fevrier', 'Mars', 'Avril', 'Mai', 'Juin',
@@ -63,7 +65,9 @@ const ExpenseNotesMonthView = ({ month, expense, branding, user, onBack, onBackT
   const [editingKmTripId, setEditingKmTripId] = useState(null);
   const [editingKmValue, setEditingKmValue] = useState('');
   const [recentlyTouchedId, setRecentlyTouchedId] = useState(null);
+  const [showMailModal, setShowMailModal] = useState(false);
   const searchInputRef = useRef(null);
+  const { config: smtpConfig } = useSmtpConfig();
 
   const note = expense.notes[month] || { trips: [], totalKm: 0 };
   const trips = useMemo(() => {
@@ -289,25 +293,33 @@ const ExpenseNotesMonthView = ({ month, expense, branding, user, onBack, onBackT
     cancelEditKm();
   };
 
+  // Opts partagees export PDF + envoi mail (meme document)
+  const buildPdfOpts = () => ({
+    monthLabel: `${monthLabel} ${year}`,
+    vehicle: {
+      label: vehicle?.label || 'Vehicule',
+      plateNumber: vehicle?.plateNumber || '',
+      puissanceLabel: PUISSANCES.find((p) => p.value === puissance)?.label || `${puissance} CV`,
+      isElectric,
+    },
+    tripsWithAmount,
+    totalKm: effectiveMonthKm,
+    totalAmount: monthAmount,
+    trancheLabel,
+    ratePerKm,
+    forcedTranche: forcedTranche !== null,
+    branding,
+    userName: user?.displayName || user?.email || '',
+  });
+
   const handleExportPdf = () => {
     if (tripsWithAmount.length === 0) return;
-    generateExpenseNotesPdf({
-      monthLabel: `${monthLabel} ${year}`,
-      vehicle: {
-        label: vehicle?.label || 'Vehicule',
-        plateNumber: vehicle?.plateNumber || '',
-        puissanceLabel: PUISSANCES.find((p) => p.value === puissance)?.label || `${puissance} CV`,
-        isElectric,
-      },
-      tripsWithAmount,
-      totalKm: effectiveMonthKm,
-      totalAmount: monthAmount,
-      trancheLabel,
-      ratePerKm,
-      forcedTranche: forcedTranche !== null,
-      branding,
-      userName: user?.displayName || user?.email || '',
-    });
+    generateExpenseNotesPdf(buildPdfOpts());
+  };
+
+  const handleSendMail = () => {
+    if (tripsWithAmount.length === 0) return;
+    setShowMailModal(true);
   };
 
   return (
@@ -338,6 +350,15 @@ const ExpenseNotesMonthView = ({ month, expense, branding, user, onBack, onBackT
         >
           <FileDown size={14} />
           PDF
+        </button>
+        <button
+          onClick={handleSendMail}
+          disabled={tripsWithAmount.length === 0}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all text-xs font-medium disabled:opacity-30 disabled:cursor-not-allowed"
+          title="Envoyer la note du mois par email (PDF en pièce jointe)"
+        >
+          <Mail size={14} />
+          Email
         </button>
         <button
           onClick={() => { setEditingTrip(null); setShowForm(true); }}
@@ -635,6 +656,20 @@ const ExpenseNotesMonthView = ({ month, expense, branding, user, onBack, onBackT
           onClose={() => { setShowForm(false); setEditingTrip(null); }}
         />
       )}
+
+      <ExpenseNotesSendMailModal
+        open={showMailModal}
+        onClose={() => setShowMailModal(false)}
+        pdfPayload={buildPdfOpts()}
+        monthLabel={`${monthLabel} ${year}`}
+        userName={user?.displayName || user?.email || ''}
+        totalKm={effectiveMonthKm}
+        totalAmount={monthAmount}
+        tripCount={tripsWithAmount.length}
+        vehicleLabel={vehicle?.label || ''}
+        trancheLabel={trancheLabel}
+        smtpConfig={smtpConfig}
+      />
     </div>
   );
 };
