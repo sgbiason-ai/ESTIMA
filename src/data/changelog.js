@@ -15,6 +15,7 @@ export const CHANGELOG = [
       'Export PDF des observations : l\'en-tête de colonnes (Émetteur · Date · Observation · Statut · Par · Pour le) est maintenant parfaitement aligné avec le tableau, et son texte est de nouveau lisible',
       'Export PDF : le bandeau « Observations » avec ses statistiques et la ligne d\'en-tête des colonnes se répètent en haut de chaque nouvelle page pour faciliter la lecture des comptes rendus longs',
       'Aperçu écran du compte rendu : colonnes du tableau d\'observations stabilisées (largeurs fixes, retour à la ligne des textes longs)',
+      'Export Excel de l\'estimation : les bandes colorées des lignes de titre (chapitres, sous-chapitres) et de sous-total s\'arrêtent désormais au bord du tableau au lieu de déborder sur toute la largeur de la feuille',
     ],
   },
   {

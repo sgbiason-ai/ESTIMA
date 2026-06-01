@@ -198,14 +198,15 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
         const chapNum = level === 0 ? (index + 1).toString() : '';
         const titleStr = (node.title || node.designation || '').toUpperCase();
         const rowHeader = ws.addRow([chapNum, titleStr, '', '', '', '']);
-        if (level === 0) {
-          rowHeader.font = fonts.chapterTitle; rowHeader.fill = fills.chapter;
-          rowHeader.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
-        } else {
-          rowHeader.font = { ...fonts.bold, size: 9, color: { argb: 'FF4B5563' } };
-          rowHeader.fill = fills.subChapter; rowHeader.getCell(2).alignment = { horizontal: 'left', indent: 2 };
+        // Appliquer la couleur cellule par cellule (A→F) pour ne pas déborder hors du tableau
+        const headerFont = level === 0 ? fonts.chapterTitle : { ...fonts.bold, size: 9, color: { argb: 'FF4B5563' } };
+        const headerFill = level === 0 ? fills.chapter : fills.subChapter;
+        for (let c = 1; c <= 6; c++) {
+          const cell = rowHeader.getCell(c);
+          cell.font = headerFont; cell.fill = headerFill; cell.border = borders.thin;
         }
-        rowHeader.eachCell(cell => cell.border = borders.thin);
+        if (level === 0) rowHeader.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+        else rowHeader.getCell(2).alignment = { horizontal: 'left', indent: 2 };
         const startChildRow = ws.lastRow.number + 1;
         processNodes(node.children, ws, qtyMap, level + 1, mode, isEffectiveOption, null, _includePM);
         const endChildRow = ws.lastRow.number;
@@ -224,11 +225,15 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
           if (childTotal !== 0) {
             const rowTotal = ws.addRow(['', `SOUS-TOTAL ${titleStr}`, '', '', '', { formula }]);
             if (level === 0 && subTotalCollector) subTotalCollector.push(`F${rowTotal.number}`);
-            rowTotal.font = level === 0 ? fonts.subTotalMain : fonts.subTotalSub;
-            rowTotal.fill = level === 0 ? fills.subTotalMain : fills.subTotalSub;
+            // Couleur cellule par cellule (A→F) pour rester dans les limites du tableau
+            const totalFont = level === 0 ? fonts.subTotalMain : fonts.subTotalSub;
+            const totalFill = level === 0 ? fills.subTotalMain : fills.subTotalSub;
+            for (let c = 1; c <= 6; c++) {
+              const cell = rowTotal.getCell(c);
+              cell.font = totalFont; cell.fill = totalFill; cell.border = borders.thin;
+            }
             rowTotal.getCell(2).alignment = { horizontal: 'right' };
             rowTotal.getCell(6).numFmt = '#,##0.00 €';
-            rowTotal.eachCell(cell => cell.border = borders.thin);
           }
         }
       } else if (node.type === 'item') {
