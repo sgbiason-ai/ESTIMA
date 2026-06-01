@@ -593,7 +593,7 @@ function GroupBadgeMobile({ name, colorIndex }) {
   const c = getGroupColor(colorIndex ?? 0);
   const abbr = abbreviateGroup(name);
   return (
-    <span className={`inline-flex items-center rounded-full border font-bold leading-none whitespace-nowrap text-[9px] px-1.5 py-0.5 gap-1 ${c.bg} ${c.text} ${c.border}`}>
+    <span className={`inline-flex items-center justify-center rounded-full border font-bold leading-none whitespace-nowrap text-[9px] px-1 py-0.5 gap-1 w-[52px] shrink-0 ${c.bg} ${c.text} ${c.border}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${c.dot} shrink-0`} />
       {abbr}
     </span>

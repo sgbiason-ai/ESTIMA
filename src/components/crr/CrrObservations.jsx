@@ -5,31 +5,14 @@ import {
   Plus, Trash2, ChevronDown, ChevronRight,
   MinusCircle, Circle, Loader, CheckCircle2,
   ImagePlus, Camera, X, Bold, Underline, Highlighter, List, GripVertical,
-  ArrowUp, ArrowDown, TextSelect,
+  ArrowUp, ArrowDown, ArrowUpDown, TextSelect,
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { OBSERVATION_STATUSES, getGroupColor, abbreviateGroup } from '../../data/crrData';
+import { OBSERVATION_STATUSES, getGroupColor } from '../../data/crrData';
 import { confirm, toast } from '../../utils/globalUI';
 import { normalizeObsText } from '../../utils/formatObsText.jsx';
 import { uploadCrrImage, deleteCrrImage } from '../../utils/crrImageStorage';
-
-// ── Pastille de groupe (partagee entre observations et participants) ─────────
-
-const GroupBadge = memo(({ name, colorIndex, onRemove }) => {
-  const c = getGroupColor(colorIndex);
-  const abbr = abbreviateGroup(name);
-  return (
-    <span className={`inline-flex items-center rounded-full border font-bold leading-none whitespace-nowrap text-[9px] px-1.5 py-0.5 gap-1 ${c.bg} ${c.text} ${c.border}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${c.dot} shrink-0`} />
-      {abbr}
-      {onRemove && (
-        <button onClick={onRemove} className="hover:opacity-70 -mr-0.5">
-          <X size={8} />
-        </button>
-      )}
-    </span>
-  );
-});
+import GroupBadge from './GroupBadge';
 
 // ── Selecteur multi-groupes avec pastilles (Emetteur / PAR) ─────────────────
 
@@ -608,12 +591,13 @@ const CrrObservations = ({
     ? [...categories].sort((a, b) => sortCat === 'asc' ? a.localeCompare(b) : b.localeCompare(a))
     : categories;
 
-  const sortObsForCat = (obs) => {
-    if (!sortDate) return obs;
+  const sortObsForCat = (obs, cat) => {
+    const dir = sortDate?.[cat];
+    if (!dir) return obs;
     return [...obs].sort((a, b) => {
       const da = a.date || '';
       const db = b.date || '';
-      return sortDate === 'asc' ? da.localeCompare(db) : db.localeCompare(da);
+      return dir === 'asc' ? da.localeCompare(db) : db.localeCompare(da);
     });
   };
 
@@ -669,11 +653,7 @@ const CrrObservations = ({
         <div className="grid grid-cols-[24px_48px_100px_1fr_72px_48px_100px_24px] xl:grid-cols-[30px_80px_120px_1fr_86px_80px_120px_30px] gap-x-2 items-center px-3 py-2.5 bg-gray-50 border-b border-gray-200 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
           <span />
           <span className="text-center">Emet.</span>
-          <button onClick={onCycleDateSort} className={`flex items-center justify-center gap-0.5 hover:text-blue-600 transition-colors ${sortDate ? 'text-blue-600' : ''}`} title="Trier par date">
-            Date
-            {sortDate === 'asc' && <ArrowUp size={10} />}
-            {sortDate === 'desc' && <ArrowDown size={10} />}
-          </button>
+          <span className="text-center">Date</span>
           <button onClick={onCycleCatSort} className={`flex items-center gap-0.5 hover:text-blue-600 transition-colors ${sortCat ? 'text-blue-600' : ''}`} title="Trier par chapitre">
             Observations
             {sortCat === 'asc' && <ArrowUp size={10} />}
@@ -688,8 +668,9 @@ const CrrObservations = ({
 
       {/* Categories */}
       {sortedCategories.map((cat) => {
-        const obs = sortObsForCat(observationsByCategory[cat] || []);
+        const obs = sortObsForCat(observationsByCategory[cat] || [], cat);
         const isCollapsed = collapsedCats.has(cat);
+        const catSortDir = sortDate?.[cat];
 
         return (
           <div key={cat} className="space-y-1.5">
@@ -708,16 +689,39 @@ const CrrObservations = ({
                   ({obs.length} observation{obs.length !== 1 ? 's' : ''})
                 </span>
               </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  addObservation(cat);
-                }}
-                className="flex items-center gap-1 px-2.5 py-1 text-[11px] bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200/80 transition-all font-medium"
-              >
-                <Plus size={10} />
-                Ajouter
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCycleDateSort?.(cat);
+                  }}
+                  className={`flex items-center gap-0.5 px-2.5 py-1 text-[11px] rounded-lg transition-all font-medium ${
+                    catSortDir
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white/70 text-blue-700 hover:bg-white border border-blue-200/60'
+                  }`}
+                  title={
+                    catSortDir === 'asc' ? 'Date croissante — cliquez pour décroissant'
+                    : catSortDir === 'desc' ? 'Date décroissante — cliquez pour annuler'
+                    : 'Trier ce chapitre par date'
+                  }
+                >
+                  Date
+                  {catSortDir === 'asc' && <ArrowUp size={11} />}
+                  {catSortDir === 'desc' && <ArrowDown size={11} />}
+                  {!catSortDir && <ArrowUpDown size={11} className="opacity-60" />}
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    addObservation(cat);
+                  }}
+                  className="flex items-center gap-1 px-2.5 py-1 text-[11px] bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200/80 transition-all font-medium"
+                >
+                  <Plus size={10} />
+                  Ajouter
+                </button>
+              </div>
             </div>
 
             {!isCollapsed && (

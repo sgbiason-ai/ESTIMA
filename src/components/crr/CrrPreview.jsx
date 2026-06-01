@@ -45,8 +45,8 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
           const c = GROUP_COLORS[idx % GROUP_COLORS.length];
           const abbr = abbreviateGroup(name);
           return (
-            <span key={name} className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-px text-[7px] font-bold leading-none whitespace-nowrap"
-              style={{ backgroundColor: `rgb(${c.rgbBg.join(',')})`, color: `rgb(${c.rgb.join(',')})`, border: `0.5px solid rgb(${c.rgb.map((v) => Math.min(255, v + 60)).join(',')})` }}>
+            <span key={name} className="inline-flex items-center justify-center gap-0.5 rounded-full px-1 py-px text-[7px] font-bold leading-none whitespace-nowrap"
+              style={{ minWidth: '40px', backgroundColor: `rgb(${c.rgbBg.join(',')})`, color: `rgb(${c.rgb.join(',')})`, border: `0.5px solid rgb(${c.rgb.map((v) => Math.min(255, v + 60)).join(',')})` }}>
               <span className="w-1 h-1 rounded-full" style={{ backgroundColor: `rgb(${c.rgb.join(',')})` }} />
               {abbr}
             </span>
@@ -199,8 +199,8 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
                               const abbr = abbreviateGroup(group.name);
                               return (
                                 <span
-                                  className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[7px] font-bold"
-                                  style={{ backgroundColor: `rgb(${gc.rgbBg.join(',')})`, color: `rgb(${gc.rgb.join(',')})` }}
+                                  className="inline-flex items-center justify-center gap-0.5 px-1 py-0.5 rounded text-[7px] font-bold"
+                                  style={{ minWidth: '40px', backgroundColor: `rgb(${gc.rgbBg.join(',')})`, color: `rgb(${gc.rgb.join(',')})` }}
                                 >
                                   <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ backgroundColor: `rgb(${gc.rgb.join(',')})` }} />
                                   {abbr}
@@ -271,16 +271,25 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
           </span>
         </div>
 
-        {/* En-tete colonnes */}
-        <table className="w-full text-[10px] border-collapse mt-0">
+        {/* En-tete colonnes — table-layout fixed + colgroup partage avec le corps
+            pour garantir l'alignement parfait des colonnes (header vs lignes) */}
+        <table className="w-full text-[10px] border-collapse mt-0" style={{ tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: '11%' }} />
+            <col style={{ width: '10%' }} />
+            <col />
+            <col style={{ width: '10%' }} />
+            <col style={{ width: '13%' }} />
+            <col style={{ width: '11%' }} />
+          </colgroup>
           <thead>
             <tr style={{ backgroundColor: lightenHex(primary, 0.78) }}>
-              <th className="text-center px-2 py-2 border border-slate-200 font-bold w-[11%]" style={{ color: primary }}>EMETTEUR</th>
-              <th className="text-center px-2 py-2 border border-slate-200 font-bold w-[10%]" style={{ color: primary }}>DATE</th>
+              <th className="text-center px-2 py-2 border border-slate-200 font-bold" style={{ color: primary }}>EMETTEUR</th>
+              <th className="text-center px-2 py-2 border border-slate-200 font-bold" style={{ color: primary }}>DATE</th>
               <th className="text-left px-2 py-2 border border-slate-200 font-bold" style={{ color: primary }}>OBSERVATIONS</th>
-              <th className="text-center px-2 py-2 border border-slate-200 font-bold w-[10%]" style={{ color: primary }}>STATUT</th>
-              <th className="text-center px-2 py-2 border border-slate-200 font-bold w-[13%]" style={{ color: primary }}>PAR</th>
-              <th className="text-center px-2 py-2 border border-slate-200 font-bold w-[11%]" style={{ color: primary }}>POUR LE</th>
+              <th className="text-center px-2 py-2 border border-slate-200 font-bold" style={{ color: primary }}>STATUT</th>
+              <th className="text-center px-2 py-2 border border-slate-200 font-bold" style={{ color: primary }}>PAR</th>
+              <th className="text-center px-2 py-2 border border-slate-200 font-bold" style={{ color: primary }}>POUR LE</th>
             </tr>
           </thead>
         </table>
@@ -288,8 +297,9 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
         {/* Categories */}
         {categories.map((cat, ci) => {
           const rawCatObs = observations.filter((o) => o.category === cat);
-          const catObs = sortDate
-            ? [...rawCatObs].sort((a, b) => { const da = a.date || ''; const db = b.date || ''; return sortDate === 'asc' ? da.localeCompare(db) : db.localeCompare(da); })
+          const dateDir = sortDate?.[cat];
+          const catObs = dateDir
+            ? [...rawCatObs].sort((a, b) => { const da = a.date || ''; const db = b.date || ''; return dateDir === 'asc' ? da.localeCompare(db) : db.localeCompare(da); })
             : rawCatObs;
           const catColor = CAT_COLORS[ci % CAT_COLORS.length];
 
@@ -314,7 +324,15 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
                   Aucune observation
                 </div>
               ) : (
-                <table className="w-full text-[10px] border-collapse">
+                <table className="w-full text-[10px] border-collapse" style={{ tableLayout: 'fixed' }}>
+                  <colgroup>
+                    <col style={{ width: '11%' }} />
+                    <col style={{ width: '10%' }} />
+                    <col />
+                    <col style={{ width: '10%' }} />
+                    <col style={{ width: '13%' }} />
+                    <col style={{ width: '11%' }} />
+                  </colgroup>
                   <tbody>
                     {catObs.map((obs, oi) => {
                       const isDone = obs.status === 'done';
@@ -336,8 +354,9 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
                           <td className="text-center px-2 py-1.5 border border-slate-200 w-[10%] align-top" style={{ color: '#64748b' }}>
                             {formatDate(obs.date)}
                           </td>
-                          <td className="px-2 py-1.5 border border-slate-200 whitespace-pre-wrap align-top" style={{
+                          <td className="px-2 py-1.5 border border-slate-200 whitespace-pre-wrap break-words align-top" style={{
                             color: isDone ? 'rgb(22,120,70)' : isProgress ? 'rgb(30,90,170)' : '#282828',
+                            wordBreak: 'break-word',
                           }}>
                             {renderFormattedText(obs.text)}
                             {obs.originMeetingNumber && (

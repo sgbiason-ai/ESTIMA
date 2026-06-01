@@ -113,6 +113,7 @@ const drawBadgeLabel = (doc, cell, letter, txtColor, bgColor, font) => {
 const BADGE_H = 3.2;
 const BADGE_GAP = 0.8;
 const BADGE_PAD = 1.5; // padding vertical dans la cellule
+const BADGE_W = 9;     // largeur fixe (mm) pour aligner toutes les pastilles
 
 // Calcule la hauteur necessaire pour N pastilles
 const badgesHeight = (n) => n > 0 ? n * BADGE_H + (n - 1) * BADGE_GAP + BADGE_PAD * 2 : 0;
@@ -139,8 +140,7 @@ const drawGroupBadges = (doc, cell, value, groupIndexMap, font) => {
 
     doc.setFont(font, 'bold');
     doc.setFontSize(5);
-    const textW = doc.getTextWidth(abbr);
-    const badgeW = Math.min(textW + 5, cell.width - 1);
+    const badgeW = Math.min(BADGE_W, cell.width - 1);
     const bx = cell.x + (cell.width - badgeW) / 2;
 
     // Fond du badge
@@ -423,8 +423,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
 
         doc.setFont(fontH, 'bold');
         doc.setFontSize(4.5);
-        const tw = doc.getTextWidth(abbr);
-        const bw = Math.min(tw + 4, data.cell.width - 1);
+        const bw = Math.min(BADGE_W, data.cell.width - 1);
         const bh = 3;
         const bx = data.cell.x + (data.cell.width - bw) / 2;
         const by = data.cell.y + (data.cell.height - bh) / 2;
@@ -536,26 +535,56 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
   const openObs  = observations.filter(o => o.status === 'open').length;
   const progObs  = observations.filter(o => o.status === 'in_progress').length;
   const doneObs  = observations.filter(o => o.status === 'done').length;
-
-  // Bandeau principal OBSERVATIONS avec stats
-  ensureSpace(doc, cursor, 20);
-
-  doc.setFillColor(...THEME.primary);
-  roundedRect(doc, M.left, cursor.y, CW, 10, 1.5, 'F');
-
-  doc.setFont(fontH, 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(255, 255, 255);
-  doc.text('OBSERVATIONS', M.left + 5, cursor.y + 7);
-
-  // Stats a droite
   const statsText = `${totalObs} obs.  |  ${openObs} ouvertes  |  ${progObs} en cours  |  ${doneObs} faites`;
-  doc.setFont(fontB, 'normal');
-  doc.setFontSize(7);
-  doc.setTextColor(220, 240, 230);
-  doc.text(statsText, PW - M.right - 5, cursor.y + 7, { align: 'right' });
 
-  cursor.y += 13;
+  // Largeurs colonnes observations (partagees : header manuel ET corps autoTable)
+  const OBS_COL_W = CW - 20 - 18 - 18 - 24 - 20;
+  const OBS_COL_W_ARR = [20, 18, OBS_COL_W, 18, 24, 20];
+  const OBS_HEAD_LABELS = ['EMETTEUR', 'DATE', 'OBSERVATIONS', 'STATUT', 'PAR', 'POUR LE'];
+  const HEAD_H = 6.5;
+
+  // Bandeau principal OBSERVATIONS + stats (repete en haut de chaque page)
+  const drawObsBanner = () => {
+    doc.setFillColor(...THEME.primary);
+    roundedRect(doc, M.left, cursor.y, CW, 10, 1.5, 'F');
+    doc.setFont(fontH, 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(255, 255, 255);
+    doc.text('OBSERVATIONS', M.left + 5, cursor.y + 7);
+    doc.setFont(fontB, 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(220, 240, 230);
+    doc.text(statsText, PW - M.right - 5, cursor.y + 7, { align: 'right' });
+    cursor.y += 13;
+  };
+
+  // Ligne de colonnes (EMETTEUR DATE ...), memes largeurs que le corps.
+  // Fonds D'ABORD puis textes : en jsPDF doc.text peint avec la couleur de remplissage,
+  // l'intercaler entre deux rect contaminerait la couleur des cellules suivantes.
+  const drawObsColHeader = () => {
+    doc.setFillColor(...lightenRgb(THEME.primary, 0.78));
+    doc.setDrawColor(...THEME.borders);
+    doc.setLineWidth(0.12);
+    const bounds = [];
+    let hx = M.left;
+    OBS_COL_W_ARR.forEach((w) => { doc.rect(hx, cursor.y, w, HEAD_H, 'FD'); bounds.push([hx, w]); hx += w; });
+    doc.setFont(fontH, 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(...darkenRgb(THEME.primary, 0.1));
+    OBS_HEAD_LABELS.forEach((label, i) => {
+      const [bx, w] = bounds[i];
+      doc.text(label, bx + w / 2, cursor.y + HEAD_H / 2, { align: 'center', baseline: 'middle' });
+    });
+    cursor.y += HEAD_H;
+  };
+
+  const drawObsHeader = () => { drawObsBanner(); drawObsColHeader(); };
+  // Saut de page DANS la section observations : repete bandeau + colonnes
+  const obsPageBreak = () => { doc.addPage(); cursor.y = M.top; drawObsHeader(); };
+
+  // En-tete initial
+  ensureSpace(doc, cursor, 20);
+  drawObsHeader();
 
   // Precharger toutes les images des observations (supporte string ou { src, lat, lng })
   // Les URLs Firebase Storage doivent etre converties en data URL pour jsPDF.
@@ -618,10 +647,8 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
   }
 
   const IMG_ROW_H = 25; // mm par rangee d'images
-  const OBS_COL_W = CW - 20 - 18 - 18 - 24 - 20; // largeur auto de la colonne obs
 
-  // Par categorie
-  const OBS_HEAD = [['EMETTEUR', 'DATE', 'OBSERVATIONS', 'STATUT', 'PAR', 'POUR LE']];
+  // Style d'en-tete (conserve pour le corps autoTable, showHead never)
   const obsHeadStyles = {
     fillColor: lightenRgb(THEME.primary, 0.78),
     textColor: darkenRgb(THEME.primary, 0.1),
@@ -630,37 +657,27 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
     halign: 'center',
     fontSize: 7,
   };
+  // Largeurs fixes des colonnes du corps (identiques au header manuel OBS_COL_W_ARR)
   const OBS_COL_STYLES = {
     0: { cellWidth: 20 },
     1: { cellWidth: 18 },
-    2: {},
+    2: { cellWidth: OBS_COL_W },
     3: { cellWidth: 18 },
     4: { cellWidth: 24 },
     5: { cellWidth: 20 },
   };
-  // Header colonnes (une seule fois, avant les categories)
-  autoTable(doc, {
-    startY: cursor.y,
-    margin: { left: M.left, right: M.right },
-    tableWidth: CW,
-    head: OBS_HEAD,
-    body: [],
-    theme: 'grid',
-    styles: { lineColor: THEME.borders, lineWidth: 0.12 },
-    headStyles: obsHeadStyles,
-    columnStyles: OBS_COL_STYLES,
-  });
-  cursor.y = doc.lastAutoTable.finalY;
 
   for (let ci = 0; ci < categories.length; ci++) {
     const cat = categories[ci];
     const rawCatObs = observations.filter((o) => o.category === cat);
-    const catObs = sortDate
-      ? [...rawCatObs].sort((a, b) => { const da = a.date || ''; const db = b.date || ''; return sortDate === 'asc' ? da.localeCompare(db) : db.localeCompare(da); })
+    const dateDir = sortDate?.[cat];
+    const catObs = dateDir
+      ? [...rawCatObs].sort((a, b) => { const da = a.date || ''; const db = b.date || ''; return dateDir === 'asc' ? da.localeCompare(db) : db.localeCompare(da); })
       : rawCatObs;
     const catColor = CAT_COLORS[ci % CAT_COLORS.length];
 
-    ensureSpace(doc, cursor, 14);
+    // Nouvelle page si le bandeau categorie ne tient pas -> repete bandeau + colonnes obs
+    if (cursor.y + 14 > PH - M.bottom) obsPageBreak();
 
     // Bandeau categorie avec pastille coloree
     doc.setFillColor(...lightenRgb(catColor, 0.88));
@@ -744,10 +761,9 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
       }
       const estH = textH + imgH;
 
-      // Saut de page si l'observation ne rentre pas
+      // Saut de page si l'observation ne rentre pas -> repete bandeau + colonnes obs
       if (cursor.y + estH > pageBottom && cursor.y > M.top + 20) {
-        doc.addPage();
-        cursor.y = M.top;
+        obsPageBreak();
       }
 
     autoTable(doc, {
@@ -773,7 +789,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
       columnStyles: {
         0: { cellWidth: OBS_COL_STYLES[0].cellWidth, halign: 'center', fontStyle: 'bold', textColor: catColor },
         1: { cellWidth: OBS_COL_STYLES[1].cellWidth, halign: 'center', textColor: THEME.lightText },
-        2: {},
+        2: { cellWidth: OBS_COL_STYLES[2].cellWidth },
         3: { cellWidth: OBS_COL_STYLES[3].cellWidth, halign: 'center' },
         4: { cellWidth: OBS_COL_STYLES[4].cellWidth, halign: 'center', fontStyle: 'bold' },
         5: { cellWidth: OBS_COL_STYLES[5].cellWidth, halign: 'center', textColor: THEME.lightText },

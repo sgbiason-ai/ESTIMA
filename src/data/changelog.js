@@ -2,9 +2,21 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.10.1';
+export const APP_VERSION = '2.11.0';
 
 export const CHANGELOG = [
+  {
+    version: '2.11.0',
+    date: '2026-06-01',
+    title: 'Compte rendu de chantier : tri par chapitre, pastilles alignées & en-tête PDF',
+    highlights: [
+      'Observations : le tri par date est désormais propre à chaque chapitre (un bouton « Date » par catégorie, qui bascule croissant / décroissant / aucun). Le choix est mémorisé et repris fidèlement dans les exports PDF et Word',
+      'Pastilles de rôle (MOA, MDBDP, CONC…) à largeur fixe et alignées partout : observations, participants, fenêtre de gestion, aperçu, application mobile et export PDF — les libellés qui les suivent tombent enfin sur la même colonne',
+      'Export PDF des observations : l\'en-tête de colonnes (Émetteur · Date · Observation · Statut · Par · Pour le) est maintenant parfaitement aligné avec le tableau, et son texte est de nouveau lisible',
+      'Export PDF : le bandeau « Observations » avec ses statistiques et la ligne d\'en-tête des colonnes se répètent en haut de chaque nouvelle page pour faciliter la lecture des comptes rendus longs',
+      'Aperçu écran du compte rendu : colonnes du tableau d\'observations stabilisées (largeurs fixes, retour à la ligne des textes longs)',
+    ],
+  },
   {
     version: '2.10.1',
     date: '2026-06-01',

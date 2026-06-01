@@ -1,8 +1,9 @@
 // src/components/crr/CrrParticipants.jsx
 import React, { useState, useRef, useCallback } from 'react';
 import { Plus, Trash2, UserPlus, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Users, Check, X, Minus, Edit2, GripVertical } from 'lucide-react';
-import { PRESENCE_OPTIONS, getGroupColor, abbreviateGroup } from '../../data/crrData';
+import { PRESENCE_OPTIONS } from '../../data/crrData';
 import { confirm } from '../../utils/globalUI';
+import GroupBadge from './GroupBadge';
 
 const PresenceButton = ({ value, onChange }) => {
   const cycle = () => {
@@ -269,16 +270,7 @@ const CrrParticipants = ({
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    {(() => {
-                      const gc = getGroupColor(groupIdx);
-                      const abbr = abbreviateGroup(group.name);
-                      return (
-                        <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${gc.bg} ${gc.text} ${gc.border}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${gc.dot}`} />
-                          {abbr}
-                        </span>
-                      );
-                    })()}
+                    <GroupBadge name={group.name} colorIndex={groupIdx} />
                     <span className="text-xs font-bold text-slate-700 uppercase">
                       {group.name}
                     </span>

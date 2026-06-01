@@ -11,7 +11,7 @@ import {
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import * as XLSX from 'xlsx';
 import { toast } from '../../utils/globalUI';
-import { getGroupColor, abbreviateGroup } from '../../data/crrData';
+import GroupBadge from './GroupBadge';
 import { confirm } from '../../utils/globalUI';
 
 // ── PANNEAU GAUCHE : ARBORESCENCE GROUPES ──────────────────────────────────
@@ -101,9 +101,6 @@ const GroupTree = ({
         {(participantGroups || []).map((group, groupIdx) => {
           const isExpanded = expandedGroups.has(group.id);
           const isEditingG = editingGroup === group.id;
-          const gc = getGroupColor(groupIdx);
-          const abbr = abbreviateGroup(group.name);
-
           return (
             <Droppable droppableId={`group-${group.id}`} key={group.id}>
               {(provided, snapshot) => (
@@ -142,9 +139,7 @@ const GroupTree = ({
                       </div>
                     ) : (
                       <>
-                        <span className={`inline-flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 rounded-full border ${gc.bg} ${gc.text} ${gc.border}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${gc.dot}`} />{abbr}
-                        </span>
+                        <GroupBadge name={group.name} colorIndex={groupIdx} />
                         <span className="text-[11px] font-bold text-slate-700 uppercase truncate">{group.name}</span>
                         {group.subLabel && <span className="text-[10px] text-slate-400 truncate">{group.subLabel}</span>}
                         <span className="text-[9px] text-slate-400">({group.contacts.length})</span>

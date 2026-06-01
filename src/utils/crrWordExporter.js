@@ -175,8 +175,9 @@ export const generateWordCrr = (meeting, crrConfig, projectName = '', branding =
 
   for (const cat of categories) {
     const rawCatObs = observations.filter((o) => o.category === cat);
-    const catObs = sortDate
-      ? [...rawCatObs].sort((a, b) => { const da = a.date || ''; const db = b.date || ''; return sortDate === 'asc' ? da.localeCompare(db) : db.localeCompare(da); })
+    const dateDir = sortDate?.[cat];
+    const catObs = dateDir
+      ? [...rawCatObs].sort((a, b) => { const da = a.date || ''; const db = b.date || ''; return dateDir === 'asc' ? da.localeCompare(db) : db.localeCompare(da); })
       : rawCatObs;
     html += `<div class="cat-banner">${cat.toUpperCase()} <span style="float:right;font-weight:normal;font-size:8pt">${catObs.length} observation${catObs.length > 1 ? 's' : ''}</span></div>`;
 

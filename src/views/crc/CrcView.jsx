@@ -275,12 +275,19 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
   });
 
   const [viewMode, setViewMode] = useState('edit');
-  const [sortDate, setSortDate] = useState(() => localStorage.getItem('crc_sort_date') || null);
+  // Tri par date PAR categorie : map { [categorie]: 'asc' | 'desc' }
+  const [sortDate, setSortDate] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('crc_sort_dates') || '{}') || {}; }
+    catch { return {}; }
+  });
   const [sortCat, setSortCat] = useState(() => localStorage.getItem('crc_sort_cat') || null);
-  const cycleDateSort = useCallback(() => setSortDate(p => {
-    const next = p === null ? 'asc' : p === 'asc' ? 'desc' : null;
-    next ? localStorage.setItem('crc_sort_date', next) : localStorage.removeItem('crc_sort_date');
-    return next;
+  const cycleDateSort = useCallback((cat) => setSortDate(prev => {
+    const cur = prev?.[cat] || null;
+    const next = cur === null ? 'asc' : cur === 'asc' ? 'desc' : null;
+    const updated = { ...prev };
+    if (next) updated[cat] = next; else delete updated[cat];
+    localStorage.setItem('crc_sort_dates', JSON.stringify(updated));
+    return updated;
   }), []);
   const cycleCatSort = useCallback(() => setSortCat(p => {
     const next = p === null ? 'asc' : p === 'asc' ? 'desc' : null;
