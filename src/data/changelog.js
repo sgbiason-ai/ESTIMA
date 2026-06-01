@@ -2,13 +2,13 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.9.0';
+export const APP_VERSION = '2.10.0';
 
 export const CHANGELOG = [
   {
-    version: '2.9.0',
-    date: '2026-05-31',
-    title: 'GED « Documents émis » : versions figées de l\'étude de prix',
+    version: '2.10.0',
+    date: '2026-06-01',
+    title: 'GED « Documents émis » : versions figées & cycle de vie de l\'affaire',
     highlights: [
       'Nouveau module « Documents émis » dans Estima VRD : figer une version de l\'étude de prix crée une copie immuable et horodatée (indice par phase : DCE-A, DCE-B, EXE-A…), tandis que le projet de travail reste librement modifiable',
       'Chaque version figée se consulte en lecture seule (visualiseur dédié) et peut être ré-imprimée à l\'identique en PDF et Excel (DQE ou Estimation) — les quantités, tranches et majorations sont recalculées fidèlement au moment du gel',
