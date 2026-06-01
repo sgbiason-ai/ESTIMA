@@ -189,7 +189,7 @@ const AdminView = ({ currentUserEmail }) => {
         />
       )}
       <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="admin" />
-      {showSimulator && <FirebaseSimulatorModal companies={companies} onClose={() => setShowSimulator(false)} />}
+      {showSimulator && <FirebaseSimulatorModal companies={companies} users={users} onClose={() => setShowSimulator(false)} />}
 
       {/* En-tête */}
       <div className="flex items-center justify-between">

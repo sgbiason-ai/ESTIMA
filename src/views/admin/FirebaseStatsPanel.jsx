@@ -13,17 +13,25 @@ const QUOTA_LIMIT_BYTES = 1 * 1024 * 1024 * 1024;
 const WARN_THRESHOLD  = 0.60;
 const DANGER_THRESHOLD = 0.85;
 
+// `perUser: true` → sous-collection stockée sous companies/{id}/users/{uid}/…
+// (agrégée sur tous les utilisateurs de l'entreprise lors de l'analyse).
 const COL_META = {
-  projects:   { label: 'Projets',       color: '#059669', icon: '📁' },
-  bpu:        { label: 'BPU',           color: '#2563eb', icon: '📋' },
-  categories: { label: 'Catégories',    color: '#7c3aed', icon: '🏷️' },
-  units:      { label: 'Unités',        color: '#ea580c', icon: '📐' },
-  resources:  { label: 'Ressources',    color: '#db2777', icon: '🎨' },
-  crr:        { label: 'CRC',           color: '#0d9488', icon: '📝' },
-  devisMoe:   { label: 'Devis MOE',    color: '#ca8a04', icon: '💰' },
-  fichesMarche:{ label: 'Fiches Marché',color: '#a21caf', icon: '📄' },
-  folders:    { label: 'Dossiers',      color: '#64748b', icon: '📂' },
-  presence:   { label: 'Présence',      color: '#0891b2', icon: '🟢' },
+  projects:           { label: 'Projets',       color: '#059669', icon: '📁' },
+  bpu:                { label: 'BPU',           color: '#2563eb', icon: '📋' },
+  categories:         { label: 'Catégories',    color: '#7c3aed', icon: '🏷️' },
+  units:              { label: 'Unités',        color: '#ea580c', icon: '📐' },
+  resources:          { label: 'Ressources',    color: '#db2777', icon: '🎨' },
+  crr:                { label: 'CRC',           color: '#0d9488', icon: '📝' },
+  devisMoe:           { label: 'Devis MOE',     color: '#ca8a04', icon: '💰' },
+  fichesMarche:       { label: 'Fiches Marché', color: '#a21caf', icon: '📄' },
+  folders:            { label: 'Dossiers',      color: '#64748b', icon: '📂' },
+  presence:           { label: 'Présence',      color: '#0891b2', icon: '🟢' },
+  site_visits:        { label: 'Visites',       color: '#16a34a', icon: '📍' },
+  expenseNotes:       { label: 'Notes frais',   color: '#e11d48', icon: '🧾', perUser: true },
+  vehicles:           { label: 'Véhicules',     color: '#9333ea', icon: '🚗', perUser: true },
+  expenseLocations:   { label: 'Lieux',         color: '#0284c7', icon: '🗺️', perUser: true },
+  expenseYearSettings:{ label: 'Régl. frais',   color: '#65a30d', icon: '🗓️', perUser: true },
+  expenseSettings:    { label: 'Régl. global',  color: '#737373', icon: '🛠️' },
 };
 
 const estimateBytes = (data) => {
@@ -61,22 +69,31 @@ const FirebaseStatsPanel = ({ companies, users }) => {
     try {
       const results = await Promise.all(
         companies.map(async (company) => {
-          const cols = Object.keys(COL_META);
+          const companyUsers = users.filter(u => u.companyId === company.id);
           const colStats = {};
           let totalBytes = estimateBytes({ id: company.id, name: company.name });
-          await Promise.all(cols.map(async (colName) => {
+          await Promise.all(Object.entries(COL_META).map(async ([colName, meta]) => {
             try {
-              const snap = await getDocs(collection(db, 'companies', company.id, colName));
-              let bytes = 0;
-              snap.docs.forEach(d => { bytes += estimateBytes(d.data()); });
-              colStats[colName] = { count: snap.size, bytes };
+              let count = 0, bytes = 0;
+              if (meta.perUser) {
+                // Sous-collection par utilisateur → agréger sur tous les membres.
+                await Promise.all(companyUsers.map(async (u) => {
+                  const snap = await getDocs(collection(db, 'companies', company.id, 'users', u.uid, colName));
+                  count += snap.size;
+                  snap.docs.forEach(d => { bytes += estimateBytes(d.data()); });
+                }));
+              } else {
+                const snap = await getDocs(collection(db, 'companies', company.id, colName));
+                count = snap.size;
+                snap.docs.forEach(d => { bytes += estimateBytes(d.data()); });
+              }
+              colStats[colName] = { count, bytes };
               totalBytes += bytes;
             } catch {
               colStats[colName] = { count: 0, bytes: 0 };
             }
           }));
-          const memberCount = users.filter(u => u.companyId === company.id).length;
-          return { company, colStats, totalBytes, memberCount };
+          return { company, colStats, totalBytes, memberCount: companyUsers.length };
         })
       );
       setStats(results);
@@ -137,7 +154,7 @@ const FirebaseStatsPanel = ({ companies, users }) => {
         <div className="py-12 text-center">
           <Database size={32} className="mx-auto mb-3 text-gray-300" />
           <p className="text-sm font-medium text-gray-500">Lance l'analyse pour voir l'occupation Firebase</p>
-          <p className="text-[10px] text-gray-400 font-mono mt-1">Interroge toutes les sous-collections de chaque entreprise</p>
+          <p className="text-[10px] text-gray-400 font-mono mt-1">Interroge toutes les sous-collections (incl. notes de frais par utilisateur)</p>
         </div>
       )}
 
@@ -307,7 +324,7 @@ const FirebaseStatsPanel = ({ companies, users }) => {
 
                       {isExp && (
                         <tr className="border-b border-gray-200/60">
-                          <td colSpan={13} className="px-5 pb-4 pt-2 bg-gray-50/80" style={{ paddingLeft: 52 }}>
+                          <td colSpan={Object.keys(COL_META).length + 3} className="px-5 pb-4 pt-2 bg-gray-50/80" style={{ paddingLeft: 52 }}>
                             <div className="grid grid-cols-5 gap-2 pt-2">
                               {Object.entries(COL_META).map(([col, m]) => {
                                 const cs = colStats[col] || { count: 0, bytes: 0 };
@@ -321,6 +338,9 @@ const FirebaseStatsPanel = ({ companies, users }) => {
                                       <span className="text-[9px] font-bold uppercase tracking-widest" style={{ color: cs.count > 0 ? m.color : '#9ca3af' }}>
                                         {m.label}
                                       </span>
+                                      {m.perUser && (
+                                        <span className="ml-auto text-[8px] text-gray-400 font-mono normal-case tracking-normal" title="Agrégé sur tous les utilisateurs">/ user</span>
+                                      )}
                                     </div>
                                     <p className="text-xl font-bold" style={{ color: cs.count > 0 ? '#111827' : '#d1d5db' }}>{cs.count}</p>
                                     <p className="text-[9px] text-gray-400 font-mono mt-0.5">{fmtSize(cs.bytes)}</p>

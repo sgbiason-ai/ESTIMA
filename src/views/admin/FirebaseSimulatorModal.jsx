@@ -9,7 +9,14 @@ const SPARK_STORAGE_GB  = 1;
 const SPARK_READS_DAY   = 50000;
 const SPARK_WRITES_DAY  = 20000;
 
-const COLLECTIONS = ['projects', 'bpu', 'categories', 'units', 'resources', 'crr', 'devisMoe', 'fichesMarche', 'folders', 'presence'];
+// Collections au niveau entreprise (companies/{id}/{col})
+const COMPANY_COLLECTIONS = [
+  'projects', 'bpu', 'categories', 'units', 'resources', 'crr', 'devisMoe',
+  'fichesMarche', 'folders', 'presence', 'site_visits', 'expenseSettings',
+];
+// Sous-collections par utilisateur (companies/{id}/users/{uid}/{col}) — notes de frais
+const USER_COLLECTIONS = ['expenseNotes', 'vehicles', 'expenseLocations', 'expenseYearSettings'];
+const TOTAL_COLLECTIONS = COMPANY_COLLECTIONS.length + USER_COLLECTIONS.length;
 
 const estimateBytes = (data) => {
   try { return new Blob([JSON.stringify(data)]).size; } catch { return 0; }
@@ -64,7 +71,7 @@ const SimBar = ({ label, used, max, color, unit='' }) => {
 
 // ─── Modale principale ───────────────────────────────────────────────────────
 
-const FirebaseSimulatorModal = ({ companies, onClose }) => {
+const FirebaseSimulatorModal = ({ companies, users = [], onClose }) => {
   const [count,    setCount]    = useState(companies.length || 5);
   const [overhead, setOverhead] = useState(1.35);
   const [realData, setRealData] = useState(null);
@@ -79,14 +86,28 @@ const FirebaseSimulatorModal = ({ companies, onClose }) => {
         companies.map(async (company) => {
           let totalBytes = estimateBytes({ id: company.id, name: company.name });
           let totalDocs = 0;
+          const companyUsers = users.filter(u => u.companyId === company.id);
 
-          await Promise.all(COLLECTIONS.map(async (colName) => {
-            try {
-              const snap = await getDocs(collection(db, 'companies', company.id, colName));
-              totalDocs += snap.size;
-              snap.docs.forEach(d => { totalBytes += estimateBytes(d.data()); });
-            } catch { /* skip */ }
-          }));
+          await Promise.all([
+            // Collections au niveau entreprise
+            ...COMPANY_COLLECTIONS.map(async (colName) => {
+              try {
+                const snap = await getDocs(collection(db, 'companies', company.id, colName));
+                totalDocs += snap.size;
+                snap.docs.forEach(d => { totalBytes += estimateBytes(d.data()); });
+              } catch { /* skip */ }
+            }),
+            // Sous-collections par utilisateur (notes de frais) — agrégées sur tous les membres
+            ...USER_COLLECTIONS.map(async (colName) => {
+              await Promise.all(companyUsers.map(async (u) => {
+                try {
+                  const snap = await getDocs(collection(db, 'companies', company.id, 'users', u.uid, colName));
+                  totalDocs += snap.size;
+                  snap.docs.forEach(d => { totalBytes += estimateBytes(d.data()); });
+                } catch { /* skip */ }
+              }));
+            }),
+          ]);
 
           return { id: company.id, name: company.name, totalBytes, totalDocs };
         })
@@ -356,9 +377,9 @@ const FirebaseSimulatorModal = ({ companies, onClose }) => {
         {/* Footer */}
         <div style={{ padding:'10px 20px 14px', borderTop:'1px solid rgba(255,255,255,0.05)' }}>
           <p style={{ fontFamily:'monospace', fontSize:8, color:'rgba(255,255,255,0.15)' }}>
-            {'\u26A0'} Simulation basee sur les donnees reelles Firebase (10 collections : Projets, BPU, CRC, Devis MOE, Fiches Marche, Ressources, Dossiers, etc.) — Moyenne : {avgMB.toFixed(2)} Mo / {Math.round(avgDocs)} docs par entreprise.
+            {'\u26A0'} Simulation basee sur les donnees reelles Firebase ({TOTAL_COLLECTIONS} collections : Projets, BPU, CRC, Devis MOE, Fiches Marche, Ressources, Dossiers, Visites de site, Notes de frais, etc. — notes de frais agregees par utilisateur) — Moyenne : {avgMB.toFixed(2)} Mo / {Math.round(avgDocs)} docs par entreprise.
             Overhead {'\u00D7'}{overhead} applique (index Firestore, metadata, padding).
-            Heuristiques ajustees pour le module CRC (autosave, WYSIWYG, images).
+            Heuristiques ajustees pour les modules intensifs (CRC, Visites : autosave, WYSIWYG, images).
           </p>
         </div>
       </div>
