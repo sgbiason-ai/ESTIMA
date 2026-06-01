@@ -313,10 +313,10 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
   };
 
   return (
-    <div className="fixed inset-0 z-modal flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-modal flex items-center justify-center p-3">
       <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={isProjectSavedAndValid ? onClose : undefined} />
 
-      <div ref={modalRef} className="relative bg-white rounded-2xl shadow-2xl w-full max-w-[1400px] overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-white/20 ring-1 ring-black/5 will-change-transform flex flex-col">
+      <div ref={modalRef} className="relative bg-white rounded-2xl shadow-2xl w-[96vw] max-w-[1600px] h-[94vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-white/20 ring-1 ring-black/5 will-change-transform flex flex-col">
         
         {/* HEADER — pleine largeur */}
         <div className="bg-slate-900 px-6 py-4 flex justify-between items-center border-b border-slate-800 cursor-move select-none group shrink-0" onMouseDown={handleMouseDown}>
@@ -339,7 +339,7 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
         </div>
 
         {/* BODY — deux colonnes */}
-        <div className="flex flex-1 min-h-0" style={{ maxHeight: 'calc(90vh - 140px)' }}>
+        <div className="flex flex-1 min-h-0">
 
           {/* COL GAUCHE : formulaire */}
           <div className="flex-1 flex flex-col min-w-0">
