@@ -59,7 +59,9 @@ export default function UpdatePrompt() {
     setNeedRefresh(false);
   };
 
-  if (!offlineReady && !needRefresh) return null;
+  // On n'affiche QUE la banniere de mise a jour. Le message "Pret pour le mode
+  // hors-ligne" (offlineReady) est une confirmation sans action utile -> masque.
+  if (!needRefresh) return null;
 
   return (
     <div className="fixed bottom-4 right-4 z-toast max-w-sm animate-in fade-in slide-in-from-bottom-4 duration-300">

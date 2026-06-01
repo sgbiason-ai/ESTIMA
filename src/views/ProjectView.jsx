@@ -785,7 +785,7 @@ const ProjectView = ({
       />
 
       {!isReadOnly && (
-        <button onClick={() => setShowFormulaHelp(true)} className="fixed bottom-6 right-6 z-[9000] flex items-center gap-2 px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 group">
+        <button onClick={() => setShowFormulaHelp(true)} className="fixed bottom-20 right-6 z-[9000] flex items-center gap-2 px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 group">
           <HelpCircle size={16} />
           <span className="text-[11px] font-bold uppercase tracking-wide max-w-0 overflow-hidden group-hover:max-w-[120px] transition-all duration-300 whitespace-nowrap">Aide formules</span>
         </button>

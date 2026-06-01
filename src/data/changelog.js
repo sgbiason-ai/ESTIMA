@@ -21,6 +21,8 @@ export const CHANGELOG = [
       'Mini-frise des phases cliquable dans l\'en-tête du projet : un coup d\'œil sur l\'avancement, un clic pour ouvrir les documents émis',
       'Audit comparatif enrichi : décomposition de chaque écart en « effet quantité » et « effet prix », cascade visuelle de l\'écart total (ajouts / suppressions / quantité / prix), articles triés par impact avec recherche, comparaison tranche par tranche, et export de l\'audit en PDF ou Excel',
       'Sur mobile : la phase courante s\'affiche en badge coloré sur chaque projet, la frise « Cycle de vie » apparaît dans le détail du projet, et un écran « Documents émis » permet de consulter les versions figées (lecture seule)',
+      'Estima VRD : le bouton « Aide formules » ne chevauche plus le bouton de feedback — il est désormais empilé juste au-dessus dans le coin bas-droite',
+      'La notification « Prêt pour le mode hors-ligne » ne s\'affiche plus : seule la bannière « Nouvelle version disponible » apparaît désormais',
     ],
   },
   {
