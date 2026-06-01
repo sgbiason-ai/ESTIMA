@@ -8,7 +8,7 @@ import PropTypes from 'prop-types';
 import { ArrowLeft, FileText, Table2, Lock, ChevronDown } from 'lucide-react';
 import { formatPrice } from '../../utils/helpers';
 import { toast } from '../../utils/globalUI';
-import { computeQtyMaps } from '../../utils/projectCalculations';
+import { computeQtyMaps, buildRefMap } from '../../utils/projectCalculations';
 import { getPhaseStyle, formatDateLong } from './gedConstants';
 import { previewArchivePdf, exportArchive } from './gedExport';
 import ExportModal from '../../components/modals/ExportModal';
@@ -46,6 +46,13 @@ const GedVersionViewer = ({ archive, onBack, branding = null }) => {
 
   const activeQtyMap = qtyMaps[selectedTranche] || qtyMaps.global || {};
   const qtyOf = (item) => Number(activeQtyMap[item.id] || 0);
+
+  // Numérotation telle qu'elle était au moment du gel (auto P.1… ou manuelle).
+  const refMap = useMemo(
+    () => buildRefMap(snapshot?.chapters || [], snapshot?.bpuConfig || {}),
+    [snapshot],
+  );
+  const refOf = (item) => refMap.get(item.id) || item.bpuNum || '—';
 
   // Total HT d'un chapitre selon la tranche sélectionnée (options exclues).
   const chapterTotal = (node) => {
@@ -124,7 +131,7 @@ const GedVersionViewer = ({ archive, onBack, branding = null }) => {
           key={node.id}
           className={`${GRID} px-3 py-1.5 text-[11px] border-b border-slate-50 hover:bg-slate-50/60 ${node.isOption ? 'opacity-60 italic' : ''}`}
         >
-          <span className="font-mono text-slate-400 truncate">{node.bpuNum || '—'}</span>
+          <span className="font-mono text-slate-400 truncate">{refOf(node)}</span>
           <span className="text-slate-700 truncate" style={{ paddingLeft: `${depth * 14}px` }} title={node.designation}>
             {node.designation || '—'}
           </span>

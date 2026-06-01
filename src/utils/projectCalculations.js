@@ -313,6 +313,54 @@ export function recalculateProject(chapters, tranches = []) {
   return { updatedChapters: current, sourceIds: Array.from(detectedIds) };
 }
 
+// ─── NUMÉROTATION DES ARTICLES (réf BPU) ──────────────────────────────────────
+
+/**
+ * Construit la map de numérotation des articles { itemId → réf }.
+ * Reproduit la logique du hook useProjectCalculations (source de vérité) :
+ *   - mode 'manual' : on utilise le bpuNum saisi (repli auto si vide)
+ *   - sinon (auto)  : P.1, P.2… attribué par clé (uid, sinon désignation|unité|prix),
+ *                     un même article (même clé) garde le même numéro.
+ * Pure : aucune dépendance React. Utilisée par le viewer de version figée pour
+ * respecter le mode de numérotation tel qu'il était au moment du gel.
+ */
+export function buildRefMap(chapters, bpuConfig = {}) {
+  const map = new Map();
+  const registry = new Map();
+  let counter = 1;
+  const buildKey = (node) => {
+    if (node?.uid) return `UID:${String(node.uid)}`;
+    const d = (node?.designation || '').trim().toUpperCase();
+    const u = (node?.unit || '').trim().toUpperCase();
+    const p = Number(node?.price || 0);
+    return `FALLBACK:${d}|${u}|${p}`;
+  };
+  const traverse = (nodes) => {
+    if (!Array.isArray(nodes)) return;
+    nodes.forEach((node) => {
+      if (!node) return;
+      if (node.type === 'item') {
+        let refLabel = '';
+        if (bpuConfig?.numberingMode === 'manual' && node.bpuNum) {
+          refLabel = String(node.bpuNum).trim();
+        } else {
+          const key = buildKey(node);
+          if (registry.has(key)) {
+            refLabel = registry.get(key);
+          } else {
+            refLabel = `P.${counter++}`;
+            registry.set(key, refLabel);
+          }
+        }
+        map.set(node.id, refLabel);
+      }
+      if (node.children) traverse(node.children);
+    });
+  };
+  traverse(chapters || []);
+  return map;
+}
+
 // ─── MAPS DE QUANTITÉS ────────────────────────────────────────────────────────
 
 /**

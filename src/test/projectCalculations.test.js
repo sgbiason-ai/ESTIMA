@@ -10,6 +10,7 @@ import {
   computeQtyMaps,
   computePriceScore,
   detectAtypicalPrice,
+  buildRefMap,
 } from '../utils/projectCalculations';
 
 // ── calculateSafeClientQty ─────────────────────────────────────────────────
@@ -347,5 +348,44 @@ describe('detectAtypicalPrice', () => {
     expect(detectAtypicalPrice(0,   100, 100, 10000).isAtypical).toBe(false);
     expect(detectAtypicalPrice(100, 0,   100, 10000).isAtypical).toBe(false);
     expect(detectAtypicalPrice(100, 100, 100, 0    ).isAtypical).toBe(false);
+  });
+});
+
+// ── buildRefMap ────────────────────────────────────────────────────────────
+describe('buildRefMap', () => {
+  const chapters = [
+    { type: 'chapter', id: 'c1', children: [
+      { type: 'item', id: 'i1', uid: 'A', bpuNum: '1.01', designation: 'Déblai', unit: 'm3', price: 10 },
+      { type: 'item', id: 'i2', uid: 'B', bpuNum: '1.02', designation: 'Remblai', unit: 'm3', price: 20 },
+      { type: 'chapter', id: 'c2', children: [
+        { type: 'item', id: 'i3', uid: 'A', bpuNum: '1.01', designation: 'Déblai', unit: 'm3', price: 10 },
+      ]},
+    ]},
+  ];
+
+  it('mode auto : numérote P.1, P.2… par clé uid', () => {
+    const m = buildRefMap(chapters, { numberingMode: 'auto' });
+    expect(m.get('i1')).toBe('P.1');
+    expect(m.get('i2')).toBe('P.2');
+    // i3 a le même uid que i1 → même numéro
+    expect(m.get('i3')).toBe('P.1');
+  });
+
+  it('mode manuel : utilise le bpuNum saisi', () => {
+    const m = buildRefMap(chapters, { numberingMode: 'manual' });
+    expect(m.get('i1')).toBe('1.01');
+    expect(m.get('i2')).toBe('1.02');
+    expect(m.get('i3')).toBe('1.01');
+  });
+
+  it('mode manuel mais bpuNum vide → repli auto', () => {
+    const ch = [{ type: 'chapter', id: 'c', children: [
+      { type: 'item', id: 'x', uid: 'Z', designation: 'X', unit: 'u', price: 5 },
+    ]}];
+    expect(buildRefMap(ch, { numberingMode: 'manual' }).get('x')).toBe('P.1');
+  });
+
+  it('défaut (config vide) = mode auto', () => {
+    expect(buildRefMap(chapters, {}).get('i1')).toBe('P.1');
   });
 });
