@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import Icon from './Icon';
 import { dateFr } from './formatters';
+import MobilePhaseBadge from './MobilePhaseBadge';
 
 export default function ProjectsList({ projects, folders, loading, search, onSearch, onSelect, onSelectAndNavigate, onRefresh, isLandscape, selectedId = null }) {
   const [currentFolderId, setCurrentFolderId] = useState(null);
@@ -170,6 +171,7 @@ export default function ProjectsList({ projects, folders, loading, search, onSea
               <div className="text-[15px] font-semibold text-gray-900 leading-tight truncate">{p.name}</div>
               {p.client && <div className="text-[13px] text-gray-400 font-medium mt-0.5">{p.client}</div>}
             </div>
+            <MobilePhaseBadge project={p} />
           </div>
           <div className="flex items-center gap-2 mt-2 text-[13px] text-gray-400 font-medium">
             <span>{p.chaptersCount} chap.</span>

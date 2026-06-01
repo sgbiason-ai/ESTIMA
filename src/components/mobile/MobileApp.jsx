@@ -30,6 +30,7 @@ import MobileHubView   from './MobileHubView';
 import Icon            from './Icon';
 import ProjectsList    from './ProjectsList';
 import ProjectDetail   from './ProjectDetail';
+import VersionsView    from './VersionsView';
 import BPUView         from './BPUView';
 import DQEView         from './DQEView';
 import TranchesView    from './TranchesView';
@@ -486,6 +487,7 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
     if (subView === 'tranches') return 'Récap. par Tranche';
     if (subView === 'rao') return 'Analyse des Offres';
     if (subView === 'plans') return 'Plans';
+    if (subView === 'versions') return 'Documents émis';
     if (subView === 'exports') return 'Exports';
     if (selectedProject) return selectedProject.name;
     if (selectedChantier) {
@@ -702,6 +704,13 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
         )}
         {subView === 'plans' && fullProject && (
           <PlansListView project={fullProject} />
+        )}
+        {subView === 'versions' && fullProject && (
+          <VersionsView
+            project={fullProject}
+            archives={fullProject.__archives || []}
+            loading={projectLoading}
+          />
         )}
         {subView === 'exports' && (
           <ExportsView

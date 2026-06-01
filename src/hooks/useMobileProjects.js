@@ -36,6 +36,8 @@ export const useMobileProjects = (user, companyId) => {
             lastSaved: data.lastSaved || '',
             updatedBy: data.updatedBy || '',
             tranches:  data.tranches || [],
+            phase:     data.phase || null,
+            phases:    data.phases || null,
             hasPSE:    !!data.hasPSE,
             hasRao:    false, // sera mis à jour après vérification subcollection
             hasCrc:    false,
@@ -111,13 +113,17 @@ export const useMobileProjects = (user, companyId) => {
       const snap = await getDoc(doc(db, 'companies', companyId, 'projects', projectId));
       if (!snap.exists()) return null;
       const data = snap.data();
-      // Charger analysis/data et rao/data en parallèle
-      const [analysisSnap, raoSnap] = await Promise.all([
+      // Charger analysis/data, rao/data et archives (versions figées) en parallèle
+      const [analysisSnap, raoSnap, archivesSnap] = await Promise.all([
         getDoc(doc(db, 'companies', companyId, 'projects', projectId, 'analysis', 'data')).catch(() => null),
         getDoc(doc(db, 'companies', companyId, 'projects', projectId, 'rao', 'data')).catch(() => null),
+        getDocs(collection(db, 'companies', companyId, 'projects', projectId, 'archives')).catch(() => null),
       ]);
       if (analysisSnap?.exists()) data.analysis = analysisSnap.data();
       if (raoSnap?.exists() && raoSnap.data().rao) data.rao = raoSnap.data().rao;
+      data.__archives = archivesSnap
+        ? archivesSnap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+        : [];
       return data;
     } catch (e) {
       console.error('[Mobile] Erreur chargement projet:', e);

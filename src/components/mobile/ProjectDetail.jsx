@@ -2,8 +2,11 @@ import React from 'react';
 import Icon from './Icon';
 import { fmt, dateFr } from './formatters';
 import { flattenItems } from './helpers';
+import MobilePhaseBadge from './MobilePhaseBadge';
+import MobileLifecycle from './MobileLifecycle';
 
 export default function ProjectDetail({ project, projectMeta, calcHook, onNavigate, onNavigateModule, isLandscape }) {
+  const archives = project.__archives || [];
   const totalClient = calcHook.projectStats?.client?.base + calcHook.projectStats?.client?.option || 0;
   const totalStudy  = calcHook.projectStats?.study?.base + calcHook.projectStats?.study?.option || 0;
   const nbTranches  = (project.tranches || []).length;
@@ -19,6 +22,7 @@ export default function ProjectDetail({ project, projectMeta, calcHook, onNaviga
     ...(hasRAO ? [{ key: 'rao', icon: 'chart', label: 'Analyse des Offres', desc: `${analysisCompanies.length} entreprise${analysisCompanies.length !== 1 ? 's' : ''}` }] : []),
     ...((project.sharepointPlans?.length > 0 || project.sharepointUrl) ? [{ key: 'plans', icon: 'map', label: 'Plans', desc: `${project.sharepointPlans?.length || 1} dossier${(project.sharepointPlans?.length || 1) > 1 ? 's' : ''} SharePoint` }] : []),
     ...(projectMeta?.hasCrc ? [{ key: 'crc', icon: 'clipboard', label: 'Comptes Rendus', desc: `${projectMeta.crcCount} CR lié${projectMeta.crcCount > 1 ? 's' : ''} à cette affaire` }] : []),
+    ...(archives.length > 0 ? [{ key: 'versions', icon: 'layers', label: 'Documents émis', desc: `${archives.length} version${archives.length > 1 ? 's' : ''} figée${archives.length > 1 ? 's' : ''}` }] : []),
     { key: 'exports', icon: 'download', label: 'Exports', desc: 'PDF, Excel, partage' },
   ];
 
@@ -27,8 +31,11 @@ export default function ProjectDetail({ project, projectMeta, calcHook, onNaviga
       {/* Summary */}
       <div className="mx-4 mt-2 mb-3 p-4 bg-white rounded-2xl border border-gray-200 shadow-sm">
         <div className="flex justify-between items-center mb-2">
-          {project.client && <span className="text-xs text-gray-700 font-semibold">{project.client}</span>}
-          <span className="text-xs text-gray-600">{dateFr(project.lastSaved)}</span>
+          <div className="flex items-center gap-2 min-w-0">
+            {project.client && <span className="text-xs text-gray-700 font-semibold truncate">{project.client}</span>}
+            <MobilePhaseBadge project={project} />
+          </div>
+          <span className="text-xs text-gray-600 shrink-0">{dateFr(project.lastSaved)}</span>
         </div>
         <div className="flex justify-between items-baseline">
           <div>
@@ -53,6 +60,9 @@ export default function ProjectDetail({ project, projectMeta, calcHook, onNaviga
           {project.hasPSE && <span className="text-amber-600 font-bold">PSE</span>}
         </div>
       </div>
+
+      {/* Cycle de vie (frise lecture seule) */}
+      <MobileLifecycle project={project} archives={archives} />
 
       {/* Menu */}
       <div className={`px-4 ${isLandscape ? 'grid grid-cols-2 gap-2' : ''}`}>

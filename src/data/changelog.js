@@ -2,11 +2,11 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.10.0';
+export const APP_VERSION = '2.10.1';
 
 export const CHANGELOG = [
   {
-    version: '2.10.0',
+    version: '2.10.1',
     date: '2026-06-01',
     title: 'GED « Documents émis » : versions figées & cycle de vie de l\'affaire',
     highlights: [
@@ -20,6 +20,7 @@ export const CHANGELOG = [
       'Bouton « Clôturer la phase & passer à la suivante » : fige la version officielle de fin de phase puis fait avancer l\'affaire dans la phase suivante, en un seul geste',
       'Mini-frise des phases cliquable dans l\'en-tête du projet : un coup d\'œil sur l\'avancement, un clic pour ouvrir les documents émis',
       'Audit comparatif enrichi : décomposition de chaque écart en « effet quantité » et « effet prix », cascade visuelle de l\'écart total (ajouts / suppressions / quantité / prix), articles triés par impact avec recherche, comparaison tranche par tranche, et export de l\'audit en PDF ou Excel',
+      'Sur mobile : la phase courante s\'affiche en badge coloré sur chaque projet, la frise « Cycle de vie » apparaît dans le détail du projet, et un écran « Documents émis » permet de consulter les versions figées (lecture seule)',
     ],
   },
   {
