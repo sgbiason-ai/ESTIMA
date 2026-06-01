@@ -169,3 +169,91 @@ describe('buildComparison', () => {
     expect(cmp.totalDiffPct).toBe(0);
   });
 });
+
+describe('décomposition qté/prix (computeItemDiff)', () => {
+  it('sépare effet quantité et effet prix, somme = écart total', () => {
+    // source : 10 × 100 = 1000 ; cible : 12 × 110 = 1320 ; écart = 320
+    const src = analyzeChapters([chapter('C', [item({ uid: 'A', qty: 10, price: 100 })])]);
+    const tgt = analyzeChapters([chapter('C', [item({ uid: 'A', qty: 12, price: 110 })])]);
+    const { changed } = computeItemDiff(src, tgt);
+    expect(changed).toHaveLength(1);
+    const c = changed[0];
+    // effet qté = (12-10)*100 = 200 ; effet prix = (110-100)*12 = 120
+    expect(c.qtyEffect).toBe(200);
+    expect(c.priceEffect).toBe(120);
+    expect(c.qtyEffect + c.priceEffect).toBe(c.diff);
+    expect(c.diff).toBe(320);
+    expect(c.qtyChanged).toBe(true);
+    expect(c.priceChanged).toBe(true);
+  });
+
+  it('changement de prix seul : effet quantité nul', () => {
+    const src = analyzeChapters([chapter('C', [item({ uid: 'A', qty: 5, price: 100 })])]);
+    const tgt = analyzeChapters([chapter('C', [item({ uid: 'A', qty: 5, price: 120 })])]);
+    const c = computeItemDiff(src, tgt).changed[0];
+    expect(c.qtyEffect).toBe(0);
+    expect(c.priceEffect).toBe(100);
+    expect(c.qtyChanged).toBe(false);
+    expect(c.priceChanged).toBe(true);
+  });
+});
+
+describe('waterfall + tri par impact (buildComparison)', () => {
+  const src = [
+    chapter('C', [
+      item({ uid: 'A', qty: 10, price: 100 }), // 1000
+      item({ uid: 'B', qty: 1, price: 500 }),  // 500 (sera supprimé)
+      item({ uid: 'C', qty: 2, price: 50 }),   // 100
+    ]),
+  ];
+  const tgt = [
+    chapter('C', [
+      item({ uid: 'A', qty: 12, price: 100 }), // 1200 (+200)
+      item({ uid: 'C', qty: 2, price: 80 }),   // 160 (+60)
+      item({ uid: 'D', qty: 1, price: 300 }),  // 300 (ajouté)
+    ]),
+  ];
+
+  it('waterfall : start + added + removed + changed = end', () => {
+    const { waterfall } = buildComparison(src, tgt);
+    expect(waterfall.start).toBe(1600);
+    expect(waterfall.added).toBe(300);
+    expect(waterfall.removed).toBe(-500);
+    expect(waterfall.changed).toBe(260); // +200 (A) +60 (C)
+    expect(waterfall.start + waterfall.added + waterfall.removed + waterfall.changed)
+      .toBe(waterfall.end);
+    expect(waterfall.end).toBe(1660);
+  });
+
+  it('waterfall : qtyEffect + priceEffect = changed', () => {
+    const { waterfall } = buildComparison(src, tgt);
+    // A : Δqté → 200 ; C : Δprix → (80-50)*2 = 60
+    expect(waterfall.qtyEffect).toBe(200);
+    expect(waterfall.priceEffect).toBe(60);
+    expect(waterfall.qtyEffect + waterfall.priceEffect).toBe(waterfall.changed);
+  });
+
+  it('changedByImpact trié par écart absolu décroissant', () => {
+    const { items } = buildComparison(src, tgt);
+    const impacts = items.changedByImpact.map((c) => Math.abs(c.diff));
+    expect(impacts).toEqual([...impacts].sort((a, b) => b - a));
+    expect(items.changedByImpact[0].source.uid).toBe('A'); // +200 en tête
+  });
+});
+
+describe('analyzeChapters avec qtyMap (tranches)', () => {
+  it('utilise les quantités de la map au lieu de node.qty', () => {
+    const chapters = [chapter('C', [item({ id: 'i1', uid: 'A', qty: 0, price: 100 })])];
+    const res = analyzeChapters(chapters, { i1: 7 });
+    expect(res.totalHT).toBe(700);
+    expect(res.items[0].qty).toBe(7);
+  });
+
+  it('buildComparison compare deux tranches via maps', () => {
+    const chapters = [chapter('C', [item({ id: 'i1', uid: 'A', qty: 0, price: 100 })])];
+    const cmp = buildComparison(chapters, chapters, { sourceQtyMap: { i1: 5 }, targetQtyMap: { i1: 8 } });
+    expect(cmp.source.totalHT).toBe(500);
+    expect(cmp.target.totalHT).toBe(800);
+    expect(cmp.totalDiff).toBe(300);
+  });
+});

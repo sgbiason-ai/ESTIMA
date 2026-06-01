@@ -19,6 +19,7 @@ export const CHANGELOG = [
       'Frise « Cycle de vie » dans les Documents émis : visualisation de la progression du projet, avec pour chaque phase franchie son indice figé, son montant et sa date',
       'Bouton « Clôturer la phase & passer à la suivante » : fige la version officielle de fin de phase puis fait avancer l\'affaire dans la phase suivante, en un seul geste',
       'Mini-frise des phases cliquable dans l\'en-tête du projet : un coup d\'œil sur l\'avancement, un clic pour ouvrir les documents émis',
+      'Audit comparatif enrichi : décomposition de chaque écart en « effet quantité » et « effet prix », cascade visuelle de l\'écart total (ajouts / suppressions / quantité / prix), articles triés par impact avec recherche, comparaison tranche par tranche, et export de l\'audit en PDF ou Excel',
     ],
   },
   {

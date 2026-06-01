@@ -21,6 +21,17 @@ const flattenItems = (chapters) => {
   return items;
 };
 
+// Quantités d'ÉTUDE par tranche d'un projet/snapshot (pour l'audit comparatif).
+// Retourne { studyQtyMaps, tranches, hasTranches }.
+export const resolveStudyQtyMaps = (project) => {
+  const tranches = project?.tranches || [];
+  const hasTranches = tranches.length > 0;
+  const clientPercent = Number(project?.clientPercent ?? 10);
+  const items = flattenItems(project?.chapters);
+  const { studyQtyMaps } = computeQtyMaps(items, hasTranches, tranches, clientPercent);
+  return { studyQtyMaps, tranches, hasTranches };
+};
+
 // Construit le contexte d'export depuis un snapshot figé.
 const buildExportContext = (snapshot) => {
   const tranches = snapshot?.tranches || [];

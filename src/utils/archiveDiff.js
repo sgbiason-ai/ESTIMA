@@ -38,22 +38,39 @@ export const countChapterItems = (node) => {
   return count;
 };
 
+// ─── Total d'un chapitre avec quantités résolues (tranche) ───────────
+const chapterTotalWithQty = (node, qtyOf) => {
+  let total = 0;
+  const walk = (nodes) => {
+    (nodes || []).forEach((n) => {
+      if (n.type === 'item' && !n.isOption) total += qtyOf(n) * (Number(n.price) || 0);
+      if (n.children) walk(n.children);
+    });
+  };
+  walk(node.children);
+  return total;
+};
+
 // ─── Analyse d'un snapshot ───────────────────────────────────────────
 // Aplatit l'arbre du projet en listes exploitables pour la comparaison.
+// qtyMap (optionnel) : { [itemId]: qty } — quantités résolues d'une tranche.
+//   Si absent, on lit node.qty (mode global / sans tranche).
 // Retourne { chapters, items, totalHT, itemCount }.
-export const analyzeChapters = (chapters) => {
+export const analyzeChapters = (chapters, qtyMap = null) => {
   const result = { chapters: [], items: [], totalHT: 0, itemCount: 0 };
+  const qtyOf = (node) => (qtyMap ? Number(qtyMap[node.id] || 0) : Number(node.qty) || 0);
 
   const walk = (nodes, path = '') => {
     (nodes || []).forEach((node) => {
       if (node.type === 'item') {
-        const amount = (Number(node.qty) || 0) * (Number(node.price) || 0);
+        const qty = qtyOf(node);
+        const amount = qty * (Number(node.price) || 0);
         result.items.push({
           id: node.id,
           uid: node.uid || node.bpuNum || '',
           designation: node.designation || '',
           unit: node.unit || '',
-          qty: Number(node.qty) || 0,
+          qty,
           price: Number(node.price) || 0,
           amount,
           path,
@@ -67,7 +84,7 @@ export const analyzeChapters = (chapters) => {
         result.chapters.push({
           id: node.id,
           title: node.title || 'Sans titre',
-          total: computeChapterTotal(node),
+          total: chapterTotalWithQty(node, qtyOf),
           itemCount: countChapterItems(node),
           path,
         });
@@ -106,7 +123,21 @@ export const computeItemDiff = (sourceData, targetData) => {
     if (!sItem) {
       added.push(tItem);
     } else if (sItem.qty !== tItem.qty || sItem.price !== tItem.price) {
-      changed.push({ source: sItem, target: tItem, diff: tItem.amount - sItem.amount });
+      // Décomposition de l'écart (analyse de variance) :
+      //   effet quantité = Δqté × prix_source
+      //   effet prix     = Δprix × qté_cible
+      //   qtyEffect + priceEffect = écart total (exact).
+      const qtyEffect = (tItem.qty - sItem.qty) * sItem.price;
+      const priceEffect = (tItem.price - sItem.price) * tItem.qty;
+      changed.push({
+        source: sItem,
+        target: tItem,
+        diff: tItem.amount - sItem.amount,
+        qtyEffect,
+        priceEffect,
+        qtyChanged: sItem.qty !== tItem.qty,
+        priceChanged: sItem.price !== tItem.price,
+      });
     }
   });
 
@@ -136,21 +167,45 @@ export const mergeChapters = (sourceChapters, targetChapters) => {
 // ─── Synthèse complète d'une comparaison ─────────────────────────────
 // Point d'entrée haut niveau : prend deux jeux de chapitres bruts et
 // retourne tout ce qu'il faut pour afficher un audit.
-export const buildComparison = (sourceChapters, targetChapters) => {
-  const source = analyzeChapters(sourceChapters);
-  const target = analyzeChapters(targetChapters);
+// opts.sourceQtyMap / opts.targetQtyMap : quantités résolues d'une tranche
+//   (pour comparer tranche par tranche ; sinon lecture de node.qty / global).
+export const buildComparison = (sourceChapters, targetChapters, opts = {}) => {
+  const source = analyzeChapters(sourceChapters, opts.sourceQtyMap || null);
+  const target = analyzeChapters(targetChapters, opts.targetQtyMap || null);
   const items = computeItemDiff(source, target);
   const chapters = mergeChapters(source.chapters, target.chapters);
   const totalDiff = target.totalHT - source.totalHT;
   const totalDiffPct = source.totalHT ? (totalDiff / source.totalHT) * 100 : 0;
 
+  // Contribution de chaque type de mouvement à l'écart total (waterfall).
+  const sum = (arr, f) => arr.reduce((s, x) => s + f(x), 0);
+  const addedTotal = sum(items.added.filter((i) => !i.isOption), (i) => i.amount);
+  const removedTotal = -sum(items.removed.filter((i) => !i.isOption), (i) => i.amount);
+  const changedTotal = sum(items.changed.filter((c) => !c.target.isOption), (c) => c.diff);
+  const qtyEffectTotal = sum(items.changed.filter((c) => !c.target.isOption), (c) => c.qtyEffect);
+  const priceEffectTotal = sum(items.changed.filter((c) => !c.target.isOption), (c) => c.priceEffect);
+
+  // Articles modifiés triés par impact absolu décroissant (plus gros postes en tête).
+  const changedByImpact = [...items.changed].sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+
+  const waterfall = {
+    start: source.totalHT,
+    added: addedTotal,
+    removed: removedTotal,
+    changed: changedTotal,
+    qtyEffect: qtyEffectTotal,
+    priceEffect: priceEffectTotal,
+    end: target.totalHT,
+  };
+
   return {
     source,
     target,
-    items,
+    items: { ...items, changedByImpact },
     chapters,
     totalDiff,
     totalDiffPct,
+    waterfall,
     hasChanges:
       items.added.length > 0 || items.removed.length > 0 || items.changed.length > 0,
   };
