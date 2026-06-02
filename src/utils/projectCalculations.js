@@ -361,6 +361,112 @@ export function buildRefMap(chapters, bpuConfig = {}) {
   return map;
 }
 
+// ─── VÉRIFICATION D'UNICITÉ DES NUMÉROS DE PRIX ───────────────────────────────
+
+/**
+ * Vérifie la cohérence des numéros de prix sur tout le projet.
+ * Règle métier : un même numéro de prix (P.xx ou n° manuel) doit porter
+ * partout le même libellé (désignation) ET la même unité.
+ *
+ * Détecte deux familles d'anomalies :
+ *   A. numberConflicts  — un même numéro porte des libellés et/ou unités divergents.
+ *   B. duplicateNumbers — un même couple (libellé + unité) apparaît sous plusieurs
+ *                         numéros différents (article en double non fusionné).
+ *
+ * Comparaison insensible à la casse et aux espaces superflus ; les valeurs
+ * affichées restent les valeurs réelles saisies. Pure : aucune dépendance React.
+ *
+ * @returns {{ totalItems, numberConflicts[], duplicateNumbers[], ok }}
+ */
+export function checkPriceConsistency(chapters, bpuConfig = {}) {
+  const refMap = buildRefMap(chapters, bpuConfig);
+
+  const normD = (s) => (s || '').trim().replace(/\s+/g, ' ').toUpperCase();
+  const normU = (s) => (s || '').trim().toUpperCase();
+
+  const items = [];
+  const walk = (nodes, path = []) => {
+    if (!Array.isArray(nodes)) return;
+    nodes.forEach((node) => {
+      if (!node) return;
+      if (node.type === 'item') {
+        items.push({
+          id: node.id,
+          ref: refMap.get(node.id) || '—',
+          designation: (node.designation || '').trim(),
+          unit: (node.unit || '').trim(),
+          price: Number(node.price || 0),
+          path: path.slice(),
+        });
+      }
+      if (node.children) {
+        const label = node.title || node.designation || 'Chapitre';
+        walk(node.children, [...path, label]);
+      }
+    });
+  };
+  walk(chapters || []);
+
+  // ── A. Même numéro → libellé / unité divergents ──
+  const byRef = new Map();
+  items.forEach((it) => {
+    if (!byRef.has(it.ref)) byRef.set(it.ref, []);
+    byRef.get(it.ref).push(it);
+  });
+  const numberConflicts = [];
+  byRef.forEach((group, ref) => {
+    if (group.length < 2) return;
+    const desigSet = new Set(group.map((g) => normD(g.designation)));
+    const unitSet = new Set(group.map((g) => normU(g.unit)));
+    if (desigSet.size > 1 || unitSet.size > 1) {
+      numberConflicts.push({
+        ref,
+        divergesOn: [
+          desigSet.size > 1 ? 'libellé' : null,
+          unitSet.size > 1 ? 'unité' : null,
+        ].filter(Boolean),
+        items: group,
+      });
+    }
+  });
+
+  // ── B. Même libellé + unité → numéros différents ──
+  const byContent = new Map();
+  items.forEach((it) => {
+    if (!it.designation) return; // on ignore les lignes sans libellé
+    const key = `${normD(it.designation)}|||${normU(it.unit)}`;
+    if (!byContent.has(key)) byContent.set(key, { items: [], refs: new Set() });
+    const entry = byContent.get(key);
+    entry.items.push(it);
+    entry.refs.add(it.ref);
+  });
+  const duplicateNumbers = [];
+  byContent.forEach((entry) => {
+    if (entry.refs.size > 1) {
+      duplicateNumbers.push({
+        designation: entry.items[0].designation,
+        unit: entry.items[0].unit,
+        refs: [...entry.refs],
+        items: entry.items,
+      });
+    }
+  });
+
+  // ── IDs de toutes les lignes en anomalie (pastille par ligne) ──
+  const flagged = new Set();
+  numberConflicts.forEach((c) => c.items.forEach((it) => flagged.add(it.id)));
+  duplicateNumbers.forEach((d) => d.items.forEach((it) => flagged.add(it.id)));
+
+  return {
+    totalItems: items.length,
+    numberConflicts,
+    duplicateNumbers,
+    flaggedItemIds: [...flagged],
+    anomalyCount: numberConflicts.length + duplicateNumbers.length,
+    ok: numberConflicts.length === 0 && duplicateNumbers.length === 0,
+  };
+}
+
 // ─── MAPS DE QUANTITÉS ────────────────────────────────────────────────────────
 
 /**

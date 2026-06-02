@@ -11,6 +11,7 @@ import {
   computePriceScore,
   detectAtypicalPrice,
   buildRefMap,
+  checkPriceConsistency,
 } from '../utils/projectCalculations';
 
 // ── calculateSafeClientQty ─────────────────────────────────────────────────
@@ -387,5 +388,85 @@ describe('buildRefMap', () => {
 
   it('défaut (config vide) = mode auto', () => {
     expect(buildRefMap(chapters, {}).get('i1')).toBe('P.1');
+  });
+});
+
+// ── checkPriceConsistency ───────────────────────────────────────────────────
+describe('checkPriceConsistency', () => {
+  const wrap = (items) => [{ type: 'chapter', id: 'c1', title: 'Chap', children: items }];
+
+  it('projet cohérent → ok, aucune anomalie', () => {
+    // Même uid → même numéro, contenu identique
+    const r = checkPriceConsistency(wrap([
+      { type: 'item', id: 'i1', uid: 'A', designation: 'Déblai', unit: 'm3', price: 10 },
+      { type: 'item', id: 'i2', uid: 'A', designation: 'Déblai', unit: 'm3', price: 10 },
+    ]), { numberingMode: 'auto' });
+    expect(r.ok).toBe(true);
+    expect(r.numberConflicts).toHaveLength(0);
+    expect(r.duplicateNumbers).toHaveLength(0);
+    expect(r.totalItems).toBe(2);
+    expect(r.anomalyCount).toBe(0);
+    expect(r.flaggedItemIds).toHaveLength(0);
+  });
+
+  it('même numéro, libellés divergents → conflit (libellé)', () => {
+    const r = checkPriceConsistency(wrap([
+      { type: 'item', id: 'i1', uid: 'A', designation: 'Déblai', unit: 'm3', price: 10 },
+      { type: 'item', id: 'i2', uid: 'A', designation: 'Remblai', unit: 'm3', price: 10 },
+    ]), { numberingMode: 'auto' });
+    expect(r.ok).toBe(false);
+    expect(r.numberConflicts).toHaveLength(1);
+    expect(r.numberConflicts[0].ref).toBe('P.1');
+    expect(r.numberConflicts[0].divergesOn).toContain('libellé');
+    expect(r.numberConflicts[0].items).toHaveLength(2);
+    expect(r.anomalyCount).toBe(1);
+    expect([...r.flaggedItemIds].sort()).toEqual(['i1', 'i2']);
+  });
+
+  it('même numéro, unités divergentes → conflit (unité)', () => {
+    const r = checkPriceConsistency(wrap([
+      { type: 'item', id: 'i1', uid: 'A', designation: 'Déblai', unit: 'm3', price: 10 },
+      { type: 'item', id: 'i2', uid: 'A', designation: 'Déblai', unit: 'm2', price: 10 },
+    ]), { numberingMode: 'auto' });
+    expect(r.numberConflicts).toHaveLength(1);
+    expect(r.numberConflicts[0].divergesOn).toEqual(['unité']);
+  });
+
+  it('même libellé + unité sous deux numéros → doublon', () => {
+    const r = checkPriceConsistency(wrap([
+      { type: 'item', id: 'i1', uid: 'A', designation: 'Déblai', unit: 'm3', price: 10 },
+      { type: 'item', id: 'i2', uid: 'B', designation: 'Déblai', unit: 'm3', price: 10 },
+    ]), { numberingMode: 'auto' });
+    expect(r.numberConflicts).toHaveLength(0);
+    expect(r.duplicateNumbers).toHaveLength(1);
+    expect(r.duplicateNumbers[0].refs.sort()).toEqual(['P.1', 'P.2']);
+    expect(r.duplicateNumbers[0].items).toHaveLength(2);
+    expect([...r.flaggedItemIds].sort()).toEqual(['i1', 'i2']);
+  });
+
+  it('comparaison insensible à la casse et aux espaces', () => {
+    const r = checkPriceConsistency(wrap([
+      { type: 'item', id: 'i1', uid: 'A', designation: 'Déblai', unit: 'm3', price: 10 },
+      { type: 'item', id: 'i2', uid: 'A', designation: '  déblai  ', unit: 'M3', price: 10 },
+    ]), { numberingMode: 'auto' });
+    expect(r.ok).toBe(true);
+  });
+
+  it('ignore les lignes sans libellé pour les doublons', () => {
+    const r = checkPriceConsistency(wrap([
+      { type: 'item', id: 'i1', uid: 'A', designation: '', unit: 'm3', price: 10 },
+      { type: 'item', id: 'i2', uid: 'B', designation: '', unit: 'm3', price: 10 },
+    ]), { numberingMode: 'auto' });
+    expect(r.ok).toBe(true);
+    expect(r.duplicateNumbers).toHaveLength(0);
+  });
+
+  it('mode manuel : même n° saisi sur contenus différents → conflit', () => {
+    const r = checkPriceConsistency(wrap([
+      { type: 'item', id: 'i1', uid: 'A', bpuNum: '201', designation: 'Déblai', unit: 'm3', price: 10 },
+      { type: 'item', id: 'i2', uid: 'B', bpuNum: '201', designation: 'Remblai', unit: 'm3', price: 20 },
+    ]), { numberingMode: 'manual' });
+    expect(r.numberConflicts).toHaveLength(1);
+    expect(r.numberConflicts[0].ref).toBe('201');
   });
 });

@@ -1,9 +1,9 @@
 // src/views/ProjectView.jsx
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { useStableHash } from '../hooks/useStableHash';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { Plus, Trash2, GripVertical, Layers, HelpCircle } from 'lucide-react';
+import { Plus, Trash2, GripVertical, Layers, HelpCircle, AlertTriangle } from 'lucide-react';
 
 import { ProjectContext } from '../context/ProjectContext';
 import { EditableTitle, OptionToggle } from '../components/ProjectUI';
@@ -26,12 +26,14 @@ import ProjectFormulaBar from '../components/project/ProjectFormulaBar';
 import FormulaHelpModal from '../components/modals/FormulaHelpModal';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import PriceAuditModal from '../components/modals/PriceAuditModal';
+import PriceConsistencyModal from '../components/modals/PriceConsistencyModal';
 import CloudProjectPicker from '../components/modals/CloudProjectPicker';
 import BpuAuditPanel from './bpu/BpuAuditPanel';
 
 // NOS CUSTOM HOOKS
 import { useProjectTranches } from '../hooks/useProjectTranches';
 import { useProjectCalculations } from '../hooks/useProjectCalculations';
+import { checkPriceConsistency } from '../utils/projectCalculations';
 import { useBpuData } from './bpu/hooks/useBpuData';
 import { useBpuAudit } from './bpu/hooks/useBpuAudit';
 import { saveFileWithPicker, openFileWithPicker, FILE_TYPES, PICKER_IDS } from '../utils/fileSaver';
@@ -84,6 +86,7 @@ const ProjectView = ({
   const viewedProject = project;
 
   const [showPriceAudit, setShowPriceAudit] = useState(false);
+  const [showPriceCheck, setShowPriceCheck] = useState(false);
   const [showCloudPicker, setShowCloudPicker] = useState(false);
   const [showBpuAudit, setShowBpuAudit] = useState(false);
 
@@ -112,6 +115,19 @@ const ProjectView = ({
   });
 
   // ── Handlers Audit Prix ──
+  // Aller à une ligne d'article : scroll + surbrillance temporaire (réutilise .rao-highlight-pulse)
+  const goToItem = useCallback((itemId) => {
+    if (!itemId) return;
+    // Laisse la modale se fermer avant de scroller
+    setTimeout(() => {
+      const el = document.getElementById(`estima-item-${itemId}`);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('rao-highlight-pulse');
+      setTimeout(() => el.classList.remove('rao-highlight-pulse'), 2000);
+    }, 80);
+  }, []);
+
   const handleRestorePrice = (itemId, bpuPrice) => {
     if (bpuPrice == null) return;
     // Trouver le parentId de l'item
@@ -152,6 +168,7 @@ const ProjectView = ({
   const [showCalculationModal, setShowCalculationModal] = useState(false);
   const [editItemTarget, setEditItemTarget] = useState(null); 
   const [exportModalState, setExportModalState] = useState({ show: false, format: 'pdf', type: 'ESTIMATION' });
+  const [exportGuard, setExportGuard] = useState({ show: false, format: 'pdf', type: 'ESTIMATION' });
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, itemId: null });
   const [showFormulaHelp, setShowFormulaHelp] = useState(false);
   const [calculationAnalysis, setCalculationAnalysis] = useState({ totalStudy: 0, fixedTotal: 0, smallQtyTotal: 0 });
@@ -620,12 +637,19 @@ const ProjectView = ({
     setEditItemTarget(null);
   };
 
+  // ── Contrôle d'unicité des numéros de prix, recalculé en continu (pur, instantané) ──
+  const priceCheck = useMemo(
+    () => checkPriceConsistency(displayProject?.chapters || [], bpuConfig),
+    [displayProject, bpuConfig]
+  );
+  const priceIssueIds = useMemo(() => new Set(priceCheck.flaggedItemIds), [priceCheck]);
+
   const contextValue = {
       selection, setSelection, updateProjectItem: handleUpdateItem, removeProjectItem: handleRemoveItem,
       setModal: handleModalIntercept, addSubChapter, refMap, viewMode: currentMode, showComparison,
       clientQtyMap, activeTrancheId, isGlobalMode, bpuConfig, onOpenCalculation: handleOpenCalculation,
       formulaMode, setFormulaMode, allItems, sourceIds: project?.sourceIds || [],
-      multiSelection, toggleMultiSelection,
+      multiSelection, toggleMultiSelection, priceIssueIds,
       onEditItem: (item) => {
         const bpuSource = allBpuItems?.find(b => String(b.id) === String(item?.uid) || String(b.uid) === String(item?.uid));
         setEditItemTarget({
@@ -662,7 +686,10 @@ const ProjectView = ({
             project={project} updateProjectName={updateProjectName} saveStatus={saveStatus} onSaveProject={handleManualCloudSave}
             isReadOnly={isReadOnly} showBpu={showBpu} setShowBpu={setShowBpu} currentMode={currentMode} setViewMode={setViewMode}
             showComparison={showComparison} setShowComparison={setShowComparison} totalBase={totalBase} activeTrancheId={activeTrancheId}
-            onExport={(format, type) => setExportModalState({ show: true, format, type })} 
+            onExport={(format, type) => {
+              if (priceCheck.anomalyCount > 0) setExportGuard({ show: true, format, type });
+              else setExportModalState({ show: true, format, type });
+            }}
             onOpenCalculation={handleOpenCalculation} onOpenDetails={() => setShowDetailsModal(true)} onAddChapter={addChapter}
             bpuConfig={bpuConfig} setBpuConfig={setBpuConfig}
             onSaveAffaire={handleSaveAffaire}
@@ -670,6 +697,8 @@ const ProjectView = ({
             onNewProject={handleNewProject}
             onOpenCloudProject={() => setShowCloudPicker(v => !v)}
             onOpenPriceAudit={() => setShowPriceAudit(true)}
+            onOpenPriceCheck={() => setShowPriceCheck(true)}
+            priceCheckCount={priceCheck.anomalyCount}
             onOpenBpuAudit={() => { refreshBpuAudit(); setShowBpuAudit(v => !v); }}
             bpuAuditActive={showBpuAudit}
             onUndo={onUndo}
@@ -800,6 +829,49 @@ const ProjectView = ({
         onRestorePrice={handleRestorePrice}
         onRestoreAllPrices={handleRestoreAllPrices}
       />
+      <PriceConsistencyModal
+        show={showPriceCheck}
+        onClose={() => setShowPriceCheck(false)}
+        project={displayProject}
+        bpuConfig={bpuConfig}
+        onGoToItem={goToItem}
+      />
+
+      {/* Garde à l'export : avertir si des numéros de prix sont incohérents */}
+      {exportGuard.show && (
+        <div className="fixed inset-0 z-modal-stack flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl w-[440px] border border-slate-200 p-6">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                <AlertTriangle size={20} className="text-amber-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-800">Numéros de prix incohérents</h3>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  {priceCheck.anomalyCount} anomalie{priceCheck.anomalyCount > 1 ? 's' : ''} détectée{priceCheck.anomalyCount > 1 ? 's' : ''} sur la numérotation des prix.
+                </p>
+              </div>
+            </div>
+            <p className="text-[11px] text-slate-600 bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+              Le document exporté reprendra ces incohérences (un même numéro avec des libellés / unités différents, ou des doublons). Souhaitez-vous corriger avant d'exporter ?
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => { const { format, type } = exportGuard; setExportGuard(g => ({ ...g, show: false })); setExportModalState({ show: true, format, type }); }}
+                className="px-4 py-2 text-[11px] font-bold uppercase tracking-wide border border-slate-300 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"
+              >
+                Exporter quand même
+              </button>
+              <button
+                onClick={() => { setExportGuard(g => ({ ...g, show: false })); setShowPriceCheck(true); }}
+                className="px-4 py-2 text-[11px] font-bold uppercase tracking-wide bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors shadow-sm"
+              >
+                Corriger d'abord
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {!isReadOnly && (
         <button onClick={() => setShowFormulaHelp(true)} className="fixed bottom-20 right-6 z-[9000] flex items-center gap-2 px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 group">

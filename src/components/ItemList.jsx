@@ -1,7 +1,7 @@
 // src/components/ItemList.jsx
 import React, { useContext, memo, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Draggable, Droppable } from '@hello-pangea/dnd'; 
-import { GripVertical, Layers, Trash2, Plus, ShieldCheck, AlertCircle, FunctionSquare, Check } from 'lucide-react';
+import { GripVertical, Layers, Trash2, Plus, ShieldCheck, AlertCircle, AlertTriangle, FunctionSquare, Check } from 'lucide-react';
 
 import { ProjectContext } from '../context/ProjectContext';
 import { EditableTitle, FormattedInput, OptionToggle } from './ProjectUI';
@@ -255,6 +255,7 @@ const ItemRow = memo(
     isMultiSelected,
     hasMultiSelection,
     onToggleMultiSelection,
+    priceIssue,
   }) => {
     const draggableId = `item:${stableKey}`;
 
@@ -335,6 +336,7 @@ const ItemRow = memo(
           <div
             ref={provided.innerRef}
             {...provided.draggableProps}
+            id={`estima-item-${el.id}`}
             className={`group flex items-center border-b border-slate-100 py-1 outline-none transition-colors
               ${isMultiSelected ? 'bg-red-50/60 ring-1 ring-inset ring-red-200' : isSelected ? 'bg-emerald-50 ring-1 ring-inset ring-emerald-200' : 'bg-white'}
               ${hasFormula && !isSelected && !isMultiSelected ? 'bg-emerald-50/30' : ''}
@@ -392,7 +394,15 @@ const ItemRow = memo(
             </div>
 
             {/* Numéro / Ref */}
-            <div className="w-16 flex items-center justify-center shrink-0">
+            <div className="w-16 flex items-center justify-center gap-1 shrink-0">
+              {priceIssue && (
+                <span
+                  title="Incohérence de numéro de prix : ce numéro porte un libellé / une unité différent ailleurs, ou cet article existe sous un autre numéro. Voir « Vérif. n° prix »."
+                  className="shrink-0 text-amber-500"
+                >
+                  <AlertTriangle size={12} strokeWidth={2.2} />
+                </span>
+              )}
               {bpuConfig?.numberingMode === 'manual' ? (
                 el.bpuNum ? (
                   <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-1.5 rounded">{el.bpuNum}</span>
@@ -628,6 +638,7 @@ const ItemList = ({ items, parentId, level = 0, bpuConfig }) => {
     formulaMode, setFormulaMode, activeTrancheId, sourceIds, allItems,
     onEditItem,
     multiSelection, toggleMultiSelection,
+    priceIssueIds,
   } = useContext(ProjectContext);
 
   const hasMultiSelection = multiSelection && multiSelection.size > 0;
@@ -678,6 +689,7 @@ const ItemList = ({ items, parentId, level = 0, bpuConfig }) => {
           isMultiSelected={multiSelection?.has(el.id) || false}
           hasMultiSelection={hasMultiSelection}
           onToggleMultiSelection={toggleMultiSelection}
+          priceIssue={priceIssueIds?.has(el.id) || false}
         />
       );
     }

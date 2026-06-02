@@ -5,7 +5,7 @@ import {
   CheckCircle2, CloudOff, FileSignature, Bookmark, ListOrdered, Hash,
   FolderOpen, Save, Upload, Eye, Pencil, PlusCircle,
   BarChart3, Download, Info, Table2, FileOutput,
-  Cloud, PanelLeftOpen, FileDown, ShieldCheck, ClipboardCheck, Undo2
+  Cloud, PanelLeftOpen, FileDown, ShieldCheck, ClipboardCheck, Undo2, ScanSearch
 } from 'lucide-react';
 
 import { RibbonGroup, RibbonBtnLarge, RibbonBtnSmall } from './common/RibbonParts';
@@ -37,6 +37,8 @@ const ProjectToolbar = ({
   onNewProject,
   onOpenCloudProject,
   onOpenPriceAudit,
+  onOpenPriceCheck,
+  priceCheckCount = 0,
   onOpenBpuAudit,
   bpuAuditActive = false,
   onUndo,
@@ -202,6 +204,18 @@ const ProjectToolbar = ({
                   onClick={onOpenPriceAudit}
                   accent="text-amber-500"
                   title="Auditer les prix du projet vs la base BPU"
+                />
+              )}
+              {!isReadOnly && onOpenPriceCheck && (
+                <RibbonBtnLarge
+                  icon={ScanSearch}
+                  label={'Vérif. n° prix'}
+                  onClick={onOpenPriceCheck}
+                  accent={priceCheckCount > 0 ? 'text-red-500' : 'text-violet-500'}
+                  badge={priceCheckCount}
+                  title={priceCheckCount > 0
+                    ? `${priceCheckCount} anomalie(s) de numérotation détectée(s) — cliquez pour le détail`
+                    : "Vérifier l'unicité des numéros de prix (même libellé et même unité partout)"}
                 />
               )}
               {!isReadOnly && currentMode === 'study' && onOpenBpuAudit && (

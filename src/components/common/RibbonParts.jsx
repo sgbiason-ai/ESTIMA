@@ -33,7 +33,7 @@ export const RibbonGroup = ({ label, children, className = '', noBorder }) => {
 };
 
 // ─── Bouton large : icône 22px + texte dessous ─────────────────────
-export const RibbonBtnLarge = ({ icon: Icon, label, onClick, title, active, accent, disabled }) => {
+export const RibbonBtnLarge = ({ icon: Icon, label, onClick, title, active, accent, disabled, badge = 0 }) => {
   const dark = useContext(RibbonThemeCtx);
   return (
     <button
@@ -41,7 +41,7 @@ export const RibbonBtnLarge = ({ icon: Icon, label, onClick, title, active, acce
       disabled={disabled}
       title={title || (typeof label === 'string' ? label : '')}
       className={`
-        group flex flex-col items-center justify-center gap-1 px-3 py-1.5 rounded min-w-[52px]
+        group relative flex flex-col items-center justify-center gap-1 px-3 py-1.5 rounded min-w-[52px]
         transition-all duration-100
         ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-default'}
         ${dark
@@ -54,6 +54,11 @@ export const RibbonBtnLarge = ({ icon: Icon, label, onClick, title, active, acce
         }
       `}
     >
+      {badge > 0 && (
+        <span className="absolute top-0.5 right-0.5 z-10 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold leading-none shadow-sm ring-1 ring-white">
+          {badge > 99 ? '99+' : badge}
+        </span>
+      )}
       <div className={`transition-colors ${accent || (dark ? 'text-slate-400' : 'text-slate-600')} ${
         !disabled && !active ? (dark ? 'group-hover:text-slate-100' : 'group-hover:text-slate-800') : ''
       }`}>

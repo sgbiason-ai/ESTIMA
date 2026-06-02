@@ -2,9 +2,18 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.11.0';
+export const APP_VERSION = '2.12.0';
 
 export const CHANGELOG = [
+  {
+    version: '2.12.0',
+    date: '2026-06-02',
+    title: 'Estimation : contrôle d\'unicité des numéros de prix',
+    highlights: [
+      'Estimation : nouveau bouton « Vérif. n° prix » (ruban Outils) qui contrôle l\'unicité des numéros de prix sur tout le projet — il signale les numéros portant des libellés ou unités différents, ainsi que les articles identiques (même libellé + unité) saisis sous des numéros différents. Un clic sur une anomalie amène directement à la ligne concernée',
+      'Estimation : surveillance permanente de la cohérence des numéros de prix — un badge rouge sur le bouton « Vérif. n° prix » compte les anomalies en temps réel pendant la saisie, une pastille ⚠ apparaît directement sur les lignes fautives, et un avertissement propose de corriger avant de lancer un export (PDF / Excel / DQE)',
+    ],
+  },
   {
     version: '2.11.0',
     date: '2026-06-01',
