@@ -28,6 +28,7 @@ import { cleanText, normalizeUnitSymbol } from './helpers';
 import { sanitizeFilename, formatNumberFr } from './pdf/pdfSharedHelpers';
 import { buildTheme as _buildTheme } from './pdf/buildTheme';
 import { getCurrentPhaseCode } from './phaseModel';
+import { computeOABThreshold as calculateOABThreshold } from './analysisCompute';
 
 // ─── CONSTRUCTION DU THÈME DEPUIS LE BRANDING ───────────────────────────────
 // Analyse utilise des defaults vert foncé différents du thème principal.
@@ -62,15 +63,6 @@ const SCORING_FORMULAS = {
 
 const getCompanyStyle = (index) => COMPANY_COLORS[index % COMPANY_COLORS.length];
 
-const calculateOABThreshold = (values) => {
-  const validValues = values.filter(v => v > 0);
-  if (validValues.length === 0) return 0;
-  const M1 = validValues.reduce((a, b) => a + b, 0) / validValues.length;
-  const upperLimit = M1 * 1.20;
-  const filteredValues = validValues.filter(v => v <= upperLimit);
-  if (filteredValues.length === 0) return M1 * 0.90;
-  return (filteredValues.reduce((a, b) => a + b, 0) / filteredValues.length) * 0.90;
-};
 
 const getHeatmapStyle = (value, reference) => {
   if (!value || !reference || reference === 0) return null;

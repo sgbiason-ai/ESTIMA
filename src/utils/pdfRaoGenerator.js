@@ -8,6 +8,7 @@ import { normalizeUnitSymbol } from './helpers';
 import { formatNumberFr, cleanText, loadLogos, drawCoverPage as _drawCoverPage } from './pdf/pdfSharedHelpers';
 import { buildTheme as _buildTheme } from './pdf/buildTheme';
 import { getCurrentPhaseCode } from './phaseModel';
+import { scoreOffer, computeOABThreshold as calculateOABThreshold } from './analysisCompute';
 
 // ─── COULEUR PRIMAIRE RAO : VERT PAPYRUS ────────────────────────────────────
 const VERT_PAPYRUS = [45, 138, 78];   // #2d8a4e
@@ -57,15 +58,6 @@ const fmt = (n) => {
 };
 const fmtScore = (n) => typeof n === 'number' ? n.toFixed(2) : '—';
 
-const calculateOABThreshold = (values) => {
-  const validValues = values.filter(v => v > 0);
-  if (validValues.length === 0) return 0;
-  const M1 = validValues.reduce((a, b) => a + b, 0) / validValues.length;
-  const upperLimit = M1 * 1.20;
-  const filteredValues = validValues.filter(v => v <= upperLimit);
-  if (filteredValues.length === 0) return M1 * 0.90;
-  return (filteredValues.reduce((a, b) => a + b, 0) / filteredValues.length) * 0.90;
-};
 
 const getHeatmapStyle = (value, reference) => {
   if (!value || !reference || reference === 0) return null;
@@ -355,23 +347,9 @@ export const generateRaoPDF = async (optionsParams) => {
     const Pmax = valid.length ? Math.max(...valid) : 0;
     const Pmoy = valid.length ? valid.reduce((a, b) => a + b, 0) / valid.length : 0;
 
-    const scoreFor = (p) => {
-      if (p <= 0 || Pmin <= 0) return 0;
-      let s = 0;
-      switch (mode) {
-        case 'f1': s = N * (Pmin / p); break;
-        case 'f2': s = N * Math.pow(Pmin / p, 2); break;
-        case 'f3': s = N * Math.pow(Pmin / p, 3); break;
-        case 'f4': s = N * (1 - (p - Pmin) / Pmin); break;
-        case 'f5': s = N * (1 - (p - Pmin) / Pmoy); break;
-        case 'f6': s = p <= Pmoy ? N * Math.sqrt(Pmin / p) : N * Math.pow(Pmin / p, 2); break;
-        case 'f7': s = Pmax === Pmin ? N : N * (1 - (p - Pmin) / (Pmax - Pmin)); break;
-        case 'f8': s = (N * Pmoy) / (Pmoy + p); break;
-        case 'f9': s = N * ((2 * Pmin) / (Pmin + p)); break;
-        default:   s = 0;
-      }
-      return Math.max(0, Math.min(N, s));
-    };
+    // Notation prix : primitif partagé scoreOffer (src/utils/analysisCompute.js).
+    // Garde Pmin > 0 conservée (sinon pas de moins-disant valide → 0).
+    const scoreFor = (p) => (Pmin > 0 ? scoreOffer(p, Pmin, Pmax, Pmoy, N, mode) : 0);
 
     const recomputed = flat.map(r => {
       const priceScore = r.irregular ? 0 : scoreFor(r.price);
@@ -1058,23 +1036,8 @@ export const generateRaoPDF = async (optionsParams) => {
     const PmaxS = validPrices.length ? Math.max(...validPrices) : 0;
     const PmoyS = validPrices.length ? validPrices.reduce((a, b) => a + b, 0) / validPrices.length : 0;
     const modeS = scoringConfig?.mode || 'f1';
-    const scoreForS = (p) => {
-      if (p <= 0 || PminS <= 0) return 0;
-      let s = 0;
-      switch (modeS) {
-        case 'f1': s = maxScore * (PminS / p); break;
-        case 'f2': s = maxScore * Math.pow(PminS / p, 2); break;
-        case 'f3': s = maxScore * Math.pow(PminS / p, 3); break;
-        case 'f4': s = maxScore * (1 - (p - PminS) / PminS); break;
-        case 'f5': s = maxScore * (1 - (p - PminS) / PmoyS); break;
-        case 'f6': s = p <= PmoyS ? maxScore * Math.sqrt(PminS / p) : maxScore * Math.pow(PminS / p, 2); break;
-        case 'f7': s = PmaxS === PminS ? maxScore : maxScore * (1 - (p - PminS) / (PmaxS - PminS)); break;
-        case 'f8': s = (maxScore * PmoyS) / (PmoyS + p); break;
-        case 'f9': s = maxScore * ((2 * PminS) / (PminS + p)); break;
-        default:   s = 0;
-      }
-      return Math.max(0, Math.min(maxScore, s));
-    };
+    // Notation prix : même primitif partagé scoreOffer (source unique de la formule).
+    const scoreForS = (p) => (PminS > 0 ? scoreOffer(p, PminS, PmaxS, PmoyS, maxScore, modeS) : 0);
 
     const summaryData = synthRows.map(r => ({
       ...r,

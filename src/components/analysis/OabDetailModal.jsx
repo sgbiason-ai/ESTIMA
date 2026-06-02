@@ -2,6 +2,7 @@
 import React from 'react';
 import { AlertTriangle, X, CheckCircle2, ArrowDown, TrendingDown } from 'lucide-react';
 import { formatPrice } from '../../utils/helpers';
+import { computeOABDetail } from '../../utils/analysisCompute';
 
 const OabDetailModal = ({ companies, companiesTotals, targetCompanyId, onClose }) => {
   if (!targetCompanyId) return null;
@@ -16,12 +17,9 @@ const OabDetailModal = ({ companies, companiesTotals, targetCompanyId, onClose }
   const validTotals = allTotals.filter(c => c.total > 0).sort((a, b) => a.total - b.total);
 
   const values = validTotals.map(c => c.total);
-  const M1 = values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0;
-  const plafond = M1 * 1.20;
-  const filtered = values.filter(v => v <= plafond);
+  // Calcul Double Moyenne via le primitif partagé (source unique analysisCompute).
+  const { M1, plafond, filtered, M2, threshold: seuil } = computeOABDetail(values);
   const excluded = validTotals.filter(c => c.total > plafond);
-  const M2 = filtered.length > 0 ? filtered.reduce((a, b) => a + b, 0) / filtered.length : M1;
-  const seuil = (filtered.length > 0 ? M2 : M1) * 0.90;
   const isOAB = targetTotal > 0 && targetTotal < seuil;
 
   // Barre visuelle : min et max pour positionner

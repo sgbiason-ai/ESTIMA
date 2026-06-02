@@ -1,6 +1,12 @@
 // src/test/analysisCompute.test.js
 import { describe, it, expect } from 'vitest';
-import { scoreOffer, computeChaptersData, computeAnalysisStats } from '../utils/analysisCompute';
+import {
+  scoreOffer,
+  computeChaptersData,
+  computeAnalysisStats,
+  computeOABDetail,
+  computeOABThreshold,
+} from '../utils/analysisCompute';
 
 // ── scoreOffer : primitif de notation partagé desktop + mobile ──────────────
 describe('scoreOffer', () => {
@@ -150,5 +156,50 @@ describe('computeChaptersData', () => {
 
   it('retourne [] si le projet est vide', () => {
     expect(computeChaptersData(null, companies, qtyMap)).toEqual([]);
+  });
+});
+
+// ── computeOABDetail / computeOABThreshold : seuil Double Moyenne ────────────
+describe('computeOABDetail', () => {
+  it('renvoie des zéros si aucune offre valide', () => {
+    expect(computeOABDetail([])).toEqual({ M1: 0, plafond: 0, filtered: [], M2: 0, threshold: 0 });
+    expect(computeOABDetail([0, -5])).toEqual({ M1: 0, plafond: 0, filtered: [], M2: 0, threshold: 0 });
+  });
+
+  it('cas simple sans offre écartée (toutes ≤ plafond)', () => {
+    // M1 = 110, plafond = 132, filtered = [100,110,120], M2 = 110, seuil = 99
+    const d = computeOABDetail([100, 110, 120]);
+    expect(d.M1).toBe(110);
+    expect(d.plafond).toBeCloseTo(132, 5);
+    expect(d.filtered).toEqual([100, 110, 120]);
+    expect(d.M2).toBe(110);
+    expect(d.threshold).toBeCloseTo(99, 5);
+  });
+
+  it('écarte les offres au-dessus du plafond (M1 × 1.20) pour M2', () => {
+    // [100,110,120,500] : M1 = 207.5, plafond = 249, 500 écartée
+    // M2 = moyenne(100,110,120) = 110, seuil = 99
+    const d = computeOABDetail([100, 110, 120, 500]);
+    expect(d.M1).toBe(207.5);
+    expect(d.plafond).toBeCloseTo(249, 5);
+    expect(d.filtered).toEqual([100, 110, 120]);
+    expect(d.threshold).toBeCloseTo(99, 5);
+  });
+
+  it('ignore les valeurs nulles ou négatives', () => {
+    expect(computeOABDetail([0, 100, -5, 110, 120]).threshold)
+      .toBeCloseTo(computeOABDetail([100, 110, 120]).threshold, 5);
+  });
+
+  it('est robuste à une entrée non-tableau', () => {
+    expect(computeOABDetail(null).threshold).toBe(0);
+  });
+});
+
+describe('computeOABThreshold', () => {
+  it('renvoie le seuil seul (= computeOABDetail.threshold)', () => {
+    const values = [100, 110, 120, 500];
+    expect(computeOABThreshold(values)).toBe(computeOABDetail(values).threshold);
+    expect(computeOABThreshold([])).toBe(0);
   });
 });

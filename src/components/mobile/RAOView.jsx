@@ -7,17 +7,7 @@ import { db as fireDb } from '../../firebase';
 import Icon from './Icon';
 import { fmt, fmtShort } from './formatters';
 import { flattenItems } from './helpers';
-import { scoreOffer } from '../../utils/analysisCompute';
-
-// ─── OAB (Double Moyenne) ────────────────────────────────────────────────────
-const calcOAB = (values) => {
-  const v = values.filter(x => x > 0);
-  if (!v.length) return 0;
-  const M1 = v.reduce((a, b) => a + b, 0) / v.length;
-  const f = v.filter(x => x <= M1 * 1.2);
-  const M2 = f.length ? f.reduce((a, b) => a + b, 0) / f.length : M1;
-  return (f.length ? M2 : M1) * 0.9;
-};
+import { scoreOffer, computeOABThreshold } from '../../utils/analysisCompute';
 
 // Notation prix : primitif partagé scoreOffer (src/utils/analysisCompute.js),
 // même source que le desktop — inclut le clamp [0, N] (les offres chères ne
@@ -202,7 +192,7 @@ export default function RAOView({ project, companyId, calcHook }) {
     const Pmin = validTotals.length ? Math.min(...validTotals) : 0;
     const Pmax = validTotals.length ? Math.max(...validTotals) : 0;
     const Pmoy = validTotals.length ? validTotals.reduce((a, b) => a + b, 0) / validTotals.length : 0;
-    const oabThreshold = calcOAB(validTotals);
+    const oabThreshold = computeOABThreshold(validTotals);
     const N = scoringConfig.maxScore || 40;
     const mode = scoringConfig.mode || 'f1';
 

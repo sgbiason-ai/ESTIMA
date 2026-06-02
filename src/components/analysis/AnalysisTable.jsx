@@ -2,6 +2,7 @@ import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { Trash2, ChevronRight, AlertTriangle, Info, HelpCircle, TrendingDown, TrendingUp, GitBranch, Plus } from 'lucide-react';
 import { formatPrice, normalizeUnitSymbol } from '../../utils/helpers';
 import { COMPANY_STYLES } from '../../utils/analysisConstants';
+import { computeOABThreshold as calculateOABThreshold } from '../../utils/analysisCompute';
 import OabDetailModal from './OabDetailModal';
 
 // --- SOUS-COMPOSANT : Cellule de Prix ---
@@ -60,20 +61,8 @@ const PriceCell = ({ value, onChange, style, anomaly }) => {
   );
 };
 
-// --- ALGORITHME OAB (Double Moyenne) ---
-const calculateOABThreshold = (values) => {
-  const validValues = values.filter(v => v > 0);
-  if (validValues.length === 0) return 0;
-
-  const M1 = validValues.reduce((a, b) => a + b, 0) / validValues.length;
-  const upperLimit = M1 * 1.20;
-  const filteredValues = validValues.filter(v => v <= upperLimit);
-
-  if (filteredValues.length === 0) return M1 * 0.90;
-
-  const M2 = filteredValues.reduce((a, b) => a + b, 0) / filteredValues.length;
-  return M2 * 0.90;
-};
+// Algorithme OAB (Double Moyenne) : importé depuis analysisCompute (source unique),
+// aliasé en calculateOABThreshold pour les sites d'appel existants.
 
 // --- DETECTION ANOMALIE PRIX PAR ARTICLE (mediane + % d'ecart) ---
 // Compare chaque prix a la mediane des offres pour cet article. Robuste aux

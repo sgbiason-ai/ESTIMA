@@ -4,19 +4,9 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db as fireDb } from '../firebase';
 import { useDialog } from '../contexts/DialogContext';
 import { useToast } from '../contexts/ToastContext';
-import { computeChaptersData, computeAnalysisStats } from '../utils/analysisCompute';
+import { computeChaptersData, computeAnalysisStats, computeOABThreshold as calculateOABThreshold } from '../utils/analysisCompute';
 
-// --- ALGORITHME OAB (Double Moyenne) ---
-const calculateOABThreshold = (values) => {
-  const validValues = values.filter(v => v > 0);
-  if (validValues.length === 0) return 0;
-  const M1 = validValues.reduce((a, b) => a + b, 0) / validValues.length;
-  const upperLimit = M1 * 1.20;
-  const filteredValues = validValues.filter(v => v <= upperLimit);
-  if (filteredValues.length === 0) return M1 * 0.90;
-  const M2 = filteredValues.reduce((a, b) => a + b, 0) / filteredValues.length;
-  return M2 * 0.90;
-};
+// Algorithme OAB (Double Moyenne) : source unique dans analysisCompute.
 
 const safeStorage = {
   get: (key) => { try { return localStorage.getItem(key); } catch { return null; } },

@@ -32,6 +32,37 @@ export function scoreOffer(P, Pmin, Pmax, Pmoy, N, mode) {
 }
 
 /**
+ * Seuil OAB (Offre Anormalement Basse) par la méthode de la Double Moyenne,
+ * avec le détail des étapes intermédiaires (pour l'affichage pédagogique).
+ * Source unique partagée : AnalysisTable, OabDetailModal et le mobile.
+ *
+ *  M1      = moyenne des offres valides (> 0)
+ *  plafond = M1 × 1.20  (écarte les offres trop hautes)
+ *  M2      = moyenne des offres ≤ plafond
+ *  seuil   = M2 × 0.90  (une offre en dessous est « anormalement basse »)
+ *
+ * @param   {number[]} values - totaux des offres
+ * @returns {{ M1:number, plafond:number, filtered:number[], M2:number, threshold:number }}
+ */
+export function computeOABDetail(values) {
+  const valid = (Array.isArray(values) ? values : []).filter(v => v > 0);
+  if (valid.length === 0) return { M1: 0, plafond: 0, filtered: [], M2: 0, threshold: 0 };
+
+  const M1       = valid.reduce((a, b) => a + b, 0) / valid.length;
+  const plafond  = M1 * 1.20;
+  const filtered = valid.filter(v => v <= plafond);
+  const M2       = filtered.length > 0 ? filtered.reduce((a, b) => a + b, 0) / filtered.length : M1;
+  const threshold = (filtered.length > 0 ? M2 : M1) * 0.90;
+
+  return { M1, plafond, filtered, M2, threshold };
+}
+
+/** Seuil OAB seul (raccourci sur computeOABDetail). */
+export function computeOABThreshold(values) {
+  return computeOABDetail(values).threshold;
+}
+
+/**
  * Construit chaptersData : liste de chapitres avec leurs items enrichis
  * de companyData (PU, lineTotal, ecart) par entreprise.
  *
