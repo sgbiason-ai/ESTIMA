@@ -33,6 +33,11 @@ const isTeslaBrowser = /Tesla/i.test(ua)
 
 // Firestore : mémoire pour Tesla (pas d'IndexedDB fiable), persistant sinon
 const db = initializeFirestore(app, {
+  // Auto-détection long-polling : le WebChannel temps-réel est souvent bloqué
+  // ou instable sur mobile, Wi-Fi d'entreprise, proxies et WebView Android
+  // (symptôme « coupures / tentative de reconnexion » réseau OK par ailleurs).
+  // Le SDK bascule automatiquement en long-polling quand c'est nécessaire.
+  experimentalAutoDetectLongPolling: true,
   localCache: isTeslaBrowser
     ? memoryLocalCache()
     : persistentLocalCache({ tabManager: persistentMultipleTabManager() })
