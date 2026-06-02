@@ -833,9 +833,6 @@ function ObservationSwiper({ observations, currentIdx, onChangeIdx, onClose, onE
   const [settling, setSettling] = useState(false); // transition retour en cours
   const containerRef = React.useRef(null);
 
-  const obs = observations[currentIdx];
-  if (!obs) return null;
-
   const canPrev = currentIdx > 0;
   const canNext = currentIdx < observations.length - 1;
   const slideW = containerRef.current?.offsetWidth || (window.innerWidth > 448 ? 448 : window.innerWidth);
@@ -859,6 +856,10 @@ function ObservationSwiper({ observations, currentIdx, onChangeIdx, onClose, onE
       onChangeIdx(next);
     }, 300);
   }, [currentIdx, observations.length, onChangeIdx, slideW]);
+
+  // Garde placé après le dernier hook (useCallback) — règle des hooks respectée.
+  const obs = observations[currentIdx];
+  if (!obs) return null;
 
   const handleTouchStart = (e) => {
     if (settling) return;

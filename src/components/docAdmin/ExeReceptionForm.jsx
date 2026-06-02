@@ -616,7 +616,9 @@ export default function ExeReceptionForm({ fiche, dateFinRevisee: externalDateFi
   }, [activeTab]);
 
   // ── Dates ──
-  const dateFinRevisee = externalDateFinRevisee || useMemo(() => getDateFinRevisee(fiche), [fiche]);
+  // useMemo toujours appelé (jamais derrière un `||` qui le rendrait conditionnel).
+  const computedDateFinRevisee = useMemo(() => getDateFinRevisee(fiche), [fiche]);
+  const dateFinRevisee = externalDateFinRevisee || computedDateFinRevisee;
 
   const dateProposeeError = useMemo(() => {
     if (!data.dateAchevementProposee || !dateFinRevisee) return null;

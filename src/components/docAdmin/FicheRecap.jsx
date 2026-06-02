@@ -226,14 +226,17 @@ const MiniTimeline = ({ label, sublabel, dates, color = 'blue' }) => {
 
 // ─── Composant ──────────────────────────────────────────────────────────────
 export default function FicheRecap({ fiche, ficheMere, isAlloti, activeGroupeId, groupesAttributaires = [], lots = [], onSave, isSaving }) {
-  if (!fiche) return null;
-
-  const D = fiche.sectionD || {};
+  // ⚠️ Tous les hooks sont déclarés AVANT le moindre `return` (règle des hooks).
+  // Le garde `if (!fiche)` est placé après le dernier hook, plus bas.
+  const D = useMemo(() => fiche?.sectionD || {}, [fiche]);
   const DMere = ficheMere?.sectionD || D;
 
   // Extraction des données de frise pour la fiche active (ou virtualFiche en alloti)
+  // Fallback sûr si la fiche est absente (extractTimelineData suppose fiche défini).
   const { osList, dateDemarrage, arretData, dateFinTheorique, totalOSHT } = useMemo(
-    () => extractTimelineData(fiche, D),
+    () => fiche
+      ? extractTimelineData(fiche, D)
+      : { osList: [], osDemarrage: null, dateDemarrage: null, arretData: { totalArretDays: 0 }, dateFinTheorique: null, totalOSHT: 0 },
     [fiche, D]
   );
 
@@ -284,6 +287,9 @@ export default function FicheRecap({ fiche, ficheMere, isAlloti, activeGroupeId,
       };
     });
   }, [isAlloti, ficheMere, groupesAttributaires, lots, DMere, activeGroupeId]);
+
+  // Tous les hooks sont déclarés : on peut sortir sans risque si la fiche est absente.
+  if (!fiche) return null;
 
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6">
