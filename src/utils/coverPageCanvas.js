@@ -22,6 +22,7 @@ const ptpx = (pt) => pt * S * 0.352778;
 
 import { loadImage as sharedLoadImage } from './pdf/pdfSharedHelpers';
 import { buildTheme } from './pdf/buildTheme';
+import { getCurrentPhaseCode } from './phaseModel';
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 const rgb = ([r, g, b]) => `rgb(${r},${g},${b})`;
@@ -83,7 +84,7 @@ export const buildCoverPageCanvas = async (project, docLabel, branding = null, t
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // ── Données projet ──────────────────────────────────────────────────────────
-  const phaseLabel   = (project.phase    || 'DCE').toUpperCase();
+  const phaseLabel   = getCurrentPhaseCode(project).toUpperCase();
   const clientName   = project.client    || 'Non renseigné';
   const clientStreet = (project.clientAddress || '').trim();
   const clientCityZip = [project.clientZip, project.clientCity].filter(Boolean).join(' ').trim();

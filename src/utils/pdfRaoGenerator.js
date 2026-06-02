@@ -7,6 +7,7 @@ import { DEFAULT_CRITERIA, DEFAULT_ADMIN_PIECES, DEFAULT_OFFER_PIECES } from '..
 import { normalizeUnitSymbol } from './helpers';
 import { formatNumberFr, cleanText, loadLogos, drawCoverPage as _drawCoverPage } from './pdf/pdfSharedHelpers';
 import { buildTheme as _buildTheme } from './pdf/buildTheme';
+import { getCurrentPhaseCode } from './phaseModel';
 
 // ─── COULEUR PRIMAIRE RAO : VERT PAPYRUS ────────────────────────────────────
 const VERT_PAPYRUS = [45, 138, 78];   // #2d8a4e
@@ -160,7 +161,7 @@ const drawCoverPageRao = (doc, project, consultation, logoMoe, logoClient, today
     title: consultation?.objet || project?.name,
     subtitle1: (consultation?.subtitle1 || project?.subtitle1 || '').trim(),
     subtitle2: (consultation?.subtitle2 || project?.subtitle2 || '').trim(),
-    phaseLabel: (consultation?.phase || project?.phase || 'DCE').toUpperCase(),
+    phaseLabel: (consultation?.phase || getCurrentPhaseCode(project)).toUpperCase(),
     clientName: consultation?.client || project?.client || 'Non renseigné',
     clientStreet: project?.clientAddress ? project.clientAddress.trim() : '',
     clientCityZip: [project?.clientZip, project?.clientCity].filter(Boolean).join(' ').trim(),

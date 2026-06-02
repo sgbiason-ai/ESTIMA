@@ -8,6 +8,7 @@ import { getItemRefMap, normalizeUnitSymbol } from './helpers';
 import { saveFileWithPicker, FILE_TYPES, PICKER_IDS } from './fileSaver';
 import { sanitizeFilename, loadLogos, drawCoverPage as _drawCoverPage } from './pdf/pdfSharedHelpers';
 import { buildTheme } from './pdf/buildTheme';
+import { getCurrentPhaseCode } from './phaseModel';
 
 const cleanFormat = (num) => {
   if (num === undefined || num === null || num === '' || isNaN(num)) return "0,00";
@@ -75,7 +76,7 @@ const drawCoverPage = (doc, project, logoMoe, logoClient, type, today, branding 
     title: project?.name,
     subtitle1: (project.subtitle1 || '').trim(),
     subtitle2: (project.subtitle2 || '').trim(),
-    phaseLabel: (project.phase || 'DCE').toUpperCase(),
+    phaseLabel: getCurrentPhaseCode(project).toUpperCase(),
     clientName: project.client || 'Non renseigné',
     clientStreet: project.clientAddress ? project.clientAddress.trim() : '',
     clientCityZip: [project.clientZip, project.clientCity].filter(Boolean).join(' ').trim(),
@@ -100,7 +101,7 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
   // Chargement des logos (fonction partagée)
   const { logoMoe, logoClient } = await loadLogos(branding, project);
 
-  const phaseLabel = (project.phase || 'PROJET').toUpperCase();
+  const phaseLabel = getCurrentPhaseCode(project).toUpperCase();
   const isDQE = type === 'DQE';
 
   let currentHeaderTrancheName = "";
@@ -144,7 +145,15 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
     const titleText = currentHeaderTrancheName
       ? `${(project?.name || "PROJET").toUpperCase()} - ${currentHeaderTrancheName}`
       : (project?.name || "PROJET").toUpperCase();
-    doc.setFontSize(12); doc.text(titleText, centerX, 25, { align: 'center' });
+    doc.setFontSize(12);
+    // Largeur max pour rester centré sans déborder sur le bord ni le logo MOE → wrap.
+    const maxTitleW = 2 * (moeBlockX - 5 - centerX);
+    const titleLines = doc.splitTextToSize(titleText, maxTitleW);
+    const titleLineH = 5.5;
+    const titleStartY = 25 - ((titleLines.length - 1) * titleLineH) / 2;
+    titleLines.forEach((line, i) => {
+      doc.text(line, centerX, titleStartY + i * titleLineH, { align: 'center' });
+    });
     const bandY = 38; doc.setFillColor(...THEME.secondary); doc.rect(15, bandY, pageWidth - 30, 8, 'F');
     doc.setFontSize(7); doc.text(`PHASE : ${phaseLabel}  -  DATE : ${today}`, centerX, bandY + 5, { align: 'center' });
   };

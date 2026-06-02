@@ -81,6 +81,11 @@ export const getCurrentPhase = (project) => {
   return phases[0] || null;
 };
 
+// Code court de la phase courante (ESQ, AVP, DCE…), pour pastilles/badges PDF.
+// Résout project.phase (id stable OU ancien code) → code lisible. Repli 'DCE'.
+export const getCurrentPhaseCode = (project) =>
+  getCurrentPhase(project)?.code || 'DCE';
+
 // Index de la phase courante dans la liste (−1 si introuvable).
 export const getCurrentPhaseIndex = (project) => {
   const phases = getProjectPhases(project);

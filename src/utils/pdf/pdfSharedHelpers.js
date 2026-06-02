@@ -365,10 +365,12 @@ export const drawCoverPage = (doc, config, theme, logos) => {
   // Col 2 : Phase + code
   doc.setFontSize(8); doc.setTextColor(...theme.lightText); doc.setFont('Helvetica', 'bold');
   doc.text('PHASE DU PROJET', col2X, startY);
+  doc.setFontSize(9); doc.setFont('Helvetica', 'bold');
+  const phasePillW = Math.max(28, doc.getTextWidth(phaseLabel) + 8);
   doc.setFillColor(...theme.primary);
-  doc.roundedRect(col2X, startY + 3, 28, 6, 1.5, 1.5, 'F');
-  doc.setFontSize(9); doc.setTextColor(255, 255, 255); doc.setFont('Helvetica', 'bold');
-  doc.text(phaseLabel, col2X + 14, startY + 7.5, { align: 'center' });
+  doc.roundedRect(col2X, startY + 3, phasePillW, 6, 1.5, 1.5, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.text(phaseLabel, col2X + phasePillW / 2, startY + 7.5, { align: 'center' });
 
   const rightY = startY + 22;
   doc.setFontSize(8); doc.setTextColor(...theme.lightText); doc.setFont('Helvetica', 'bold');

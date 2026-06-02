@@ -27,6 +27,7 @@ import autoTable from 'jspdf-autotable';
 import { cleanText, normalizeUnitSymbol } from './helpers';
 import { sanitizeFilename, formatNumberFr } from './pdf/pdfSharedHelpers';
 import { buildTheme as _buildTheme } from './pdf/buildTheme';
+import { getCurrentPhaseCode } from './phaseModel';
 
 // ─── CONSTRUCTION DU THÈME DEPUIS LE BRANDING ───────────────────────────────
 // Analyse utilise des defaults vert foncé différents du thème principal.
@@ -193,7 +194,7 @@ const drawCoverPage = (doc, project, logoMoeData, logoMoeDims, logoClientData, l
   // Phase ACT
   doc.setDrawColor(...THEME.primary);
   doc.setLineWidth(0.5);
-  const phaseLabel = `PHASE ${(project.phase || 'ACT').toUpperCase()}`;
+  const phaseLabel = `PHASE ${getCurrentPhaseCode(project).toUpperCase()}`;
   const phaseBoxWidth = Math.max(80, doc.getTextWidth(phaseLabel) + 16);
   doc.roundedRect(centerX - phaseBoxWidth / 2, 235, phaseBoxWidth, 15, 2, 2, 'S');
   doc.setFontSize(18);

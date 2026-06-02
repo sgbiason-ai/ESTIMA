@@ -350,6 +350,7 @@ describe('drawCoverPage', () => {
     text: () => {},
     addImage: () => {},
     splitTextToSize: (t) => [t],
+    getTextWidth: (t) => String(t).length * 2,
   });
 
   const theme = {
