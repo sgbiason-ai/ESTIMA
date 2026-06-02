@@ -10,6 +10,7 @@ export const CHANGELOG = [
     date: '2026-06-01',
     title: 'Compte rendu de chantier : tri par chapitre, pastilles alignées & en-tête PDF',
     highlights: [
+      'Estimation : correction des formules de quantité qui pouvaient renvoyer 0 lorsqu\'un même prix (n° P.xx) figure sur plusieurs lignes. La référence pointe désormais sur la ligne exactement cliquée et reprend bien SA quantité',
       'Observations : le tri par date est désormais propre à chaque chapitre (un bouton « Date » par catégorie, qui bascule croissant / décroissant / aucun). Le choix est mémorisé et repris fidèlement dans les exports PDF et Word',
       'Pastilles de rôle (MOA, MDBDP, CONC…) à largeur fixe et alignées partout : observations, participants, fenêtre de gestion, aperçu, application mobile et export PDF — les libellés qui les suivent tombent enfin sur la même colonne',
       'Export PDF des observations : l\'en-tête de colonnes (Émetteur · Date · Observation · Statut · Par · Pour le) est maintenant parfaitement aligné avec le tableau, et son texte est de nouveau lisible',

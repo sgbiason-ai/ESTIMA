@@ -17,6 +17,11 @@ const FormulaInput = ({ value, formula, formulaMode, setFormulaMode, onCommit, d
   const inputRef = useRef(null);
   const inputValueRef = useRef(String(value));
   const savedCursorPos = useRef(null); // Position curseur sauvegardée avant blur
+  // Mémorise l'id EXACT de chaque ligne cliquée pour cette session d'édition.
+  // Indispensable car un même article en double (même uid BPU) partage le même
+  // label P.x : reverseRefMap ne garderait qu'un seul id et la formule pointerait
+  // vers la mauvaise instance (souvent vide → résultat 0).
+  const sessionRefMap = useRef(new Map());
 
   // Map inverse label → id (node.id) pour ré-encoder la formule au commit.
   // refMap insère dans l'ordre {designation → label, uid → label, id → label}.
@@ -42,9 +47,11 @@ const FormulaInput = ({ value, formula, formulaMode, setFormulaMode, onCommit, d
 
   // {P.01} → {uid} pour le stockage interne (recalculateProject travaille en uid)
   const labelToUid = useCallback((s) => {
-    if (!s || !reverseRefMap?.size) return s;
+    if (!s) return s;
     return String(s).replace(/\{([^}]+)\}/g, (match, label) => {
-      const uid = reverseRefMap.get(label);
+      // Priorité à l'id exact mémorisé pour cette session (lève l'ambiguïté des doublons),
+      // sinon repli sur la map inverse globale (référence saisie/collée à la main).
+      const uid = sessionRefMap.current.get(label) ?? reverseRefMap.get(label);
       return uid ? `{${uid}}` : match;
     });
   }, [reverseRefMap]);
@@ -60,6 +67,8 @@ const FormulaInput = ({ value, formula, formulaMode, setFormulaMode, onCommit, d
   const handleInsertRef = useCallback((refId) => {
     // Insérer directement le label lisible si dispo (sinon fallback sur l'uid brut)
     const label = refMap?.get(refId) || refMap?.get(String(refId)) || refId;
+    // Mémorise la ligne EXACTE cliquée pour ce label (préservé au commit même en cas de doublon).
+    sessionRefMap.current.set(String(label), refId);
     const ref = `{${label}}`;
     const currentVal = inputValueRef.current;
     // On préfère la position sauvegardée (avant que le focus parte vers l'autre ligne)
@@ -86,6 +95,15 @@ const FormulaInput = ({ value, formula, formulaMode, setFormulaMode, onCommit, d
     // Si on est déjà en mode formule (ex: on vient d'insérer une ref via clic),
     // on ne réinitialise PAS l'input — la formule en cours doit être conservée.
     if (formulaMode?.isActive) return;
+    // Pré-remplit la session avec les ids déjà référencés : un aller-retour d'édition
+    // (P.x affiché → id stocké) doit conserver l'instance d'origine, pas la re-deviner.
+    if (formula && refMap) {
+      String(formula).replace(/\{([^}]+)\}/g, (m, id) => {
+        const lbl = refMap.get(id) || refMap.get(String(id));
+        if (lbl) sessionRefMap.current.set(String(lbl), id);
+        return m;
+      });
+    }
     // Afficher les références sous leur forme lisible (P.01) plutôt que l'uid interne
     const displayVal = formula ? uidToLabel(formula) : (Number(value) === 0 ? '' : String(value));
     setInputValue(displayVal);
