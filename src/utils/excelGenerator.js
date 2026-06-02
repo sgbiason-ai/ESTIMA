@@ -109,60 +109,21 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
     }
   }
 
-  // ── CALCUL RÉCAPITULATIF ──
-  const calcNodeTotal = (nodes, mode, qtyMap, isParentOption = false) => {
-    let total = 0;
-    nodes.forEach(n => {
-      const isEffectiveOption = isParentOption || !!n.isOption;
-      if (mode === 'base' && isEffectiveOption) return;
-      if (mode === 'option' && !isEffectiveOption && n.type === 'item') return;
-      if (n.type === 'item') {
-        const mapKey = String(n.id);
-        const rawQty = qtyMap.has(mapKey) ? Number(qtyMap.get(mapKey)) : (Number(n.qty) || 0);
-        const qty = Math.round(rawQty * 100) / 100;
-        total += Math.round(qty * Number(n.price || 0) * 100) / 100;
-      } else if (n.children) {
-        total += calcNodeTotal(n.children, mode, qtyMap, isEffectiveOption);
-      }
-    });
-    return total;
-  };
-
-  // ── RÉCAPITULATIF ──
+  // ── RÉCAPITULATIF (création de l'onglet en 1er, rempli après les feuilles détail) ──
+  // On crée la feuille maintenant pour qu'elle reste en tête de classeur, mais on
+  // ne remplit le corps qu'APRÈS avoir construit les feuilles détail : le récap
+  // référence alors les sous-totaux de chaque tranche via des formules inter-feuilles
+  // (valable DQE comme ESTIMATION → se recalcule quand les P.U. sont saisis).
+  let summarySheet = null;
+  const summaryRefs = {}; // { [expId]: { sheetName, totalRow, chapters: { [chapIdx]: 'Fxx' } } }
   if (includeSummary && selectedExports.length > 0) {
-    const summarySheet = workbook.addWorksheet('RÉCAPITULATIF', { views: [{ showGridLines: false }] });
+    summarySheet = workbook.addWorksheet('RÉCAPITULATIF', { views: [{ showGridLines: false }] });
     const headers = ['DÉSIGNATION', ...selectedExports.map(getTrancheName)];
     summarySheet.columns = [{ key: 'desc', width: 50 }, ...selectedExports.map(() => ({ width: 18 }))];
     summarySheet.addRow(['RÉCAPITULATIF FINANCIER']).font = fonts.title;
     summarySheet.addRow([]);
     const headerRow = summarySheet.addRow(headers);
     headerRow.eachCell(cell => { cell.font = fonts.header; cell.fill = fills.header; cell.alignment = { horizontal: 'center' }; });
-
-    const totals = new Array(selectedExports.length).fill(0);
-    if (project.chapters) {
-      project.chapters.forEach(chap => {
-        const rowData = [(chap.title || chap.designation || '').toUpperCase()];
-        let chapHasValue = false;
-        selectedExports.forEach((expId, idx) => {
-          const map = new Map(Object.entries(clientQtyMaps[expId] || {}));
-          const val = calcNodeTotal([chap], 'base', map);
-          rowData.push(type === 'DQE' ? '' : val);
-          totals[idx] += val;
-          if (val !== 0) chapHasValue = true;
-        });
-        // Ne pas afficher la ligne si tous les totaux sont à 0
-        if (!chapHasValue && type !== 'DQE') return;
-        const row = summarySheet.addRow(rowData);
-        row.getCell(1).font = fonts.bold;
-        for (let i = 2; i <= rowData.length; i++) row.getCell(i).numFmt = '#,##0.00 €';
-      });
-    }
-    summarySheet.addRow([]);
-    const footRow = summarySheet.addRow(['TOTAL GÉNÉRAL HT', ...totals.map(t => type === 'DQE' ? '' : t)]);
-    footRow.getCell(1).font = fonts.total;
-    for (let i = 2; i <= footRow.values.length - 1; i++) {
-      const cell = footRow.getCell(i); cell.numFmt = '#,##0.00 €'; cell.font = fonts.total; cell.fill = fills.total;
-    }
   }
 
   // ── TRAITEMENT NŒUDS ──
@@ -222,9 +183,14 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
               childTotal += cell.value;
             }
           }
-          if (childTotal !== 0) {
+          // En DQE les P.U. sont vides → childTotal vaut toujours 0, mais on veut
+          // quand même les lignes de sous-total (formules SUBTOTAL live, calculées
+          // dès que le candidat saisit les prix). On les force donc pour le DQE.
+          if (childTotal !== 0 || type === 'DQE') {
             const rowTotal = ws.addRow(['', `SOUS-TOTAL ${titleStr}`, '', '', '', { formula }]);
-            if (level === 0 && subTotalCollector) subTotalCollector.push(`F${rowTotal.number}`);
+            // On mémorise l'index du chapitre (= index niveau 0) pour pouvoir
+            // référencer ce sous-total depuis le récapitulatif (formule inter-feuilles).
+            if (level === 0 && subTotalCollector) subTotalCollector.push({ ref: `F${rowTotal.number}`, chapterIndex: index });
             // Couleur cellule par cellule (A→F) pour rester dans les limites du tableau
             const totalFont = level === 0 ? fonts.subTotalMain : fonts.subTotalSub;
             const totalFill = level === 0 ? fills.subTotalMain : fills.subTotalSub;
@@ -313,21 +279,26 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
     dateCell.value = `DATE : ${new Date().toLocaleDateString('fr-FR')}`;
     dateCell.font = fonts.info; dateCell.alignment = { horizontal: 'center', vertical: 'top' };
 
-    // ── LOGO MOE (en haut à droite) ──
-    if (moeLogoId !== null && moeDims) {
-      const ratio = Math.min(150 / moeDims.width, 80 / moeDims.height);
-      worksheet.addImage(moeLogoId, {
-        tl: { col: 4.5, row: 0.2 },
-        ext: { width: moeDims.width * ratio, height: moeDims.height * ratio }
+    // ── LOGOS (bandeau haut-droit) ──
+    // Le titre est fusionné sur A1:D1 → on réserve les colonnes E et F aux logos
+    // pour éviter tout chevauchement : MOA (client) dans la colonne E, MOE dans
+    // la colonne F (la plus à droite). Largeurs plafonnées à la largeur de leur
+    // colonne respective afin qu'ils ne se recouvrent jamais.
+    // ── LOGO CLIENT (MOA) — colonne E ──
+    if (clientLogoId !== null && clientDims) {
+      const ratio = Math.min(100 / clientDims.width, 70 / clientDims.height);
+      worksheet.addImage(clientLogoId, {
+        tl: { col: 4.05, row: 0.2 },
+        ext: { width: clientDims.width * ratio, height: clientDims.height * ratio }
       });
     }
 
-    // ── LOGO CLIENT (à gauche du logo MOE, ou col 3.5) ──
-    if (clientLogoId !== null && clientDims) {
-      const ratio = Math.min(120 / clientDims.width, 72 / clientDims.height);
-      worksheet.addImage(clientLogoId, {
-        tl: { col: 3.2, row: 0.2 },
-        ext: { width: clientDims.width * ratio, height: clientDims.height * ratio }
+    // ── LOGO MOE — colonne F (coin haut-droit) ──
+    if (moeLogoId !== null && moeDims) {
+      const ratio = Math.min(120 / moeDims.width, 75 / moeDims.height);
+      worksheet.addImage(moeLogoId, {
+        tl: { col: 5.0, row: 0.2 },
+        ext: { width: moeDims.width * ratio, height: moeDims.height * ratio }
       });
     }
 
@@ -344,10 +315,19 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
     if (project.chapters) processNodes(project.chapters, worksheet, currentQtyMap, 0, 'base', false, mainSubTotalsRefs, includePM);
 
     worksheet.addRow([]);
-    const totalBaseFormula = mainSubTotalsRefs.length > 0 ? mainSubTotalsRefs.join('+') : "0";
+    const totalBaseFormula = mainSubTotalsRefs.length > 0 ? mainSubTotalsRefs.map(r => r.ref).join('+') : "0";
     const rowTotalHT = addTotalRow(worksheet, 'TOTAL GÉNÉRAL HT (Hors PSE)', totalBaseFormula, false);
     addTotalRow(worksheet, 'TVA (20%)', `F${rowTotalHT}*0.2`, false);
     addTotalRow(worksheet, 'TOTAL GÉNÉRAL TTC', `F${rowTotalHT}*1.2`, true);
+
+    // Mémorise les références (feuille + ligne) pour alimenter le récapitulatif.
+    if (summarySheet) {
+      summaryRefs[expId] = {
+        sheetName: safeSheetName,
+        totalRow: rowTotalHT,
+        chapters: Object.fromEntries(mainSubTotalsRefs.map(r => [r.chapterIndex, r.ref])),
+      };
+    }
 
     if (project.chapters) {
       project.chapters.forEach((chap, idx) => {
@@ -365,7 +345,7 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
           processNodes([chap], worksheet, currentQtyMap, 0, 'option', false, pseSubTotalsRefs, includePM);
           const endPseRow = worksheet.lastRow.number;
           if (endPseRow >= startPseRow && pseSubTotalsRefs.length > 0) {
-            const pseTotalFormula = pseSubTotalsRefs.join('+');
+            const pseTotalFormula = pseSubTotalsRefs.map(r => r.ref).join('+');
             worksheet.addRow([]);
             const rowPseHT = addTotalRow(worksheet, `TOTAL HT (${pseTitle})`, pseTotalFormula, false, true);
             addTotalRow(worksheet, `TVA (20%)`, `F${rowPseHT}*0.2`, false, true);
@@ -375,6 +355,38 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
       });
     }
   });
+
+  // ── REMPLISSAGE DU RÉCAPITULATIF (après les feuilles détail) ──
+  // Chaque cellule référence le sous-total du chapitre dans la feuille de la
+  // tranche concernée ; le total général pointe sur la ligne « TOTAL GÉNÉRAL HT »
+  // de chaque tranche. Formules valables pour DQE comme ESTIMATION.
+  if (summarySheet && project.chapters) {
+    const quote = (sheet) => `'${String(sheet).replace(/'/g, "''")}'`;
+    project.chapters.forEach((chap, chapIdx) => {
+      const rowData = [(chap.title || chap.designation || '').toUpperCase()];
+      let hasAny = false;
+      selectedExports.forEach((expId) => {
+        const ref = summaryRefs[expId]?.chapters?.[chapIdx];
+        if (ref) { rowData.push({ formula: `${quote(summaryRefs[expId].sheetName)}!${ref}` }); hasAny = true; }
+        else rowData.push('');
+      });
+      if (!hasAny) return; // chapitre sans sous-total dans aucune tranche (ex. PSE) → masqué
+      const row = summarySheet.addRow(rowData);
+      row.getCell(1).font = fonts.bold;
+      for (let i = 2; i <= rowData.length; i++) row.getCell(i).numFmt = '#,##0.00 €';
+    });
+    summarySheet.addRow([]);
+    const footData = ['TOTAL GÉNÉRAL HT'];
+    selectedExports.forEach((expId) => {
+      const tr = summaryRefs[expId];
+      footData.push(tr ? { formula: `${quote(tr.sheetName)}!F${tr.totalRow}` } : '');
+    });
+    const footRow = summarySheet.addRow(footData);
+    footRow.getCell(1).font = fonts.total;
+    for (let i = 2; i <= footData.length; i++) {
+      const cell = footRow.getCell(i); cell.numFmt = '#,##0.00 €'; cell.font = fonts.total; cell.fill = fills.total;
+    }
+  }
 
   const xlsxBuffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([xlsxBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });

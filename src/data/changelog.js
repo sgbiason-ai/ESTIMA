@@ -17,6 +17,10 @@ export const CHANGELOG = [
       'Aperçu écran du compte rendu : colonnes du tableau d\'observations stabilisées (largeurs fixes, retour à la ligne des textes longs)',
       'Export Excel de l\'estimation : les bandes colorées des lignes de titre (chapitres, sous-chapitres) et de sous-total s\'arrêtent désormais au bord du tableau au lieu de déborder sur toute la largeur de la feuille',
       'Administration › Capacités : l\'occupation Firebase intègre désormais tous les modules récents (Visites de site, Notes de frais, Véhicules, Lieux favoris, réglages de frais), les données « notes de frais » étant agrégées par utilisateur',
+      'Bordereau des prix : la phase affichée dans les exports PDF et Word (page de garde + en-tête de page) montre de nouveau son code (ex. DCE) au lieu de l\'identifiant interne',
+      'Export Excel DQE : les sous-totaux par chapitre, le total général HT, la TVA et le TTC (et les blocs PSE) sont de nouveau présents sous forme de formules — elles se calculent automatiquement dès que l\'entreprise saisit ses prix unitaires',
+      'Export Excel : l\'onglet Récapitulatif (s\'il est demandé) reporte désormais les totaux via des formules liées aux feuilles de détail, pour le DQE comme pour l\'estimation confidentielle — le récap du DQE se remplit donc tout seul à la saisie des prix',
+      'Export Excel : les logos maître d\'œuvre (MOE) et maître d\'ouvrage (MOA / client) ne se chevauchent plus dans l\'en-tête — ils sont désormais placés dans deux colonnes distinctes en haut à droite',
     ],
   },
   {
