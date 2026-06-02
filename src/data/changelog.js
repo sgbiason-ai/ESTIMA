@@ -12,6 +12,7 @@ export const CHANGELOG = [
     highlights: [
       'Estimation : nouveau bouton « Vérif. n° prix » (ruban Outils) qui contrôle l\'unicité des numéros de prix sur tout le projet — il signale les numéros portant des libellés ou unités différents, ainsi que les articles identiques (même libellé + unité) saisis sous des numéros différents. Un clic sur une anomalie amène directement à la ligne concernée',
       'Estimation : surveillance permanente de la cohérence des numéros de prix — un badge rouge sur le bouton « Vérif. n° prix » compte les anomalies en temps réel pendant la saisie, une pastille ⚠ apparaît directement sur les lignes fautives, et un avertissement propose de corriger avant de lancer un export (PDF / Excel / DQE)',
+      'RAO sur mobile : la note de prix des offres est désormais bornée exactement comme sur ordinateur (entre 0 et la note maximale). Fini les notes négatives sur les offres très chères avec certaines formules (F4, F5, F7), qui pouvaient fausser le classement final — l\'analyse mobile et l\'analyse bureau donnent maintenant rigoureusement le même résultat',
     ],
   },
   {

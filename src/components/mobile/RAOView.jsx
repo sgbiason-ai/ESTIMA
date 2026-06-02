@@ -7,6 +7,7 @@ import { db as fireDb } from '../../firebase';
 import Icon from './Icon';
 import { fmt, fmtShort } from './formatters';
 import { flattenItems } from './helpers';
+import { scoreOffer } from '../../utils/analysisCompute';
 
 // ─── OAB (Double Moyenne) ────────────────────────────────────────────────────
 const calcOAB = (values) => {
@@ -18,22 +19,9 @@ const calcOAB = (values) => {
   return (f.length ? M2 : M1) * 0.9;
 };
 
-// ─── Scoring formules ────────────────────────────────────────────────────────
-const calcScore = (P, Pmin, Pmax, Pmoy, N, mode) => {
-  if (!P || P <= 0) return 0;
-  switch (mode) {
-    case 'f1': return N * (Pmin / P);
-    case 'f2': return N * Math.pow(Pmin / P, 2);
-    case 'f3': return N * Math.pow(Pmin / P, 3);
-    case 'f4': return N * (1 - (P - Pmin) / Pmin);
-    case 'f5': return N * (1 - (P - Pmin) / Pmoy);
-    case 'f6': return P <= Pmoy ? N * Math.sqrt(Pmin / P) : N * Math.pow(Pmin / P, 2);
-    case 'f7': return Pmax === Pmin ? N : N * (1 - (P - Pmin) / (Pmax - Pmin));
-    case 'f8': return (N * Pmoy) / (Pmoy + P);
-    case 'f9': return N * ((2 * Pmin) / (Pmin + P));
-    default: return N * (Pmin / P);
-  }
-};
+// Notation prix : primitif partagé scoreOffer (src/utils/analysisCompute.js),
+// même source que le desktop — inclut le clamp [0, N] (les offres chères ne
+// produisent plus de note négative comme avec l'ancien calcScore local).
 
 // ─── Couleurs rang ───────────────────────────────────────────────────────────
 const RANK_COLORS = ['bg-amber-400', 'bg-gray-300', 'bg-amber-700'];
@@ -221,7 +209,7 @@ export default function RAOView({ project, companyId, calcHook }) {
     const ranked = entries
       .map(e => ({
         ...e,
-        score: calcScore(e.total, Pmin, Pmax, Pmoy, N, mode),
+        score: scoreOffer(e.total, Pmin, Pmax, Pmoy, N, mode),
         ecart: totalEstimation ? ((e.total - totalEstimation) / totalEstimation * 100) : 0,
         isOAB: e.total > 0 && e.total < oabThreshold,
       }))

@@ -18,6 +18,20 @@ const SCORING_MODES = {
 };
 
 /**
+ * Note prix d'une offre selon la formule choisie (f1..f9), bornée à [0, N].
+ * Primitif partagé desktop (computeAnalysisStats) ET mobile (RAOView) : c'est
+ * LA source unique de la formule de notation, pour éviter toute divergence.
+ * Signature alignée sur l'usage mobile : (P, Pmin, Pmax, Pmoy, N, mode).
+ *
+ * @returns {number} note dans [0, N] (0 si l'offre est nulle/absente)
+ */
+export function scoreOffer(P, Pmin, Pmax, Pmoy, N, mode) {
+  if (!(P > 0)) return 0;
+  const fn = SCORING_MODES[mode] || SCORING_MODES.f1;
+  return Math.max(0, Math.min(N, fn(N, Pmin, P, Pmax, Pmoy)));
+}
+
+/**
  * Construit chaptersData : liste de chapitres avec leurs items enrichis
  * de companyData (PU, lineTotal, ecart) par entreprise.
  *
@@ -116,7 +130,6 @@ export function computeAnalysisStats(chaptersData, companies, scoringConfig) {
   const Pmoy = totals.reduce((a, b) => a + b, 0) / totals.length;
   const N    = Number(scoringConfig?.maxScore || 40);
   const mode = scoringConfig?.mode || 'f1';
-  const scoreFn = SCORING_MODES[mode] || SCORING_MODES.f1;
 
   report.Pmin = Pmin;
   report.Pmax = Pmax;
@@ -127,10 +140,7 @@ export function computeAnalysisStats(chaptersData, companies, scoringConfig) {
     const ecartAbs = P - report.totalEstimation;
     const ecartPct = report.totalEstimation !== 0 ? (ecartAbs / report.totalEstimation) * 100 : 0;
     report.companyEcarts[company.id] = { abs: ecartAbs, pct: ecartPct };
-
-    let score = 0;
-    if (P > 0) score = scoreFn(N, Pmin, P, Pmax, Pmoy);
-    report.companyScores[company.id] = Math.max(0, Math.min(N, score));
+    report.companyScores[company.id] = scoreOffer(P, Pmin, Pmax, Pmoy, N, mode);
   });
 
   return report;
