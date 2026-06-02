@@ -1,6 +1,6 @@
 # Claude.md – EstimaVRD Workflow & Agents
 
-**V2.4** | Avril 2026 | Samuel & Claude | Économe tokens
+**V2.5** | Juin 2026 | Samuel & Claude | Économe tokens
 
 ---
 
@@ -477,13 +477,23 @@ src/App.jsx                  # Sidebar nav + routing + FAB switch-to-mobile (tab
 - [x] **CRC participants** repliés par défaut + toggle "tout déplier/tout replier"
 - [x] **Ribbon CRC multi-lignes** sous xl (flex-wrap tablette portrait)
 - [x] **Table observations CRC** responsive (colonnes compactées sous xl)
+- [x] **Audit 2026-06 — Perf bundle** : helper preload Vite isolé, vendor-pdf/leaflet/quill hors chemin critique (**-49 %** chargement initial)
+- [x] **Audit 2026-06 — Bugs hooks** : 5 hooks conditionnels corrigés (FicheRecap, ExeReceptionForm, CrcDetailView) → `rules-of-hooks` à 0
+- [x] **Audit 2026-06 — RAO source unique** : scoring f1-f9 + OAB Double Moyenne centralisés dans `analysisCompute` (`scoreOffer` / `computeOABThreshold`), mobile aligné sur desktop (clamp `[0,N]`), +25 tests
+- [x] **Audit 2026-06 — Résilience** : `ErrorBoundary` variant `inline` par module (helper `Lazy`) → crash de vue isolé
+- [x] **Audit 2026-06 — Fix env** : `firebase.js` ne lit plus `window` à l'import (suite verte, +21 tests débloqués)
 - [ ] RAO: Export PDF avec sous-critères et groupements
 - [ ] CRC: form → Firestore → PDF complet
 - [ ] Admin-docs: templates éditables + role check
-- [ ] Vitest RAO/CRC business logic
+- [~] Vitest business logic : **RAO/OAB couverts** (`analysisCompute.test.js`) ; CRC carry-forward (`useCrrManager`) encore à tester
 - [ ] Lighthouse audit + optimisation
 - [ ] Split-view autres modules (MOE subView, BPU subView si pertinent)
 - [ ] Export PDF RAO avec sous-critères et groupements
+- [ ] **Audit — Firestore rules** : super-admin par custom claim (vs email en dur), wildcard `{document=**}` en read-only, validation des tailles, ownership intra-tenant
+- [ ] **Audit — Perf** : `React.memo(PriceCell)` + virtualisation `AnalysisTable` ; `useFeedback` `limit(100)` ; PWA precache `globIgnores` ; TTL collection `history/`
+- [ ] **Audit — ESLint** : 23 erreurs `only-export-components` à nettoyer
+- [ ] **Audit — xlsx** : migration ExcelJS reportée (arbitrage perte `.xls`) ; 2 vulns critiques restantes (impact client-side faible)
+- [ ] **Audit — Test flaky** : assertion wall-clock `stressTest <200ms` à fiabiliser
 
 ---
 
@@ -638,6 +648,7 @@ MOI: Code rules + tests
 
 | V | Date | Changes |
 |---|------|---------|
+| 2.5 | Juin 2026 | **Audit complet** (6 commits) : perf bundle −49 % (preload Vite isolé), 5 bugs hooks conditionnels corrigés, fix `firebase.js` lecture `window` à l'import, **RAO source unique** (scoring f1-f9 + OAB Double Moyenne dans `analysisCompute`, mobile aligné desktop, +25 tests), **ErrorBoundary par module** (variant `inline`). Backlog audit ajouté (§12) : Firestore rules, perf AnalysisTable, ESLint, xlsx |
 | 2.4 | Avril 2026 | **Support tablette Galaxy Tab S10 FE** : useDeviceMode, container adaptatif, split-view listes, hub multi-colonnes, caméra tablette (CRC + Visites), ribbon responsive, table observations compactée, toggle déplier/replier participants. **Règles d'Or** : questions d'abord, demander avant commit/deploy |
 | 2.3 | Avril 2026 | **Module RAO complet** : sauvegarde Firestore dédiée, sous-critères, groupements, OAB détail, volets figés, vue mobile RAO 4 onglets, hub mobile 2x3, import Excel multi-onglets + fallback ref, export/import JSON |
 | 2.2 | Avril 2026 | **Changelog intégré** + règle auto-update CLAUDE.md |
