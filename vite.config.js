@@ -114,10 +114,23 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          // Le helper de préchargement de Vite est utilisé par TOUS les imports
+          // dynamiques. Sans règle explicite, Rollup le range dans vendor-pdf :
+          // l'import statique de ce mini-helper force alors tout vendor-pdf
+          // (jspdf + html2canvas, ~743 KB) dans le préchargement initial.
+          // On l'ancre dans vendor-react, déjà toujours en chemin critique.
+          if (id.includes('vite/preload-helper')) return 'vendor-react';
           if (id.includes('node_modules')) {
             if (id.includes('xlsx')) return 'vendor-xlsx';
-            if (id.includes('jspdf') || id.includes('html2canvas') || id.includes('canvg') || id.includes('purify'))
+            // DOMPurify isolé : importé statiquement par helpers.js (chemin eager),
+            // il ne doit PAS embarquer jspdf/html2canvas dans le préchargement initial.
+            if (id.includes('purify')) return 'vendor-sanitize';
+            if (id.includes('jspdf') || id.includes('html2canvas') || id.includes('canvg'))
               return 'vendor-pdf';
+            // leaflet & quill isolés AVANT la règle react (sinon react-leaflet /
+            // react-quill seraient captés par `react` et préchargés au démarrage).
+            if (id.includes('leaflet')) return 'vendor-leaflet';
+            if (id.includes('quill')) return 'vendor-quill';
             if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler') || id.includes('prop-types') || id.includes('object-assign') || id.includes('loose-envify'))
               return 'vendor-react';
             if (id.includes('firebase'))
