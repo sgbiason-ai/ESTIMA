@@ -300,6 +300,11 @@ const ProjectView = ({
 
   const [formulaBarState, setFormulaBarState] = useState({ isEditing: false, displayValue: '', rawValue: '' });
   const formulaInputRef = useRef(null);
+  // Mémorise l'id EXACT de chaque ligne cliquée pour cette session d'édition de la barre.
+  // Indispensable car plusieurs lignes peuvent partager la même désignation (même prix BPU
+  // utilisé à plusieurs endroits) : designationToIdMap ne garde qu'un id et la formule
+  // pointerait vers la mauvaise ligne (souvent vide → résultat 0).
+  const formulaBarSessionMap = useRef(new Map());
 
   const designationToIdMap = React.useMemo(() => {
     const map = {};
@@ -309,17 +314,29 @@ const ProjectView = ({
 
   const displayToRaw = (displayStr) => {
     return (displayStr || '').replace(/\[([^\]]+)\]/g, (match, label) => {
-      const id = designationToIdMap[label];
+      // Priorité à l'id exact mémorisé pour cette session (lève l'ambiguïté des désignations
+      // en double), sinon repli sur la map globale (référence tapée/collée à la main).
+      const id = formulaBarSessionMap.current.get(label) ?? designationToIdMap[label];
       return id ? `{${id}}` : match;
     });
   };
 
   const openFormulaBar = () => {
     const currentFormula = selectedFormula || '';
+    // Réinitialise puis pré-remplit la session avec les ids déjà référencés : un aller-retour
+    // d'édition ([Désignation] affiché → {id} stocké) doit conserver l'instance d'origine.
+    formulaBarSessionMap.current = new Map();
+    String(currentFormula).replace(/\{([^}]+)\}/g, (m, id) => {
+      const it = allItems.find(x => x.id === id);
+      if (it?.designation) formulaBarSessionMap.current.set(it.designation, id);
+      return m;
+    });
     setFormulaBarState({ isEditing: true, displayValue: renderFormulaReadable(currentFormula) || '=', rawValue: currentFormula || '=' });
     setFormulaMode({
       isActive: true,
       onInsert: (item) => {
+        // Mémorise la ligne EXACTE cliquée pour cette désignation (préservée au commit même en doublon).
+        if (item?.designation) formulaBarSessionMap.current.set(item.designation, item.id);
         setFormulaBarState(prev => {
           const inputEl = formulaInputRef.current;
           const pos = inputEl ? inputEl.selectionStart : prev.displayValue.length;
