@@ -20,7 +20,7 @@ import HelpPanel from '../components/help/HelpPanel';
 import HelpButton from '../components/help/HelpButton';
 import { simplifyGpsTrace } from '../utils/gpsSimplify';
 import { useMobileSiteVisits } from '../hooks/useMobileSiteVisits';
-import { useRobustSave } from '../hooks/useRobustSave';
+import { useRobustSave, loadDraft, clearDraft } from '../hooks/useRobustSave';
 import SaveStatusDot from '../components/mobile/SaveStatusDot';
 import {
   haversine, totalDistance, splitTraceSegments, accuracyColor,
@@ -139,7 +139,25 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
     setDetailLoading(true);
     try {
       const v = await loadVisit(visitId);
-      setFullVisit(v);
+      // Brouillon local plus récent (sauvegarde interrompue) → restaurer + re-pousser.
+      const draft = loadDraft(`draft_svd_${visitId}`);
+      const draftAt = draft?._draftAt || 0;
+      const fsAt = v?.lastSaved ? new Date(v.lastSaved).getTime() : 0;
+      if (draft && draftAt > fsAt) {
+        const { _draftAt, ...cleanDraft } = draft;
+        setFullVisit(cleanDraft);
+        // Ne nettoyer le brouillon qu'après confirmation de la sauvegarde Firestore.
+        try {
+          await saveVisit(visitId, cleanDraft);
+          clearDraft(`draft_svd_${visitId}`);
+          showToast('Brouillon local synchronisé ✓');
+        } catch {
+          showToast('Brouillon restauré — sync en attente réseau');
+        }
+      } else {
+        setFullVisit(v);
+        if (draft) clearDraft(`draft_svd_${visitId}`);
+      }
       if (user?.uid && visitId) {
         setDoc(
           doc(db, 'users', user.uid, 'preferences', 'modules'),
@@ -149,7 +167,7 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
       }
     } catch { setFullVisit(null); }
     finally { setDetailLoading(false); }
-  }, [loadVisit, user, forceSave]);
+  }, [loadVisit, saveVisit, user, forceSave]);
 
   // ── Pre-load routes : stockée en Firestore si dispo, sinon IGN ──
   useEffect(() => {

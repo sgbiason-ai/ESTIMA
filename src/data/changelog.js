@@ -21,6 +21,7 @@ export const CHANGELOG = [
       'Export Excel DQE : les sous-totaux par chapitre, le total général HT, la TVA et le TTC (et les blocs PSE) sont de nouveau présents sous forme de formules — elles se calculent automatiquement dès que l\'entreprise saisit ses prix unitaires',
       'Export Excel : l\'onglet Récapitulatif (s\'il est demandé) reporte désormais les totaux via des formules liées aux feuilles de détail, pour le DQE comme pour l\'estimation confidentielle — le récap du DQE se remplit donc tout seul à la saisie des prix',
       'Export Excel : les logos maître d\'œuvre (MOE) et maître d\'ouvrage (MOA / client) ne se chevauchent plus dans l\'en-tête — ils sont désormais placés dans deux colonnes distinctes en haut à droite',
+      'Visites de site : fiabilisation de la synchronisation. Si le réseau coupe pendant une visite (mobile ou desktop), la sauvegarde locale est désormais ré-envoyée automatiquement à la réouverture de la visite, et n\'est effacée qu\'une fois la synchronisation confirmée — fini les versions terrain qui n\'arrivaient pas sur le poste fixe',
     ],
   },
   {

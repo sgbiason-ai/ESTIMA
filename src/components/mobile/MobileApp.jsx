@@ -248,15 +248,24 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
     if (draft && svDraftAt > svFirestoreAt) {
       const { _draftAt, ...cleanDraft } = draft;
       setFullVisit(cleanDraft);
-      setToast('Brouillon local restauré');
-      setTimeout(() => setToast(null), 2400);
-      clearDraft(`draft_sv_${v.id}`);
+      // Re-pousser le brouillon vers Firestore. On ne nettoie le brouillon
+      // local QU'APRÈS confirmation de la sauvegarde : si le réseau est encore
+      // KO, il reste disponible et l'auto-save reprendra à la 1re modif.
+      try {
+        await saveVisit(v.id, cleanDraft);
+        clearDraft(`draft_sv_${v.id}`);
+        visitsRefetch();
+        setToast('Brouillon local synchronisé ✓');
+      } catch {
+        setToast('Brouillon restauré — sync en attente réseau');
+      }
+      setTimeout(() => setToast(null), 2600);
     } else {
       setFullVisit(data);
       if (draft) clearDraft(`draft_sv_${v.id}`);
     }
     setVisitLoading(false);
-  }, [loadVisit]);
+  }, [loadVisit, saveVisit, visitsRefetch]);
 
   const handleCreateVisit = useCallback(async () => {
     const visit = await createVisit();
