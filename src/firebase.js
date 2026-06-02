@@ -25,9 +25,13 @@ const app = initializeApp(firebaseConfig);
 
 // Détection navigateur Tesla ou contexte sans IndexedDB fiable
 // UA Tesla Model 3 : "Mozilla/5.0 (X11; Linux x86_64) ... Chrome/140 ... Safari/537.36" (pas de "Tesla" dedans)
-const ua = navigator.userAgent || '';
+// Accès gardés (typeof) : ce module est évalué à l'import, y compris en
+// environnement non-DOM (tests Vitest, SSR) où navigator/window n'existent pas.
+const ua = typeof navigator !== 'undefined' ? (navigator.userAgent || '') : '';
+const hasTeslaParam = typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).get('tesla') === '1';
 const isTeslaBrowser = /Tesla/i.test(ua)
-  || new URLSearchParams(window.location.search).get('tesla') === '1'
+  || hasTeslaParam
   || (/X11; Linux x86_64/.test(ua) && /Chrome\/\d/.test(ua)
       && !/Ubuntu|Fedora|Debian|SUSE|Mint|Arch|CrOS|Android/.test(ua));
 
