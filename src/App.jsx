@@ -1,6 +1,7 @@
 // src/App.jsx
 import React, { useState, useEffect, Suspense } from 'react';
 import lazyWithReload from './utils/lazyWithReload';
+import ErrorBoundary from './components/common/ErrorBoundary';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db as fireDb } from './firebase';
 
@@ -70,8 +71,13 @@ const LazyFallback = () => (
   </div>
 );
 
-/** Wrapper Suspense pour les composants lazy-loaded */
-const Lazy = ({ children }) => <Suspense fallback={<LazyFallback />}>{children}</Suspense>;
+/** Wrapper Suspense + ErrorBoundary par module : un crash dans une vue lazy
+ *  reste contenu (fallback light + Sentry) au lieu de faire tomber toute l'app. */
+const Lazy = ({ children }) => (
+  <ErrorBoundary variant="inline">
+    <Suspense fallback={<LazyFallback />}>{children}</Suspense>
+  </ErrorBoundary>
+);
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
 export default function App() {
@@ -174,7 +180,7 @@ export default function App() {
   // ── MOBILE → rendu simplifié ──────────────────────────────────────────────
   if (isMobile) {
     return (
-      <Suspense fallback={<LazyFallback />}>
+      <Lazy>
         <MobileApp
           user={user}
           companyId={companyId}
@@ -184,7 +190,7 @@ export default function App() {
           isTablet={isTablet}
           onSwitchToDesktop={() => forceLayout('desktop')}
         />
-      </Suspense>
+      </Lazy>
     );
   }
 
