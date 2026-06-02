@@ -4,6 +4,7 @@ import { saveAs } from 'file-saver';
 import { cleanText, normalizeUnitSymbol } from '../../../utils/helpers';
 import { hexToDocxColor } from '../utils/bpuBrandingUtils';
 import { getRawDescription, normalizeToHtml } from '../utils/bpuDescriptionUtils';
+import { getCurrentPhase } from '../../../utils/phaseModel';
 
 let Document, Packer, Paragraph, Table, TableCell, TableRow,
     WidthType, BorderStyle, TextRun, AlignmentType,
@@ -206,7 +207,7 @@ export const useBpuWordExport = ({
         new Paragraph({
           children: [
             new TextRun({ text: 'PHASE : ', bold: true, size: 22, font: headingFont, color: hexToDocxColor(branding.colors.subtle) }),
-            new TextRun({ text: project?.phase || 'DCE', bold: true, size: 24, font: headingFont, color: primaryColorDocx }),
+            new TextRun({ text: getCurrentPhase(project)?.code || 'DCE', bold: true, size: 24, font: headingFont, color: primaryColorDocx }),
           ],
           spacing: { after: 400 },
         }),
@@ -324,7 +325,7 @@ export const useBpuWordExport = ({
             rows: [
               new TableRow({
                 children: [
-                  new TableCell({ shading: { fill: 'F1F5F9' }, verticalAlign: VerticalAlign.CENTER, width: { size: 33, type: WidthType.PERCENTAGE }, margins: { left: 150, top: 100, bottom: 100 }, children: [new Paragraph({ children: [new TextRun({ text: 'PHASE : ', font: mainFont, size: 16, color: '64748B', bold: true }), new TextRun({ text: project.phase || 'DCE', font: mainFont, size: 16, color: '0F172A', bold: true })] })] }),
+                  new TableCell({ shading: { fill: 'F1F5F9' }, verticalAlign: VerticalAlign.CENTER, width: { size: 33, type: WidthType.PERCENTAGE }, margins: { left: 150, top: 100, bottom: 100 }, children: [new Paragraph({ children: [new TextRun({ text: 'PHASE : ', font: mainFont, size: 16, color: '64748B', bold: true }), new TextRun({ text: getCurrentPhase(project)?.code || 'DCE', font: mainFont, size: 16, color: '0F172A', bold: true })] })] }),
                   new TableCell({ shading: { fill: 'F1F5F9' }, verticalAlign: VerticalAlign.CENTER, width: { size: 33, type: WidthType.PERCENTAGE }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'DATE : ', font: mainFont, size: 16, color: '64748B', bold: true }), new TextRun({ text: today, font: mainFont, size: 16, color: '0F172A', bold: true })] })] }),
                   new TableCell({ shading: { fill: 'F1F5F9' }, verticalAlign: VerticalAlign.CENTER, width: { size: 34, type: WidthType.PERCENTAGE }, margins: { right: 150 }, children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: 'PAGE ', font: mainFont, size: 16, color: '64748B', bold: true }), new SimpleField('PAGE'), new TextRun({ text: ' / ', font: mainFont, size: 16, color: '64748B' }), new SimpleField('NUMPAGES')] })] }),
                 ],

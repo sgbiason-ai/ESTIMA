@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { cleanText, normalizeUnitSymbol } from '../../utils/helpers';
+import { getCurrentPhase } from '../../utils/phaseModel';
 import { lighten } from './utils/bpuBrandingUtils';
 import {
   extractImageFiles, addPhotos, getCleanDescriptionHtml, decoratePhotoGrid, tryDeletePhoto,
@@ -153,7 +154,7 @@ const BpuPageView = ({
                   <div className="flex items-center gap-2">
                     <span className="font-bold uppercase text-slate-400">Phase</span>
                     <div className="font-black text-slate-900 bg-white px-2 h-5 flex items-center justify-center rounded border border-slate-200 leading-none pb-[1px]">
-                      {project?.phase || "DCE"}
+                      {getCurrentPhase(project)?.code || "DCE"}
                     </div>
                   </div>
                   <div className="w-px h-3 bg-slate-300" />

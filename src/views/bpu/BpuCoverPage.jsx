@@ -1,6 +1,7 @@
 import React from 'react';
 import { hexToRgb, lighten } from './utils/bpuBrandingUtils';
 import { PAGE_WIDTH_PX, PAGE_HEIGHT_PX } from './constants/bpuLayout';
+import { getCurrentPhase } from '../../utils/phaseModel';
 
 /**
  * BpuCoverPage
@@ -78,7 +79,7 @@ const BpuCoverPage = ({ project, branding, resolvedLogo, today, onLogoError }) =
         <div style={{ position: 'absolute', top: '15%', left: '55%', right: '5%' }}>
           <div style={{ fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px', color: colors.subtle, fontFamily: fonts.headings, fontSize: '10px' }}>PHASE DU PROJET</div>
           <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#FFFFFF', borderRadius: '4px', padding: '0 12px', height: '24px', backgroundColor: colors.primary, fontFamily: fonts.headings, fontSize: '13px', textTransform: 'uppercase' }}>
-            {project?.phase || 'DCE'}
+            {getCurrentPhase(project)?.code || 'DCE'}
           </div>
           <div style={{ fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '15%', color: colors.subtle, fontFamily: fonts.headings, fontSize: '10px' }}>RÉFÉRENCE (CODE AFFAIRE)</div>
           <div style={{ fontWeight: 600, textTransform: 'uppercase', color: colors.text, fontFamily: fonts.headings, fontSize: '16px' }}>{project?.code || '2025-XXX'}</div>
