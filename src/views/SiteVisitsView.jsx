@@ -21,6 +21,7 @@ import HelpButton from '../components/help/HelpButton';
 import { simplifyGpsTrace } from '../utils/gpsSimplify';
 import { useMobileSiteVisits } from '../hooks/useMobileSiteVisits';
 import { useRobustSave, loadDraft, clearDraft } from '../hooks/useRobustSave';
+import { deleteSiteVisitImage } from '../utils/siteVisitImageStorage';
 import SaveStatusDot from '../components/mobile/SaveStatusDot';
 import {
   haversine, totalDistance, splitTraceSegments, accuracyColor,
@@ -199,11 +200,16 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
     const ok = await confirm(`Supprimer la visite "${visitNom}" et toutes ses données ?`, { danger: true });
     if (!ok) return;
     try {
+      // Nettoyer les photos Storage de la visite avant de supprimer le doc.
+      const data = selectedId === visitId && fullVisit ? fullVisit : await loadVisit(visitId);
+      for (const obs of (data?.observations || [])) {
+        for (const img of (obs.images || [])) deleteSiteVisitImage(img);
+      }
       await deleteDoc(doc(db, 'companies', companyId, 'site_visits', visitId));
       refetch();
       if (selectedId === visitId) { setSelectedId(null); setFullVisit(null); }
     } catch (e) { console.error('Erreur suppression:', e); }
-  }, [companyId, selectedId, refetch]);
+  }, [companyId, selectedId, fullVisit, loadVisit, refetch]);
 
   // ── Save visit info (modal) ──
   const handleSaveInfo = useCallback((info) => {
@@ -343,6 +349,8 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
   // ── Delete segment/obs ──
   const handleDeleteObs = useCallback((obsId) => {
     if (!fullVisit) return;
+    const removed = (fullVisit.observations || []).find(o => o.id === obsId);
+    for (const img of (removed?.images || [])) deleteSiteVisitImage(img);
     const updatedObs = (fullVisit.observations || []).filter(o => o.id !== obsId);
     const updated = { ...fullVisit, observations: updatedObs };
     setFullVisit(updated);
@@ -572,7 +580,7 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
 
       <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="siteVisits" />
       <VisitInfoModal isOpen={showInfoModal} onClose={() => setShowInfoModal(false)} visit={fullVisit} onSave={handleSaveInfo} />
-      <ObsEditModal isOpen={!!editingObs} onClose={() => setEditingObs(null)} obs={editingObs} onSave={handleSaveObsText} />
+      <ObsEditModal isOpen={!!editingObs} onClose={() => setEditingObs(null)} obs={editingObs} onSave={handleSaveObsText} companyId={companyId} visitId={fullVisit?.id} />
 
       <CoEditBanner editors={coEditors} />
 

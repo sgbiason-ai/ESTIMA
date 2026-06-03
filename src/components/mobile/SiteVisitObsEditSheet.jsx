@@ -3,28 +3,68 @@
 
 import React, { useState, useRef } from 'react';
 import Icon from './Icon';
-import { compressImage } from '../../utils/imageCompressor';
+import { uploadSiteVisitImage, deleteSiteVisitImage } from '../../utils/siteVisitImageStorage';
 
-export default function SiteVisitObsEditSheet({ obs, onUpdate, onDelete, onClose, onViewImage, inline = false }) {
+// Cle stable d'une image (path Storage, sinon src/base64)
+const imgKey = (img) => (typeof img === 'object' && img ? (img.path || img.src) : img);
+
+export default function SiteVisitObsEditSheet({ obs, onUpdate, onDelete, onClose, onViewImage, inline = false, companyId, visitId }) {
   const [text, setText] = useState(obs.text || '');
   const [images, setImages] = useState(obs.images || []);
+  const [uploading, setUploading] = useState(false);
+  const originalRef = useRef(obs.images || []);
   const fileRef = useRef(null);
 
+  // Enregistrer : supprimer de Storage les images retirees.
   const handleSave = () => {
+    const finalKeys = new Set(images.map(imgKey));
+    originalRef.current
+      .filter(img => !finalKeys.has(imgKey(img)))
+      .forEach(img => deleteSiteVisitImage(img));
     onUpdate(obs.id, { text, images });
+    onClose();
+  };
+
+  // Annuler : supprimer de Storage les images ajoutees cette session.
+  const handleCancel = () => {
+    const originalKeys = new Set(originalRef.current.map(imgKey));
+    images
+      .filter(img => !originalKeys.has(imgKey(img)))
+      .forEach(img => deleteSiteVisitImage(img));
     onClose();
   };
 
   const handleAddPhotos = async (e) => {
     const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-    const compressed = await Promise.all(files.map(f => compressImage(f)));
-    setImages(prev => [...prev, ...compressed]);
     if (fileRef.current) fileRef.current.value = '';
+    if (files.length === 0) return;
+    if (!companyId || !visitId || !obs?.id) {
+      console.error('[Visite] Upload photo impossible : contexte manquant');
+      return;
+    }
+    setUploading(true);
+    try {
+      const uploaded = await Promise.all(
+        files.map(f => uploadSiteVisitImage(f, { companyId, visitId, obsId: obs.id }))
+      );
+      setImages(prev => [...prev, ...uploaded]);
+    } catch (err) {
+      console.error('[Visite] Erreur upload photo:', err);
+    } finally {
+      setUploading(false);
+    }
   };
 
+  // Retrait local uniquement (suppression Storage differee a l'enregistrement).
   const handleRemoveImage = (idx) => {
     setImages(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  // Supprimer l'observation : nettoyer ses photos Storage.
+  const handleDeleteObs = () => {
+    for (const img of images) deleteSiteVisitImage(img);
+    onDelete(obs.id);
+    onClose();
   };
 
   return (
@@ -32,9 +72,9 @@ export default function SiteVisitObsEditSheet({ obs, onUpdate, onDelete, onClose
 
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200/60 bg-white/80 backdrop-blur-xl shrink-0">
-        <button onClick={onClose} className="text-[13px] font-medium text-gray-500">Annuler</button>
+        <button onClick={handleCancel} className="text-[13px] font-medium text-gray-500">Annuler</button>
         <span className="text-[14px] font-bold text-gray-900">Observation</span>
-        <button onClick={handleSave} className="text-[13px] font-bold text-blue-600">Enregistrer</button>
+        <button onClick={handleSave} disabled={uploading} className="text-[13px] font-bold text-blue-600 disabled:opacity-40">Enregistrer</button>
       </div>
 
         {/* Content */}
@@ -72,14 +112,14 @@ export default function SiteVisitObsEditSheet({ obs, onUpdate, onDelete, onClose
             className="flex items-center justify-center gap-2 w-full mt-3 py-3 bg-gray-100 rounded-xl text-[13px] font-medium text-gray-600 active:bg-gray-200 transition"
           >
             <Icon name="camera" size={16} color="#6b7280" />
-            Ajouter des photos
+            {uploading ? 'Téléversement…' : 'Ajouter des photos'}
           </button>
           <input ref={fileRef} type="file" accept="image/*" multiple capture="environment" className="hidden"
             onChange={handleAddPhotos} />
 
           {/* Supprimer */}
           <button
-            onClick={() => { onDelete(obs.id); onClose(); }}
+            onClick={handleDeleteObs}
             className="flex items-center justify-center gap-2 w-full mt-4 py-3 rounded-xl text-[13px] font-medium text-red-500 hover:bg-red-50 transition"
           >
             <Icon name="trash" size={14} color="#ef4444" />

@@ -802,7 +802,7 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
           isTablet && isLandscape ? (
             <SplitView
               List={<SiteVisitListView visits={siteVisits} loading={visitsLoading} onSelect={handleSelectVisit} onCreate={handleCreateVisit} onDelete={deleteVisit} onRefresh={visitsRefetch} isLandscape={false} />}
-              Detail={fullVisit && <SiteVisitDetailView visit={fullVisit} onSave={handleSiteVisitSave} saveStatus={svSaveStatus} onToast={triggerToast} isLandscape={isLandscape} branding={resources.masterBranding} />}
+              Detail={fullVisit && <SiteVisitDetailView visit={fullVisit} onSave={handleSiteVisitSave} saveStatus={svSaveStatus} onToast={triggerToast} isLandscape={isLandscape} branding={resources.masterBranding} companyId={companyId} />}
               hasSelection={!!selectedVisit}
               loading={visitLoading}
               emptyIcon="camera"
@@ -816,7 +816,7 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
               <span className="text-sm">Chargement…</span>
             </div>
           ) : fullVisit ? (
-            <SiteVisitDetailView visit={fullVisit} onSave={handleSiteVisitSave} saveStatus={svSaveStatus} onToast={triggerToast} isLandscape={isLandscape} branding={resources.masterBranding} />
+            <SiteVisitDetailView visit={fullVisit} onSave={handleSiteVisitSave} saveStatus={svSaveStatus} onToast={triggerToast} isLandscape={isLandscape} branding={resources.masterBranding} companyId={companyId} />
           ) : null
         )}
 

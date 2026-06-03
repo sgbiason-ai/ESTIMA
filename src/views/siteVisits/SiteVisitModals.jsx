@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { MapPin, Navigation, MessageSquare, X, Pencil, ImagePlus, Camera, Info } from 'lucide-react';
-import { compressImage } from '../../utils/imageCompressor';
+import { uploadSiteVisitImage, deleteSiteVisitImage } from '../../utils/siteVisitImageStorage';
 
 // ─── Modale edition infos visite ────────────────────────────────────────────
 
@@ -56,9 +56,14 @@ export function VisitInfoModal({ isOpen, onClose, visit, onSave }) {
 
 // ─── Modale edition observation ─────────────────────────────────────────────
 
-export function ObsEditModal({ isOpen, onClose, obs, onSave }) {
+// Cle stable d'une image (path Storage, sinon src/base64)
+const imgKey = (img) => (typeof img === 'object' && img ? (img.path || img.src) : img);
+
+export function ObsEditModal({ isOpen, onClose, obs, onSave, companyId, visitId }) {
   const [text, setText] = useState('');
   const [images, setImages] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const originalRef = useRef([]);
   const fileRef = useRef(null);
   const cameraRef = useRef(null);
 
@@ -66,33 +71,71 @@ export function ObsEditModal({ isOpen, onClose, obs, onSave }) {
     if (isOpen && obs) {
       setText(obs.text || '');
       setImages(obs.images || []);
+      originalRef.current = obs.images || [];
     }
   }, [isOpen, obs?.id]);
 
   const handleAddImages = async (e) => {
     const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-    const compressed = await Promise.all(files.map(f => compressImage(f)));
-    setImages(prev => [...prev, ...compressed]);
     if (fileRef.current) fileRef.current.value = '';
     if (cameraRef.current) cameraRef.current.value = '';
+    if (files.length === 0) return;
+    if (!companyId || !visitId || !obs?.id) {
+      console.error('[Visite] Upload photo impossible : contexte manquant');
+      return;
+    }
+    setUploading(true);
+    try {
+      // Upload vers Storage → le document ne stocke qu'une URL (jamais de base64).
+      const uploaded = await Promise.all(
+        files.map(f => uploadSiteVisitImage(f, { companyId, visitId, obsId: obs.id }))
+      );
+      setImages(prev => [...prev, ...uploaded]);
+    } catch (err) {
+      console.error('[Visite] Erreur upload photo:', err);
+    } finally {
+      setUploading(false);
+    }
   };
 
+  // Retrait local uniquement : la suppression Storage est differee a
+  // l'enregistrement (sinon « Annuler » apres retrait perdrait la photo).
   const handleRemoveImage = (idx) => {
     setImages(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  // Enregistrer : supprimer de Storage les images retirees (presentes a
+  // l'ouverture mais plus dans la liste finale).
+  const handleSave = () => {
+    const finalKeys = new Set(images.map(imgKey));
+    originalRef.current
+      .filter(img => !finalKeys.has(imgKey(img)))
+      .forEach(img => deleteSiteVisitImage(img));
+    onSave(text, images);
+    onClose();
+  };
+
+  // Annuler : supprimer de Storage les images ajoutees cette session (pas
+  // dans l'original) pour ne pas laisser d'orphelins.
+  const handleCancel = () => {
+    const originalKeys = new Set(originalRef.current.map(imgKey));
+    images
+      .filter(img => !originalKeys.has(imgKey(img)))
+      .forEach(img => deleteSiteVisitImage(img));
+    onClose();
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-modal flex items-center justify-center" onMouseDown={onClose}>
+    <div className="fixed inset-0 bg-black/60 z-modal flex items-center justify-center" onMouseDown={handleCancel}>
       <div className="bg-white rounded-2xl shadow-2xl w-[560px] max-h-[90vh] overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200/60">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-xl bg-amber-50"><Pencil size={18} className="text-amber-600" /></div>
             <h3 className="text-sm font-bold text-gray-900">Modifier l'observation</h3>
           </div>
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-xl transition"><X size={16} className="text-gray-400" /></button>
+          <button onClick={handleCancel} className="p-1.5 hover:bg-gray-100 rounded-xl transition"><X size={16} className="text-gray-400" /></button>
         </div>
         <div className="p-6 space-y-4">
           <textarea value={text} onChange={(e) => setText(e.target.value)}
@@ -131,12 +174,13 @@ export function ObsEditModal({ isOpen, onClose, obs, onSave }) {
               Prendre une photo
             </button>
           </div>
+          {uploading && <p className="text-[11px] text-blue-600 text-center">Téléversement des photos…</p>}
           <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleAddImages} />
           <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleAddImages} />
         </div>
         <div className="px-6 py-4 border-t border-gray-200/60 flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-500 rounded-xl hover:bg-gray-100 transition">Annuler</button>
-          <button onClick={() => { onSave(text, images); onClose(); }} className="px-5 py-2 bg-gray-900 text-white text-sm font-medium rounded-xl hover:bg-gray-800 transition active:scale-[0.97]">Enregistrer</button>
+          <button onClick={handleCancel} className="px-4 py-2 text-sm font-medium text-gray-500 rounded-xl hover:bg-gray-100 transition">Annuler</button>
+          <button onClick={handleSave} disabled={uploading} className="px-5 py-2 bg-gray-900 text-white text-sm font-medium rounded-xl hover:bg-gray-800 transition active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed">Enregistrer</button>
         </div>
       </div>
     </div>

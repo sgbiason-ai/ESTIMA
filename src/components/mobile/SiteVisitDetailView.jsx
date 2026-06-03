@@ -10,6 +10,7 @@ import SiteVisitObsEditSheet from './SiteVisitObsEditSheet';
 import GpsTrackingSection from './GpsTrackingSection';
 import SaveStatusDot from './SaveStatusDot';
 import { fmtCoord, fmtDist } from '../../utils/geoHelpers';
+import { deleteSiteVisitImage } from '../../utils/siteVisitImageStorage';
 
 // ─── Sous-composants ───────────────────────────────────────────────────────
 
@@ -113,7 +114,7 @@ function ObsCard({ obs, number, onTap, onDelete, onViewImage }) {
 
 // ─── Composant principal ───────────────────────────────────────────────────
 
-export default function SiteVisitDetailView({ visit, onSave, saveStatus, onToast, isLandscape, branding }) {
+export default function SiteVisitDetailView({ visit, onSave, saveStatus, onToast, isLandscape, branding, companyId }) {
   const [activeSection, setActiveSection] = useState('observations');
   const [editingObs, setEditingObs] = useState(null);
   const [viewingImage, setViewingImage] = useState(null);
@@ -162,10 +163,11 @@ export default function SiteVisitDetailView({ visit, onSave, saveStatus, onToast
 
   const deleteObservation = useCallback((obsId) => {
     isUserEdit.current = true;
-    setLocalVisit(prev => ({
-      ...prev,
-      observations: (prev.observations || []).filter(o => o.id !== obsId),
-    }));
+    setLocalVisit(prev => {
+      const removed = (prev.observations || []).find(o => o.id === obsId);
+      for (const img of (removed?.images || [])) deleteSiteVisitImage(img);
+      return { ...prev, observations: (prev.observations || []).filter(o => o.id !== obsId) };
+    });
   }, []);
 
   const updateInfo = useCallback((patch) => {
@@ -270,6 +272,8 @@ export default function SiteVisitDetailView({ visit, onSave, saveStatus, onToast
             onClose={() => setEditingObs(null)}
             onViewImage={setViewingImage}
             inline
+            companyId={companyId}
+            visitId={localVisit.id}
           />
         ) : activeSection === 'observations' && (
           <div className="space-y-2">

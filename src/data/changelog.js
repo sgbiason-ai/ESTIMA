@@ -36,6 +36,7 @@ export const CHANGELOG = [
       'Export Excel : les logos maître d\'œuvre (MOE) et maître d\'ouvrage (MOA / client) ne se chevauchent plus dans l\'en-tête — ils sont désormais placés dans deux colonnes distinctes en haut à droite',
       'Visites de site : fiabilisation de la synchronisation. Si le réseau coupe pendant une visite (mobile ou desktop), la sauvegarde locale est désormais ré-envoyée automatiquement à la réouverture de la visite, et n\'est effacée qu\'une fois la synchronisation confirmée — fini les versions terrain qui n\'arrivaient pas sur le poste fixe',
       'Connexion Firebase plus stable sur mobile et tablette : la liaison temps-réel bascule automatiquement vers un mode plus robuste quand le réseau, le Wi-Fi d\'entreprise ou la 4G perturbent la connexion — nettement moins de « coupures / tentatives de reconnexion » sur le terrain',
+      'Visites de site : les photos sont désormais stockées sur Firebase Storage au lieu d\'être embarquées dans le document. Les fiches de visite restent légères même avec beaucoup de photos — fini les blocages de sauvegarde quand une visite contenait plusieurs clichés. Les anciennes photos restent lisibles ; les exports PDF intègrent toujours les images',
     ],
   },
   {

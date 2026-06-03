@@ -724,9 +724,58 @@ const buildObsMiniMap = async (obs, visit, THEME, obsIdx) => {
 
 // ─── PAGES OBSERVATIONS ───────────────────────────────────────────────────────
 
+// Precharge les images des observations en dataURL (jsPDF n'accepte pas une URL
+// Storage distante). Les photos Storage ({ src, path }) sont recuperees via le
+// SDK (getBlob), avec fallback fetch ; les anciennes base64 (string) restent telles quelles.
+const preloadObsImages = async (observations) => {
+  let fbGetBlob, fbRef, fbStorage;
+  try {
+    const fbMod = await import('firebase/storage');
+    fbGetBlob = fbMod.getBlob;
+    fbRef = fbMod.ref;
+    fbStorage = (await import('../firebase')).storage;
+  } catch { /* Firebase non disponible */ }
+
+  const blobToDataUrl = (blob) => new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(blob);
+  });
+
+  const cache = new Map();
+  for (const obs of observations) {
+    for (const imgEntry of (obs.images || [])) {
+      const src = typeof imgEntry === 'string' ? imgEntry : imgEntry?.src;
+      const path = typeof imgEntry === 'object' ? imgEntry?.path : null;
+      if (!src || cache.has(src)) continue;
+
+      let dataUri = null;
+      if (src.startsWith('data:')) {
+        dataUri = src;
+      } else if (path && fbGetBlob) {
+        try { dataUri = await blobToDataUrl(await fbGetBlob(fbRef(fbStorage, path))); } catch { /* fallback */ }
+      }
+      if (!dataUri && !src.startsWith('data:')) {
+        try {
+          const resp = await fetch(src);
+          if (resp.ok) dataUri = await blobToDataUrl(await resp.blob());
+        } catch { /* image ignoree */ }
+      }
+      if (dataUri) {
+        const img = await loadImage(dataUri).catch(() => null);
+        if (img) cache.set(src, { w: img.width, h: img.height, uri: dataUri });
+      }
+    }
+  }
+  return cache;
+};
+
 const drawObservations = async (doc, visit, THEME) => {
   const observations = visit.observations || [];
   if (!observations.length) return;
+
+  const imageCache = await preloadObsImages(observations);
 
   doc.addPage();
   let y = 20;
@@ -881,13 +930,12 @@ const drawObservations = async (doc, visit, THEME) => {
       for (let j = 0; j < images.length; j++) {
         const imgData = images[j];
         const imgSrc = typeof imgData === 'string' ? imgData : imgData.src;
+        const cached = imageCache.get(imgSrc);
+        if (!cached) continue; // image non chargee (Storage/fetch KO)
 
         try {
-          const loaded = await loadImage(imgSrc);
-          if (!loaded) continue;
-
-          const aspect = loaded.width / loaded.height;
-          let imgW = Math.min(maxImgW, loaded.width * 0.264);
+          const aspect = cached.w / cached.h;
+          let imgW = Math.min(maxImgW, cached.w * 0.264);
           let imgH = imgW / aspect;
           if (imgH > maxImgH) { imgH = maxImgH; imgW = imgH * aspect; }
           if (imgW > maxImgW) { imgW = maxImgW; imgH = imgW / aspect; }
@@ -901,7 +949,7 @@ const drawObservations = async (doc, visit, THEME) => {
           doc.setDrawColor(...THEME.borders);
           doc.setLineWidth(0.2);
           doc.roundedRect(imgX - 0.5, y - 0.5, imgW + 1, imgH + 1, 1, 1, 'S');
-          doc.addImage(imgSrc, 'JPEG', imgX, y, imgW, imgH);
+          doc.addImage(cached.uri, 'JPEG', imgX, y, imgW, imgH);
 
           if (typeof imgData === 'object' && imgData.lat != null && imgData.lng != null) {
             doc.setFont('Helvetica', 'italic');
