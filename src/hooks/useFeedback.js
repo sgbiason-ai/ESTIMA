@@ -7,7 +7,7 @@
 import { useEffect, useState } from 'react';
 import {
   collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc,
-  query, orderBy, serverTimestamp,
+  query, orderBy, limit, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -26,8 +26,13 @@ export const submitFeedback = (payload) =>
     createdAt: serverTimestamp(),
   });
 
+/** Nombre max de feedbacks chargés par l'abonnement temps réel (borne les reads). */
+const FEEDBACK_LIMIT = 100;
+
 /**
- * Abonnement temps réel à tous les feedbacks (super-admin uniquement).
+ * Abonnement temps réel aux feedbacks récents (super-admin uniquement).
+ * Borné à FEEDBACK_LIMIT (les 100 plus récents) pour éviter de charger toute
+ * la collection et faire croître les reads à chaque nouvel ajout.
  * @param {boolean} enabled - n'abonne que si vrai (évite les permission-denied)
  */
 export const useFeedbackList = (enabled) => {
@@ -38,7 +43,7 @@ export const useFeedbackList = (enabled) => {
   useEffect(() => {
     if (!enabled) { setLoading(false); return; }
     setLoading(true);
-    const q = query(collection(db, COL), orderBy('createdAt', 'desc'));
+    const q = query(collection(db, COL), orderBy('createdAt', 'desc'), limit(FEEDBACK_LIMIT));
     const unsub = onSnapshot(
       q,
       (snap) => {
