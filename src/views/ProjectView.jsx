@@ -351,13 +351,20 @@ const ProjectView = ({
     setFormulaBarState({ isEditing: true, displayValue: renderFormulaReadable(currentFormula) || '=', rawValue: currentFormula || '=' });
     setFormulaMode({
       isActive: true,
-      onInsert: (item) => {
+      // ⚠️ ItemList appelle onInsert(el.id) : l'argument est un ID, pas l'objet ligne.
+      // On résout la ligne depuis allItems (tolère aussi un objet par sécurité), sinon
+      // item.designation = undefined → la barre insérait « [] » au lieu de la tâche.
+      onInsert: (arg) => {
+        const item = (arg && typeof arg === 'object')
+          ? arg
+          : allItems.find(x => String(x.id) === String(arg));
+        if (!item) return;
         // Mémorise la ligne EXACTE cliquée pour cette désignation (préservée au commit même en doublon).
-        if (item?.designation) formulaBarSessionMap.current.set(item.designation, item.id);
+        if (item.designation) formulaBarSessionMap.current.set(item.designation, item.id);
         setFormulaBarState(prev => {
           const inputEl = formulaInputRef.current;
           const pos = inputEl ? inputEl.selectionStart : prev.displayValue.length;
-          const label = `[${item?.designation || ''}]`;
+          const label = `[${item.designation || ''}]`;
           const newDisplay = prev.displayValue.slice(0, pos) + label + prev.displayValue.slice(pos);
           return { ...prev, displayValue: newDisplay, rawValue: displayToRaw(newDisplay) };
         });

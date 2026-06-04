@@ -10,6 +10,7 @@ export const CHANGELOG = [
     date: '2026-06-04',
     title: 'Estimation : unité de la modale fidèle au DQE · Compte rendu : absence en rouge',
     highlights: [
+      'Estimation : dans la barre de formule ƒ(x), cliquer sur une tâche pour insérer sa référence n\'insérait que « [] » au lieu de la tâche — la référence (désignation de l\'article) est désormais correctement insérée',
       'Estimation : la fenêtre de modification d\'un article affiche enfin la bonne unité. Pour les articles importés avec une unité non standard (ex. « M2 », « m² », « ML »), la liste déroulante affichait par erreur « u - Unité » alors que le DQE montrait la vraie unité — elle reprend désormais fidèlement l\'unité de la ligne',
       'Compte rendu de chantier : l\'absence d\'un participant ressort enfin clairement — la présence « A » s\'affiche en pastille rouge pleine (lettre blanche sur fond rouge) partout : saisie sur ordinateur et mobile, aperçu écran, et exports PDF et Word',
     ],
