@@ -8,6 +8,7 @@ import { normalizeUnitSymbol } from './helpers';
 import { formatNumberFr, cleanText, loadLogos, drawCoverPage as _drawCoverPage } from './pdf/pdfSharedHelpers';
 import { buildTheme as _buildTheme } from './pdf/buildTheme';
 import { getCurrentPhaseCode } from './phaseModel';
+import { computeVatBreakdown } from './financeFormat';
 import { scoreOffer, computeOABThreshold as calculateOABThreshold } from './analysisCompute';
 
 // ─── COULEUR PRIMAIRE RAO : VERT PAPYRUS ────────────────────────────────────
@@ -1049,7 +1050,7 @@ export const generateRaoPDF = async (optionsParams) => {
     const summaryBody = summaryData.map((d, index) => {
       const origIdx = analysisCompanies.findIndex(c => c.name === d.name);
       const cStyle = getCompanyStyle(origIdx !== -1 ? origIdx : 0);
-      const ttc = d.total * 1.2;
+      const ttc = computeVatBreakdown(d.total).ttc;
       const isVariant = d.kind === 'variant';
       const displayName = isVariant
         ? `  > ${d.name} - V${d.variantIndex}${d.variantLabel ? ` (${d.variantLabel})` : ''}`
@@ -1420,13 +1421,14 @@ export const generateRaoPDF = async (optionsParams) => {
 
         // TVA 20%
         const tvaRate = 0.20;
-        const tvaEstTotal = trEstTotal * tvaRate;
+        const estVat = computeVatBreakdown(trEstTotal, tvaRate);
+        const tvaEstTotal = estVat.tva;
         const tvaRow = [{ content: 'TVA (20%)', colSpan: 4, styles: { fontStyle: 'bold', halign: 'right', fillColor: [245, 245, 250] } }, { content: '', styles: { fillColor: [245, 245, 250] } }, { content: formatNumberFr(tvaEstTotal), styles: { fontStyle: 'bold', halign: 'right', fillColor: [245, 245, 250] } }];
         detailColumns.forEach(col => {
           const isVar = col.kind === 'variant';
           let total = trColumnTotals[col.key] || 0;
           if (isVar) total += (col.newItems || []).reduce((s, it) => s + Number(it.lineTotal || (it.qty * it.price) || 0), 0);
-          const tva = total * tvaRate;
+          const tva = computeVatBreakdown(total, tvaRate).tva;
           if (isVar) tvaRow.push({ content: '', styles: { fillColor: [245, 245, 250] } });
           tvaRow.push({ content: '', styles: { fillColor: [245, 245, 250] } });
           tvaRow.push({ content: formatNumberFr(tva), styles: { halign: 'right', fillColor: [245, 245, 250] } });
@@ -1435,13 +1437,13 @@ export const generateRaoPDF = async (optionsParams) => {
         tableBody.push(tvaRow);
 
         // Total TTC
-        const ttcEstTotal = trEstTotal + tvaEstTotal;
+        const ttcEstTotal = estVat.ttc;
         const ttcRow = [{ content: `TOTAL ${hasTr ? tranche.name.toUpperCase() : 'GÉNÉRAL'} TTC`, colSpan: 4, styles: { fontStyle: 'bold', halign: 'right', fillColor: [209, 250, 229] } }, { content: '', styles: { fillColor: [209, 250, 229] } }, { content: formatNumberFr(ttcEstTotal), styles: { fontStyle: 'bold', halign: 'right', fillColor: [209, 250, 229] } }];
         detailColumns.forEach(col => {
           const isVar = col.kind === 'variant';
           let total = trColumnTotals[col.key] || 0;
           if (isVar) total += (col.newItems || []).reduce((s, it) => s + Number(it.lineTotal || (it.qty * it.price) || 0), 0);
-          const ttc = total * (1 + tvaRate);
+          const ttc = computeVatBreakdown(total, tvaRate).ttc;
           if (isVar) ttcRow.push({ content: '', styles: { fillColor: [209, 250, 229] } });
           ttcRow.push({ content: '', styles: { fillColor: [209, 250, 229] } });
           ttcRow.push({ content: formatNumberFr(ttc), styles: { fontStyle: 'bold', halign: 'right', fillColor: [209, 250, 229] } });
@@ -2169,7 +2171,7 @@ export const generateRaoPDF = async (optionsParams) => {
     lines.forEach(ln => { doc.text(ln, W / 2, textY, { align: 'center' }); textY += lineH; });
     doc.setFont('Helvetica', 'normal');
     doc.setFontSize(8);
-    doc.text(`Score : ${fmtScore(winner.totalScore)} / 100  —  Montant : ${fmt(winner.price)} € HT  —  ${fmt(winner.price * 1.2)} € TTC`, W / 2, textY + 2, { align: 'center' });
+    doc.text(`Score : ${fmtScore(winner.totalScore)} / 100  —  Montant : ${fmt(winner.price)} € HT  —  ${fmt(computeVatBreakdown(winner.price).ttc)} € TTC`, W / 2, textY + 2, { align: 'center' });
   }
 
   // ─────────────────────────────────────────────────────────────────────────

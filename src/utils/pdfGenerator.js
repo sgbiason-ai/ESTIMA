@@ -9,6 +9,7 @@ import { saveFileWithPicker, FILE_TYPES, PICKER_IDS } from './fileSaver';
 import { sanitizeFilename, loadLogos, drawCoverPage as _drawCoverPage } from './pdf/pdfSharedHelpers';
 import { buildTheme } from './pdf/buildTheme';
 import { getCurrentPhaseCode } from './phaseModel';
+import { computeVatBreakdown } from './financeFormat';
 
 const cleanFormat = (num) => {
   if (num === undefined || num === null || num === '' || isNaN(num)) return "0,00";
@@ -371,12 +372,15 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
       }
       const marginX = 10;
       const rightAlignX = doc.internal.pageSize.width - marginX;
+      // TTC = HT + TVA via helper unique (audit F1). globalTotal étant déjà une somme de
+      // lignes arrondies au centime, l'affichage est inchangé ici — garde-fou + cohérence inter-exports.
+      const { ht, tva, ttc } = computeVatBreakdown(globalTotal);
       doc.setFontSize(9); doc.setFont("Helvetica", "bold");
-      doc.text(`TOTAL GÉNÉRAL HT (Hors PSE) : ${cleanFormat(globalTotal)} €`, rightAlignX, currentY + 5, { align: 'right' });
+      doc.text(`TOTAL GÉNÉRAL HT (Hors PSE) : ${cleanFormat(ht)} €`, rightAlignX, currentY + 5, { align: 'right' });
       doc.setFont("Helvetica", "normal");
-      doc.text(`T.V.A. (20%) : ${cleanFormat(globalTotal * 0.2)} €`, rightAlignX, currentY + 11, { align: 'right' });
+      doc.text(`T.V.A. (20%) : ${cleanFormat(tva)} €`, rightAlignX, currentY + 11, { align: 'right' });
       doc.setFontSize(11); doc.setFont("Helvetica", "bold");
-      doc.text(`TOTAL GÉNÉRAL TTC : ${cleanFormat(globalTotal * 1.2)} €`, rightAlignX, currentY + 19, { align: 'right' });
+      doc.text(`TOTAL GÉNÉRAL TTC : ${cleanFormat(ttc)} €`, rightAlignX, currentY + 19, { align: 'right' });
     }
 
     // Pages PSE

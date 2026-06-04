@@ -1,6 +1,7 @@
 // src/utils/excelGenerator.js
 import ExcelJS from 'exceljs';
 import { getItemRefMap, cleanText, normalizeUnitSymbol } from './helpers';
+import { roundEuro } from './financeFormat';
 import { saveFileWithPicker, FILE_TYPES, PICKER_IDS } from './fileSaver';
 
 // ─── HELPERS IMAGE ────────────────────────────────────────────────────────────
@@ -225,9 +226,10 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
           totalCell.value = isDQE ? '' : 'PM';
           if (!isDQE) { totalCell.font = fonts.pmStyle; totalCell.alignment = { horizontal: 'right' }; }
         } else {
+          // Arrondi à la ligne (ROUND) pour coïncider au centime avec le PDF (audit F3).
           totalCell.value = isDQE
-            ? { formula: `IF(E${currentRowNum}="","",D${currentRowNum}*E${currentRowNum})` }
-            : { formula: `D${currentRowNum}*E${currentRowNum}`, result: qty * price };
+            ? { formula: `IF(E${currentRowNum}="","",ROUND(D${currentRowNum}*E${currentRowNum},2))` }
+            : { formula: `ROUND(D${currentRowNum}*E${currentRowNum},2)`, result: roundEuro(qty * price) };
           totalCell.numFmt = '#,##0.00 €';
         }
         rowItem.getCell(1).alignment = { horizontal: 'center' };
@@ -317,8 +319,9 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
     worksheet.addRow([]);
     const totalBaseFormula = mainSubTotalsRefs.length > 0 ? mainSubTotalsRefs.map(r => r.ref).join('+') : "0";
     const rowTotalHT = addTotalRow(worksheet, 'TOTAL GÉNÉRAL HT (Hors PSE)', totalBaseFormula, false);
-    addTotalRow(worksheet, 'TVA (20%)', `F${rowTotalHT}*0.2`, false);
-    addTotalRow(worksheet, 'TOTAL GÉNÉRAL TTC', `F${rowTotalHT}*1.2`, true);
+    // TTC = HT + TVA (et non HT × 1.2 recalculé) pour garantir HT + TVA = TTC (audit F1).
+    const rowTotalTVA = addTotalRow(worksheet, 'TVA (20%)', `ROUND(F${rowTotalHT}*0.2,2)`, false);
+    addTotalRow(worksheet, 'TOTAL GÉNÉRAL TTC', `F${rowTotalHT}+F${rowTotalTVA}`, true);
 
     // Mémorise les références (feuille + ligne) pour alimenter le récapitulatif.
     if (summarySheet) {
@@ -348,8 +351,8 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
             const pseTotalFormula = pseSubTotalsRefs.map(r => r.ref).join('+');
             worksheet.addRow([]);
             const rowPseHT = addTotalRow(worksheet, `TOTAL HT (${pseTitle})`, pseTotalFormula, false, true);
-            addTotalRow(worksheet, `TVA (20%)`, `F${rowPseHT}*0.2`, false, true);
-            addTotalRow(worksheet, `TOTAL TTC (${pseTitle})`, `F${rowPseHT}*1.2`, false, true);
+            const rowPseTVA = addTotalRow(worksheet, `TVA (20%)`, `ROUND(F${rowPseHT}*0.2,2)`, false, true);
+            addTotalRow(worksheet, `TOTAL TTC (${pseTitle})`, `F${rowPseHT}+F${rowPseTVA}`, false, true);
           }
         }
       });
