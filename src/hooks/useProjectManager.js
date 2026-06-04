@@ -4,6 +4,8 @@ import { doc, getDoc, setDoc, addDoc, collection, serverTimestamp } from 'fireba
 import { db } from '../firebase';
 import { generateId } from '../utils/helpers';
 import { recalculateProject } from '../utils/projectCalculations';
+import { loadDraft, clearDraft } from './useRobustSave';
+import { toast } from '../utils/globalUI';
 
 // Legacy localStorage key — conservé pour migration one-shot vers Firestore prefs.
 const lastProjectKey = (companyId) => `last_active_project_id__${companyId}`;
@@ -24,6 +26,25 @@ export const useProjectManager = (user, companyId) => {
     if (!user || !companyId) return;
 
     const loadProject = async () => {
+      // Restaure un brouillon localStorage plus récent que la version cloud
+      // (anti perte de travail : reprise après crash/fermeture avant envoi). Idem CRC.
+      const restoreDraftIfNewer = (loaded) => {
+        if (!loaded?.id) return loaded;
+        const key = `draft_estima_${loaded.id}`;
+        const draft = loadDraft(key);
+        if (!draft) return loaded;
+        const draftAt = draft._draftAt || 0;
+        const firestoreAt = loaded.lastSaved ? new Date(loaded.lastSaved).getTime() : 0;
+        if (draftAt > firestoreAt) {
+          const { _draftAt, ...clean } = draft;
+          toast.warning('Brouillon local restauré (dernière modification non envoyée au cloud).', { duration: 6000 });
+          clearDraft(key);
+          return clean;
+        }
+        clearDraft(key);
+        return loaded;
+      };
+
       try {
         // 1. Lire la pref Firestore
         const prefsRef = doc(db, 'users', user.uid, 'preferences', 'modules');
@@ -53,7 +74,7 @@ export const useProjectManager = (user, companyId) => {
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
-          setProject(docSnap.data());
+          setProject(restoreDraftIfNewer(docSnap.data()));
           setProjectVersion(v => v + 1);
           return;
         }
@@ -64,7 +85,7 @@ export const useProjectManager = (user, companyId) => {
           const fallbackRef  = doc(db, 'companies', companyId, 'projects', 'draft_project');
           const fallbackSnap = await getDoc(fallbackRef);
           if (fallbackSnap.exists()) {
-            setProject(fallbackSnap.data());
+            setProject(restoreDraftIfNewer(fallbackSnap.data()));
             setProjectVersion(v => v + 1);
           }
         }

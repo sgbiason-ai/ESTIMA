@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { useStableHash } from '../hooks/useStableHash';
+import { useRobustSave } from '../hooks/useRobustSave';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Plus, Trash2, GripVertical, Layers, HelpCircle, AlertTriangle } from 'lucide-react';
 
@@ -458,50 +459,48 @@ const ProjectView = ({
     }
   };
 
-  const [saveStatus, setSaveStatus] = useState('saved');
-  const saveTimeoutRef = useRef(null);
+  // ── Sauvegarde robuste : debounce + brouillon localStorage + flush
+  //    (beforeunload / pagehide / visibilitychange) + retry. Même socle que le CRC.
   const projectHash = useStableHash(project);
-  const lastSavedHashRef = useRef(projectHash);
+  const lastTriggeredHashRef = useRef(projectHash);
+  const lastProjectIdRef = useRef(project?.id);
 
+  const draftKey = project?.id ? `draft_estima_${project.id}` : null;
+  const { saveStatus, triggerSave, forceSave } = useRobustSave({
+    saveFn: onSaveProject,
+    draftKey,
+    debounceMs: 2000,
+  });
+
+  // Déclenche l'autosave à chaque modification réelle. Un changement de projet
+  // (chargement initial / ouverture cloud) resynchronise le hash SANS sauvegarder
+  // (évite l'écriture parasite que provoquait l'ancien autosave au chargement).
   useEffect(() => {
     if (isReadOnly || !project) return;
-    if (projectHash === lastSavedHashRef.current) return;
-
-    setSaveStatus('waiting');
-    if (onSaveStatusChange) onSaveStatusChange('waiting');
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-
-    saveTimeoutRef.current = setTimeout(async () => {
-      if (onSaveProject) {
-        setSaveStatus('saving');
-        if (onSaveStatusChange) onSaveStatusChange('saving');
-        try {
-          await onSaveProject(project);
-          setSaveStatus('saved');
-          if (onSaveStatusChange) onSaveStatusChange('saved');
-          lastSavedHashRef.current = projectHash;
-        } catch { setSaveStatus('error'); if (onSaveStatusChange) onSaveStatusChange('error'); }
-      }
-    }, 2000);
-    return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
-  }, [projectHash, onSaveProject, isReadOnly, onSaveStatusChange]);
-
-  // Sauvegarde cloud manuelle (bouton) avec mise à jour du statut
-  const handleManualCloudSave = async () => {
-    if (!onSaveProject || !project) return;
-    // Annuler l'auto-save en cours pour éviter un double appel
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    setSaveStatus('saving');
-    if (onSaveStatusChange) onSaveStatusChange('saving');
-    try {
-      await onSaveProject(project);
-      setSaveStatus('saved');
-      if (onSaveStatusChange) onSaveStatusChange('saved');
-      lastSavedHashRef.current = projectHash;
-    } catch {
-      setSaveStatus('error');
-      if (onSaveStatusChange) onSaveStatusChange('error');
+    if (project.id !== lastProjectIdRef.current) {
+      lastProjectIdRef.current = project.id;
+      lastTriggeredHashRef.current = projectHash;
+      return;
     }
+    if (projectHash === lastTriggeredHashRef.current) return;
+    lastTriggeredHashRef.current = projectHash;
+    triggerSave(project);
+  }, [projectHash, isReadOnly, project, triggerSave]);
+
+  // 'idle' (état initial du hook) affiché comme 'saved' dans l'UI existante.
+  const displayStatus = saveStatus === 'idle' ? 'saved' : saveStatus;
+
+  // Remonte le statut au conteneur (App.jsx → ProjectToolbar).
+  useEffect(() => {
+    if (onSaveStatusChange) onSaveStatusChange(displayStatus);
+  }, [displayStatus, onSaveStatusChange]);
+
+  // Sauvegarde cloud manuelle (bouton) / relance après erreur : flush immédiat
+  // sans attendre le debounce.
+  const handleManualCloudSave = () => {
+    if (!onSaveProject || !project) return;
+    triggerSave(project);
+    forceSave();
   };
 
   const handleUpdateItem = (type, id, field, value) => {
@@ -690,7 +689,7 @@ const ProjectView = ({
 
         <div className="flex-1 flex flex-col overflow-hidden">
           <ProjectToolbar
-            project={project} updateProjectName={updateProjectName} saveStatus={saveStatus} onSaveProject={handleManualCloudSave}
+            project={project} updateProjectName={updateProjectName} saveStatus={displayStatus} onSaveProject={handleManualCloudSave}
             isReadOnly={isReadOnly} showBpu={showBpu} setShowBpu={setShowBpu} currentMode={currentMode} setViewMode={setViewMode}
             showComparison={showComparison} setShowComparison={setShowComparison} totalBase={totalBase} activeTrancheId={activeTrancheId}
             onExport={(format, type) => {
