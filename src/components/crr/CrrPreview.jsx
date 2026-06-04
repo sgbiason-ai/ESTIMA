@@ -228,10 +228,14 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
                           <span className="inline-block px-1.5 py-0.5 rounded text-[8px] font-bold" style={{ backgroundColor: `${primary}22`, color: primary }}>C</span>
                         )}
                       </td>
-                      <td className="text-center border border-slate-200 font-bold text-[9px]" style={{
-                        color: att === 'present' ? 'rgb(22,130,76)' : att === 'excused' ? 'rgb(180,120,20)' : att === 'not_summoned' ? 'rgb(168,85,247)' : 'rgb(160,170,180)',
-                      }}>
-                        {att === 'present' ? 'P' : att === 'excused' ? 'E' : att === 'not_summoned' ? 'NC' : 'A'}
+                      <td className="text-center border border-slate-200 font-bold text-[9px]">
+                        {att === 'absent' ? (
+                          <span className="inline-block px-1.5 py-0.5 rounded text-[8px] font-bold" style={{ backgroundColor: 'rgb(239,68,68)', color: 'white' }}>A</span>
+                        ) : (
+                          <span style={{ color: att === 'present' ? 'rgb(22,130,76)' : att === 'excused' ? 'rgb(180,120,20)' : 'rgb(168,85,247)' }}>
+                            {att === 'present' ? 'P' : att === 'excused' ? 'E' : 'NC'}
+                          </span>
+                        )}
                       </td>
                       <td className="text-center border border-slate-200">
                         {diff && (

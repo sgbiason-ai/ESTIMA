@@ -15,7 +15,7 @@ const PresenceButton = ({ value, onChange }) => {
   const display = {
     present:       { label: 'P',  cls: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
     excused:       { label: 'E',  cls: 'bg-amber-100 text-amber-700 border-amber-300' },
-    absent:        { label: 'A',  cls: 'bg-slate-100 text-slate-400 border-slate-200' },
+    absent:        { label: 'A',  cls: 'bg-red-500 text-white border-red-600' },
     not_summoned:  { label: 'NC', cls: 'bg-purple-100 text-purple-700 border-purple-300' },
   };
 

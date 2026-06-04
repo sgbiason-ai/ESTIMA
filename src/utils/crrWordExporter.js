@@ -138,7 +138,10 @@ export const generateWordCrr = (meeting, crrConfig, projectName = '', branding =
         html += `<td style="text-align:center">${contact.cpr ? `<span style="display:inline-block;padding:1px 4px;border-radius:3px;font-size:7pt;font-weight:bold;background:${primary}22;color:${primary}">C</span>` : ''}</td>`;
         const presColor = att === 'present' ? '#16823c' : att === 'excused' ? '#b47814' : att === 'not_summoned' ? '#a855f7' : '#a0aab4';
         const presLetter = att === 'present' ? 'P' : att === 'excused' ? 'E' : att === 'not_summoned' ? 'NC' : 'A';
-        html += `<td style="text-align:center;font-weight:bold;font-size:8pt;color:${presColor}">${presLetter}</td>`;
+        const presCell = att === 'absent'
+          ? `<span style="display:inline-block;padding:1px 5px;border-radius:3px;font-size:8pt;font-weight:bold;background:#dc2626;color:#ffffff">A</span>`
+          : `<span style="color:${presColor}">${presLetter}</span>`;
+        html += `<td style="text-align:center;font-weight:bold;font-size:8pt">${presCell}</td>`;
         html += `<td style="text-align:center">${diff ? '<span style="display:inline-block;padding:1px 4px;border-radius:3px;font-size:7pt;font-weight:bold;background:#e6f2ff;color:#1e5aaa">D</span>' : ''}</td>`;
         html += `</tr>`;
       });

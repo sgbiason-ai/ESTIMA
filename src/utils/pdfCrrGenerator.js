@@ -444,15 +444,19 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
           drawBadgeLabel(doc, data.cell, 'C', THEME.primary, lightenRgb(THEME.primary, 0.82), fontH);
         }
       }
-      // Col 6 : Presence — lettre seule (legende en bas du tableau)
+      // Col 6 : Presence — lettre seule (legende en bas du tableau).
+      // Absent : pastille rouge pleine (lettre blanche) pour bien marquer l'absence.
       if (data.column.index === 6) {
-        const presMap = { present: 'P', excused: 'E', not_summoned: 'NC', absent: 'A' };
-        const letter = presMap[row.att] || 'A';
-        const colorMap = { present: THEME.presentTxt, excused: THEME.excusedTxt, not_summoned: [168, 85, 247], absent: [160, 170, 180] };
-        doc.setFont(fontH, 'bold');
-        doc.setFontSize(6.5);
-        doc.setTextColor(...(colorMap[row.att] || colorMap.absent));
-        doc.text(letter, data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2 + 1, { align: 'center' });
+        if (row.att === 'absent') {
+          drawBadgeLabel(doc, data.cell, 'A', [255, 255, 255], [220, 38, 38], fontH);
+        } else {
+          const presMap = { present: 'P', excused: 'E', not_summoned: 'NC' };
+          const colorMap = { present: THEME.presentTxt, excused: THEME.excusedTxt, not_summoned: [168, 85, 247] };
+          doc.setFont(fontH, 'bold');
+          doc.setFontSize(6.5);
+          doc.setTextColor(...(colorMap[row.att] || THEME.presentTxt));
+          doc.text(presMap[row.att] || 'A', data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2 + 1, { align: 'center' });
+        }
       }
       // Col 7 : Diffusion badge
       if (data.column.index === 7) {

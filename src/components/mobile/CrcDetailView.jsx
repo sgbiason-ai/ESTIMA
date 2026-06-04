@@ -32,7 +32,7 @@ const presenceShort = (value) => {
 const presenceColor = (value) => {
   if (value === 'present') return 'text-blue-600 bg-blue-50';
   if (value === 'excused') return 'text-amber-400 bg-amber-500/15';
-  if (value === 'absent') return 'text-red-400 bg-red-500/15';
+  if (value === 'absent') return 'text-white bg-red-500';
   return 'text-gray-700 bg-gray-500/10';
 };
 
