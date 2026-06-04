@@ -318,9 +318,13 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
 
     worksheet.addRow([]);
     const totalBaseFormula = mainSubTotalsRefs.length > 0 ? mainSubTotalsRefs.map(r => r.ref).join('+') : "0";
+    // Taux de TVA configurable par projet (défaut 20 %) — audit F2.
+    const tvaRatePct = Number(project?.tauxTVA ?? 20);
+    const tvaRate = tvaRatePct / 100;
+    const tvaLabel = `TVA (${String(tvaRatePct).replace('.', ',')}%)`;
     const rowTotalHT = addTotalRow(worksheet, 'TOTAL GÉNÉRAL HT (Hors PSE)', totalBaseFormula, false);
-    // TTC = HT + TVA (et non HT × 1.2 recalculé) pour garantir HT + TVA = TTC (audit F1).
-    const rowTotalTVA = addTotalRow(worksheet, 'TVA (20%)', `ROUND(F${rowTotalHT}*0.2,2)`, false);
+    // TTC = HT + TVA (et non HT × taux recalculé) pour garantir HT + TVA = TTC (audit F1).
+    const rowTotalTVA = addTotalRow(worksheet, tvaLabel, `ROUND(F${rowTotalHT}*${tvaRate},2)`, false);
     addTotalRow(worksheet, 'TOTAL GÉNÉRAL TTC', `F${rowTotalHT}+F${rowTotalTVA}`, true);
 
     // Mémorise les références (feuille + ligne) pour alimenter le récapitulatif.
@@ -351,7 +355,7 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
             const pseTotalFormula = pseSubTotalsRefs.map(r => r.ref).join('+');
             worksheet.addRow([]);
             const rowPseHT = addTotalRow(worksheet, `TOTAL HT (${pseTitle})`, pseTotalFormula, false, true);
-            const rowPseTVA = addTotalRow(worksheet, `TVA (20%)`, `ROUND(F${rowPseHT}*0.2,2)`, false, true);
+            const rowPseTVA = addTotalRow(worksheet, tvaLabel, `ROUND(F${rowPseHT}*${tvaRate},2)`, false, true);
             addTotalRow(worksheet, `TOTAL TTC (${pseTitle})`, `F${rowPseHT}+F${rowPseTVA}`, false, true);
           }
         }

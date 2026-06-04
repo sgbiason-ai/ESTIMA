@@ -4,7 +4,7 @@ import {
   Ruler, Briefcase, Clock, Hash, CheckCircle2,
   Hourglass, Navigation, Move, AlertTriangle, Upload, Trash2, ImageIcon,
   FileText, Globe2, ShieldAlert, Layers, PenLine, ToggleLeft, ToggleRight,
-  Eye, RefreshCw, Link, Plus, Download
+  Eye, RefreshCw, Link, Plus, Download, Percent
 } from 'lucide-react';
 import { buildCoverPageCanvas } from '../../utils/coverPageCanvas';
 import { getProjectPhases, getCurrentPhase } from '../../utils/phaseModel';
@@ -164,7 +164,7 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
   const [formData, setFormData] = useState({
     name: '', subtitle1: '', subtitle2: '',
     client: '', clientAddress: '', clientZip: '', clientCity: '',
-    moe: 'PAPYRUS', code: '', location: '', marketType: 'Privé',
+    moe: 'PAPYRUS', code: '', location: '', marketType: 'Privé', tauxTVA: 20,
     phase: 'DCE', dateRemise: '', timeRemise: '', duration: '', prepPeriod: '1 mois',
     clientLogo: null, projectDescription: '', hasPSE: 'ne comporte pas', department: '',
     showSignatures: true,
@@ -263,6 +263,7 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
         clientCity: project.clientCity || '', moe: project.moe || 'PAPYRUS',
         code: project.code || '', location: project.location || '',
         marketType: project.marketType || 'Privé',
+        tauxTVA: project.tauxTVA ?? 20,
         phases: getProjectPhases(project),
         phase: getCurrentPhase(project)?.id || project.phase || 'DCE',
         dateRemise: project.dateRemise || today, timeRemise: project.timeRemise || '',
@@ -308,7 +309,8 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!isFormValid) return;
-    onSave(formData);
+    const tauxTVA = Number(formData.tauxTVA);
+    onSave({ ...formData, tauxTVA: Number.isFinite(tauxTVA) ? tauxTVA : 20 });
     onClose();
   };
 
@@ -399,6 +401,8 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
               <ModernInput label="Maître d'Oeuvre (MOE)" name="moe" value={formData.moe} onChange={handleChange} icon={Ruler} placeholder="PAPYRUS" error={errors.moe} />
               <ModernSelect label="Type de Marché" name="marketType" value={formData.marketType} onChange={handleChange} icon={Briefcase}
                 options={[{ value: 'Privé', label: 'Marché Privé' }, { value: 'Public', label: 'Marché Public' }, { value: 'Sous-traitance', label: 'Sous-traitance' }]} />
+              <ModernSelect label="Taux de TVA" name="tauxTVA" value={String(formData.tauxTVA)} onChange={handleChange} icon={Percent}
+                options={[{ value: '20', label: '20 % (taux normal)' }, { value: '10', label: '10 % (intermédiaire)' }, { value: '5.5', label: '5,5 % (réduit)' }, { value: '0', label: '0 % (exonéré / autoliquidation)' }]} />
             </div>
 
             {/* COL 4 — PLANNING */}

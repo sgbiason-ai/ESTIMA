@@ -33,6 +33,7 @@ describe('normalizeProject — champs de base', () => {
     expect(p.tranches).toEqual([]);
     expect(p.sourceIds).toEqual([]);
     expect(p.clientPercent).toBe(10);
+    expect(p.tauxTVA).toBe(20);
     expect(p.subtitle1).toBe('');
     expect(p.subtitle2).toBe('');
     expect(p.showSignatures).toBe(false);
@@ -49,6 +50,11 @@ describe('normalizeProject — champs de base', () => {
   it('conserve un scoringConfig existant', () => {
     const p = normalizeProject({ scoringConfig: { maxScore: 60, mode: 'f3' } });
     expect(p.scoringConfig).toEqual({ maxScore: 60, mode: 'f3' });
+  });
+
+  it('conserve un taux de TVA personnalisé (taux réduit)', () => {
+    expect(normalizeProject({ tauxTVA: 5.5 }).tauxTVA).toBe(5.5);
+    expect(normalizeProject({ tauxTVA: 0 }).tauxTVA).toBe(0);
   });
 
   it('initialise rao avec les champs attendus', () => {

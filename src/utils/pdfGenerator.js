@@ -372,13 +372,13 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
       }
       const marginX = 10;
       const rightAlignX = doc.internal.pageSize.width - marginX;
-      // TTC = HT + TVA via helper unique (audit F1). globalTotal étant déjà une somme de
-      // lignes arrondies au centime, l'affichage est inchangé ici — garde-fou + cohérence inter-exports.
-      const { ht, tva, ttc } = computeVatBreakdown(globalTotal);
+      // Taux de TVA configurable par projet (défaut 20 %). TTC = HT + TVA (audit F1/F2).
+      const tvaRatePct = Number(project?.tauxTVA ?? 20);
+      const { ht, tva, ttc } = computeVatBreakdown(globalTotal, tvaRatePct / 100);
       doc.setFontSize(9); doc.setFont("Helvetica", "bold");
       doc.text(`TOTAL GÉNÉRAL HT (Hors PSE) : ${cleanFormat(ht)} €`, rightAlignX, currentY + 5, { align: 'right' });
       doc.setFont("Helvetica", "normal");
-      doc.text(`T.V.A. (20%) : ${cleanFormat(tva)} €`, rightAlignX, currentY + 11, { align: 'right' });
+      doc.text(`T.V.A. (${String(tvaRatePct).replace('.', ',')}%) : ${cleanFormat(tva)} €`, rightAlignX, currentY + 11, { align: 'right' });
       doc.setFontSize(11); doc.setFont("Helvetica", "bold");
       doc.text(`TOTAL GÉNÉRAL TTC : ${cleanFormat(ttc)} €`, rightAlignX, currentY + 19, { align: 'right' });
     }

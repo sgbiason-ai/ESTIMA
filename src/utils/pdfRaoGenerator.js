@@ -293,6 +293,10 @@ export const generateRaoPDF = async (optionsParams) => {
     optionChapters = [], includedOptions = {},
   } = optionsParams;
 
+  // Taux de TVA configurable par projet (défaut 20 %), partagé par toutes les sorties RAO (audit F2).
+  const projectTvaRate = Number(project?.tauxTVA ?? 20) / 100;
+  const projectTvaPct = String(Number(project?.tauxTVA ?? 20)).replace('.', ',');
+
   const { default: jsPDF } = await import('jspdf');
   const { default: autoTable } = await import('jspdf-autotable');
 
@@ -1050,7 +1054,7 @@ export const generateRaoPDF = async (optionsParams) => {
     const summaryBody = summaryData.map((d, index) => {
       const origIdx = analysisCompanies.findIndex(c => c.name === d.name);
       const cStyle = getCompanyStyle(origIdx !== -1 ? origIdx : 0);
-      const ttc = computeVatBreakdown(d.total).ttc;
+      const ttc = computeVatBreakdown(d.total, projectTvaRate).ttc;
       const isVariant = d.kind === 'variant';
       const displayName = isVariant
         ? `  > ${d.name} - V${d.variantIndex}${d.variantLabel ? ` (${d.variantLabel})` : ''}`
@@ -1420,10 +1424,10 @@ export const generateRaoPDF = async (optionsParams) => {
         tableBody.push(totalRow);
 
         // TVA 20%
-        const tvaRate = 0.20;
+        const tvaRate = projectTvaRate;
         const estVat = computeVatBreakdown(trEstTotal, tvaRate);
         const tvaEstTotal = estVat.tva;
-        const tvaRow = [{ content: 'TVA (20%)', colSpan: 4, styles: { fontStyle: 'bold', halign: 'right', fillColor: [245, 245, 250] } }, { content: '', styles: { fillColor: [245, 245, 250] } }, { content: formatNumberFr(tvaEstTotal), styles: { fontStyle: 'bold', halign: 'right', fillColor: [245, 245, 250] } }];
+        const tvaRow = [{ content: `TVA (${projectTvaPct}%)`, colSpan: 4, styles: { fontStyle: 'bold', halign: 'right', fillColor: [245, 245, 250] } }, { content: '', styles: { fillColor: [245, 245, 250] } }, { content: formatNumberFr(tvaEstTotal), styles: { fontStyle: 'bold', halign: 'right', fillColor: [245, 245, 250] } }];
         detailColumns.forEach(col => {
           const isVar = col.kind === 'variant';
           let total = trColumnTotals[col.key] || 0;
@@ -2171,7 +2175,7 @@ export const generateRaoPDF = async (optionsParams) => {
     lines.forEach(ln => { doc.text(ln, W / 2, textY, { align: 'center' }); textY += lineH; });
     doc.setFont('Helvetica', 'normal');
     doc.setFontSize(8);
-    doc.text(`Score : ${fmtScore(winner.totalScore)} / 100  —  Montant : ${fmt(winner.price)} € HT  —  ${fmt(computeVatBreakdown(winner.price).ttc)} € TTC`, W / 2, textY + 2, { align: 'center' });
+    doc.text(`Score : ${fmtScore(winner.totalScore)} / 100  —  Montant : ${fmt(winner.price)} € HT  —  ${fmt(computeVatBreakdown(winner.price, projectTvaRate).ttc)} € TTC`, W / 2, textY + 2, { align: 'center' });
   }
 
   // ─────────────────────────────────────────────────────────────────────────

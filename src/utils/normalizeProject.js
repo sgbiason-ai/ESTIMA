@@ -217,6 +217,7 @@ export function normalizeProject(raw) {
 
     // Calcul
     clientPercent:  num(raw.clientPercent, 10),
+    tauxTVA:        num(raw.tauxTVA, 20),
     scoringConfig:  normalizeScoringConfig(raw.scoringConfig),
 
     // Arbre des chapitres
