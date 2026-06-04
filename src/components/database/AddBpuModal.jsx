@@ -203,6 +203,11 @@ const AddBpuModal = ({ isOpen, onClose, onAdd, units, categories = [], bpuConfig
               <div className="col-span-2">
                  <label className={labelClass}>Unité</label>
                  <select value={formData.unit} onChange={(e) => setFormData({...formData, unit: e.target.value})} className={`${inputClass} cursor-pointer`}>
+                   {/* Article dupliqué avec une unité hors liste (ex. "M2", "m²") : on la conserve brute
+                       pour rester fidèle au DQE, au lieu de retomber sur la 1re option ("u - Unité"). */}
+                   {formData.unit && !units.some(u => u.symbol === formData.unit) && (
+                     <option value={formData.unit}>{formData.unit}</option>
+                   )}
                    {units.map(u => (<option key={u.symbol} value={u.symbol}>{u.symbol} - {u.label}</option>))}
                  </select>
               </div>

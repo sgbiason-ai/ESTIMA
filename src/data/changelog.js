@@ -2,9 +2,18 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.12.0';
+export const APP_VERSION = '2.12.1';
 
 export const CHANGELOG = [
+  {
+    version: '2.12.1',
+    date: '2026-06-04',
+    title: 'Estimation : unité de la modale fidèle au DQE · Compte rendu : absence en rouge',
+    highlights: [
+      'Estimation : la fenêtre de modification d\'un article affiche enfin la bonne unité. Pour les articles importés avec une unité non standard (ex. « M2 », « m² », « ML »), la liste déroulante affichait par erreur « u - Unité » alors que le DQE montrait la vraie unité — elle reprend désormais fidèlement l\'unité de la ligne',
+      'Compte rendu de chantier : l\'absence d\'un participant ressort enfin clairement — la présence « A » s\'affiche en pastille rouge pleine (lettre blanche sur fond rouge) partout : saisie sur ordinateur et mobile, aperçu écran, et exports PDF et Word',
+    ],
+  },
   {
     version: '2.12.0',
     date: '2026-06-02',
