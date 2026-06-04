@@ -154,6 +154,14 @@ describe('computeChaptersData', () => {
     expect(i1.maxPU).toBe(120);
   });
 
+  it('repli quantité 0 quand l\'item est absent de la carte de quantités (alignement desktop/mobile, audit F4)', () => {
+    const data = computeChaptersData(project, companies, { i1: 10 }); // i2 absent de la carte
+    const i2 = data[0].items[1];
+    expect(i2.activeQty).toBe(0);
+    expect(i2.estimationTotal).toBe(0);
+    expect(i2.companyData.A.lineTotal).toBe(0);
+  });
+
   it('retourne [] si le projet est vide', () => {
     expect(computeChaptersData(null, companies, qtyMap)).toEqual([]);
   });

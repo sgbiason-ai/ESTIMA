@@ -16,6 +16,7 @@ export const CHANGELOG = [
       'Estimation : sauvegarde renforcée contre la perte de travail — une alerte prévient si vous fermez l\'onglet alors qu\'une modification n\'est pas encore envoyée au cloud, et un brouillon local est conservé puis restauré automatiquement après une coupure réseau ou une fermeture accidentelle (même fiabilité que les comptes rendus de chantier)',
       'Exactitude financière : les totaux HT / TVA / TTC sont désormais rigoureusement cohérents (HT + TVA = TTC au centime) et les exports PDF et Excel d\'un même devis affichent exactement les mêmes montants (arrondi à la ligne harmonisé). Concerne l\'estimation, le DQE et le rapport d\'analyse des offres',
       'Taux de TVA paramétrable par projet : dans la fiche projet, choisissez 20 %, 10 %, 5,5 % ou 0 % (exonéré / autoliquidation). Le taux retenu est appliqué et affiché sur tous les exports — estimation, DQE (PDF et Excel) et rapport d\'analyse des offres',
+      'Analyse des offres sur mobile : le classement des entreprises et le montant retenu sont désormais rigoureusement identiques au poste de bureau (même périmètre — options exclues de la comparaison — et mêmes quantités). Le montant TTC du lauréat suit aussi le taux de TVA du projet',
     ],
   },
   {

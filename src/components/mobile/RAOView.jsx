@@ -7,7 +7,8 @@ import { db as fireDb } from '../../firebase';
 import Icon from './Icon';
 import { fmt, fmtShort } from './formatters';
 import { flattenItems } from './helpers';
-import { scoreOffer, computeOABThreshold } from '../../utils/analysisCompute';
+import { scoreOffer, computeOABThreshold, computeChaptersData, computeAnalysisStats } from '../../utils/analysisCompute';
+import { computeVatBreakdown } from '../../utils/financeFormat';
 
 // Notation prix : primitif partagé scoreOffer (src/utils/analysisCompute.js),
 // même source que le desktop — inclut le clamp [0, N] (les offres chères ne
@@ -120,12 +121,13 @@ export default function RAOView({ project, companyId, calcHook }) {
 
   const allItems = useMemo(() => flattenItems(project?.chapters || []), [project?.chapters]);
 
-  const totalEstimation = useMemo(() => {
-    return allItems.reduce((sum, item) => {
-      const qty = Number(qtyMap[item.id] || item.qty || 0);
-      return sum + qty * Number(item.price || 0);
-    }, 0);
-  }, [allItems, qtyMap]);
+  // Base de comparaison IDENTIQUE au desktop (audit F4) : options exclues + repli quantité 0.
+  // Réutilise les primitives partagées analysisCompute → totaux et classement mobile == bureau.
+  const baseStats = useMemo(
+    () => computeAnalysisStats(computeChaptersData(project, companies, qtyMap), companies, scoringConfig),
+    [project, companies, qtyMap, scoringConfig]
+  );
+  const totalEstimation = baseStats.totalEstimation;
 
   // ─── Helper : total d'une variante (matched + new items, removed exclus) ──
   // Recalcule a la volee depuis offers/quantities de la variante (au cas ou v.total
@@ -155,13 +157,9 @@ export default function RAOView({ project, companyId, calcHook }) {
     companies.forEach((c, ci) => {
       const admin = raoCompanies[c.name]?.admin || {};
       const baseIrregular = !!(admin.conclusion && NON_REGULAR.includes(admin.conclusion));
-      // Base (toujours ajoutee — la regularite est juste un marqueur visuel)
-      let baseTotal = 0;
-      allItems.forEach(item => {
-        const qty = Number(qtyMap[item.id] || item.qty || 0);
-        const pu  = Number(c.offers?.[item.id] ?? 0);
-        baseTotal += qty * pu;
-      });
+      // Base (toujours ajoutee — la regularite est juste un marqueur visuel).
+      // Total de base aligne sur le desktop (options exclues, repli qty 0) — audit F4.
+      const baseTotal = baseStats.companiesTotals[c.id] || 0;
       entries.push({
         ...c, kind: 'base', total: baseTotal, baseTotal,
         companyIndex: ci, displayName: c.name, irregular: baseIrregular,
@@ -207,7 +205,7 @@ export default function RAOView({ project, companyId, calcHook }) {
       .map((e, i) => ({ ...e, rank: i + 1 }));
 
     return { ranked, Pmin, Pmax, Pmoy, oabThreshold, N, mode };
-  }, [companies, allItems, qtyMap, totalEstimation, scoringConfig, raoCompanies]);
+  }, [companies, allItems, qtyMap, baseStats, totalEstimation, scoringConfig, raoCompanies]);
 
   // ─── Notes techniques par entreprise ─────────────────────────────────
   const techScoresMap = useMemo(() => {
@@ -248,12 +246,12 @@ export default function RAOView({ project, companyId, calcHook }) {
     return chapters.map(chap => {
       const chapItems = flattenItems([chap]);
       const estTotal = chapItems.reduce((s, item) => {
-        const qty = Number(qtyMap[item.id] || item.qty || 0);
+        const qty = Number(qtyMap[item.id] || 0);
         return s + qty * Number(item.price || 0);
       }, 0);
       const companyTotals = companies.map(c => {
         const total = chapItems.reduce((s, item) => {
-          const qty = Number(qtyMap[item.id] || item.qty || 0);
+          const qty = Number(qtyMap[item.id] || 0);
           return s + qty * Number(c.offers?.[item.id] ?? 0);
         }, 0);
         return { id: c.id, name: c.name, total };
@@ -467,7 +465,7 @@ export default function RAOView({ project, companyId, calcHook }) {
                 )}
               </p>
               <p className="text-[10px] text-emerald-200 mt-1">
-                {fmt(ranking[0].total)} HT — {fmt(ranking[0].total * 1.2)} TTC
+                {fmt(ranking[0].total)} HT — {fmt(computeVatBreakdown(ranking[0].total, Number(project?.tauxTVA ?? 20) / 100).ttc)} TTC
               </p>
             </div>
           )}
