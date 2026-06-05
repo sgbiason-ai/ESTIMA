@@ -14,6 +14,7 @@ export const isSuperAdmin = (email) =>
 export const ASSIGNABLE_MODULES = [
   { id: 'projects_manager', label: 'Gestion de Projets',          group: 'Projet & Estimation' },
   { id: 'estima',           label: 'ESTIMA VRD',                  group: 'Projet & Estimation' },
+  { id: 'estim_rapide',     label: 'Estimation Rapide',           group: 'Projet & Estimation' },
   { id: 'rao_analysis',     label: 'RAO & Analyse',               group: 'Projet & Estimation' },
   { id: 'devis_moe',        label: 'Devis MOE',                   group: 'Outils & Administration' },
   { id: 'expense_notes',    label: 'Notes de Frais',              group: 'Outils & Administration' },

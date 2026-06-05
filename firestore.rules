@@ -156,6 +156,14 @@ service cloud.firestore {
         allow read, write: if isCompanyMember(companyId);
       }
 
+      // Estimations rapides (esquisse / avant-projet) + modèles utilisateur
+      match /quickEstimates/{estimateId} {
+        allow read, write: if isCompanyMember(companyId);
+      }
+      match /estimTemplates/{templateId} {
+        allow read, write: if isCompanyMember(companyId);
+      }
+
       // Comptes rendus de chantier (CRC/CRR)
       match /crr/{crrId} {
         allow read: if isCompanyMember(companyId);
