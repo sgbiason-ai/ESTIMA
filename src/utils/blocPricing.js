@@ -3,10 +3,11 @@
 // d'estimation à l'insertion. Source unique, testée (blocPricing.test.js).
 //
 // Un bloc a une unité (ex. m²). Chaque article composant est ramené à cette unité
-// via un facteur dépendant de SON unité :
-//   - tonne (T)  → facteur = épaisseur(m) × densité(t/m³)   [t par unité de bloc]
-//   - m³ (M3)    → facteur = épaisseur(m)                    [m³ par unité de bloc]
-//   - autre      → facteur = 1
+// via un facteur dépendant de SON unité, puis majoré d'un coefficient de perte (%) :
+//   - tonne (T)  → base = épaisseur(m) × densité(t/m³)   [t par unité de bloc]
+//   - m³ (M3)    → base = épaisseur(m)                    [m³ par unité de bloc]
+//   - autre      → base = 1
+//   facteur = base × (1 + perte/100)        (perte = % de chutes/foisonnement, tous articles)
 // Coût ramené d'un article = prix × facteur. Prix du bloc = Σ des coûts ramenés.
 import { normalizeUnitSymbol, generateId } from './helpers';
 
@@ -16,6 +17,8 @@ const VOLUME_UNITS = ['M3'];
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 // Représentation courte d'un nombre pour une formule (0.30 → "0.3", 2 → "2").
 const numStr = (v) => { const n = Number(v); return Number.isFinite(n) ? String(n) : '0'; };
+// Coefficient multiplicateur de perte à partir d'un pourcentage (5 → 1.05). Vide/0 → 1.
+const perteCoef = (perte) => Math.round((1 + num(perte) / 100) * 1e6) / 1e6;
 
 /** Le calcul a-t-il besoin d'une épaisseur pour cette unité d'article ? (T ou m³) */
 export function needsThickness(articleUnit) {
@@ -28,24 +31,25 @@ export function needsDensity(articleUnit) {
   return MASS_UNITS.includes(normalizeUnitSymbol(articleUnit || ''));
 }
 
-/** Facteur numérique pour ramener 1 unité de bloc → quantité d'article. */
-export function blocUnitFactor(articleUnit, epaisseur, densite) {
+/** Facteur numérique pour ramener 1 unité de bloc → quantité d'article (perte incluse). */
+export function blocUnitFactor(articleUnit, epaisseur, densite, perte) {
   const u = normalizeUnitSymbol(articleUnit || '');
-  if (MASS_UNITS.includes(u)) return num(epaisseur) * num(densite);
-  if (VOLUME_UNITS.includes(u)) return num(epaisseur);
-  return 1;
+  let base = 1;
+  if (MASS_UNITS.includes(u)) base = num(epaisseur) * num(densite);
+  else if (VOLUME_UNITS.includes(u)) base = num(epaisseur);
+  return base * perteCoef(perte);
 }
 
-/** Coût d'un article ramené à l'unité du bloc (prix × facteur). */
-export function articleContribution(article, epaisseur, densite) {
-  return num(article?.price) * blocUnitFactor(article?.unit, epaisseur, densite);
+/** Coût d'un article ramené à l'unité du bloc (prix × facteur, perte incluse). */
+export function articleContribution(article, epaisseur, densite, perte) {
+  return num(article?.price) * blocUnitFactor(article?.unit, epaisseur, densite, perte);
 }
 
 /** Normalise les composants d'un bloc (gère l'ancien format `articleIds`). */
 export function getBlocArticles(bloc) {
   if (Array.isArray(bloc?.articles)) return bloc.articles;
   if (Array.isArray(bloc?.articleIds)) {
-    return bloc.articleIds.map(id => ({ id: String(id), epaisseur: '', densite: '' }));
+    return bloc.articleIds.map(id => ({ id: String(id), epaisseur: '', densite: '', perte: '' }));
   }
   return [];
 }
@@ -54,15 +58,21 @@ export function getBlocArticles(bloc) {
 export function blocUnitPrice(bloc, bpuById) {
   return getBlocArticles(bloc).reduce((sum, a) => {
     const art = bpuById?.[String(a.id)];
-    return art ? sum + articleContribution(art, a.epaisseur, a.densite) : sum;
+    return art ? sum + articleContribution(art, a.epaisseur, a.densite, a.perte) : sum;
   }, 0);
 }
 
 /** Fragment de formule multiplicateur (hors quantité pilote), ou null si facteur = 1. */
-export function blocFormulaFactor(articleUnit, epaisseur, densite) {
+export function blocFormulaFactor(articleUnit, epaisseur, densite, perte) {
   const u = normalizeUnitSymbol(articleUnit || '');
-  if (MASS_UNITS.includes(u)) return `${numStr(epaisseur)}*${numStr(densite)}`;
-  if (VOLUME_UNITS.includes(u)) return `${numStr(epaisseur)}`;
+  let base = null;
+  if (MASS_UNITS.includes(u)) base = `${numStr(epaisseur)}*${numStr(densite)}`;
+  else if (VOLUME_UNITS.includes(u)) base = `${numStr(epaisseur)}`;
+  const coef = perteCoef(perte);
+  const coefStr = coef !== 1 ? numStr(coef) : null;
+  if (base && coefStr) return `${base}*${coefStr}`;
+  if (base) return base;
+  if (coefStr) return coefStr;
   return null;
 }
 
@@ -88,7 +98,7 @@ export function buildBlocSubChapter(bloc, bpuById, tranches = []) {
     const art = bpuById?.[String(a.id)];
     if (!art) { missing++; return; }
 
-    const factorStr = blocFormulaFactor(art.unit, a.epaisseur, a.densite);
+    const factorStr = blocFormulaFactor(art.unit, a.epaisseur, a.densite, a.perte);
     const formula = factorStr ? `={${blocId}}*${factorStr}` : `={${blocId}}`;
 
     const quantitiesFormula = {};
@@ -107,9 +117,9 @@ export function buildBlocSubChapter(bloc, bpuById, tranches = []) {
       quantitiesFormula,
       bpuNum: art.bpuNum ?? '',
       isFixed: !!art.isFixed,
-      // Facteur de conversion mémorisé → permet d'afficher le PU moyen du bloc
-      // (Σ prix×facteur) même à surface nulle, sans relire le BPU.
-      blocFactor: blocUnitFactor(art.unit, a.epaisseur, a.densite),
+      // Facteur de conversion mémorisé (perte incluse) → permet d'afficher le PU moyen
+      // du bloc (Σ prix×facteur) même à surface nulle, sans relire le BPU.
+      blocFactor: blocUnitFactor(art.unit, a.epaisseur, a.densite, a.perte),
     });
   });
 

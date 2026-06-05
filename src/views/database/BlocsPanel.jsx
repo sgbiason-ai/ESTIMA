@@ -65,7 +65,7 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
     return { available: matches.slice(0, LIST_CAP), availableTotal: matches.length };
   }, [fullBpu, draft.articles, search]);
 
-  const addArticle = (id) => setDraft(d => ({ ...d, articles: [...d.articles, { id: String(id), epaisseur: '', densite: '' }] }));
+  const addArticle = (id) => setDraft(d => ({ ...d, articles: [...d.articles, { id: String(id), epaisseur: '', densite: '', perte: '' }] }));
   const removeArticle = (idx) => setDraft(d => ({ ...d, articles: d.articles.filter((_, i) => i !== idx) }));
   const setArticle = (idx, patch) => setDraft(d => ({ ...d, articles: d.articles.map((a, i) => i === idx ? { ...a, ...patch } : a) }));
   const move = (idx, dir) => setDraft(d => {
@@ -212,6 +212,7 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
                     <span className="w-10 text-center">U</span>
                     <span className="w-16 text-center">Ép. (m)</span>
                     <span className="w-16 text-center">Densité</span>
+                    <span className="w-14 text-center">Perte %</span>
                     <span className="w-20 text-right">→ /{blocUnitLabel}</span>
                     <span className="w-14" />
                   </div>
@@ -225,7 +226,7 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
                     const article = bpuById[String(a.id)];
                     const wantEp = article && needsThickness(article.unit);
                     const wantD = article && needsDensity(article.unit);
-                    const contrib = article ? articleContribution(article, a.epaisseur, a.densite) : 0;
+                    const contrib = article ? articleContribution(article, a.epaisseur, a.densite, a.perte) : 0;
                     return (
                       <div key={`${a.id}-${idx}`} className="group flex items-center gap-2 px-2 py-2 bg-white border border-slate-200 rounded-lg hover:border-indigo-300 transition-all">
                         <span className="w-5 text-center text-[10px] font-black text-slate-400">{idx + 1}</span>
@@ -261,6 +262,19 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
                               onChange={(e) => setArticle(idx, { densite: e.target.value })}
                               placeholder="t/m³"
                               className="w-14 text-center text-[11px] font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded px-1 py-1 outline-none focus:border-indigo-400 focus:bg-white"
+                            />
+                          ) : <span className="text-slate-300 text-xs">—</span>}
+                        </div>
+                        {/* Perte (%) — tous articles */}
+                        <div className="w-14 flex justify-center">
+                          {article ? (
+                            <input
+                              type="number" step="1" min="0" inputMode="decimal"
+                              value={a.perte ?? ''}
+                              onChange={(e) => setArticle(idx, { perte: e.target.value })}
+                              placeholder="0"
+                              title="Coefficient de perte en % (chutes, foisonnement)"
+                              className="w-12 text-center text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 py-1 outline-none focus:border-amber-400 focus:bg-white"
                             />
                           ) : <span className="text-slate-300 text-xs">—</span>}
                         </div>

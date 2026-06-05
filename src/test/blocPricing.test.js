@@ -87,8 +87,8 @@ describe('getBlocArticles (rétro-compat)', () => {
   });
   it('convertit l’ancien format articleIds', () => {
     expect(getBlocArticles({ articleIds: ['a1', 'a2'] })).toEqual([
-      { id: 'a1', epaisseur: '', densite: '' },
-      { id: 'a2', epaisseur: '', densite: '' },
+      { id: 'a1', epaisseur: '', densite: '', perte: '' },
+      { id: 'a2', epaisseur: '', densite: '', perte: '' },
     ]);
   });
   it('vide par défaut', () => {
@@ -101,6 +101,49 @@ describe('blocFormulaFactor', () => {
     expect(blocFormulaFactor('t', 0.3, 2)).toBe('0.3*2');
     expect(blocFormulaFactor('m³', 0.25)).toBe('0.25');
     expect(blocFormulaFactor('m²')).toBeNull();
+  });
+});
+
+describe('perte (coefficient % — tous articles)', () => {
+  it('facteur = base × (1 + perte/100)', () => {
+    expect(blocUnitFactor('t', 0.3, 2, 5)).toBeCloseTo(0.63, 6);   // 0.6 × 1.05
+    expect(blocUnitFactor('m³', 0.4, 0, 10)).toBeCloseTo(0.44, 6); // 0.4 × 1.10
+    expect(blocUnitFactor('m²', 0, 0, 3)).toBeCloseTo(1.03, 6);    // 1 × 1.03 (perte sur m²)
+  });
+  it('vide / 0 → pas de perte (coef 1)', () => {
+    expect(blocUnitFactor('m²', 0, 0, '')).toBe(1);
+    expect(blocUnitFactor('t', 0.3, 2, 0)).toBeCloseTo(0.6, 6);
+  });
+  it('contribution intègre la perte', () => {
+    expect(articleContribution(BPU.a1, 0.3, 2, 5)).toBeCloseTo(12 * 0.63, 6); // 7.56
+    expect(articleContribution(BPU.a3, 0, 0, 10)).toBeCloseTo(3.5 * 1.1, 6);  // 3.85 (m² + perte)
+  });
+  it('formule : perte ajoutée comme multiplicateur, même sans base', () => {
+    expect(blocFormulaFactor('t', 0.3, 2, 5)).toBe('0.3*2*1.05');
+    expect(blocFormulaFactor('m³', 0.4, 0, 10)).toBe('0.4*1.1');
+    expect(blocFormulaFactor('m²', '', '', 5)).toBe('1.05'); // base 1 → seul le coef
+    expect(blocFormulaFactor('m²', '', '', 0)).toBeNull();   // pas de perte → null
+  });
+  it('blocUnitPrice agrège les pertes', () => {
+    const bloc = { unit: 'm²', articles: [
+      { id: 'a1', epaisseur: 0.3, densite: 2, perte: 5 },  // 12 × 0.63 = 7.56
+      { id: 'a3', perte: 10 },                              // 3.5 × 1.1 = 3.85
+    ] };
+    expect(blocUnitPrice(bloc, BPU)).toBeCloseTo(7.56 + 3.85, 6);
+  });
+
+  it('buildBlocSubChapter : la perte figure dans la formule + le blocFactor', () => {
+    const bloc = { name: 'V', unit: 'm²', articles: [
+      { id: 'a1', epaisseur: 0.3, densite: 2, perte: 5 }, // t
+      { id: 'a3', perte: 10 },                            // m²
+    ] };
+    const { node } = buildBlocSubChapter(bloc, BPU, []);
+    const blocId = node.id;
+    const compT = node.children.find(l => l.uid === 'a1');
+    const compM2 = node.children.find(l => l.uid === 'a3');
+    expect(compT.formula).toBe(`={${blocId}}*0.3*2*1.05`);
+    expect(compM2.formula).toBe(`={${blocId}}*1.1`); // base 1 → seul le coef de perte
+    expect(compT.blocFactor).toBeCloseTo(0.3 * 2 * 1.05, 6);
   });
 });
 
