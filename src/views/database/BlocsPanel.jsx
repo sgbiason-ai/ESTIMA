@@ -6,7 +6,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { Droppable, Draggable } from '@hello-pangea/dnd';
 import {
-  Boxes, Plus, Trash2, Search, X, Save, GripVertical,
+  Boxes, Plus, Trash2, Search, X, Save, Copy, Filter, GripVertical,
   Package, AlertTriangle, Layers,
 } from 'lucide-react';
 import { formatPrice, cleanText, normalizeUnitSymbol } from '../../utils/helpers';
@@ -30,6 +30,14 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
   const [selectedId, setSelectedId] = useState(null);
   const [draft, setDraft] = useState({ name: '', unit: '', articles: [] });
   const [search, setSearch] = useState('');
+  const [blocSearch, setBlocSearch] = useState('');
+  const [unitFilter, setUnitFilter] = useState('');   // '' = toutes les unités
+  const [sortField, setSortField] = useState('name'); // 'name' | 'unit' | 'price'
+  const [sortDir, setSortDir] = useState('asc');       // 'asc' | 'desc'
+  const toggleSort = (field) => {
+    if (sortField === field) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortField(field); setSortDir('asc'); }
+  };
 
   // Charge le brouillon quand on change de bloc sélectionné
   useEffect(() => {
@@ -66,6 +74,32 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
     return { available: matches.slice(0, LIST_CAP), availableTotal: matches.length };
   }, [fullBpu, draft.articles, search]);
 
+  // Blocs visibles dans la colonne de gauche : filtre accent-insensible par nom
+  // OU par article contenu (comme la bibliothèque de l'estimation), puis tri alpha.
+  // Unités distinctes présentes parmi les blocs (pour le menu de filtre).
+  const blocUnits = useMemo(() => {
+    const set = new Set();
+    (blocs || []).forEach(b => { const u = normalizeUnitSymbol(b.unit || ''); if (u) set.add(u); });
+    return [...set].sort((a, b) => a.localeCompare(b, 'fr'));
+  }, [blocs]);
+
+  const visibleBlocs = useMemo(() => {
+    const norm = (s) => (s || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+    const q = norm(blocSearch).trim();
+    let arr = blocs || [];
+    if (unitFilter) arr = arr.filter(b => normalizeUnitSymbol(b.unit || '') === unitFilter);
+    if (q) arr = arr.filter(b => {
+      if (norm(b.name).includes(q)) return true;
+      return getBlocArticles(b).some(a => norm(cleanText(bpuById[String(a.id)]?.designation || '')).includes(q));
+    });
+    const dir = sortDir === 'desc' ? -1 : 1;
+    return [...arr].sort((a, b) => {
+      if (sortField === 'price') return dir * (blocUnitPrice(a, bpuById) - blocUnitPrice(b, bpuById));
+      if (sortField === 'unit') return dir * normalizeUnitSymbol(a.unit || '').localeCompare(normalizeUnitSymbol(b.unit || ''), 'fr');
+      return dir * (a.name || '').localeCompare(b.name || '', 'fr');
+    });
+  }, [blocs, blocSearch, bpuById, unitFilter, sortField, sortDir]);
+
   const addArticle = (id) => setDraft(d => ({ ...d, articles: [...d.articles, { id: String(id), epaisseur: '', densite: '', perte: '' }] }));
   const removeArticle = (idx) => setDraft(d => ({ ...d, articles: d.articles.filter((_, i) => i !== idx) }));
   const setArticle = (idx, patch) => setDraft(d => ({ ...d, articles: d.articles.map((a, i) => i === idx ? { ...a, ...patch } : a) }));
@@ -100,6 +134,15 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
     }
   };
 
+  // « Comme nouveau » : crée un nouveau bloc à partir du brouillon courant en
+  // conservant le bloc d'origine intact (déclinaison/variante sous un autre nom).
+  const handleSaveAsNew = async () => {
+    const name = draft.name.trim();
+    if (!name) return;
+    const created = await addBloc(name, draft.unit, draft.articles);
+    if (created) setSelectedId(created.id);
+  };
+
   const handleDelete = async (id, e) => {
     e?.stopPropagation();
     const ok = await confirm('Supprimer ce bloc ? Les articles de la bibliothèque ne sont pas affectés.', { title: 'Supprimer le bloc', danger: true, confirmLabel: 'Supprimer' });
@@ -113,17 +156,57 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
   return (
     <div className="flex-1 flex h-full overflow-hidden bg-slate-50">
       {/* ── Colonne gauche : liste des blocs ── */}
-      <div className="w-72 bg-white border-r border-slate-200 flex flex-col shrink-0">
+      <div className="w-96 bg-white border-r border-slate-200 flex flex-col shrink-0">
         <div className="p-4 border-b border-slate-100 bg-slate-50">
           <h3 className="font-black text-xs uppercase text-slate-500 tracking-widest mb-3 flex items-center gap-2">
-            <Boxes size={14} /> Blocs ({blocs.length})
+            <Boxes size={14} /> Blocs ({(blocSearch.trim() || unitFilter) ? `${visibleBlocs.length}/${blocs.length}` : blocs.length})
           </h3>
           <button
             onClick={() => setSelectedId(NEW)}
-            className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all shadow-md active:scale-95"
+            className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all shadow-md active:scale-95"
           >
             <Plus size={14} /> Nouveau bloc
           </button>
+          <div className="relative mt-3">
+            <Search className="absolute left-3 top-2.5 text-slate-400" size={14} />
+            <input
+              type="text"
+              value={blocSearch}
+              onChange={(e) => setBlocSearch(e.target.value)}
+              placeholder="Rechercher un bloc…"
+              className="w-full pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:border-emerald-500 focus:bg-white transition-all font-medium"
+            />
+            {blocSearch && (
+              <button onClick={() => setBlocSearch('')} title="Effacer la recherche" className="absolute right-2 top-2 text-slate-400 hover:text-slate-600">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          {/* Filtre par unité (menu déroulant, façon bibliothèque estima) */}
+          <div className="relative mt-2">
+            <Filter className="absolute left-3 top-2.5 text-slate-400" size={12} />
+            <select
+              value={unitFilter}
+              onChange={(e) => setUnitFilter(e.target.value)}
+              className="w-full pl-9 pr-8 py-1.5 bg-white border border-slate-200 rounded-lg text-[11px] font-bold text-slate-600 outline-none focus:border-emerald-500 appearance-none cursor-pointer hover:bg-slate-50 transition-colors uppercase tracking-wide"
+            >
+              <option value="">Toutes les unités</option>
+              {blocUnits.map(u => <option key={u} value={u}>{u}</option>)}
+            </select>
+          </div>
+          {/* Tri : nom / unité / prix — clic répété inverse le sens */}
+          <div className="mt-2 grid grid-cols-3 bg-slate-100 rounded-lg p-0.5 gap-0.5">
+            {[{ key: 'name', label: 'Nom' }, { key: 'unit', label: 'Unité' }, { key: 'price', label: 'Prix' }].map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => toggleSort(key)}
+                title={`Trier par ${label.toLowerCase()} (cliquer pour inverser ↑ / ↓)`}
+                className={`py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all ${sortField === key ? 'bg-white shadow-sm text-emerald-700' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                {label}{sortField === key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-2 space-y-2">
@@ -136,12 +219,22 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
           )}
 
           {selectedId === NEW && (
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 border-dashed border-indigo-300 bg-indigo-50 text-indigo-600">
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 border-dashed border-emerald-300 bg-emerald-50 text-emerald-600">
               <Plus size={16} /><span className="text-xs font-bold italic">Nouveau bloc…</span>
             </div>
           )}
 
-          {[...blocs].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'fr')).map(b => {
+          {blocs.length > 0 && visibleBlocs.length === 0 && (
+            <div className="p-6 text-center text-slate-400">
+              <Search size={24} className="mx-auto mb-2 opacity-30" />
+              <p className="text-xs italic">Aucun bloc ne correspond</p>
+              {blocSearch.trim() && <p className="text-[11px] font-bold text-slate-500 mt-0.5">« {blocSearch.trim()} »</p>}
+              {unitFilter && <p className="text-[10px] font-bold text-slate-500 mt-0.5">Unité : {unitFilter}</p>}
+              <button onClick={() => { setBlocSearch(''); setUnitFilter(''); }} className="mt-3 text-[10px] font-black uppercase tracking-wider text-emerald-600 hover:text-emerald-700">Réinitialiser</button>
+            </div>
+          )}
+
+          {visibleBlocs.map(b => {
             const count = getBlocArticles(b).length;
             const active = selectedId === b.id;
             const u = b.unit ? normalizeUnitSymbol(b.unit) : '';
@@ -149,16 +242,20 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
               <div
                 key={b.id}
                 onClick={() => setSelectedId(b.id)}
-                className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all border ${active ? 'bg-indigo-50 border-indigo-300 ring-2 ring-indigo-100' : 'bg-white border-slate-200 hover:border-indigo-300 hover:shadow-sm'}`}
+                className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all border ${active ? 'bg-emerald-50 border-emerald-300 ring-2 ring-emerald-100' : 'bg-white border-slate-200 hover:border-emerald-300 hover:shadow-sm'}`}
               >
-                <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${active ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400 group-hover:text-indigo-500'}`}>
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${active ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400 group-hover:text-emerald-500'}`}>
                   <Boxes size={18} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-bold text-slate-800 truncate uppercase tracking-tight">{b.name}</p>
-                  <p className="text-[10px] text-slate-400 font-medium">{count} art. · {formatPrice(blocUnitPrice(b, bpuById))}{u ? `/${u}` : ''}</p>
+                  <p className="text-[10px] text-slate-400 font-medium mt-0.5">{count} article{count > 1 ? 's' : ''}</p>
                 </div>
-                <button onClick={(e) => handleDelete(b.id, e)} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all">
+                <div className="flex flex-col items-end shrink-0 gap-0.5">
+                  <span className="text-[11px] font-black text-emerald-700 font-mono bg-emerald-100/60 border border-emerald-100 px-2 py-0.5 rounded shadow-sm whitespace-nowrap">{formatPrice(blocUnitPrice(b, bpuById))}</span>
+                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">{u ? `/ ${u}` : '/ unité'}</span>
+                </div>
+                <button onClick={(e) => handleDelete(b.id, e)} title="Supprimer le bloc" className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all shrink-0">
                   <Trash2 size={14} />
                 </button>
               </div>
@@ -179,14 +276,14 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
           <>
             {/* En-tête éditeur : nom + unité + enregistrer */}
             <div className="bg-white px-6 py-4 border-b border-slate-200 flex items-center gap-3 shadow-sm">
-              <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg shrink-0"><Boxes size={18} /></div>
+              <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg shrink-0"><Boxes size={18} /></div>
               <input
                 autoFocus
                 type="text"
                 value={draft.name}
                 onChange={(e) => setDraft(d => ({ ...d, name: e.target.value }))}
                 placeholder="Nom du bloc (ex : Voirie légère en granulaire)"
-                className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-800 outline-none focus:border-indigo-500 focus:bg-white transition-colors uppercase tracking-tight"
+                className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-800 outline-none focus:border-emerald-500 focus:bg-white transition-colors uppercase tracking-tight"
                 onKeyDown={(e) => e.key === 'Enter' && handleSave()}
               />
               <div className="flex flex-col shrink-0">
@@ -194,7 +291,7 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
                 <select
                   value={draft.unit}
                   onChange={(e) => setDraft(d => ({ ...d, unit: e.target.value }))}
-                  className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-indigo-500 focus:bg-white transition-colors uppercase cursor-pointer min-w-[110px]"
+                  className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-emerald-500 focus:bg-white transition-colors uppercase cursor-pointer min-w-[110px]"
                 >
                   <option value="">— choisir —</option>
                   {(units || []).map(u => <option key={u.symbol} value={u.symbol}>{normalizeUnitSymbol(u.symbol)} — {u.label}</option>)}
@@ -203,10 +300,20 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
               <button
                 onClick={handleSave}
                 disabled={!draft.name.trim() || !isDirty}
-                className="flex items-center gap-2 px-4 py-2 mt-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-black uppercase tracking-widest rounded-lg shadow-md transition-all active:scale-95"
+                className="flex items-center gap-2 px-4 py-2 mt-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-black uppercase tracking-widest rounded-lg shadow-md transition-all active:scale-95 shrink-0"
               >
                 <Save size={14} /> {selectedId === NEW ? 'Créer' : 'Enregistrer'}
               </button>
+              {selectedId !== NEW && (
+                <button
+                  onClick={handleSaveAsNew}
+                  disabled={!draft.name.trim()}
+                  title="Crée un nouveau bloc à partir des modifications (nom, composition) sans toucher au bloc actuel"
+                  className="flex items-center gap-2 px-4 py-2 mt-3 bg-white border border-emerald-300 text-emerald-700 hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-black uppercase tracking-widest rounded-lg shadow-sm transition-all active:scale-95 shrink-0"
+                >
+                  <Copy size={14} /> Comme nouveau
+                </button>
+              )}
             </div>
 
             <div className="flex-1 flex overflow-hidden">
@@ -214,7 +321,7 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
               <div className="flex-1 flex flex-col overflow-hidden border-r border-slate-200">
                 <div className="px-6 py-3 bg-slate-100 border-b border-slate-200 flex items-center justify-between">
                   <span className="text-[11px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2"><Package size={13} /> Composition ({draft.articles.length})</span>
-                  <span className="text-xs font-black text-indigo-700">{formatPrice(draftPrice)} <span className="text-slate-400 font-bold">/ {blocUnitLabel}</span></span>
+                  <span className="text-xs font-black text-emerald-700">{formatPrice(draftPrice)} <span className="text-slate-400 font-bold">/ {blocUnitLabel}</span></span>
                 </div>
 
                 {/* En-tête de colonnes */}
@@ -252,7 +359,7 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
                               <div
                                 ref={dragProvided.innerRef}
                                 {...dragProvided.draggableProps}
-                                className={`group flex items-center gap-2 px-2 py-2 bg-white border rounded-lg transition-all ${dragSnapshot.isDragging ? 'border-indigo-400 shadow-lg ring-2 ring-indigo-100 rotate-1' : 'border-slate-200 hover:border-indigo-300'}`}
+                                className={`group flex items-center gap-2 px-2 py-2 bg-white border rounded-lg transition-all ${dragSnapshot.isDragging ? 'border-emerald-400 shadow-lg ring-2 ring-emerald-100 rotate-1' : 'border-slate-200 hover:border-emerald-300'}`}
                               >
                                 {/* Poignée de glissement (remplace le n° au survol) */}
                                 <div
@@ -261,12 +368,12 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
                                   className="w-5 flex items-center justify-center shrink-0 cursor-grab active:cursor-grabbing"
                                 >
                                   <span className="text-[10px] font-black text-slate-400 group-hover:hidden">{idx + 1}</span>
-                                  <GripVertical size={13} className="hidden group-hover:block text-indigo-400" />
+                                  <GripVertical size={13} className="hidden group-hover:block text-emerald-400" />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   {article ? (
                                     <>
-                                      <p className="text-[11px] font-bold text-slate-800 uppercase truncate tracking-tight leading-tight">{cleanText(article.designation)}</p>
+                                      <p className="text-[11px] font-bold text-slate-800 uppercase line-clamp-2 tracking-tight leading-tight">{cleanText(article.designation)}</p>
                                       <p className="text-[9px] text-slate-400 font-bold">{formatPrice(article.price)}/{normalizeUnitSymbol(article.unit)}</p>
                                     </>
                                   ) : (
@@ -282,7 +389,7 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
                                       value={a.epaisseur ?? ''}
                                       onChange={(e) => setArticle(idx, { epaisseur: e.target.value })}
                                       placeholder="0.00"
-                                      className="w-14 text-center text-[11px] font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded px-1 py-1 outline-none focus:border-indigo-400 focus:bg-white"
+                                      className="w-14 text-center text-[11px] font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded px-1 py-1 outline-none focus:border-emerald-400 focus:bg-white"
                                     />
                                   ) : <span className="text-slate-300 text-xs">—</span>}
                                 </div>
@@ -294,7 +401,7 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
                                       value={a.densite ?? ''}
                                       onChange={(e) => setArticle(idx, { densite: e.target.value })}
                                       placeholder="t/m³"
-                                      className="w-14 text-center text-[11px] font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded px-1 py-1 outline-none focus:border-indigo-400 focus:bg-white"
+                                      className="w-14 text-center text-[11px] font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded px-1 py-1 outline-none focus:border-emerald-400 focus:bg-white"
                                     />
                                   ) : <span className="text-slate-300 text-xs">—</span>}
                                 </div>
@@ -311,7 +418,7 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
                                     />
                                   ) : <span className="text-slate-300 text-xs">—</span>}
                                 </div>
-                                <span className="w-20 text-right text-[11px] font-black text-indigo-700">{formatPrice(contrib)}</span>
+                                <span className="w-20 text-right text-[11px] font-black text-emerald-700">{formatPrice(contrib)}</span>
                                 <div className="w-8 flex items-center justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                                   <button onClick={() => removeArticle(idx)} className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded"><X size={13} /></button>
                                 </div>
@@ -327,15 +434,15 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
 
                 {/* Total */}
                 {draft.articles.length > 0 && (
-                  <div className="px-4 py-3 bg-indigo-50 border-t border-indigo-100 flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600">Prix du bloc</span>
-                    <span className="text-sm font-black text-indigo-700">{formatPrice(draftPrice)} <span className="text-indigo-400 text-xs">/ {blocUnitLabel}</span></span>
+                  <div className="px-4 py-3 bg-emerald-50 border-t border-emerald-100 flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Prix du bloc</span>
+                    <span className="text-sm font-black text-emerald-700">{formatPrice(draftPrice)} <span className="text-emerald-400 text-xs">/ {blocUnitLabel}</span></span>
                   </div>
                 )}
               </div>
 
               {/* Ajout d'articles */}
-              <div className="w-72 flex flex-col overflow-hidden bg-white shrink-0">
+              <div className="w-96 flex flex-col overflow-hidden bg-white shrink-0">
                 <div className="p-4 border-b border-slate-100">
                   <div className="relative">
                     <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
@@ -344,7 +451,7 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       placeholder="Rechercher un article à ajouter…"
-                      className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-500 focus:bg-white transition-all"
+                      className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-emerald-500 focus:bg-white transition-all"
                     />
                   </div>
                 </div>
@@ -353,14 +460,17 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
                     <button
                       key={item.id}
                       onClick={() => addArticle(item.id)}
-                      className="w-full group flex items-center gap-2 p-2 bg-white border border-slate-200 rounded-lg hover:border-indigo-400 hover:bg-indigo-50/40 transition-all text-left active:scale-[0.98]"
+                      title={`Ajouter « ${cleanText(item.designation)} » au bloc`}
+                      className="w-full group relative flex items-start justify-between p-2 bg-white border border-slate-200 rounded-lg shadow-sm hover:border-emerald-400 hover:shadow-md hover:bg-emerald-50/30 cursor-pointer transition-all duration-200 active:scale-[0.98] text-left"
                     >
-                      <Plus size={14} className="text-slate-300 group-hover:text-indigo-500 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[10px] font-bold text-slate-700 uppercase truncate leading-snug group-hover:text-indigo-800">{cleanText(item.designation)}</p>
+                      <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg bg-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <div className="flex-1 min-w-0 pr-2 pl-1.5">
+                        <p className="text-[10px] font-bold text-slate-700 uppercase leading-snug group-hover:text-emerald-800 line-clamp-2 transition-colors">{cleanText(item.designation)}</p>
                       </div>
-                      <span className="text-[9px] font-black text-slate-500 shrink-0">{normalizeUnitSymbol(item.unit)}</span>
-                      <span className="text-[10px] font-black text-indigo-700 bg-indigo-100/60 px-1.5 py-0.5 rounded shrink-0">{formatPrice(item.price)}</span>
+                      <div className="flex flex-col items-end shrink-0 gap-1">
+                        <span className="text-[10px] font-black text-emerald-700 font-mono bg-emerald-100/50 border border-emerald-100 px-2 py-0.5 rounded shadow-sm group-hover:bg-emerald-200 group-hover:text-emerald-900 transition-colors">{formatPrice(item.price)}</span>
+                        <span className="text-[8px] font-bold text-slate-600 uppercase tracking-wider">{normalizeUnitSymbol(item.unit)}</span>
+                      </div>
                     </button>
                   ))}
                   {available.length === 0 && (
