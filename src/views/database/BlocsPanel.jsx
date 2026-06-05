@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { formatPrice, cleanText, normalizeUnitSymbol } from '../../utils/helpers';
 import {
-  getBlocArticles, blocUnitPrice, articleContribution, needsThickness, needsDensity,
+  getBlocArticles, getBlocKind, blocUnitPrice, articleContribution, needsThickness, needsDensity,
 } from '../../utils/blocPricing';
 import { useDialog } from '../../contexts/DialogContext';
 
@@ -28,10 +28,11 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
   // Sélection / brouillon d'édition. Composant = { id, epaisseur, densite }.
   const NEW = '__new__';
   const [selectedId, setSelectedId] = useState(null);
-  const [draft, setDraft] = useState({ name: '', unit: '', articles: [] });
+  const [draft, setDraft] = useState({ name: '', unit: '', articles: [], kind: 'formula' });
   const [search, setSearch] = useState('');
   const [blocSearch, setBlocSearch] = useState('');
   const [unitFilter, setUnitFilter] = useState('');   // '' = toutes les unités
+  const [kindFilter, setKindFilter] = useState('all'); // 'all' | 'formula' | 'aggregate'
   const [sortField, setSortField] = useState('name'); // 'name' | 'unit' | 'price'
   const [sortDir, setSortDir] = useState('asc');       // 'asc' | 'desc'
   const toggleSort = (field) => {
@@ -42,10 +43,10 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
   // Charge le brouillon quand on change de bloc sélectionné
   useEffect(() => {
     if (selectedId === NEW) {
-      setDraft({ name: '', unit: '', articles: [] });
+      setDraft({ name: '', unit: '', articles: [], kind: 'formula' });
     } else if (selectedId) {
       const b = blocs.find(x => x.id === selectedId);
-      if (b) setDraft({ name: b.name || '', unit: b.unit || '', articles: getBlocArticles(b).map(a => ({ ...a })) });
+      if (b) setDraft({ name: b.name || '', unit: b.unit || '', articles: getBlocArticles(b).map(a => ({ ...a })), kind: getBlocKind(b) });
     }
     setSearch('');
   }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -57,6 +58,7 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
     : currentBloc && (
         draft.name !== currentBloc.name ||
         draft.unit !== (currentBloc.unit || '') ||
+        draft.kind !== getBlocKind(currentBloc) ||
         JSON.stringify(draft.articles) !== JSON.stringify(getBlocArticles(currentBloc))
       );
 
@@ -87,6 +89,7 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
     const norm = (s) => (s || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
     const q = norm(blocSearch).trim();
     let arr = blocs || [];
+    if (kindFilter !== 'all') arr = arr.filter(b => getBlocKind(b) === kindFilter);
     if (unitFilter) arr = arr.filter(b => normalizeUnitSymbol(b.unit || '') === unitFilter);
     if (q) arr = arr.filter(b => {
       if (norm(b.name).includes(q)) return true;
@@ -98,7 +101,7 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
       if (sortField === 'unit') return dir * normalizeUnitSymbol(a.unit || '').localeCompare(normalizeUnitSymbol(b.unit || ''), 'fr');
       return dir * (a.name || '').localeCompare(b.name || '', 'fr');
     });
-  }, [blocs, blocSearch, bpuById, unitFilter, sortField, sortDir]);
+  }, [blocs, blocSearch, bpuById, unitFilter, kindFilter, sortField, sortDir]);
 
   const addArticle = (id) => setDraft(d => ({ ...d, articles: [...d.articles, { id: String(id), epaisseur: '', densite: '', perte: '' }] }));
   const removeArticle = (idx) => setDraft(d => ({ ...d, articles: d.articles.filter((_, i) => i !== idx) }));
@@ -126,11 +129,12 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
   const handleSave = async () => {
     const name = draft.name.trim();
     if (!name) return;
+    const unit = isAggregate ? '' : draft.unit;
     if (selectedId === NEW) {
-      const created = await addBloc(name, draft.unit, draft.articles);
+      const created = await addBloc(name, unit, draft.articles, draft.kind);
       if (created) setSelectedId(created.id);
     } else {
-      await updateBloc(selectedId, { name, unit: draft.unit, articles: draft.articles });
+      await updateBloc(selectedId, { name, unit, articles: draft.articles, kind: draft.kind });
     }
   };
 
@@ -139,7 +143,7 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
   const handleSaveAsNew = async () => {
     const name = draft.name.trim();
     if (!name) return;
-    const created = await addBloc(name, draft.unit, draft.articles);
+    const created = await addBloc(name, isAggregate ? '' : draft.unit, draft.articles, draft.kind);
     if (created) setSelectedId(created.id);
   };
 
@@ -151,6 +155,10 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
     if (selectedId === id) setSelectedId(null);
   };
 
+  const isAggregate = draft.kind === 'aggregate';
+  // Bascule de type : un agrégat n'a pas d'unité de bloc (articles à unités mixtes).
+  const setKind = (kind) => setDraft(d => ({ ...d, kind, unit: kind === 'aggregate' ? '' : d.unit }));
+
   const blocUnitLabel = draft.unit ? normalizeUnitSymbol(draft.unit) : 'unité';
 
   return (
@@ -159,7 +167,7 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
       <div className="w-96 bg-white border-r border-slate-200 flex flex-col shrink-0">
         <div className="p-4 border-b border-slate-100 bg-slate-50">
           <h3 className="font-black text-xs uppercase text-slate-500 tracking-widest mb-3 flex items-center gap-2">
-            <Boxes size={14} /> Blocs ({(blocSearch.trim() || unitFilter) ? `${visibleBlocs.length}/${blocs.length}` : blocs.length})
+            <Boxes size={14} /> Blocs ({(blocSearch.trim() || unitFilter || kindFilter !== 'all') ? `${visibleBlocs.length}/${blocs.length}` : blocs.length})
           </h3>
           <button
             onClick={() => setSelectedId(NEW)}
@@ -182,7 +190,21 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
               </button>
             )}
           </div>
-          {/* Filtre par unité (menu déroulant, façon bibliothèque estima) */}
+          {/* Filtre par type : tous / formule / agrégat */}
+          <div className="mt-2 grid grid-cols-3 bg-slate-100 rounded-lg p-0.5 gap-0.5">
+            {[{ key: 'all', label: 'Tous' }, { key: 'formula', label: 'Formule' }, { key: 'aggregate', label: 'Agrégat' }].map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => { setKindFilter(key); if (key === 'aggregate') setUnitFilter(''); }}
+                title={`Afficher ${key === 'all' ? 'tous les blocs' : key === 'formula' ? 'les blocs formule' : 'les blocs agrégat'}`}
+                className={`py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all ${kindFilter === key ? 'bg-white shadow-sm text-emerald-700' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {/* Filtre par unité (masqué pour les agrégats, sans unité) */}
+          {kindFilter !== 'aggregate' && (
           <div className="relative mt-2">
             <Filter className="absolute left-3 top-2.5 text-slate-400" size={12} />
             <select
@@ -194,6 +216,7 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
               {blocUnits.map(u => <option key={u} value={u}>{u}</option>)}
             </select>
           </div>
+          )}
           {/* Tri : nom / unité / prix — clic répété inverse le sens */}
           <div className="mt-2 grid grid-cols-3 bg-slate-100 rounded-lg p-0.5 gap-0.5">
             {[{ key: 'name', label: 'Nom' }, { key: 'unit', label: 'Unité' }, { key: 'price', label: 'Prix' }].map(({ key, label }) => (
@@ -229,14 +252,16 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
               <Search size={24} className="mx-auto mb-2 opacity-30" />
               <p className="text-xs italic">Aucun bloc ne correspond</p>
               {blocSearch.trim() && <p className="text-[11px] font-bold text-slate-500 mt-0.5">« {blocSearch.trim()} »</p>}
+              {kindFilter !== 'all' && <p className="text-[10px] font-bold text-slate-500 mt-0.5">Type : {kindFilter === 'aggregate' ? 'agrégat' : 'formule'}</p>}
               {unitFilter && <p className="text-[10px] font-bold text-slate-500 mt-0.5">Unité : {unitFilter}</p>}
-              <button onClick={() => { setBlocSearch(''); setUnitFilter(''); }} className="mt-3 text-[10px] font-black uppercase tracking-wider text-emerald-600 hover:text-emerald-700">Réinitialiser</button>
+              <button onClick={() => { setBlocSearch(''); setUnitFilter(''); setKindFilter('all'); }} className="mt-3 text-[10px] font-black uppercase tracking-wider text-emerald-600 hover:text-emerald-700">Réinitialiser</button>
             </div>
           )}
 
           {visibleBlocs.map(b => {
             const count = getBlocArticles(b).length;
             const active = selectedId === b.id;
+            const isAgg = getBlocKind(b) === 'aggregate';
             const u = b.unit ? normalizeUnitSymbol(b.unit) : '';
             return (
               <div
@@ -244,17 +269,19 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
                 onClick={() => setSelectedId(b.id)}
                 className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all border ${active ? 'bg-emerald-50 border-emerald-300 ring-2 ring-emerald-100' : 'bg-white border-slate-200 hover:border-emerald-300 hover:shadow-sm'}`}
               >
-                <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${active ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400 group-hover:text-emerald-500'}`}>
-                  <Boxes size={18} />
-                </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-slate-800 truncate uppercase tracking-tight">{b.name}</p>
-                  <p className="text-[10px] text-slate-400 font-medium mt-0.5">{count} article{count > 1 ? 's' : ''}</p>
+                  <p className="text-xs font-bold text-slate-800 line-clamp-2 uppercase tracking-tight">{b.name}</p>
+                  <p className="text-[10px] text-slate-400 font-medium mt-0.5 flex items-center gap-1.5">
+                    {isAgg && <span className="px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 text-[8px] font-black uppercase tracking-wider">Agrégat</span>}
+                    <span>{count} article{count > 1 ? 's' : ''}</span>
+                  </p>
                 </div>
-                <div className="flex flex-col items-end shrink-0 gap-0.5">
-                  <span className="text-[11px] font-black text-emerald-700 font-mono bg-emerald-100/60 border border-emerald-100 px-2 py-0.5 rounded shadow-sm whitespace-nowrap">{formatPrice(blocUnitPrice(b, bpuById))}</span>
-                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">{u ? `/ ${u}` : '/ unité'}</span>
-                </div>
+                {!isAgg && (
+                  <div className="flex flex-col items-end shrink-0 gap-0.5">
+                    <span className="text-[11px] font-black text-emerald-700 font-mono bg-emerald-100/60 border border-emerald-100 px-2 py-0.5 rounded shadow-sm whitespace-nowrap">{formatPrice(blocUnitPrice(b, bpuById))}</span>
+                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">{u ? `/ ${u}` : '/ unité'}</span>
+                  </div>
+                )}
                 <button onClick={(e) => handleDelete(b.id, e)} title="Supprimer le bloc" className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all shrink-0">
                   <Trash2 size={14} />
                 </button>
@@ -277,6 +304,27 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
             {/* En-tête éditeur : nom + unité + enregistrer */}
             <div className="bg-white px-6 py-4 border-b border-slate-200 flex items-center gap-3 shadow-sm">
               <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg shrink-0"><Boxes size={18} /></div>
+              <div className="flex flex-col shrink-0">
+                <label className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-0.5 ml-1">Type de bloc</label>
+                <div className="flex bg-slate-100 rounded-lg p-0.5 gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setKind('formula')}
+                    title="Ouvrage composite : chaque article est ramené à l'unité du bloc via épaisseur / densité / perte (PU au m², ml…)"
+                    className={`px-3 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-all ${!isAggregate ? 'bg-white shadow-sm text-emerald-700' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    Formule
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setKind('aggregate')}
+                    title="Simple regroupement d'articles, sans calcul : chaque article garde son unité, les quantités se saisissent dans l'estimation"
+                    className={`px-3 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-all ${isAggregate ? 'bg-white shadow-sm text-emerald-700' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    Agrégat
+                  </button>
+                </div>
+              </div>
               <input
                 autoFocus
                 type="text"
@@ -286,17 +334,19 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
                 className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-800 outline-none focus:border-emerald-500 focus:bg-white transition-colors uppercase tracking-tight"
                 onKeyDown={(e) => e.key === 'Enter' && handleSave()}
               />
-              <div className="flex flex-col shrink-0">
-                <label className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-0.5 ml-1">Unité du bloc</label>
-                <select
-                  value={draft.unit}
-                  onChange={(e) => setDraft(d => ({ ...d, unit: e.target.value }))}
-                  className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-emerald-500 focus:bg-white transition-colors uppercase cursor-pointer min-w-[110px]"
-                >
-                  <option value="">— choisir —</option>
-                  {(units || []).map(u => <option key={u.symbol} value={u.symbol}>{normalizeUnitSymbol(u.symbol)} — {u.label}</option>)}
-                </select>
-              </div>
+              {!isAggregate && (
+                <div className="flex flex-col shrink-0">
+                  <label className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-0.5 ml-1">Unité du bloc</label>
+                  <select
+                    value={draft.unit}
+                    onChange={(e) => setDraft(d => ({ ...d, unit: e.target.value }))}
+                    className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-emerald-500 focus:bg-white transition-colors uppercase cursor-pointer min-w-[110px]"
+                  >
+                    <option value="">— choisir —</option>
+                    {(units || []).map(u => <option key={u.symbol} value={u.symbol}>{normalizeUnitSymbol(u.symbol)} — {u.label}</option>)}
+                  </select>
+                </div>
+              )}
               <button
                 onClick={handleSave}
                 disabled={!draft.name.trim() || !isDirty}
@@ -320,8 +370,10 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
               {/* Table des articles du bloc */}
               <div className="flex-1 flex flex-col overflow-hidden border-r border-slate-200">
                 <div className="px-6 py-3 bg-slate-100 border-b border-slate-200 flex items-center justify-between">
-                  <span className="text-[11px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2"><Package size={13} /> Composition ({draft.articles.length})</span>
-                  <span className="text-xs font-black text-emerald-700">{formatPrice(draftPrice)} <span className="text-slate-400 font-bold">/ {blocUnitLabel}</span></span>
+                  <span className="text-[11px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2"><Package size={13} /> Composition ({draft.articles.length}){isAggregate && <span className="px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 text-[8px] font-black uppercase tracking-wider">Agrégat</span>}</span>
+                  {!isAggregate && (
+                    <span className="text-xs font-black text-emerald-700">{formatPrice(draftPrice)} <span className="text-slate-400 font-bold">/ {blocUnitLabel}</span></span>
+                  )}
                 </div>
 
                 {/* En-tête de colonnes */}
@@ -330,10 +382,14 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
                     <span className="w-5 text-center">#</span>
                     <span className="flex-1">Article</span>
                     <span className="w-10 text-center">U</span>
-                    <span className="w-16 text-center">Ép. (m)</span>
-                    <span className="w-16 text-center">Densité</span>
-                    <span className="w-14 text-center">Perte %</span>
-                    <span className="w-20 text-right">→ /{blocUnitLabel}</span>
+                    {!isAggregate && (
+                      <>
+                        <span className="w-16 text-center">Ép. (m)</span>
+                        <span className="w-16 text-center">Densité</span>
+                        <span className="w-14 text-center">Perte %</span>
+                        <span className="w-20 text-right">→ /{blocUnitLabel}</span>
+                      </>
+                    )}
                     <span className="w-8" />
                   </div>
                 )}
@@ -381,6 +437,8 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
                                   )}
                                 </div>
                                 <span className="w-10 text-center text-[9px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 rounded px-1 py-0.5 uppercase">{article ? normalizeUnitSymbol(article.unit) : '—'}</span>
+                                {!isAggregate && (
+                                <>
                                 {/* Épaisseur */}
                                 <div className="w-16 flex justify-center">
                                   {wantEp ? (
@@ -419,6 +477,8 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
                                   ) : <span className="text-slate-300 text-xs">—</span>}
                                 </div>
                                 <span className="w-20 text-right text-[11px] font-black text-emerald-700">{formatPrice(contrib)}</span>
+                                </>
+                                )}
                                 <div className="w-8 flex items-center justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                                   <button onClick={() => removeArticle(idx)} className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded"><X size={13} /></button>
                                 </div>
@@ -432,8 +492,8 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
                   )}
                 </Droppable>
 
-                {/* Total */}
-                {draft.articles.length > 0 && (
+                {/* Total — blocs formule uniquement (un agrégat n'a pas de PU unique) */}
+                {!isAggregate && draft.articles.length > 0 && (
                   <div className="px-4 py-3 bg-emerald-50 border-t border-emerald-100 flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Prix du bloc</span>
                     <span className="text-sm font-black text-emerald-700">{formatPrice(draftPrice)} <span className="text-emerald-400 text-xs">/ {blocUnitLabel}</span></span>

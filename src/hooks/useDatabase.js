@@ -339,9 +339,9 @@ export const useDatabase = (user, companyId) => {
   // Références dynamiques : les articles sont résolus depuis le BPU courant
   // au moment de l'insertion dans l'estimation (prix/désignation à jour).
 
-  const addBloc = async (name, unit = '', articles = []) => {
+  const addBloc = async (name, unit = '', articles = [], kind = 'formula') => {
     if (!companyId) return null;
-    const newBloc = { id: generateId(), name: (name || '').trim(), unit: unit || '', articles, updatedAt: new Date().toISOString() };
+    const newBloc = { id: generateId(), name: (name || '').trim(), unit: unit || '', kind, articles, updatedAt: new Date().toISOString() };
     const prevBlocs = blocs;
     setBlocs(prev => [...prev, newBloc]);
     try {

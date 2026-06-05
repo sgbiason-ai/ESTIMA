@@ -54,6 +54,18 @@ export function getBlocArticles(bloc) {
   return [];
 }
 
+/**
+ * Type d'un bloc :
+ *  - 'formula'   : ouvrage composite (défaut) — articles ramenés à l'unité du bloc
+ *                  via épaisseur/densité/perte, inséré avec une surface pilote + formules.
+ *  - 'aggregate' : simple regroupement d'articles (pas de calcul), inséré en
+ *                  sous-chapitre normal avec quantités à saisir.
+ * Rétro-compat : un bloc sans `kind` est considéré 'formula'.
+ */
+export function getBlocKind(bloc) {
+  return bloc?.kind === 'aggregate' ? 'aggregate' : 'formula';
+}
+
 /** Prix unitaire du bloc (Σ des coûts ramenés), à partir d'un lookup id→article. */
 export function blocUnitPrice(bloc, bpuById) {
   return getBlocArticles(bloc).reduce((sum, a) => {
@@ -88,6 +100,8 @@ export function blocFormulaFactor(articleUnit, epaisseur, densite, perte) {
  * @returns { node, added, missing }
  */
 export function buildBlocSubChapter(bloc, bpuById, tranches = []) {
+  if (getBlocKind(bloc) === 'aggregate') return buildAggregateSubChapter(bloc, bpuById);
+
   const articles = getBlocArticles(bloc);
   const blocId = generateId();
 
@@ -129,6 +143,53 @@ export function buildBlocSubChapter(bloc, bpuById, tranches = []) {
     isBloc: true,
     title: bloc?.name || 'Bloc',
     unit: bloc?.unit || '',
+    qty: 0,
+    quantities: {},
+    quantitiesFormula: {},
+    isOption: false,
+    children: components,
+  };
+
+  return { node, added: components.length, missing };
+}
+
+/**
+ * Sous-chapitre d'un bloc AGRÉGAT (simple regroupement d'articles, sans calcul) :
+ *  - un nœud `type:'chapter'` NORMAL (numéroté, sous-totalisé) — pas de `isBloc`,
+ *    donc aucune surface pilote ni formule.
+ *  - ses enfants = les articles en lignes standard (prix/unité natifs FIGÉS),
+ *    quantité VIDE (0) à saisir dans l'estimation, sans formule.
+ * @returns { node, added, missing }
+ */
+export function buildAggregateSubChapter(bloc, bpuById) {
+  const articles = getBlocArticles(bloc);
+
+  const components = [];
+  let missing = 0;
+
+  articles.forEach(a => {
+    const art = bpuById?.[String(a.id)];
+    if (!art) { missing++; return; }
+
+    components.push({
+      type: 'item',
+      id: `line_${generateId()}`,
+      uid: String(art.id ?? a.id ?? ''),
+      designation: art.designation || '',
+      unit: art.unit || '',
+      price: num(art.price),
+      qty: 0,
+      quantities: {},
+      quantitiesFormula: {},
+      bpuNum: art.bpuNum ?? '',
+      isFixed: !!art.isFixed,
+    });
+  });
+
+  const node = {
+    id: generateId(),
+    type: 'chapter',
+    title: bloc?.name || 'Bloc',
     qty: 0,
     quantities: {},
     quantitiesFormula: {},

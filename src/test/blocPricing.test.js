@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   blocUnitFactor, articleContribution, blocUnitPrice, getBlocArticles,
   needsThickness, needsDensity, blocFormulaFactor, buildBlocSubChapter,
+  buildAggregateSubChapter, getBlocKind,
 } from '../utils/blocPricing';
 import { recalculateProject } from '../utils/projectCalculations';
 
@@ -236,5 +237,47 @@ describe('intégration buildBlocSubChapter → recalculateProject', () => {
     expect(bb.quantities.t1).toBeCloseTo(250 * 0.147, 4); // 36.75
     expect(bb.quantities.t2).toBeCloseTo(100 * 0.147, 4); // 14.70
     expect(bb.qty).toBeCloseTo(350 * 0.147, 4);           // somme = 51.45
+  });
+});
+
+// ── Bloc AGRÉGAT : simple regroupement d'articles, sans calcul ni formule ──
+describe('bloc agrégat (sans formule)', () => {
+  it('getBlocKind : formula par défaut, aggregate si kind explicite', () => {
+    expect(getBlocKind({})).toBe('formula');
+    expect(getBlocKind({ kind: 'formula' })).toBe('formula');
+    expect(getBlocKind({ kind: 'aggregate' })).toBe('aggregate');
+  });
+
+  it('buildBlocSubChapter route un agrégat vers un sous-chapitre NORMAL (pas isBloc)', () => {
+    const bloc = { name: 'Regard complet', kind: 'aggregate', articles: [{ id: 'a3' }, { id: 'a5' }] };
+    const { node, added, missing } = buildBlocSubChapter(bloc, BPU, []);
+    expect(added).toBe(2);
+    expect(missing).toBe(0);
+    expect(node.type).toBe('chapter');
+    expect(node.isBloc).toBeUndefined(); // pas de surface pilote
+    expect(node.title).toBe('Regard complet');
+    node.children.forEach(c => {
+      expect(c.type).toBe('item');
+      expect(c.qty).toBe(0);             // quantité vide à saisir
+      expect(c.formula).toBeUndefined(); // aucune formule
+      expect(c.quantitiesFormula).toEqual({});
+    });
+    expect(node.children.map(c => c.uid)).toEqual(['a3', 'a5']);
+    expect(node.children[0].unit).toBe('m²');
+    expect(node.children[0].price).toBe(3.5);
+  });
+
+  it('buildAggregateSubChapter compte les articles introuvables', () => {
+    const bloc = { name: 'X', kind: 'aggregate', articles: [{ id: 'a3' }, { id: 'zzz' }] };
+    const { added, missing } = buildAggregateSubChapter(bloc, BPU);
+    expect(added).toBe(1);
+    expect(missing).toBe(1);
+  });
+
+  it('intégration : un agrégat inséré ne propage aucune quantité (lignes indépendantes)', () => {
+    const bloc = { name: 'Agg', kind: 'aggregate', articles: [{ id: 'a3' }, { id: 'a5' }] };
+    const { node } = buildBlocSubChapter(bloc, BPU, []);
+    const { updatedChapters } = recalculateProject([{ id: 'c1', type: 'chapter', children: [node] }], []);
+    updatedChapters[0].children[0].children.forEach(c => expect(c.qty).toBe(0));
   });
 });

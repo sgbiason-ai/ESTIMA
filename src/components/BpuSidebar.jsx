@@ -3,7 +3,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback, memo } from '
 import { createPortal } from 'react-dom';
 import { Package, PanelLeftClose, Search, Filter, Boxes, ChevronDown } from 'lucide-react';
 import { formatPrice, cleanText, normalizeUnitSymbol, sanitizeHtml } from '../utils/helpers';
-import { buildBlocSubChapter, blocUnitPrice, getBlocArticles } from '../utils/blocPricing';
+import { buildBlocSubChapter, blocUnitPrice, getBlocArticles, getBlocKind } from '../utils/blocPricing';
 import { useToast } from '../contexts/ToastContext';
 
 // ── Carte article BPU memoisee ─────────────────────────────────────────────
@@ -145,7 +145,9 @@ const BpuSidebar = ({
       return;
     }
     onInsertLinesRef.current?.([node]);
-    success(`Bloc « ${bloc.name} » inséré : sous-chapitre + ${added} article${added > 1 ? 's' : ''}${missing ? ` (${missing} introuvable${missing > 1 ? 's' : ''})` : ''}. Saisissez la surface sur l'en-tête.`);
+    const isAgg = getBlocKind(bloc) === 'aggregate';
+    const tail = isAgg ? ' Saisissez les quantités sur chaque ligne.' : " Saisissez la surface sur l'en-tête.";
+    success(`Bloc « ${bloc.name} » inséré : sous-chapitre + ${added} article${added > 1 ? 's' : ''}${missing ? ` (${missing} introuvable${missing > 1 ? 's' : ''})` : ''}.${tail}`);
   }, [bpuById, tranches, success, error]);
 
   if (!showBpu) return null;
@@ -228,6 +230,7 @@ const BpuSidebar = ({
             ) : (
               [...blocsToShow].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'fr')).map(bloc => {
                 const count = getBlocArticles(bloc).length;
+                const isAgg = getBlocKind(bloc) === 'aggregate';
                 const u = bloc.unit ? normalizeUnitSymbol(bloc.unit) : '';
                 return (
                   <button
@@ -241,7 +244,7 @@ const BpuSidebar = ({
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[10px] font-bold text-slate-700 uppercase leading-snug line-clamp-2 group-hover:text-indigo-800 transition-colors">{bloc.name}</p>
-                      <p className="text-[9px] font-bold text-slate-400 mt-0.5">{count} art. · {formatPrice(blocUnitPrice(bloc, bpuById))}{u ? `/${u}` : ''}</p>
+                      <p className="text-[9px] font-bold text-slate-400 mt-0.5">{count} art.{isAgg ? ' · agrégat' : ` · ${formatPrice(blocUnitPrice(bloc, bpuById))}${u ? `/${u}` : ''}`}</p>
                     </div>
                   </button>
                 );
