@@ -2,10 +2,11 @@
 // Gestion des "blocs" = ouvrages composites. Chaque bloc a une UNITÉ ; chaque
 // article composant est ramené à cette unité via épaisseur/densité (voir blocPricing).
 // Utilisé dans la Bibliothèque (DatabaseView) via le toggle Articles / Blocs.
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
+import { Droppable, Draggable } from '@hello-pangea/dnd';
 import {
-  Boxes, Plus, Trash2, Search, X, Save, ArrowUp, ArrowDown,
+  Boxes, Plus, Trash2, Search, X, Save, GripVertical,
   Package, AlertTriangle, Layers,
 } from 'lucide-react';
 import { formatPrice, cleanText, normalizeUnitSymbol } from '../../utils/helpers';
@@ -14,7 +15,7 @@ import {
 } from '../../utils/blocPricing';
 import { useDialog } from '../../contexts/DialogContext';
 
-const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc, deleteBloc }) => {
+const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc, deleteBloc, dragEndRef }) => {
   const { confirm } = useDialog();
 
   // Lookup rapide article par id
@@ -68,13 +69,25 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
   const addArticle = (id) => setDraft(d => ({ ...d, articles: [...d.articles, { id: String(id), epaisseur: '', densite: '', perte: '' }] }));
   const removeArticle = (idx) => setDraft(d => ({ ...d, articles: d.articles.filter((_, i) => i !== idx) }));
   const setArticle = (idx, patch) => setDraft(d => ({ ...d, articles: d.articles.map((a, i) => i === idx ? { ...a, ...patch } : a) }));
-  const move = (idx, dir) => setDraft(d => {
+  // Réordonnancement par glisser-déposer. Le DragDropContext est porté par DatabaseView ;
+  // il délègue ici via dragEndRef car le brouillon des articles vit dans ce composant
+  // (hello-pangea n'autorise pas les DragDropContext imbriqués).
+  const reorderArticles = useCallback((from, to) => setDraft(d => {
+    if (to == null || to < 0 || to >= d.articles.length || from === to) return d;
     const arr = [...d.articles];
-    const j = idx + dir;
-    if (j < 0 || j >= arr.length) return d;
-    [arr[idx], arr[j]] = [arr[j], arr[idx]];
+    const [moved] = arr.splice(from, 1);
+    arr.splice(to, 0, moved);
     return { ...d, articles: arr };
-  });
+  }), []);
+
+  useEffect(() => {
+    if (!dragEndRef) return undefined;
+    dragEndRef.current = ({ source, destination }) => {
+      if (!destination) return;
+      reorderArticles(source.index, destination.index);
+    };
+    return () => { dragEndRef.current = null; };
+  }, [dragEndRef, reorderArticles]);
 
   const handleSave = async () => {
     const name = draft.name.trim();
@@ -214,80 +227,103 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
                     <span className="w-16 text-center">Densité</span>
                     <span className="w-14 text-center">Perte %</span>
                     <span className="w-20 text-right">→ /{blocUnitLabel}</span>
-                    <span className="w-14" />
+                    <span className="w-8" />
                   </div>
                 )}
 
-                <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-                  {draft.articles.length === 0 && (
-                    <div className="p-6 text-center text-slate-400 text-xs italic">Ajoutez des articles depuis la liste de droite →</div>
+                <Droppable droppableId="bloc-composition" type="BLOC_ARTICLE">
+                  {(dropProvided) => (
+                    <div
+                      ref={dropProvided.innerRef}
+                      {...dropProvided.droppableProps}
+                      className="flex-1 overflow-y-auto p-2 space-y-1.5"
+                    >
+                      {draft.articles.length === 0 && (
+                        <div className="p-6 text-center text-slate-400 text-xs italic">Ajoutez des articles depuis la liste de droite →</div>
+                      )}
+                      {draft.articles.map((a, idx) => {
+                        const article = bpuById[String(a.id)];
+                        const wantEp = article && needsThickness(article.unit);
+                        const wantD = article && needsDensity(article.unit);
+                        const contrib = article ? articleContribution(article, a.epaisseur, a.densite, a.perte) : 0;
+                        return (
+                          <Draggable key={String(a.id)} draggableId={String(a.id)} index={idx}>
+                            {(dragProvided, dragSnapshot) => (
+                              <div
+                                ref={dragProvided.innerRef}
+                                {...dragProvided.draggableProps}
+                                className={`group flex items-center gap-2 px-2 py-2 bg-white border rounded-lg transition-all ${dragSnapshot.isDragging ? 'border-indigo-400 shadow-lg ring-2 ring-indigo-100 rotate-1' : 'border-slate-200 hover:border-indigo-300'}`}
+                              >
+                                {/* Poignée de glissement (remplace le n° au survol) */}
+                                <div
+                                  {...dragProvided.dragHandleProps}
+                                  title="Glisser pour réordonner"
+                                  className="w-5 flex items-center justify-center shrink-0 cursor-grab active:cursor-grabbing"
+                                >
+                                  <span className="text-[10px] font-black text-slate-400 group-hover:hidden">{idx + 1}</span>
+                                  <GripVertical size={13} className="hidden group-hover:block text-indigo-400" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  {article ? (
+                                    <>
+                                      <p className="text-[11px] font-bold text-slate-800 uppercase truncate tracking-tight leading-tight">{cleanText(article.designation)}</p>
+                                      <p className="text-[9px] text-slate-400 font-bold">{formatPrice(article.price)}/{normalizeUnitSymbol(article.unit)}</p>
+                                    </>
+                                  ) : (
+                                    <p className="text-[11px] font-bold text-amber-600 italic flex items-center gap-1"><AlertTriangle size={12} /> Article introuvable</p>
+                                  )}
+                                </div>
+                                <span className="w-10 text-center text-[9px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 rounded px-1 py-0.5 uppercase">{article ? normalizeUnitSymbol(article.unit) : '—'}</span>
+                                {/* Épaisseur */}
+                                <div className="w-16 flex justify-center">
+                                  {wantEp ? (
+                                    <input
+                                      type="number" step="0.01" min="0" inputMode="decimal"
+                                      value={a.epaisseur ?? ''}
+                                      onChange={(e) => setArticle(idx, { epaisseur: e.target.value })}
+                                      placeholder="0.00"
+                                      className="w-14 text-center text-[11px] font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded px-1 py-1 outline-none focus:border-indigo-400 focus:bg-white"
+                                    />
+                                  ) : <span className="text-slate-300 text-xs">—</span>}
+                                </div>
+                                {/* Densité */}
+                                <div className="w-16 flex justify-center">
+                                  {wantD ? (
+                                    <input
+                                      type="number" step="0.01" min="0" inputMode="decimal"
+                                      value={a.densite ?? ''}
+                                      onChange={(e) => setArticle(idx, { densite: e.target.value })}
+                                      placeholder="t/m³"
+                                      className="w-14 text-center text-[11px] font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded px-1 py-1 outline-none focus:border-indigo-400 focus:bg-white"
+                                    />
+                                  ) : <span className="text-slate-300 text-xs">—</span>}
+                                </div>
+                                {/* Perte (%) — tous articles */}
+                                <div className="w-14 flex justify-center">
+                                  {article ? (
+                                    <input
+                                      type="number" step="1" min="0" inputMode="decimal"
+                                      value={a.perte ?? ''}
+                                      onChange={(e) => setArticle(idx, { perte: e.target.value })}
+                                      placeholder="0"
+                                      title="Coefficient de perte en % (chutes, foisonnement)"
+                                      className="w-12 text-center text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 py-1 outline-none focus:border-amber-400 focus:bg-white"
+                                    />
+                                  ) : <span className="text-slate-300 text-xs">—</span>}
+                                </div>
+                                <span className="w-20 text-right text-[11px] font-black text-indigo-700">{formatPrice(contrib)}</span>
+                                <div className="w-8 flex items-center justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button onClick={() => removeArticle(idx)} className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded"><X size={13} /></button>
+                                </div>
+                              </div>
+                            )}
+                          </Draggable>
+                        );
+                      })}
+                      {dropProvided.placeholder}
+                    </div>
                   )}
-                  {draft.articles.map((a, idx) => {
-                    const article = bpuById[String(a.id)];
-                    const wantEp = article && needsThickness(article.unit);
-                    const wantD = article && needsDensity(article.unit);
-                    const contrib = article ? articleContribution(article, a.epaisseur, a.densite, a.perte) : 0;
-                    return (
-                      <div key={`${a.id}-${idx}`} className="group flex items-center gap-2 px-2 py-2 bg-white border border-slate-200 rounded-lg hover:border-indigo-300 transition-all">
-                        <span className="w-5 text-center text-[10px] font-black text-slate-400">{idx + 1}</span>
-                        <div className="flex-1 min-w-0">
-                          {article ? (
-                            <>
-                              <p className="text-[11px] font-bold text-slate-800 uppercase truncate tracking-tight leading-tight">{cleanText(article.designation)}</p>
-                              <p className="text-[9px] text-slate-400 font-bold">{formatPrice(article.price)}/{normalizeUnitSymbol(article.unit)}</p>
-                            </>
-                          ) : (
-                            <p className="text-[11px] font-bold text-amber-600 italic flex items-center gap-1"><AlertTriangle size={12} /> Article introuvable</p>
-                          )}
-                        </div>
-                        <span className="w-10 text-center text-[9px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 rounded px-1 py-0.5 uppercase">{article ? normalizeUnitSymbol(article.unit) : '—'}</span>
-                        {/* Épaisseur */}
-                        <div className="w-16 flex justify-center">
-                          {wantEp ? (
-                            <input
-                              type="number" step="0.01" min="0" inputMode="decimal"
-                              value={a.epaisseur ?? ''}
-                              onChange={(e) => setArticle(idx, { epaisseur: e.target.value })}
-                              placeholder="0.00"
-                              className="w-14 text-center text-[11px] font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded px-1 py-1 outline-none focus:border-indigo-400 focus:bg-white"
-                            />
-                          ) : <span className="text-slate-300 text-xs">—</span>}
-                        </div>
-                        {/* Densité */}
-                        <div className="w-16 flex justify-center">
-                          {wantD ? (
-                            <input
-                              type="number" step="0.01" min="0" inputMode="decimal"
-                              value={a.densite ?? ''}
-                              onChange={(e) => setArticle(idx, { densite: e.target.value })}
-                              placeholder="t/m³"
-                              className="w-14 text-center text-[11px] font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded px-1 py-1 outline-none focus:border-indigo-400 focus:bg-white"
-                            />
-                          ) : <span className="text-slate-300 text-xs">—</span>}
-                        </div>
-                        {/* Perte (%) — tous articles */}
-                        <div className="w-14 flex justify-center">
-                          {article ? (
-                            <input
-                              type="number" step="1" min="0" inputMode="decimal"
-                              value={a.perte ?? ''}
-                              onChange={(e) => setArticle(idx, { perte: e.target.value })}
-                              placeholder="0"
-                              title="Coefficient de perte en % (chutes, foisonnement)"
-                              className="w-12 text-center text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 py-1 outline-none focus:border-amber-400 focus:bg-white"
-                            />
-                          ) : <span className="text-slate-300 text-xs">—</span>}
-                        </div>
-                        <span className="w-20 text-right text-[11px] font-black text-indigo-700">{formatPrice(contrib)}</span>
-                        <div className="w-14 flex items-center gap-0.5 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => move(idx, -1)} disabled={idx === 0} className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded disabled:opacity-20"><ArrowUp size={13} /></button>
-                          <button onClick={() => move(idx, 1)} disabled={idx === draft.articles.length - 1} className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded disabled:opacity-20"><ArrowDown size={13} /></button>
-                          <button onClick={() => removeArticle(idx)} className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded"><X size={13} /></button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                </Droppable>
 
                 {/* Total */}
                 {draft.articles.length > 0 && (
@@ -350,6 +386,7 @@ BlocsPanel.propTypes = {
   addBloc: PropTypes.func.isRequired,
   updateBloc: PropTypes.func.isRequired,
   deleteBloc: PropTypes.func.isRequired,
+  dragEndRef: PropTypes.shape({ current: PropTypes.any }),
 };
 
 export default BlocsPanel;

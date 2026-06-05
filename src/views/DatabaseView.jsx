@@ -265,9 +265,15 @@ const DatabaseView = ({
     link.click();
   };
 
+  // Réordonnancement des articles d'un bloc : délégué à BlocsPanel (qui détient le brouillon),
+  // car hello-pangea n'autorise qu'un seul DragDropContext (celui-ci).
+  const blocDragEndRef = useRef(null);
+
   const handleDragEnd = (result) => {
     const { source, destination, type, draggableId } = result;
-    if (!destination || (destination.index === source.index && destination.droppableId === source.droppableId)) return;
+    if (!destination) return;
+    if (type === 'BLOC_ARTICLE') { blocDragEndRef.current?.(result); return; }
+    if (destination.index === source.index && destination.droppableId === source.droppableId) return;
     if (type === 'CATEGORY') {
         const newCategories = Array.from(categories); const [moved] = newCategories.splice(source.index, 1); newCategories.splice(destination.index, 0, moved);
         if (reorderCategories) reorderCategories(newCategories);
@@ -767,6 +773,7 @@ const DatabaseView = ({
                 addBloc={addBloc}
                 updateBloc={updateBloc}
                 deleteBloc={deleteBloc}
+                dragEndRef={blocDragEndRef}
               />
             )}
           </div>
