@@ -72,8 +72,8 @@ const BpuExportView = ({
         ref={measureRef}
         style={{
           position: 'absolute', top: 0, left: '-9999px',
-          visibility: 'hidden', fontSize: '10px', lineHeight: '1.625',
-          fontFamily: 'ui-sans-serif, system-ui, sans-serif',
+          visibility: 'hidden', fontSize: '13px', lineHeight: '1.15',
+          fontFamily: branding.fonts.main,
         }}
       />
 

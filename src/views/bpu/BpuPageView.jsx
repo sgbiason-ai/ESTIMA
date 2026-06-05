@@ -2,7 +2,6 @@ import React, { useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { cleanText, normalizeUnitSymbol } from '../../utils/helpers';
 import { getCurrentPhase } from '../../utils/phaseModel';
-import { lighten } from './utils/bpuBrandingUtils';
 import {
   extractImageFiles, addPhotos, getCleanDescriptionHtml, decoratePhotoGrid, tryDeletePhoto,
 } from '../../utils/editorImages';
@@ -122,24 +121,23 @@ const BpuPageView = ({
               paddingLeft: `${MARGIN_X_PX}px`, paddingRight: `${MARGIN_X_PX}px`,
             }}
           >
-            {/* ── EN-TÊTE DE PAGE ─────────────────────────────────────────── */}
-            <div className="mb-4 relative flex flex-col justify-between" style={{ height: `${HEADER_HEIGHT}px` }}>
-              <div className="flex justify-between items-start h-[155px] pb-2">
-                {/* Titre projet */}
+            {/* ── EN-TÊTE DE PAGE (calquée sur le Word) ─────────────────────── */}
+            <div className="mb-2 relative flex flex-col justify-between" style={{ height: `${HEADER_HEIGHT}px` }}>
+              <div className="flex justify-between items-center h-[100px] pb-2">
+                {/* Titre projet centré (sous-titre + nom, sans pastille ni soulignement) */}
                 <div className="flex-1 h-full flex flex-col items-center justify-center px-6 text-center">
                   <div
-                    className="bg-[#ecfdf5] border px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.15em] mb-4 shadow-sm"
-                    style={{ color: branding.colors.primary, borderColor: lighten(branding.colors.primary, 0.8), backgroundColor: lighten(branding.colors.primary, 0.95) }}
+                    className="text-[11px] font-bold uppercase tracking-[0.06em] mb-2"
+                    style={{ color: branding.colors.primary, fontFamily: branding.fonts.headings }}
                   >
                     Bordereau des Prix Unitaires
                   </div>
-                  <h1 className="text-2xl font-black text-slate-900 uppercase leading-tight tracking-tight" style={{ fontFamily: branding.fonts.headings }}>
+                  <h1 className="text-[24px] font-black text-slate-900 uppercase leading-tight tracking-tight" style={{ fontFamily: branding.fonts.headings }}>
                     {project?.name || "INTITULÉ DU PROJET"}
                   </h1>
-                  <div className="w-12 h-1 mt-4 rounded-full" style={{ backgroundColor: branding.colors.secondary }} />
                 </div>
-                {/* Logo MOE */}
-                <div className="w-[20%] h-full flex flex-col items-end justify-center">
+                {/* Logo MOE (25% comme le Word) */}
+                <div className="w-[25%] h-full flex items-center justify-end">
                   {resolvedLogo ? (
                     <img src={resolvedLogo} alt="Logo" className="object-contain max-h-[70px] max-w-full" onError={onLogoError} loading="lazy" />
                   ) : (
@@ -148,26 +146,19 @@ const BpuPageView = ({
                 </div>
               </div>
 
-              {/* Barre méta (phase / date / page) */}
-              <div className="h-[35px] bg-slate-100 rounded-lg flex items-center justify-between px-4 text-[9px] border border-slate-200" style={{ fontFamily: branding.fonts.main }}>
-                <div className="flex items-center gap-8 text-slate-600">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold uppercase text-slate-400">Phase</span>
-                    <div className="font-black text-slate-900 bg-white px-2 h-5 flex items-center justify-center rounded border border-slate-200 leading-none pb-[1px]">
-                      {getCurrentPhase(project)?.code || "DCE"}
-                    </div>
-                  </div>
-                  <div className="w-px h-3 bg-slate-300" />
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold uppercase text-slate-400">Date</span>
-                    <span className="font-bold text-slate-800">{today}</span>
-                  </div>
+              {/* Barre méta (phase / date / page) — 3 cellules, rectangulaire comme le Word */}
+              <div className="h-[40px] bg-slate-100 border border-slate-200 flex items-stretch text-[11px]" style={{ fontFamily: branding.fonts.main }}>
+                <div className="flex-1 flex items-center gap-1.5 px-4">
+                  <span className="font-bold uppercase text-slate-500">Phase :</span>
+                  <span className="font-bold text-slate-900">{getCurrentPhase(project)?.code || "DCE"}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-slate-400 font-bold uppercase text-[8px]">Page</span>
-                  <span className="font-black text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200 shadow-sm min-w-[40px] text-center">
-                    {page.index} / {pages.length}
-                  </span>
+                <div className="flex-1 flex items-center justify-center gap-1.5">
+                  <span className="font-bold uppercase text-slate-500">Date :</span>
+                  <span className="font-bold text-slate-900">{today}</span>
+                </div>
+                <div className="flex-1 flex items-center justify-end gap-1.5 px-4">
+                  <span className="font-bold uppercase text-slate-500">Page</span>
+                  <span className="font-bold text-slate-900">{page.index} / {pages.length}</span>
                 </div>
               </div>
             </div>
@@ -177,7 +168,7 @@ const BpuPageView = ({
               {/* En-tête colonnes */}
               {page.items.length > 0 && (
                 <div
-                  className="flex text-white text-[10px] font-bold uppercase text-center shrink-0 rounded-t-lg overflow-hidden"
+                  className="flex text-white text-[12px] font-bold uppercase text-center shrink-0"
                   style={{ height: `${TABLE_HEADER_HEIGHT}px`, backgroundColor: branding.colors.primary }}
                 >
                   <div className="flex items-center justify-center border-r border-slate-600/50" style={{ width: `${COL_NUM_WIDTH}px` }}>N° Prix</div>
@@ -188,7 +179,7 @@ const BpuPageView = ({
               )}
 
               {/* Lignes articles */}
-              <div className="flex-col border-x border-b border-slate-200 rounded-b-lg overflow-hidden">
+              <div className="flex-col border-x border-b border-slate-200">
                 {page.items.map((item, idx) => {
                   const unitLong = unitResolver(item.unit);
                   const prefix   = ['A', 'E', 'I', 'O', 'U', 'Y'].includes(unitLong.charAt(0).toUpperCase()) ? "L'" : 'LE ';
@@ -198,25 +189,27 @@ const BpuPageView = ({
                     <div key={idx} data-bpu-item-id={item.id} className="flex border-b border-slate-200 last:border-b-0 text-[10px] break-inside-avoid">
                       {/* Numéro */}
                       <div
-                        className="p-3 border-r border-slate-200 bg-slate-50/50 text-center font-bold font-mono flex items-start justify-center pt-3 text-slate-600"
+                        className="p-3 border-r border-slate-200 bg-slate-100 text-center font-bold flex items-center justify-center text-slate-600 text-[12px]"
                         style={{ width: `${COL_NUM_WIDTH}px` }}
                       >
                         {item.isSuite ? <span className="text-[8px] text-slate-300 italic">...</span> : displayNum}
                       </div>
 
                       {/* Désignation + description */}
-                      <div className="p-3 border-r border-slate-200 text-justify" style={{ width: `${COL_DESC_WIDTH}px` }}>
-                        {/* Désignation — lecture seule */}
-                        <div
-                          className="font-black uppercase mb-1.5 text-[11px]"
-                          style={{ color: branding.colors.text }}
-                          ref={(el) => {
-                            if (el) {
-                              const text = item._overrideDesignation ?? cleanText(item.designation);
-                              if (el.textContent !== text) el.textContent = text;
-                            }
-                          }}
-                        />
+                      <div className="py-2 px-2.5 border-r border-slate-200 text-justify leading-[1.15]" style={{ width: `${COL_DESC_WIDTH}px` }}>
+                        {/* Désignation — lecture seule (masquée sur la partie « suite ») */}
+                        {!item.isSuite && (
+                          <div
+                            className="font-black uppercase mb-1.5 text-[13px]"
+                            style={{ color: branding.colors.text }}
+                            ref={(el) => {
+                              if (el) {
+                                const text = item._overrideDesignation ?? cleanText(item.designation);
+                                if (el.textContent !== text) el.textContent = text;
+                              }
+                            }}
+                          />
+                        )}
 
                         {/* Description — rich text éditable */}
                         <div
@@ -267,17 +260,10 @@ const BpuPageView = ({
 
                         {/* Pied unité */}
                         {!item.isSplitStart && (
-                          <div className="pt-2 border-t border-dashed border-slate-200 mt-auto flex items-center gap-2">
+                          <div className="pt-1.5 border-t border-dashed border-slate-200 mt-auto flex items-center gap-1.5">
                             <div className="h-1 w-1 rounded-full" style={{ backgroundColor: branding.colors.secondary }} />
-                            <span className="font-bold uppercase text-slate-700 text-[9px] tracking-wide">
+                            <span className="font-bold uppercase text-slate-700 text-[11px] tracking-wide">
                               {prefix}{unitLong.toUpperCase()}
-                            </span>
-                          </div>
-                        )}
-                        {item.isSplitStart && (
-                          <div className="pt-2 border-t border-dashed border-slate-200 text-center mt-auto">
-                            <span className="font-bold italic text-slate-400 text-[8px] bg-slate-50 px-2 py-0.5 rounded-full">
-                              (...Suite page suivante)
                             </span>
                           </div>
                         )}
@@ -285,7 +271,7 @@ const BpuPageView = ({
 
                       {/* Unité */}
                       <div
-                        className="p-3 border-r border-slate-200 text-center font-bold uppercase flex items-center justify-center text-slate-500 bg-slate-50/30"
+                        className="p-3 border-r border-slate-200 text-center font-bold uppercase flex items-center justify-center text-slate-600 bg-slate-50 text-[12px]"
                         style={{ width: `${COL_UNIT_WIDTH}px` }}
                       >
                         {!item.isSuite && (normalizeUnitSymbol(item.unit) || '-')}
@@ -337,8 +323,8 @@ const BpuPageView = ({
       <style>{`
         .html-content,
         .html-content * {
-          font-size: 10px !important;
-          line-height: 1.625 !important;
+          font-size: 13px !important;
+          line-height: 1.15 !important;
         }
         .html-content ul { list-style-type: disc; padding-left: 1.2em; margin: 0.2em 0; }
         .html-content ol { list-style-type: decimal; padding-left: 1.2em; margin: 0.2em 0; }

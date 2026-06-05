@@ -10,7 +10,12 @@ import {
   COL_DESC_WIDTH,
   MAX_DESC_CHARS_FOR_SPLIT,
   MAX_SPLIT_ATTEMPTS,
+  ROW_CAPACITY_ADJUST_PX,
 } from '../constants/bpuLayout';
+
+// Hauteur utile pour les lignes d'articles sur une page (calée sur le Word via
+// ROW_CAPACITY_ADJUST_PX). Centralisé pour rester cohérent partout.
+const ROWS_AREA_PX = CONTENT_HEIGHT_PX - HEADER_HEIGHT - TABLE_HEADER_HEIGHT - ROW_CAPACITY_ADJUST_PX;
 
 /**
  * useBpuPagination
@@ -46,23 +51,23 @@ export const useBpuPagination = ({ sortedCatalog, articlesDb, unitResolver, meas
   };
 
   // ── CONSTRUCTION DU HTML DE MESURE D'UNE LIGNE ───────────────────────────────
-  const buildDesignationCellHtml = ({ designation, descriptionHtml, unitFooterText, showUnitFooter, isSplitStart }) => `
-    <div style="padding: 12px; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 10px; line-height: 1.625; text-align: justify;">
-      <div style="font-weight: 900; text-transform: uppercase; margin-bottom: 6px; font-size: 11px; color: #0f172a;">
+  // ⚠ Doit rester strictement identique au rendu de BpuPageView (mêmes tailles,
+  // paddings, interlignes) sinon la pagination déborde. Tailles calquées sur le
+  // Word : désignation/description ≈ 10 pt (13 px), pied unité ≈ 8 pt (11 px).
+  const buildDesignationCellHtml = ({ designation, descriptionHtml, unitFooterText, showUnitFooter, showDesignation = true }) => `
+    <div style="padding: 8px 10px; font-size: 13px; line-height: 1.15; text-align: justify;">
+      ${showDesignation ? `
+      <div style="font-weight: 900; text-transform: uppercase; margin-bottom: 6px; font-size: 13px; color: #0f172a;">
         ${escapeHtml(cleanText(designation || 'ARTICLE SANS NOM'))}
       </div>
-      <div class="html-content" style="color: #475569; margin-bottom: 8px; font-weight: 500; font-size: 10px; line-height: 1.625;">
+      ` : ''}
+      <div class="html-content" style="color: #475569; margin-bottom: 8px; font-weight: 500; font-size: 13px; line-height: 1.15;">
         ${descriptionHtml || "<em style='color:#cbd5e1'>Aucune description technique disponible.</em>"}
       </div>
       ${showUnitFooter ? `
-        <div style="padding-top: 8px; border-top: 1px dashed #cbd5e1; display: flex; align-items: center; gap: 6px;">
+        <div style="padding-top: 6px; border-top: 1px dashed #cbd5e1; display: flex; align-items: center; gap: 6px;">
           <div style="width: 4px; height: 4px; border-radius: 999px; background-color: #34d399;"></div>
-          <span style="font-weight: 700; text-transform: uppercase; color: #334155; font-size: 9px;">${escapeHtml(unitFooterText || '')}</span>
-        </div>
-      ` : ''}
-      ${isSplitStart ? `
-        <div style="padding-top: 8px; border-top: 1px dashed #cbd5e1; text-align: center;">
-          <span style="font-weight: 700; font-style: italic; color: #94a3b8; font-size: 9px;">(...Suite page suivante)</span>
+          <span style="font-weight: 700; text-transform: uppercase; color: #334155; font-size: 11px;">${escapeHtml(unitFooterText || '')}</span>
         </div>
       ` : ''}
     </div>`;
@@ -79,7 +84,7 @@ export const useBpuPagination = ({ sortedCatalog, articlesDb, unitResolver, meas
 
     const fits = (html) =>
       measureHtmlHeightCached(
-        buildDesignationCellHtml({ ...ctx, descriptionHtml: html, isSplitStart: true, showUnitFooter: false }),
+        buildDesignationCellHtml({ ...ctx, descriptionHtml: html, showUnitFooter: false }),
         COL_DESC_WIDTH
       ) <= maxHeight;
 
@@ -162,12 +167,12 @@ export const useBpuPagination = ({ sortedCatalog, articlesDb, unitResolver, meas
           descriptionHtml: htmlDesc,
           unitFooterText,
           showUnitFooter: !item.isSplitStart,
-          isSplitStart: item.isSplitStart,
+          showDesignation: !item.isSuite,   // pas de titre répété sur la partie « suite »
         });
 
         const measuredH = measureHtmlHeightCached(fullRowHtml, COL_DESC_WIDTH);
         const rowHeight = Math.max(50, measuredH);
-        const spaceLeft = CONTENT_HEIGHT_PX - HEADER_HEIGHT - TABLE_HEADER_HEIGHT - currentY;
+        const spaceLeft = ROWS_AREA_PX - currentY;
 
         if (rowHeight <= spaceLeft) {
           // L'article tient dans l'espace restant
@@ -205,6 +210,7 @@ export const useBpuPagination = ({ sortedCatalog, articlesDb, unitResolver, meas
           const [part1, part2] = splitHtmlToFit(htmlDesc, strictSpaceLeft, {
             designation: item.designation,
             unitFooterText,
+            showDesignation: !item.isSuite,   // un « suite » resplitté ne réaffiche pas le titre
           });
 
           if (!part1 || part1.trim() === '') {
@@ -237,7 +243,7 @@ export const useBpuPagination = ({ sortedCatalog, articlesDb, unitResolver, meas
       }
 
       // Dernière page : vérifier si le bloc signature tient
-      const spaceLeftLast = CONTENT_HEIGHT_PX - HEADER_HEIGHT - TABLE_HEADER_HEIGHT - currentY;
+      const spaceLeftLast = ROWS_AREA_PX - currentY;
       if (currentPageItems.length > 0) {
         if (spaceLeftLast < SIGNATURE_BLOCK_HEIGHT) {
           finalizePage(false);

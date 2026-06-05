@@ -2,9 +2,20 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '2.12.1';
+export const APP_VERSION = '3.0.0';
 
 export const CHANGELOG = [
+  {
+    version: '3.0.0',
+    date: '2026-06-05',
+    title: 'Bordereau des prix : aperçu & PDF calés sur le Word',
+    highlights: [
+      'Bordereau des prix : l\'aperçu à l\'écran et l\'export PDF reproduisent désormais fidèlement la mise en page du document Word — page de garde, en-tête de page et tableau ont la même présentation, pour que ce que vous voyez à l\'écran corresponde à ce que vous envoyez',
+      'Bordereau des prix : la pagination de l\'aperçu et du PDF est calée sur celle du Word (police, marges, interligne et largeurs de colonnes identiques) — les pages se coupent aux mêmes endroits (un réglage fin reste possible au cas par cas selon les projets)',
+      'Bordereau des prix : sur un article qui se poursuit d\'une page à l\'autre, suppression de la note « (...Suite page suivante) » et du titre répété « … (SUITE) » — la description continue simplement, comme dans le Word',
+      'Accueil : retrait de la tuile « Estimation Rapide » du hub',
+    ],
+  },
   {
     version: '2.12.1',
     date: '2026-06-04',

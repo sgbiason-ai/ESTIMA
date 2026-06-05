@@ -1,5 +1,4 @@
 import React from 'react';
-import { hexToRgb, lighten } from './utils/bpuBrandingUtils';
 import { PAGE_WIDTH_PX, PAGE_HEIGHT_PX } from './constants/bpuLayout';
 import { getCurrentPhase } from '../../utils/phaseModel';
 
@@ -7,9 +6,15 @@ import { getCurrentPhase } from '../../utils/phaseModel';
  * BpuCoverPage
  * Div cachée (display: none) rendue dans le DOM et capturée par html2canvas
  * pour générer la page de garde du PDF.
+ *
+ * Mise en page calquée sur l'export Word (useBpuWordExport) : page sobre,
+ * titre à droite, gros nom de projet, trait secondaire pleine largeur, puis
+ * blocs Maître d'ouvrage / Lieu de réalisation / Phase / Code affaire en pile.
+ * Seul ajout par rapport au Word : le(s) logo(s) conservé(s) en haut.
  */
-const BpuCoverPage = ({ project, branding, resolvedLogo, today, onLogoError }) => {
-  const { colors, fonts, companyName, tagline, address, phone, email, website } = branding;
+const BpuCoverPage = ({ project, branding, resolvedLogo, onLogoError }) => {
+  const { colors, fonts } = branding;
+  const head = fonts.headings;
 
   return (
     <div
@@ -19,95 +24,67 @@ const BpuCoverPage = ({ project, branding, resolvedLogo, today, onLogoError }) =
         position: 'fixed', top: 0, left: 0,
         width: `${PAGE_WIDTH_PX}px`, height: `${PAGE_HEIGHT_PX}px`,
         backgroundColor: '#FFFFFF', zIndex: -9999,
-        fontFamily: fonts.main,
+        fontFamily: fonts.main, boxSizing: 'border-box',
+        padding: '72px 90px',
       }}
     >
-      {/* Bande couleur gauche */}
-      <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '2.5%', backgroundColor: colors.primary }} />
-
-      {/* Logos (MOE + client) */}
-      <div style={{ position: 'absolute', top: '3%', left: '5%', right: '5%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '10%' }}>
+      {/* Logo(s) en haut (seul ajout vs Word) */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '70px', marginBottom: '40px' }}>
         <div style={{ height: '100%', display: 'flex', alignItems: 'center' }}>
-          {resolvedLogo ? (
-            <img src={resolvedLogo} alt="logo MOE" style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} onError={onLogoError} loading="lazy" />
-          ) : (
-            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 12px', borderRadius: '4px', backgroundColor: lighten(colors.primary, 0.93), color: colors.primary, fontFamily: fonts.headings, minWidth: '80px', fontSize: '14px', fontWeight: 'bold' }}>
-              {companyName || 'VOTRE SOCIÉTÉ'}
-            </div>
+          {resolvedLogo && (
+            <img src={resolvedLogo} alt="logo MOE" style={{ maxHeight: '100%', maxWidth: '260px', objectFit: 'contain' }} onError={onLogoError} loading="lazy" />
           )}
         </div>
-        <div style={{ height: '70%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ height: '70%', display: 'flex', alignItems: 'center' }}>
           {project?.clientLogo && (
-            <img src={project.clientLogo} alt="logo client" style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} loading="lazy" />
+            <img src={project.clientLogo} alt="logo client" style={{ maxHeight: '100%', maxWidth: '200px', objectFit: 'contain' }} loading="lazy" />
           )}
         </div>
       </div>
 
-      {/* Séparateur */}
-      <div style={{ position: 'absolute', left: '5%', right: '5%', top: '14.5%', height: '1px', backgroundColor: `rgba(${hexToRgb(colors.primary)}, 0.15)` }} />
-
-      {/* Sous-titre */}
-      <div style={{ position: 'absolute', right: '5%', top: '16%', fontWeight: 'bold', textTransform: 'uppercase', textAlign: 'right', color: colors.subtle, fontFamily: fonts.headings, fontSize: '12px', letterSpacing: '0.1em' }}>
-        BORDEREAU DES PRIX UNITAIRES
+      {/* Sous-titre (aligné à droite, comme le Word) */}
+      <div style={{ marginTop: '40px', marginBottom: '46px', textAlign: 'right', fontWeight: 'bold', textTransform: 'uppercase', color: colors.subtle, fontFamily: head, fontSize: '15px', letterSpacing: '0.06em' }}>
+        Bordereau des Prix Unitaires
       </div>
 
       {/* Titre projet */}
-      <div style={{ position: 'absolute', left: '5%', right: '5%', top: '28%', fontWeight: 900, lineHeight: 1.2, textTransform: 'uppercase', color: colors.primary, fontFamily: fonts.headings, fontSize: '36px' }}>
+      <div style={{ marginBottom: '18px', fontWeight: 900, lineHeight: 1.15, textTransform: 'uppercase', color: colors.primary, fontFamily: head, fontSize: '34px' }}>
         {project?.name || 'NOM DU PROJET'}
       </div>
 
-      {/* Trait accent */}
-      <div style={{ position: 'absolute', top: '38%', left: '5%', width: '15%', height: '2px', backgroundColor: colors.secondary, borderRadius: '1px' }} />
+      {/* Trait accent pleine largeur (comme la bordure basse du Word) */}
+      <div style={{ height: '3px', width: '100%', backgroundColor: colors.secondary, marginBottom: '88px' }} />
 
-      {/* Bloc infos projet */}
-      <div style={{ position: 'absolute', left: '5%', right: '5%', top: '42%', height: '24%', backgroundColor: lighten(colors.primary, 0.93), borderRadius: '8px' }}>
-        {/* Colonne gauche */}
-        <div style={{ position: 'absolute', top: '15%', left: '5%', width: '42%' }}>
-          <div style={{ fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px', color: colors.subtle, fontFamily: fonts.headings, fontSize: '10px' }}>MAÎTRE D'OUVRAGE</div>
-          <div style={{ fontWeight: 600, textTransform: 'uppercase', color: colors.text, fontFamily: fonts.headings, fontSize: '16px' }}>{project?.client || 'NOM DU CLIENT'}</div>
-          <div style={{ color: colors.subtle, fontSize: '12px', marginTop: '2px' }}>
-            {project?.clientAddress || ''}<br />{project?.clientZip || ''} {project?.clientCity || ''}
-          </div>
-          <div style={{ fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '15%', color: colors.subtle, fontFamily: fonts.headings, fontSize: '10px' }}>LIEU DE RÉALISATION</div>
-          <div style={{ fontWeight: 600, textTransform: 'uppercase', color: colors.text, fontFamily: fonts.headings, fontSize: '16px' }}>{project?.location || 'VILLE, DÉPARTEMENT'}</div>
-        </div>
-
-        {/* Séparateur vertical */}
-        <div style={{ position: 'absolute', top: '10%', bottom: '10%', left: '50%', width: '1px', backgroundColor: `rgba(${hexToRgb(colors.primary)}, 0.15)` }} />
-
-        {/* Colonne droite */}
-        <div style={{ position: 'absolute', top: '15%', left: '55%', right: '5%' }}>
-          <div style={{ fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px', color: colors.subtle, fontFamily: fonts.headings, fontSize: '10px' }}>PHASE DU PROJET</div>
-          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#FFFFFF', borderRadius: '4px', padding: '0 12px', height: '24px', backgroundColor: colors.primary, fontFamily: fonts.headings, fontSize: '13px', textTransform: 'uppercase' }}>
-            {getCurrentPhase(project)?.code || 'DCE'}
-          </div>
-          <div style={{ fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '15%', color: colors.subtle, fontFamily: fonts.headings, fontSize: '10px' }}>RÉFÉRENCE (CODE AFFAIRE)</div>
-          <div style={{ fontWeight: 600, textTransform: 'uppercase', color: colors.text, fontFamily: fonts.headings, fontSize: '16px' }}>{project?.code || '2025-XXX'}</div>
-        </div>
+      {/* Maître d'ouvrage */}
+      <div style={{ marginBottom: '9px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.08em', color: colors.subtle, fontFamily: head, fontSize: '13px' }}>
+        Maître d'ouvrage
+      </div>
+      <div style={{ marginBottom: '5px', fontWeight: 'bold', textTransform: 'uppercase', color: colors.text, fontFamily: head, fontSize: '19px' }}>
+        {project?.client || 'NOM DU CLIENT'}
+      </div>
+      <div style={{ color: colors.subtle, fontSize: '14px', lineHeight: 1.5 }}>{project?.clientAddress || 'Adresse du client'}</div>
+      <div style={{ marginBottom: '44px', color: colors.subtle, fontSize: '14px', lineHeight: 1.5 }}>
+        {project?.clientZip || ''} {project?.clientCity || ''}
       </div>
 
-      {/* Pied de page — coordonnées société */}
-      {(companyName || address || phone || email) && (
-        <div style={{ position: 'absolute', left: '5%', right: '5%', bottom: '6%' }}>
-          <div style={{ height: '1px', marginBottom: '8px', backgroundColor: `rgba(${hexToRgb(colors.primary)}, 0.15)` }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-            <div>
-              {companyName && <div style={{ fontWeight: 'bold', color: colors.text, fontSize: '11px' }}>{companyName}</div>}
-              {address    && <div style={{ color: colors.subtle, fontSize: '10px' }}>{address}</div>}
-              {tagline    && <div style={{ color: colors.subtle, fontSize: '10px', fontStyle: 'italic' }}>{tagline}</div>}
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              {phone   && <div style={{ color: colors.subtle, fontSize: '10px' }}>{phone}</div>}
-              {email   && <div style={{ color: colors.subtle, fontSize: '10px' }}>{email}</div>}
-              {website && <div style={{ color: colors.primary, fontSize: '10px', fontWeight: 600 }}>{website}</div>}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Lieu de réalisation */}
+      <div style={{ marginBottom: '9px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.08em', color: colors.subtle, fontFamily: head, fontSize: '13px' }}>
+        Lieu de réalisation
+      </div>
+      <div style={{ marginBottom: '80px', fontWeight: 'bold', textTransform: 'uppercase', color: colors.text, fontFamily: head, fontSize: '19px' }}>
+        {project?.location || 'VILLE, DÉPARTEMENT'}
+      </div>
 
-      {/* Date d'édition */}
-      <div style={{ position: 'absolute', right: '5%', bottom: '2%', color: colors.subtle, fontSize: '9px' }}>
-        Édité le {today}
+      {/* Phase */}
+      <div style={{ marginBottom: '16px', fontFamily: head }}>
+        <span style={{ fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.04em', color: colors.subtle, fontSize: '15px' }}>Phase : </span>
+        <span style={{ fontWeight: 'bold', textTransform: 'uppercase', color: colors.primary, fontSize: '16px' }}>{getCurrentPhase(project)?.code || 'DCE'}</span>
+      </div>
+
+      {/* Code affaire */}
+      <div style={{ fontFamily: head }}>
+        <span style={{ fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.04em', color: colors.subtle, fontSize: '15px' }}>Code affaire : </span>
+        <span style={{ fontWeight: 'bold', textTransform: 'uppercase', color: colors.text, fontSize: '16px' }}>{project?.code || '2025-XXX'}</span>
       </div>
     </div>
   );
