@@ -270,9 +270,15 @@ export const useProjectManager = (user, companyId) => {
 
   // Insère un lot de lignes déjà construites (ex. un bloc : ligne pilote + composants
   // avec leurs formules de quantité) dans le chapitre/sous-chapitre ciblé, en bloc.
-  const addItemsToProject = (lines, selection = null) => {
+  const addItemsToProject = (lines, selection = null, opts = {}) => {
     if (!Array.isArray(lines) || lines.length === 0) return;
     setProject(prev => {
+      // Insertion au PREMIER NIVEAU : les templates/agrégats deviennent des
+      // chapitres à part entière (et non des sous-chapitres du chapitre sélectionné).
+      if (opts.atTopLevel) {
+        return { ...prev, chapters: [...(prev.chapters || []), ...lines] };
+      }
+
       const targetParentId =
         (selection?.type === 'chapter' || selection?.type === 'subchapter' ? selection.id : null) ||
         (prev.chapters?.[0]?.id || null);

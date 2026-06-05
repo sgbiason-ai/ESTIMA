@@ -11,9 +11,21 @@ import {
 } from 'lucide-react';
 import { formatPrice, cleanText, normalizeUnitSymbol } from '../../utils/helpers';
 import {
-  getBlocArticles, getBlocKind, blocUnitPrice, articleContribution, needsThickness, needsDensity,
+  getBlocArticles, getBlocKind, blocUnitPrice, articleContribution, needsThickness, needsDensity, isBlocRef,
 } from '../../utils/blocPricing';
 import { useDialog } from '../../contexts/DialogContext';
+
+// Le bloc `root` contient-il (transitivement) `targetId` via ses réfs de blocs ?
+// Sert à interdire, à l'édition, l'ajout d'un bloc qui créerait un cycle (A⊂B⊂A).
+function blocContainsBloc(root, targetId, blocsById, seen = new Set()) {
+  if (!root || !targetId || seen.has(String(root.id))) return false;
+  seen.add(String(root.id));
+  return getBlocArticles(root).some(a => {
+    if (!isBlocRef(a)) return false;
+    if (String(a.id) === String(targetId)) return true;
+    return blocContainsBloc(blocsById[String(a.id)], targetId, blocsById, seen);
+  });
+}
 
 const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc, deleteBloc, dragEndRef }) => {
   const { confirm } = useDialog();
@@ -25,11 +37,19 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
     return map;
   }, [fullBpu]);
 
+  // Lookup rapide bloc par id (résolution des sous-blocs imbriqués).
+  const blocsByIdMap = useMemo(() => {
+    const m = {};
+    (blocs || []).forEach(b => { m[String(b.id)] = b; });
+    return m;
+  }, [blocs]);
+
   // Sélection / brouillon d'édition. Composant = { id, epaisseur, densite }.
   const NEW = '__new__';
   const [selectedId, setSelectedId] = useState(null);
   const [draft, setDraft] = useState({ name: '', unit: '', articles: [], kind: 'formula' });
   const [search, setSearch] = useState('');
+  const [addMode, setAddMode] = useState('articles'); // volet Ajout (agrégats) : 'articles' | 'blocs'
   const [blocSearch, setBlocSearch] = useState('');
   const [unitFilter, setUnitFilter] = useState('');   // '' = toutes les unités
   const [kindFilter, setKindFilter] = useState('all'); // 'all' | 'formula' | 'aggregate'
@@ -49,6 +69,7 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
       if (b) setDraft({ name: b.name || '', unit: b.unit || '', articles: getBlocArticles(b).map(a => ({ ...a })), kind: getBlocKind(b) });
     }
     setSearch('');
+    setAddMode('articles');
   }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isEditing = selectedId != null;
@@ -75,6 +96,20 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
       .filter(i => !q || norm(cleanText(i.designation || '')).includes(q));
     return { available: matches.slice(0, LIST_CAP), availableTotal: matches.length };
   }, [fullBpu, draft.articles, search]);
+
+  // Blocs ajoutables dans un agrégat : exclut soi-même, les déjà-ajoutés et tout
+  // bloc qui (transitivement) contient le bloc courant (anti-cycle).
+  const { availableBlocs, availableBlocsTotal } = useMemo(() => {
+    const norm = (s) => (s || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+    const already = new Set(draft.articles.filter(isBlocRef).map(a => String(a.id)));
+    const q = norm(search).trim();
+    const matches = (blocs || [])
+      .filter(b => String(b.id) !== String(selectedId))
+      .filter(b => !already.has(String(b.id)))
+      .filter(b => !blocContainsBloc(b, selectedId, blocsByIdMap))
+      .filter(b => !q || norm(b.name).includes(q));
+    return { availableBlocs: matches.slice(0, LIST_CAP), availableBlocsTotal: matches.length };
+  }, [blocs, draft.articles, search, selectedId, blocsByIdMap]);
 
   // Blocs visibles dans la colonne de gauche : filtre accent-insensible par nom
   // OU par article contenu (comme la bibliothèque de l'estimation), puis tri alpha.
@@ -104,6 +139,7 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
   }, [blocs, blocSearch, bpuById, unitFilter, kindFilter, sortField, sortDir]);
 
   const addArticle = (id) => setDraft(d => ({ ...d, articles: [...d.articles, { id: String(id), epaisseur: '', densite: '', perte: '' }] }));
+  const addBlocRef = (id) => setDraft(d => ({ ...d, articles: [...d.articles, { ref: 'bloc', id: String(id) }] }));
   const removeArticle = (idx) => setDraft(d => ({ ...d, articles: d.articles.filter((_, i) => i !== idx) }));
   const setArticle = (idx, patch) => setDraft(d => ({ ...d, articles: d.articles.map((a, i) => i === idx ? { ...a, ...patch } : a) }));
   // Réordonnancement par glisser-déposer. Le DragDropContext est porté par DatabaseView ;
@@ -156,6 +192,8 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
   };
 
   const isAggregate = draft.kind === 'aggregate';
+  // Volet Ajout en mode « Blocs » : seulement pour les agrégats.
+  const showBlocs = isAggregate && addMode === 'blocs';
   // Bascule de type : un agrégat n'a pas d'unité de bloc (articles à unités mixtes).
   const setKind = (kind) => setDraft(d => ({ ...d, kind, unit: kind === 'aggregate' ? '' : d.unit }));
 
@@ -402,20 +440,23 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
                       className="flex-1 overflow-y-auto p-2 space-y-1.5"
                     >
                       {draft.articles.length === 0 && (
-                        <div className="p-6 text-center text-slate-400 text-xs italic">Ajoutez des articles depuis la liste de droite →</div>
+                        <div className="p-6 text-center text-slate-400 text-xs italic">{isAggregate ? 'Ajoutez des articles ou des blocs depuis la liste de droite →' : 'Ajoutez des articles depuis la liste de droite →'}</div>
                       )}
                       {draft.articles.map((a, idx) => {
-                        const article = bpuById[String(a.id)];
+                        const blocRef = isBlocRef(a);
+                        const childBloc = blocRef ? blocsByIdMap[String(a.id)] : null;
+                        const article = blocRef ? null : bpuById[String(a.id)];
                         const wantEp = article && needsThickness(article.unit);
                         const wantD = article && needsDensity(article.unit);
                         const contrib = article ? articleContribution(article, a.epaisseur, a.densite, a.perte) : 0;
+                        const dndId = `${blocRef ? 'bloc' : 'art'}_${String(a.id)}`;
                         return (
-                          <Draggable key={String(a.id)} draggableId={String(a.id)} index={idx}>
+                          <Draggable key={dndId} draggableId={dndId} index={idx}>
                             {(dragProvided, dragSnapshot) => (
                               <div
                                 ref={dragProvided.innerRef}
                                 {...dragProvided.draggableProps}
-                                className={`group flex items-center gap-2 px-2 py-2 bg-white border rounded-lg transition-all ${dragSnapshot.isDragging ? 'border-emerald-400 shadow-lg ring-2 ring-emerald-100 rotate-1' : 'border-slate-200 hover:border-emerald-300'}`}
+                                className={`group flex items-center gap-2 px-2 py-2 bg-white border rounded-lg transition-all ${dragSnapshot.isDragging ? 'border-emerald-400 shadow-lg ring-2 ring-emerald-100 rotate-1' : blocRef ? 'border-violet-200 hover:border-violet-300 bg-violet-50/20' : 'border-slate-200 hover:border-emerald-300'}`}
                               >
                                 {/* Poignée de glissement (remplace le n° au survol) */}
                                 <div
@@ -427,7 +468,19 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
                                   <GripVertical size={13} className="hidden group-hover:block text-emerald-400" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  {article ? (
+                                  {blocRef ? (
+                                    childBloc ? (
+                                      <>
+                                        <p className="text-[11px] font-bold text-violet-900 uppercase line-clamp-2 tracking-tight leading-tight flex items-center gap-1.5">
+                                          <span className="px-1 py-0.5 rounded bg-violet-100 text-violet-700 text-[8px] font-black shrink-0">{getBlocKind(childBloc) === 'aggregate' ? 'Agrégat' : 'Formule'}</span>
+                                          {childBloc.name}
+                                        </p>
+                                        <p className="text-[9px] text-slate-400 font-bold">{getBlocArticles(childBloc).length} article{getBlocArticles(childBloc).length > 1 ? 's' : ''}{childBloc.unit ? ` · ${normalizeUnitSymbol(childBloc.unit)}` : ''}</p>
+                                      </>
+                                    ) : (
+                                      <p className="text-[11px] font-bold text-amber-600 italic flex items-center gap-1"><AlertTriangle size={12} /> Bloc introuvable</p>
+                                    )
+                                  ) : article ? (
                                     <>
                                       <p className="text-[11px] font-bold text-slate-800 uppercase line-clamp-2 tracking-tight leading-tight">{cleanText(article.designation)}</p>
                                       <p className="text-[9px] text-slate-400 font-bold">{formatPrice(article.price)}/{normalizeUnitSymbol(article.unit)}</p>
@@ -436,8 +489,8 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
                                     <p className="text-[11px] font-bold text-amber-600 italic flex items-center gap-1"><AlertTriangle size={12} /> Article introuvable</p>
                                   )}
                                 </div>
-                                <span className="w-10 text-center text-[9px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 rounded px-1 py-0.5 uppercase">{article ? normalizeUnitSymbol(article.unit) : '—'}</span>
-                                {!isAggregate && (
+                                <span className={`w-10 text-center text-[9px] font-black rounded px-1 py-0.5 uppercase border ${blocRef ? 'text-violet-600 bg-violet-50 border-violet-100' : 'text-emerald-600 bg-emerald-50 border-emerald-100'}`}>{blocRef ? 'bloc' : (article ? normalizeUnitSymbol(article.unit) : '—')}</span>
+                                {!isAggregate && !blocRef && (
                                 <>
                                 {/* Épaisseur */}
                                 <div className="w-16 flex justify-center">
@@ -503,41 +556,75 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
 
               {/* Ajout d'articles */}
               <div className="w-96 flex flex-col overflow-hidden bg-white shrink-0">
-                <div className="p-4 border-b border-slate-100">
+                <div className="p-4 border-b border-slate-100 space-y-2">
+                  {isAggregate && (
+                    <div className="grid grid-cols-2 bg-slate-100 rounded-lg p-0.5 gap-0.5">
+                      <button onClick={() => setAddMode('articles')} className={`py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all ${!showBlocs ? 'bg-white shadow-sm text-emerald-700' : 'text-slate-500 hover:text-slate-700'}`}>Articles</button>
+                      <button onClick={() => setAddMode('blocs')} className={`py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all ${showBlocs ? 'bg-white shadow-sm text-violet-700' : 'text-slate-500 hover:text-slate-700'}`}>Blocs</button>
+                    </div>
+                  )}
                   <div className="relative">
                     <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
                     <input
                       type="text"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
-                      placeholder="Rechercher un article à ajouter…"
+                      placeholder={showBlocs ? 'Rechercher un bloc à ajouter…' : 'Rechercher un article à ajouter…'}
                       className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-emerald-500 focus:bg-white transition-all"
                     />
                   </div>
                 </div>
                 <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-                  {available.map(item => (
-                    <button
-                      key={item.id}
-                      onClick={() => addArticle(item.id)}
-                      title={`Ajouter « ${cleanText(item.designation)} » au bloc`}
-                      className="w-full group relative flex items-start justify-between p-2 bg-white border border-slate-200 rounded-lg shadow-sm hover:border-emerald-400 hover:shadow-md hover:bg-emerald-50/30 cursor-pointer transition-all duration-200 active:scale-[0.98] text-left"
-                    >
-                      <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg bg-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      <div className="flex-1 min-w-0 pr-2 pl-1.5">
-                        <p className="text-[10px] font-bold text-slate-700 uppercase leading-snug group-hover:text-emerald-800 line-clamp-2 transition-colors">{cleanText(item.designation)}</p>
-                      </div>
-                      <div className="flex flex-col items-end shrink-0 gap-1">
-                        <span className="text-[10px] font-black text-emerald-700 font-mono bg-emerald-100/50 border border-emerald-100 px-2 py-0.5 rounded shadow-sm group-hover:bg-emerald-200 group-hover:text-emerald-900 transition-colors">{formatPrice(item.price)}</span>
-                        <span className="text-[8px] font-bold text-slate-600 uppercase tracking-wider">{normalizeUnitSymbol(item.unit)}</span>
-                      </div>
-                    </button>
-                  ))}
-                  {available.length === 0 && (
-                    <div className="p-4 text-center text-slate-400 text-[11px] italic">{search ? 'Aucun article trouvé.' : 'Tous les articles sont déjà dans le bloc.'}</div>
-                  )}
-                  {availableTotal > LIST_CAP && (
-                    <div className="p-2 text-center text-slate-400 text-[10px] italic">{availableTotal - LIST_CAP} autre(s) article(s) — affinez la recherche</div>
+                  {showBlocs ? (
+                    <>
+                      {availableBlocs.map(b => (
+                        <button
+                          key={b.id}
+                          onClick={() => addBlocRef(b.id)}
+                          title={`Imbriquer le bloc « ${b.name} »`}
+                          className="w-full group relative flex items-center gap-2 p-2 bg-white border border-slate-200 rounded-lg shadow-sm hover:border-violet-400 hover:shadow-md hover:bg-violet-50/30 cursor-pointer transition-all duration-200 active:scale-[0.98] text-left"
+                        >
+                          <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg bg-violet-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          <Boxes size={15} className="text-violet-400 shrink-0 ml-1" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[10px] font-bold text-slate-700 uppercase leading-snug group-hover:text-violet-800 line-clamp-2 transition-colors">{b.name}</p>
+                            <p className="text-[9px] font-bold text-slate-400">{getBlocArticles(b).length} art. · {getBlocKind(b) === 'aggregate' ? 'agrégat' : 'formule'}</p>
+                          </div>
+                        </button>
+                      ))}
+                      {availableBlocs.length === 0 && (
+                        <div className="p-4 text-center text-slate-400 text-[11px] italic">{search ? 'Aucun bloc trouvé.' : 'Aucun autre bloc à imbriquer.'}</div>
+                      )}
+                      {availableBlocsTotal > LIST_CAP && (
+                        <div className="p-2 text-center text-slate-400 text-[10px] italic">{availableBlocsTotal - LIST_CAP} autre(s) bloc(s) — affinez la recherche</div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {available.map(item => (
+                        <button
+                          key={item.id}
+                          onClick={() => addArticle(item.id)}
+                          title={`Ajouter « ${cleanText(item.designation)} » au bloc`}
+                          className="w-full group relative flex items-start justify-between p-2 bg-white border border-slate-200 rounded-lg shadow-sm hover:border-emerald-400 hover:shadow-md hover:bg-emerald-50/30 cursor-pointer transition-all duration-200 active:scale-[0.98] text-left"
+                        >
+                          <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg bg-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          <div className="flex-1 min-w-0 pr-2 pl-1.5">
+                            <p className="text-[10px] font-bold text-slate-700 uppercase leading-snug group-hover:text-emerald-800 line-clamp-2 transition-colors">{cleanText(item.designation)}</p>
+                          </div>
+                          <div className="flex flex-col items-end shrink-0 gap-1">
+                            <span className="text-[10px] font-black text-emerald-700 font-mono bg-emerald-100/50 border border-emerald-100 px-2 py-0.5 rounded shadow-sm group-hover:bg-emerald-200 group-hover:text-emerald-900 transition-colors">{formatPrice(item.price)}</span>
+                            <span className="text-[8px] font-bold text-slate-600 uppercase tracking-wider">{normalizeUnitSymbol(item.unit)}</span>
+                          </div>
+                        </button>
+                      ))}
+                      {available.length === 0 && (
+                        <div className="p-4 text-center text-slate-400 text-[11px] italic">{search ? 'Aucun article trouvé.' : 'Tous les articles sont déjà dans le bloc.'}</div>
+                      )}
+                      {availableTotal > LIST_CAP && (
+                        <div className="p-2 text-center text-slate-400 text-[10px] italic">{availableTotal - LIST_CAP} autre(s) article(s) — affinez la recherche</div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

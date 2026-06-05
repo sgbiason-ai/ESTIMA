@@ -643,7 +643,7 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNav
                 filteredBpu={filteredBpuToDisplay}
                 categories={localMode.currentCategories}
                 addItemToProject={(item) => addItemToProject(item, null, modals.selection)}
-                addItemsToProject={(lines) => addItemsToProject(lines, modals.selection)}
+                addItemsToProject={(lines, opts) => addItemsToProject(lines, modals.selection, opts)}
                 selection={modals.selection}
                 setSelection={modals.setSelection}
                 multiSelection={modals.multiSelection}

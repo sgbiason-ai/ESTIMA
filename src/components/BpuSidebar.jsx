@@ -62,6 +62,45 @@ const BpuSidebar = ({
   const [blocsOpen, setBlocsOpen] = useState(true);
   const tooltipTimer = useRef(null);
 
+  // Césure Articles / Blocs redimensionnable : poignée à glisser, hauteur mémorisée (localStorage).
+  const sidebarRef = useRef(null);
+  const [blocsHeight, setBlocsHeight] = useState(() => {
+    const v = Number(localStorage.getItem('estima_bpu_blocs_height'));
+    return Number.isFinite(v) && v >= 120 ? v : 240;
+  });
+  const blocsHeightRef = useRef(blocsHeight);
+  const [isResizing, setIsResizing] = useState(false);
+
+  const startResize = useCallback((e) => {
+    e.preventDefault();
+    setIsResizing(true);
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'row-resize';
+    const onMove = (ev) => {
+      const rect = sidebarRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const clientY = ev.touches ? ev.touches[0].clientY : ev.clientY;
+      const max = Math.max(160, rect.height - 240);          // garde de la place pour les Articles
+      const h = Math.max(120, Math.min(rect.bottom - clientY, max));
+      blocsHeightRef.current = h;
+      setBlocsHeight(h);
+    };
+    const onUp = () => {
+      setIsResizing(false);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onUp);
+      try { localStorage.setItem('estima_bpu_blocs_height', String(Math.round(blocsHeightRef.current))); } catch { /* quota / mode privé */ }
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onUp);
+  }, []);
+
   // Résolution des articles d'un bloc depuis le BPU complet (ou la liste filtrée en repli).
   const bpuById = useMemo(() => {
     const map = {};
@@ -69,6 +108,13 @@ const BpuSidebar = ({
     (source || []).forEach(i => { map[String(i.id)] = i; });
     return map;
   }, [allBpu, filteredBpu]);
+
+  // Lookup bloc par id → résolution des sous-blocs imbriqués à l'insertion (templates).
+  const blocsByIdMap = useMemo(() => {
+    const m = {};
+    (blocs || []).forEach(b => { m[String(b.id)] = b; });
+    return m;
+  }, [blocs]);
 
   // La recherche du volet filtre aussi les blocs : par nom OU par article contenu (accent-insensible).
   const blocsToShow = useMemo(() => {
@@ -139,21 +185,23 @@ const BpuSidebar = ({
   useEffect(() => { onInsertLinesRef.current = onInsertLines; }, [onInsertLines]);
 
   const handleInsertBloc = useCallback((bloc) => {
-    const { node, added, missing } = buildBlocSubChapter(bloc, bpuById, tranches);
+    const { node, added, missing } = buildBlocSubChapter(bloc, bpuById, tranches, blocsByIdMap);
     if (added === 0) {
       error(`Bloc « ${bloc.name} » : aucun article disponible.`);
       return;
     }
-    onInsertLinesRef.current?.([node]);
     const isAgg = getBlocKind(bloc) === 'aggregate';
+    // Agrégat (template) → chapitre de premier niveau ; formule → sous-chapitre.
+    onInsertLinesRef.current?.([node], { atTopLevel: isAgg });
+    const place = isAgg ? 'chapitre' : 'sous-chapitre';
     const tail = isAgg ? ' Saisissez les quantités sur chaque ligne.' : " Saisissez la surface sur l'en-tête.";
-    success(`Bloc « ${bloc.name} » inséré : sous-chapitre + ${added} article${added > 1 ? 's' : ''}${missing ? ` (${missing} introuvable${missing > 1 ? 's' : ''})` : ''}.${tail}`);
-  }, [bpuById, tranches, success, error]);
+    success(`Bloc « ${bloc.name} » inséré : ${place} + ${added} article${added > 1 ? 's' : ''}${missing ? ` (${missing} introuvable${missing > 1 ? 's' : ''})` : ''}.${tail}`);
+  }, [bpuById, blocsByIdMap, tranches, success, error]);
 
   if (!showBpu) return null;
 
   return (
-    <div className="w-80 bg-white border-r border-slate-200 flex flex-col z-20 shadow-xl">
+    <div ref={sidebarRef} className="w-80 bg-white border-r border-slate-200 flex flex-col z-20 shadow-xl">
       <header className="p-4 border-b border-slate-100 bg-slate-50/50">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-black text-slate-800 flex items-center gap-2 uppercase text-[10px] tracking-widest">
@@ -188,7 +236,7 @@ const BpuSidebar = ({
           </div>
         </div>
       </header>
-      <div className="flex-[3] min-h-0 overflow-y-auto p-2 space-y-2 bg-slate-50/50">
+      <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2 bg-slate-50/50">
         {sidebarItems.map((item) => (
           <BpuItemCard
             key={item.id}
@@ -204,8 +252,23 @@ const BpuSidebar = ({
         )}
       </div>
 
-      {/* ── Zone Blocs (bas du volet, repliable) ── */}
-      <div className={`border-t border-slate-200 bg-white flex flex-col ${blocsOpen ? 'flex-[2] min-h-0' : 'shrink-0'}`}>
+      {/* Poignée de redimensionnement de la césure Articles / Blocs (zone Blocs dépliée) */}
+      {blocsOpen && (
+        <div
+          onMouseDown={startResize}
+          onTouchStart={startResize}
+          title="Glisser pour redimensionner Articles / Blocs"
+          className={`shrink-0 h-2 flex items-center justify-center cursor-row-resize group ${isResizing ? 'bg-emerald-100' : 'hover:bg-emerald-50'}`}
+        >
+          <div className={`h-0.5 w-10 rounded-full transition-colors ${isResizing ? 'bg-emerald-500' : 'bg-slate-300 group-hover:bg-emerald-400'}`} />
+        </div>
+      )}
+
+      {/* ── Zone Blocs (bas du volet, repliable, hauteur ajustable) ── */}
+      <div
+        className="border-t border-slate-200 bg-white flex flex-col shrink-0 min-h-0"
+        style={blocsOpen ? { height: blocsHeight } : undefined}
+      >
         <button
           onClick={() => setBlocsOpen(o => !o)}
           className="shrink-0 w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-50 transition-colors"

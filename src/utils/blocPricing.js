@@ -66,9 +66,25 @@ export function getBlocKind(bloc) {
   return bloc?.kind === 'aggregate' ? 'aggregate' : 'formula';
 }
 
-/** Prix unitaire du bloc (Σ des coûts ramenés), à partir d'un lookup id→article. */
-export function blocUnitPrice(bloc, bpuById) {
+/** Un composant de bloc référence-t-il un autre bloc (vs un article BPU) ? */
+export function isBlocRef(component) {
+  return component?.ref === 'bloc';
+}
+
+/**
+ * Prix unitaire du bloc (Σ des coûts ramenés), à partir d'un lookup id→article.
+ * Récursif : un composant `{ref:'bloc'}` ajoute le prix du sous-bloc (résolu via
+ * `blocsById`). `visited` empêche les boucles (A⊂B⊂A) ; un cycle compte pour 0.
+ */
+export function blocUnitPrice(bloc, bpuById, blocsById = {}, visited = new Set()) {
+  const seen = new Set(visited);
+  if (bloc?.id) seen.add(String(bloc.id));
   return getBlocArticles(bloc).reduce((sum, a) => {
+    if (isBlocRef(a)) {
+      const child = blocsById?.[String(a.id)];
+      if (!child || seen.has(String(a.id))) return sum;
+      return sum + blocUnitPrice(child, bpuById, blocsById, seen);
+    }
     const art = bpuById?.[String(a.id)];
     return art ? sum + articleContribution(art, a.epaisseur, a.densite, a.perte) : sum;
   }, 0);
@@ -99,9 +115,14 @@ export function blocFormulaFactor(articleUnit, epaisseur, densite, perte) {
  *
  * @returns { node, added, missing }
  */
-export function buildBlocSubChapter(bloc, bpuById, tranches = []) {
-  if (getBlocKind(bloc) === 'aggregate') return buildAggregateSubChapter(bloc, bpuById);
+export function buildBlocSubChapter(bloc, bpuById, tranches = [], blocsById = {}, visited = new Set()) {
+  const seen = new Set(visited);
+  if (bloc?.id) seen.add(String(bloc.id));
 
+  if (getBlocKind(bloc) === 'aggregate') return buildAggregateSubChapter(bloc, bpuById, blocsById, seen, tranches);
+
+  // Branche FORMULE : composants = articles uniquement (une éventuelle réf de bloc,
+  // non résolue par bpuById, est ignorée → comptée « missing »).
   const articles = getBlocArticles(bloc);
   const blocId = generateId();
 
@@ -154,20 +175,37 @@ export function buildBlocSubChapter(bloc, bpuById, tranches = []) {
 }
 
 /**
- * Sous-chapitre d'un bloc AGRÉGAT (simple regroupement d'articles, sans calcul) :
+ * Sous-chapitre d'un bloc AGRÉGAT (simple regroupement, sans calcul) :
  *  - un nœud `type:'chapter'` NORMAL (numéroté, sous-totalisé) — pas de `isBloc`,
  *    donc aucune surface pilote ni formule.
- *  - ses enfants = les articles en lignes standard (prix/unité natifs FIGÉS),
- *    quantité VIDE (0) à saisir dans l'estimation, sans formule.
+ *  - ses enfants = les articles en lignes standard (quantité VIDE à saisir) ET,
+ *    pour un composant `{ref:'bloc'}`, le sous-chapitre du bloc enfant inséré
+ *    RÉCURSIVEMENT (templates « bloc de blocs », ex. Lotissement ⊃ Voirie ⊃ articles).
+ *    Le bloc enfant garde son propre type (un sous-bloc formule conserve sa surface
+ *    pilote + ses formules).
+ *  - `blocsById` résout les blocs enfants ; `visited` empêche les cycles (A⊂B⊂A).
+ * `added` = nombre total de lignes d'articles FEUILLES (récursif) ; `missing` =
+ * composants non résolus (article/bloc introuvable, ou référence cyclique ignorée).
  * @returns { node, added, missing }
  */
-export function buildAggregateSubChapter(bloc, bpuById) {
-  const articles = getBlocArticles(bloc);
-
+export function buildAggregateSubChapter(bloc, bpuById, blocsById = {}, visited = new Set(), tranches = []) {
   const components = [];
+  let added = 0;
   let missing = 0;
 
-  articles.forEach(a => {
+  getBlocArticles(bloc).forEach(a => {
+    // Composant = sous-bloc → on insère récursivement son sous-chapitre.
+    if (isBlocRef(a)) {
+      const child = blocsById?.[String(a.id)];
+      if (!child || visited.has(String(a.id))) { missing++; return; } // introuvable ou cycle
+      const sub = buildBlocSubChapter(child, bpuById, tranches, blocsById, visited);
+      components.push(sub.node);
+      added += sub.added;
+      missing += sub.missing;
+      return;
+    }
+
+    // Composant = article → ligne standard, quantité vide.
     const art = bpuById?.[String(a.id)];
     if (!art) { missing++; return; }
 
@@ -184,6 +222,7 @@ export function buildAggregateSubChapter(bloc, bpuById) {
       bpuNum: art.bpuNum ?? '',
       isFixed: !!art.isFixed,
     });
+    added += 1;
   });
 
   const node = {
@@ -197,5 +236,5 @@ export function buildAggregateSubChapter(bloc, bpuById) {
     children: components,
   };
 
-  return { node, added: components.length, missing };
+  return { node, added, missing };
 }

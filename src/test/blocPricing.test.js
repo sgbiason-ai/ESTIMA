@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   blocUnitFactor, articleContribution, blocUnitPrice, getBlocArticles,
   needsThickness, needsDensity, blocFormulaFactor, buildBlocSubChapter,
-  buildAggregateSubChapter, getBlocKind,
+  buildAggregateSubChapter, getBlocKind, isBlocRef,
 } from '../utils/blocPricing';
 import { recalculateProject } from '../utils/projectCalculations';
 
@@ -279,5 +279,86 @@ describe('bloc agrégat (sans formule)', () => {
     const { node } = buildBlocSubChapter(bloc, BPU, []);
     const { updatedChapters } = recalculateProject([{ id: 'c1', type: 'chapter', children: [node] }], []);
     updatedChapters[0].children[0].children.forEach(c => expect(c.qty).toBe(0));
+  });
+});
+
+// ── Blocs imbriqués : un agrégat peut contenir d'autres blocs (templates) ──
+describe('blocs imbriqués (agrégat ⊃ blocs)', () => {
+  // Sous-blocs feuilles (m² → facteur 1, prix lisibles)
+  const voirie = { id: 'b_voirie', name: 'Voirie', kind: 'aggregate', articles: [{ id: 'a3' }, { id: 'a4' }] }; // 3.5 + 1.2
+  const assain = { id: 'b_assain', name: 'Assainissement', kind: 'aggregate', articles: [{ id: 'a4' }] };       // 1.2
+  // Template Lotissement = agrégat de sous-blocs + un article direct
+  const lotissement = {
+    id: 'b_lot', name: 'Lotissement', kind: 'aggregate',
+    articles: [{ ref: 'bloc', id: 'b_voirie' }, { ref: 'bloc', id: 'b_assain' }, { id: 'a3' }],
+  };
+  const blocsById = { b_voirie: voirie, b_assain: assain, b_lot: lotissement };
+
+  it('isBlocRef distingue un sous-bloc d\'un article', () => {
+    expect(isBlocRef({ ref: 'bloc', id: 'x' })).toBe(true);
+    expect(isBlocRef({ id: 'a3' })).toBe(false);
+  });
+
+  it('matérialise une structure imbriquée (sous-chapitres + ligne directe)', () => {
+    const { node, added, missing } = buildBlocSubChapter(lotissement, BPU, [], blocsById);
+    expect(missing).toBe(0);
+    expect(added).toBe(4); // a3+a4 (voirie) + a4 (assain) + a3 (direct)
+    expect(node.title).toBe('Lotissement');
+    expect(node.children).toHaveLength(3);
+    const [cVoirie, cAssain, lineDirect] = node.children;
+    expect(cVoirie.type).toBe('chapter');
+    expect(cVoirie.isBloc).toBeUndefined();
+    expect(cVoirie.title).toBe('Voirie');
+    expect(cVoirie.children.map(c => c.uid)).toEqual(['a3', 'a4']);
+    expect(cAssain.children.map(c => c.uid)).toEqual(['a4']);
+    expect(lineDirect.type).toBe('item');
+    expect(lineDirect.uid).toBe('a3');
+  });
+
+  it('blocUnitPrice est récursif (somme des sous-blocs + article direct)', () => {
+    expect(blocUnitPrice(lotissement, BPU, blocsById)).toBeCloseTo(4.7 + 1.2 + 3.5, 6); // 9.4
+  });
+
+  it('garde anti-cycle : un bloc se référençant lui-même ne boucle pas', () => {
+    const self = { id: 'b_self', name: 'Self', kind: 'aggregate', articles: [{ ref: 'bloc', id: 'b_self' }, { id: 'a3' }] };
+    const { node, added, missing } = buildBlocSubChapter(self, BPU, [], { b_self: self });
+    expect(added).toBe(1);
+    expect(missing).toBe(1);
+    expect(node.children.map(c => c.uid)).toEqual(['a3']);
+    // blocUnitPrice ne boucle pas non plus
+    expect(blocUnitPrice(self, BPU, { b_self: self })).toBeCloseTo(3.5, 6);
+  });
+
+  it('garde anti-cycle : A ⊂ B ⊂ A ne boucle pas', () => {
+    const A = { id: 'A', name: 'A', kind: 'aggregate', articles: [{ ref: 'bloc', id: 'B' }, { id: 'a3' }] };
+    const B = { id: 'B', name: 'B', kind: 'aggregate', articles: [{ ref: 'bloc', id: 'A' }, { id: 'a4' }] };
+    const { added, missing } = buildBlocSubChapter(A, BPU, [], { A, B });
+    expect(added).toBe(2);   // a4 (dans B) + a3 (dans A) ; la réf B→A est bloquée
+    expect(missing).toBe(1);
+  });
+
+  it('bloc enfant introuvable → compté manquant', () => {
+    const lot = { id: 'L', name: 'L', kind: 'aggregate', articles: [{ ref: 'bloc', id: 'inconnu' }, { id: 'a3' }] };
+    const { added, missing } = buildBlocSubChapter(lot, BPU, [], { L: lot });
+    expect(added).toBe(1);
+    expect(missing).toBe(1);
+  });
+
+  it('agrégat ⊃ bloc FORMULE : le sous-bloc garde sa surface pilote + formules, et recalcule', () => {
+    const voirieF = { id: 'b_voirieF', name: 'Voirie', kind: 'formula', unit: 'm²', articles: [{ id: 'a1', epaisseur: 0.3, densite: 2 }] };
+    const lot = { id: 'b_lot2', name: 'Lot', kind: 'aggregate', articles: [{ ref: 'bloc', id: 'b_voirieF' }, { id: 'a3' }] };
+    const { node, added } = buildBlocSubChapter(lot, BPU, [], { b_voirieF: voirieF, b_lot2: lot });
+    expect(added).toBe(2);
+    const voirieNode = node.children[0];
+    expect(voirieNode.isBloc).toBe(true);          // sous-bloc formule = surface pilote conservée
+    expect(voirieNode.unit).toBe('m²');
+    expect(voirieNode.children[0].formula).toBe(`={${voirieNode.id}}*0.3*2`);
+
+    voirieNode.qty = 100; // surface saisie sur l'en-tête du sous-bloc
+    const { updatedChapters } = recalculateProject([{ id: 'c1', type: 'chapter', children: [node] }], []);
+    const lotNode = updatedChapters[0].children[0]; // sous-chapitre « Lot »
+    const v = lotNode.children[0];                  // sous-bloc « Voirie » (isBloc)
+    expect(v.children.find(l => l.uid === 'a1').qty).toBeCloseTo(100 * 0.6, 6); // 60
+    expect(lotNode.children.find(l => l.uid === 'a3').qty).toBe(0);             // article direct = manuel
   });
 });
