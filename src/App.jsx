@@ -465,6 +465,7 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNav
     addToBpu:        db.addToBpu,
     deleteFromBpu:   db.deleteFromBpu,
     updateBpuItem:   db.updateBpuItem,
+    clearObservedPrices: db.clearObservedPrices,
     addCategory:     db.addCategory,
     deleteCategory:  db.deleteCategory,
     renameCategory:  db.renameCategory,
@@ -731,13 +732,7 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNav
                 addBloc={db.addBloc}
                 updateBloc={db.updateBloc}
                 deleteBloc={db.deleteBloc}
-                onClearObservedPrices={async () => {
-                  const items = localMode.currentBpu.filter(i => i.observedPrice);
-                  if (items.length === 0) return;
-                  for (const item of items) {
-                    await localMode.handleUpdateBpuItem(item.id, { observedPrice: null });
-                  }
-                }}
+                onClearObservedPrices={localMode.handleClearObservedPrices}
               />
             )}
 

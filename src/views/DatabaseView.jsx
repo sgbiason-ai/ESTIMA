@@ -99,6 +99,7 @@ const DatabaseView = ({
       if (!selectedCatId) return true;
       if (selectedCatId === 'uncategorized') return itemCatIds.length === 0;
       if (selectedCatId === 'nodescription') return !item.description || item.description.trim() === '' || item.description === '<p><br></p>';
+      if (selectedCatId === 'observed') return !!item.observedPrice;
       return itemCatIds.map(String).includes(String(selectedCatId));
     });
 
@@ -504,6 +505,7 @@ const DatabaseView = ({
                 )}
               </Droppable>
               <div onClick={() => setSelectedCatId('nodescription')} className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${selectedCatId === 'nodescription' ? 'bg-red-50 text-red-800 font-bold' : 'text-slate-500 hover:bg-slate-100'}`}><div className="w-4"></div><FileWarning size={16} /><span className="text-xs italic">Sans description</span><span className="ml-auto text-[10px] bg-red-100 text-red-600 px-1.5 rounded-full">{fullBpu.filter(i => !i.description || i.description.trim() === '' || i.description === '<p><br></p>').length}</span></div>
+              <div onClick={() => setSelectedCatId('observed')} className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${selectedCatId === 'observed' ? 'bg-blue-50 text-blue-800 font-bold' : 'text-slate-500 hover:bg-slate-100'}`}><div className="w-4"></div><TrendingUp size={16} /><span className="text-xs italic">Prix observés</span><span className="ml-auto text-[10px] bg-blue-100 text-blue-600 px-1.5 rounded-full">{fullBpu.filter(i => i.observedPrice).length}</span></div>
             </div>
           </div>
           )}
@@ -554,7 +556,7 @@ const DatabaseView = ({
                           const count = fullBpu.filter(i => i.observedPrice).length;
                           if (count === 0) { toastInfo("Aucun prix observé à supprimer."); return; }
                           const ok = await confirm(`Supprimer les prix observés de ${count} article(s) ? Cette action est irréversible.`, { title: 'RAZ Prix Observés', danger: true, confirmLabel: 'Tout supprimer' });
-                          if (ok) onClearObservedPrices();
+                          if (ok) await onClearObservedPrices();
                         }}
                         title="Action Administrateur : Réinitialiser tous les prix observés"
                         className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-red-600 hover:bg-red-50 rounded-lg border border-red-100 transition-all"

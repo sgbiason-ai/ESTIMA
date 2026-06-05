@@ -1,6 +1,6 @@
 // src/hooks/useDatabase.js
 import { useState, useEffect, useCallback } from 'react';
-import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, writeBatch, deleteField } from 'firebase/firestore';
 import { db } from '../firebase';
 // XLSX chargé dynamiquement dans importFromExcel() pour éviter 425 KB au démarrage
 import { generateId } from '../utils/helpers';
@@ -201,6 +201,44 @@ export const useDatabase = (user, companyId) => {
       setBpu(prevBpu);
       setDatabaseVersion(v => v + 1);
       toast.error('Modification non sauvegardée sur le Cloud.', { title: 'Erreur sauvegarde' });
+    }
+  };
+
+  // RAZ admin : efface observedPrice + priceHistory sur toute la base (batch atomique)
+  const clearObservedPrices = async () => {
+    if (!companyId) return 0;
+    const targets = bpu.filter(i => i.observedPrice != null || (i.priceHistory && i.priceHistory.length > 0));
+    if (targets.length === 0) return 0;
+    const ids = new Set(targets.map(t => t.id));
+    const prevBpu = bpu;
+    const now = new Date().toISOString();
+    // Mise à jour optimiste en UNE seule passe (pas de remount par item)
+    setBpu(prev => prev.map(i => {
+      if (!ids.has(i.id)) return i;
+      const { observedPrice, priceHistory, ...rest } = i;
+      return { ...rest, updatedAt: now };
+    }));
+    setDatabaseVersion(v => v + 1);
+    try {
+      // Firestore limite chaque batch à 500 opérations
+      for (let i = 0; i < targets.length; i += 450) {
+        const batch = writeBatch(db);
+        targets.slice(i, i + 450).forEach(item => {
+          batch.update(dref(companyId, 'bpu', item.id), {
+            observedPrice: deleteField(),
+            priceHistory: deleteField(),
+            updatedAt: now,
+          });
+        });
+        await batch.commit();
+      }
+      toast.success(`Prix observés réinitialisés sur ${targets.length} article(s).`);
+      return targets.length;
+    } catch {
+      setBpu(prevBpu);
+      setDatabaseVersion(v => v + 1);
+      toast.error('Réinitialisation non synchronisée sur le Cloud.', { title: 'Erreur' });
+      return 0;
     }
   };
 
@@ -516,7 +554,7 @@ export const useDatabase = (user, companyId) => {
     databaseVersion,
     isLoading,
     loadBpu, isBpuLoaded, forceRefresh,
-    addToBpu, updateBpuItem, deleteFromBpu, clearBpu,
+    addToBpu, updateBpuItem, deleteFromBpu, clearBpu, clearObservedPrices,
     addCategory, deleteCategory, renameCategory, assignCategoryToItem,
     saveUnit, deleteUnit,
     importFromExcel, handleImportDatabase,

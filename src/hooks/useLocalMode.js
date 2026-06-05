@@ -23,6 +23,7 @@ export const useLocalMode = ({
   addToBpu,
   deleteFromBpu,
   updateBpuItem,
+  clearObservedPrices,
   addCategory,
   deleteCategory: cloudDeleteCategory,
   renameCategory: cloudRenameCategory,
@@ -163,8 +164,24 @@ export const useLocalMode = ({
     if (isLocalMode) {
       setLocalBpu(prev => prev.map(i => i.id === id ? { ...i, ...fields } : i));
     } else {
-      updateBpuItem(id, fields);
+      return updateBpuItem(id, fields);
     }
+  };
+
+  // RAZ prix observés (observedPrice + priceHistory) — route local / cloud
+  const handleClearObservedPrices = async () => {
+    if (isLocalMode) {
+      const targets = localBpu.filter(i => i.observedPrice != null || (i.priceHistory && i.priceHistory.length > 0));
+      if (targets.length === 0) return 0;
+      const ids = new Set(targets.map(t => t.id));
+      setLocalBpu(prev => prev.map(i => {
+        if (!ids.has(i.id)) return i;
+        const { observedPrice, priceHistory, ...rest } = i;
+        return rest;
+      }));
+      return targets.length;
+    }
+    return clearObservedPrices ? clearObservedPrices() : 0;
   };
 
   // ─── HANDLERS CATÉGORIES UNIFIÉS ──────────────────────────────────────────
@@ -219,6 +236,7 @@ export const useLocalMode = ({
     handleAddToBpu,
     handleDeleteFromBpu,
     handleUpdateBpuItem,
+    handleClearObservedPrices,
     handleAddCategory,
     handleDeleteCategory,
     handleRenameCategory,
