@@ -38,6 +38,7 @@ import FeedbackWidget       from './components/feedback/FeedbackWidget';
 // ─── VUES (lazy-loaded — code-splitting par module) ──────────────────────────
 const ProjectManagerView = lazyWithReload(() => import('./views/projectManager/ProjectManagerView'));
 const ProjectView        = lazyWithReload(() => import('./views/ProjectView'));
+const EstimRapideView    = lazyWithReload(() => import('./views/estimRapide/EstimRapideView'));
 const GedView            = lazyWithReload(() => import('./views/ged/GedView'));
 const DatabaseView       = lazyWithReload(() => import('./views/DatabaseView'));
 const PriceAnalysisView  = lazyWithReload(() => import('./views/PriceAnalysisView'));
@@ -249,6 +250,15 @@ export default function App() {
           onBackToHub={handleBackToHub}
           onNavigateModule={setActiveModule}
         />
+      </Lazy>
+    );
+  }
+
+  // Module : Estimation Rapide (esquisse / avant-projet)
+  if (activeModule === 'estim_rapide') {
+    return (
+      <Lazy>
+        <EstimRapideView user={user} companyId={companyId} onBackToHub={handleBackToHub} onNavigateModule={setActiveModule} />
       </Lazy>
     );
   }
