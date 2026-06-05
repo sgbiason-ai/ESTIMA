@@ -59,7 +59,7 @@ const DatabaseView = ({
   const [isRefreshing, setIsRefreshing] = useState(false); // État pour l'animation du bouton
   const { confirm } = useDialog();
   
-  const { showToast } = useToast();
+  const { error: toastError, info: toastInfo } = useToast();
 
   // --- Lookup CCTP : id → titre ---
   const cctpTitleMap = useMemo(() => {
@@ -354,7 +354,7 @@ const DatabaseView = ({
                   } else {
                     onImportData(json, { name: fileName });
                   }
-              } catch { showToast("Fichier JSON invalide.", 'error'); }
+              } catch { toastError("Fichier JSON invalide."); }
           };
           reader.readAsText(file);
       }} className="hidden" accept=".json" />
@@ -552,7 +552,7 @@ const DatabaseView = ({
                       <button
                         onClick={async () => {
                           const count = fullBpu.filter(i => i.observedPrice).length;
-                          if (count === 0) { showToast("Aucun prix observé à supprimer.", 'info'); return; }
+                          if (count === 0) { toastInfo("Aucun prix observé à supprimer."); return; }
                           const ok = await confirm(`Supprimer les prix observés de ${count} article(s) ? Cette action est irréversible.`, { title: 'RAZ Prix Observés', danger: true, confirmLabel: 'Tout supprimer' });
                           if (ok) onClearObservedPrices();
                         }}

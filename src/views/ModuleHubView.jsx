@@ -1,7 +1,7 @@
 // src/views/ModuleHubView.jsx — Bento Box Apple-style
 import React, { useState, useEffect } from 'react';
 import {
-  Calculator, BarChart3, ClipboardList, FileStack, ShieldCheck,
+  Calculator, Zap, BarChart3, ClipboardList, FileStack, ShieldCheck,
   Folder, LogOut, Lock, Briefcase, Wrench, Receipt, Car,
   Layers, Settings, Palette, Shield, Smartphone, RefreshCw,
   Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudDrizzle, CloudFog, MapPin, ChevronRight, Sparkles
@@ -57,6 +57,7 @@ const MODULES = [
   // Row 1 — Projet & Estimation (white)
   { id: 'projects_manager', label: 'Gestion de Projets', description: 'Création, organisation et gestion de vos projets VRD', icon: Folder, access: 'all', tag: 'Core', row: 1 },
   { id: 'estima', label: 'ESTIMA VRD', description: 'Estimation, chiffrage et documents de consultation', icon: Calculator, access: 'all', tag: 'Core', row: 1, featured: true },
+  { id: 'estim_rapide', label: 'Estimation Rapide', description: "Chiffrage d'enveloppe par ratios et grands lots VRD — esquisse & avant-projet", icon: Zap, access: 'all', tag: 'Esquisse', row: 1 },
   { id: 'rao_analysis', label: 'RAO & Analyse', description: "Rapport d'analyse des offres et analyse comparative", icon: BarChart3, access: 'all', tag: 'Analyse', row: 1 },
   // Row 2 — Outils & Administration (copper glass)
   { id: 'devis_moe', label: 'Devis MOE', description: "Proposition d'honoraires de maîtrise d'œuvre VRD", icon: Receipt, access: 'admin_only', tag: 'Finance', row: 2 },
