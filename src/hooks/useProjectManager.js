@@ -268,6 +268,32 @@ export const useProjectManager = (user, companyId) => {
     setProjectVersion(v => v + 1);
   };
 
+  // Insère un lot de lignes déjà construites (ex. un bloc : ligne pilote + composants
+  // avec leurs formules de quantité) dans le chapitre/sous-chapitre ciblé, en bloc.
+  const addItemsToProject = (lines, selection = null) => {
+    if (!Array.isArray(lines) || lines.length === 0) return;
+    setProject(prev => {
+      const targetParentId =
+        (selection?.type === 'chapter' || selection?.type === 'subchapter' ? selection.id : null) ||
+        (prev.chapters?.[0]?.id || null);
+
+      if (!targetParentId) {
+        console.warn('Aucun chapitre disponible.');
+        return prev;
+      }
+
+      const insertRecursive = (nodes) =>
+        nodes.map(node => {
+          if (node.id === targetParentId) return { ...node, children: [...(node.children || []), ...lines] };
+          if (node.children) return { ...node, children: insertRecursive(node.children) };
+          return node;
+        });
+
+      return { ...prev, chapters: insertRecursive(prev.chapters || []) };
+    });
+    setProjectVersion(v => v + 1);
+  };
+
   // ─── MOTEUR DE CALCUL ─────────────────────────────────────────────────────
 
   // Moteur de recalcul (résolution des formules + somme des tranches) :
@@ -389,6 +415,6 @@ export const useProjectManager = (user, companyId) => {
 
   return {
     project, setProject, projectVersion, handleSaveProject, resetProject,
-    updateProjectName, addChapter, addSubChapter, addItemToProject, updateProjectItem, handleDragEnd,
+    updateProjectName, addChapter, addSubChapter, addItemToProject, addItemsToProject, updateProjectItem, handleDragEnd,
   };
 };

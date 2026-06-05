@@ -412,7 +412,7 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNav
   const {
     project, setProject,
     handleSaveProject, updateProjectName,
-    addChapter, addSubChapter, addItemToProject,
+    addChapter, addSubChapter, addItemToProject, addItemsToProject,
     updateProjectItem, handleDragEnd,
   } = useProjectManager(user, companyId);
 
@@ -633,6 +633,7 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNav
                 filteredBpu={filteredBpuToDisplay}
                 categories={localMode.currentCategories}
                 addItemToProject={(item) => addItemToProject(item, null, modals.selection)}
+                addItemsToProject={(lines) => addItemsToProject(lines, modals.selection)}
                 selection={modals.selection}
                 setSelection={modals.setSelection}
                 multiSelection={modals.multiSelection}
@@ -658,6 +659,7 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNav
                 units={db.units}
                 masterCctp={resources.masterCctp}
                 allBpuItems={localMode.currentBpu}
+                blocs={db.blocs}
                 companyId={companyId}
                 onLoadCloudProject={(proj) => {
                   setProject(proj);
@@ -715,6 +717,10 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNav
                 isAdmin={isAdmin}
                 onForceRefresh={db.forceRefresh}
                 masterCctp={resources.masterCctp}
+                blocs={db.blocs}
+                addBloc={db.addBloc}
+                updateBloc={db.updateBloc}
+                deleteBloc={db.deleteBloc}
                 onClearObservedPrices={async () => {
                   const items = localMode.currentBpu.filter(i => i.observedPrice);
                   if (items.length === 0) return;

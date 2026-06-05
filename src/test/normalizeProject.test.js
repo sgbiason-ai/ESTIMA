@@ -166,6 +166,38 @@ describe('normalizeProject — normalisation des chapitres', () => {
     expect(item.formula).toBe('=10*4+2');
     expect(item.quantities).toEqual({ t1: 20, t2: 22 });
   });
+
+  it('préserve un sous-chapitre BLOC (unité, surface, quantités) + le facteur des composants', () => {
+    const p = normalizeProject({
+      chapters: [{
+        id: 'c1', title: 'VRD', type: 'chapter', isOption: false,
+        children: [{
+          id: 'bloc1', title: 'Voirie légère', type: 'chapter', isBloc: true,
+          unit: 'm²', qty: 350, quantities: { t1: 250, t2: 100 },
+          children: [{
+            id: 'i1', type: 'item', designation: 'GNT 0/80', unit: 't', price: 12,
+            formula: '={bloc1}*0.6', blocFactor: 0.6,
+          }],
+        }],
+      }],
+    });
+    const bloc = p.chapters[0].children[0];
+    expect(bloc.isBloc).toBe(true);
+    expect(bloc.unit).toBe('m²');
+    expect(bloc.qty).toBe(350);
+    expect(bloc.quantities).toEqual({ t1: 250, t2: 100 });
+    expect(bloc.children[0].blocFactor).toBe(0.6);
+    expect(bloc.children[0].formula).toBe('={bloc1}*0.6');
+  });
+
+  it('un chapitre normal ne reçoit pas de champs bloc', () => {
+    const p = normalizeProject({
+      chapters: [{ id: 'c1', title: 'VRD', type: 'chapter', children: [] }],
+    });
+    expect(p.chapters[0].isBloc).toBeUndefined();
+    expect(p.chapters[0].unit).toBeUndefined();
+    expect(p.chapters[0].qty).toBeUndefined();
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

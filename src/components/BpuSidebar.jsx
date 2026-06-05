@@ -1,8 +1,10 @@
 // src/components/BpuSidebar.jsx
 import React, { useState, useMemo, useRef, useEffect, useCallback, memo } from 'react';
 import { createPortal } from 'react-dom';
-import { Package, PanelLeftClose, Search, Filter } from 'lucide-react';
+import { Package, PanelLeftClose, Search, Filter, Boxes, ChevronDown } from 'lucide-react';
 import { formatPrice, cleanText, normalizeUnitSymbol, sanitizeHtml } from '../utils/helpers';
+import { buildBlocSubChapter, blocUnitPrice, getBlocArticles } from '../utils/blocPricing';
+import { useToast } from '../contexts/ToastContext';
 
 // ── Carte article BPU memoisee ─────────────────────────────────────────────
 // Un changement de bpuSearch / selectedCategory provoque un nouveau filtrage,
@@ -47,12 +49,37 @@ const BpuSidebar = ({
   filteredBpu,
   categories,
   bpuConfig,
-  addItemToProject
+  addItemToProject,
+  blocs = [],
+  allBpu = [],
+  tranches = [],
+  onInsertLines
 }) => {
+  const { success, error } = useToast();
   // Ces états ne vivent désormais QUE dans la sidebar, ce qui allège ProjectView !
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [tooltipState, setTooltipState] = useState({ visible: false, item: null, style: {} });
+  const [blocsOpen, setBlocsOpen] = useState(true);
   const tooltipTimer = useRef(null);
+
+  // Résolution des articles d'un bloc depuis le BPU complet (ou la liste filtrée en repli).
+  const bpuById = useMemo(() => {
+    const map = {};
+    const source = (allBpu && allBpu.length) ? allBpu : filteredBpu;
+    (source || []).forEach(i => { map[String(i.id)] = i; });
+    return map;
+  }, [allBpu, filteredBpu]);
+
+  // La recherche du volet filtre aussi les blocs : par nom OU par article contenu (accent-insensible).
+  const blocsToShow = useMemo(() => {
+    const norm = (s) => (s || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+    const q = norm(bpuSearch).trim();
+    if (!q) return blocs;
+    return blocs.filter(b => {
+      if (norm(b.name).includes(q)) return true;
+      return getBlocArticles(b).some(a => norm(cleanText(bpuById[String(a.id)]?.designation || '')).includes(q));
+    });
+  }, [blocs, bpuSearch, bpuById]);
 
   // Le calcul des items filtrés est déplacé ici
   const sidebarItems = useMemo(() => {
@@ -106,6 +133,21 @@ const BpuSidebar = ({
     addItemToProjectRef.current(cleanItem);
   }, []);
 
+  // Insère un bloc dans le chapitre sélectionné : 1 ligne pilote "surface" +
+  // N composants (prix figés) dont la quantité est une formule =({pilote})×facteur.
+  const onInsertLinesRef = useRef(onInsertLines);
+  useEffect(() => { onInsertLinesRef.current = onInsertLines; }, [onInsertLines]);
+
+  const handleInsertBloc = useCallback((bloc) => {
+    const { node, added, missing } = buildBlocSubChapter(bloc, bpuById, tranches);
+    if (added === 0) {
+      error(`Bloc « ${bloc.name} » : aucun article disponible.`);
+      return;
+    }
+    onInsertLinesRef.current?.([node]);
+    success(`Bloc « ${bloc.name} » inséré : sous-chapitre + ${added} article${added > 1 ? 's' : ''}${missing ? ` (${missing} introuvable${missing > 1 ? 's' : ''})` : ''}. Saisissez la surface sur l'en-tête.`);
+  }, [bpuById, tranches, success, error]);
+
   if (!showBpu) return null;
 
   return (
@@ -144,7 +186,7 @@ const BpuSidebar = ({
           </div>
         </div>
       </header>
-      <div className="flex-1 overflow-y-auto p-2 space-y-2 bg-slate-50/50">
+      <div className="flex-[3] min-h-0 overflow-y-auto p-2 space-y-2 bg-slate-50/50">
         {sidebarItems.map((item) => (
           <BpuItemCard
             key={item.id}
@@ -157,6 +199,55 @@ const BpuSidebar = ({
         ))}
         {sidebarItems.length === 0 && filteredBpu.length > 0 && (
           <div className="p-4 text-center text-slate-400 text-[10px] italic">Aucun article trouvé avec les filtres actuels.</div>
+        )}
+      </div>
+
+      {/* ── Zone Blocs (bas du volet, repliable) ── */}
+      <div className={`border-t border-slate-200 bg-white flex flex-col ${blocsOpen ? 'flex-[2] min-h-0' : 'shrink-0'}`}>
+        <button
+          onClick={() => setBlocsOpen(o => !o)}
+          className="shrink-0 w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-50 transition-colors"
+        >
+          <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-indigo-600">
+            <Boxes size={14} /> Blocs
+            <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full">{bpuSearch.trim() ? `${blocsToShow.length}/${blocs.length}` : blocs.length}</span>
+          </span>
+          <ChevronDown size={16} className={`text-slate-400 transition-transform ${blocsOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        {blocsOpen && (
+          <div className="flex-1 min-h-0 overflow-y-auto p-2 pt-0 space-y-1.5 bg-slate-50/50">
+            {blocs.length === 0 ? (
+              <div className="px-3 py-4 text-center text-slate-400 text-[10px] italic leading-relaxed">
+                Aucun bloc.<br />Créez-en dans la <span className="font-bold text-slate-500">Bibliothèque</span>.
+              </div>
+            ) : blocsToShow.length === 0 ? (
+              <div className="px-3 py-4 text-center text-slate-400 text-[10px] italic leading-relaxed">
+                Aucun bloc ne correspond à<br /><span className="font-bold text-slate-500">« {bpuSearch.trim()} »</span>.
+              </div>
+            ) : (
+              [...blocsToShow].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'fr')).map(bloc => {
+                const count = getBlocArticles(bloc).length;
+                const u = bloc.unit ? normalizeUnitSymbol(bloc.unit) : '';
+                return (
+                  <button
+                    key={bloc.id}
+                    onClick={() => handleInsertBloc(bloc)}
+                    title={`Insérer le bloc « ${bloc.name} » (${count} article${count > 1 ? 's' : ''}) dans le chapitre sélectionné`}
+                    className="w-full group flex items-center gap-2.5 p-2 bg-white border border-slate-200 rounded-lg shadow-sm hover:border-indigo-400 hover:shadow-md hover:bg-indigo-50/40 cursor-pointer transition-all duration-200 active:scale-[0.98] text-left"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center shrink-0 group-hover:bg-indigo-100 transition-colors">
+                      <Boxes size={16} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] font-bold text-slate-700 uppercase leading-snug line-clamp-2 group-hover:text-indigo-800 transition-colors">{bloc.name}</p>
+                      <p className="text-[9px] font-bold text-slate-400 mt-0.5">{count} art. · {formatPrice(blocUnitPrice(bloc, bpuById))}{u ? `/${u}` : ''}</p>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
         )}
       </div>
 

@@ -48,6 +48,7 @@ const ProjectView = ({
   filteredBpu,
   categories,
   addItemToProject,
+  addItemsToProject,
   selection,
   setSelection,
   updateProjectItem,
@@ -68,6 +69,7 @@ const ProjectView = ({
   units = [],
   masterCctp = [],
   allBpuItems = [],
+  blocs = [],
   companyId,
   onLoadCloudProject,
   onUndo,
@@ -684,6 +686,7 @@ const ProjectView = ({
           <BpuSidebar
             showBpu={showBpu} setShowBpu={setShowBpu} bpuSearch={bpuSearch} setBpuSearch={setBpuSearch}
             filteredBpu={filteredBpu} categories={categories} bpuConfig={bpuConfig} addItemToProject={addItemToProject}
+            blocs={blocs} allBpu={allBpuItems} tranches={viewedProject?.tranches || []} onInsertLines={addItemsToProject}
           />
         )}
 
@@ -926,7 +929,9 @@ ProjectView.propTypes = {
   setBpuSearch: PropTypes.func.isRequired,
   filteredBpu: PropTypes.array,
   categories: PropTypes.array,
+  blocs: PropTypes.array,
   addItemToProject: PropTypes.func.isRequired,
+  addItemsToProject: PropTypes.func,
   selection: PropTypes.object,
   setSelection: PropTypes.func.isRequired,
   updateProjectItem: PropTypes.func.isRequired,

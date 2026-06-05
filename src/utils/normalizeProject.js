@@ -47,7 +47,7 @@ function normalizeNode(node) {
   if (!node || typeof node !== 'object') return null;
 
   if (node.type === 'item') {
-    return {
+    const item = {
       type:               'item',
       id:                 str(node.id),
       uid:                str(node.uid),
@@ -61,16 +61,28 @@ function normalizeNode(node) {
       bpuNum:             str(node.bpuNum),
       isFixed:            bool(node.isFixed),
     };
+    // Composant de bloc : facteur de conversion mémorisé (PU moyen, affichage).
+    if (node.blocFactor != null) item.blocFactor = num(node.blocFactor);
+    return item;
   }
 
   // chapter / subChapter
-  return {
+  const chapter = {
     type:     str(node.type, 'chapter'),
     id:       str(node.id),
     title:    str(node.title),
     isOption: bool(node.isOption),
     children: arr(node.children).map(normalizeNode).filter(Boolean),
   };
+  // Sous-chapitre "bloc" (ouvrage composite) : conserver unité + surface (Qté/tranches).
+  if (node.isBloc) {
+    chapter.isBloc = true;
+    chapter.unit = str(node.unit);
+    chapter.qty = num(node.qty);
+    chapter.quantities = obj(node.quantities);
+    chapter.quantitiesFormula = obj(node.quantitiesFormula);
+  }
+  return chapter;
 }
 
 // ─── NORMALISATION DES TRANCHES ───────────────────────────────────────────────

@@ -1,7 +1,7 @@
 // src/components/ItemList.jsx
 import React, { useContext, memo, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Draggable, Droppable } from '@hello-pangea/dnd'; 
-import { GripVertical, Layers, Trash2, Plus, ShieldCheck, AlertCircle, AlertTriangle, FunctionSquare, Check } from 'lucide-react';
+import { GripVertical, Layers, Trash2, Plus, ShieldCheck, AlertCircle, AlertTriangle, FunctionSquare, Check, Boxes } from 'lucide-react';
 
 import { ProjectContext } from '../context/ProjectContext';
 import { EditableTitle, FormattedInput, OptionToggle } from './ProjectUI';
@@ -530,9 +530,33 @@ const ItemRow = memo(
 // --------------------
 // SUBCHAPTER ROW
 // --------------------
-const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly, viewMode, clientQtyMap, bpuConfig, onUpdate, onSelect, onModal, stableKey }) => {
+const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly, viewMode, clientQtyMap, bpuConfig, onUpdate, onSelect, onModal, stableKey, activeTrancheId, isGlobalMode }) => {
   const draggableId = `chapter:${stableKey}`;
   const total = sumNodeTotal(el, viewMode === 'client', clientQtyMap);
+
+  // ── Bloc (ouvrage composite) : en-tête porteur d'une surface (Qté + unité) ──
+  const isBloc = !!el.isBloc;
+  const isTrancheView = activeTrancheId && activeTrancheId !== 'global';
+  const surfaceVal = isTrancheView ? Number(el.quantities?.[activeTrancheId] || 0) : Number(el.qty || 0);
+  const surfaceDisabled = isReadOnly || isGlobalMode;
+  const [surfaceInput, setSurfaceInput] = useState(String(surfaceVal || ''));
+  useEffect(() => { setSurfaceInput(surfaceVal ? String(surfaceVal) : ''); }, [surfaceVal]);
+  const commitSurface = () => {
+    const n = Number(String(surfaceInput).replace(',', '.')) || 0;
+    if (n === surfaceVal) return;
+    if (isTrancheView) onUpdate(parentId, el.id, 'qty_tranche', { trancheId: activeTrancheId, value: n, clearAllFormulas: true });
+    else onUpdate(parentId, el.id, 'qty', n);
+  };
+  // PU moyen du bloc = Σ(prix composant × facteur) → prix dans l'unité du bloc.
+  // Calculé depuis les facteurs mémorisés (stable même à surface nulle) ;
+  // repli sur total/surface si les composants n'ont pas de facteur (anciens blocs).
+  const blocPuMoyen = (() => {
+    if (!isBloc) return 0;
+    const children = el.children || [];
+    const withFactor = children.filter(c => c && c.blocFactor != null);
+    if (withFactor.length) return withFactor.reduce((s, c) => s + (Number(c.price) || 0) * (Number(c.blocFactor) || 0), 0);
+    return surfaceVal > 0 ? total / surfaceVal : 0;
+  })();
 
   return (
     <Draggable draggableId={draggableId} index={index} isDragDisabled={isReadOnly}>
@@ -586,13 +610,18 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
                   <div className="w-16 text-[10px] font-mono font-black text-slate-500 shrink-0 text-center">-</div>
 
                   <div className="flex-1 px-2 flex items-center gap-2" style={{ paddingLeft: `${level * 20 + 8}px` }}>
-                    <Layers size={14} className={`shrink-0 ${el.isOption ? 'text-slate-400' : 'text-emerald-600'}`} />
+                    {isBloc
+                      ? <Boxes size={14} className="shrink-0 text-indigo-600" />
+                      : <Layers size={14} className={`shrink-0 ${el.isOption ? 'text-slate-400' : 'text-emerald-600'}`} />}
                     <EditableTitle
                       value={el.title}
                       onSave={(val) => onUpdate(parentId, el.id, 'title', val)}
                       disabled={isReadOnly}
                       className="text-[11px] font-black uppercase text-slate-800 tracking-wider truncate hover:bg-white/50 px-1 rounded"
                     />
+                    {isBloc && (
+                      <span className="shrink-0 text-[8px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-100 px-1.5 py-0.5 rounded">Bloc</span>
+                    )}
                     <OptionToggle
                       isOption={!!el.isOption}
                       onClick={() => onUpdate(parentId, el.id, 'isOption', !el.isOption)}
@@ -600,14 +629,51 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
                     />
                   </div>
 
-                  <div className={`w-28 text-right px-3 text-[11px] font-mono font-black ${el.isOption ? 'text-slate-500 line-through' : 'text-emerald-800'}`}>
-                    {formatPrice(total)}
-                  </div>
-
-                  {/* Spacer (corbeille deplacee a gauche) */}
-                  <div className="w-10 shrink-0">
-                    {null}
-                  </div>
+                  {isBloc ? (
+                    <>
+                      {/* Colonnes alignées sur la grille article : (indic) · unité · surface · PU moyen · total */}
+                      <div className="w-10 shrink-0" />
+                      <div className="w-16 flex justify-center shrink-0">
+                        <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 uppercase">{normalizeUnitSymbol(el.unit)}</span>
+                      </div>
+                      <div
+                        className="w-24 px-2 shrink-0 flex items-center"
+                        onClick={(e) => e.stopPropagation()}
+                        title={isGlobalMode ? 'Sélectionnez une tranche pour saisir la surface' : 'Surface du bloc — pilote les quantités des composants'}
+                      >
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={surfaceInput}
+                          disabled={surfaceDisabled}
+                          onChange={(e) => setSurfaceInput(e.target.value)}
+                          onBlur={commitSurface}
+                          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                          placeholder="surface"
+                          className={`w-full text-right text-xs font-mono font-black rounded py-0.5 px-1.5 outline-none transition-colors border ${
+                            surfaceDisabled
+                              ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                              : 'bg-white border-indigo-300 focus:border-indigo-500 text-indigo-800 shadow-sm'
+                          }`}
+                        />
+                      </div>
+                      <div className="w-32 px-2 shrink-0 text-right leading-none" title="PU moyen du bloc (Σ prix × facteur)">
+                        <span className="text-[11px] font-mono font-black text-indigo-700">{formatPrice(blocPuMoyen)}</span>
+                        <span className="block text-[8px] font-bold text-indigo-400 uppercase tracking-tight">/{normalizeUnitSymbol(el.unit)} moy.</span>
+                      </div>
+                      <div className={`w-28 text-right px-3 text-[11px] font-mono font-black ${el.isOption ? 'text-slate-500 line-through' : 'text-indigo-800'}`}>
+                        {formatPrice(total)}
+                      </div>
+                      <div className="w-10 shrink-0" />
+                    </>
+                  ) : (
+                    <>
+                      <div className={`w-28 text-right px-3 text-[11px] font-mono font-black ${el.isOption ? 'text-slate-500 line-through' : 'text-emerald-800'}`}>
+                        {formatPrice(total)}
+                      </div>
+                      <div className="w-10 shrink-0">{null}</div>
+                    </>
+                  )}
                 </div>
 
                 <div className={`pl-4 border-l ml-4 min-h-[40px] ${el.isOption ? 'border-slate-300 opacity-70' : 'border-slate-300'}`}>
@@ -711,6 +777,8 @@ const ItemList = ({ items, parentId, level = 0, bpuConfig }) => {
         onSelect={setSelection}
         onModal={setModal}
         onAddSub={addSubChapter}
+        activeTrancheId={activeTrancheId}
+        isGlobalMode={isGlobalMode}
       />
     );
   });
