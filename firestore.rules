@@ -147,6 +147,11 @@ service cloud.firestore {
         allow read, write: if isCompanyMember(companyId);
       }
 
+      // Blocs — ensembles d'articles BPU (références dynamiques)
+      match /blocs/{blocId} {
+        allow read, write: if isCompanyMember(companyId);
+      }
+
       match /resources/{resId} {
         allow read, write: if isCompanyMember(companyId);
       }

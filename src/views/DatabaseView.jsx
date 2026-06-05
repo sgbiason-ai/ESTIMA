@@ -7,13 +7,14 @@ import {
   Calendar, Copy, ArrowDownAZ, ArrowUpAZ, Euro, Hash, ArrowDownUp, 
   FileWarning, CheckSquare, Square, FolderInput, TrendingUp, TrendingDown,
   Info, History, BarChart2, RefreshCw, BookOpen, Cloud, Monitor, AlertCircle,
-  HelpCircle, AlignLeft 
+  HelpCircle, AlignLeft, Boxes, LayoutList
 } from 'lucide-react';
 import { formatPrice, cleanText, normalizeUnitSymbol } from '../utils/helpers';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useToast } from '../contexts/ToastContext';
 import { useDialog } from '../contexts/DialogContext';
 import HelpPanel from '../components/help/HelpPanel';
+import BlocsPanel from './database/BlocsPanel';
 
 const DatabaseView = ({ 
   filteredBpu,      
@@ -43,8 +44,13 @@ const DatabaseView = ({
   bpuSearch,
   setBpuSearch,
   bpuConfig,
-  masterCctp = []
+  masterCctp = [],
+  blocs = [],
+  addBloc,
+  updateBloc,
+  deleteBloc
 }) => {
+  const [mode, setMode] = useState('articles'); // 'articles' | 'blocs'
   const [selectedCatId, setSelectedCatId] = useState(null);
   const [isCreatingCat, setIsCreatingCat] = useState(false);
   const [newCatName, setNewCatName] = useState("");
@@ -350,6 +356,7 @@ const DatabaseView = ({
       <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="database" />
 
       <DragDropContext onDragEnd={handleDragEnd}>
+          {mode === 'articles' && (
           <div className="w-80 bg-white border-r border-slate-200 flex flex-col shrink-0 z-30">
             <div className="p-4 border-b border-slate-100 bg-slate-50">
             
@@ -493,6 +500,7 @@ const DatabaseView = ({
               <div onClick={() => setSelectedCatId('nodescription')} className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${selectedCatId === 'nodescription' ? 'bg-red-50 text-red-800 font-bold' : 'text-slate-500 hover:bg-slate-100'}`}><div className="w-4"></div><FileWarning size={16} /><span className="text-xs italic">Sans description</span><span className="ml-auto text-[10px] bg-red-100 text-red-600 px-1.5 rounded-full">{fullBpu.filter(i => !i.description || i.description.trim() === '' || i.description === '<p><br></p>').length}</span></div>
             </div>
           </div>
+          )}
 
           <div className="flex-1 flex flex-col h-full overflow-hidden relative">
             
@@ -505,6 +513,12 @@ const DatabaseView = ({
 
             <div className="bg-white px-6 py-2 border-b border-slate-100 flex items-center justify-between shadow-sm z-10">
                 <div className="flex items-center gap-6">
+                    {/* Toggle Articles / Blocs */}
+                    <div className="flex items-center bg-slate-100 p-0.5 rounded-xl">
+                        <button onClick={() => setMode('articles')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${mode === 'articles' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}><LayoutList size={13} /> Articles</button>
+                        <button onClick={() => setMode('blocs')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${mode === 'blocs' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}><Boxes size={13} /> Blocs</button>
+                    </div>
+                    {mode === 'articles' && (
                     <div className="flex items-center gap-2">
                         <div className={`p-1.5 rounded-lg ${isLocalMode ? 'bg-amber-50 text-amber-600' : 'bg-indigo-50 text-indigo-600'}`}><BarChart2 size={16} /></div>
                         <div>
@@ -512,6 +526,7 @@ const DatabaseView = ({
                             <p className="text-xs font-bold text-slate-700">{formatPrice(itemsToDisplay.reduce((acc, i) => acc + (i.price || 0), 0))}</p>
                         </div>
                     </div>
+                    )}
                 </div>
                 
                 <div className="flex items-center gap-2">
@@ -546,6 +561,7 @@ const DatabaseView = ({
                 </div>
             </div>
 
+            {mode === 'articles' && (<>
             <header className="bg-white p-4 border-b border-slate-200 flex justify-between items-center z-20 relative">
               <div className="relative flex-1 mr-4 flex items-center gap-4">
                 <div className="relative w-96">
@@ -741,6 +757,18 @@ const DatabaseView = ({
                     )}
                 </Droppable>
             </div>
+            </>)}
+
+            {mode === 'blocs' && (
+              <BlocsPanel
+                blocs={blocs}
+                fullBpu={fullBpu}
+                units={units}
+                addBloc={addBloc}
+                updateBloc={updateBloc}
+                deleteBloc={deleteBloc}
+              />
+            )}
           </div>
       </DragDropContext>
 
@@ -850,6 +878,10 @@ DatabaseView.propTypes = {
   setBpuSearch: PropTypes.func.isRequired,
   bpuConfig: PropTypes.object,
   masterCctp: PropTypes.array,
+  blocs: PropTypes.array,
+  addBloc: PropTypes.func,
+  updateBloc: PropTypes.func,
+  deleteBloc: PropTypes.func,
 };
 
 export default DatabaseView;

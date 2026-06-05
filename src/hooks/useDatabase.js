@@ -24,6 +24,7 @@ export const useDatabase = (user, companyId) => {
   const [bpu, setBpu]               = useState([]);
   const [categories, setCategories] = useState([]);
   const [units, setUnits]           = useState([]);
+  const [blocs, setBlocs]           = useState([]);
 
   // 16 couleurs bien distinctes (couvre 5-15 dossiers sans doublon)
   const CAT_COLORS = [
@@ -113,6 +114,9 @@ export const useDatabase = (user, companyId) => {
           await Promise.all(defaultUnits.map(u => setDoc(dref(companyId, 'units', u.symbol), u)));
           setUnits(defaultUnits);
         }
+
+        const blocSnap = await getDocs(col(companyId, 'blocs'));
+        setBlocs(blocSnap.docs.map(d => d.data()));
       } catch (error) {
         console.error('Erreur chargement Firebase :', error);
         toast.error('Impossible de charger les données. Vérifiez votre connexion.', { title: 'Erreur réseau' });
@@ -145,15 +149,17 @@ export const useDatabase = (user, companyId) => {
     if (!companyId) return;
     try {
       setIsLoading(true);
-      const [bpuSnap, catSnap, unitSnap] = await Promise.all([
+      const [bpuSnap, catSnap, unitSnap, blocSnap] = await Promise.all([
         getDocs(col(companyId, 'bpu')),
         getDocs(col(companyId, 'categories')),
         getDocs(col(companyId, 'units')),
+        getDocs(col(companyId, 'blocs')),
       ]);
       setBpu(bpuSnap.docs.map(d => d.data()));
       const catData = catSnap.docs.map(d => d.data());
       setCategories(await ensureCategoryColors(catData));
       setUnits(unitSnap.docs.map(d => d.data()));
+      setBlocs(blocSnap.docs.map(d => d.data()));
       setIsBpuLoaded(true);
       setDatabaseVersion(v => v + 1);
     } catch (error) {
@@ -328,6 +334,52 @@ export const useDatabase = (user, companyId) => {
     }
   };
 
+  // ─── ACTIONS BLOCS ────────────────────────────────────────────────────────
+  // Un bloc = { id, name, articleIds: [bpuId...], updatedAt }.
+  // Références dynamiques : les articles sont résolus depuis le BPU courant
+  // au moment de l'insertion dans l'estimation (prix/désignation à jour).
+
+  const addBloc = async (name, unit = '', articles = []) => {
+    if (!companyId) return null;
+    const newBloc = { id: generateId(), name: (name || '').trim(), unit: unit || '', articles, updatedAt: new Date().toISOString() };
+    const prevBlocs = blocs;
+    setBlocs(prev => [...prev, newBloc]);
+    try {
+      await setDoc(dref(companyId, 'blocs', newBloc.id), newBloc);
+      toast.success(`Bloc "${newBloc.name}" créé.`);
+    } catch {
+      setBlocs(prevBlocs);
+      toast.error('Bloc non sauvegardé sur le Cloud.', { title: 'Erreur' });
+    }
+    return newBloc;
+  };
+
+  const updateBloc = async (id, fields) => {
+    if (!companyId) return;
+    const updated = { ...fields, updatedAt: new Date().toISOString() };
+    const prevBlocs = blocs;
+    setBlocs(prev => prev.map(b => b.id === id ? { ...b, ...updated } : b));
+    try {
+      await updateDoc(dref(companyId, 'blocs', id), updated);
+    } catch {
+      setBlocs(prevBlocs);
+      toast.error('Bloc non sauvegardé sur le Cloud.', { title: 'Erreur' });
+    }
+  };
+
+  const deleteBloc = async (id) => {
+    if (!companyId) return;
+    const prevBlocs = blocs;
+    setBlocs(prev => prev.filter(b => b.id !== id));
+    try {
+      await deleteDoc(dref(companyId, 'blocs', id));
+      toast.success('Bloc supprimé.');
+    } catch {
+      setBlocs(prevBlocs);
+      toast.error('Suppression non synchronisée.', { title: 'Erreur' });
+    }
+  };
+
   // ─── IMPORTS ──────────────────────────────────────────────────────────────
 
   const MAX_IMPORT_ROWS = 5000;
@@ -459,6 +511,8 @@ export const useDatabase = (user, companyId) => {
     bpu, setBpu,
     categories, setCategories,
     units,
+    blocs,
+    addBloc, updateBloc, deleteBloc,
     databaseVersion,
     isLoading,
     loadBpu, isBpuLoaded, forceRefresh,

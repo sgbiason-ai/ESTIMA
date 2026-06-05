@@ -253,7 +253,9 @@ export function recalculateProject(chapters, tranches = []) {
 
     const extractQtys = (nodes) => {
       nodes.forEach(it => {
-        if (it.type === 'item') {
+        // Les items ET les sous-chapitres "bloc" exposent une quantité référençable
+        // (la surface du bloc pilote les quantités de ses composants).
+        if (it.type === 'item' || it.isBloc) {
           qtyMaps.global[it.id] = Number(it.qty) || 0;
           if (it.quantities) {
             Object.keys(it.quantities).forEach(tId => {
@@ -303,6 +305,11 @@ export function recalculateProject(chapters, tranches = []) {
             const newVal = evalF(it.formula, qtyMaps.global);
             if (newVal !== null && newVal !== it.qty) { it.qty = newVal; hasChanges = true; }
           }
+        } else if (it.isBloc && hasTranches) {
+          // Surface globale du bloc = somme des surfaces de tranche (saisies sur l'en-tête).
+          let s = 0;
+          if (it.quantities) Object.values(it.quantities).forEach(v => { s += Number(v) || 0; });
+          if (it.qty !== s) { it.qty = s; hasChanges = true; }
         }
         if (it.children) apply(it.children);
       });
