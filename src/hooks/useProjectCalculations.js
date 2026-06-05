@@ -107,6 +107,11 @@ export const useProjectCalculations = ({
             if (node.designation) map.set(node.designation.trim().toUpperCase(), refLabel);
             if (node.uid) map.set(node.uid, refLabel);
             map.set(node.id, refLabel);
+          } else if (node.isBloc) {
+            // Sous-chapitre bloc : référencé par {blocId} dans les formules de ses
+            // composants. Pas de numéro P.x — on mappe son id sur son titre lisible.
+            const label = (node.title || 'BLOC').trim().toUpperCase();
+            map.set(node.id, label);
           }
           if (node.children) traverse(node.children);
         });

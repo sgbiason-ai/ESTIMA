@@ -280,12 +280,23 @@ const ProjectView = ({
   const flattenItems = (nodes, result = []) => {
     nodes?.forEach(node => {
       if (node.type === 'item') {
-        result.push({ 
-          id: node.id, 
-          designation: node.designation || '', 
-          unit: node.unit || '', 
-          formula: node.formula || '', 
-          quantitiesFormula: node.quantitiesFormula || {} 
+        result.push({
+          id: node.id,
+          designation: node.designation || '',
+          unit: node.unit || '',
+          formula: node.formula || '',
+          quantitiesFormula: node.quantitiesFormula || {}
+        });
+      } else if (node.isBloc) {
+        // Sous-chapitre bloc : ses composants le référencent par {blocId}.
+        // On l'expose (désignation = titre) pour que la formule s'affiche en clair
+        // ([Voirie légère…]) et soit ré-encodable depuis la barre ƒ(x).
+        result.push({
+          id: node.id,
+          designation: node.title || 'Bloc',
+          unit: node.unit || '',
+          formula: '',
+          quantitiesFormula: {},
         });
       }
       if (node.children) flattenItems(node.children, result);
