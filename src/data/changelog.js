@@ -14,6 +14,7 @@ export const CHANGELOG = [
       'Bordereau des prix : la pagination de l\'aperçu et du PDF est calée sur celle du Word (police, marges, interligne et largeurs de colonnes identiques) — les pages se coupent aux mêmes endroits (un réglage fin reste possible au cas par cas selon les projets)',
       'Bordereau des prix : sur un article qui se poursuit d\'une page à l\'autre, suppression de la note « (...Suite page suivante) » et du titre répété « … (SUITE) » — la description continue simplement, comme dans le Word',
       'Accueil : retrait de la tuile « Estimation Rapide » du hub',
+      'Mobile : les sous-chapitres sont enfin visibles dans « DQE par Tranche » et « Récap. par Tranche ». Chaque sous-chapitre apparaît comme son propre groupe (avec le chapitre parent rappelé en fil d\'Ariane au-dessus du titre) au lieu d\'être fondu dans le chapitre parent — utile notamment pour les templates imbriqués type « Lotissement »',
     ],
   },
   {

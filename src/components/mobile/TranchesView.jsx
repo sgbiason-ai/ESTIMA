@@ -15,19 +15,22 @@ export default function TranchesView({ project, calcHook, tranchesHook }) {
       let total = 0;
       const chapitres = [];
 
-      (project.chapters || []).forEach(ch => {
-        let chapTotal = 0;
-        const collectFromChapter = (node) => {
-          if (node.type === 'item') {
-            chapTotal += (qtyMap[node.id] || 0) * Number(node.price || 0);
-          }
-          (node.children || []).forEach(collectFromChapter);
-        };
-        collectFromChapter(ch);
-
-        chapitres.push({ nom: ch.title || 'Sans titre', montant: chapTotal });
-        total += chapTotal;
-      });
+      // Chaque chapitre/sous-chapitre = une rubrique "plate" (items directs uniquement)
+      const walk = (node, parents) => {
+        if (node.type !== 'chapter') return;
+        let montant = 0;
+        (node.children || []).forEach(c => {
+          if (c.type === 'item') montant += (qtyMap[c.id] || 0) * Number(c.price || 0);
+        });
+        if (montant !== 0) {
+          chapitres.push({ nom: node.title || 'Sans titre', parents, montant });
+          total += montant;
+        }
+        (node.children || []).forEach(c => {
+          if (c.type === 'chapter') walk(c, [...parents, node.title || 'Sans titre']);
+        });
+      };
+      (project.chapters || []).forEach(ch => walk(ch, []));
 
       data.push({ nom: t.name, montant: total, chapitres });
     });
@@ -67,9 +70,16 @@ export default function TranchesView({ project, calcHook, tranchesHook }) {
                   const barW = tr.montant > 0 ? (ch.montant / tr.montant) * 100 : 0;
                   return (
                     <div key={j} className="py-2 border-b border-gray-100 last:border-0">
-                      <div className="flex justify-between mb-1">
-                        <span className="text-[13px] text-gray-600 font-semibold">{ch.nom}</span>
-                        <span className="text-[13px] text-gray-900 font-bold">{fmtShort(ch.montant)}</span>
+                      <div className="flex justify-between mb-1 gap-2">
+                        <div className="min-w-0">
+                          {ch.parents?.length > 0 && (
+                            <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wide truncate">
+                              {ch.parents.join(' › ')}
+                            </div>
+                          )}
+                          <span className="text-[13px] text-gray-600 font-semibold">{ch.nom}</span>
+                        </div>
+                        <span className="text-[13px] text-gray-900 font-bold shrink-0">{fmtShort(ch.montant)}</span>
                       </div>
                       <div className="h-1.5 bg-white rounded-full overflow-hidden">
                         <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full transition-all"

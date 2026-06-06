@@ -13,44 +13,45 @@ export default function DQEView({ project, calcHook, tranchesHook }) {
     const chapters = [];
     let total = 0;
 
-    const processChapter = (node) => {
-      if (node.type === 'chapter') {
-        const lignes = [];
-        let sousTotal = 0;
+    // Parcours récursif : chaque chapitre/sous-chapitre devient une section "plate"
+    // avec ses lignes directes uniquement. Le fil d'Ariane garde le contexte parent.
+    const walk = (node, parents) => {
+      if (node.type !== 'chapter') return;
+      const lignes = [];
+      let sousTotal = 0;
 
-        const collectItems = (children) => {
-          (children || []).forEach(child => {
-            if (child.type === 'item') {
-              const qty = qtyMap[child.id] || 0;
-              const pu = Number(child.price || 0);
-              const lineTotal = qty * pu;
-              if (qty !== 0 || pu !== 0) {
-                lignes.push({
-                  id: child.id,
-                  ref: calcHook.refMap?.get(child.id) || '',
-                  designation: child.designation || '',
-                  unite: normalizeUnitSymbol(child.unit),
-                  qte: qty,
-                  pu,
-                  total: lineTotal,
-                });
-                sousTotal += lineTotal;
-              }
-            } else if (child.type === 'chapter') {
-              collectItems(child.children);
-            }
-          });
-        };
-        collectItems(node.children);
-
-        if (lignes.length > 0) {
-          chapters.push({ nom: node.title || 'Sans titre', lignes, sousTotal });
-          total += sousTotal;
+      (node.children || []).forEach(child => {
+        if (child.type === 'item') {
+          const qty = qtyMap[child.id] || 0;
+          const pu = Number(child.price || 0);
+          const lineTotal = qty * pu;
+          if (qty !== 0 || pu !== 0) {
+            lignes.push({
+              id: child.id,
+              ref: calcHook.refMap?.get(child.id) || '',
+              designation: child.designation || '',
+              unite: normalizeUnitSymbol(child.unit),
+              qte: qty,
+              pu,
+              total: lineTotal,
+            });
+            sousTotal += lineTotal;
+          }
         }
+      });
+
+      if (lignes.length > 0) {
+        chapters.push({ nom: node.title || 'Sans titre', parents, lignes, sousTotal });
+        total += sousTotal;
       }
+
+      // Sous-chapitres → leurs propres sections (à plat), parent ajouté au fil d'Ariane
+      (node.children || []).forEach(child => {
+        if (child.type === 'chapter') walk(child, [...parents, node.title || 'Sans titre']);
+      });
     };
 
-    (project.chapters || []).forEach(ch => processChapter(ch));
+    (project.chapters || []).forEach(ch => walk(ch, []));
     return { chapters, total };
   }, [project, activeTranche, calcHook]);
 
@@ -104,7 +105,12 @@ export default function DQEView({ project, calcHook, tranchesHook }) {
           <div key={idx} className="mx-4 mb-1.5">
             <button onClick={() => toggleChap(idx)}
               className={`flex items-center gap-2 w-full p-3 bg-white border border-gray-200 text-left ${isOpen ? 'rounded-t-xl' : 'rounded-xl'}`}>
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
+                {chap.parents?.length > 0 && (
+                  <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wide truncate">
+                    {chap.parents.join(' › ')}
+                  </div>
+                )}
                 <div className="text-[13px] font-bold text-gray-900 uppercase">{chap.nom}</div>
                 <div className="text-[11px] text-gray-700 mt-0.5">{chap.lignes.length} ligne{chap.lignes.length > 1 ? 's' : ''} • {pct}%</div>
               </div>
