@@ -488,13 +488,12 @@ const ItemRow = memo(
                   onBlur={commitPrice}
                   onKeyDown={handlePriceKeyDown}
                   disabled={isReadOnly}
-                  className={`w-full rounded py-0.5 px-1 pr-4 text-right text-xs font-mono font-bold outline-none transition-colors 
+                  className={`w-full rounded py-0.5 px-1 pr-4 text-right text-xs font-mono font-bold outline-none transition-colors
                     ${
                       isReadOnly
                         ? 'bg-transparent border-transparent text-emerald-700'
                         : 'bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white text-emerald-700'
                     }`}
-                  isPrice={true}
                 />
                 <span className="absolute right-1.5 text-[10px] text-emerald-300 font-black pointer-events-none">€</span>
               </div>
