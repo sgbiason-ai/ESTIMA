@@ -34,6 +34,19 @@ export const DialogProvider = ({ children }) => {
     });
   }, []);
 
+  /**
+   * Ouvre un dialog de choix parmi N options.
+   * @param {string} message
+   * @param {Array<{key:string,label:string,description?:string,danger?:boolean}>} options
+   * @returns {Promise<string|null>} la `key` de l'option choisie, ou null si annulé
+   */
+  const choose = useCallback((message, options = [], { title = 'Choix' } = {}) => {
+    return new Promise((resolve) => {
+      const id = `dialog_${Date.now()}`;
+      setDialogs(prev => [...prev, { id, type: 'choose', message, title, options, resolve }]);
+    });
+  }, []);
+
   const closeDialog = useCallback((id, result) => {
     setDialogs(prev => {
       const dialog = prev.find(d => d.id === id);
@@ -43,9 +56,9 @@ export const DialogProvider = ({ children }) => {
   }, []);
 
   // Enregistrer dans le singleton global pour accès hors React
-  useEffect(() => { registerDialog({ confirm, prompt }); }, [confirm, prompt]);
+  useEffect(() => { registerDialog({ confirm, prompt, choose }); }, [confirm, prompt, choose]);
 
-  const value = useMemo(() => ({ confirm, prompt }), [confirm, prompt]);
+  const value = useMemo(() => ({ confirm, prompt, choose }), [confirm, prompt, choose]);
 
   return (
     <DialogContext.Provider value={value}>
@@ -68,7 +81,7 @@ export const useDialog = () => {
 // ─── MODAL INTERNE ───────────────────────────────────────────────────────────
 
 const DialogModal = ({ dialog, onClose }) => {
-  const { type, message, title, danger, confirmLabel, cancelLabel, defaultValue, placeholder } = dialog;
+  const { type, message, title, danger, confirmLabel, cancelLabel, defaultValue, placeholder, options = [] } = dialog;
   const [inputValue, setInputValue] = useState(defaultValue || '');
   const inputRef = useRef(null);
 
@@ -138,6 +151,24 @@ const DialogModal = ({ dialog, onClose }) => {
               className="mt-4 w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-800 focus:outline-none focus:border-emerald-500 focus:bg-white transition-all shadow-sm"
             />
           )}
+          {type === 'choose' && (
+            <div className="mt-4 space-y-2">
+              {options.map((opt) => (
+                <button
+                  key={opt.key}
+                  onClick={() => onClose(opt.key)}
+                  className={`w-full text-left px-4 py-3 rounded-xl border transition-all active:scale-[0.98] ${
+                    opt.danger
+                      ? 'border-red-200 hover:border-red-400 hover:bg-red-50'
+                      : 'border-slate-200 hover:border-emerald-400 hover:bg-emerald-50'
+                  }`}
+                >
+                  <div className="text-sm font-black text-slate-800">{opt.label}</div>
+                  {opt.description && <div className="text-xs text-slate-500 mt-0.5 leading-snug">{opt.description}</div>}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -146,16 +177,18 @@ const DialogModal = ({ dialog, onClose }) => {
             onClick={handleCancel}
             className="px-5 py-2.5 text-xs font-black uppercase tracking-widest text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all"
           >
-            {cancelLabel}
+            {cancelLabel || 'Annuler'}
           </button>
-          <button
-            onClick={handleConfirm}
-            autoFocus={type === 'confirm'}
-            className={`flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all active:scale-95 ${confirmBtnClass}`}
-          >
-            <Check size={14} />
-            {confirmLabel}
-          </button>
+          {type !== 'choose' && (
+            <button
+              onClick={handleConfirm}
+              autoFocus={type === 'confirm'}
+              className={`flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all active:scale-95 ${confirmBtnClass}`}
+            >
+              <Check size={14} />
+              {confirmLabel}
+            </button>
+          )}
         </div>
       </div>
     </div>

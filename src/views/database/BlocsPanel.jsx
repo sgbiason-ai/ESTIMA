@@ -7,11 +7,11 @@ import PropTypes from 'prop-types';
 import { Droppable, Draggable } from '@hello-pangea/dnd';
 import {
   Boxes, Plus, Trash2, Search, X, Save, Copy, Filter, GripVertical,
-  Package, AlertTriangle, Layers,
+  Package, AlertTriangle, Layers, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { formatPrice, cleanText, normalizeUnitSymbol } from '../../utils/helpers';
 import {
-  getBlocArticles, getBlocKind, blocUnitPrice, articleContribution, needsThickness, needsDensity, isBlocRef,
+  getBlocArticles, getBlocKind, blocUnitPrice, articleContribution, geoSpec, isBlocRef,
 } from '../../utils/blocPricing';
 import { useDialog } from '../../contexts/DialogContext';
 
@@ -26,6 +26,32 @@ function blocContainsBloc(root, targetId, blocsById, seen = new Set()) {
     return blocContainsBloc(blocsById[String(a.id)], targetId, blocsById, seen);
   });
 }
+
+// Volet latéral replié : fine bande verticale cliquable (icône + libellé vertical).
+// `side` oriente le chevron d'ouverture et la bordure.
+const CollapsedRail = ({ side, label, icon: Icon, onExpand, count }) => (
+  <button
+    type="button"
+    onClick={onExpand}
+    title={`Déplier « ${label} »`}
+    className={`w-10 shrink-0 bg-white ${side === 'left' ? 'border-r' : 'border-l'} border-slate-200 flex flex-col items-center gap-3 py-3 hover:bg-slate-50 transition-colors group`}
+  >
+    {side === 'left'
+      ? <ChevronRight size={16} className="text-slate-400 group-hover:text-emerald-600" />
+      : <ChevronLeft size={16} className="text-slate-400 group-hover:text-emerald-600" />}
+    <Icon size={16} className="text-slate-400 group-hover:text-slate-600" />
+    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 [writing-mode:vertical-rl] rotate-180">
+      {label}{typeof count === 'number' ? ` · ${count}` : ''}
+    </span>
+  </button>
+);
+CollapsedRail.propTypes = {
+  side: PropTypes.oneOf(['left', 'right']).isRequired,
+  label: PropTypes.string.isRequired,
+  icon: PropTypes.elementType.isRequired,
+  onExpand: PropTypes.func.isRequired,
+  count: PropTypes.number,
+};
 
 const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc, deleteBloc, dragEndRef }) => {
   const { confirm } = useDialog();
@@ -59,6 +85,16 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
     if (sortField === field) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
     else { setSortField(field); setSortDir('asc'); }
   };
+
+  // Volets latéraux repliables (état persisté par utilisateur).
+  const [leftCollapsed, setLeftCollapsed] = useState(() => {
+    try { return localStorage.getItem('estima_blocs_left_collapsed') === '1'; } catch { return false; }
+  });
+  const [rightCollapsed, setRightCollapsed] = useState(() => {
+    try { return localStorage.getItem('estima_blocs_right_collapsed') === '1'; } catch { return false; }
+  });
+  useEffect(() => { try { localStorage.setItem('estima_blocs_left_collapsed', leftCollapsed ? '1' : '0'); } catch { /* ignore */ } }, [leftCollapsed]);
+  useEffect(() => { try { localStorage.setItem('estima_blocs_right_collapsed', rightCollapsed ? '1' : '0'); } catch { /* ignore */ } }, [rightCollapsed]);
 
   // Charge le brouillon quand on change de bloc sélectionné
   useEffect(() => {
@@ -138,7 +174,7 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
     });
   }, [blocs, blocSearch, bpuById, unitFilter, kindFilter, sortField, sortDir]);
 
-  const addArticle = (id) => setDraft(d => ({ ...d, articles: [...d.articles, { id: String(id), epaisseur: '', densite: '', perte: '' }] }));
+  const addArticle = (id) => setDraft(d => ({ ...d, articles: [...d.articles, { id: String(id), largeur: '', epaisseur: '', densite: '', perte: '' }] }));
   const addBlocRef = (id) => setDraft(d => ({ ...d, articles: [...d.articles, { ref: 'bloc', id: String(id) }] }));
   const removeArticle = (idx) => setDraft(d => ({ ...d, articles: d.articles.filter((_, i) => i !== idx) }));
   const setArticle = (idx, patch) => setDraft(d => ({ ...d, articles: d.articles.map((a, i) => i === idx ? { ...a, ...patch } : a) }));
@@ -198,15 +234,23 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
   const setKind = (kind) => setDraft(d => ({ ...d, kind, unit: kind === 'aggregate' ? '' : d.unit }));
 
   const blocUnitLabel = draft.unit ? normalizeUnitSymbol(draft.unit) : 'unité';
+  // La colonne Largeur n'apparaît que pour un bloc linéaire (ml) — sinon Ép. + Densité suffisent.
+  const blocIsLinear = normalizeUnitSymbol(draft.unit) === 'ML';
 
   return (
     <div className="flex-1 flex h-full overflow-hidden bg-slate-50">
-      {/* ── Colonne gauche : liste des blocs ── */}
+      {/* ── Colonne gauche : liste des blocs (repliable) ── */}
+      {leftCollapsed ? (
+        <CollapsedRail side="left" label="Blocs" icon={Boxes} count={blocs.length} onExpand={() => setLeftCollapsed(false)} />
+      ) : (
       <div className="w-96 bg-white border-r border-slate-200 flex flex-col shrink-0">
         <div className="p-4 border-b border-slate-100 bg-slate-50">
-          <h3 className="font-black text-xs uppercase text-slate-500 tracking-widest mb-3 flex items-center gap-2">
-            <Boxes size={14} /> Blocs ({(blocSearch.trim() || unitFilter || kindFilter !== 'all') ? `${visibleBlocs.length}/${blocs.length}` : blocs.length})
-          </h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-black text-xs uppercase text-slate-500 tracking-widest flex items-center gap-2">
+              <Boxes size={14} /> Blocs ({(blocSearch.trim() || unitFilter || kindFilter !== 'all') ? `${visibleBlocs.length}/${blocs.length}` : blocs.length})
+            </h3>
+            <button type="button" onClick={() => setLeftCollapsed(true)} title="Replier le volet" className="p-1 rounded-md hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors"><ChevronLeft size={16} /></button>
+          </div>
           <button
             onClick={() => setSelectedId(NEW)}
             className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all shadow-md active:scale-95"
@@ -328,6 +372,7 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
           })}
         </div>
       </div>
+      )}
 
       {/* ── Colonne droite : éditeur ── */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
@@ -422,6 +467,7 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
                     <span className="w-10 text-center">U</span>
                     {!isAggregate && (
                       <>
+                        {blocIsLinear && <span className="w-16 text-center" title="Largeur (m) — bloc linéaire">Largeur</span>}
                         <span className="w-16 text-center">Ép. (m)</span>
                         <span className="w-16 text-center">Densité</span>
                         <span className="w-14 text-center">Perte %</span>
@@ -446,9 +492,11 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
                         const blocRef = isBlocRef(a);
                         const childBloc = blocRef ? blocsByIdMap[String(a.id)] : null;
                         const article = blocRef ? null : bpuById[String(a.id)];
-                        const wantEp = article && needsThickness(article.unit);
-                        const wantD = article && needsDensity(article.unit);
-                        const contrib = article ? articleContribution(article, a.epaisseur, a.densite, a.perte) : 0;
+                        const spec = article ? geoSpec(draft.unit, article.unit) : { needsLargeur: false, needsEpaisseur: false, needsDensity: false };
+                        const wantL = spec.needsLargeur;
+                        const wantEp = spec.needsEpaisseur;
+                        const wantD = spec.needsDensity;
+                        const contrib = article ? articleContribution(draft.unit, article, a.largeur, a.epaisseur, a.densite, a.perte) : 0;
                         const dndId = `${blocRef ? 'bloc' : 'art'}_${String(a.id)}`;
                         return (
                           <Draggable key={dndId} draggableId={dndId} index={idx}>
@@ -490,9 +538,33 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
                                   )}
                                 </div>
                                 <span className={`w-10 text-center text-[9px] font-black rounded px-1 py-0.5 uppercase border ${blocRef ? 'text-violet-600 bg-violet-50 border-violet-100' : 'text-emerald-600 bg-emerald-50 border-emerald-100'}`}>{blocRef ? 'bloc' : (article ? normalizeUnitSymbol(article.unit) : '—')}</span>
-                                {!isAggregate && !blocRef && (
+                                {!isAggregate && (blocRef ? (
                                 <>
-                                {/* Épaisseur */}
+                                {/* Sous-bloc dans une formule : cellules vides alignées sur l'en-tête (géométrie sans objet) */}
+                                {blocIsLinear && <span className="w-16 text-center text-slate-300 text-xs">—</span>}
+                                <span className="w-16 text-center text-slate-300 text-xs">—</span>
+                                <span className="w-16 text-center text-slate-300 text-xs">—</span>
+                                <span className="w-14 text-center text-slate-300 text-xs">—</span>
+                                <span className="w-20 text-right text-slate-300 text-xs">—</span>
+                                </>
+                                ) : (
+                                <>
+                                {/* Largeur (m) — uniquement pour un bloc linéaire (ml) */}
+                                {blocIsLinear && (
+                                  <div className="w-16 flex justify-center">
+                                    {wantL ? (
+                                      <input
+                                        type="number" step="0.01" min="0" inputMode="decimal"
+                                        value={a.largeur ?? ''}
+                                        onChange={(e) => setArticle(idx, { largeur: e.target.value })}
+                                        placeholder="0.00"
+                                        title="Largeur développée (m)"
+                                        className="w-14 text-center text-[11px] font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded px-1 py-1 outline-none focus:border-emerald-400 focus:bg-white"
+                                      />
+                                    ) : <span className="text-slate-300 text-xs">—</span>}
+                                  </div>
+                                )}
+                                {/* Épaisseur (m) */}
                                 <div className="w-16 flex justify-center">
                                   {wantEp ? (
                                     <input
@@ -500,6 +572,7 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
                                       value={a.epaisseur ?? ''}
                                       onChange={(e) => setArticle(idx, { epaisseur: e.target.value })}
                                       placeholder="0.00"
+                                      title="Épaisseur (m)"
                                       className="w-14 text-center text-[11px] font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded px-1 py-1 outline-none focus:border-emerald-400 focus:bg-white"
                                     />
                                   ) : <span className="text-slate-300 text-xs">—</span>}
@@ -531,7 +604,7 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
                                 </div>
                                 <span className="w-20 text-right text-[11px] font-black text-emerald-700">{formatPrice(contrib)}</span>
                                 </>
-                                )}
+                                ))}
                                 <div className="w-8 flex items-center justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                                   <button onClick={() => removeArticle(idx)} className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded"><X size={13} /></button>
                                 </div>
@@ -554,9 +627,16 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
                 )}
               </div>
 
-              {/* Ajout d'articles */}
+              {/* Ajout d'articles (repliable) */}
+              {rightCollapsed ? (
+                <CollapsedRail side="right" label="Ajouter" icon={Plus} onExpand={() => setRightCollapsed(false)} />
+              ) : (
               <div className="w-96 flex flex-col overflow-hidden bg-white shrink-0">
                 <div className="p-4 border-b border-slate-100 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Ajouter</span>
+                    <button type="button" onClick={() => setRightCollapsed(true)} title="Replier le volet" className="p-1 rounded-md hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors"><ChevronRight size={16} /></button>
+                  </div>
                   {isAggregate && (
                     <div className="grid grid-cols-2 bg-slate-100 rounded-lg p-0.5 gap-0.5">
                       <button onClick={() => setAddMode('articles')} className={`py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all ${!showBlocs ? 'bg-white shadow-sm text-emerald-700' : 'text-slate-500 hover:text-slate-700'}`}>Articles</button>
@@ -628,6 +708,7 @@ const BlocsPanel = ({ blocs = [], fullBpu = [], units = [], addBloc, updateBloc,
                   )}
                 </div>
               </div>
+              )}
             </div>
           </>
         )}

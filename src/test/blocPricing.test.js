@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   blocUnitFactor, articleContribution, blocUnitPrice, getBlocArticles,
-  needsThickness, needsDensity, blocFormulaFactor, buildBlocSubChapter,
+  geoSpec, blocFormulaFactor, buildBlocSubChapter,
   buildAggregateSubChapter, getBlocKind, isBlocRef,
 } from '../utils/blocPricing';
 import { recalculateProject } from '../utils/projectCalculations';
@@ -15,51 +15,66 @@ const BPU = {
   a5: { id: 'a5', designation: 'Remblai', unit: 'm³', price: 20 },
 };
 
-describe('blocUnitFactor', () => {
+// Signature : blocUnitFactor(blocUnit, articleUnit, largeur, epaisseur, densite, perte)
+// (la largeur ne sert qu'aux blocs ml ; en m²/m³ elle est ignorée)
+describe('blocUnitFactor (bloc m² — défaut historique)', () => {
   it('tonne → épaisseur × densité', () => {
-    expect(blocUnitFactor('t', 0.3, 2)).toBeCloseTo(0.6, 6);
-    expect(blocUnitFactor('T', 0.1, 2.1)).toBeCloseTo(0.21, 6);
+    expect(blocUnitFactor('m²', 't', 0, 0.3, 2)).toBeCloseTo(0.6, 6);
+    expect(blocUnitFactor('m²', 'T', 0, 0.1, 2.1)).toBeCloseTo(0.21, 6);
   });
   it('m³ → épaisseur (densité ignorée)', () => {
-    expect(blocUnitFactor('m³', 0.25, 999)).toBeCloseTo(0.25, 6);
-    expect(blocUnitFactor('m3', 0.4)).toBeCloseTo(0.4, 6);
+    expect(blocUnitFactor('m²', 'm³', 0, 0.25, 999)).toBeCloseTo(0.25, 6);
+    expect(blocUnitFactor('m²', 'm3', 0, 0.4)).toBeCloseTo(0.4, 6);
   });
   it('autre unité → 1', () => {
-    expect(blocUnitFactor('m²', 0.3, 2)).toBe(1);
-    expect(blocUnitFactor('ml', 5, 5)).toBe(1);
-    expect(blocUnitFactor('u')).toBe(1);
+    expect(blocUnitFactor('m²', 'm²', 0, 0.3, 2)).toBe(1);
+    expect(blocUnitFactor('m²', 'ml', 0, 5, 5)).toBe(1);
+    expect(blocUnitFactor('m²', 'u')).toBe(1);
   });
   it('valeurs manquantes → 0 pour les unités à conversion', () => {
-    expect(blocUnitFactor('t', '', '')).toBe(0);
-    expect(blocUnitFactor('t', 0.3, '')).toBe(0);
+    expect(blocUnitFactor('m²', 't', 0, '', '')).toBe(0);
+    expect(blocUnitFactor('m²', 't', 0, 0.3, '')).toBe(0);
+  });
+  it('bloc sans unité = m² (rétro-compat)', () => {
+    expect(blocUnitFactor('', 't', 0, 0.3, 2)).toBeCloseTo(0.6, 6);
+    expect(blocUnitFactor(undefined, 'm³', 0, 0.25)).toBeCloseTo(0.25, 6);
+  });
+  it('m² : la largeur est ignorée', () => {
+    expect(blocUnitFactor('m²', 'm³', 99, 0.25)).toBeCloseTo(0.25, 6);
   });
 });
 
-describe('needsThickness / needsDensity', () => {
-  it('épaisseur requise pour t et m³, pas pour m²/ml/u', () => {
-    expect(needsThickness('t')).toBe(true);
-    expect(needsThickness('m³')).toBe(true);
-    expect(needsThickness('m²')).toBe(false);
-    expect(needsThickness('u')).toBe(false);
+describe('geoSpec (couple unité bloc / unité article)', () => {
+  it('bloc m² : épaisseur pour t et m³, densité pour t — jamais de largeur', () => {
+    expect(geoSpec('m²', 't')).toEqual({ needsLargeur: false, needsEpaisseur: true, needsDensity: true });
+    expect(geoSpec('m²', 'm³')).toEqual({ needsLargeur: false, needsEpaisseur: true, needsDensity: false });
+    expect(geoSpec('m²', 'm²')).toEqual({ needsLargeur: false, needsEpaisseur: false, needsDensity: false });
+    expect(geoSpec('m²', 'u')).toEqual({ needsLargeur: false, needsEpaisseur: false, needsDensity: false });
   });
-  it('densité requise pour t uniquement', () => {
-    expect(needsDensity('t')).toBe(true);
-    expect(needsDensity('m³')).toBe(false);
-    expect(needsDensity('m²')).toBe(false);
+  it('bloc ml : largeur + épaisseur pour t/m³, largeur seule pour m²', () => {
+    expect(geoSpec('ml', 'm³')).toEqual({ needsLargeur: true, needsEpaisseur: true, needsDensity: false });
+    expect(geoSpec('ml', 't')).toEqual({ needsLargeur: true, needsEpaisseur: true, needsDensity: true });
+    expect(geoSpec('ml', 'm²')).toEqual({ needsLargeur: true, needsEpaisseur: false, needsDensity: false });
+    expect(geoSpec('ml', 'ml')).toEqual({ needsLargeur: false, needsEpaisseur: false, needsDensity: false });
+  });
+  it('bloc m³ : densité seule pour t, rien pour m³ — jamais de largeur', () => {
+    expect(geoSpec('m³', 't')).toEqual({ needsLargeur: false, needsEpaisseur: false, needsDensity: true });
+    expect(geoSpec('m³', 'm³')).toEqual({ needsLargeur: false, needsEpaisseur: false, needsDensity: false });
   });
 });
 
-describe('articleContribution', () => {
+// Signature : articleContribution(blocUnit, article, largeur, epaisseur, densite, perte)
+describe('articleContribution (bloc m²)', () => {
   it('tonne : prix × épaisseur × densité', () => {
-    expect(articleContribution(BPU.a1, 0.3, 2)).toBeCloseTo(7.2, 6);   // 12 × 0.6
-    expect(articleContribution(BPU.a2, 0.1, 2.1)).toBeCloseTo(2.94, 6); // 14 × 0.21
+    expect(articleContribution('m²', BPU.a1, 0, 0.3, 2)).toBeCloseTo(7.2, 6);   // 12 × 0.6
+    expect(articleContribution('m²', BPU.a2, 0, 0.1, 2.1)).toBeCloseTo(2.94, 6); // 14 × 0.21
   });
   it('m² : prix inchangé (facteur 1)', () => {
-    expect(articleContribution(BPU.a3)).toBeCloseTo(3.5, 6);
-    expect(articleContribution(BPU.a4)).toBeCloseTo(1.2, 6);
+    expect(articleContribution('m²', BPU.a3)).toBeCloseTo(3.5, 6);
+    expect(articleContribution('m²', BPU.a4)).toBeCloseTo(1.2, 6);
   });
   it('m³ : prix × épaisseur', () => {
-    expect(articleContribution(BPU.a5, 0.25)).toBeCloseTo(5, 6); // 20 × 0.25
+    expect(articleContribution('m²', BPU.a5, 0, 0.25)).toBeCloseTo(5, 6); // 20 × 0.25
   });
 });
 
@@ -88,8 +103,8 @@ describe('getBlocArticles (rétro-compat)', () => {
   });
   it('convertit l’ancien format articleIds', () => {
     expect(getBlocArticles({ articleIds: ['a1', 'a2'] })).toEqual([
-      { id: 'a1', epaisseur: '', densite: '', perte: '' },
-      { id: 'a2', epaisseur: '', densite: '', perte: '' },
+      { id: 'a1', largeur: '', epaisseur: '', densite: '', perte: '' },
+      { id: 'a2', largeur: '', epaisseur: '', densite: '', perte: '' },
     ]);
   });
   it('vide par défaut', () => {
@@ -97,33 +112,34 @@ describe('getBlocArticles (rétro-compat)', () => {
   });
 });
 
-describe('blocFormulaFactor', () => {
+// Signature : blocFormulaFactor(blocUnit, articleUnit, largeur, epaisseur, densite, perte)
+describe('blocFormulaFactor (bloc m²)', () => {
   it('t → "ép*densité", m³ → "ép", autre → null', () => {
-    expect(blocFormulaFactor('t', 0.3, 2)).toBe('0.3*2');
-    expect(blocFormulaFactor('m³', 0.25)).toBe('0.25');
-    expect(blocFormulaFactor('m²')).toBeNull();
+    expect(blocFormulaFactor('m²', 't', 0, 0.3, 2)).toBe('0.3*2');
+    expect(blocFormulaFactor('m²', 'm³', 0, 0.25)).toBe('0.25');
+    expect(blocFormulaFactor('m²', 'm²')).toBeNull();
   });
 });
 
 describe('perte (coefficient % — tous articles)', () => {
   it('facteur = base × (1 + perte/100)', () => {
-    expect(blocUnitFactor('t', 0.3, 2, 5)).toBeCloseTo(0.63, 6);   // 0.6 × 1.05
-    expect(blocUnitFactor('m³', 0.4, 0, 10)).toBeCloseTo(0.44, 6); // 0.4 × 1.10
-    expect(blocUnitFactor('m²', 0, 0, 3)).toBeCloseTo(1.03, 6);    // 1 × 1.03 (perte sur m²)
+    expect(blocUnitFactor('m²', 't', 0, 0.3, 2, 5)).toBeCloseTo(0.63, 6);   // 0.6 × 1.05
+    expect(blocUnitFactor('m²', 'm³', 0, 0.4, 0, 10)).toBeCloseTo(0.44, 6); // 0.4 × 1.10
+    expect(blocUnitFactor('m²', 'm²', 0, 0, 0, 3)).toBeCloseTo(1.03, 6);    // 1 × 1.03 (perte sur m²)
   });
   it('vide / 0 → pas de perte (coef 1)', () => {
-    expect(blocUnitFactor('m²', 0, 0, '')).toBe(1);
-    expect(blocUnitFactor('t', 0.3, 2, 0)).toBeCloseTo(0.6, 6);
+    expect(blocUnitFactor('m²', 'm²', 0, 0, 0, '')).toBe(1);
+    expect(blocUnitFactor('m²', 't', 0, 0.3, 2, 0)).toBeCloseTo(0.6, 6);
   });
   it('contribution intègre la perte', () => {
-    expect(articleContribution(BPU.a1, 0.3, 2, 5)).toBeCloseTo(12 * 0.63, 6); // 7.56
-    expect(articleContribution(BPU.a3, 0, 0, 10)).toBeCloseTo(3.5 * 1.1, 6);  // 3.85 (m² + perte)
+    expect(articleContribution('m²', BPU.a1, 0, 0.3, 2, 5)).toBeCloseTo(12 * 0.63, 6); // 7.56
+    expect(articleContribution('m²', BPU.a3, 0, 0, 0, 10)).toBeCloseTo(3.5 * 1.1, 6);  // 3.85 (m² + perte)
   });
   it('formule : perte ajoutée comme multiplicateur, même sans base', () => {
-    expect(blocFormulaFactor('t', 0.3, 2, 5)).toBe('0.3*2*1.05');
-    expect(blocFormulaFactor('m³', 0.4, 0, 10)).toBe('0.4*1.1');
-    expect(blocFormulaFactor('m²', '', '', 5)).toBe('1.05'); // base 1 → seul le coef
-    expect(blocFormulaFactor('m²', '', '', 0)).toBeNull();   // pas de perte → null
+    expect(blocFormulaFactor('m²', 't', 0, 0.3, 2, 5)).toBe('0.3*2*1.05');
+    expect(blocFormulaFactor('m²', 'm³', 0, 0.4, 0, 10)).toBe('0.4*1.1');
+    expect(blocFormulaFactor('m²', 'm²', '', '', '', 5)).toBe('1.05'); // base 1 → seul le coef
+    expect(blocFormulaFactor('m²', 'm²', '', '', '', 0)).toBeNull();   // pas de perte → null
   });
   it('blocUnitPrice agrège les pertes', () => {
     const bloc = { unit: 'm²', articles: [
@@ -145,6 +161,131 @@ describe('perte (coefficient % — tous articles)', () => {
     expect(compT.formula).toBe(`={${blocId}}*0.3*2*1.05`);
     expect(compM2.formula).toBe(`={${blocId}}*1.1`); // base 1 → seul le coef de perte
     expect(compT.blocFactor).toBeCloseTo(0.3 * 2 * 1.05, 6);
+  });
+});
+
+// ── Bloc linéaire (ml) : tranchée — section = largeur × épaisseur, m² = largeur ──
+describe('bloc linéaire (ml) — tranchée', () => {
+  const TR = {
+    rem: { id: 'rem', designation: 'Remblai',    unit: 'm³', price: 20 },
+    gnt: { id: 'gnt', designation: 'GNT',         unit: 't',  price: 12 },
+    geo: { id: 'geo', designation: 'Géotextile',  unit: 'm²', price: 2 },
+    tuy: { id: 'tuy', designation: 'Tuyau PVC',   unit: 'ml', price: 30 },
+  };
+  it('m³ : facteur = largeur × épaisseur (× perte)', () => {
+    expect(blocUnitFactor('ml', 'm³', 0.6, 0.5)).toBeCloseTo(0.3, 6);   // 0.6 × 0.5 = 0.3 m³/ml
+    expect(blocFormulaFactor('ml', 'm³', 0.6, 0.5)).toBe('0.6*0.5');
+    expect(articleContribution('ml', TR.rem, 0.6, 0.5)).toBeCloseTo(6, 6); // 20 × 0.3
+  });
+  it('t : largeur × épaisseur × densité', () => {
+    expect(blocUnitFactor('ml', 't', 0.6, 0.2, 2)).toBeCloseTo(0.24, 6); // 0.6 × 0.2 × 2
+    expect(blocFormulaFactor('ml', 't', 0.6, 0.2, 2)).toBe('0.6*0.2*2');
+  });
+  it('m² : facteur = largeur (épaisseur ignorée)', () => {
+    expect(blocUnitFactor('ml', 'm²', 1.2)).toBeCloseTo(1.2, 6);        // 1 ml × 1.2 m = 1.2 m²
+    expect(blocFormulaFactor('ml', 'm²', 1.2)).toBe('1.2');
+    expect(articleContribution('ml', TR.geo, 1.2)).toBeCloseTo(2.4, 6);
+  });
+  it('ml / u → 1 pour 1 (pas de coef)', () => {
+    expect(blocUnitFactor('ml', 'ml', 99, 99)).toBe(1);
+    expect(blocFormulaFactor('ml', 'ml', 99, 99)).toBeNull();
+  });
+  it('prix au ml du bloc = somme des contributions', () => {
+    const bloc = { name: 'Tranchée', unit: 'ml', articles: [
+      { id: 'rem', largeur: 0.6, epaisseur: 0.5 },             // section 0.3 → 20 × 0.3 = 6
+      { id: 'gnt', largeur: 0.6, epaisseur: 0.2, densite: 2 }, // 0.24 → 12 × 0.24 = 2.88
+      { id: 'geo', largeur: 1.2 },                             // largeur 1.2 → 2 × 1.2 = 2.4
+      { id: 'tuy' },                                           // 1 pour 1 → 30
+    ] };
+    expect(blocUnitPrice(bloc, TR)).toBeCloseTo(6 + 2.88 + 2.4 + 30, 6); // 41.28
+  });
+  it('intégration : linéaire saisi → quantités composants', () => {
+    const bloc = { name: 'Tranchée', unit: 'ml', articles: [
+      { id: 'rem', largeur: 0.6, epaisseur: 0.5 }, { id: 'geo', largeur: 1.2 }, { id: 'tuy' },
+    ] };
+    const { node } = buildBlocSubChapter(bloc, TR, []);
+    node.qty = 80; // 80 ml
+    const { updatedChapters } = recalculateProject([{ id: 'c1', type: 'chapter', children: [node] }], []);
+    const f = updatedChapters[0].children[0].children;
+    expect(f.find(l => l.uid === 'rem').qty).toBeCloseTo(80 * 0.3, 4); // 24 m³
+    expect(f.find(l => l.uid === 'geo').qty).toBeCloseTo(80 * 1.2, 4); // 96 m²
+    expect(f.find(l => l.uid === 'tuy').qty).toBeCloseTo(80, 4);       // 80 ml
+  });
+  it('perte combinée à la géométrie (ml)', () => {
+    expect(blocUnitFactor('ml', 't', 0.6, 0.2, 2, 5)).toBeCloseTo(0.252, 6);   // 0.24 × 1.05
+    expect(blocFormulaFactor('ml', 't', 0.6, 0.2, 2, 5)).toBe('0.6*0.2*2*1.05');
+    expect(blocUnitFactor('ml', 'm³', 0.6, 0.5, 0, 10)).toBeCloseTo(0.33, 6);  // 0.3 × 1.10
+    expect(blocFormulaFactor('ml', 'm³', 0.6, 0.5, 0, 10)).toBe('0.6*0.5*1.1');
+    expect(blocUnitFactor('ml', 'm²', 1.2, 0, 0, 5)).toBeCloseTo(1.26, 6);     // 1.2 × 1.05
+    expect(blocFormulaFactor('ml', 'm²', 1.2, 0, 0, 5)).toBe('1.2*1.05');
+  });
+  it('intégration : la perte se propage jusqu\'à la quantité résolue (ml)', () => {
+    const bloc = { name: 'Tranchée', unit: 'ml', articles: [
+      { id: 'rem', largeur: 0.6, epaisseur: 0.5, perte: 5 },              // 0.3 × 1.05
+      { id: 'gnt', largeur: 0.6, epaisseur: 0.2, densite: 2, perte: 10 }, // 0.24 × 1.10
+    ] };
+    const { node } = buildBlocSubChapter(bloc, TR, []);
+    node.qty = 80;
+    const { updatedChapters } = recalculateProject([{ id: 'c1', type: 'chapter', children: [node] }], []);
+    const f = updatedChapters[0].children[0].children;
+    expect(f.find(l => l.uid === 'rem').qty).toBeCloseTo(80 * 0.3 * 1.05, 4);  // 25.2
+    expect(f.find(l => l.uid === 'gnt').qty).toBeCloseTo(80 * 0.24 * 1.10, 4); // 21.12
+  });
+  it('intégration AVEC tranches (ml) : quantité par tranche + somme globale', () => {
+    const bloc = { name: 'Tranchée', unit: 'ml', articles: [{ id: 'rem', largeur: 0.6, epaisseur: 0.5 }] };
+    const tranches = [{ id: 't1' }, { id: 't2' }];
+    const { node } = buildBlocSubChapter(bloc, TR, tranches);
+    node.quantities = { t1: 80, t2: 20 };
+    const { updatedChapters } = recalculateProject([{ id: 'c1', type: 'chapter', children: [node] }], tranches);
+    const blocNode = updatedChapters[0].children[0];
+    expect(blocNode.qty).toBeCloseTo(100, 4); // somme des tranches
+    const rem = blocNode.children.find(l => l.uid === 'rem');
+    expect(rem.quantities.t1).toBeCloseTo(80 * 0.3, 4); // 24
+    expect(rem.quantities.t2).toBeCloseTo(20 * 0.3, 4); // 6
+    expect(rem.qty).toBeCloseTo(100 * 0.3, 4);          // 30
+  });
+});
+
+// ── Bloc volumique (m³) : déblais — densité seule pour les tonnes ──
+describe('bloc volumique (m³) — déblais', () => {
+  const V = {
+    deb: { id: 'deb', designation: 'Déblais',    unit: 'm³', price: 8 },
+    eva: { id: 'eva', designation: 'Évacuation', unit: 't',  price: 15 },
+  };
+  it('m³ → 1 pour 1 (volume direct)', () => {
+    expect(blocUnitFactor('m³', 'm³', 0, 0)).toBe(1);
+    expect(blocFormulaFactor('m³', 'm³')).toBeNull();
+    expect(articleContribution('m³', V.deb)).toBeCloseTo(8, 6);
+  });
+  it('t → densité seule (pas de géométrie)', () => {
+    expect(blocUnitFactor('m³', 't', 0, 0, 1.8)).toBeCloseTo(1.8, 6);
+    expect(blocFormulaFactor('m³', 't', 0, 0, 1.8)).toBe('1.8');
+    expect(articleContribution('m³', V.eva, 0, 0, 1.8)).toBeCloseTo(27, 6); // 15 × 1.8
+  });
+  it('m² / ml / u → 1 pour 1 (largeur & épaisseur ignorées)', () => {
+    expect(blocUnitFactor('m³', 'm²', 99, 0.5, 9)).toBe(1); // largeur & épaisseur ignorées
+    expect(blocFormulaFactor('m³', 'm²', 99, 0.5)).toBeNull();
+    expect(blocUnitFactor('m³', 'ml', 5, 5, 5)).toBe(1);
+    expect(blocUnitFactor('m³', 'u')).toBe(1);
+    expect(blocFormulaFactor('m³', 'ml')).toBeNull();
+    expect(articleContribution('m³', { id: 'x', unit: 'm²', price: 7 }, 99, 0.5)).toBeCloseTo(7, 6);
+    expect(geoSpec('m³', 'm²')).toEqual({ needsLargeur: false, needsEpaisseur: false, needsDensity: false });
+    expect(geoSpec('m³', 'ml')).toEqual({ needsLargeur: false, needsEpaisseur: false, needsDensity: false });
+  });
+  it('perte combinée à la densité (m³)', () => {
+    expect(blocUnitFactor('m³', 't', 0, 0, 1.8, 10)).toBeCloseTo(1.98, 6); // 1.8 × 1.10
+    expect(blocFormulaFactor('m³', 't', 0, 0, 1.8, 10)).toBe('1.8*1.1');
+  });
+  it('intégration : volume saisi → quantités', () => {
+    const bloc = { name: 'Déblais', unit: 'm³', articles: [
+      { id: 'deb' }, { id: 'eva', densite: 1.8 },
+    ] };
+    const { node } = buildBlocSubChapter(bloc, V, []);
+    node.qty = 200; // 200 m³
+    const { updatedChapters } = recalculateProject([{ id: 'c1', type: 'chapter', children: [node] }], []);
+    const f = updatedChapters[0].children[0].children;
+    expect(f.find(l => l.uid === 'deb').qty).toBeCloseTo(200, 4);       // 200 m³
+    expect(f.find(l => l.uid === 'eva').qty).toBeCloseTo(200 * 1.8, 4); // 360 t
   });
 });
 

@@ -272,6 +272,7 @@ export const useProjectManager = (user, companyId) => {
   // avec leurs formules de quantité) dans le chapitre/sous-chapitre ciblé, en bloc.
   const addItemsToProject = (lines, selection = null, opts = {}) => {
     if (!Array.isArray(lines) || lines.length === 0) return;
+    opts = opts || {}; // garde-fou : un appelant peut passer null explicitement
     setProject(prev => {
       // Insertion au PREMIER NIVEAU : les templates/agrégats deviennent des
       // chapitres à part entière (et non des sous-chapitres du chapitre sélectionné).

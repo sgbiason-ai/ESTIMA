@@ -5,6 +5,7 @@ import { Package, PanelLeftClose, Search, Filter, Boxes, ChevronDown } from 'luc
 import { formatPrice, cleanText, normalizeUnitSymbol, sanitizeHtml } from '../utils/helpers';
 import { buildBlocSubChapter, blocUnitPrice, getBlocArticles, getBlocKind } from '../utils/blocPricing';
 import { useToast } from '../contexts/ToastContext';
+import { useDialog } from '../contexts/DialogContext';
 
 // ── Carte article BPU memoisee ─────────────────────────────────────────────
 // Un changement de bpuSearch / selectedCategory provoque un nouveau filtrage,
@@ -56,6 +57,7 @@ const BpuSidebar = ({
   onInsertLines
 }) => {
   const { success, error } = useToast();
+  const { choose } = useDialog();
   // Ces états ne vivent désormais QUE dans la sidebar, ce qui allège ProjectView !
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [tooltipState, setTooltipState] = useState({ visible: false, item: null, style: {} });
@@ -184,19 +186,40 @@ const BpuSidebar = ({
   const onInsertLinesRef = useRef(onInsertLines);
   useEffect(() => { onInsertLinesRef.current = onInsertLines; }, [onInsertLines]);
 
-  const handleInsertBloc = useCallback((bloc) => {
+  // Insère le nœud bloc déjà construit, au niveau demandé, avec un toast explicite.
+  const placeBloc = useCallback((bloc, node, added, missing, atTopLevel) => {
+    // Contrat onInsertLines = (lines, opts) ; le parent injecte la sélection courante
+    // (sous-chapitre → chapitre sélectionné). atTopLevel = true → chapitre de 1er niveau.
+    onInsertLinesRef.current?.([node], { atTopLevel });
+    const place = atTopLevel ? 'chapitre de 1er niveau' : 'sous-chapitre';
+    const isAgg = getBlocKind(bloc) === 'aggregate';
+    const tail = isAgg ? ' Saisissez les quantités sur chaque ligne.' : " Saisissez la surface sur l'en-tête.";
+    success(`Bloc « ${bloc.name} » inséré : ${place} + ${added} article${added > 1 ? 's' : ''}${missing ? ` (${missing} introuvable${missing > 1 ? 's' : ''})` : ''}.${tail}`);
+  }, [success]);
+
+  const handleInsertBloc = useCallback(async (bloc) => {
     const { node, added, missing } = buildBlocSubChapter(bloc, bpuById, tranches, blocsByIdMap);
     if (added === 0) {
       error(`Bloc « ${bloc.name} » : aucun article disponible.`);
       return;
     }
-    const isAgg = getBlocKind(bloc) === 'aggregate';
-    // Agrégat (template) → chapitre de premier niveau ; formule → sous-chapitre.
-    onInsertLinesRef.current?.([node], { atTopLevel: isAgg });
-    const place = isAgg ? 'chapitre' : 'sous-chapitre';
-    const tail = isAgg ? ' Saisissez les quantités sur chaque ligne.' : " Saisissez la surface sur l'en-tête.";
-    success(`Bloc « ${bloc.name} » inséré : ${place} + ${added} article${added > 1 ? 's' : ''}${missing ? ` (${missing} introuvable${missing > 1 ? 's' : ''})` : ''}.${tail}`);
-  }, [bpuById, blocsByIdMap, tranches, success, error]);
+    if (getBlocKind(bloc) === 'aggregate') {
+      // Agrégat : pas de pilote → chapitre OU sous-chapitre, au choix de l'utilisateur.
+      const dest = await choose(
+        `Où insérer l'agrégat « ${bloc.name} » (${added} article${added > 1 ? 's' : ''}) ?`,
+        [
+          { key: 'top', label: 'Chapitre de 1er niveau', description: 'Un chapitre à part entière, en bas de l’estimation.' },
+          { key: 'sub', label: 'Sous-chapitre du chapitre courant', description: 'Imbriqué dans le chapitre actuellement sélectionné.' },
+        ],
+        { title: 'Insérer l’agrégat' }
+      );
+      if (!dest) return; // annulé
+      placeBloc(bloc, node, added, missing, dest === 'top');
+    } else {
+      // Bloc calculé : toujours un sous-chapitre (porte la surface pilote).
+      placeBloc(bloc, node, added, missing, false);
+    }
+  }, [bpuById, blocsByIdMap, tranches, error, choose, placeBloc]);
 
   if (!showBpu) return null;
 
@@ -291,27 +314,46 @@ const BpuSidebar = ({
                 Aucun bloc ne correspond à<br /><span className="font-bold text-slate-500">« {bpuSearch.trim()} »</span>.
               </div>
             ) : (
-              [...blocsToShow].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'fr')).map(bloc => {
+              <>
+              {/* Légende sticky : type de bloc → destination d'insertion */}
+              <div className="sticky top-0 z-10 -mx-2 px-3 py-1.5 bg-slate-100/95 backdrop-blur border-b border-slate-200 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[8px] font-bold uppercase tracking-wide text-slate-500">
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-indigo-600" /> Calculé → sous-chap.</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-amber-500" /> Agrégat → chap. / sous-chap.</span>
+              </div>
+              {[...blocsToShow].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'fr')).map(bloc => {
                 const count = getBlocArticles(bloc).length;
                 const isAgg = getBlocKind(bloc) === 'aggregate';
                 const u = bloc.unit ? normalizeUnitSymbol(bloc.unit) : '';
+                // Classes littérales (Tailwind JIT ne détecte pas les noms construits dynamiquement).
+                const C = isAgg
+                  ? { card: 'hover:border-amber-400 hover:bg-amber-50/50', icon: 'bg-amber-100 text-amber-600 group-hover:bg-amber-200', name: 'group-hover:text-amber-800', badge: 'bg-amber-500 text-white' }
+                  : { card: 'hover:border-indigo-400 hover:bg-indigo-50/50', icon: 'bg-indigo-100 text-indigo-600 group-hover:bg-indigo-200', name: 'group-hover:text-indigo-800', badge: 'bg-indigo-600 text-white' };
                 return (
                   <button
                     key={bloc.id}
                     onClick={() => handleInsertBloc(bloc)}
-                    title={`Insérer le bloc « ${bloc.name} » (${count} article${count > 1 ? 's' : ''}) dans le chapitre sélectionné`}
-                    className="w-full group flex items-center gap-2.5 p-2 bg-white border border-slate-200 rounded-lg shadow-sm hover:border-indigo-400 hover:shadow-md hover:bg-indigo-50/40 cursor-pointer transition-all duration-200 active:scale-[0.98] text-left"
+                    title={isAgg
+                      ? `Insérer l'agrégat « ${bloc.name} » (${count} article${count > 1 ? 's' : ''}) — au choix : chapitre ou sous-chapitre`
+                      : `Insérer le bloc calculé « ${bloc.name} » (${count} article${count > 1 ? 's' : ''}) en sous-chapitre (porte la surface)`}
+                    className={`w-full group flex items-center gap-2.5 p-2 bg-white border border-slate-200 rounded-lg shadow-sm hover:shadow-md cursor-pointer transition-all duration-200 active:scale-[0.98] text-left ${C.card}`}
                   >
-                    <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center shrink-0 group-hover:bg-indigo-100 transition-colors">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${C.icon}`}>
                       <Boxes size={16} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-bold text-slate-700 uppercase leading-snug line-clamp-2 group-hover:text-indigo-800 transition-colors">{bloc.name}</p>
-                      <p className="text-[9px] font-bold text-slate-400 mt-0.5">{count} art.{isAgg ? ' · agrégat' : ` · ${formatPrice(blocUnitPrice(bloc, bpuById))}${u ? `/${u}` : ''}`}</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className={`text-[10px] font-bold text-slate-700 uppercase leading-snug line-clamp-2 transition-colors ${C.name}`}>{bloc.name}</p>
+                        <span className={`shrink-0 text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded ${C.badge}`}>{isAgg ? 'Agrégat' : 'Calculé'}</span>
+                      </div>
+                      <p className="text-[9px] font-bold text-slate-400 mt-0.5">
+                        {count} art.{isAgg ? '' : ` · ${formatPrice(blocUnitPrice(bloc, bpuById))}${u ? `/${u}` : ''}`}
+                        {' · '}<span className="text-slate-500">{isAgg ? 'chapitre / sous-chap.' : 'sous-chapitre'}</span>
+                      </p>
                     </div>
                   </button>
                 );
-              })
+              })}
+              </>
             )}
           </div>
         )}
