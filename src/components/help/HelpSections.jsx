@@ -11,7 +11,7 @@ import {
   FilePlus, ListTree, Calculator, Info, LayoutGrid, Compass,
   Palette, Type, FileCheck, Paintbrush, LayoutDashboard, FileSearch,
   FolderTree, FileText, Download, List, FileSpreadsheet, Keyboard,
-  MousePointerClick, GitBranch, FunctionSquare,
+  MousePointerClick, GitBranch, FunctionSquare, Boxes, Layers, Package,
 } from 'lucide-react';
 
 const ICON_MAP = {
@@ -23,7 +23,7 @@ const ICON_MAP = {
   FilePlus, ListTree, Calculator, Info, LayoutGrid, Compass,
   Palette, Type, FileCheck, Paintbrush, LayoutDashboard, FileSearch,
   FolderTree, FileText, Download, List, FileSpreadsheet, Keyboard,
-  MousePointerClick, GitBranch, FunctionSquare,
+  MousePointerClick, GitBranch, FunctionSquare, Boxes, Layers, Package,
 };
 
 const getIcon = (name) => ICON_MAP[name] || HelpCircle;

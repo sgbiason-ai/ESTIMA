@@ -21,6 +21,7 @@ import BpuSidebar from '../components/BpuSidebar';
 import TranchesBar from '../components/TranchesBar';
 import ProjectStatsBar from '../components/ProjectStatsBar';
 import ProjectFooterStats from '../components/ProjectFooterStats';
+import HelpPanel from '../components/help/HelpPanel';
 
 // NOUVEAUX COMPOSANTS EXTRAITS
 import ProjectFormulaBar from '../components/project/ProjectFormulaBar'; 
@@ -174,6 +175,7 @@ const ProjectView = ({
   const [exportGuard, setExportGuard] = useState({ show: false, format: 'pdf', type: 'ESTIMATION' });
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, itemId: null });
   const [showFormulaHelp, setShowFormulaHelp] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [calculationAnalysis, setCalculationAnalysis] = useState({ totalStudy: 0, fixedTotal: 0, smallQtyTotal: 0 });
   const [formulaMode, setFormulaMode] = useState({ isActive: false, callback: null });
 
@@ -725,6 +727,7 @@ const ProjectView = ({
             canUndo={canUndo}
             archives={archives}
             onOpenGed={onOpenGed}
+            onShowHelp={() => setShowHelp(true)}
           />
           <input ref={loadAffaireRef} type="file" accept=".json" className="hidden" onChange={handleOpenAffaireFallback} />
 
@@ -841,6 +844,7 @@ const ProjectView = ({
       <ExportModal isOpen={exportModalState.show} onClose={() => setExportModalState(prev => ({ ...prev, show: false }))} onConfirm={handleConfirmExport} onPreviewPdf={handlePreviewPdf} format={exportModalState.format} type={exportModalState.type} hasTranches={hasTranches} tranches={tranches} activeTrancheId={activeTrancheId} />
       <ConfirmDeleteModal isOpen={deleteConfirm.show} onClose={() => setDeleteConfirm({ show: false, itemId: null })} onConfirm={() => { if(deleteConfirm.itemId) { handleRemoveItem(deleteConfirm.itemId); setDeleteConfirm({ show: false, itemId: null }); } }} />
       <FormulaHelpModal isOpen={showFormulaHelp} onClose={() => setShowFormulaHelp(false)} />
+      <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="estimation" />
       <PriceAuditModal
         show={showPriceAudit}
         onClose={() => setShowPriceAudit(false)}

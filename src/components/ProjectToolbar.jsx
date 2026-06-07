@@ -5,7 +5,7 @@ import {
   CheckCircle2, CloudOff, FileSignature, Bookmark, ListOrdered, Hash,
   FolderOpen, Save, Upload, Eye, Pencil, PlusCircle,
   BarChart3, Download, Info, Table2, FileOutput,
-  Cloud, PanelLeftOpen, FileDown, ShieldCheck, ClipboardCheck, Undo2, ScanSearch
+  Cloud, PanelLeftOpen, FileDown, ShieldCheck, ClipboardCheck, Undo2, ScanSearch, HelpCircle
 } from 'lucide-react';
 
 import { RibbonGroup, RibbonBtnLarge, RibbonBtnSmall } from './common/RibbonParts';
@@ -45,6 +45,7 @@ const ProjectToolbar = ({
   canUndo = false,
   archives = [],
   onOpenGed,
+  onShowHelp,
 }) => {
   const [activeTab, setActiveTab] = useState('accueil');
 
@@ -117,9 +118,18 @@ const ProjectToolbar = ({
           <MiniPhaseStepper project={project} archives={archives} onClick={onOpenGed} />
         </div>
 
-        {/* Indicateur de sauvegarde à droite */}
-        <div className="flex items-center pr-2">
+        {/* Indicateur de sauvegarde + Aide à droite */}
+        <div className="flex items-center gap-1 pr-2">
           <SaveIndicator />
+          {onShowHelp && (
+            <button
+              onClick={onShowHelp}
+              title="Aide du module Estimation"
+              className="p-1 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+            >
+              <HelpCircle size={15} strokeWidth={1.8} />
+            </button>
+          )}
         </div>
       </div>
 

@@ -5,6 +5,126 @@
 export const helpContent = {
 
   // ──────────────────────────────────────────────────────────────────────────
+  // ESTIMATION (module principal — ProjectView)
+  // ──────────────────────────────────────────────────────────────────────────
+  estimation: {
+    title: 'Guide — Estimation',
+    subtitle: 'Construire votre devis VRD chapitre par chapitre',
+    tabs: [
+      {
+        id: 'structure', label: 'Structure', icon: 'ListTree',
+        sections: [
+          { type: 'intro', text: "L'estimation s'organise comme un bordereau : chapitres → sous-chapitres → articles. Les totaux et sous-totaux se recalculent en direct." },
+          {
+            type: 'steps',
+            items: [
+              { color: 'blue', title: 'Chapitre', description: "Bouton « Chapitre » (à droite du ruban). Un chapitre est numéroté et sous-totalisé ; il contient sous-chapitres et articles." },
+              { color: 'emerald', title: 'Sous-chapitre', description: "Regroupement intermédiaire à l'intérieur d'un chapitre. Sélectionnez un chapitre puis ajoutez-y un sous-chapitre." },
+              { color: 'amber', title: 'Article', description: "Ligne de prix issue du BPU. Ouvrez le volet « BPU » et cliquez un article : il s'ajoute à l'élément sélectionné." },
+              { color: 'purple', title: 'Option', description: "Le toggle « option » sort un poste du total principal (affiché à part, barré). Utile pour les variantes / PSE." },
+              { color: 'rose', title: 'Glisser-déposer', description: "Réorganisez chapitres, sous-chapitres et articles par glisser-déposer (poignée ⋮⋮)." },
+            ],
+          },
+          { type: 'tip', text: "Cliquez une ligne pour la sélectionner (surbrillance verte) : c'est la cible des ajouts BPU et de la barre de formule." },
+        ],
+      },
+      {
+        id: 'saisie', label: 'Saisie & formules', icon: 'Edit3',
+        sections: [
+          { type: 'intro', text: "Renseignez les quantités dans le tableau. Une quantité peut aussi être une formule qui se calcule à partir d'autres articles." },
+          {
+            type: 'steps',
+            items: [
+              { color: 'blue', title: 'Volet BPU', description: "Bouton « BPU » : ouvre la bibliothèque (articles + blocs). Recherche plein texte et filtre par catégorie. Le clic ajoute au chapitre sélectionné." },
+              { color: 'emerald', title: 'Quantités', description: "Tapez la quantité dans la colonne Qté. Les articles forfaitaires (ENS, FT, U…) sont figés à 1." },
+              { color: 'amber', title: 'Formules ƒ(x)', description: "Une quantité peut être une formule, ex : =[FOUILLE EN MASSE]*1.1. Référencez d'autres articles par clic." },
+              { color: 'purple', title: '% à valoir', description: "Bouton « % à valoir » : applique un pourcentage aux petites quantités / forfaits pour couvrir les aléas." },
+            ],
+          },
+          { type: 'tip', title: 'Aide formules dédiée', text: "Le détail de la syntaxe, l'insertion par clic et les raccourcis sont dans l'« Aide formules » (bouton flottant en bas à droite, ou icône ƒ(x) de la barre de formule)." },
+        ],
+      },
+      {
+        id: 'tranches', label: 'Tranches', icon: 'GitBranch',
+        sections: [
+          { type: 'intro', text: "Un projet VRD peut être découpé en tranches (Ferme, Conditionnelles). Chaque article porte une quantité par tranche." },
+          {
+            type: 'steps',
+            items: [
+              { color: 'blue', title: 'Gérer les tranches', description: "Barre des tranches sous le ruban : ajoutez TF, TC1, TC2…, renommez, réordonnez." },
+              { color: 'emerald', title: 'Global vs par tranche', description: "« Global » additionne toutes les tranches (synthèse). Sélectionnez une tranche précise pour saisir ses quantités." },
+              { color: 'amber', title: 'Formules propagées', description: "Une formule saisie dans la barre se propage automatiquement à toutes les tranches." },
+            ],
+          },
+          { type: 'warning', text: "En vue « Global », la saisie des quantités est désactivée — sélectionnez une tranche pour éditer." },
+        ],
+      },
+      {
+        id: 'blocs', label: 'Blocs', icon: 'Boxes',
+        sections: [
+          { type: 'intro', text: "Un bloc regroupe plusieurs articles à insérer en un clic. Ouvrez la zone « Blocs » en bas du volet BPU, filtrez par Tous / Calculé / Agrégat, puis cliquez pour insérer." },
+          {
+            type: 'card', icon: 'Calculator', color: 'indigo', title: 'Bloc Calculé',
+            description: "Inséré en sous-chapitre avec une quantité pilote sur l'en-tête : surface (bloc m²), longueur (ml) ou volume (m³). Les quantités des composants se calculent automatiquement.",
+          },
+          {
+            type: 'card', icon: 'Layers', color: 'violet', title: 'Bloc Agrégat',
+            description: "Inséré en chapitre ou sous-chapitre (au choix). Aucun calcul : saisissez les quantités ligne par ligne, comme des articles classiques.",
+          },
+          { type: 'tip', text: "Les blocs se créent dans le Catalogue BPU (onglet Blocs). Voir l'aide du Catalogue pour la géométrie (épaisseur, densité, largeur, perte)." },
+        ],
+      },
+      {
+        id: 'modes', label: 'Modes & exports', icon: 'FileDown',
+        sections: [
+          { type: 'intro', text: "Deux modes d'affichage et des exports rapides DQE / Estimation." },
+          {
+            type: 'grid',
+            items: [
+              { title: 'Mode Étude', text: "Édition complète : ajout, formules, prix, numérotation. C'est votre espace de travail.", color: 'emerald' },
+              { title: 'Mode Rendu', text: "Lecture seule, vue client. Applique le % client et débloque les exports + la comparaison des écarts.", color: 'indigo' },
+            ],
+          },
+          {
+            type: 'card', icon: 'FileDown', color: 'red', title: 'Exports rapides (mode Rendu)',
+            description: "Disponibles via le ruban en mode Rendu.",
+            steps: [
+              "PDF DQE — Détail Quantitatif Estimatif",
+              "PDF Estimation — version chiffrée MOE",
+              "Excel DQE / Excel Estimation — données pour traitement externe",
+            ],
+          },
+          {
+            type: 'card', icon: 'BarChart3', color: 'amber', title: 'Écarts',
+            description: "En mode Rendu, le bouton « Écarts » affiche la comparaison visuelle (base vs rendu / % client).",
+          },
+        ],
+      },
+      {
+        id: 'outils', label: 'Outils & sauvegarde', icon: 'Settings',
+        sections: [
+          { type: 'intro', text: "Sauvegarde, contrôles qualité et numérotation du bordereau." },
+          {
+            type: 'steps',
+            items: [
+              { color: 'blue', title: 'Sauvegarde Cloud', description: "« Sauver Cloud » enregistre tout sur Firebase ; « Ouvrir Cloud » recharge un projet. L'état est indiqué en haut à droite." },
+              { color: 'emerald', title: 'Fichier JSON', description: "« Enregistrer JSON » / « Ouvrir JSON » : sauvegarde et restauration hors-ligne (archivage, transfert)." },
+              { color: 'amber', title: 'Audit prix', description: "Compare les prix du projet à la base BPU et signale les écarts." },
+              { color: 'violet', title: 'Vérif. n° prix', description: "Contrôle l'unicité des numéros de prix (même libellé + même unité partout). Badge rouge = anomalies à corriger." },
+              { color: 'teal', title: 'Audit bordereau', description: "Audite prix, unités, désignations et descriptions du bordereau vs la base BPU (mode Étude)." },
+              { color: 'slate', title: 'Annuler', description: "« Annuler » (Ctrl+Z) revient sur la dernière action." },
+            ],
+          },
+          {
+            type: 'card', icon: 'ListTree', color: 'blue', title: 'Numérotation Auto / Manuel',
+            description: "Basculez la numérotation du bordereau entre automatique (séquentielle) et manuelle (numéros saisis / repris du BPU).",
+          },
+        ],
+      },
+    ],
+  },
+
+  // ──────────────────────────────────────────────────────────────────────────
   // GESTION DE PROJETS
   // ──────────────────────────────────────────────────────────────────────────
   projectManager: {
@@ -346,6 +466,61 @@ export const helpContent = {
               { color: 'purple', title: 'Rechercher', description: "Utilisez la barre de recherche pour trouver un article par numero, designation ou description." },
             ],
           },
+        ],
+      },
+      {
+        id: 'blocs', label: 'Blocs', icon: 'Boxes',
+        sections: [
+          { type: 'intro', text: "Un bloc regroupe plusieurs articles reutilisables, inseres en un clic dans l'estimation. Basculez sur l'onglet « Blocs » (toggle Articles / Blocs en haut de la bibliotheque) pour les creer et les gerer." },
+          {
+            type: 'card', icon: 'Boxes', color: 'emerald', title: 'Creer un bloc', badge: 'Nouveau',
+            description: "Un bloc est sauvegarde dans votre bibliotheque et reste disponible pour tous vos projets.",
+            steps: [
+              'Cliquez sur « Nouveau bloc » en haut de la colonne de gauche',
+              "Donnez-lui un nom (ex : Voirie legere en granulaire)",
+              "Choisissez le type : Formule (calcule) ou Agregat (regroupement)",
+              "Ajoutez des articles depuis le volet de droite (recherche + clic)",
+              'Cliquez « Creer » / « Enregistrer »',
+            ],
+            tip: "« Comme nouveau » cree une variante (autre nom) a partir du bloc courant sans toucher a l'original.",
+          },
+          {
+            type: 'grid',
+            items: [
+              { title: 'Bloc Formule', text: "Ouvrage composite avec une unite pilote (m², ml ou m³). Chaque article est ramene a cette unite : le bloc a un prix unitaire unique (PU / m², / ml…).", color: 'indigo' },
+              { title: 'Bloc Agregat', text: "Simple regroupement d'articles, sans calcul. Chaque article garde son unite ; les quantites se saisissent dans l'estimation. Peut imbriquer d'autres blocs.", color: 'violet' },
+            ],
+          },
+          {
+            type: 'card', icon: 'Calculator', color: 'indigo', title: 'Bloc Formule — geometrie des composants',
+            description: "Pour ramener chaque article a l'unite du bloc, renseignez sa geometrie. Les champs demandes dependent de l'unite du bloc et de celle de l'article.",
+            steps: [
+              "Epaisseur (m) : pour convertir un article m³ ou tonne vers une surface/longueur",
+              "Densite (t/m³) : pour les articles en tonnes (T)",
+              "Largeur (m) : uniquement pour un bloc lineaire (ml)",
+              "Perte (%) : majore tous les articles (chutes, foisonnement) — ex : 5 → ×1,05",
+            ],
+            tip: "Le prix du bloc se met a jour en direct (Σ prix × facteur) et s'affiche en bas de la composition.",
+          },
+          {
+            type: 'table', title: "Saisie selon l'unite du bloc",
+            headers: ['Unite bloc', 'Pilote (estimation)', 'Champs composants'],
+            rows: [
+              { label: 'm² — surface', desc: 'surface', extra: 'Ep. + Densite' },
+              { label: 'ml — lineaire', desc: 'longueur', extra: 'Largeur + Ep. + Densite' },
+              { label: 'm³ — volume', desc: 'volume', extra: 'Densite (tonnes)' },
+            ],
+          },
+          {
+            type: 'card', icon: 'GitBranch', color: 'violet', title: 'Sous-blocs imbriques (agregats)',
+            description: "Un bloc Agregat peut contenir d'autres blocs (templates « bloc de blocs », ex : Lotissement ⊃ Voirie ⊃ articles). Volet d'ajout : basculez sur « Blocs ».",
+            warning: "Les references circulaires (A contient B qui contient A) sont automatiquement bloquees a l'edition.",
+          },
+          {
+            type: 'card', icon: 'List', color: 'blue', title: 'Retrouver un bloc',
+            description: "La colonne de gauche se filtre par type (Tous / Formule / Agregat), par unite, et se trie par nom / unite / prix. La recherche cible le nom OU un article contenu.",
+          },
+          { type: 'warning', text: "Supprimer un bloc n'affecte pas les articles de la bibliotheque ni les estimations ou il a deja ete insere — seul le modele reutilisable disparait." },
         ],
       },
       {

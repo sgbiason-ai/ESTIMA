@@ -1,6 +1,6 @@
 // src/components/modals/FormulaHelpModal.jsx
 import React from 'react';
-import { FunctionSquare, X, BookOpen, MousePointerClick, GitBranch, Keyboard } from 'lucide-react';
+import { FunctionSquare, X, BookOpen, MousePointerClick, GitBranch, Keyboard, Boxes } from 'lucide-react';
 
 const FormulaHelpModal = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
@@ -86,7 +86,29 @@ const FormulaHelpModal = ({ isOpen, onClose }) => {
             </div>
           </div>
 
-          {/* Section 4 — Raccourcis */}
+          {/* Section 4 — Blocs */}
+          <div className="rounded-xl border border-indigo-100 overflow-hidden">
+            <div className="flex items-center gap-2.5 px-4 py-3 bg-indigo-50 border-b border-indigo-100">
+              <Boxes size={14} className="text-indigo-500 shrink-0" />
+              <span className="font-black text-indigo-700 text-[11px] uppercase tracking-widest">Insérer un bloc</span>
+            </div>
+            <div className="p-4 space-y-3 text-xs text-slate-600">
+              <p className="text-[11px] leading-relaxed">Un <strong>bloc</strong> regroupe plusieurs articles à insérer en un clic. Ouvrez la zone <strong>Blocs</strong> en bas de la bibliothèque (volet de gauche), filtrez par <strong>Tous / Calculé / Agrégat</strong>, puis cliquez sur un bloc pour l'insérer.</p>
+              <div className="space-y-2">
+                <div className="flex items-start gap-3 p-2.5 rounded-lg bg-indigo-50/50 border border-indigo-100">
+                  <span className="shrink-0 text-[9px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-100 px-1.5 py-0.5 rounded mt-0.5">Calculé</span>
+                  <span className="text-[11px] leading-relaxed">Inséré en <strong>sous-chapitre</strong> avec une quantité pilote sur l'en-tête (<strong>surface</strong> pour un bloc m², <strong>longueur</strong> pour ml, <strong>volume</strong> pour m³). Les quantités des composants se calculent automatiquement par formule.</span>
+                </div>
+                <div className="flex items-start gap-3 p-2.5 rounded-lg bg-amber-50/50 border border-amber-100">
+                  <span className="shrink-0 text-[9px] font-black uppercase tracking-widest text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded mt-0.5">Agrégat</span>
+                  <span className="text-[11px] leading-relaxed">Inséré en <strong>chapitre</strong> ou <strong>sous-chapitre</strong> (au choix). Aucun calcul : saisissez les quantités ligne par ligne, comme des articles classiques.</span>
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-400">Les blocs se créent dans la bibliothèque (Catalogue BPU → onglet Blocs).</p>
+            </div>
+          </div>
+
+          {/* Section 5 — Raccourcis */}
           <div className="rounded-xl border border-amber-100 overflow-hidden">
             <div className="flex items-center gap-2.5 px-4 py-3 bg-amber-50 border-b border-amber-100">
               <Keyboard size={14} className="text-amber-600 shrink-0" />
