@@ -538,6 +538,14 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
   const isTrancheView = activeTrancheId && activeTrancheId !== 'global';
   const surfaceVal = isTrancheView ? Number(el.quantities?.[activeTrancheId] || 0) : Number(el.qty || 0);
   const surfaceDisabled = isReadOnly || isGlobalMode;
+  // Libellé de la quantité pilote selon l'unité du bloc (m²→surface, ml→longueur, m³→volume).
+  const pilotLabel = (() => {
+    const u = normalizeUnitSymbol(el.unit);
+    if (u === 'ML') return 'longueur';
+    if (u === 'M3') return 'volume';
+    if (u === 'M2') return 'surface';
+    return 'quantité';
+  })();
   const [surfaceInput, setSurfaceInput] = useState(String(surfaceVal || ''));
   useEffect(() => { setSurfaceInput(surfaceVal ? String(surfaceVal) : ''); }, [surfaceVal]);
   const commitSurface = () => {
@@ -638,7 +646,7 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
                       <div
                         className="w-24 px-2 shrink-0 flex items-center"
                         onClick={(e) => e.stopPropagation()}
-                        title={isGlobalMode ? 'Sélectionnez une tranche pour saisir la surface' : 'Surface du bloc — pilote les quantités des composants'}
+                        title={isGlobalMode ? `Sélectionnez une tranche pour saisir la ${pilotLabel}` : `${pilotLabel.charAt(0).toUpperCase()}${pilotLabel.slice(1)} du bloc — pilote les quantités des composants`}
                       >
                         <input
                           type="text"
@@ -648,7 +656,7 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
                           onChange={(e) => setSurfaceInput(e.target.value)}
                           onBlur={commitSurface}
                           onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                          placeholder="surface"
+                          placeholder={pilotLabel}
                           className={`w-full text-right text-xs font-mono font-black rounded py-0.5 px-1.5 outline-none transition-colors border ${
                             surfaceDisabled
                               ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
