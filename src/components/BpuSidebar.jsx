@@ -62,6 +62,7 @@ const BpuSidebar = ({
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [tooltipState, setTooltipState] = useState({ visible: false, item: null, style: {} });
   const [blocsOpen, setBlocsOpen] = useState(true);
+  const [blocKindFilter, setBlocKindFilter] = useState('all'); // 'all' | 'formula' | 'aggregate'
   const tooltipTimer = useRef(null);
 
   // Césure Articles / Blocs redimensionnable : poignée à glisser, hauteur mémorisée (localStorage).
@@ -122,12 +123,14 @@ const BpuSidebar = ({
   const blocsToShow = useMemo(() => {
     const norm = (s) => (s || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
     const q = norm(bpuSearch).trim();
-    if (!q) return blocs;
-    return blocs.filter(b => {
+    let list = blocs;
+    if (blocKindFilter !== 'all') list = list.filter(b => getBlocKind(b) === blocKindFilter);
+    if (!q) return list;
+    return list.filter(b => {
       if (norm(b.name).includes(q)) return true;
       return getBlocArticles(b).some(a => norm(cleanText(bpuById[String(a.id)]?.designation || '')).includes(q));
     });
-  }, [blocs, bpuSearch, bpuById]);
+  }, [blocs, bpuSearch, bpuById, blocKindFilter]);
 
   // Le calcul des items filtrés est déplacé ici
   const sidebarItems = useMemo(() => {
@@ -298,7 +301,7 @@ const BpuSidebar = ({
         >
           <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-indigo-600">
             <Boxes size={14} /> Blocs
-            <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full">{bpuSearch.trim() ? `${blocsToShow.length}/${blocs.length}` : blocs.length}</span>
+            <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full">{(bpuSearch.trim() || blocKindFilter !== 'all') ? `${blocsToShow.length}/${blocs.length}` : blocs.length}</span>
           </span>
           <ChevronDown size={16} className={`text-slate-400 transition-transform ${blocsOpen ? 'rotate-180' : ''}`} />
         </button>
@@ -309,18 +312,35 @@ const BpuSidebar = ({
               <div className="px-3 py-4 text-center text-slate-400 text-[10px] italic leading-relaxed">
                 Aucun bloc.<br />Créez-en dans la <span className="font-bold text-slate-500">Bibliothèque</span>.
               </div>
-            ) : blocsToShow.length === 0 ? (
-              <div className="px-3 py-4 text-center text-slate-400 text-[10px] italic leading-relaxed">
-                Aucun bloc ne correspond à<br /><span className="font-bold text-slate-500">« {bpuSearch.trim()} »</span>.
-              </div>
             ) : (
               <>
-              {/* Légende sticky : type de bloc → destination d'insertion */}
-              <div className="sticky top-0 z-10 -mx-2 px-3 py-1.5 bg-slate-100/95 backdrop-blur border-b border-slate-200 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[8px] font-bold uppercase tracking-wide text-slate-500">
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-indigo-600" /> Calculé → sous-chap.</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-amber-500" /> Agrégat → chap. / sous-chap.</span>
+              {/* Filtre sticky : type de bloc (Tous / Calculé / Agrégat) */}
+              <div className="sticky top-0 z-10 -mx-2 px-2 py-1.5 bg-slate-100/95 backdrop-blur border-b border-slate-200">
+                <div className="flex items-center gap-1 bg-slate-200/60 p-0.5 rounded-lg">
+                  {[
+                    { key: 'all', label: 'Tous', color: 'text-slate-800' },
+                    { key: 'formula', label: 'Calculé', color: 'text-indigo-700' },
+                    { key: 'aggregate', label: 'Agrégat', color: 'text-amber-700' },
+                  ].map(opt => {
+                    const active = blocKindFilter === opt.key;
+                    return (
+                      <button
+                        key={opt.key}
+                        onClick={() => setBlocKindFilter(opt.key)}
+                        className={`flex-1 text-[9px] font-black uppercase tracking-wide py-1 rounded-md transition-colors ${active ? `bg-white shadow-sm ${opt.color}` : 'text-slate-400 hover:text-slate-600'}`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              {[...blocsToShow].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'fr')).map(bloc => {
+              {blocsToShow.length === 0 ? (
+                <div className="px-3 py-4 text-center text-slate-400 text-[10px] italic leading-relaxed">
+                  Aucun bloc{blocKindFilter === 'formula' ? ' calculé' : blocKindFilter === 'aggregate' ? ' agrégat' : ''}{bpuSearch.trim() ? <> pour <span className="font-bold text-slate-500">« {bpuSearch.trim()} »</span></> : ' à afficher'}.
+                </div>
+              ) : (
+                [...blocsToShow].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'fr')).map(bloc => {
                 const count = getBlocArticles(bloc).length;
                 const isAgg = getBlocKind(bloc) === 'aggregate';
                 const u = bloc.unit ? normalizeUnitSymbol(bloc.unit) : '';
@@ -352,7 +372,8 @@ const BpuSidebar = ({
                     </div>
                   </button>
                 );
-              })}
+              })
+              )}
               </>
             )}
           </div>
