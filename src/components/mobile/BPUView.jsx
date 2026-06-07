@@ -50,16 +50,18 @@ export default function BPUView({ project, bpuDescMap, refMap, search, onSearch 
 
   return (
     <div>
-      <div className="flex items-center gap-2 mx-4 mt-3 mb-2 px-3.5 py-2.5 bg-white rounded-xl border border-gray-200">
-        <Icon name="search" size={18} color="#64748b" />
-        <input type="text" placeholder="Rechercher un article…"
-          value={search} onChange={(e) => onSearch(e.target.value)}
-          className="flex-1 border-none outline-none text-sm bg-transparent text-gray-900 placeholder-slate-500" />
+      <div className="sticky top-0 z-30 bg-[#f5f5f7] px-4 pt-3 pb-2">
+        <div className="flex items-center gap-2 px-3.5 py-2.5 bg-white rounded-xl border border-gray-200 shadow-sm">
+          <Icon name="search" size={18} color="#64748b" />
+          <input type="text" placeholder="Rechercher un article…"
+            value={search} onChange={(e) => onSearch(e.target.value)}
+            className="flex-1 border-none outline-none text-sm bg-transparent text-gray-900 placeholder-slate-500" />
+        </div>
       </div>
 
       {Object.entries(grouped).map(([chapitre, items]) => (
         <div key={chapitre} className="mb-1">
-          <div className="sticky top-0 z-10 text-[11px] font-extrabold text-blue-600/70 uppercase tracking-wider px-4 py-2 bg-[#f5f5f7]">
+          <div className="sticky top-[62px] z-20 text-[11px] font-extrabold text-blue-600 uppercase tracking-wider px-4 py-2 bg-[#f5f5f7] border-b border-gray-200/70">
             {chapitre}
           </div>
           {items.map(item => {
@@ -74,18 +76,20 @@ export default function BPUView({ project, bpuDescMap, refMap, search, onSearch 
                 onClick={() => setExpandedId(isOpen ? null : (item.uid || item.id))}
                 className={`block w-full text-left px-4 py-2.5 border-b border-gray-100 transition ${isOpen ? 'bg-blue-50' : 'bg-white'}`}
               >
-                <div className="flex justify-between items-start">
-                  <span className="text-[11px] font-extrabold text-blue-600 tabular-nums">{ref}</span>
-                  <span className="text-sm font-extrabold text-gray-900 tabular-nums">
-                    {fmt(item.price || 0)}
-                    <span className="text-[11px] text-gray-700 font-normal"> / {normalizeUnitSymbol(item.unit)}</span>
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-[13px] text-gray-600 mt-0.5">{item.designation}</span>
-                  <span className={`ml-1.5 shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''} opacity-30`}>
-                    <Icon name="chevron" size={14} color="#64748b" />
-                  </span>
+                <div className={isOpen ? 'sticky top-[92px] z-10 bg-blue-50 -mx-4 px-4 py-1.5 border-b border-blue-100' : ''}>
+                  <div className="flex justify-between items-start gap-2">
+                    <span className="text-[11px] font-extrabold text-blue-600 tabular-nums">{ref}</span>
+                    <span className="text-sm font-extrabold text-gray-900 tabular-nums shrink-0">
+                      {fmt(item.price || 0)}
+                      <span className="text-[11px] text-gray-700 font-normal"> / {normalizeUnitSymbol(item.unit)}</span>
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center gap-2">
+                    <span className={`text-[13px] mt-0.5 ${isOpen ? 'text-gray-900 font-semibold line-clamp-2' : 'text-gray-700'}`}>{item.designation}</span>
+                    <span className={`ml-1.5 shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''} opacity-40`}>
+                      <Icon name="chevron" size={14} color="#64748b" />
+                    </span>
+                  </div>
                 </div>
 
                 {isOpen && description && (

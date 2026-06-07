@@ -86,7 +86,7 @@ export default function DQEView({ project, calcHook, tranchesHook }) {
           {tranches.map(t => (
             <button key={t.id}
               onClick={() => { setActiveTranche(t.id); setExpandedChap({}); }}
-              className={`px-3 py-2 rounded-lg border text-xs font-bold whitespace-nowrap transition ${
+              className={`px-3 py-2.5 rounded-lg border text-xs font-bold whitespace-nowrap transition ${
                 activeTranche === t.id
                   ? 'bg-gray-900 border-gray-900 text-white shadow-sm'
                   : 'bg-white border-gray-200 text-gray-600'
@@ -114,7 +114,7 @@ export default function DQEView({ project, calcHook, tranchesHook }) {
                 <div className="text-[13px] font-bold text-gray-900 uppercase">{chap.nom}</div>
                 <div className="text-[11px] text-gray-700 mt-0.5">{chap.lignes.length} ligne{chap.lignes.length > 1 ? 's' : ''} • {pct}%</div>
               </div>
-              <span className="text-sm font-extrabold text-gray-600">{fmt(chap.sousTotal)}</span>
+              <span className="text-sm font-extrabold text-gray-900">{fmt(chap.sousTotal)}</span>
               <span className={`transition-transform ${isOpen ? 'rotate-90' : ''}`}>
                 <Icon name="chevron" size={14} color="#64748b" />
               </span>
@@ -122,34 +122,29 @@ export default function DQEView({ project, calcHook, tranchesHook }) {
 
             {isOpen && (
               <div className="bg-white border border-t-0 border-gray-200 rounded-b-xl overflow-hidden">
-                {/* Header */}
-                <div className="grid grid-cols-[1fr_46px_62px_84px] gap-0.5 px-2.5 py-1.5 text-[9px] font-extrabold text-gray-600 uppercase tracking-wider border-b border-gray-100">
-                  <span>Désign.</span>
+                {/* En-tête de colonnes */}
+                <div className="grid grid-cols-[1fr_24px_46px_48px_62px] gap-1 px-2.5 py-1.5 bg-gray-50 text-[9px] font-extrabold text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                  <span>Désignation</span>
+                  <span className="text-center">U</span>
                   <span className="text-right">Qté</span>
-                  <span className="text-right">P.U.</span>
-                  <span className="text-right">Total</span>
+                  <span className="text-right">PU €</span>
+                  <span className="text-right">Total €</span>
                 </div>
                 {chap.lignes.map((l, lIdx) => (
-                  <div key={lIdx} className="grid grid-cols-[1fr_46px_62px_84px] gap-0.5 px-2.5 py-2 border-b border-gray-100 items-start">
-                    <div className="min-w-0 pr-1 overflow-hidden">
-                      <div className="text-[10px] text-blue-600 font-bold tabular-nums">{l.ref}</div>
-                      <div className="text-[11px] text-gray-600 font-medium leading-tight truncate" title={l.designation}>{l.designation}</div>
+                  <div key={lIdx} className="grid grid-cols-[1fr_24px_46px_48px_62px] gap-1 px-2.5 py-2 border-b border-gray-100 items-start">
+                    <div className="min-w-0 leading-snug break-words" title={l.designation}>
+                      <span className="text-[10px] text-blue-600 font-bold tabular-nums mr-1">{l.ref}</span>
+                      <span className="text-[11px] text-gray-900 font-medium">{l.designation}</span>
                     </div>
-                    <div className="text-right text-[11px] font-semibold text-gray-600 tabular-nums whitespace-nowrap">
-                      {l.qte.toLocaleString('fr-FR')}
-                      <div className="text-[9px] text-gray-600 font-normal">{l.unite}</div>
-                    </div>
-                    <div className="text-right text-[11px] font-semibold text-gray-600 tabular-nums whitespace-nowrap">
-                      {l.pu.toLocaleString('fr-FR', { minimumFractionDigits: 0 })}€
-                    </div>
-                    <div className="text-right text-[11px] font-extrabold text-blue-600 tabular-nums whitespace-nowrap">
-                      {l.total.toLocaleString('fr-FR', { minimumFractionDigits: 0 })}€
-                    </div>
+                    <div className="text-center text-[11px] font-bold text-gray-900">{l.unite}</div>
+                    <div className="text-right text-[11px] font-bold text-gray-900 tabular-nums whitespace-nowrap">{l.qte.toLocaleString('fr-FR')}</div>
+                    <div className="text-right text-[11px] font-bold text-gray-900 tabular-nums whitespace-nowrap">{l.pu.toLocaleString('fr-FR', { minimumFractionDigits: 0 })}</div>
+                    <div className="text-right text-[11px] font-bold text-gray-900 tabular-nums whitespace-nowrap">{l.total.toLocaleString('fr-FR', { minimumFractionDigits: 0 })}</div>
                   </div>
                 ))}
                 {/* Sous-total */}
                 <div className="flex justify-between px-3 py-2.5 bg-white border-t border-gray-200">
-                  <span className="text-xs font-bold text-gray-600">Sous-total</span>
+                  <span className="text-xs font-bold text-gray-700">Sous-total</span>
                   <span className="text-[13px] font-extrabold text-blue-600">{fmt(chap.sousTotal)}</span>
                 </div>
               </div>
