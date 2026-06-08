@@ -125,9 +125,9 @@ const parseHtmlToDocx = (htmlContent) => {
 // --- CONFIGURATION DES STYLES ---
 const createDocStyles = (branding) => ({
   paragraphStyles: [
-    { id: "Heading1", name: "Heading 1", basedOn: "Normal", next: "Normal", quickFormat: true, run: { font: branding.fonts.headings, size: branding.sizes.title1, bold: true, color: cleanColor(branding.colors.primary), allCaps: true }, paragraph: { spacing: { before: 480, after: 240 }, keepNext: true, tabStops: [{ type: "left", position: 900 }] } },
-    { id: "Heading2", name: "Heading 2", basedOn: "Normal", next: "Normal", quickFormat: true, run: { font: branding.fonts.headings, size: branding.sizes.title2, bold: true, color: cleanColor(branding.colors.secondary) }, paragraph: { spacing: { before: 240, after: 120 }, keepNext: true, tabStops: [{ type: "left", position: 900 }] } },
-    { id: "Heading3", name: "Heading 3", basedOn: "Normal", next: "Normal", quickFormat: true, run: { font: branding.fonts.headings, size: branding.sizes.title3, bold: true, color: "444444", italics: true }, paragraph: { spacing: { before: 200, after: 100 }, keepNext: true, tabStops: [{ type: "left", position: 900 }] } },
+    { id: "Heading1", name: "Heading 1", basedOn: "Normal", next: "Normal", quickFormat: true, run: { font: branding.fonts.headings, size: branding.sizes.title1, bold: true, color: cleanColor(branding.colors.heading1 || branding.colors.primary), allCaps: true }, paragraph: { spacing: { before: 480, after: 240 }, keepNext: true, tabStops: [{ type: "left", position: 900 }] } },
+    { id: "Heading2", name: "Heading 2", basedOn: "Normal", next: "Normal", quickFormat: true, run: { font: branding.fonts.headings, size: branding.sizes.title2, bold: true, color: cleanColor(branding.colors.heading2 || branding.colors.secondary) }, paragraph: { spacing: { before: 240, after: 120 }, keepNext: true, tabStops: [{ type: "left", position: 900 }] } },
+    { id: "Heading3", name: "Heading 3", basedOn: "Normal", next: "Normal", quickFormat: true, run: { font: branding.fonts.headings, size: branding.sizes.title3, bold: true, color: cleanColor(branding.colors.heading3 || '#444444'), italics: true }, paragraph: { spacing: { before: 200, after: 100 }, keepNext: true, tabStops: [{ type: "left", position: 900 }] } },
     { id: "Heading4", name: "Heading 4", basedOn: "Normal", next: "Normal", quickFormat: true, run: { font: branding.fonts.headings, size: branding.sizes.title4, bold: true, color: "000000" }, paragraph: { spacing: { before: 180, after: 80 }, keepNext: true, tabStops: [{ type: "left", position: 900 }] } },
     { id: "Heading5", name: "Heading 5", basedOn: "Normal", next: "Normal", quickFormat: true, run: { font: branding.fonts.headings, size: branding.sizes.title5, bold: false, underline: { type: "single" }, color: "000000" }, paragraph: { spacing: { before: 160, after: 60 }, keepNext: true, tabStops: [{ type: "left", position: 900 }] } },
     { id: "Normal", name: "Normal", run: { font: branding.fonts.main, size: branding.sizes.body, color: cleanColor(branding.colors.text) }, paragraph: { alignment: AlignmentType.JUSTIFIED, spacing: { line: 276, after: 120 } } },
@@ -157,10 +157,10 @@ export const generateWordRC = async (selectedNodes, variables, masterData, brand
       counter++;
       const currentNumber = parentPrefix ? `${parentPrefix}.${counter}` : `${counter}`;
 
-      let hLevel = HeadingLevel.HEADING_1; let titleColor = cleanColor(branding.colors.primary); let fontSize = branding.sizes.title1; let isCaps = true; let isBold = true; let isItalic = false; let isUnderline = false;
+      let hLevel = HeadingLevel.HEADING_1; let titleColor = cleanColor(branding.colors.heading1 || branding.colors.primary); let fontSize = branding.sizes.title1; let isCaps = true; let isBold = true; let isItalic = false; let isUnderline = false;
 
-      if (node.level === 2) { hLevel = HeadingLevel.HEADING_2; titleColor = cleanColor(branding.colors.secondary); fontSize = branding.sizes.title2; isCaps = false; }
-      else if (node.level === 3) { hLevel = HeadingLevel.HEADING_3; titleColor = "444444"; fontSize = branding.sizes.title3; isCaps = false; isItalic = true; }
+      if (node.level === 2) { hLevel = HeadingLevel.HEADING_2; titleColor = cleanColor(branding.colors.heading2 || branding.colors.secondary); fontSize = branding.sizes.title2; isCaps = false; }
+      else if (node.level === 3) { hLevel = HeadingLevel.HEADING_3; titleColor = cleanColor(branding.colors.heading3 || '#444444'); fontSize = branding.sizes.title3; isCaps = false; isItalic = true; }
       else if (node.level === 4) { hLevel = HeadingLevel.HEADING_4; titleColor = "000000"; fontSize = branding.sizes.title4 || branding.sizes.body; isCaps = false; }
       else if (node.level >= 5) { hLevel = HeadingLevel.HEADING_5; titleColor = "000000"; fontSize = branding.sizes.title5 || branding.sizes.body; isCaps = false; isBold = false; isUnderline = true; }
 

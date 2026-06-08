@@ -225,7 +225,7 @@ const createDocStyles = (branding) => ({
       basedOn: "Normal",
       next: "Normal",
       quickFormat: true,
-      run: { font: branding.fonts.headings, size: branding.sizes.title1, bold: true, color: cleanColor(branding.colors.primary), allCaps: true },
+      run: { font: branding.fonts.headings, size: branding.sizes.title1, bold: true, color: cleanColor(branding.colors.heading1 || branding.colors.primary), allCaps: true },
       paragraph: { spacing: { before: 480, after: 240 }, keepNext: true, tabStops: [{ type: "left", position: 900 }] },
     },
     {
@@ -234,7 +234,7 @@ const createDocStyles = (branding) => ({
       basedOn: "Normal",
       next: "Normal",
       quickFormat: true,
-      run: { font: branding.fonts.headings, size: branding.sizes.title2, bold: true, color: cleanColor(branding.colors.secondary) },
+      run: { font: branding.fonts.headings, size: branding.sizes.title2, bold: true, color: cleanColor(branding.colors.heading2 || branding.colors.secondary) },
       paragraph: { spacing: { before: 240, after: 120 }, keepNext: true, tabStops: [{ type: "left", position: 900 }] },
     },
     {
@@ -243,7 +243,7 @@ const createDocStyles = (branding) => ({
       basedOn: "Normal",
       next: "Normal",
       quickFormat: true,
-      run: { font: branding.fonts.headings, size: branding.sizes.title3, bold: true, color: "444444", italics: true },
+      run: { font: branding.fonts.headings, size: branding.sizes.title3, bold: true, color: cleanColor(branding.colors.heading3 || '#444444'), italics: true },
       paragraph: { spacing: { before: 200, after: 100 }, keepNext: true, tabStops: [{ type: "left", position: 900 }] },
     },
     {
@@ -297,7 +297,7 @@ export const generateWordCCTP = async (selectedNodes, variables, masterData, bra
       const currentNumber = parentPrefix ? `${parentPrefix}.${counter}` : `${counter}`;
 
       let hLevel = HeadingLevel.HEADING_1;
-      let titleColor = cleanColor(branding.colors.primary);
+      let titleColor = cleanColor(branding.colors.heading1 || branding.colors.primary);
       let fontSize = branding.sizes.title1;
       let isCaps = true;
       let isBold = true;
@@ -306,13 +306,13 @@ export const generateWordCCTP = async (selectedNodes, variables, masterData, bra
 
       if (node.level === 2) {
         hLevel = HeadingLevel.HEADING_2;
-        titleColor = cleanColor(branding.colors.secondary);
+        titleColor = cleanColor(branding.colors.heading2 || branding.colors.secondary);
         fontSize = branding.sizes.title2;
         isCaps = false;
       }
       else if (node.level === 3) {
         hLevel = HeadingLevel.HEADING_3;
-        titleColor = "444444";
+        titleColor = cleanColor(branding.colors.heading3 || '#444444');
         fontSize = branding.sizes.title3;
         isCaps = false;
         isItalic = true;
