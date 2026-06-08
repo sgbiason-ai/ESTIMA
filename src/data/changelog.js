@@ -10,6 +10,7 @@ export const CHANGELOG = [
     date: '2026-06-05',
     title: 'Bordereau des prix : aperçu & PDF calés sur le Word',
     highlights: [
+      'Bibliothèque (Catalogue) : correction — modifier le lien CCTP d\'un article depuis la liste (badge « + CCTP » / chapitre lié) n\'enregistrait pas la modification. Le titre et les identifiants de chapitre sont désormais bien sauvegardés (Cloud et travail local)',
       'Bordereau des prix : l\'aperçu à l\'écran et l\'export PDF reproduisent désormais fidèlement la mise en page du document Word — page de garde, en-tête de page et tableau ont la même présentation, pour que ce que vous voyez à l\'écran corresponde à ce que vous envoyez',
       'Bordereau des prix : la pagination de l\'aperçu et du PDF est calée sur celle du Word (police, marges, interligne et largeurs de colonnes identiques) — les pages se coupent aux mêmes endroits (un réglage fin reste possible au cas par cas selon les projets)',
       'Bordereau des prix : sur un article qui se poursuit d\'une page à l\'autre, suppression de la note « (...Suite page suivante) » et du titre répété « … (SUITE) » — la description continue simplement, comme dans le Word',

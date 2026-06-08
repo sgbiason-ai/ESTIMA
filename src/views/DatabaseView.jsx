@@ -172,26 +172,23 @@ const DatabaseView = ({
   const saveCctpLink = () => {
     const { item, refValue, labelValue } = cctpLinkModal;
     const refs = refValue.split(',').map(s => s.trim()).filter(Boolean);
-    const updatedItem = { ...item };
 
+    // onUpdateItem attend (id, champs partiels) : on construit un patch.
+    // Les champs vidés sont mis à null (un merge ne peut pas supprimer par omission).
+    const fields = {};
     if (refs.length > 1) {
-        updatedItem.cctpRefs = refs;
-        delete updatedItem.cctpRef;
+        fields.cctpRefs = refs;
+        fields.cctpRef = null;
     } else if (refs.length === 1) {
-        updatedItem.cctpRef = refs[0];
-        delete updatedItem.cctpRefs;
+        fields.cctpRef = refs[0];
+        fields.cctpRefs = null;
     } else {
-        delete updatedItem.cctpRef;
-        delete updatedItem.cctpRefs;
+        fields.cctpRef = null;
+        fields.cctpRefs = null;
     }
+    fields.cctpLabel = labelValue.trim() ? labelValue.trim() : null;
 
-    if (labelValue.trim()) {
-        updatedItem.cctpLabel = labelValue.trim();
-    } else {
-        delete updatedItem.cctpLabel;
-    }
-
-    if (onUpdateItem) onUpdateItem(updatedItem);
+    if (onUpdateItem && item) onUpdateItem(item.id, fields);
     setCctpLinkModal({ isOpen: false, item: null, refValue: '', labelValue: '' });
   };
   // ----------------------------------------------------
