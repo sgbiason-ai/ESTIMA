@@ -522,9 +522,9 @@ const DatabaseView = ({
             <div className="bg-white px-6 py-2 border-b border-slate-100 flex items-center justify-between shadow-sm z-10">
                 <div className="flex items-center gap-6">
                     {/* Toggle Articles / Blocs */}
-                    <div className="flex items-center bg-slate-100 p-0.5 rounded-xl">
-                        <button onClick={() => setMode('articles')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${mode === 'articles' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}><LayoutList size={13} /> Articles</button>
-                        <button onClick={() => setMode('blocs')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${mode === 'blocs' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}><Boxes size={13} /> Blocs</button>
+                    <div className="flex items-center bg-slate-100 p-1 rounded-2xl shadow-inner shrink-0">
+                        <button onClick={() => setMode('articles')} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-wider transition-all active:scale-95 ${mode === 'articles' ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><LayoutList size={18} /> Articles</button>
+                        <button onClick={() => setMode('blocs')} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-wider transition-all active:scale-95 ${mode === 'blocs' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><Boxes size={18} /> Blocs</button>
                     </div>
                     {mode === 'articles' && (
                     <div className="flex items-center gap-2">
