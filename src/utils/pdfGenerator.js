@@ -162,9 +162,9 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
   const tableConfig = {
     theme: 'grid',
     styles: { font: 'Helvetica', fontSize: 7, overflow: 'linebreak' },
-    headStyles: { fillColor: THEME.primary, textColor: 255, fontStyle: 'bold', halign: 'center', valign: 'middle' },
+    headStyles: { fillColor: THEME.tableHeader, textColor: 255, fontStyle: 'bold', halign: 'center', valign: 'middle' },
     bodyStyles: { textColor: THEME.text, lineColor: THEME.borders },
-    alternateRowStyles: { fillColor: THEME.secondary },
+    alternateRowStyles: { fillColor: THEME.tableAlt },
     columnStyles: {
       0: { cellWidth: 12, halign: 'center', fontStyle: 'bold' },
       1: { cellWidth: 'auto' },
@@ -266,7 +266,7 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
       });
       const pseRows = buildSummaryRows(project.chapters, 0, 'option');
       if (pseRows.length > 0) {
-        body.push([{ content: 'OPTIONS / PRESTATIONS SUPPLÉMENTAIRES', colSpan: summaryExports.length + 1, styles: { fillColor: [255, 245, 230], textColor: THEME.pse, fontStyle: 'bold', halign: 'center' } }]);
+        body.push([{ content: 'OPTIONS / PRESTATIONS SUPPLÉMENTAIRES', colSpan: summaryExports.length + 1, styles: { fillColor: THEME.pseBg, textColor: THEME.pse, fontStyle: 'bold', halign: 'center' } }]);
         body.push(...pseRows);
       }
     }
@@ -285,11 +285,11 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
 
     autoTable(doc, {
       theme: 'grid', startY: 58, head, body, foot,
-      headStyles: { fillColor: THEME.primary, textColor: 255, fontStyle: 'bold', halign: 'center', fontSize: 7 },
+      headStyles: { fillColor: THEME.tableHeader, textColor: 255, fontStyle: 'bold', halign: 'center', fontSize: 7 },
       footStyles: { fillColor: THEME.secondary, textColor: 0, fontStyle: 'bold' },
       styles: { font: 'Helvetica', fontSize: 8, halign: 'right', cellPadding: { left: 2, right: 2, top: 2, bottom: 2 } },
       columnStyles: summaryColumnStyles,
-      alternateRowStyles: { fillColor: THEME.secondary },
+      alternateRowStyles: { fillColor: THEME.tableAlt },
       didDrawPage: drawHeader,
       margin: { top: 58, bottom: 15, left: 10, right: 10 }
     });
@@ -420,7 +420,7 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
                 if (row.type === 'HEADER') {
                   data.cell.styles.halign = 'left'; data.cell.colSpan = 6; data.cell.styles.fontStyle = 'bold';
                   data.cell.styles.cellPadding = { left: 5, top: 2, bottom: 2 };
-                  if (row.level === 0) data.cell.styles.fillColor = [255, 251, 235];
+                  if (row.level === 0) data.cell.styles.fillColor = THEME.pseBg;
                 }
                 if (row.type === 'SUBTOTAL') {
                   data.cell.styles.fontStyle = 'bold';

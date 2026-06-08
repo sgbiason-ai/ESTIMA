@@ -25,7 +25,9 @@ export const DEFAULT_THEME = {
   lightBg:    [245, 250, 248],   // lightenRgb(primary, 0.96)
   categoryBg: [207, 236, 224],   // lightenRgb(primary, 0.82)
   tableAlt:   [245, 250, 248],   // lightenRgb(primary, 0.96)
+  tableHeader:[40, 110, 85],     // = primary (fond en-tête tableau)
   pse:        [180, 83, 9],
+  pseBg:      [255, 245, 230],   // fond clair des blocs PSE / options
   white:      [255, 255, 255],
 };
 
@@ -46,20 +48,26 @@ export const buildTheme = (branding, overrides = {}, defaults = {}) => {
   const text      = hexToRgbArray(branding.colors.text)       || base.text;
   const lightText = hexToRgbArray(branding.colors.subtle)     || base.lightText;
 
+  // Couleurs « avancées » : override explicite, sinon dérivée ("auto").
+  const c = branding.colors;
+  const pse = hexToRgbArray(c.pse) || DEFAULT_THEME.pse;
+
   return {
     primary,
     accent,
     text,
     lightText,
-    chapterBg:  lightenRgb(primary, 0.85),
+    chapterBg:  hexToRgbArray(c.chapterBg)   || lightenRgb(primary, 0.85),
     secondary:  lightenRgb(primary, 0.96),
     borders:    lightenRgb(primary, 0.80),
     headerBg:   lightenRgb(primary, 0.92),
     tableBg:    lightenRgb(primary, 0.88),
     lightBg:    lightenRgb(primary, 0.96),
     categoryBg: lightenRgb(primary, 0.82),
-    tableAlt:   lightenRgb(primary, 0.96),
-    pse:        DEFAULT_THEME.pse,
+    tableAlt:   hexToRgbArray(c.tableAlt)    || lightenRgb(primary, 0.96),
+    tableHeader:hexToRgbArray(c.tableHeader) || primary,
+    pse,
+    pseBg:      lightenRgb(pse, 0.88),
     white:      DEFAULT_THEME.white,
     ...overrides,
   };
