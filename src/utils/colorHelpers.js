@@ -25,3 +25,19 @@ export const lightenHex = (hex, factor = 0.9) => {
   });
   return `rgb(${rgb.join(', ')})`;
 };
+
+/**
+ * Eclaircit un hex et retourne un hex "#RRGGBB"
+ * (nécessaire pour <input type="color"> qui n'accepte que l'hexa).
+ * Même algorithme que lightenHex / lightenRgb (PDF) → tons cohérents.
+ */
+export const lightenToHex = (hex, factor = 0.9) => {
+  if (!hex) return '#e6f0eb';
+  const m = hex.replace('#', '').match(/.{2}/g);
+  if (!m || m.length < 3) return '#e6f0eb';
+  const toHex = (v) => Math.round(v).toString(16).padStart(2, '0');
+  return '#' + m.map(c => {
+    const v = parseInt(c, 16);
+    return toHex(v + (255 - v) * factor);
+  }).join('');
+};
