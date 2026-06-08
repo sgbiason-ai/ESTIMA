@@ -175,7 +175,7 @@ export const useDatabase = (user, companyId) => {
 
   const addToBpu = async (item) => {
     if (!companyId) return;
-    const newItem = { ...item, id: generateId(), updatedAt: new Date().toISOString() };
+    const newItem = { ...item, id: item.id || generateId(), updatedAt: new Date().toISOString() };
     const prevBpu = bpu;
     setBpu(prev => [...prev, newItem]);
     setDatabaseVersion(v => v + 1);

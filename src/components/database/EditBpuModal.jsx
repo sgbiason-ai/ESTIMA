@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, Edit2, Hash, BookOpen, Search, Folder, Check, ChevronDown, Maximize2, Minimize2, Trash2 } from 'lucide-react';
+import { X, Save, Edit2, Hash, BookOpen, Search, Folder, Check, ChevronDown, Maximize2, Minimize2, Trash2, Library, Plus, RefreshCw } from 'lucide-react';
 import RichTextEditor from '../common/RichTextEditor';
 import CctpSelectorModal from '../modals/CctpSelectorModal'; 
 
-const EditBpuModal = ({ item, onClose, onUpdate, units, categories = [], bpuConfig, existingItems = [], masterCctp = [], projectOnly = false }) => {
-  const [formData, setFormData] = useState({ 
+const EditBpuModal = ({ item, onClose, onUpdate, units, categories = [], bpuConfig, existingItems = [], masterCctp = [], projectOnly = false, onSaveToLibrary = null, libraryItems = [] }) => {
+  const [formData, setFormData] = useState({
     designation: '', description: '', unit: '', price: 0, bpuNum: '', categoryIds: [], cctpRefs: [] // cctpRefs tableau
   });
 
@@ -12,9 +12,14 @@ const EditBpuModal = ({ item, onClose, onUpdate, units, categories = [], bpuConf
   const [error, setError] = useState("");
   const [showCctpSelector, setShowCctpSelector] = useState(false);
   const [showCatSelector, setShowCatSelector] = useState(false);
+  const [showLibMenu, setShowLibMenu] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  
+
   const catDropdownRef = useRef(null);
+  const libMenuRef = useRef(null);
+
+  // L'article est-il lié à un prix de la bibliothèque ? (sinon "Mettre à jour la source" est impossible)
+  const isLinkedToLibrary = Boolean(item?.uid);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -27,6 +32,18 @@ const EditBpuModal = ({ item, onClose, onUpdate, units, categories = [], bpuConf
     }
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showCatSelector]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (libMenuRef.current && !libMenuRef.current.contains(event.target)) {
+        setShowLibMenu(false);
+      }
+    };
+    if (showLibMenu) {
+        document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showLibMenu]);
 
   const getCctpTitle = (id) => {
     if (!id || !masterCctp) return "";
@@ -57,6 +74,8 @@ const EditBpuModal = ({ item, onClose, onUpdate, units, categories = [], bpuConf
       setDisplayPrice(formatPrice(item.price || 0));
     }
     setShowCatSelector(false);
+    setShowLibMenu(false);
+    setError("");
   }, [item]);
 
   const formatPrice = (value) => {
@@ -101,6 +120,38 @@ const EditBpuModal = ({ item, onClose, onUpdate, units, categories = [], bpuConf
           ...prev, 
           cctpRefs: (prev.cctpRefs || []).filter(ref => ref !== id)
       }));
+  };
+
+  // Construit un article "propre" pour la bibliothèque (sans les champs propres au projet :
+  // id, uid, quantity, children… présents dans formData mais à ne PAS pousser dans le BPU).
+  const buildLibraryPayload = () => ({
+    designation: (formData.designation || '').toUpperCase(),
+    description: formData.description || '',
+    unit: formData.unit || 'u',
+    price: Number(formData.price) || 0,
+    bpuNum: formData.bpuNum?.trim() || "",
+    cctpRefs: formData.cctpRefs || [],
+    cctpRef: null,
+    categoryIds: formData.categoryIds || [],
+    categoryId: null,
+  });
+
+  // Enregistrer dans la bibliothèque : 'new' = prix nouveau, 'update' = écraser l'article source lié.
+  const handleSaveToLibrary = (mode) => {
+    setError("");
+    setShowLibMenu(false);
+    if (!formData.designation || !formData.designation.trim()) {
+      setError("La désignation est obligatoire pour enregistrer dans la bibliothèque.");
+      return;
+    }
+    if (mode === 'new' && bpuConfig?.numberingMode === 'manual') {
+      const num = formData.bpuNum?.trim();
+      if (num && (libraryItems || []).some(i => i.bpuNum === num)) {
+        setError(`Le numéro "${num}" est déjà utilisé dans la bibliothèque.`);
+        return;
+      }
+    }
+    onSaveToLibrary?.({ mode, data: buildLibraryPayload() });
   };
 
   const handleSubmit = (e) => {
@@ -170,11 +221,49 @@ const EditBpuModal = ({ item, onClose, onUpdate, units, categories = [], bpuConf
 
         <div className="flex-1 overflow-hidden flex flex-col min-h-0 bg-slate-50">
           {projectOnly && (
-            <div className="px-6 py-2.5 bg-amber-50 border-b border-amber-200 flex items-center gap-2 shrink-0">
+            <div className="relative z-30 px-6 py-2.5 bg-amber-50 border-b border-amber-200 flex items-center gap-3 shrink-0">
               <div className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-              <p className="text-[11px] text-amber-800 font-medium">
+              <p className="text-[11px] text-amber-800 font-medium flex-1">
                 Les modifications s'appliquent <strong>uniquement à cet article dans le projet en cours</strong>. La base de prix unitaires (BPU) ne sera pas modifiée.
               </p>
+              {onSaveToLibrary && (
+                <div className="relative shrink-0" ref={libMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setShowLibMenu(v => !v)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-amber-300 text-amber-800 text-[10px] font-black uppercase tracking-wider hover:bg-amber-100 hover:border-amber-400 transition-colors shadow-sm whitespace-nowrap"
+                  >
+                    <Library size={13} /> Enregistrer dans la bibliothèque <ChevronDown size={12} className={`transition-transform ${showLibMenu ? 'rotate-180' : ''}`} />
+                  </button>
+                  {showLibMenu && (
+                    <div className="absolute right-0 top-full mt-1.5 w-72 bg-white rounded-xl shadow-2xl border border-slate-200 p-1.5 z-modal ring-4 ring-black/5 animate-in zoom-in-95 duration-100">
+                      <button
+                        type="button"
+                        onClick={() => handleSaveToLibrary('new')}
+                        className="w-full flex items-start gap-2.5 p-2.5 rounded-lg hover:bg-emerald-50 text-left transition-colors"
+                      >
+                        <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0 mt-0.5"><Plus size={15} className="text-emerald-600" /></div>
+                        <div>
+                          <div className="text-[11px] font-bold text-slate-800">Créer un prix nouveau</div>
+                          <div className="text-[10px] text-slate-500 leading-tight">Ajoute un nouvel article à la bibliothèque (et lie cette ligne au nouveau prix).</div>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!isLinkedToLibrary}
+                        onClick={() => isLinkedToLibrary && handleSaveToLibrary('update')}
+                        className={`w-full flex items-start gap-2.5 p-2.5 rounded-lg text-left transition-colors ${isLinkedToLibrary ? 'hover:bg-blue-50' : 'opacity-50 cursor-not-allowed'}`}
+                      >
+                        <div className="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center shrink-0 mt-0.5"><RefreshCw size={14} className="text-blue-600" /></div>
+                        <div>
+                          <div className="text-[11px] font-bold text-slate-800">Mettre à jour l'article source</div>
+                          <div className="text-[10px] text-slate-500 leading-tight">{isLinkedToLibrary ? "Écrase le prix et le descriptif de l'article lié dans la bibliothèque." : "Cette ligne n'est liée à aucun article de la bibliothèque."}</div>
+                        </div>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
           <form onSubmit={handleSubmit} className="flex flex-col h-full">

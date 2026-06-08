@@ -670,6 +670,8 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNav
                 units={db.units}
                 masterCctp={resources.masterCctp}
                 allBpuItems={localMode.currentBpu}
+                onAddToBpu={localMode.handleAddToBpu}
+                onUpdateBpuItem={localMode.handleUpdateBpuItem}
                 blocs={db.blocs}
                 companyId={companyId}
                 onLoadCloudProject={(proj) => {

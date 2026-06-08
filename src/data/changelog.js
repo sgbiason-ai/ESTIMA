@@ -2,14 +2,23 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '3.0.0';
+export const APP_VERSION = '3.1.0';
 
 export const CHANGELOG = [
+  {
+    version: '3.1.0',
+    date: '2026-06-08',
+    title: 'Estimation : enregistrer un article modifié dans la bibliothèque',
+    highlights: [
+      'Estimation : quand vous modifiez un article dans un devis (double-clic sur la ligne → « Modifier dans le projet »), vous pouvez maintenant l\'enregistrer dans la bibliothèque sans quitter la fenêtre — un bouton « Enregistrer dans la bibliothèque » propose au choix de créer un prix nouveau (un nouvel article du catalogue, auquel la ligne se relie automatiquement) ou de mettre à jour l\'article source déjà lié (écrase son prix et son descriptif). Le ou les dossiers de destination se choisissent dans la même fenêtre (champ « Dossiers »). L\'option « mettre à jour la source » est désactivée si la ligne ne provient pas de la bibliothèque. Jusqu\'ici, ces modifications restaient cantonnées au projet et n\'étaient jamais répercutées dans la base de prix',
+    ],
+  },
   {
     version: '3.0.0',
     date: '2026-06-05',
     title: 'Bordereau des prix : aperçu & PDF calés sur le Word',
     highlights: [
+      'Accueil (Hub) : l\'aide (bouton « ? » en haut à droite) est entièrement refaite et à jour — onglet « Modules » qui présente les 11 modules regroupés par les 3 rangées (Projet & Estimation, Outils & Administration, Paramètres & Compte), onglet « Navigation & repères » (ouvrir un module, revenir au hub, météo, bascule mobile/desktop, Nouveautés, vider le cache) et onglet « Accès & verrouillage » (cartes verrouillées, module Administration, comment obtenir un accès)',
       'Bibliothèque (Catalogue) : correction — modifier le lien CCTP d\'un article depuis la liste (badge « + CCTP » / chapitre lié) n\'enregistrait pas la modification. Le titre et les identifiants de chapitre sont désormais bien sauvegardés (Cloud et travail local)',
       'Bordereau des prix : l\'aperçu à l\'écran et l\'export PDF reproduisent désormais fidèlement la mise en page du document Word — page de garde, en-tête de page et tableau ont la même présentation, pour que ce que vous voyez à l\'écran corresponde à ce que vous envoyez',
       'Bordereau des prix : la pagination de l\'aperçu et du PDF est calée sur celle du Word (police, marges, interligne et largeurs de colonnes identiques) — les pages se coupent aux mêmes endroits (un réglage fin reste possible au cas par cas selon les projets)',

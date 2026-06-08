@@ -70,6 +70,8 @@ const ProjectView = ({
   units = [],
   masterCctp = [],
   allBpuItems = [],
+  onAddToBpu,
+  onUpdateBpuItem,
   blocs = [],
   companyId,
   onLoadCloudProject,
@@ -642,19 +644,55 @@ const ProjectView = ({
     }
   };
 
-  const handleSaveEditedItem = (updatedFields) => {
-    if (!editItemTarget) return;
-    const findParent = (nodes, targetId) => {
+  const findItemParentId = (targetId) => {
+    const findParent = (nodes, id) => {
       for (const node of nodes) {
-        if (node.children?.some(c => c.id === targetId)) return node.id;
-        if (node.children) { const found = findParent(node.children, targetId); if (found) return found; }
+        if (node.children?.some(c => c.id === id)) return node.id;
+        if (node.children) { const found = findParent(node.children, id); if (found) return found; }
       }
       return null;
     };
-    const parentId = findParent(project?.chapters || [], editItemTarget.id) ?? 'root';
+    return findParent(project?.chapters || [], targetId) ?? 'root';
+  };
+
+  // Applique les champs édités à la SEULE ligne du projet (n'altère pas le BPU).
+  const applyFieldsToProjectLine = (fields) => {
+    if (!editItemTarget) return;
+    const parentId = findItemParentId(editItemTarget.id);
     ['designation','description','unit','price','bpuNum','cctpRefs','categoryIds'].forEach(key => {
-      if (updatedFields[key] !== undefined) updateProjectItem(parentId, editItemTarget.id, key, updatedFields[key]);
+      if (fields[key] !== undefined) updateProjectItem(parentId, editItemTarget.id, key, fields[key]);
     });
+  };
+
+  const handleSaveEditedItem = (updatedFields) => {
+    applyFieldsToProjectLine(updatedFields);
+    setEditItemTarget(null);
+  };
+
+  // Pousse l'article édité vers la bibliothèque : 'new' = prix nouveau, 'update' = écraser la source.
+  // Dans les deux cas, on applique aussi l'édition à la ligne du projet pour rester cohérent.
+  const handleSaveItemToLibrary = ({ mode, data }) => {
+    if (!editItemTarget) return;
+    applyFieldsToProjectLine(data);
+
+    if (mode === 'update') {
+      const source = allBpuItems?.find(
+        b => String(b.id) === String(editItemTarget.uid) || String(b.uid) === String(editItemTarget.uid)
+      );
+      const sourceId = source?.id || editItemTarget.uid;
+      if (sourceId && onUpdateBpuItem) {
+        onUpdateBpuItem(sourceId, data);
+        toast.success("Article source mis à jour dans la bibliothèque.");
+      } else {
+        toast.error("Article source introuvable dans la bibliothèque.", { title: 'Mise à jour impossible' });
+      }
+    } else {
+      const newId = generateId();
+      onAddToBpu?.({ ...data, id: newId });
+      // Relie la ligne du projet au nouvel article (le prix nouveau devient sa source).
+      const parentId = findItemParentId(editItemTarget.id);
+      updateProjectItem(parentId, editItemTarget.id, 'uid', newId);
+    }
     setEditItemTarget(null);
   };
 
@@ -839,7 +877,7 @@ const ProjectView = ({
         )}
 
       <ProjectDetailsModal isOpen={showDetailsModal} onClose={() => setShowDetailsModal(false)} project={project} onSave={handleSaveDetails} branding={masterBranding} archives={archives} />
-      {editItemTarget && <EditBpuModal item={editItemTarget} onClose={() => setEditItemTarget(null)} onUpdate={handleSaveEditedItem} units={units} categories={categories} bpuConfig={bpuConfig} existingItems={[]} masterCctp={masterCctp} projectOnly />}
+      {editItemTarget && <EditBpuModal item={editItemTarget} onClose={() => setEditItemTarget(null)} onUpdate={handleSaveEditedItem} units={units} categories={categories} bpuConfig={bpuConfig} existingItems={[]} masterCctp={masterCctp} projectOnly onSaveToLibrary={handleSaveItemToLibrary} libraryItems={allBpuItems} />}
       <CalculationModal show={showCalculationModal} onClose={() => setShowCalculationModal(false)} onConfirm={handleApplyCalculation} analysis={calculationAnalysis} />
       <ExportModal isOpen={exportModalState.show} onClose={() => setExportModalState(prev => ({ ...prev, show: false }))} onConfirm={handleConfirmExport} onPreviewPdf={handlePreviewPdf} format={exportModalState.format} type={exportModalState.type} hasTranches={hasTranches} tranches={tranches} activeTrancheId={activeTrancheId} />
       <ConfirmDeleteModal isOpen={deleteConfirm.show} onClose={() => setDeleteConfirm({ show: false, itemId: null })} onConfirm={() => { if(deleteConfirm.itemId) { handleRemoveItem(deleteConfirm.itemId); setDeleteConfirm({ show: false, itemId: null }); } }} />
@@ -967,6 +1005,8 @@ ProjectView.propTypes = {
   units: PropTypes.array,
   masterCctp: PropTypes.array,
   allBpuItems: PropTypes.array,
+  onAddToBpu: PropTypes.func,
+  onUpdateBpuItem: PropTypes.func,
   companyId: PropTypes.string,
   onLoadCloudProject: PropTypes.func,
   onUndo: PropTypes.func,
