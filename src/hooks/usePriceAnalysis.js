@@ -1157,6 +1157,8 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
           count: validPrices.length,
           total: prices.length,
           excluded: prices.length - validPrices.length,
+          qty: item.activeQty ?? null,
+          unit: item.unit || '',
         };
       });
     });
@@ -1188,7 +1190,18 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
 
     let updated = 0;
     const now = new Date().toISOString();
-    // Nom du projet pour traçabilité (passé en 3e argument optionnel)
+
+    // Date métier de la remontée : ouverture des plis (RAO) → remise de l'offre → date du jour.
+    // Le RAO vit dans une sous-collection (rao/data) souvent absente de project.rao : on la va-chercher si besoin.
+    let raoData = project?.rao || {};
+    if (Object.keys(raoData).length === 0 && project?.id && companyId) {
+      try {
+        const snap = await getDoc(doc(fireDb, 'companies', companyId, 'projects', project.id, 'rao', 'data'));
+        if (snap.exists() && snap.data().rao) raoData = snap.data().rao;
+      } catch (e) { console.warn('[Analysis] RAO fetch pour date observée:', e); }
+    }
+    const observedDate = raoData?.consultation?.dateOuverturePLis || project?.dateRemise || now;
+
     for (const [, data] of entries) {
       const key = data.designation?.trim().toUpperCase();
       const bpuItem = bpuByDesignation.get(key);
@@ -1199,7 +1212,7 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
         if (history.length === 0 && bpuItem.observedPrice && bpuItem.observedPrice !== data.avg) {
           history.push({ price: bpuItem.observedPrice, date: bpuItem.updatedAt || now, count: 0 });
         }
-        history.push({ price: data.avg, date: now, count: data.count, total: data.total });
+        history.push({ price: data.avg, date: observedDate, count: data.count, total: data.total, project: project?.name || '', qty: data.qty ?? null, unit: data.unit || '' });
         // Moyenne de tout l'historique
         const avgAll = Math.round(history.reduce((s, h) => s + h.price, 0) / history.length * 100) / 100;
         await updateBpuItem(bpuItem.id, { observedPrice: avgAll, priceHistory: history });
@@ -1212,7 +1225,7 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
     } else {
       toast.warning("Aucune correspondance trouvée entre les articles analysés et la base de prix.");
     }
-  }, [averagesHorsOAB, confirm, toast]);
+  }, [averagesHorsOAB, confirm, toast, project, companyId]);
 
   const handleManualSave = useCallback(async () => {
     await saveAnalysis();
