@@ -43,7 +43,10 @@ export const Select = ({ value, onChange, options }) => (
   </select>
 );
 
-export const ColorPicker = ({ label, value, onChange, description }) => (
+// `isAuto` / `onReset` (optionnels) → mode "auto par défaut, débrayage ponctuel" :
+//   - isAuto = true  → la couleur est dérivée (badge « Auto » gris)
+//   - isAuto = false → couleur fixée manuellement (bouton « ↺ Auto » pour revenir au dérivé)
+export const ColorPicker = ({ label, value, onChange, description, isAuto, onReset }) => (
   <div className="flex items-center gap-3 mb-3 p-3 rounded-2xl bg-gray-50/80 border border-gray-100">
     <div className="relative group">
       <div
@@ -60,7 +63,21 @@ export const ColorPicker = ({ label, value, onChange, description }) => (
       />
     </div>
     <div className="flex-1 min-w-0">
-      <div className="text-sm font-medium text-gray-800">{label}</div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-sm font-medium text-gray-800 truncate">{label}</div>
+        {onReset && (
+          isAuto
+            ? <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-300 flex-shrink-0">Auto</span>
+            : <button
+                onClick={onReset}
+                className="text-[10px] font-semibold uppercase tracking-wide text-blue-400
+                           hover:text-blue-600 flex-shrink-0"
+                title="Revenir à la couleur automatique (dérivée)"
+              >
+                ↺ Auto
+              </button>
+        )}
+      </div>
       {description && <div className="text-xs text-gray-400 truncate">{description}</div>}
       <input
         type="text"
@@ -68,8 +85,8 @@ export const ColorPicker = ({ label, value, onChange, description }) => (
         onChange={e => {
           if (/^#[0-9A-Fa-f]{0,6}$/.test(e.target.value)) onChange(e.target.value);
         }}
-        className="text-xs font-mono text-gray-500 bg-transparent border-none
-                   outline-none w-24 mt-0.5"
+        className={`text-xs font-mono bg-transparent border-none outline-none w-24 mt-0.5
+                    ${isAuto ? 'text-gray-300' : 'text-gray-500'}`}
         maxLength={7}
       />
     </div>

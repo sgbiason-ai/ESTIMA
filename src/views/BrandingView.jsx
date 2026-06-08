@@ -5,7 +5,9 @@ import { lightenHex } from '../utils/colorHelpers';
 import HelpPanel from '../components/help/HelpPanel';
 import HelpButton from '../components/help/HelpButton';
 import CoverPreview from './branding/CoverPreview';
+import DetailPreview from './branding/DetailPreview';
 import { SectionTitle, Field, Input, Select, ColorPicker, SizeSlider } from './branding/BrandingFormParts';
+import { resolveAdvancedColors, ADVANCED_TABLE_COLORS, ADVANCED_TITLE_COLORS } from './branding/brandingColors';
 
 // ─── SCHÉMA PAR DÉFAUT ────────────────────────────────────────────────────────
 export const DEFAULT_BRANDING = {
@@ -89,6 +91,7 @@ const BrandingView = ({
 
   const [activeTab, setActiveTab]         = useState('identity');
   const [activeDocType, setActiveDocType] = useState('estimation');
+  const [previewPage, setPreviewPage]     = useState('cover'); // cover | detail
   const [saveStatus, setSaveStatus]       = useState('idle'); // idle | saving | saved
   const [showHelp, setShowHelp]           = useState(false);
   const fileInputRef = useRef(null);
@@ -119,6 +122,16 @@ const BrandingView = ({
         next[keys[0]] = { ...next[keys[0]], [keys[1]]: value };
       }
       return next;
+    });
+  }, []);
+
+  // ── Reset d'une couleur avancée → retour au mode "auto" (dérivée) ──
+  const resetColor = useCallback((key) => {
+    isDirty.current = true;
+    setBranding(prev => {
+      const colors = { ...prev.colors };
+      delete colors[key];
+      return { ...prev, colors };
     });
   }, []);
 
@@ -156,6 +169,9 @@ const BrandingView = ({
     setBranding({ ...DEFAULT_BRANDING });
     isDirty.current = true;
   };
+
+  // Couleurs avancées effectives (override ou dérivée "auto")
+  const advColors = resolveAdvancedColors(branding.colors);
 
   return (
     <div className="flex h-full w-full bg-[#f5f5f7] overflow-hidden"
@@ -383,6 +399,40 @@ const BrandingView = ({
                   tag
                 </div>
               </div>
+
+              {/* ── TABLEAU (Estimation / DQE / BPU) ── */}
+              <SectionTitle>Tableau — Estimation, DQE, BPU</SectionTitle>
+              <p className="text-xs text-gray-400 mb-3 -mt-1">
+                « Auto » = dérivé de la couleur primaire. Réglez pour débrayer.
+              </p>
+              {ADVANCED_TABLE_COLORS.map(({ key, label, description }) => (
+                <ColorPicker
+                  key={key}
+                  label={label}
+                  description={description}
+                  value={advColors[key]}
+                  isAuto={!branding.colors[key]}
+                  onChange={v => update(`colors.${key}`, v)}
+                  onReset={() => resetColor(key)}
+                />
+              ))}
+
+              {/* ── TITRES (CCTP / RC) ── */}
+              <SectionTitle>Titres — CCTP, RC</SectionTitle>
+              <p className="text-xs text-gray-400 mb-3 -mt-1">
+                Titre 1 « auto » = primaire, Titre 2 = secondaire, Titre 3 = gris.
+              </p>
+              {ADVANCED_TITLE_COLORS.map(({ key, label, description }) => (
+                <ColorPicker
+                  key={key}
+                  label={label}
+                  description={description}
+                  value={advColors[key]}
+                  isAuto={!branding.colors[key]}
+                  onChange={v => update(`colors.${key}`, v)}
+                  onReset={() => resetColor(key)}
+                />
+              ))}
             </>
           )}
 
@@ -443,9 +493,9 @@ const BrandingView = ({
                 style={{ fontFamily: branding.fonts.headings }}
               >
                 {[
-                  { key: 'title1', text: '1. TITRE NIVEAU 1', color: branding.colors.primary,   bold: true,  caps: true  },
-                  { key: 'title2', text: '1.1 Titre niveau 2', color: branding.colors.secondary, bold: true,  caps: false },
-                  { key: 'title3', text: '1.1.1 Titre niveau 3', color: '#444444',               bold: true,  caps: false, italic: true },
+                  { key: 'title1', text: '1. TITRE NIVEAU 1', color: advColors.heading1,   bold: true,  caps: true  },
+                  { key: 'title2', text: '1.1 Titre niveau 2', color: advColors.heading2, bold: true,  caps: false },
+                  { key: 'title3', text: '1.1.1 Titre niveau 3', color: advColors.heading3,               bold: true,  caps: false, italic: true },
                   { key: 'title4', text: '1.1.1.1 Titre niveau 4', color: '#000000',             bold: true,  caps: false },
                   { key: 'body',   text: 'Corps de texte régulier.', color: branding.colors.text, bold: false, caps: false, font: branding.fonts.main },
                 ].map(({ key, text, color, bold, caps, italic, font }) => (
@@ -522,26 +572,65 @@ const BrandingView = ({
         {/* Aperçu centré */}
         <div className="flex-1 overflow-auto p-8 flex items-start justify-center">
           <div className="w-full max-w-md">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-semibold text-gray-800">
-                  Page de garde — Format A4
-                </h3>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  Basé sur les informations de votre projet actuel
-                </p>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span className="text-xs text-gray-400">Temps réel</span>
-              </div>
-            </div>
+            {(() => {
+              const canShowDetail = ['estimation', 'dqe'].includes(activeDocType);
+              const page = canShowDetail ? previewPage : 'cover';
+              return (
+                <>
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-semibold text-gray-800">
+                        {page === 'detail' ? 'Détail quantitatif — Format A4' : 'Page de garde — Format A4'}
+                      </h3>
+                      <p className="text-xs text-gray-400 mt-0.5 truncate">
+                        {page === 'detail'
+                          ? "Données d'exemple — seul le style reflète votre charte"
+                          : 'Basé sur les informations de votre projet actuel'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                      <span className="text-xs text-gray-400">Temps réel</span>
+                    </div>
+                  </div>
 
-            <CoverPreview
-              branding={branding}
-              activeDocType={activeDocType}
-              project={project}
-            />
+                  {/* Toggle Garde / Intérieur — uniquement Estimation & DQE */}
+                  {canShowDetail && (
+                    <div className="flex p-0.5 bg-gray-100 rounded-xl mb-4">
+                      {[
+                        { id: 'cover',  label: 'Page de garde' },
+                        { id: 'detail', label: 'Intérieur (détail)' },
+                      ].map(opt => (
+                        <button
+                          key={opt.id}
+                          onClick={() => setPreviewPage(opt.id)}
+                          className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all duration-200
+                            ${page === opt.id
+                              ? 'bg-white text-gray-900 shadow-sm'
+                              : 'text-gray-400 hover:text-gray-600'}`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {page === 'detail' ? (
+                    <DetailPreview
+                      branding={branding}
+                      activeDocType={activeDocType}
+                      project={project}
+                    />
+                  ) : (
+                    <CoverPreview
+                      branding={branding}
+                      activeDocType={activeDocType}
+                      project={project}
+                    />
+                  )}
+                </>
+              );
+            })()}
 
             {/* Légende des documents impactés */}
             <div className="mt-5 p-4 bg-white rounded-2xl border border-gray-200/60">
