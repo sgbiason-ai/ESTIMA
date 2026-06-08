@@ -4,10 +4,10 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { 
   Search, Plus, Trash2, Folder, FolderOpen, LayoutGrid, FileText, 
   Edit2, GripVertical, Download, Upload, Check, X, MoreVertical, 
-  Calendar, Copy, ArrowDownAZ, ArrowUpAZ, Euro, Hash, ArrowDownUp, 
+  Calendar, Copy, ArrowDownAZ, ArrowUpAZ, ArrowUp, ArrowDown, Euro, Hash,
   FileWarning, CheckSquare, Square, FolderInput, TrendingUp, TrendingDown,
   Info, History, BarChart2, RefreshCw, BookOpen, Cloud, Monitor, AlertCircle,
-  HelpCircle, AlignLeft, Boxes, LayoutList
+  HelpCircle, AlignLeft, Boxes, LayoutList, ChevronDown, Briefcase
 } from 'lucide-react';
 import { formatPrice, cleanText, normalizeUnitSymbol } from '../utils/helpers';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -35,10 +35,8 @@ const DatabaseView = ({
   isLocalMode = false,
   onExitLocalMode = null,
   onFullResetLocal = null,
-  dbProfiles = null,
-  activeDbId = null,
-  onSelectDb = null,
-  onForceRefresh = null, // <-- NOUVELLE PROP AJOUTÉE ICI
+  onForceRefresh = null,
+  localLibraryName = null,
   isAdmin = false,
   onClearObservedPrices = null,
   bpuSearch,
@@ -51,6 +49,7 @@ const DatabaseView = ({
   deleteBloc
 }) => {
   const [mode, setMode] = useState('articles'); // 'articles' | 'blocs'
+  const [sourceMenuOpen, setSourceMenuOpen] = useState(false); // popover source de données
   const [selectedCatId, setSelectedCatId] = useState(null);
   const [isCreatingCat, setIsCreatingCat] = useState(false);
   const [newCatName, setNewCatName] = useState("");
@@ -85,6 +84,7 @@ const DatabaseView = ({
   // --- État pour la modale de modification du lien CCTP ---
   const [cctpLinkModal, setCctpLinkModal] = useState({ isOpen: false, item: null, refValue: '', labelValue: '' });
   const [priceHistoryItem, setPriceHistoryItem] = useState(null); // item pour modale historique prix
+  const [confirmDeleteHistIdx, setConfirmDeleteHistIdx] = useState(null); // index (original) de la remontée en attente de confirmation
 
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [isShiftPressed, setIsShiftPressed] = useState(false);
@@ -229,6 +229,29 @@ const DatabaseView = ({
     setTimeout(() => setIsRefreshing(false), 800);
   };
 
+  // Réinitialise la confirmation inline quand on change d'article / ferme la modale
+  useEffect(() => { setConfirmDeleteHistIdx(null); }, [priceHistoryItem?.id]);
+
+  // Supprime une remontée de prix de l'historique et recalcule la moyenne observée
+  const handleDeleteHistoryEntry = (origIdx) => {
+    const item = priceHistoryItem;
+    if (!item) return;
+    const history = [...(item.priceHistory || [])];
+    history.splice(origIdx, 1);
+    if (history.length === 0) {
+      // Plus aucune remontée : l'article n'est plus « observé »
+      onUpdateItem?.(item.id, { observedPrice: null, priceHistory: [] });
+      setPriceHistoryItem(null);
+      toastInfo("Dernière remontée supprimée — l'article n'a plus de prix observé.");
+    } else {
+      const avgAll = Math.round(history.reduce((s, h) => s + (h.price || 0), 0) / history.length * 100) / 100;
+      onUpdateItem?.(item.id, { observedPrice: avgAll, priceHistory: history });
+      setPriceHistoryItem({ ...item, observedPrice: avgAll, priceHistory: history });
+      toastInfo("Remontée supprimée.");
+    }
+    setConfirmDeleteHistIdx(null);
+  };
+
   const toggleSelection = (id) => {
     const newSelection = new Set(selectedIds);
     if (newSelection.has(id)) newSelection.delete(id);
@@ -248,15 +271,15 @@ const DatabaseView = ({
   };
 
   const handleExport = () => {
-    const activeDbName = (dbProfiles && activeDbId) ? (dbProfiles.find(d => d.id === activeDbId)?.name || activeDbId) : "complet";
-    const dataToExport = { 
-      version: "1.3", 
-      timestamp: new Date().toISOString(), 
-      meta: { activeDbId: activeDbId || null, activeDbName, isLocal: isLocalMode }, 
-      units, 
-      categories, 
-      bpu: fullBpu, 
-      observatory 
+    const activeDbName = isLocalMode ? (localLibraryName || "base_locale") : "complet";
+    const dataToExport = {
+      version: "1.3",
+      timestamp: new Date().toISOString(),
+      meta: { activeDbName, isLocal: isLocalMode },
+      units,
+      categories,
+      bpu: fullBpu,
+      observatory
     };
     const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -366,47 +389,6 @@ const DatabaseView = ({
           {mode === 'articles' && (
           <div className="w-80 bg-white border-r border-slate-200 flex flex-col shrink-0 z-30">
             <div className="p-4 border-b border-slate-100 bg-slate-50">
-            
-            <div className={`mb-4 p-3 rounded-xl border shadow-sm transition-all ${isLocalMode ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-200'}`}>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    {isLocalMode ? <Monitor size={14} className="text-amber-600" /> : <Cloud size={14} className="text-blue-600" />}
-                    <span className={`text-[10px] font-black uppercase tracking-widest ${isLocalMode ? 'text-amber-700' : 'text-slate-600'}`}>
-                        {isLocalMode ? 'Travail Local' : 'Cloud Sync'}
-                    </span>
-                  </div>
-                  {isLocalMode && (
-                    <button onClick={onExitLocalMode} className="p-1 hover:bg-amber-200 text-amber-700 rounded transition-colors"><X size={14} /></button>
-                  )}
-                </div>
-
-                {!isLocalMode ? (
-                  <>
-                    <select
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 mb-2 shadow-sm"
-                      value={activeDbId || ""}
-                      onChange={(e) => onSelectDb(e.target.value)}
-                    >
-                      {dbProfiles?.map((db) => (
-                        <option key={db.id} value={db.id}>{db.name}</option>
-                      ))}
-                    </select>
-                    <div className="grid grid-cols-2 gap-2 mt-2">
-                        <button onClick={() => fileInputRef.current?.click()} className="flex items-center justify-center gap-2 px-2 py-2 rounded-lg border border-slate-200 bg-white text-[10px] font-black text-slate-700 hover:bg-slate-50 uppercase tracking-tighter"><Upload size={12} /> Import</button>
-                        <button onClick={handleExport} className="flex items-center justify-center gap-2 px-2 py-2 rounded-lg bg-slate-900 text-[10px] font-black text-white hover:bg-slate-800 uppercase tracking-tighter"><Download size={12} /> Backup</button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="space-y-2">
-                    <p className="text-[10px] text-amber-800 leading-tight font-medium italic">Base isolée (non synchronisée sur le cloud).</p>
-                    <button onClick={handleExport} className="w-full flex items-center justify-center gap-2 px-2 py-2 rounded-lg bg-amber-600 text-white text-[10px] font-black hover:bg-amber-700 uppercase transition-all shadow-md"><Download size={12} /> Sauvegarder JSON</button>
-                    <div className="grid grid-cols-2 gap-2">
-                        <button onClick={() => fileInputRef.current?.click()} className="flex items-center justify-center gap-2 px-2 py-2 rounded-lg border border-amber-200 bg-white text-[10px] font-black text-amber-700 hover:bg-amber-50 uppercase tracking-tighter"><Upload size={12} /> Importer</button>
-                        <button onClick={async () => { const ok = await confirm('Voulez-vous vraiment vider totalement la base locale ? Cette action est irréversible.', { title: 'Vider la base', danger: true }); if(ok) onFullResetLocal(); }} className="flex items-center justify-center gap-2 px-2 py-2 rounded-lg border border-red-200 bg-white text-[10px] font-black text-red-600 hover:bg-red-50 uppercase tracking-tighter"><Trash2 size={12} /> Vider</button>
-                    </div>
-                  </div>
-                )}
-            </div>
 
               <h3 className="font-black text-xs uppercase text-slate-500 tracking-widest mb-3 flex items-center gap-2"><Folder size={14} /> Dossiers</h3>
               {!isCreatingCat ? (
@@ -519,13 +501,72 @@ const DatabaseView = ({
                 </div>
             )}
 
-            <div className="bg-white px-6 py-2 border-b border-slate-100 flex items-center justify-between shadow-sm z-10">
+            <div className="bg-white px-6 py-2 border-b border-slate-100 flex items-center justify-between shadow-sm z-30 relative">
                 <div className="flex items-center gap-6">
                     {/* Toggle Articles / Blocs */}
                     <div className="flex items-center bg-slate-100 p-1 rounded-2xl shadow-inner shrink-0">
                         <button onClick={() => setMode('articles')} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-wider transition-all active:scale-95 ${mode === 'articles' ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><LayoutList size={18} /> Articles</button>
                         <button onClick={() => setMode('blocs')} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-wider transition-all active:scale-95 ${mode === 'blocs' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><Boxes size={18} /> Blocs</button>
                     </div>
+
+                    {/* Source de données (Cloud / Local) — visible dans les deux modes */}
+                    <div className="relative shrink-0">
+                        <button
+                            onClick={() => setSourceMenuOpen(o => !o)}
+                            title="Source de données"
+                            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wide border transition-all active:scale-95 ${isLocalMode ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'}`}
+                        >
+                            {isLocalMode ? <Monitor size={16} /> : <Cloud size={16} />}
+                            <span className="max-w-[160px] truncate normal-case tracking-normal font-bold">{isLocalMode ? (localLibraryName || 'Travail Local') : 'Cloud Sync'}</span>
+                            <ChevronDown size={14} className={`transition-transform ${sourceMenuOpen ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {sourceMenuOpen && (
+                          <>
+                            <div className="fixed inset-0 z-40" onClick={() => setSourceMenuOpen(false)} />
+                            <div className="absolute left-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                                <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Source de données</p>
+                                </div>
+                                <div className="p-2 space-y-1">
+                                    {/* Cloud Sync */}
+                                    <button
+                                        onClick={() => { if (isLocalMode) onExitLocalMode?.(); setSourceMenuOpen(false); }}
+                                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors ${!isLocalMode ? 'bg-blue-50' : 'hover:bg-slate-50'}`}
+                                    >
+                                        <div className={`p-1.5 rounded-lg ${!isLocalMode ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-400'}`}><Cloud size={16} /></div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-bold text-slate-800">Cloud Sync</p>
+                                            <p className="text-[10px] text-slate-400">Bibliothèque partagée</p>
+                                        </div>
+                                        {!isLocalMode && <Check size={16} className="text-blue-600 shrink-0" />}
+                                    </button>
+                                    {/* Base externe locale (active uniquement) */}
+                                    {isLocalMode && (
+                                      <div className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-amber-50">
+                                          <div className="p-1.5 rounded-lg bg-amber-100 text-amber-600"><Monitor size={16} /></div>
+                                          <div className="flex-1 min-w-0">
+                                              <p className="text-xs font-bold text-amber-800 truncate">{localLibraryName || 'Travail Local'}</p>
+                                              <p className="text-[10px] text-amber-500">Base externe (locale)</p>
+                                          </div>
+                                          <Check size={16} className="text-amber-600 shrink-0" />
+                                      </div>
+                                    )}
+                                </div>
+                                <div className="p-2 border-t border-slate-100 space-y-1">
+                                    <button onClick={() => { fileInputRef.current?.click(); setSourceMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"><Upload size={14} className="text-slate-400" /> Charger une base externe…</button>
+                                    <button onClick={() => { handleExport(); setSourceMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"><Download size={14} className="text-slate-400" /> Sauvegarder (backup)</button>
+                                    {isLocalMode && (
+                                      <button
+                                          onClick={async () => { setSourceMenuOpen(false); const ok = await confirm('Voulez-vous vraiment vider totalement la base locale ? Cette action est irréversible.', { title: 'Vider la base', danger: true }); if (ok) onFullResetLocal?.(); }}
+                                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 transition-colors"><Trash2 size={14} /> Vider la base locale</button>
+                                    )}
+                                </div>
+                            </div>
+                          </>
+                        )}
+                    </div>
+
                     {mode === 'articles' && (
                     <div className="flex items-center gap-2">
                         <div className={`p-1.5 rounded-lg ${isLocalMode ? 'bg-amber-50 text-amber-600' : 'bg-indigo-50 text-indigo-600'}`}><BarChart2 size={16} /></div>
@@ -582,63 +623,49 @@ const DatabaseView = ({
               </div>
             </header>
 
-            <div className="flex items-center gap-3 px-6 py-3 bg-slate-100 border-b border-slate-200 sticky top-0 z-10 shadow-sm">
-                <div className="w-5"></div>
-                <div className="w-4"></div>
-                <div className="w-10"></div>
-                
-                <div className="flex-1 flex items-center gap-3">
-                    <div 
+            <div className="flex items-center gap-3 px-6 py-2.5 bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 shrink-0">Trier par</span>
+                <div className="flex items-center bg-slate-100 p-1 rounded-xl shrink-0">
+                    <button
                         onClick={() => handleSort('designation')}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wide cursor-pointer transition-all border ${
-                            sortConfig.key === 'designation' 
-                            ? 'bg-emerald-500 text-white border-emerald-600 shadow-md transform scale-105' 
-                            : 'bg-white text-slate-500 border-slate-200 hover:border-emerald-300 hover:text-emerald-600 shadow-sm'
-                        }`}
+                        className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wide transition-all active:scale-95 ${sortConfig.key === 'designation' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                     >
                         Nom
-                        {sortConfig.key === 'designation' && (sortConfig.direction === 'asc' ? <ArrowDownAZ size={12} /> : <ArrowUpAZ size={12} />)}
-                    </div>
-                    
-                    <div
+                        {sortConfig.key === 'designation' && (sortConfig.direction === 'asc' ? <ArrowDownAZ size={13} /> : <ArrowUpAZ size={13} />)}
+                    </button>
+                    <button
                         onClick={() => handleSort('cctp')}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wide cursor-pointer transition-all border ${
-                            sortConfig.key === 'cctp'
-                            ? 'bg-blue-500 text-white border-blue-600 shadow-md transform scale-105'
-                            : 'bg-white text-slate-500 border-slate-200 hover:border-blue-300 hover:text-blue-600 shadow-sm'
-                        }`}
+                        className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wide transition-all active:scale-95 ${sortConfig.key === 'cctp' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                     >
-                        <BookOpen size={12} /> CCTP
-                        {sortConfig.key === 'cctp' && <ArrowDownUp size={12} />}
-                    </div>
+                        <BookOpen size={13} /> CCTP
+                        {sortConfig.key === 'cctp' && (sortConfig.direction === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />)}
+                    </button>
+                    {bpuConfig?.numberingMode === 'manual' && (
+                        <button
+                            onClick={() => handleSort('bpuNum')}
+                            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wide transition-all active:scale-95 ${sortConfig.key === 'bpuNum' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            N°
+                            {sortConfig.key === 'bpuNum' && (sortConfig.direction === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />)}
+                        </button>
+                    )}
+                    <button
+                        onClick={() => handleSort('price')}
+                        className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wide transition-all active:scale-95 ${sortConfig.key === 'price' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                        <Euro size={13} /> Prix
+                        {sortConfig.key === 'price' && (sortConfig.direction === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />)}
+                    </button>
                 </div>
-
-                {bpuConfig?.numberingMode === 'manual' && (
-                     <div 
-                        onClick={() => handleSort('bpuNum')}
-                        className={`w-20 flex justify-center items-center gap-2 px-2 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wide cursor-pointer transition-all border ${
-                            sortConfig.key === 'bpuNum' 
-                            ? 'bg-amber-500 text-white border-amber-600 shadow-md transform scale-105' 
-                            : 'bg-white text-slate-500 border-slate-200 hover:border-amber-300 hover:text-amber-600 shadow-sm'
-                        }`}
+                {sortConfig.key && (
+                    <button
+                        onClick={() => setSortConfig({ key: null, direction: 'asc' })}
+                        title="Annuler le tri"
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all shrink-0"
                     >
-                        N°
-                        {sortConfig.key === 'bpuNum' && <ArrowDownUp size={12} />}
-                    </div>
+                        <X size={12} /> Réinit.
+                    </button>
                 )}
-
-                <div 
-                    onClick={() => handleSort('price')}
-                    className={`w-24 flex justify-center items-center gap-2 px-2 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wide cursor-pointer transition-all border ${
-                        sortConfig.key === 'price' 
-                        ? 'bg-emerald-500 text-white border-emerald-600 shadow-md transform scale-105' 
-                        : 'bg-white text-slate-500 border-slate-200 hover:border-emerald-300 hover:text-emerald-600 shadow-sm'
-                    }`}
-                >
-                    Prix
-                    {sortConfig.key === 'price' && <ArrowDownUp size={12} />}
-                </div>
-                <div className="w-8"></div>
             </div>
 
             <div ref={parentRef} className="flex-1 overflow-y-auto p-4 bg-slate-50 pb-32">
@@ -788,69 +815,114 @@ const DatabaseView = ({
         const fmtD = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
         return (
           <div className="fixed inset-0 bg-black/50 z-modal flex items-center justify-center p-4" onClick={() => setPriceHistoryItem(null)}>
-            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full overflow-hidden flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
               {/* Header */}
-              <div className="px-5 py-4 border-b border-gray-100">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center"><History size={18} className="text-blue-600" /></div>
-                  <div>
-                    <h3 className="font-bold text-sm text-gray-900">Historique des prix</h3>
-                    <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wide truncate max-w-[280px]">{cleanText(priceHistoryItem.designation)}</p>
+              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center shrink-0"><History size={20} className="text-blue-600" /></div>
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-base text-gray-900">Historique des prix observés</h3>
+                    <p className="text-[11px] text-gray-400 uppercase font-bold tracking-wide truncate">{cleanText(priceHistoryItem.designation)}</p>
                   </div>
                 </div>
+                <button onClick={() => setPriceHistoryItem(null)} className="p-2 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors shrink-0"><X size={18} /></button>
               </div>
 
-              {/* Résumé */}
-              <div className="px-5 py-3 bg-gray-50 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] text-gray-400 uppercase font-bold">Prix catalogue</span>
-                  <span className="block text-sm font-black text-gray-900">{formatPrice(priceHistoryItem.price)}</span>
+              {/* Résumé — 3 cartes */}
+              <div className="px-6 py-4 bg-gray-50 border-b border-gray-100 grid grid-cols-3 gap-3 shrink-0">
+                <div className="bg-white rounded-xl border border-gray-100 px-4 py-3">
+                  <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wide">Prix catalogue</span>
+                  <span className="block text-lg font-black text-gray-900">{formatPrice(priceHistoryItem.price)}</span>
                 </div>
-                <div className="text-right">
-                  <span className="text-[10px] text-blue-500 uppercase font-bold">Moyenne observée</span>
-                  <span className="block text-sm font-black text-blue-600">{formatPrice(priceHistoryItem.observedPrice)}</span>
+                <div className="bg-white rounded-xl border border-blue-100 px-4 py-3">
+                  <span className="text-[10px] text-blue-500 uppercase font-bold tracking-wide">Moyenne observée</span>
+                  <span className="block text-lg font-black text-blue-600">{formatPrice(priceHistoryItem.observedPrice)}</span>
                 </div>
-                {priceHistoryItem.price > 0 && priceHistoryItem.observedPrice > 0 && (() => {
-                  const diff = ((priceHistoryItem.observedPrice - priceHistoryItem.price) / priceHistoryItem.price) * 100;
-                  return (
-                    <div className={`px-2 py-1 rounded-lg text-xs font-bold ${diff > 2 ? 'bg-red-50 text-red-600' : diff < -2 ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-500'}`}>
-                      {diff > 0 ? '+' : ''}{diff.toFixed(1)}%
-                    </div>
-                  );
-                })()}
+                <div className="bg-white rounded-xl border border-gray-100 px-4 py-3">
+                  <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wide">Écart</span>
+                  {priceHistoryItem.price > 0 && priceHistoryItem.observedPrice > 0 ? (() => {
+                    const diff = ((priceHistoryItem.observedPrice - priceHistoryItem.price) / priceHistoryItem.price) * 100;
+                    return <span className={`block text-lg font-black ${diff > 2 ? 'text-red-600' : diff < -2 ? 'text-emerald-600' : 'text-gray-500'}`}>{diff > 0 ? '+' : ''}{diff.toFixed(1)}%</span>;
+                  })() : <span className="block text-lg font-black text-gray-300">—</span>}
+                </div>
               </div>
 
-              {/* Liste historique */}
-              <div className="px-5 py-3 max-h-[300px] overflow-y-auto">
+              {/* Tableau */}
+              <div className="flex-1 overflow-y-auto min-h-0">
                 {!hasHistory ? (
-                  <div className="text-center py-6 text-gray-400">
-                    <BarChart2 size={24} className="mx-auto mb-2 opacity-30" />
-                    <p className="text-xs">Aucun historique disponible</p>
-                    <p className="text-[10px] text-gray-300 mt-1">Les prochaines remontées de prix seront enregistrées ici</p>
+                  <div className="text-center py-12 text-gray-400">
+                    <BarChart2 size={28} className="mx-auto mb-2 opacity-30" />
+                    <p className="text-sm">Aucun historique disponible</p>
+                    <p className="text-[11px] text-gray-300 mt-1">Les prochaines remontées de prix seront enregistrées ici</p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    {[...history].reverse().map((h, i) => {
-                      const isLatest = i === 0;
-                      return (
-                        <div key={i} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border ${isLatest ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-100'}`}>
-                          <div className={`w-2 h-2 rounded-full shrink-0 ${isLatest ? 'bg-blue-500' : 'bg-gray-300'}`} />
-                          <div className="flex-1 min-w-0">
-                            <span className={`font-bold text-sm ${isLatest ? 'text-blue-700' : 'text-gray-800'}`}>{formatPrice(h.price)}</span>
-                            {h.count > 0 && <span className="text-[9px] text-gray-400 ml-2">({h.count} offre{h.count > 1 ? 's' : ''})</span>}
-                          </div>
-                          <span className="text-[10px] text-gray-400 shrink-0">{fmtD(h.date)}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <table className="w-full text-left border-collapse">
+                    <thead className="sticky top-0 z-10">
+                      <tr className="text-[10px] uppercase font-black tracking-wider text-gray-400">
+                        <th className="px-6 py-2.5 bg-gray-50 border-b border-gray-200">Prix</th>
+                        <th className="px-3 py-2.5 bg-gray-50 border-b border-gray-200">Affaire</th>
+                        <th className="px-3 py-2.5 bg-gray-50 border-b border-gray-200 text-right">Quantité</th>
+                        <th className="px-3 py-2.5 bg-gray-50 border-b border-gray-200 text-center">Offres</th>
+                        <th className="px-3 py-2.5 bg-gray-50 border-b border-gray-200 text-right" title="Date d'ouverture des plis (RAO), sinon date de remise de l'offre">Date</th>
+                        <th className="px-4 py-2.5 bg-gray-50 border-b border-gray-200 w-10"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...history].reverse().map((h, i) => {
+                        const isLatest = i === 0;
+                        const origIdx = history.length - 1 - i;
+                        const pendingDelete = confirmDeleteHistIdx === origIdx;
+                        if (pendingDelete) {
+                          return (
+                            <tr key={origIdx} className="bg-red-50 border-t border-red-100">
+                              <td colSpan={5} className="px-6 py-3 text-xs font-bold text-red-600">Supprimer cette remontée ? La moyenne sera recalculée.</td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button onClick={() => handleDeleteHistoryEntry(origIdx)} title="Confirmer la suppression" className="p-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"><Check size={14} /></button>
+                                  <button onClick={() => setConfirmDeleteHistIdx(null)} title="Annuler" className="p-1.5 rounded-lg bg-white border border-gray-200 text-gray-500 hover:bg-gray-100 transition-colors"><X size={14} /></button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        }
+                        return (
+                          <tr key={origIdx} className={`group border-t border-gray-100 transition-colors ${isLatest ? 'bg-blue-50/60' : 'hover:bg-gray-50'}`}>
+                            <td className="px-6 py-3 whitespace-nowrap">
+                              <div className="flex items-center gap-2">
+                                <span className={`font-black text-sm ${isLatest ? 'text-blue-700' : 'text-gray-800'}`}>{formatPrice(h.price)}</span>
+                                {isLatest && <span className="text-[8px] font-black uppercase tracking-wider text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded">Récent</span>}
+                              </div>
+                            </td>
+                            <td className="px-3 py-3 max-w-[220px]">
+                              {h.project ? (
+                                <span className="inline-flex items-center gap-1.5 text-xs text-gray-700 min-w-0 max-w-full" title={h.project}>
+                                  <Briefcase size={12} className="shrink-0 text-gray-400" />
+                                  <span className="truncate font-medium">{h.project}</span>
+                                </span>
+                              ) : <span className="text-gray-300 text-xs">—</span>}
+                            </td>
+                            <td className="px-3 py-3 text-right whitespace-nowrap text-xs font-semibold text-gray-700">
+                              {h.qty != null && h.qty !== '' ? <>{Number(h.qty).toLocaleString('fr-FR', { maximumFractionDigits: 2 })}<span className="text-gray-400 font-normal">{h.unit ? ` ${h.unit}` : ''}</span></> : <span className="text-gray-300 font-normal">—</span>}
+                            </td>
+                            <td className="px-3 py-3 text-center whitespace-nowrap text-xs text-gray-500">
+                              {h.count > 0 ? h.count : <span className="text-gray-300">—</span>}
+                            </td>
+                            <td className="px-3 py-3 text-right whitespace-nowrap text-xs text-gray-400">{fmtD(h.date)}</td>
+                            <td className="px-4 py-3 text-right">
+                              <button onClick={() => setConfirmDeleteHistIdx(origIdx)} title="Supprimer cette remontée" className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-60 group-hover:opacity-100"><Trash2 size={14} /></button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 )}
               </div>
 
               {/* Footer */}
-              <div className="px-5 py-3 border-t border-gray-100 flex justify-between items-center">
-                <span className="text-[10px] text-gray-400">{hasHistory ? `${history.length} remontée${history.length > 1 ? 's' : ''}` : ''}</span>
-                <button onClick={() => setPriceHistoryItem(null)} className="px-4 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-colors">Fermer</button>
+              <div className="px-6 py-3 border-t border-gray-100 flex justify-between items-center shrink-0">
+                <span className="text-[11px] text-gray-400">{hasHistory ? `${history.length} remontée${history.length > 1 ? 's' : ''}` : ''}</span>
+                <button onClick={() => setPriceHistoryItem(null)} className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-colors">Fermer</button>
               </div>
             </div>
           </div>
@@ -881,6 +953,7 @@ DatabaseView.propTypes = {
   onExitLocalMode: PropTypes.func,
   onFullResetLocal: PropTypes.func,
   onForceRefresh: PropTypes.func,
+  localLibraryName: PropTypes.string,
   isAdmin: PropTypes.bool,
   onClearObservedPrices: PropTypes.func,
   bpuSearch: PropTypes.string,

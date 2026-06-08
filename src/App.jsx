@@ -706,6 +706,7 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNav
                 isLocalMode={localMode.isLocalMode}
                 onExitLocalMode={localMode.handleExitLocalMode}
                 onFullResetLocal={localMode.handleFullResetLocal}
+                localLibraryName={localMode.localLibraryName}
                 filteredBpu={filteredBpuToDisplay}
                 fullBpu={localMode.currentBpu}
                 onImportData={localMode.handleLocalImport}
