@@ -191,6 +191,38 @@ const GridSection = ({ items }) => (
   </div>
 );
 
+// ─── Section: Prompt (bloc copiable pour IA) ─────────────────────────────────
+const PromptSection = ({ title = 'Prompt IA', intro, text, color = 'indigo' }) => {
+  const c = getColor(color);
+  const [copied, setCopied] = React.useState(false);
+  const handleCopy = () => {
+    if (!navigator.clipboard) return;
+    navigator.clipboard.writeText(text || '').then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {});
+  };
+  return (
+    <div className={`rounded-xl border ${c.border} overflow-hidden`}>
+      <div className={`flex items-center justify-between px-4 py-2.5 ${c.bg} border-b ${c.border}`}>
+        <p className={`text-xs font-bold ${c.text} flex items-center gap-1.5`}>
+          <MessageSquare size={13} /> {title}
+        </p>
+        <button
+          onClick={handleCopy}
+          className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg border transition-colors ${
+            copied ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : `bg-white ${c.text} ${c.border} hover:${c.bg}`
+          }`}
+        >
+          {copied ? <><CheckCircle2 size={12} /> Copié</> : <><Copy size={12} /> Copier</>}
+        </button>
+      </div>
+      {intro && <p className="px-4 pt-3 text-xs text-gray-500 leading-relaxed">{intro}</p>}
+      <pre className="px-4 py-3 text-[11px] text-gray-700 font-mono whitespace-pre-wrap leading-relaxed max-h-96 overflow-y-auto">{text}</pre>
+    </div>
+  );
+};
+
 // ─── Section: Shortcuts ──────────────────────────────────────────────────────
 const ShortcutsSection = ({ items }) => (
   <div className="rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
@@ -216,6 +248,7 @@ const SectionRenderer = ({ section }) => {
     case 'table':     return <TableSection title={section.title} headers={section.headers} rows={section.rows} />;
     case 'grid':      return <GridSection items={section.items} />;
     case 'shortcuts': return <ShortcutsSection items={section.items} />;
+    case 'prompt':    return <PromptSection title={section.title} intro={section.intro} text={section.text} color={section.color} />;
     default:          return null;
   }
 };

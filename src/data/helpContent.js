@@ -537,6 +537,60 @@ export const helpContent = {
             tip: "La premiere ligne (en-tetes) est ignoree automatiquement.",
           },
           {
+            type: 'card', icon: 'FileJson', color: 'indigo', title: 'Charger une base externe (JSON)',
+            description: "Ouvrez un catalogue complet (chapitres + articles) depuis un fichier JSON. La base est chargee en mode Local (stockee dans ce navigateur) sans toucher a la base Cloud.",
+            steps: [
+              "Menu source (en haut) > « Charger une base externe… »",
+              "Selectionnez le fichier .json",
+              "Le catalogue s'ouvre avec ses dossiers ; les prix sont a completer",
+            ],
+            tip: "Vous n'avez pas de JSON ? Donnez votre bordereau Excel (BPU/DQE) a n'importe quelle IA avec le prompt ci-dessous : elle vous genere le fichier importable.",
+          },
+          {
+            type: 'prompt',
+            color: 'indigo',
+            title: 'Prompt IA — convertir un BPU/DQE Excel en base importable',
+            intro: "Copiez ce prompt, collez-le dans l'IA de votre choix (ChatGPT, Claude, Gemini, Mistral…) et joignez votre fichier Excel. Recuperez le JSON genere puis importez-le via « Charger une base externe ».",
+            text: `Tu es un assistant qui convertit un bordereau de prix unitaires (fichier Excel BPU et/ou DQE d'un marche de travaux VRD) en un fichier JSON importable dans le logiciel EstimaVRD via « Charger une base externe ».
+
+ENTREE : un ou plusieurs tableaux Excel d'articles de prix. Colonnes habituelles (intitules variables) : un numero/code, une designation (libelle), une description technique (« Ce prix remunere... »), une unite, parfois une quantite et un prix unitaire. Le document est souvent organise en chapitres ou lots (ex. « A - SIGNALISATION », « 1 - TRAVAUX DE VOIRIE »).
+
+SORTIE : uniquement un objet JSON valide (aucun texte ni balise markdown avant/apres), en UTF-8, respectant EXACTEMENT ce schema :
+
+{
+  "name": "BPU VRD - <Nom du marche/collectivite>",
+  "id": "lib_bpu_<identifiant_court_minuscules>",
+  "categories": [
+    { "id": "cat_<prefixe>", "name": "<TITRE CHAPITRE EN MAJUSCULES>", "color": "#3b82f6" }
+  ],
+  "bpu": [
+    {
+      "id": "<code unique>",
+      "bpuNum": "<numero de prix d'origine>",
+      "designation": "<DESIGNATION EN MAJUSCULES>",
+      "description": "<description en HTML, lignes separees par <br>>",
+      "unit": "<symbole d'unite>",
+      "price": 0,
+      "categoryIds": ["cat_<prefixe>"],
+      "categoryId": "cat_<prefixe>",
+      "cctpRefs": []
+    }
+  ]
+}
+
+REGLES
+1. Un objet par article chiffrable, sous-articles/variantes inclus (taille, diametre, duree...). Aplatis toute hierarchie : pas d'imbrication dans "bpu".
+2. "id" = chaine unique (le code d'article ; si un code est reutilise, ajoute un suffixe -2).
+3. "bpuNum" = le numero de prix exact du bordereau (ex. 3TRO044, A.2.1, 0101).
+4. "designation" = le libelle court de l'article, EN MAJUSCULES.
+5. "description" = le texte technique complet (alineas, tirets) au format HTML : echappe & < > en &amp; &lt; &gt; et remplace chaque saut de ligne par <br>. Mets "" si l'article n'a pas de description (les variantes heritent du parent et restent vides).
+6. "unit" = symbole normalise : metre lineaire -> ml, metre carre/m2 -> m2, metre cube/m3 -> m3, unite -> u, tonne -> t, forfait -> forfait, heure -> h, journee -> j, pourcentage -> %, kilogramme -> kg. Si l'unite est ecrite en toutes lettres en fin de description (« Le metre carre : »), utilise-la pour "unit" et retire cette ligne de la description.
+7. "price" = 0 (les prix seront saisis dans le logiciel). Si le fichier contient deja des prix unitaires, mets le nombre (separateur decimal = point).
+8. Categories = les chapitres ou lots du bordereau. Pour chaque chapitre : "id" = "cat_" + son prefixe, "name" en MAJUSCULES, "color" prise dans cette palette en rotation : ["#3b82f6","#f59e0b","#8b5cf6","#10b981","#ef4444","#06b6d4","#ec4899","#84cc16"]. Chaque article recoit l'id de son chapitre dans "categoryIds" et "categoryId".
+9. Nettoyage : supprime les cellules d'erreur (#NAME?, #REF!), ignore les lignes de recapitulatif / sous-totaux / « CUMULS », fusionne les fragments de description orphelins dans leur article, retire les guillemets et espaces superflus.
+10. Reponds uniquement par le JSON final, sans commentaire.`,
+          },
+          {
             type: 'card', icon: 'Download', color: 'emerald', title: 'Exporter en JSON',
             description: "Exportez l'ensemble du catalogue dans un fichier JSON pour archivage ou transfert.",
             steps: [
