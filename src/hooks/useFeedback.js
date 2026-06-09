@@ -7,7 +7,7 @@
 import { useEffect, useState } from 'react';
 import {
   collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc,
-  query, orderBy, limit, serverTimestamp,
+  query, orderBy, where, limit, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -56,6 +56,35 @@ export const useFeedbackList = (enabled) => {
   }, [enabled]);
 
   return { items, loading, error };
+};
+
+/**
+ * Compteur temps réel des feedbacks au statut « nouveau » (super-admin only).
+ * Alimente la pastille de notification du hub. Borné à FEEDBACK_LIMIT pour ne
+ * pas charger toute la collection ; au-delà l'UI affiche « 99+ ». N'abonne que
+ * si enabled (évite les permission-denied côté utilisateur non super-admin).
+ * @param {boolean} enabled - n'abonne que pour le super-admin
+ * @returns {number} nombre de feedbacks non traités
+ */
+export const useNewFeedbackCount = (enabled) => {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    if (!enabled) { setCount(0); return; }
+    const q = query(
+      collection(db, COL),
+      where('status', '==', 'nouveau'),
+      limit(FEEDBACK_LIMIT),
+    );
+    const unsub = onSnapshot(
+      q,
+      (snap) => setCount(snap.size),
+      () => setCount(0),
+    );
+    return unsub;
+  }, [enabled]);
+
+  return count;
 };
 
 export const updateFeedback = (id, patch) => updateDoc(doc(db, COL, id), patch);

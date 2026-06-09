@@ -10,6 +10,8 @@ import { APP_VERSION } from '../data/changelog';
 import ChangelogModal from '../components/ChangelogModal';
 import HelpPanel from '../components/help/HelpPanel';
 import HelpButton from '../components/help/HelpButton';
+import { isSuperAdmin } from '../config/superAdmin';
+import { useNewFeedbackCount } from '../hooks/useFeedback';
 
 // ─── WIDGET MÉTÉO ──────────────────────────────────────────────────────────
 
@@ -113,7 +115,7 @@ const ROW_THEMES = {
 
 // ─── BENTO CARD ────────────────────────────────────────────────────────────
 
-function BentoCard({ mod, theme, accessible, onSelect, mounted, delay }) {
+function BentoCard({ mod, theme, accessible, onSelect, mounted, delay, notifCount = 0 }) {
   const Icon = mod.icon;
 
   return (
@@ -130,8 +132,16 @@ function BentoCard({ mod, theme, accessible, onSelect, mounted, delay }) {
     >
       {/* Header: icon + badge */}
       <div className="flex items-start justify-between mb-[clamp(0.25rem,0.5vh,1rem)]">
-        <div className={`p-[clamp(0.375rem,0.6vh,0.75rem)] rounded-xl ${theme.iconBg} transition-transform duration-200 ${accessible ? 'group-hover:scale-110' : ''}`}>
+        <div className={`relative p-[clamp(0.375rem,0.6vh,0.75rem)] rounded-xl ${theme.iconBg} transition-transform duration-200 ${accessible ? 'group-hover:scale-110' : ''}`}>
           <Icon size={24} className={accessible ? theme.iconColor : 'text-gray-400'} strokeWidth={1.5} />
+          {notifCount > 0 && (
+            <span
+              className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold leading-none ring-2 ring-white shadow-sm"
+              title={`${notifCount} feedback${notifCount > 1 ? 's' : ''} à traiter`}
+            >
+              {notifCount > 99 ? '99+' : notifCount}
+            </span>
+          )}
         </div>
         {!accessible ? (
           <span className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-gray-200/50 text-gray-400">
@@ -187,6 +197,9 @@ export default function ModuleHubView({ isAdmin, userEmail, userModules, onSelec
   const [showHelp, setShowHelp] = useState(false);
   const [cacheClearing, setCacheClearing] = useState(false);
   useEffect(() => { setMounted(true); }, []);
+
+  // Pastille « nouveau feedback » sur la carte Administration (super-admin only).
+  const newFeedbackCount = useNewFeedbackCount(isSuperAdmin(userEmail));
 
   const handleClearCache = async () => {
     if (cacheClearing) return;
@@ -335,6 +348,7 @@ export default function ModuleHubView({ isAdmin, userEmail, userModules, onSelec
                         onSelect={onSelectModule}
                         mounted={mounted}
                         delay={200 + rowNum * 100 + idx * 60}
+                        notifCount={mod.id === 'admin' ? newFeedbackCount : 0}
                       />
                     ))}
                   </div>

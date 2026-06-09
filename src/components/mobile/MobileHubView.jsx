@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import Icon from './Icon';
 import { APP_VERSION } from '../../data/changelog';
 import ChangelogModal from '../ChangelogModal';
-import { satisfiesDesktopGate } from '../../config/superAdmin';
+import { satisfiesDesktopGate, isSuperAdmin } from '../../config/superAdmin';
+import { useNewFeedbackCount } from '../../hooks/useFeedback';
 
 // ─── MODULES MOBILES ───────────────────────────────────────────────────────
 //
@@ -62,6 +63,10 @@ export default function MobileHubView({ userEmail, userModules, userMobileModule
   const [showChangelog, setShowChangelog] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
+  // Pastille « nouveau feedback » sur l'avatar (super-admin only, informatif :
+  // le panneau de traitement vit côté desktop).
+  const newFeedbackCount = useNewFeedbackCount(isSuperAdmin(userEmail));
+
   const firstName = userEmail?.split('@')[0]?.split('.')[0] || '';
   const displayName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
   const hour = new Date().getHours();
@@ -98,8 +103,18 @@ export default function MobileHubView({ userEmail, userModules, userMobileModule
                 <Icon name="monitor" size={16} color="currentColor" />
               </button>
             )}
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-              <span className="text-[10px] font-bold text-white">{firstName.charAt(0).toUpperCase()}</span>
+            <div className="relative">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                <span className="text-[10px] font-bold text-white">{firstName.charAt(0).toUpperCase()}</span>
+              </div>
+              {newFeedbackCount > 0 && (
+                <span
+                  className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold leading-none ring-2 ring-white shadow-sm"
+                  title={`${newFeedbackCount} feedback${newFeedbackCount > 1 ? 's' : ''} à traiter`}
+                >
+                  {newFeedbackCount > 99 ? '99+' : newFeedbackCount}
+                </span>
+              )}
             </div>
             <button
               onClick={onLogout}
