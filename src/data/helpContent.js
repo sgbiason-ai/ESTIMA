@@ -659,37 +659,80 @@ export const helpContent = {
   // ──────────────────────────────────────────────────────────────────────────
   moduleHub: {
     title: 'Guide — EstimaVRD',
-    subtitle: "Vue d'ensemble de l'application",
+    subtitle: "Le hub : votre point de départ",
     tabs: [
       {
         id: 'modules', label: 'Modules', icon: 'LayoutGrid',
         sections: [
-          { type: 'intro', text: "EstimaVRD est compose de modules specialises. Chaque carte du hub donne acces a un module." },
+          { type: 'intro', text: "Le hub est l'écran d'accueil : chaque carte ouvre un module. Les modules sont regroupés en 3 rangées thématiques (mise en page « Bento »). Une carte grisée avec un cadenas n'est pas accessible avec votre profil — voir l'onglet « Accès »." },
           {
-            type: 'grid',
-            items: [
-              { title: 'Estimation', text: "Module principal — creez et gerez vos devis de projets VRD avec chapitres, articles et formules.", color: 'blue' },
-              { title: 'Gestion de Projets', text: "Sauvegardez, restaurez et organisez vos projets en dossiers. Import/Export JSON.", color: 'emerald' },
-              { title: 'Analyse RAO', text: "Analysez les offres des entreprises, comparez les prix et generez les rapports d'analyse.", color: 'indigo' },
-              { title: 'Compte Rendu', text: "Redigez vos comptes rendus de reunion avec participants, observations et exports PDF/Word.", color: 'teal' },
-              { title: 'Documents Admin', text: "Generez les documents administratifs de marche : OS, avenants, fiches.", color: 'amber' },
-              { title: 'Branding', text: "Personnalisez votre identite visuelle : logo, couleurs, coordonnees, polices.", color: 'violet' },
+            type: 'card', icon: 'Briefcase', color: 'blue', title: 'Rangée 1 · Projet & Estimation',
+            description: "Le cœur du chiffrage, du projet jusqu'à l'analyse des offres.",
+            steps: [
+              "Gestion de Projets — Créez, sauvegardez, restaurez et classez vos projets en dossiers (import/export JSON).",
+              "Estimation — Module principal : construisez votre devis VRD chapitre par chapitre (articles, formules, tranches, blocs).",
+              "Analyse RAO — Dépouillez les offres des entreprises, comparez les prix et rédigez le rapport d'analyse (RAO).",
+            ],
+          },
+          {
+            type: 'card', icon: 'Wrench', color: 'amber', title: 'Rangée 2 · Outils & Administration',
+            description: "Les outils métier du quotidien et le suivi de chantier.",
+            steps: [
+              "Devis MOE — Établissez vos devis d'honoraires de maîtrise d'œuvre.",
+              "Notes de frais — Saisissez et suivez les notes de frais (déplacements, véhicules, justificatifs).",
+              "Compte Rendu (CRC) — Rédigez vos comptes rendus de chantier : participants, observations, exports PDF/Word.",
+              "Documents Admin — Générez les pièces administratives de marché (OS, avenants, fiches, réception EXE).",
+              "Visites de site — Consignez vos visites terrain avec observations et photos.",
+            ],
+          },
+          {
+            type: 'card', icon: 'Settings', color: 'violet', title: 'Rangée 3 · Paramètres & Compte',
+            description: "Personnalisation, conformité et administration de l'espace.",
+            steps: [
+              "Branding — Personnalisez votre identité visuelle : logo, couleurs, coordonnées, polices (appliquée aux exports).",
+              "RGPD — Gérez la conformité et les données personnelles.",
+              "Administration — Réservé aux administrateurs : utilisateurs, droits d'accès et espace de travail.",
             ],
           },
         ],
       },
       {
-        id: 'navigation', label: 'Navigation', icon: 'Compass',
+        id: 'navigation', label: 'Navigation & repères', icon: 'Compass',
         sections: [
-          { type: 'intro', text: "Cliquez sur une carte pour ouvrir le module correspondant. Le bouton \"← Hub\" en haut a gauche vous ramene ici." },
+          { type: 'intro', text: "Cliquez sur une carte pour ouvrir un module. Le bouton « ← Hub » (ou « Accueil ») en haut à gauche vous ramène ici depuis n'importe quel module." },
           {
             type: 'steps',
             items: [
-              { color: 'blue', title: 'Ouvrir un module', description: "Cliquez sur la carte du module souhaite. Certains modules necessitent d'avoir un projet charge." },
-              { color: 'emerald', title: 'Revenir au hub', description: "Depuis n'importe quel module, cliquez sur le bouton \"← Hub\" en haut a gauche." },
-              { color: 'amber', title: 'Meteo et infos', description: "Le hub affiche la meteo locale, les statistiques de votre espace (projets, articles BPU) et les derniers changements." },
+              { color: 'blue', title: 'Ouvrir un module', description: "Cliquez sur la carte voulue. Certains modules (Estimation, Analyse RAO…) demandent d'avoir un projet chargé au préalable." },
+              { color: 'emerald', title: 'Revenir au hub', description: "Le bouton « ← Hub » en haut à gauche est présent dans tous les modules." },
+              { color: 'amber', title: 'Salutation, date & météo', description: "Le hub affiche un message selon l'heure (Bonjour / Bon après-midi / Bonsoir), la date du jour et la météo locale si vous autorisez la géolocalisation (desktop uniquement)." },
+              { color: 'teal', title: 'Bascule mobile / desktop', description: "Sur tablette, un bouton permet de basculer entre l'affichage desktop et l'affichage mobile. Il n'apparaît pas sur PC ni sur téléphone." },
+              { color: 'violet', title: 'Nouveautés', description: "Le bouton « Nouveautés » en pied de page ouvre le journal des changements (changelog) de l'application." },
+              { color: 'slate', title: 'Vider le cache', description: "Un bouton dans l'en-tête force le rechargement de l'application et des données — utile si une ancienne version reste affichée." },
             ],
           },
+          { type: 'tip', text: "Après une mise à jour, un rafraîchissement forcé (Ctrl+Maj+R) ou le bouton « Vider le cache » garantit d'avoir la toute dernière version." },
+        ],
+      },
+      {
+        id: 'acces', label: 'Accès & verrouillage', icon: 'Lock',
+        sections: [
+          { type: 'intro', text: "Tous les modules ne sont pas forcément disponibles : l'accès dépend de votre profil utilisateur." },
+          {
+            type: 'card', icon: 'Lock', color: 'rose', title: 'Cartes verrouillées',
+            description: "Une carte grisée affiche un cadenas « Verrouillé » et la mention « Accès restreint » : elle n'est pas cliquable. Le module existe, mais il ne fait pas partie de vos droits.",
+          },
+          {
+            type: 'card', icon: 'ShieldCheck', color: 'violet', title: 'Module Administration',
+            description: "Réservé aux administrateurs : gestion des utilisateurs, des droits d'accès aux modules et de l'espace de travail. Invisible pour les comptes non administrateurs.",
+          },
+          {
+            type: 'steps',
+            items: [
+              { color: 'blue', title: 'Obtenir un accès', description: "Les droits sont attribués par un administrateur (par profil / liste de modules). Contactez l'administrateur de votre espace pour débloquer un module." },
+            ],
+          },
+          { type: 'warning', text: "Les accès se gèrent côté administration, pas en libre-service : un module verrouillé ne peut pas être débloqué par vous-même." },
         ],
       },
     ],

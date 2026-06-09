@@ -769,6 +769,7 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNav
             {activeTab === 'rc' && (
               <RcGeneratorView
                 project={project}
+                companyId={companyId}
                 masterRc={resources.masterRc || []}
                 onSaveMasterRc={resources.handleSaveMasterRc || (() => {})}
                 masterBranding={resources.masterBranding}

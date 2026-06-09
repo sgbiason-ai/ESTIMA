@@ -655,11 +655,45 @@ const ProjectView = ({
     return findParent(project?.chapters || [], targetId) ?? 'root';
   };
 
+  // Ajoute un article « libre » (hors bibliothèque BPU) à remplir directement dans le tableau.
+  // Cible : sous-chapitre/chapitre sélectionné, sinon parent de l'article sélectionné, sinon 1er chapitre.
+  const handleAddFreeItem = () => {
+    if (isReadOnly) return;
+    let targetId = null;
+    if (selection?.type === 'subchapter' || selection?.type === 'chapter') {
+      targetId = selection.id;
+    } else if (selection?.type === 'item') {
+      const p = findItemParentId(selection.id);
+      targetId = p !== 'root' ? p : null;
+    }
+    if (!targetId) targetId = project?.chapters?.[0]?.id || null;
+    if (!targetId) { toast.warning("Ajoutez d'abord un chapitre pour y placer l'article."); return; }
+
+    const newLine = {
+      type: 'item',
+      id: `line_${generateId()}`,
+      uid: '',           // non lié à la bibliothèque BPU
+      isFree: true,      // article libre → édition inline désignation + unité
+      designation: '',
+      unit: '',
+      price: 0,
+      qty: 0,
+      formula: '',
+      quantities: {},
+      quantitiesFormula: {},
+      bpuNum: '',
+      isFixed: false,
+    };
+    addItemsToProject([newLine], { type: 'subchapter', id: targetId });
+    setSelection({ type: 'item', id: newLine.id, parentId: targetId });
+    toast.success('Article libre ajouté — complétez désignation, unité, quantité et prix.');
+  };
+
   // Applique les champs édités à la SEULE ligne du projet (n'altère pas le BPU).
   const applyFieldsToProjectLine = (fields) => {
     if (!editItemTarget) return;
     const parentId = findItemParentId(editItemTarget.id);
-    ['designation','description','unit','price','bpuNum','cctpRefs','categoryIds'].forEach(key => {
+    ['designation','description','unit','price','bpuNum','cctpRefs','categoryIds','isFixed'].forEach(key => {
       if (fields[key] !== undefined) updateProjectItem(parentId, editItemTarget.id, key, fields[key]);
     });
   };
@@ -716,6 +750,8 @@ const ProjectView = ({
           description: item?.description || bpuSource?.description || '',
           cctpRefs: item?.cctpRefs?.length ? item.cctpRefs : (bpuSource?.cctpRefs || []),
           categoryIds: item?.categoryIds?.length ? item.categoryIds : (bpuSource?.categoryIds || []),
+          // Prix réel observé de l'article source (affichage seul, non écrit dans la ligne projet)
+          observedPrice: item?.observedPrice ?? bpuSource?.observedPrice ?? null,
         });
       },
   };
@@ -750,7 +786,7 @@ const ProjectView = ({
               if (priceCheck.anomalyCount > 0) setExportGuard({ show: true, format, type });
               else setExportModalState({ show: true, format, type });
             }}
-            onOpenCalculation={handleOpenCalculation} onOpenDetails={() => setShowDetailsModal(true)} onAddChapter={addChapter}
+            onOpenCalculation={handleOpenCalculation} onOpenDetails={() => setShowDetailsModal(true)} onAddChapter={addChapter} onAddFreeItem={handleAddFreeItem}
             bpuConfig={bpuConfig} setBpuConfig={setBpuConfig}
             onSaveAffaire={handleSaveAffaire}
             onOpenAffaire={() => handleOpenAffaire(null)}

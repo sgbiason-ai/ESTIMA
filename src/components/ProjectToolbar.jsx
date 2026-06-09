@@ -5,7 +5,7 @@ import {
   CheckCircle2, CloudOff, FileSignature, Bookmark, ListOrdered, Hash,
   FolderOpen, Save, Upload, Eye, Pencil, PlusCircle,
   BarChart3, Download, Info, Table2, FileOutput,
-  Cloud, PanelLeftOpen, FileDown, ShieldCheck, ClipboardCheck, Undo2, ScanSearch, HelpCircle
+  Cloud, PanelLeftOpen, FileDown, ShieldCheck, ClipboardCheck, Undo2, ScanSearch, HelpCircle, FilePlus
 } from 'lucide-react';
 
 import { RibbonGroup, RibbonBtnLarge, RibbonBtnSmall } from './common/RibbonParts';
@@ -30,6 +30,7 @@ const ProjectToolbar = ({
   onOpenCalculation,
   onOpenDetails,
   onAddChapter,
+  onAddFreeItem,
   bpuConfig,
   setBpuConfig,
   onSaveAffaire,
@@ -318,7 +319,7 @@ const ProjectToolbar = ({
               </RibbonGroup>
             )}
 
-            {/* Ajouter Chapitre (tout à droite, mode étude) */}
+            {/* Ajouter Chapitre / Article libre (tout à droite, mode étude) */}
             {!isReadOnly && currentMode === 'study' && (
               <RibbonGroup label="Nouveau" noBorder>
                 <RibbonBtnLarge
@@ -328,6 +329,15 @@ const ProjectToolbar = ({
                   accent="text-emerald-500"
                   title="Ajouter un nouveau chapitre"
                 />
+                {onAddFreeItem && (
+                  <RibbonBtnLarge
+                    icon={FilePlus}
+                    label="Article libre"
+                    onClick={onAddFreeItem}
+                    accent="text-blue-500"
+                    title="Ajouter un article libre à remplir directement (hors bibliothèque BPU)"
+                  />
+                )}
               </RibbonGroup>
             )}
           </>

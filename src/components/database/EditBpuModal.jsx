@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, Edit2, Hash, BookOpen, Search, Folder, Check, ChevronDown, Maximize2, Minimize2, Trash2, Library, Plus, RefreshCw } from 'lucide-react';
+import { X, Save, Edit2, Hash, BookOpen, Search, Folder, Check, ChevronDown, Maximize2, Minimize2, Trash2, Library, Plus, RefreshCw, History, TrendingUp, TrendingDown, Lock } from 'lucide-react';
 import RichTextEditor from '../common/RichTextEditor';
 import CctpSelectorModal from '../modals/CctpSelectorModal'; 
 
@@ -177,6 +177,13 @@ const EditBpuModal = ({ item, onClose, onUpdate, units, categories = [], bpuConf
 
   if (!item) return null;
 
+  // Prix réel observé (remontées RAO) porté par l'article. Écart % du P.U. saisi vs ce prix réel
+  // (>0 = prix saisi au-dessus du réel → rouge ; <0 = en-dessous → vert ; |%| < 2 → aligné).
+  const observedPrice = item?.observedPrice != null ? (Number(item.observedPrice) || 0) : null;
+  const obsPct = (observedPrice && observedPrice !== 0)
+    ? (((Number(formData.price) || 0) - observedPrice) / observedPrice) * 100
+    : null;
+
   const inputClass = `w-full bg-white border border-slate-300 rounded-lg font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none shadow-sm transition-all ${
     isFullScreen ? 'px-3 py-1.5 text-xs h-8' : 'px-4 py-3 text-sm'
   }`;
@@ -226,6 +233,18 @@ const EditBpuModal = ({ item, onClose, onUpdate, units, categories = [], bpuConf
               <p className="text-[11px] text-amber-800 font-medium flex-1">
                 Les modifications s'appliquent <strong>uniquement à cet article dans le projet en cours</strong>. La base de prix unitaires (BPU) ne sera pas modifiée.
               </p>
+              <button
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, isFixed: !prev.isFixed }))}
+                title="Forfait : montant fixe, non soumis à l'arrondi automatique des quantités"
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider border transition-colors shadow-sm whitespace-nowrap shrink-0 ${
+                  formData.isFixed
+                    ? 'bg-amber-500 border-amber-500 text-white hover:bg-amber-600'
+                    : 'bg-white border-amber-300 text-amber-800 hover:bg-amber-100 hover:border-amber-400'
+                }`}
+              >
+                <Lock size={12} /> Forfait {formData.isFixed ? '· activé' : ''}
+              </button>
               {onSaveToLibrary && (
                 <div className="relative shrink-0" ref={libMenuRef}>
                   <button
@@ -296,6 +315,24 @@ const EditBpuModal = ({ item, onClose, onUpdate, units, categories = [], bpuConf
               <div className="col-span-2">
                 <label className={labelClass}>P.U. (€)</label>
                 <input type="text" inputMode="decimal" value={displayPrice} onChange={handlePriceChange} onBlur={handlePriceBlur} className={`${inputClass} font-mono text-emerald-700 text-right`} placeholder="0,00" />
+                {/* Prix réel observé (remontées RAO) + écart vs le P.U. saisi */}
+                {observedPrice !== null && (
+                  <div className={`flex flex-wrap items-center justify-end gap-1 ${isFullScreen ? 'mt-0.5' : 'mt-1.5'}`}>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600" title="Prix réel observé (remontées RAO)">
+                      <History size={10} /> Réel : {formatPrice(observedPrice)} €
+                    </span>
+                    {obsPct !== null && (
+                      Math.abs(obsPct) < 2 ? (
+                        <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1 rounded">Aligné</span>
+                      ) : (
+                        <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold px-1 rounded border ${obsPct > 0 ? 'text-red-600 bg-red-50 border-red-100' : 'text-emerald-600 bg-emerald-50 border-emerald-100'}`}>
+                          {obsPct > 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                          {obsPct > 0 ? '+' : ''}{obsPct.toFixed(1)}%
+                        </span>
+                      )
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* LIGNE 2 : CCTP MULTI */}

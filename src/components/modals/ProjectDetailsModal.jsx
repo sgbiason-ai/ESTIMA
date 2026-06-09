@@ -164,9 +164,10 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
   const [formData, setFormData] = useState({
     name: '', subtitle1: '', subtitle2: '',
     client: '', clientAddress: '', clientZip: '', clientCity: '',
-    moe: 'PAPYRUS', code: '', location: '', marketType: 'Privé', tauxTVA: 20,
+    moe: 'PAPYRUS', moeAddress: '', code: '', location: '', marketType: 'Privé', tauxTVA: 20,
     phase: 'DCE', dateRemise: '', timeRemise: '', duration: '', prepPeriod: '1 mois',
     clientLogo: null, projectDescription: '', hasPSE: 'ne comporte pas', department: '',
+    lotName: '', spsLevel: 'II', startDate: '', validityDays: 120, platformUrl: '',
     showSignatures: true,
     signatories: ['', '', '', ''],
     sharepointUrl: '',
@@ -261,6 +262,7 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
         client: project.client || '',
         clientAddress: project.clientAddress || '', clientZip: project.clientZip || '',
         clientCity: project.clientCity || '', moe: project.moe || 'PAPYRUS',
+        moeAddress: project.moeAddress || (branding?.address || ''),
         code: project.code || '', location: project.location || '',
         marketType: project.marketType || 'Privé',
         tauxTVA: project.tauxTVA ?? 20,
@@ -273,6 +275,11 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
         projectDescription: project.projectDescription || '',
         hasPSE: project.hasPSE || 'ne comporte pas',
         department: project.department || '',
+        lotName: project.lotName || '',
+        spsLevel: project.spsLevel || 'II',
+        startDate: project.startDate || '',
+        validityDays: project.validityDays ?? 120,
+        platformUrl: project.platformUrl || '',
         showSignatures: project.showSignatures !== false,
         signatories: project.signatories || ['', '', '', ''],
         sharepointUrl: project.sharepointUrl || '',
@@ -399,6 +406,7 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
               </h3>
               <ModernInput label="Lieu de réalisation" name="location" value={formData.location} onChange={handleChange} icon={MapPin} placeholder="Ville / Localisation" error={errors.location} />
               <ModernInput label="Maître d'Oeuvre (MOE)" name="moe" value={formData.moe} onChange={handleChange} icon={Ruler} placeholder="PAPYRUS" error={errors.moe} />
+              <ModernInput label="Adresse MOE" name="moeAddress" value={formData.moeAddress} onChange={handleChange} icon={MapPin} placeholder="21-23 Route de la Pradine, 81500 Bannières" />
               <ModernSelect label="Type de Marché" name="marketType" value={formData.marketType} onChange={handleChange} icon={Briefcase}
                 options={[{ value: 'Privé', label: 'Marché Privé' }, { value: 'Public', label: 'Marché Public' }, { value: 'Sous-traitance', label: 'Sous-traitance' }]} />
               <ModernSelect label="Taux de TVA" name="tauxTVA" value={String(formData.tauxTVA)} onChange={handleChange} icon={Percent}
@@ -537,6 +545,32 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
               </div>
             </div>
 
+          </div>
+
+          {/* CONSULTATION / RC */}
+          <div className="mt-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <h3 className="text-xs font-black text-cyan-600 uppercase tracking-widest flex items-center gap-2">
+                <FileText size={12}/> Consultation / Règlement (RC)
+              </h3>
+            </div>
+            <div className="flex flex-col gap-3">
+              <ModernInput label="Intitulé du lot" name="lotName" value={formData.lotName} onChange={handleChange} icon={Layers}
+                placeholder="Ex: LOT unique : TERRASSEMENTS / VOIRIE / ESPACES VERTS / RÉSEAU EP / ÉCLAIRAGE" />
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <ModernSelect label="Coordination SPS" name="spsLevel" value={formData.spsLevel} onChange={handleChange} icon={ShieldAlert}
+                  options={[{ value: 'I', label: 'Niveau I' }, { value: 'II', label: 'Niveau II' }, { value: 'III', label: 'Niveau III' }, { value: 'Sans objet', label: 'Sans objet' }]} />
+                <ModernInput label="Démarrage prévisionnel" name="startDate" value={formData.startDate} onChange={handleChange} icon={Calendar} placeholder="Ex: septembre 2026" />
+                <ModernInput label="Validité des offres (jours)" name="validityDays" type="number" value={formData.validityDays} onChange={handleChange} icon={Hourglass} placeholder="120" />
+                <ModernInput label="Plateforme (URL)" name="platformUrl" type="url" value={formData.platformUrl} onChange={handleChange} icon={Link} placeholder="https://marches-publics..." />
+              </div>
+              <div className="flex items-start gap-2 bg-cyan-50/50 border border-cyan-100 rounded-lg px-3 py-2.5">
+                <FileText size={13} className="text-cyan-400 shrink-0 mt-0.5" />
+                <p className="text-[10px] text-cyan-600 font-medium leading-relaxed">
+                  Variables RC : <span className="font-black">{"{{lotName}}"}</span> · <span className="font-black">{"{{spsLevel}}"}</span> · <span className="font-black">{"{{startDate}}"}</span> · <span className="font-black">{"{{validityDays}}"}</span> · <span className="font-black">{"{{platformUrl}}"}</span> · <span className="font-black">{"{{moeAddress}}"}</span> · <span className="font-black">{"{{criteresTable}}"}</span> <em>(critères du module RAO)</em>
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* SHAREPOINT — DOSSIER PLANS */}

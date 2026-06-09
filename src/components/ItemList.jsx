@@ -1,7 +1,7 @@
 // src/components/ItemList.jsx
 import React, { useContext, memo, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Draggable, Droppable } from '@hello-pangea/dnd'; 
-import { GripVertical, Layers, Trash2, Plus, ShieldCheck, AlertCircle, AlertTriangle, FunctionSquare, Check, Boxes } from 'lucide-react';
+import { GripVertical, Layers, Trash2, Plus, ShieldCheck, AlertCircle, AlertTriangle, FunctionSquare, Check, Boxes, Pencil } from 'lucide-react';
 
 import { ProjectContext } from '../context/ProjectContext';
 import { EditableTitle, FormattedInput, OptionToggle } from './ProjectUI';
@@ -277,6 +277,22 @@ const ItemRow = memo(
     const [localPrice, setLocalPrice] = useState(el.price);
     useEffect(() => setLocalPrice(el.price), [el.price]);
 
+    // Article libre (hors BPU) : désignation + unité éditables directement dans la ligne.
+    const isFree = !!el.isFree && !el.uid;
+    const [localDesignation, setLocalDesignation] = useState(el.designation || '');
+    useEffect(() => setLocalDesignation(el.designation || ''), [el.designation]);
+    const [localUnit, setLocalUnit] = useState(el.unit || '');
+    useEffect(() => setLocalUnit(el.unit || ''), [el.unit]);
+
+    const commitDesignation = () => {
+      const v = String(localDesignation).toUpperCase();
+      if (v !== String(el.designation || '')) onUpdate(parentId, el.id, 'designation', v);
+    };
+    const commitUnit = () => {
+      const v = String(localUnit).trim().toUpperCase();
+      if (v !== String(el.unit || '')) onUpdate(parentId, el.id, 'unit', v);
+    };
+
     const commitPrice = () => {
       const currentVal = Number(localPrice);
       const dbVal = Number(el.price);
@@ -419,10 +435,42 @@ const ItemRow = memo(
             </div>
 
             {/* Désignation */}
-            <div className="flex-1 px-2 flex items-center min-w-0" style={{ paddingLeft: `${level * 20 + 8}px` }}>
-              <div className="text-[11px] font-semibold text-slate-700 uppercase leading-tight truncate">
-                {cleanText(el.designation)}
-              </div>
+            <div className="flex-1 px-2 flex items-center gap-2 min-w-0" style={{ paddingLeft: `${level * 20 + 8}px` }}>
+              {isFree && !isReadOnly ? (
+                <>
+                  <span
+                    className="shrink-0 text-[8px] font-black uppercase tracking-widest text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded"
+                    title="Article libre (non lié à la bibliothèque BPU)"
+                  >
+                    Libre
+                  </span>
+                  <input
+                    type="text"
+                    value={localDesignation}
+                    onChange={(e) => setLocalDesignation(e.target.value)}
+                    onBlur={commitDesignation}
+                    onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                    onClick={(e) => e.stopPropagation()}
+                    onDoubleClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    placeholder="Désignation libre…"
+                    className="flex-1 min-w-0 text-[11px] font-semibold text-slate-800 uppercase leading-tight bg-white border border-blue-300 focus:border-blue-500 rounded px-1.5 py-0.5 outline-none shadow-sm placeholder:normal-case placeholder:font-normal placeholder:text-slate-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onEditItem?.(el); }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    title="Édition avancée (description, CCTP, forfait, enregistrer en bibliothèque)"
+                    className="shrink-0 text-slate-300 hover:text-blue-500 transition-colors"
+                  >
+                    <Pencil size={13} />
+                  </button>
+                </>
+              ) : (
+                <div className="text-[11px] font-semibold text-slate-700 uppercase leading-tight truncate">
+                  {cleanText(el.designation)}
+                </div>
+              )}
             </div>
 
             {/* Indicateurs formule / source — colonne fixe alignée */}
@@ -438,10 +486,25 @@ const ItemRow = memo(
             </div>
 
             {/* Unité */}
-            <div className="w-16 flex justify-center shrink-0">
-              <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 uppercase">
-                {normalizeUnitSymbol(el.unit)}
-              </span>
+            <div className="w-16 flex justify-center shrink-0 px-1">
+              {isFree && !isReadOnly ? (
+                <input
+                  type="text"
+                  value={localUnit}
+                  onChange={(e) => setLocalUnit(e.target.value)}
+                  onBlur={commitUnit}
+                  onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                  onClick={(e) => e.stopPropagation()}
+                  onDoubleClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  placeholder="U"
+                  className="w-full text-center text-[9px] font-bold text-emerald-700 uppercase bg-white border border-emerald-300 focus:border-emerald-500 rounded px-1 py-0.5 outline-none shadow-sm placeholder:text-slate-300"
+                />
+              ) : (
+                <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 uppercase">
+                  {normalizeUnitSymbol(el.unit)}
+                </span>
+              )}
             </div>
 
             {/* Quantité + FormulaInput */}

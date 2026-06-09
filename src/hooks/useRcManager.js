@@ -1,9 +1,14 @@
 // src/hooks/useRcManager.js
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { doc, getDoc } from 'firebase/firestore';
+import { db as fireDb } from '../firebase';
 import { parseDocxToTree } from '../utils/wordImporter';
 import { toast, confirm } from '../utils/globalUI';
 import { useRobustSave } from './useRobustSave';
 import { useStableHash } from './useStableHash';
+import { DEFAULT_CRITERIA } from './useRao';
+import { buildCriteriaTableHtml } from '../utils/rcCriteriaTable';
+import { RC_TEMPLATE } from '../data/rcTemplate';
 
 export const useRcManager = ({
   project,
@@ -11,7 +16,8 @@ export const useRcManager = ({
   onSaveMasterRc,
   masterBranding,
   onUpdateProject,
-  onSaveProject
+  onSaveProject,
+  companyId,
 }) => {
   // --- UTILITAIRE : RÉCUPÉRER TOUS LES IDs ---
   const getAllIds = (nodes) => {
@@ -34,8 +40,31 @@ export const useRcManager = ({
   useEffect(() => {
     if (masterRc && masterRc.length > 0) {
         setRcData(JSON.parse(JSON.stringify(masterRc)));
+    } else {
+        // RC maître vide (jamais sauvegardé en Cloud) → amorçage local avec le
+        // modèle de référence, sans écriture Cloud (l'utilisateur valide via "Sauver").
+        setRcData(prev => prev.length > 0 ? prev : JSON.parse(JSON.stringify(RC_TEMPLATE)));
     }
   }, [masterRc]);
+
+  // --- CRITERES RAO (pour la variable {{criteresTable}}) ---
+  // Chargés depuis la sous-collection dédiée projects/{id}/rao/data
+  // (même source que le module RAO). Fallback : project.rao.criteria, puis défaut.
+  const [raoCriteria, setRaoCriteria] = useState(null);
+  const criteriaLoadedRef = useRef(null);
+  useEffect(() => {
+    const projectId = project?.id;
+    if (!projectId || !companyId) return;
+    if (criteriaLoadedRef.current === projectId) return;
+    criteriaLoadedRef.current = projectId;
+    const docRef = doc(fireDb, 'companies', companyId, 'projects', projectId, 'rao', 'data');
+    getDoc(docRef)
+      .then((snap) => {
+        const crit = snap.exists() ? snap.data()?.rao?.criteria : null;
+        if (Array.isArray(crit) && crit.length > 0) setRaoCriteria(crit);
+      })
+      .catch((e) => console.error('[RC] Erreur chargement critères RAO:', e));
+  }, [project?.id, companyId]);
 
   // --- SAUVEGARDE LIEE AU PROJET ---
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -146,6 +175,14 @@ export const useRcManager = ({
       ? '<ul>' + tranchesList.map(t => `<li>${t.name}</li>`).join('') + '</ul>'
       : '';
 
+    // criteresTable : tableau des critères d'attribution issu du module RAO
+    const critSource = (raoCriteria && raoCriteria.length > 0)
+      ? raoCriteria
+      : (Array.isArray(project?.rao?.criteria) && project.rao.criteria.length > 0
+          ? project.rao.criteria
+          : DEFAULT_CRITERIA);
+    const criteresTable = buildCriteriaTableHtml(critSource);
+
     return {
       name:               project?.name               || '',
       client:             project?.client             || '',
@@ -155,6 +192,7 @@ export const useRcManager = ({
       location:           project?.location           || '',
       code:               project?.code               || '',
       moe:                project?.moe                || '',
+      moeAddress:         project?.moeAddress         || '',
       phase:              project?.phase              || 'DCE',
       marketType:         project?.marketType         || 'Privé',
       dateRemise:         formatDateFR(project?.dateRemise),
@@ -166,8 +204,15 @@ export const useRcManager = ({
       trancheCount:       tranchesList.length > 0 ? String(tranchesList.length) : '1',
       trancheNames,
       department:         project?.department         || '',
+      // ── Champs RC (schéma v4) ──
+      lotName:            project?.lotName            || '',
+      spsLevel:           project?.spsLevel           || 'II',
+      startDate:          project?.startDate          || '',
+      validityDays:       project?.validityDays != null ? String(project.validityDays) : '120',
+      platformUrl:        project?.platformUrl        || '',
+      criteresTable,
     };
-  }, [project]);
+  }, [project, raoCriteria]);
 
   // --- RECHERCHE INTELLIGENTE (SANS ACCENTS) ---
   const removeAccents = (str) => {
@@ -251,6 +296,19 @@ export const useRcManager = ({
   };
 
   const collapseAll = () => setExpandedIds(new Set());
+
+  // Charge le modèle type de RC (remplace la structure courante après confirmation).
+  const loadTemplate = async () => {
+    const ok = await confirm(
+      "Charger le modèle type de RC ?\nCela remplacera entièrement la structure actuelle (vous pourrez l'ajuster avant de sauvegarder).",
+      { title: 'Modèle type RC', danger: true }
+    );
+    if (!ok) return;
+    const fresh = JSON.parse(JSON.stringify(RC_TEMPLATE));
+    setRcData(fresh);
+    setTimeout(() => setSelectedIds(getAllIds(fresh)), 100);
+    toast.success("Modèle type chargé.");
+  };
 
   const handleExportMaster = () => {
     const blob = new Blob([JSON.stringify(rcData, null, 2)], { type: "application/json" });
@@ -405,6 +463,7 @@ export const useRcManager = ({
     nodeToEdit, variables, saveStatus, filteredRcData,
     toggleExpand, expandAll, collapseAll,
     handleExportMaster, handleFileUpload, handlePreviewScroll,
-    openEditor, handleSaveNode, addChapter, deleteNode, toggleSelection, saveToCloud
+    openEditor, handleSaveNode, addChapter, deleteNode, toggleSelection, saveToCloud,
+    loadTemplate,
   };
 };

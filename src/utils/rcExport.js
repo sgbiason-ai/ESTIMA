@@ -4,14 +4,43 @@ import { buildCoverPageElements } from "./wordCoverPage";
 
 let Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
     Header, Footer, PageNumber, TableOfContents, PageBreak, ImageRun,
-    Table, TableRow, TableCell, WidthType, BorderStyle, VerticalAlign;
+    Table, TableRow, TableCell, WidthType, BorderStyle, VerticalAlign,
+    TableLayoutType, ShadingType, Tab;
 
 const ensureDocx = async () => {
   if (Document) return;
   const docx = await import("docx");
   ({ Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
      Header, Footer, PageNumber, TableOfContents, PageBreak, ImageRun,
-     Table, TableRow, TableCell, WidthType, BorderStyle, VerticalAlign } = docx);
+     Table, TableRow, TableCell, WidthType, BorderStyle, VerticalAlign,
+     TableLayoutType, ShadingType, Tab } = docx);
+};
+
+// Largeur utile A4 en DXA (twips) : 11906 - marges gauche/droite 1134 chacune.
+const TABLE_WIDTH_DXA = 9638;
+
+// Calcule des largeurs de colonnes en DXA, proportionnelles au contenu le plus
+// long de chaque colonne (avec plancher), pour éviter l'auto-layout Word qui
+// écrase les colonnes. La somme vaut exactement TABLE_WIDTH_DXA.
+const computeColumnWidths = (rows, maxCols) => {
+  const colChars = new Array(maxCols).fill(0);
+  rows.forEach((tr) => {
+    Array.from(tr.querySelectorAll("td, th")).forEach((cell, i) => {
+      if (i < maxCols) {
+        const len = (cell.textContent || "").trim().length;
+        if (len > colChars[i]) colChars[i] = len;
+      }
+    });
+  });
+  const weights = colChars.map((c) => Math.max(c, 3));
+  const total = weights.reduce((a, b) => a + b, 0) || maxCols;
+  const MIN = Math.floor(TABLE_WIDTH_DXA * 0.12);
+  let widths = weights.map((w) => Math.max(MIN, Math.round((TABLE_WIDTH_DXA * w) / total)));
+  // Renormalise pour que la somme = TABLE_WIDTH_DXA
+  const sum = widths.reduce((a, b) => a + b, 0);
+  widths = widths.map((w) => Math.round((w * TABLE_WIDTH_DXA) / sum));
+  widths[widths.length - 1] += TABLE_WIDTH_DXA - widths.reduce((a, b) => a + b, 0);
+  return widths;
 };
 
 // --- UTILITAIRES ---
@@ -41,26 +70,68 @@ const detectImageType = (bytes) => {
   return null;
 };
 
-const getCellParagraphs = (htmlContent, isHeader) => {
-  const raw = String(htmlContent || "");
-  const normalized = raw.replace(/<br\s*\/?>/gi, "\n").replace(/<\/p\s*>/gi, "\n").replace(/<\/div\s*>/gi, "\n").replace(/<\/li\s*>/gi, "\n").replace(/<li[^>]*>/gi, "• ").replace(/<\/tr\s*>/gi, "\n").replace(/<\/h[1-6]\s*>/gi, "\n");
+// Détecte une surbrillance (background) dans un attribut style inline.
+const HIGHLIGHT_RE = /background(-color)?\s*:/i;
+
+// Parcourt récursivement un nœud DOM et produit des TextRun en conservant
+// le formatage inline (gras, italique, souligné, surbrillance).
+const inlineRuns = (node, baseFmt = {}) => {
+  const runs = [];
+  const walk = (n, f) => {
+    (n.childNodes ? Array.from(n.childNodes) : []).forEach((child) => {
+      if (child.nodeType === 3) {
+        const t = sanitizeText(child.textContent).replace(/\s+/g, " ");
+        if (t && t !== " ") {
+          runs.push(new TextRun({
+            text: t,
+            bold: f.bold || undefined,
+            italics: f.italics || undefined,
+            underline: f.underline ? { type: "single" } : undefined,
+            highlight: f.highlight || undefined,
+            color: f.color || undefined,
+            size: f.size,
+          }));
+        }
+      } else if (child.nodeType === 1) {
+        const tag = child.nodeName;
+        if (tag === "BR") { runs.push(new TextRun({ text: "", break: 1, size: f.size })); return; }
+        const nf = { ...f };
+        if (tag === "STRONG" || tag === "B") nf.bold = true;
+        if (tag === "EM" || tag === "I") nf.italics = true;
+        if (tag === "U") nf.underline = true;
+        const style = child.getAttribute ? child.getAttribute("style") : null;
+        if (style && HIGHLIGHT_RE.test(style)) nf.highlight = "yellow";
+        walk(child, nf);
+      }
+    });
+  };
+  walk(node, baseFmt);
+  return runs;
+};
+
+const getCellParagraphs = (htmlContent, isHeader, color) => {
   const tempDiv = document.createElement("div");
-  tempDiv.innerHTML = normalized;
-  const text = sanitizeText(tempDiv.textContent || tempDiv.innerText || "").replace(/\u00A0/g, " ").replace(/\r/g, "").trim();
-  const lines = text.split("\n").map((l) => l.replace(/\s{2,}/g, " ").trim()).filter((l) => l.length > 0);
+  tempDiv.innerHTML = String(htmlContent || "");
+  const size = isHeader ? 22 : 20;
+  const fmt = { bold: isHeader, size, color: isHeader ? color : undefined };
+  const align = isHeader ? AlignmentType.CENTER : AlignmentType.LEFT;
 
-  if (lines.length === 0) return [new Paragraph({ children: [new TextRun({ text: " " })] })];
+  const makePara = (runs) => new Paragraph({
+    children: runs.length ? runs : [new TextRun({ text: " ", size, color: fmt.color })],
+    alignment: align,
+    spacing: { after: 0 },
+  });
 
-  return lines.map((line) => new Paragraph({
-        children: [new TextRun({ text: line, bold: isHeader, size: isHeader ? 22 : 20 })],
-        alignment: AlignmentType.LEFT,
-        spacing: { after: 0 },
-      })
-  );
+  // Un paragraphe Word par bloc de niveau "paragraphe", sinon contenu inline direct.
+  const blocks = Array.from(tempDiv.children).filter((el) => /^(P|DIV|LI)$/.test(el.nodeName));
+  if (blocks.length > 0) {
+    return blocks.map((b) => makePara(inlineRuns(b, fmt)));
+  }
+  return [makePara(inlineRuns(tempDiv, fmt))];
 };
 
 // --- PARSING HTML VERS DOCX ---
-const parseHtmlToDocx = (htmlContent) => {
+const parseHtmlToDocx = (htmlContent, branding = DEFAULT_BRANDING) => {
   if (!htmlContent) return [];
   const parser = new DOMParser();
   const doc = parser.parseFromString(`<div>${htmlContent}</div>`, "text/html");
@@ -84,37 +155,61 @@ const parseHtmlToDocx = (htmlContent) => {
             }
         }
       } else if (text) {
-        docxElements.push(new Paragraph({ children: [new TextRun({ text: sanitizeText(text) })], style: "Normal", spacing: { after: 120 } }));
+        // Conserve le formatage inline (gras, italique, souligné, surbrillance).
+        const runs = nodeName === "#text"
+          ? [new TextRun({ text: sanitizeText(text) })]
+          : inlineRuns(node);
+        docxElements.push(new Paragraph({ children: runs.length ? runs : [new TextRun({ text: sanitizeText(text) })], style: "Normal", spacing: { after: 120 } }));
       }
     }
     else if (nodeName === "UL" || nodeName === "OL") {
       Array.from(node.querySelectorAll("li")).forEach((li) => {
-        docxElements.push(new Paragraph({ children: [new TextRun({ text: sanitizeText(li.textContent) })], bullet: { level: 0 }, style: "Normal", spacing: { after: 60 } }));
+        const runs = inlineRuns(li);
+        docxElements.push(new Paragraph({ children: runs.length ? runs : [new TextRun({ text: sanitizeText(li.textContent) })], bullet: { level: 0 }, style: "Normal", spacing: { after: 60 } }));
       });
     }
     else if (nodeName === "TABLE") {
       const rows = Array.from(node.querySelectorAll("tr")).filter(tr => tr.querySelectorAll("td, th").length > 0);
       let maxCols = 0;
       rows.forEach((r) => (maxCols = Math.max(maxCols, r.querySelectorAll("td, th").length)));
-      const colWidth = Math.floor(100 / (maxCols || 1));
+      maxCols = maxCols || 1;
+      const columnWidths = computeColumnWidths(rows, maxCols);
+      const cellBorder = { style: BorderStyle.SINGLE, size: 4, color: "D9D9D9" };
+      const cellBorders = { top: cellBorder, bottom: cellBorder, left: cellBorder, right: cellBorder };
+      const headerFill = cleanColor(branding?.colors?.primary || "1E3A5F"); // en-tête couleur charte
+      const zebraFill = "F4F6F8"; // ligne paire : fond très léger
 
+      let bodyRowIdx = -1;
       const docxRows = rows.map((tr) => {
+        const cells = Array.from(tr.querySelectorAll("td, th"));
+        const isHeaderRow = cells.length > 0 && cells.every((c) => c.nodeName === "TH");
+        if (!isHeaderRow) bodyRowIdx++;
+        const zebra = !isHeaderRow && bodyRowIdx % 2 === 1;
         return new TableRow({
-          children: Array.from(tr.querySelectorAll("td, th")).map((td) => {
+          tableHeader: isHeaderRow,
+          children: cells.map((td, i) => {
             const isHeader = td.nodeName === "TH";
+            const fill = isHeader ? headerFill : (zebra ? zebraFill : undefined);
             return new TableCell({
-              children: getCellParagraphs(td.innerHTML, isHeader),
-              width: { size: colWidth, type: WidthType.PERCENTAGE },
-              shading: isHeader ? { fill: "F0F0F0" } : undefined,
-              verticalAlign: VerticalAlign.CENTER,
-              borders: { top: { style: BorderStyle.SINGLE, size: 4, color: "000000" }, bottom: { style: BorderStyle.SINGLE, size: 4, color: "000000" }, left: { style: BorderStyle.SINGLE, size: 4, color: "000000" }, right: { style: BorderStyle.SINGLE, size: 4, color: "000000" } },
+              children: getCellParagraphs(td.innerHTML, isHeader, "FFFFFF"),
+              width: { size: columnWidths[Math.min(i, maxCols - 1)], type: WidthType.DXA },
+              shading: fill ? { fill, type: ShadingType.CLEAR, color: "auto" } : undefined,
+              verticalAlign: isHeader ? VerticalAlign.CENTER : VerticalAlign.TOP,
+              margins: { top: 60, bottom: 60, left: 100, right: 100 },
+              borders: cellBorders,
             });
           }),
         });
       });
 
       if (docxRows.length > 0) {
-        docxElements.push(new Table({ rows: docxRows, width: { size: 100, type: WidthType.PERCENTAGE }, borders: { top: { style: BorderStyle.SINGLE, size: 4, color: "000000" }, bottom: { style: BorderStyle.SINGLE, size: 4, color: "000000" }, left: { style: BorderStyle.SINGLE, size: 4, color: "000000" }, right: { style: BorderStyle.SINGLE, size: 4, color: "000000" }, insideHorizontal: { style: BorderStyle.SINGLE, size: 4, color: "000000" }, insideVertical: { style: BorderStyle.SINGLE, size: 4, color: "000000" } } }));
+        docxElements.push(new Table({
+          rows: docxRows,
+          width: { size: TABLE_WIDTH_DXA, type: WidthType.DXA },
+          columnWidths,
+          layout: TableLayoutType.FIXED,
+          borders: { top: cellBorder, bottom: cellBorder, left: cellBorder, right: cellBorder, insideHorizontal: cellBorder, insideVertical: cellBorder },
+        }));
         docxElements.push(new Paragraph({ children: [new TextRun(" ")], spacing: { after: 200 } }));
       }
     }
@@ -169,9 +264,13 @@ export const generateWordRC = async (selectedNodes, variables, masterData, brand
       docChildren.push(
         new Paragraph({
           heading: hLevel,
+          // Filet de séparation sous les titres de niveau 1 (allure document pro)
+          border: node.level === 1
+            ? { bottom: { style: BorderStyle.SINGLE, size: 6, color: cleanColor(branding.colors.primary), space: 4 } }
+            : undefined,
           children: [
             new TextRun({ text: sanitizeText(`${currentNumber}.`), color: titleColor, font: branding.fonts.headings, size: fontSize, bold: isBold, italics: isItalic, underline: isUnderline ? { type: "single" } : undefined, allCaps: isCaps }),
-            new TextRun({ text: "    " }), 
+            new TextRun({ children: [new Tab()] }),
             new TextRun({ text: sanitizeText(node.title || "Titre"), color: titleColor, font: branding.fonts.headings, size: fontSize, bold: isBold, italics: isItalic, underline: isUnderline ? { type: "single" } : undefined, allCaps: isCaps }),
           ],
         })
@@ -183,7 +282,7 @@ export const generateWordRC = async (selectedNodes, variables, masterData, brand
           const regex = new RegExp(`{{${key}}}`, "g");
           text = text.replace(regex, String(variables[key] || ""));
         });
-        docChildren.push(...parseHtmlToDocx(text));
+        docChildren.push(...parseHtmlToDocx(text, branding));
       }
 
       if (node.children) processNodes(node.children, currentNumber);
@@ -196,7 +295,7 @@ export const generateWordRC = async (selectedNodes, variables, masterData, brand
   const headerLeftCell = new TableCell({ width: { size: 35, type: WidthType.PERCENTAGE }, borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.SINGLE, size: 6, color: "E0E0E0" }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } }, children: [ new Paragraph({ children: [ new TextRun({ text: sanitizeText(variables.name ? variables.name.toUpperCase() : "PROJET"), bold: true, color: cleanColor(branding.colors.primary), font: branding.fonts.main, size: 18 }) ], spacing: { after: 0 } }), new Paragraph({ children: [ new TextRun({ text: sanitizeText(variables.client || "Maître d'Ouvrage"), color: "666666", font: branding.fonts.main, size: 14 }) ], spacing: { after: 100 } }) ], });
   const headerCenterCell = new TableCell({ width: { size: 30, type: WidthType.PERCENTAGE }, verticalAlign: VerticalAlign.CENTER, borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.SINGLE, size: 6, color: "E0E0E0" }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } }, children: [ new Paragraph({ alignment: AlignmentType.CENTER, children: [ new TextRun({ text: "RÈGLEMENT DE LA CONSULTATION", bold: true, color: cleanColor(branding.colors.subtle), font: branding.fonts.main, size: 20 }) ], spacing: { after: 100 } }) ], });
   const headerRightChildren = [];
-  if (branding.logo) { const logoBytes = base64DataURLToUint8Array(branding.logo); if (logoBytes) { headerRightChildren.push(new Paragraph({ alignment: AlignmentType.RIGHT, children: [new ImageRun({ data: logoBytes, transformation: { width: 80, height: 50 } })], spacing: { after: 100 } })); } else { headerRightChildren.push(new Paragraph({ children: [new TextRun(" ")] })); } } else { headerRightChildren.push(new Paragraph({ children: [new TextRun(" ")] })); }
+  if (branding.logo) { const logoBytes = base64DataURLToUint8Array(branding.logo); if (logoBytes) { const logoType = detectImageType(logoBytes) || "png"; headerRightChildren.push(new Paragraph({ alignment: AlignmentType.RIGHT, children: [new ImageRun({ type: logoType, data: logoBytes, transformation: { width: 80, height: 50 } })], spacing: { after: 100 } })); } else { headerRightChildren.push(new Paragraph({ children: [new TextRun(" ")] })); } } else { headerRightChildren.push(new Paragraph({ children: [new TextRun(" ")] })); }
   const headerRightCell = new TableCell({ width: { size: 35, type: WidthType.PERCENTAGE }, verticalAlign: VerticalAlign.CENTER, borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.SINGLE, size: 6, color: "E0E0E0" }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } }, children: headerRightChildren, });
   const headerTable = new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideVertical: { style: BorderStyle.NONE } }, rows: [ new TableRow({ children: [headerLeftCell, headerCenterCell, headerRightCell] }) ] });
 

@@ -10,17 +10,17 @@ import { Star } from 'lucide-react';
 import HelpPanel from '../components/help/HelpPanel';
 import HelpButton from '../components/help/HelpButton';
 
-const RcGeneratorView = ({ 
-  project, masterRc, onSaveMasterRc, masterBranding, 
+const RcGeneratorView = ({
+  project, companyId, masterRc, onSaveMasterRc, masterBranding,
   onEditProject, onUpdateProject, onSaveProject,
   onEditBranding,
 }) => {
-  
+
   const [isFavoritesPanelOpen, setIsFavoritesPanelOpen] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
 
   const manager = useRcManager({
-    project, masterRc, onSaveMasterRc, masterBranding, onUpdateProject, onSaveProject
+    project, masterRc, onSaveMasterRc, masterBranding, onUpdateProject, onSaveProject, companyId
   });
 
   const { favorites, toggleFavorite, isFavorite, removeFavorite } = useFavorites();
@@ -70,6 +70,7 @@ const RcGeneratorView = ({
         addChapter={manager.addChapter}
         handleFileUpload={manager.handleFileUpload}
         handleExportMaster={manager.handleExportMaster}
+        loadTemplate={manager.loadTemplate}
         handleExportPdf={handleExportPdf}
         saveToCloud={manager.saveToCloud}
         expandedIds={manager.expandedIds}

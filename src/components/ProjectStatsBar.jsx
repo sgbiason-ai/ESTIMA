@@ -28,9 +28,10 @@ const ProjectStatsBar = ({
               {(() => {
                   const base = projectStats.study.base;
                   const current = projectStats.client.base;
-                  if (base === 0) return '0.00%';
-                  const pct = ((current - base) / base) * 100;
-                  return `${pct > 0 ? '+' : ''}${pct.toFixed(2)}%`;
+                  const ecart = current - base;
+                  const pctStr = base === 0 ? '0.00%' : `${ecart > 0 ? '+' : ''}${((ecart / base) * 100).toFixed(2)}%`;
+                  const ecartStr = `${ecart > 0 ? '+' : ''}${formatPrice(ecart)} HT`;
+                  return `${pctStr} · ${ecartStr}`;
               })()}
               </span>
           </div>

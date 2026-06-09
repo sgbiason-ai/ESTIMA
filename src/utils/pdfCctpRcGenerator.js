@@ -59,17 +59,16 @@ const richHtmlToText = (html) => {
     .replace(/[ \t]+/g,' ').replace(/\n{3,}/g,'\n\n').trim();
 };
 
-const domTextOf = (el) =>
-  (el?.textContent || el?.innerText || '')
-    .replace(/\r/g,'').replace(/\u00A0/g,' ').replace(/[ \t]+/g,' ').trim();
-
 const parseTableEl = (tableEl) => {
   const head = [], body = [];
+  // richHtmlToText (et non domTextOf) pour préserver la séparation des fragments
+  // inline d'une cellule (<strong>…</strong><br/><span>…</span>) → multi-lignes.
+  const cellText = (el) => richHtmlToText(el?.innerHTML || '');
   Array.from(tableEl.querySelectorAll('tr')).forEach(tr => {
     const ths = Array.from(tr.querySelectorAll('th'));
     const tds = Array.from(tr.querySelectorAll('td'));
-    if (ths.length > 0) head.push(ths.map(domTextOf));
-    else if (tds.length > 0) body.push(tds.map(domTextOf));
+    if (ths.length > 0) head.push(ths.map(cellText));
+    else if (tds.length > 0) body.push(tds.map(cellText));
   });
   // Pas de <th> → 1ère ligne de body = en-tête
   if (head.length === 0 && body.length > 1) head.push(body.shift());

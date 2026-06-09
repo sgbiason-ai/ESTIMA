@@ -13,12 +13,14 @@
 //   v0  (legacy)  – pas de champ `schemaVersion`, pas de `tranches`
 //   v1            – tranches, scoringConfig
 //   v2            – rao.includedOptions, rao.raoTrancheId
-//   v3  (current) – subtitle1/subtitle2, signatories, branding
+//   v3            – subtitle1/subtitle2, signatories, branding
+//   v4  (current) – champs RC : lotName, moeAddress, spsLevel, startDate,
+//                   validityDays, platformUrl
 //
 // À chaque évolution du schéma, incrémenter CURRENT_SCHEMA_VERSION
 // et ajouter un bloc de migration numéroté ci-dessous.
 
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 4;
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
@@ -61,6 +63,8 @@ function normalizeNode(node) {
       bpuNum:             str(node.bpuNum),
       isFixed:            bool(node.isFixed),
     };
+    // Article "libre" : saisi de zéro dans le projet (non lié au BPU, uid vide).
+    if (node.isFree) item.isFree = true;
     // Composant de bloc : facteur de conversion mémorisé (PU moyen, affichage).
     if (node.blocFactor != null) item.blocFactor = num(node.blocFactor);
     return item;
@@ -176,6 +180,21 @@ const migrations = [
       showSignatures: bool(p.showSignatures, false),
     }),
   },
+
+  // v3 → v4 : champs RC (lot, MOE, SPS, démarrage, validité, plateforme)
+  {
+    from: 3,
+    description: 'RC — lotName, moeAddress, spsLevel, startDate, validityDays, platformUrl',
+    run: (p) => ({
+      ...p,
+      lotName:      str(p.lotName),
+      moeAddress:   str(p.moeAddress),
+      spsLevel:     str(p.spsLevel, 'II'),
+      startDate:    str(p.startDate),
+      validityDays: num(p.validityDays, 120),
+      platformUrl:  str(p.platformUrl),
+    }),
+  },
 ];
 
 // ─── FONCTION PRINCIPALE ──────────────────────────────────────────────────────
@@ -214,6 +233,7 @@ export function normalizeProject(raw) {
     location:       str(raw.location),
     department:     str(raw.department),
     moe:            str(raw.moe),
+    moeAddress:     str(raw.moeAddress),
     marketType:     str(raw.marketType, 'Public'),
     phase:          str(raw.phase,      'DCE'),
     dateRemise:     str(raw.dateRemise),
@@ -222,6 +242,13 @@ export function normalizeProject(raw) {
     prepPeriod:     str(raw.prepPeriod),
     projectDescription: str(raw.projectDescription),
     hasPSE:         bool(raw.hasPSE,    false),
+
+    // Règlement de la consultation (RC)
+    lotName:        str(raw.lotName),
+    spsLevel:       str(raw.spsLevel, 'II'),
+    startDate:      str(raw.startDate),
+    validityDays:   num(raw.validityDays, 120),
+    platformUrl:    str(raw.platformUrl),
 
     // Signatures
     showSignatures: bool(raw.showSignatures, false),

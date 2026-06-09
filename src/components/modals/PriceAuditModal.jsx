@@ -40,6 +40,11 @@ const PriceAuditModal = ({ show, onClose, project, allBpuItems, onRestorePrice, 
           const diff = bpuPrice !== null ? projectPrice - bpuPrice : null;
           const pctDiff = bpuPrice && bpuPrice !== 0 ? ((diff / bpuPrice) * 100) : null;
 
+          // Prix réel observé (remontées RAO) porté par l'article BPU, si présent.
+          const observedPrice = bpuItem && bpuItem.observedPrice != null ? (Number(bpuItem.observedPrice) || 0) : null;
+          // Écart % du prix projet par rapport au prix observé (>0 = projet plus cher que le réel).
+          const obsPctDiff = observedPrice && observedPrice !== 0 ? ((projectPrice - observedPrice) / observedPrice) * 100 : null;
+
           let status = 'missing'; // pas trouvé dans la BPU
           if (bpuPrice !== null) {
             status = Math.abs(diff) < 0.005 ? 'match' : 'diff';
@@ -54,6 +59,8 @@ const PriceAuditModal = ({ show, onClose, project, allBpuItems, onRestorePrice, 
             bpuPrice,
             diff,
             pctDiff,
+            observedPrice,
+            obsPctDiff,
             status,
             path,
             bpuDesignation: bpuItem?.designation || null,
@@ -289,11 +296,12 @@ const PriceAuditModal = ({ show, onClose, project, allBpuItems, onRestorePrice, 
           ) : (
             <div className="text-[11px]">
               {/* En-tête du tableau */}
-              <div className="sticky top-0 z-10 grid grid-cols-[1fr_60px_110px_110px_100px_80px_44px] gap-2 px-6 py-2 bg-slate-100 border-b border-slate-200 font-bold text-[10px] uppercase tracking-wider text-slate-500">
+              <div className="sticky top-0 z-10 grid grid-cols-[1fr_60px_104px_104px_104px_100px_80px_44px] gap-2 px-6 py-2 bg-slate-100 border-b border-slate-200 font-bold text-[10px] uppercase tracking-wider text-slate-500">
                 <span>Désignation</span>
                 <span className="text-center">Unité</span>
                 <span className="text-right">Prix projet</span>
                 <span className="text-right">Prix BPU</span>
+                <span className="text-right text-violet-600">Prix observé</span>
                 <span className="text-right">Écart</span>
                 <span className="text-center">Statut</span>
                 <span></span>
@@ -323,7 +331,7 @@ const PriceAuditModal = ({ show, onClose, project, allBpuItems, onRestorePrice, 
                       <div
                         key={item.id}
                         className={`
-                          grid grid-cols-[1fr_60px_110px_110px_100px_80px_44px] gap-2 px-6 py-2 border-b border-slate-50
+                          grid grid-cols-[1fr_60px_104px_104px_104px_100px_80px_44px] gap-2 px-6 py-2 border-b border-slate-50
                           transition-colors
                           ${item.status === 'diff' ? 'bg-amber-50/40 hover:bg-amber-50' : 'hover:bg-slate-50/50'}
                           ${selectedIds.has(item.id) ? 'ring-1 ring-inset ring-emerald-400 bg-emerald-50/30' : ''}
@@ -347,6 +355,29 @@ const PriceAuditModal = ({ show, onClose, project, allBpuItems, onRestorePrice, 
 
                         <span className={`text-right font-mono font-semibold ${item.bpuPrice !== null ? 'text-slate-800' : 'text-slate-300 italic'}`}>
                           {item.bpuPrice !== null ? formatPrice(item.bpuPrice) : '—'}
+                        </span>
+
+                        {/* Prix réel observé (remontées RAO) + écart % vs prix projet */}
+                        <span
+                          className="text-right font-mono leading-tight"
+                          title={item.observedPrice !== null ? 'Prix réel observé (remontées RAO) — écart calculé du prix projet par rapport au réel' : undefined}
+                        >
+                          {item.observedPrice !== null ? (
+                            <>
+                              <span className="font-semibold text-violet-700">{formatPrice(item.observedPrice)}</span>
+                              {item.obsPctDiff !== null && (
+                                <span className={`block text-[9px] font-bold ${
+                                  item.obsPctDiff > 0.05 ? 'text-red-600' :
+                                  item.obsPctDiff < -0.05 ? 'text-emerald-600' :
+                                  'text-slate-400'
+                                }`}>
+                                  {item.obsPctDiff > 0 ? '+' : ''}{item.obsPctDiff.toFixed(1)}%
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-slate-300 italic">—</span>
+                          )}
                         </span>
 
                         <span className={`text-right font-mono font-bold ${

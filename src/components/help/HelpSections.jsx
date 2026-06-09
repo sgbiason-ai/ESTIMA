@@ -12,6 +12,7 @@ import {
   Palette, Type, FileCheck, Paintbrush, LayoutDashboard, FileSearch,
   FolderTree, FileText, Download, List, FileSpreadsheet, Keyboard,
   MousePointerClick, GitBranch, FunctionSquare, Boxes, Layers, Package,
+  Briefcase, Wrench, Lock, ShieldCheck,
 } from 'lucide-react';
 
 const ICON_MAP = {
@@ -24,6 +25,7 @@ const ICON_MAP = {
   Palette, Type, FileCheck, Paintbrush, LayoutDashboard, FileSearch,
   FolderTree, FileText, Download, List, FileSpreadsheet, Keyboard,
   MousePointerClick, GitBranch, FunctionSquare, Boxes, Layers, Package,
+  Briefcase, Wrench, Lock, ShieldCheck,
 };
 
 const getIcon = (name) => ICON_MAP[name] || HelpCircle;

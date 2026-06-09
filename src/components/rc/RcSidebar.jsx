@@ -2,7 +2,7 @@
 import React from 'react';
 import {
   Search, X, Minimize2, Maximize2, CheckSquare,
-  Plus, UploadCloud, Download,
+  Plus, UploadCloud, Download, FileText,
   ChevronRight, ChevronDown, Square, Edit3, Trash2, Star
 } from 'lucide-react';
 
@@ -10,7 +10,7 @@ const RcSidebar = ({
   searchQuery, setSearchQuery,
   collapseAll, expandAll,
   filteredRcData, rcDataLength,
-  addChapter, handleFileUpload, handleExportMaster,
+  addChapter, handleFileUpload, handleExportMaster, loadTemplate,
   expandedIds, selectedIds, activeNodeId,
   toggleExpand, toggleSelection, openEditor, deleteNode,
   isFavorite, toggleFavorite, favoritesCount = 0, onOpenFavorites,
@@ -127,6 +127,12 @@ const RcSidebar = ({
             <Download size={16} strokeWidth={1.6} className="text-amber-600" />
             <span className="text-[11px] text-slate-600">Backup</span>
           </button>
+          {loadTemplate && (
+            <button onClick={loadTemplate} className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-transparent hover:bg-[#dce6f0] hover:border-[#c4d5e8] transition-all" title="Charger le modèle type de RC (remplace la structure actuelle)">
+              <FileText size={16} strokeWidth={1.6} className="text-cyan-600" />
+              <span className="text-[11px] text-slate-600">Modèle</span>
+            </button>
+          )}
         </div>
         <button
           onClick={onOpenFavorites}
