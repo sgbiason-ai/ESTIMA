@@ -4,7 +4,7 @@ import PropTypes from 'prop-types';
 import { useStableHash } from '../hooks/useStableHash';
 import { useRobustSave } from '../hooks/useRobustSave';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { Plus, Trash2, GripVertical, Layers, HelpCircle, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, GripVertical, Layers, HelpCircle, AlertTriangle, Target } from 'lucide-react';
 
 import { ProjectContext } from '../context/ProjectContext';
 import { EditableTitle, OptionToggle } from '../components/ProjectUI';
@@ -52,6 +52,7 @@ const ProjectView = ({
   addItemsToProject,
   selection,
   setSelection,
+  insertTargetId,
   updateProjectItem,
   setModal, 
   addChapter,
@@ -656,17 +657,11 @@ const ProjectView = ({
   };
 
   // Ajoute un article « libre » (hors bibliothèque BPU) à remplir directement dans le tableau.
-  // Cible : sous-chapitre/chapitre sélectionné, sinon parent de l'article sélectionné, sinon 1er chapitre.
+  // Cible : la cible d'insertion persistante (dernier chapitre/sous-chapitre sélectionné),
+  // résolue côté App.jsx et injectée dans addItemsToProject.
   const handleAddFreeItem = () => {
     if (isReadOnly) return;
-    let targetId = null;
-    if (selection?.type === 'subchapter' || selection?.type === 'chapter') {
-      targetId = selection.id;
-    } else if (selection?.type === 'item') {
-      const p = findItemParentId(selection.id);
-      targetId = p !== 'root' ? p : null;
-    }
-    if (!targetId) targetId = project?.chapters?.[0]?.id || null;
+    const targetId = insertTargetId || project?.chapters?.[0]?.id || null;
     if (!targetId) { toast.warning("Ajoutez d'abord un chapitre pour y placer l'article."); return; }
 
     const newLine = {
@@ -684,7 +679,7 @@ const ProjectView = ({
       bpuNum: '',
       isFixed: false,
     };
-    addItemsToProject([newLine], { type: 'subchapter', id: targetId });
+    addItemsToProject([newLine]); // la cible d'insertion est injectée par App.jsx
     setSelection({ type: 'item', id: newLine.id, parentId: targetId });
     toast.success('Article libre ajouté — complétez désignation, unité, quantité et prix.');
   };
@@ -742,7 +737,7 @@ const ProjectView = ({
       setModal: handleModalIntercept, addSubChapter, refMap, viewMode: currentMode, showComparison,
       clientQtyMap, activeTrancheId, isGlobalMode, bpuConfig, onOpenCalculation: handleOpenCalculation,
       formulaMode, setFormulaMode, allItems, sourceIds: project?.sourceIds || [],
-      multiSelection, toggleMultiSelection, priceIssueIds,
+      multiSelection, toggleMultiSelection, priceIssueIds, insertTargetId,
       onEditItem: (item) => {
         const bpuSource = allBpuItems?.find(b => String(b.id) === String(item?.uid) || String(b.uid) === String(item?.uid));
         setEditItemTarget({
@@ -857,7 +852,7 @@ const ProjectView = ({
                         return (
                           <Draggable key={chap.id} draggableId={`chapter:${chap.id}`} index={index} isDragDisabled={isReadOnly}>
                             {(provided, snapshot) => (
-                              <div ref={provided.innerRef} {...provided.draggableProps} className={`rounded-xl border overflow-hidden transition-all duration-200 ${selection?.id === chap.id ? 'ring-4 ring-emerald-50/50 border-emerald-500' : 'hover:shadow-md'} ${chap.isOption ? 'bg-slate-50 border-slate-300 border-dashed' : 'bg-white border-slate-200'} ${snapshot.isDragging ? 'shadow-2xl z-50 ring-4 ring-emerald-500/20 rotate-1 bg-white' : ''}`}>
+                              <div ref={provided.innerRef} {...provided.draggableProps} className={`rounded-xl border overflow-hidden transition-all duration-200 ${selection?.id === chap.id ? 'ring-4 ring-emerald-50/50 border-emerald-500' : 'hover:shadow-md'} ${chap.id === insertTargetId ? 'outline outline-2 outline-blue-500 -outline-offset-2' : ''} ${chap.isOption ? 'bg-slate-50 border-slate-300 border-dashed' : 'bg-white border-slate-200'} ${snapshot.isDragging ? 'shadow-2xl z-50 ring-4 ring-emerald-500/20 rotate-1 bg-white' : ''}`}>
                                 <div className={`p-3 flex justify-between items-center transition-colors duration-300 ${selection?.id === chap.id ? 'bg-emerald-600 text-white' : chap.isOption ? 'bg-slate-100 text-slate-600' : theme.chapterHeader + ' text-white'}`} onClick={() => setSelection({ type: 'chapter', id: chap.id })}>
                                   <div className="flex items-center gap-4">
                                     {!isReadOnly && (
@@ -867,6 +862,11 @@ const ProjectView = ({
                                     <span className={`w-6 h-6 rounded flex items-center justify-center font-mono text-[10px] font-black ${chap.isOption ? 'bg-slate-200 text-slate-500' : 'bg-white/20 text-white'}`}>{index + 1}</span>
                                     <EditableTitle value={chap.title} onSave={(val) => updateProjectItem('root', chap.id, 'title', val)} disabled={isReadOnly} className="font-black uppercase tracking-widest text-[11px] hover:bg-white/10" />
                                     <OptionToggle isOption={chap.isOption} onClick={() => updateProjectItem('root', chap.id, 'isOption', !chap.isOption)} disabled={isReadOnly} />
+                                    {!isReadOnly && chap.id === insertTargetId && (
+                                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shrink-0" title="Les nouveaux articles (libre ou bibliothèque) seront insérés dans ce chapitre">
+                                        <Target size={10} /> Insertion ici
+                                      </span>
+                                    )}
                                   </div>
                                   <div className="flex items-center gap-4">
                                     <span className={`font-mono font-black text-xs px-3 py-1 rounded-full ${chap.isOption ? 'bg-slate-200 text-slate-600 line-through decoration-slate-400' : 'bg-black/20 text-white'}`}>{formatPrice(chapTotal)}</span>
@@ -1023,6 +1023,7 @@ ProjectView.propTypes = {
   addItemsToProject: PropTypes.func,
   selection: PropTypes.object,
   setSelection: PropTypes.func.isRequired,
+  insertTargetId: PropTypes.string,
   updateProjectItem: PropTypes.func.isRequired,
   setModal: PropTypes.func.isRequired,
   addChapter: PropTypes.func.isRequired,

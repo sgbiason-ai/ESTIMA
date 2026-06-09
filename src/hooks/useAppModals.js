@@ -136,6 +136,19 @@ export const useAppModals = ({ project, setProject, setClientPercent, setViewMod
   // ─── SÉLECTION ACTIVE (CHAPITRE / SOUS-CHAPITRE) ──────────────────────────
   const [selection, setSelection] = useState({ type: null, id: null });
 
+  // ─── CIBLE D'INSERTION PERSISTANTE ────────────────────────────────────────
+  // Dernier chapitre/sous-chapitre sélectionné : c'est là que sont insérés les
+  // nouveaux articles (libre, bibliothèque, bloc). Elle NE change PAS quand on
+  // sélectionne un article — uniquement au choix d'un autre chapitre/sous-chapitre.
+  // Réinitialisée au changement de projet (les ids deviennent invalides).
+  const [insertTargetId, setInsertTargetId] = useState(null);
+  useEffect(() => {
+    if (selection?.type === 'chapter' || selection?.type === 'subchapter') {
+      setInsertTargetId(selection.id);
+    }
+  }, [selection]);
+  useEffect(() => { setInsertTargetId(null); }, [project?.id]);
+
   // ─── MULTI-SÉLECTION D'ARTICLES (pour suppression en masse) ─────────────
   const [multiSelection, setMultiSelection] = useState(() => new Set());
   const [multiDeleteModal, setMultiDeleteModal] = useState({ show: false, items: [] });
@@ -220,6 +233,8 @@ export const useAppModals = ({ project, setProject, setClientPercent, setViewMod
     showFloatingCalculator, setShowFloatingCalculator,
     // Sélection
     selection, setSelection,
+    // Cible d'insertion persistante (chapitre / sous-chapitre)
+    insertTargetId, setInsertTargetId,
     // Multi-sélection (suppression masse)
     multiSelection, toggleMultiSelection, clearMultiSelection,
     multiDeleteModal, openMultiDeleteModal, closeMultiDeleteModal, confirmMultiDelete,

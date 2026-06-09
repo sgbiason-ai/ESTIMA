@@ -1,7 +1,7 @@
 // src/components/ItemList.jsx
 import React, { useContext, memo, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Draggable, Droppable } from '@hello-pangea/dnd'; 
-import { GripVertical, Layers, Trash2, Plus, ShieldCheck, AlertCircle, AlertTriangle, FunctionSquare, Check, Boxes, Pencil } from 'lucide-react';
+import { GripVertical, Layers, Trash2, Plus, ShieldCheck, AlertCircle, AlertTriangle, FunctionSquare, Check, Boxes, Pencil, Target } from 'lucide-react';
 
 import { ProjectContext } from '../context/ProjectContext';
 import { EditableTitle, FormattedInput, OptionToggle } from './ProjectUI';
@@ -592,7 +592,7 @@ const ItemRow = memo(
 // --------------------
 // SUBCHAPTER ROW
 // --------------------
-const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly, viewMode, clientQtyMap, bpuConfig, onUpdate, onSelect, onModal, stableKey, activeTrancheId, isGlobalMode }) => {
+const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly, viewMode, clientQtyMap, bpuConfig, onUpdate, onSelect, onModal, stableKey, activeTrancheId, isGlobalMode, insertTargetId }) => {
   const draggableId = `chapter:${stableKey}`;
   const total = sumNodeTotal(el, viewMode === 'client', clientQtyMap);
 
@@ -635,9 +635,9 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
           ref={provided.innerRef}
           {...provided.draggableProps}
           data-subchapter-id={String(el.id)}
-          className={`flex flex-col border-b border-slate-200 rounded-lg mb-2 mt-2 overflow-hidden transition-all outline-none ${
+          className={`flex flex-col border-b border-slate-200 rounded-lg mb-2 mt-2 overflow-hidden transition-all ${
             snapshot.isDragging ? 'shadow-xl bg-white z-50' : ''
-          } ${el.isOption ? 'bg-slate-50 border-dashed border-slate-300' : 'bg-slate-100 border border-slate-200 shadow-sm'}`}
+          } ${el.id === insertTargetId ? 'outline outline-2 outline-blue-500 -outline-offset-2' : 'outline-none'} ${el.isOption ? 'bg-slate-50 border-dashed border-slate-300' : 'bg-slate-100 border border-slate-200 shadow-sm'}`}
         >
           {/* Droppable étendu : englobe header + enfants pour que hello-pangea-dnd détecte le sous-chapitre */}
           {/* comme cible dès le survol du header (items s'écartent + surbrillance native). */}
@@ -697,6 +697,11 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
                       onClick={() => onUpdate(parentId, el.id, 'isOption', !el.isOption)}
                       disabled={isReadOnly}
                     />
+                    {!isReadOnly && el.id === insertTargetId && (
+                      <span className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-500 text-white text-[8px] font-black uppercase tracking-wider shadow-sm" title="Les nouveaux articles (libre ou bibliothèque) seront insérés dans ce sous-chapitre">
+                        <Target size={9} /> Insertion ici
+                      </span>
+                    )}
                   </div>
 
                   {isBloc ? (
@@ -775,6 +780,7 @@ const ItemList = ({ items, parentId, level = 0, bpuConfig }) => {
     onEditItem,
     multiSelection, toggleMultiSelection,
     priceIssueIds,
+    insertTargetId,
   } = useContext(ProjectContext);
 
   const hasMultiSelection = multiSelection && multiSelection.size > 0;
@@ -849,6 +855,7 @@ const ItemList = ({ items, parentId, level = 0, bpuConfig }) => {
         onAddSub={addSubChapter}
         activeTrancheId={activeTrancheId}
         isGlobalMode={isGlobalMode}
+        insertTargetId={insertTargetId}
       />
     );
   });

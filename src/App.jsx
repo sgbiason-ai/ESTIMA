@@ -521,6 +521,27 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNav
     setViewMode, handleSaveProject,
   });
 
+  // Cible d'insertion effective : la cible persistante (dernier chapitre/sous-chapitre
+  // sélectionné) si elle existe encore dans l'arbre, sinon repli sur le 1er chapitre.
+  // Utilisée par TOUTES les insertions (article libre, bibliothèque, bloc) et par
+  // l'indicateur visuel « Insertion ici ».
+  const insertParentId = React.useMemo(() => {
+    const chapters = project?.chapters || [];
+    if (chapters.length === 0) return null;
+    const targetId = modals.insertTargetId;
+    if (targetId) {
+      let exists = false;
+      const walk = (nodes) => nodes.forEach((n) => {
+        if (!n) return;
+        if (n.type !== 'item' && String(n.id) === String(targetId)) exists = true;
+        if (n.children) walk(n.children);
+      });
+      walk(chapters);
+      if (exists) return targetId;
+    }
+    return chapters[0].id;
+  }, [project, modals.insertTargetId]);
+
   // ── Recherche BPU ────────────────────────────────────────────────────────────
   const filteredBpuToDisplay = localMode.currentBpu.filter((item) => {
     const term = removeAccents(bpuSearch);
@@ -643,10 +664,11 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNav
                 setBpuSearch={setBpuSearch}
                 filteredBpu={filteredBpuToDisplay}
                 categories={localMode.currentCategories}
-                addItemToProject={(item) => addItemToProject(item, null, modals.selection)}
-                addItemsToProject={(lines, opts) => addItemsToProject(lines, modals.selection, opts)}
+                addItemToProject={(item) => addItemToProject(item, insertParentId, null)}
+                addItemsToProject={(lines, opts) => addItemsToProject(lines, { type: 'subchapter', id: insertParentId }, opts)}
                 selection={modals.selection}
                 setSelection={modals.setSelection}
+                insertTargetId={insertParentId}
                 multiSelection={modals.multiSelection}
                 toggleMultiSelection={modals.toggleMultiSelection}
                 clearMultiSelection={modals.clearMultiSelection}
