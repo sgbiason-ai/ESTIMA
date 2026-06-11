@@ -1,9 +1,18 @@
 import { useState, useCallback, useEffect } from 'react';
-import { collection, getDocs, deleteDoc, setDoc, doc as fsDoc } from 'firebase/firestore';
+import { collection, getDocs, deleteDoc, setDoc, updateDoc, deleteField, doc as fsDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { toast, confirm } from '../../../utils/globalUI';
 import { getActiveLocalLibrary } from '../../../utils/localLibrary';
 import { sumNodeTotal } from '../../../utils/projectCalculations';
+
+// Durée de rétention avant purge automatique d'une affaire en corbeille.
+const TRASH_TTL_DAYS = 30;
+const TRASH_TTL_MS = TRASH_TTL_DAYS * 24 * 60 * 60 * 1000;
+export { TRASH_TTL_DAYS };
+
+// Sous-collections à purger en cascade lors d'une suppression définitive
+// (Firestore ne supprime pas les sous-collections avec le document parent).
+const PROJECT_SUBCOLLECTIONS = ['archives', 'history', 'analysis', 'rao'];
 
 // Total HT « étude » de l'affaire, hors chapitres PSE/options (comme les exports).
 // Dénormalisé sur le document à chaque Cloud Save → affichable en liste sans recalcul.
@@ -41,12 +50,27 @@ export const usePmCloudProjects = ({
   onSaveProject,
   addToHistory,
 }) => {
-  const [cloudProjects, setCloudProjects] = useState([]);
-  const [cloudLoading,  setCloudLoading]  = useState(false);
-  const [cloudError,    setCloudError]    = useState(null);
-  const [deletingId,    setDeletingId]    = useState(null);
-  const [cloudSaving,   setCloudSaving]   = useState(false);
-  const [cloudSaved,    setCloudSaved]    = useState(false);
+  const [cloudProjects,   setCloudProjects]   = useState([]);
+  const [trashedProjects, setTrashedProjects] = useState([]);
+  const [cloudLoading,    setCloudLoading]    = useState(false);
+  const [cloudError,      setCloudError]      = useState(null);
+  const [deletingId,      setDeletingId]      = useState(null);
+  const [cloudSaving,     setCloudSaving]     = useState(false);
+  const [cloudSaved,      setCloudSaved]      = useState(false);
+
+  // Suppression définitive (document + sous-collections). Utilisée par la purge
+  // manuelle depuis la corbeille et par la purge automatique à 30 jours.
+  const purgeProjectHard = useCallback(async (projId) => {
+    for (const sub of PROJECT_SUBCOLLECTIONS) {
+      try {
+        const subSnap = await getDocs(collection(db, 'companies', companyId, 'projects', projId, sub));
+        await Promise.all(subSnap.docs.map(d => deleteDoc(d.ref)));
+      } catch (errSub) {
+        console.warn(`[purgeProjectHard] purge ${sub} échouée:`, errSub.message);
+      }
+    }
+    await deleteDoc(fsDoc(db, 'companies', companyId, 'projects', projId));
+  }, [companyId]);
 
   // ── Chargement liste cloud ─────────────────────────────────────────────────
   const loadCloudProjects = useCallback(async () => {
@@ -55,16 +79,36 @@ export const usePmCloudProjects = ({
     setCloudError(null);
     try {
       const snap = await getDocs(collection(db, 'companies', companyId, 'projects'));
-      const list = snap.docs
+      const all = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .sort((a, b) => new Date(b.lastSaved || 0) - new Date(a.lastSaved || 0));
-      setCloudProjects(list);
+
+      // Partition actifs / corbeille (deletedAt) + purge auto au-delà de 30 jours.
+      const now = Date.now();
+      const expired = [];
+      const trashed = [];
+      const active = [];
+      all.forEach(p => {
+        if (!p.deletedAt) { active.push(p); return; }
+        if (now - new Date(p.deletedAt).getTime() > TRASH_TTL_MS) expired.push(p);
+        else trashed.push(p);
+      });
+      trashed.sort((a, b) => new Date(b.deletedAt) - new Date(a.deletedAt));
+
+      setCloudProjects(active);
+      setTrashedProjects(trashed);
+
+      // Purge silencieuse des affaires expirées (best effort, n'interrompt pas l'affichage)
+      if (expired.length > 0) {
+        Promise.allSettled(expired.map(p => purgeProjectHard(p.id)))
+          .catch(() => { /* re-tentée au prochain chargement */ });
+      }
     } catch {
       setCloudError('Impossible de charger les projets.');
     } finally {
       setCloudLoading(false);
     }
-  }, [companyId]);
+  }, [companyId, purgeProjectHard]);
 
   useEffect(() => {
     if (historyTab === 'cloud') loadCloudProjects();
@@ -150,31 +194,68 @@ export const usePmCloudProjects = ({
     }
   };
 
-  // ── Supprimer un projet cloud ──────────────────────────────────────────────
-  // Firestore ne supprime pas les sous-collections en cascade : on les vide
-  // explicitement pour éviter des documents orphelins (versions figées, audit…).
-  const PROJECT_SUBCOLLECTIONS = ['archives', 'history', 'analysis', 'rao'];
-
+  // ── Supprimer (corbeille / soft delete) ────────────────────────────────────
+  // La suppression déplace l'affaire à la corbeille (champ deletedAt) au lieu de
+  // l'effacer : restauration possible, purge définitive automatique à 30 jours.
   const handleDeleteCloudProject = async (proj, e) => {
-    e.stopPropagation();
-    const ok2 = await confirm(`Supprimer définitivement "${proj.name || 'Sans nom'}" du cloud ?`, { danger: true });
-    if (!ok2) return;
+    e?.stopPropagation?.();
+    const ok = await confirm(`Déplacer "${proj.name || 'Sans nom'}" à la corbeille ?\nVous pourrez la restaurer pendant ${TRASH_TTL_DAYS} jours.`, { danger: true });
+    if (!ok) return;
     setDeletingId(proj.id);
+    const deletedAt = new Date().toISOString();
     try {
-      for (const sub of PROJECT_SUBCOLLECTIONS) {
-        try {
-          const subSnap = await getDocs(collection(db, 'companies', companyId, 'projects', proj.id, sub));
-          await Promise.all(subSnap.docs.map(d => deleteDoc(d.ref)));
-        } catch (errSub) {
-          console.warn(`[handleDeleteCloudProject] purge ${sub} échouée:`, errSub.message);
-        }
-      }
-      await deleteDoc(fsDoc(db, 'companies', companyId, 'projects', proj.id));
+      await updateDoc(fsDoc(db, 'companies', companyId, 'projects', proj.id), { deletedAt });
       setCloudProjects(prev => prev.filter(p => p.id !== proj.id));
+      setTrashedProjects(prev => [{ ...proj, deletedAt }, ...prev]);
+      toast.success('Affaire déplacée à la corbeille.');
     } catch {
       toast.error('Erreur lors de la suppression.');
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  // ── Restaurer depuis la corbeille ──────────────────────────────────────────
+  const handleRestoreFromTrash = async (proj) => {
+    if (!companyId) return;
+    try {
+      await updateDoc(fsDoc(db, 'companies', companyId, 'projects', proj.id), { deletedAt: deleteField() });
+      const { deletedAt, ...restored } = proj;
+      setTrashedProjects(prev => prev.filter(p => p.id !== proj.id));
+      setCloudProjects(prev => [restored, ...prev].sort((a, b) => new Date(b.lastSaved || 0) - new Date(a.lastSaved || 0)));
+      toast.success('Affaire restaurée.');
+    } catch {
+      toast.error('Erreur lors de la restauration.');
+    }
+  };
+
+  // ── Purger définitivement (depuis la corbeille) ────────────────────────────
+  const handlePurgeProject = async (proj) => {
+    const ok = await confirm(`Supprimer DÉFINITIVEMENT "${proj.name || 'Sans nom'}" ?\nCette action est irréversible.`, { danger: true });
+    if (!ok) return;
+    setDeletingId(proj.id);
+    try {
+      await purgeProjectHard(proj.id);
+      setTrashedProjects(prev => prev.filter(p => p.id !== proj.id));
+    } catch {
+      toast.error('Erreur lors de la suppression définitive.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  // ── Vider la corbeille ─────────────────────────────────────────────────────
+  const handleEmptyTrash = async () => {
+    if (trashedProjects.length === 0) return;
+    const ok = await confirm(`Vider la corbeille ?\n${trashedProjects.length} affaire(s) seront définitivement supprimées.`, { danger: true });
+    if (!ok) return;
+    const ids = trashedProjects.map(p => p.id);
+    try {
+      await Promise.allSettled(ids.map(id => purgeProjectHard(id)));
+      setTrashedProjects([]);
+      toast.success('Corbeille vidée.');
+    } catch {
+      toast.error('Erreur lors du vidage de la corbeille.');
     }
   };
 
@@ -298,6 +379,7 @@ export const usePmCloudProjects = ({
   return {
     cloudProjects,
     setCloudProjects,
+    trashedProjects,
     cloudLoading,
     cloudError,
     deletingId,
@@ -307,6 +389,9 @@ export const usePmCloudProjects = ({
     handleRestoreSnapshot,
     handleLoadCloudProject,
     handleDeleteCloudProject,
+    handleRestoreFromTrash,
+    handlePurgeProject,
+    handleEmptyTrash,
     handleDuplicateCloudProject,
     handleCloudSave,
   };

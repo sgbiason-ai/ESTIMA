@@ -30,6 +30,7 @@ const PmCommandBar = ({
   viewMode, setViewMode,
   cloudLoading, onRefresh,
   localCount, onClearLocal,
+  trashCount = 0,
 }) => {
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
@@ -84,17 +85,29 @@ const PmCommandBar = ({
             </button>
           </div>
 
-          {historyTab === 'cloud' ? (
+          {historyTab === 'cloud' && (
             <button onClick={onRefresh} disabled={cloudLoading}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-all">
               <RefreshCw size={14} className={cloudLoading ? 'animate-spin' : ''} /> <span className="hidden sm:inline">Actualiser</span>
             </button>
-          ) : localCount > 0 && (
+          )}
+          {historyTab === 'local' && localCount > 0 && (
             <button onClick={onClearLocal}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-gray-500 hover:text-red-500 hover:bg-red-50 transition-all">
               <Trash2 size={14} /> <span className="hidden sm:inline">Vider</span>
             </button>
           )}
+
+          {/* Corbeille */}
+          <button onClick={() => setHistoryTab(historyTab === 'trash' ? 'cloud' : 'trash')}
+            title="Corbeille"
+            className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
+              historyTab === 'trash' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}>
+            <Trash2 size={14} /> <span className="hidden md:inline">Corbeille</span>
+            {trashCount > 0 && historyTab !== 'trash' && (
+              <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold">{trashCount}</span>
+            )}
+          </button>
         </div>
       </div>
 

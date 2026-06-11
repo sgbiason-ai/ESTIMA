@@ -18,6 +18,7 @@ import PmRecents         from './PmRecents';
 import PmFolderSidebar   from './PmFolderSidebar';
 import PmProjectGrid     from './PmProjectGrid';
 import PmDetailsPanel    from './PmDetailsPanel';
+import PmTrashView       from './PmTrashView';
 import ProjectDetailsModal from '../../components/modals/ProjectDetailsModal';
 import PmLocalHistory    from './PmLocalHistory';
 import LinkedLibraryModal from '../../components/modals/LinkedLibraryModal';
@@ -454,6 +455,7 @@ const ProjectManagerView = ({
             viewMode={viewMode} setViewMode={setViewMode}
             cloudLoading={cloud.cloudLoading} onRefresh={cloud.loadCloudProjects}
             localCount={local.recentProjects.length} onClearLocal={local.clearHistory}
+            trashCount={cloud.trashedProjects.length}
           />
 
           {/* Cloud tab */}
@@ -557,6 +559,18 @@ const ProjectManagerView = ({
                 onLoadFromHistory={local.loadFromHistory}
               />
             </div>
+          )}
+
+          {/* Corbeille */}
+          {historyTab === 'trash' && (
+            <PmTrashView
+              projects={cloud.trashedProjects}
+              deletingId={cloud.deletingId}
+              onRestore={cloud.handleRestoreFromTrash}
+              onPurge={cloud.handlePurgeProject}
+              onEmptyTrash={cloud.handleEmptyTrash}
+              onBack={() => setHistoryTab('cloud')}
+            />
           )}
         </div>
       </div>
