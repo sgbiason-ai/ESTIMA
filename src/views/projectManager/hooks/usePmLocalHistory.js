@@ -35,6 +35,8 @@ export const usePmLocalHistory = ({
       updated.unshift({
         id:           proj.id,
         name:         proj.name || 'Sans nom',
+        code:         proj.code || '',
+        location:     proj.location || '',
         lastModified: new Date().toISOString(),
         chapterCount: (proj.chapters || []).length,
       });

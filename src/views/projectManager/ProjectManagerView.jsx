@@ -21,17 +21,24 @@ import PmLocalHistory    from './PmLocalHistory';
 import LinkedLibraryModal from '../../components/modals/LinkedLibraryModal';
 import { getActiveLocalLibrary, backupActiveLocalLibrary, setActiveLocalLibrary, librariesMatch, compareProjectVsLibrary, deactivateLocalLibrary } from '../../utils/localLibrary';
 
+// Préférences d'affichage persistées (onglet, tri, vue) — même pattern que estima_force_layout
+const PM_PREFS_KEY = 'estima_pm_prefs';
+const readPmPrefs = () => {
+  try { return JSON.parse(localStorage.getItem(PM_PREFS_KEY)) || {}; } catch { return {}; }
+};
+
 const ProjectManagerView = ({
   project, setProject, onSaveProject,
   bpuConfig, clientPercent, setBpuConfig, setClientPercent,
   companyId, currentUserUid, onNavigateModule, setActiveTab,
   masterBranding = null,
 }) => {
-  const [historyTab, setHistoryTab] = useState('cloud');
+  const [historyTab, setHistoryTab] = useState(() => readPmPrefs().historyTab === 'local' ? 'local' : 'cloud');
   const [showHelp,   setShowHelp]   = useState(false);
-  const [sortBy,     setSortBy]     = useState('date');
+  const [sortBy,     setSortBy]     = useState(() => ['date', 'code', 'name'].includes(readPmPrefs().sortBy) ? readPmPrefs().sortBy : 'date');
   const [search,     setSearch]     = useState('');
-  const [viewMode,   setViewMode]   = useState('grid');
+  const [viewMode,   setViewMode]   = useState(() => readPmPrefs().viewMode === 'list' ? 'list' : 'grid');
+  const [creatingProject, setCreatingProject] = useState(false);
   const [detailsProject, setDetailsProject] = useState(null);
   const [linkedCrcMap, setLinkedCrcMap] = useState({});
   const [raoProjectIds, setRaoProjectIds] = useState(new Set());
@@ -39,6 +46,11 @@ const ProjectManagerView = ({
   // pendingOpen = { proj, mode: 'load' | 'openInEstima' } | null
   const [pendingOpen, setPendingOpen] = useState(null);
   const [libModalCurrent, setLibModalCurrent] = useState(null);
+
+  // Persister les préférences d'affichage
+  useEffect(() => {
+    try { localStorage.setItem(PM_PREFS_KEY, JSON.stringify({ historyTab, sortBy, viewMode })); } catch { /* ignore */ }
+  }, [historyTab, sortBy, viewMode]);
 
   // Charger les CRC liés + projets avec RAO
   useEffect(() => {
@@ -264,7 +276,7 @@ const ProjectManagerView = ({
   const lastSaved = project?.lastSaved ? new Date(project.lastSaved).toLocaleString('fr-FR') : null;
 
   return (
-    <div className="h-screen w-full bg-[#f5f5f7] overflow-hidden flex flex-col text-gray-900 select-none"
+    <div className="h-screen w-full bg-[#f5f5f7] overflow-hidden flex flex-col text-gray-900"
       >
 
       <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="projectManager" />
@@ -304,12 +316,13 @@ const ProjectManagerView = ({
         onCloudSave={cloud.handleCloudSave} onExport={local.handleExport}
         onImportClick={() => local.fileInputRef.current?.click()} onClone={local.handleClone}
         fileInputRef={local.fileInputRef} onImportChange={local.handleImport}
+        creatingProject={creatingProject}
         onNewProject={async () => {
-          const ok = await confirm('Créer un nouveau projet ?');
-          if (!ok) return;
+          if (creatingProject) return;
+          setCreatingProject(true);
           const newProject = {
             id: generateId(),
-            name: '',
+            name: `Nouvelle affaire — ${new Date().toLocaleDateString('fr-FR')}`,
             chapters: [{ id: 'c1', title: 'TRAVAUX PREPARATOIRES', children: [], type: 'chapter', isOption: false }],
             tranches: [],
             sourceIds: [],
@@ -318,11 +331,14 @@ const ProjectManagerView = ({
             await onSaveProject(newProject);
             setProject(newProject);
             cloud.setCloudProjects(prev => [{ ...newProject, lastSaved: new Date().toISOString() }, ...prev]);
-            toast.success('Nouveau projet créé.');
+            toast.success('Nouvelle affaire créée.');
+            setDetailsProject(newProject);
             if (setActiveTab) setActiveTab();
           } catch (e) {
             console.error('[ProjectManager] Erreur création projet:', e);
             toast.error('Impossible de créer le projet.');
+          } finally {
+            setCreatingProject(false);
           }
         }}
         onShowHelp={() => setShowHelp(true)}
@@ -349,15 +365,15 @@ const ProjectManagerView = ({
                     style={{ transition: 'width 0.2s ease, border-color 0.15s' }}
                   />
                   {search && (
-                    <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">×</button>
+                    <button onClick={() => setSearch('')} aria-label="Effacer la recherche" className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">×</button>
                   )}
                 </div>
               )}
 
               {historyTab === 'cloud' && cloud.cloudProjects.length > 0 && (
                 <span className="bg-gray-100 text-gray-500 border border-gray-200/60 text-xs font-medium px-2.5 py-0.5 rounded-full">
-                  {fm.filteredProjects.length}
-                  {fm.selectedFolderId !== '__all__' && <span className="text-gray-300"> / {cloud.cloudProjects.length}</span>}
+                  {sortedProjects.length}
+                  {(fm.selectedFolderId !== '__all__' || search.trim()) && <span className="text-gray-300"> / {cloud.cloudProjects.length}</span>}
                 </span>
               )}
             </div>
@@ -408,6 +424,7 @@ const ProjectManagerView = ({
                     <button
                       onClick={() => setViewMode('grid')}
                       title="Vue en dalles"
+                      aria-label="Vue en dalles"
                       className={`p-1.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
                     >
                       <LayoutGrid size={14} />
@@ -415,6 +432,7 @@ const ProjectManagerView = ({
                     <button
                       onClick={() => setViewMode('list')}
                       title="Vue en liste"
+                      aria-label="Vue en liste"
                       className={`p-1.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
                     >
                       <List size={14} />
@@ -477,6 +495,8 @@ const ProjectManagerView = ({
                   cloudError={cloud.cloudError}
                   cloudProjects={cloud.cloudProjects}
                   filteredProjects={sortedProjects}
+                  searchQuery={search}
+                  onClearSearch={() => setSearch('')}
                   selectedFolderId={fm.selectedFolderId}
                   setSelectedFolderId={fm.setSelectedFolderId}
                   project={project}
@@ -489,7 +509,14 @@ const ProjectManagerView = ({
                   onDeleteProject={cloud.handleDeleteCloudProject}
                   onDuplicateProject={cloud.handleDuplicateCloudProject}
                   onMoveProject={fm.setMovingProject}
-                  onRestoreSnapshot={cloud.handleRestoreSnapshot}
+                  onRestoreSnapshot={async (projId, iso) => {
+                    const d = new Date(iso);
+                    const ok = await confirm(
+                      `Restaurer la version du ${d.toLocaleDateString('fr-FR')} à ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} ? La version actuelle de l'affaire sera remplacée.`,
+                      { danger: true }
+                    );
+                    if (ok) cloud.handleRestoreSnapshot(projId, iso);
+                  }}
                   onInfoProject={setDetailsProject}
                   linkedCrcMap={linkedCrcMap}
                   raoProjectIds={raoProjectIds}

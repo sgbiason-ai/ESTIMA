@@ -5,6 +5,9 @@ import {
 } from 'lucide-react';
 import { NEUTRAL_COLOR } from './folderColors';
 
+// Actions révélées au hover sur desktop, toujours visibles sur tactile (pas de hover sur tablette)
+const HOVER_REVEAL = 'opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100';
+
 /**
  * PmFolderSidebar
  *
@@ -59,6 +62,9 @@ const PmFolderSidebar = ({
     return (
       <div>
         <div
+          role="button"
+          tabIndex={0}
+          onKeyDown={e => { if (e.key === 'Enter') setSelectedFolderId(folder.id); }}
           onClick={() => setSelectedFolderId(folder.id)}
           {...dndProps(folder.id, folder.id)}
           className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-xl cursor-pointer transition-all text-sm ${
@@ -69,6 +75,8 @@ const PmFolderSidebar = ({
         >
           <button
             onClick={e => hasSubs ? toggleExpand(folder.id, e) : e.stopPropagation()}
+            aria-label={hasSubs ? (isExpanded ? 'Replier le dossier' : 'Déplier le dossier') : undefined}
+            tabIndex={hasSubs ? 0 : -1}
             className={`shrink-0 transition-colors ${hasSubs ? 'text-gray-400 hover:text-gray-600' : 'text-transparent'}`}
           >
             {hasSubs ? (isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />) : <ChevronRight size={12} />}
@@ -97,17 +105,17 @@ const PmFolderSidebar = ({
           )}
 
           {!isEditing && (
-            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+            <div className={`flex items-center gap-0.5 transition-opacity shrink-0 ${HOVER_REVEAL}`}>
               <button onClick={e => { e.stopPropagation(); setCreatingFolder({ parentId: folder.id }); setNewFolderName(''); }}
-                title="Sous-dossier" className="p-0.5 rounded text-gray-400 hover:text-blue-500 hover:bg-blue-50">
+                title="Sous-dossier" aria-label="Créer un sous-dossier" className="p-0.5 rounded text-gray-400 hover:text-blue-500 hover:bg-blue-50">
                 <FolderPlus size={11} />
               </button>
               <button onClick={e => { e.stopPropagation(); setEditingFolder({ id: folder.id, name: folder.name }); }}
-                title="Renommer" className="p-0.5 rounded text-gray-400 hover:text-amber-500 hover:bg-amber-50">
+                title="Renommer" aria-label="Renommer le dossier" className="p-0.5 rounded text-gray-400 hover:text-amber-500 hover:bg-amber-50">
                 <Edit2 size={11} />
               </button>
               <button onClick={e => handleDeleteFolder(folder.id, e)}
-                title="Supprimer" className="p-0.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50">
+                title="Supprimer" aria-label="Supprimer le dossier" className="p-0.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50">
                 <Trash2 size={11} />
               </button>
             </div>
@@ -140,6 +148,7 @@ const PmFolderSidebar = ({
         <button
           onClick={() => { setCreatingFolder({ parentId: null }); setNewFolderName(''); }}
           title="Nouveau dossier"
+          aria-label="Nouveau dossier"
           className="p-1 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
         >
           <FolderPlus size={14} />

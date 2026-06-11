@@ -10,7 +10,7 @@ const RibbonGroup = ({ label, children, noBorder }) => (
       {children}
     </div>
     <div className="text-center pb-1 px-2">
-      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest select-none whitespace-nowrap leading-none">
+      <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest select-none whitespace-nowrap leading-none">
         {label}
       </span>
     </div>
@@ -35,11 +35,11 @@ const RibbonBtnLarge = ({ icon: Icon, label, onClick, title, active, accent, dis
       }
     `}
   >
-    <div className={`transition-colors ${accent || 'text-gray-400'} ${!disabled && !active ? 'group-hover:text-gray-700' : ''}`}>
+    <div className={`transition-colors ${accent || 'text-gray-500'} ${!disabled && !active ? 'group-hover:text-gray-700' : ''}`}>
       <Icon size={20} strokeWidth={1.5} className={loading ? 'animate-spin' : ''} />
     </div>
-    <span className={`text-[10px] leading-tight text-center font-semibold transition-colors
-      ${active ? 'text-blue-600' : 'text-gray-400'}
+    <span className={`text-[11px] leading-tight text-center font-semibold transition-colors
+      ${active ? 'text-blue-600' : 'text-gray-600'}
       ${!disabled && !active ? 'group-hover:text-gray-700' : ''}
     `}>
       {label}
@@ -67,7 +67,7 @@ const RibbonBtnSmall = ({ icon: Icon, label, onClick, title, active, accent, dis
     </div>
     {label && (
       <span className={`text-[11px] leading-none whitespace-nowrap font-medium transition-colors
-        ${active ? 'text-blue-600' : 'text-gray-400'}
+        ${active ? 'text-blue-600' : 'text-gray-600'}
         ${!disabled && !active ? 'group-hover:text-gray-700' : ''}
       `}>
         {label}
@@ -84,6 +84,7 @@ const PmLeftColumn = ({
   cloudSaving, cloudSaved,
   onCloudSave, onExport, onImportClick, onClone,
   fileInputRef, onImportChange, onNewProject, onShowHelp,
+  creatingProject = false,
 }) => (
   <div className="flex-none flex items-stretch bg-white/80 backdrop-blur-xl border-b border-gray-200/60 h-[80px] select-none z-20 overflow-x-hidden"
     >
@@ -96,14 +97,14 @@ const PmLeftColumn = ({
         </div>
         <div>
           <h1 className="text-sm font-black text-gray-900 uppercase tracking-wider leading-none">Workspace</h1>
-          <p className="text-[9px] text-gray-400 font-medium mt-1">Estima Suite</p>
+          <p className="text-[10px] text-gray-500 font-medium mt-1">Estima Suite</p>
         </div>
       </div>
     </div>
 
     {/* ── Session en cours ── */}
     <div className="flex flex-col justify-center px-6 border-r border-gray-200/60 min-w-[180px] max-w-[300px]">
-      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Session en cours</p>
+      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Session en cours</p>
       <div className="flex items-center gap-2 mb-2">
         <span className="flex items-center gap-1 bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border border-emerald-200/60">
           <CheckCircle2 size={10} /> Actif
@@ -113,17 +114,23 @@ const PmLeftColumn = ({
         </span>
       </div>
       {lastSaved && (
-        <div className="flex items-center gap-3 text-[10px] font-medium text-gray-400">
-          <span className="flex items-center gap-1 text-gray-300" title={`Dernière sauvegarde : ${lastSaved}`}>
-            <Cloud size={10} /> Sync
-          </span>
+        <div className="flex items-center gap-1 text-[10px] font-medium text-gray-500 min-w-0" title={`Dernière sauvegarde : ${lastSaved}`}>
+          <Cloud size={10} className="shrink-0" />
+          <span className="truncate">{lastSaved}</span>
         </div>
       )}
     </div>
 
     {/* ── Général ── */}
     <RibbonGroup label="Général">
-      <RibbonBtnLarge icon={PlusCircle} label="Nouveau" onClick={onNewProject} accent="text-blue-500" />
+      <RibbonBtnLarge
+        icon={creatingProject ? RefreshCw : PlusCircle}
+        label={creatingProject ? 'Création...' : 'Nouveau'}
+        onClick={onNewProject}
+        disabled={creatingProject}
+        loading={creatingProject}
+        accent="text-blue-500"
+      />
       <RibbonBtnLarge icon={HelpCircle} label="Guide" onClick={onShowHelp} accent="text-gray-500" />
     </RibbonGroup>
 
@@ -141,14 +148,14 @@ const PmLeftColumn = ({
     </RibbonGroup>
 
     {/* ── Actions Fichier ── */}
-    <RibbonGroup label="Local & Fichier">
+    <RibbonGroup label="Fichier">
       <div className="flex flex-col gap-0.5 justify-center">
-        <RibbonBtnSmall icon={FolderOpen} label="Ouvrir JSON" onClick={onImportClick} accent="text-amber-500" />
+        <RibbonBtnSmall icon={FolderOpen} label="Importer un projet" title="Importer un projet depuis un fichier .json" onClick={onImportClick} accent="text-amber-500" />
         <input type="file" ref={fileInputRef} onChange={onImportChange} accept=".json" className="hidden" />
-        <RibbonBtnSmall icon={Save} label="Exporter JSON" onClick={onExport} accent="text-blue-500" />
+        <RibbonBtnSmall icon={Save} label="Exporter une copie" title="Exporter l'affaire en cours en fichier .json" onClick={onExport} accent="text-blue-500" />
       </div>
       <div className="flex flex-col gap-0.5 justify-center">
-        <RibbonBtnSmall icon={Copy} label="Dupliquer le projet" onClick={onClone} accent="text-violet-500" />
+        <RibbonBtnSmall icon={Copy} label="Dupliquer la session" title="Créer une copie locale de l'affaire en cours" onClick={onClone} accent="text-violet-500" />
       </div>
     </RibbonGroup>
 

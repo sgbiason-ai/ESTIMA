@@ -1,15 +1,22 @@
-import React from 'react';
-import { Cloud, Folder, Clock, RefreshCw, CloudOff, Trash2, RotateCcw, Info, ClipboardList, BarChart3, Copy, ExternalLink, User } from 'lucide-react';
+import React, { useState } from 'react';
+import { Cloud, Folder, Clock, RefreshCw, CloudOff, Trash2, RotateCcw, Info, ClipboardList, BarChart3, Copy, ExternalLink, User, SearchX } from 'lucide-react';
 import { NEUTRAL_COLOR } from './folderColors';
+
+// Actions révélées au hover sur desktop, mais toujours visibles sur tactile
+// (tablette/mobile : pas de hover → opacity-0 les rendait inaccessibles)
+const HOVER_REVEAL = 'opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100';
 
 const PmProjectGrid = ({
   viewMode = 'grid',
   cloudLoading, cloudError, cloudProjects, filteredProjects,
+  searchQuery = '', onClearSearch,
   setSelectedFolderId,
   project, folders, folderColorMap = {},
   presenceByProject, deletingId,
   onLoadProject, onOpenInEstima, onDeleteProject, onDuplicateProject, onMoveProject, onRestoreSnapshot, onInfoProject, linkedCrcMap = {}, raoProjectIds = new Set(), onNavigateModule,
 }) => {
+  // Popover "Versions précédentes" : ouvrable au clic (tactile) en plus du hover
+  const [openHistId, setOpenHistId] = useState(null);
 
   // Simple clic = sélection/aperçu (chargement silencieux dans la session, reste sur le Workspace).
   // Double-clic OU bouton "Ouvrir" = ouverture dans Estima VRD. Plus de délai artificiel :
@@ -47,18 +54,33 @@ const PmProjectGrid = ({
     </div>
   );
 
-  if (filteredProjects.length === 0) return (
-    <div className="h-full flex flex-col items-center justify-center gap-4 text-gray-400">
-      <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mb-2">
-        <Folder size={28} className="text-gray-300" />
+  if (filteredProjects.length === 0) {
+    // Empty state recherche : différencié du "dossier vide" (cause différente, CTA différent)
+    if (searchQuery.trim()) return (
+      <div className="h-full flex flex-col items-center justify-center gap-4 text-gray-400">
+        <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mb-2">
+          <SearchX size={28} className="text-gray-300" />
+        </div>
+        <p className="text-base font-medium text-gray-600">Aucun résultat pour « {searchQuery.trim()} »</p>
+        <p className="text-sm text-center max-w-xs text-gray-400">Vérifiez l'orthographe ou essayez un nom, un n° ou un lieu.</p>
+        <button onClick={() => onClearSearch?.()} className="text-xs text-blue-500 hover:text-blue-600 transition-colors">
+          Effacer la recherche
+        </button>
       </div>
-      <p className="text-base font-medium text-gray-600">Dossier vide</p>
-      <p className="text-sm text-center max-w-xs text-gray-400">Aucune affaire dans ce dossier.</p>
-      <button onClick={() => setSelectedFolderId('__all__')} className="text-xs text-blue-500 hover:text-blue-600 transition-colors">
-        &larr; Voir tous les projets
-      </button>
-    </div>
-  );
+    );
+    return (
+      <div className="h-full flex flex-col items-center justify-center gap-4 text-gray-400">
+        <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mb-2">
+          <Folder size={28} className="text-gray-300" />
+        </div>
+        <p className="text-base font-medium text-gray-600">Dossier vide</p>
+        <p className="text-sm text-center max-w-xs text-gray-400">Aucune affaire dans ce dossier.</p>
+        <button onClick={() => setSelectedFolderId('__all__')} className="text-xs text-blue-500 hover:text-blue-600 transition-colors">
+          &larr; Voir tous les projets
+        </button>
+      </div>
+    );
+  }
 
   // ── Helpers ──────────────────────────────────────────────────────────────
   const getProjectMeta = (proj) => {
@@ -92,6 +114,9 @@ const PmProjectGrid = ({
             <div
               key={proj.id}
               draggable
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleCardClick(proj); }}
               onDragStart={(e) => { e.dataTransfer.setData('text/plain', proj.id); e.dataTransfer.effectAllowed = 'move'; }}
               onClick={() => handleCardClick(proj)}
               onDoubleClick={() => handleCardDoubleClick(proj)}
@@ -147,13 +172,13 @@ const PmProjectGrid = ({
               </div>
               <div className="flex items-center justify-end gap-1">
                 <button onClick={e => { e.stopPropagation(); onOpenInEstima?.(proj); }} title="Ouvrir dans Estima VRD"
-                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-blue-600 bg-blue-50 border border-blue-200/60 hover:bg-blue-100 transition-colors opacity-0 group-hover:opacity-100">
+                  className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-blue-600 bg-blue-50 border border-blue-200/60 hover:bg-blue-100 transition-colors ${HOVER_REVEAL}`}>
                   <ExternalLink size={11} /> Ouvrir
                 </button>
-                <button onClick={e => { e.stopPropagation(); onInfoProject?.(proj); }} className="p-1 rounded-lg text-gray-300 hover:text-indigo-500 hover:bg-indigo-50 transition-colors opacity-0 group-hover:opacity-100" title="Fiche projet"><Info size={13} /></button>
-                <button onClick={e => onDuplicateProject?.(proj, e)} className="p-1 rounded-lg text-gray-300 hover:text-violet-500 hover:bg-violet-50 transition-colors opacity-0 group-hover:opacity-100" title="Dupliquer"><Copy size={13} /></button>
-                <button onClick={e => { e.stopPropagation(); onMoveProject(proj); }} className="p-1 rounded-lg text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-colors opacity-0 group-hover:opacity-100" title="Déplacer"><Folder size={13} /></button>
-                <button onClick={e => onDeleteProject(proj, e)} disabled={deletingId === proj.id} className="p-1 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100" title="Supprimer">
+                <button onClick={e => { e.stopPropagation(); onInfoProject?.(proj); }} className={`p-1 rounded-lg text-gray-300 hover:text-indigo-500 hover:bg-indigo-50 transition-colors ${HOVER_REVEAL}`} title="Fiche projet" aria-label="Fiche projet"><Info size={13} /></button>
+                <button onClick={e => onDuplicateProject?.(proj, e)} className={`p-1 rounded-lg text-gray-300 hover:text-violet-500 hover:bg-violet-50 transition-colors ${HOVER_REVEAL}`} title="Dupliquer cette affaire" aria-label="Dupliquer cette affaire"><Copy size={13} /></button>
+                <button onClick={e => { e.stopPropagation(); onMoveProject(proj); }} className={`p-1 rounded-lg text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-colors ${HOVER_REVEAL}`} title="Déplacer" aria-label="Déplacer"><Folder size={13} /></button>
+                <button onClick={e => onDeleteProject(proj, e)} disabled={deletingId === proj.id} className={`p-1 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors ${HOVER_REVEAL}`} title="Supprimer" aria-label="Supprimer">
                   {deletingId === proj.id ? <RefreshCw size={13} className="animate-spin" /> : <Trash2 size={13} />}
                 </button>
               </div>
@@ -175,6 +200,9 @@ const PmProjectGrid = ({
           <div
             key={proj.id}
             draggable
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleCardClick(proj); }}
             onDragStart={(e) => { e.dataTransfer.setData('text/plain', proj.id); e.dataTransfer.effectAllowed = 'move'; }}
             onClick={() => handleCardClick(proj)}
             onDoubleClick={() => handleCardDoubleClick(proj)}
@@ -234,11 +262,13 @@ const PmProjectGrid = ({
                 </div>
                 {saveHistory.length > 1 && (
                   <div className="relative group/hist shrink-0">
-                    <button onClick={e => e.stopPropagation()} title="Versions précédentes"
+                    <button
+                      onClick={e => { e.stopPropagation(); setOpenHistId(openHistId === proj.id ? null : proj.id); }}
+                      title="Versions précédentes" aria-label="Versions précédentes"
                       className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-lg text-[10px] font-semibold text-gray-400 hover:text-amber-500 hover:bg-amber-50 transition-colors">
                       <RotateCcw size={11} /> {saveHistory.length}
                     </button>
-                    <div className="hidden group-hover/hist:block absolute bottom-full right-0 pb-1.5 z-30">
+                    <div className={`${openHistId === proj.id ? 'block' : 'hidden group-hover/hist:block'} absolute bottom-full right-0 pb-1.5 z-30`}>
                       <div className="w-44 bg-white rounded-xl shadow-lg border border-gray-200/70 p-1.5">
                         <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wider px-1 pb-1">Restaurer une version</p>
                         {saveHistory.slice(1).map((iso, i) => {
@@ -246,7 +276,7 @@ const PmProjectGrid = ({
                           const dStr = d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
                           const tStr = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
                           return (
-                            <button key={i} onClick={e => { e.stopPropagation(); onRestoreSnapshot?.(proj.id, iso); }}
+                            <button key={i} onClick={e => { e.stopPropagation(); setOpenHistId(null); onRestoreSnapshot?.(proj.id, iso); }}
                               title={`Restaurer la version du ${dStr} à ${tStr}`}
                               className="w-full flex items-center gap-1.5 px-1.5 py-1 rounded-lg text-[10px] text-gray-500 hover:bg-amber-50 hover:text-amber-600 transition-colors">
                               <RotateCcw size={10} className="shrink-0" />
@@ -266,13 +296,13 @@ const PmProjectGrid = ({
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button onClick={e => { e.stopPropagation(); onOpenInEstima?.(proj); }} title="Ouvrir dans Estima VRD"
-                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-blue-600 bg-blue-50 border border-blue-200/60 hover:bg-blue-100 transition-colors opacity-0 group-hover:opacity-100">
+                    className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-blue-600 bg-blue-50 border border-blue-200/60 hover:bg-blue-100 transition-colors ${HOVER_REVEAL}`}>
                     <ExternalLink size={11} /> Ouvrir
                   </button>
-                  <button onClick={e => { e.stopPropagation(); onInfoProject?.(proj); }} className="p-1 rounded-lg text-gray-300 hover:text-indigo-500 hover:bg-indigo-50 transition-colors opacity-0 group-hover:opacity-100" title="Fiche projet"><Info size={13} /></button>
-                  <button onClick={e => onDuplicateProject?.(proj, e)} className="p-1 rounded-lg text-gray-300 hover:text-violet-500 hover:bg-violet-50 transition-colors opacity-0 group-hover:opacity-100" title="Dupliquer"><Copy size={13} /></button>
-                  <button onClick={e => { e.stopPropagation(); onMoveProject(proj); }} className="p-1 rounded-lg text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-colors opacity-0 group-hover:opacity-100" title="Déplacer"><Folder size={13} /></button>
-                  <button onClick={e => onDeleteProject(proj, e)} disabled={deletingId === proj.id} className="p-1 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100" title="Supprimer">
+                  <button onClick={e => { e.stopPropagation(); onInfoProject?.(proj); }} className={`p-1 rounded-lg text-gray-300 hover:text-indigo-500 hover:bg-indigo-50 transition-colors ${HOVER_REVEAL}`} title="Fiche projet" aria-label="Fiche projet"><Info size={13} /></button>
+                  <button onClick={e => onDuplicateProject?.(proj, e)} className={`p-1 rounded-lg text-gray-300 hover:text-violet-500 hover:bg-violet-50 transition-colors ${HOVER_REVEAL}`} title="Dupliquer cette affaire" aria-label="Dupliquer cette affaire"><Copy size={13} /></button>
+                  <button onClick={e => { e.stopPropagation(); onMoveProject(proj); }} className={`p-1 rounded-lg text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-colors ${HOVER_REVEAL}`} title="Déplacer" aria-label="Déplacer"><Folder size={13} /></button>
+                  <button onClick={e => onDeleteProject(proj, e)} disabled={deletingId === proj.id} className={`p-1 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors ${HOVER_REVEAL}`} title="Supprimer" aria-label="Supprimer">
                     {deletingId === proj.id ? <RefreshCw size={13} className="animate-spin" /> : <Trash2 size={13} />}
                   </button>
                 </div>

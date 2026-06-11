@@ -27,12 +27,18 @@ const PmLocalHistory = ({ recentProjects, onLoadFromHistory }) => {
         const timeStr = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
         const isToday = new Date().toDateString() === date.toDateString();
 
-        let extraInfo = null;
-        try {
-          const raw  = localStorage.getItem(`project_backup_${item.id}`);
-          const full = raw ? JSON.parse(raw) : null;
-          if (full?.code || full?.location) extraInfo = full;
-        } catch { /* ignore */ }
+        // code/location sont stockés dans l'index depuis la v2.5 ; fallback sur le
+        // backup complet uniquement pour les entrées antérieures (legacy)
+        let extraInfo = (item.code !== undefined || item.location !== undefined)
+          ? { code: item.code, location: item.location }
+          : null;
+        if (!extraInfo) {
+          try {
+            const raw  = localStorage.getItem(`project_backup_${item.id}`);
+            const full = raw ? JSON.parse(raw) : null;
+            if (full?.code || full?.location) extraInfo = { code: full.code, location: full.location };
+          } catch { /* ignore */ }
+        }
 
         return (
           <div

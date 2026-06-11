@@ -16,6 +16,14 @@ const HelpPanel = ({ isOpen, onClose, moduleId, content: contentProp, headerActi
   // Reset tab quand on change de module
   useEffect(() => { setActiveTab(0); }, [moduleId, contentProp]);
 
+  // Fermeture par Échap
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
+
   if (!isOpen || !content) return null;
 
   const tabs = content.tabs || [];

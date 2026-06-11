@@ -1,8 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, MoveRight, Folder, Layers, CheckCircle2 } from 'lucide-react';
 
 const MoveFolderModal = ({ project, folders, onMove, onClose }) => {
   const [selectedId, setSelectedId] = useState(project?.folderId ?? '__none__');
+
+  // Fermeture par Échap
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
 
   const rootFolders  = folders.filter(f => !f.parentId);
   const getSubfolders = (parentId) => folders.filter(f => f.parentId === parentId);
@@ -34,8 +41,8 @@ const MoveFolderModal = ({ project, folders, onMove, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-sm shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-sm shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
 
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-slate-800 bg-slate-800/50">
