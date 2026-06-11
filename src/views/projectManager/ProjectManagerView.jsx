@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { HelpCircle, PlusCircle, Clock, Cloud, RefreshCw, Trash2, ArrowUpDown, Search, LayoutGrid, List } from 'lucide-react';
 import { buildFolderColorMap } from './folderColors';
 import { toast } from '../../utils/globalUI';
 import { generateId } from '../../utils/helpers';
@@ -14,6 +13,8 @@ import { usePmFolders }          from './hooks/usePmFolders';
 import HelpPanel         from '../../components/help/HelpPanel';
 import MoveFolderModal   from './MoveFolderModal';
 import PmToolbar         from './PmToolbar';
+import PmCommandBar      from './PmCommandBar';
+import PmRecents         from './PmRecents';
 import PmFolderSidebar   from './PmFolderSidebar';
 import PmProjectGrid     from './PmProjectGrid';
 import ProjectDetailsModal from '../../components/modals/ProjectDetailsModal';
@@ -33,12 +34,16 @@ const ProjectManagerView = ({
   companyId, currentUserUid, onNavigateModule, setActiveTab,
   masterBranding = null,
 }) => {
+  const SORT_KEYS = ['date', 'code', 'name', 'location', 'folder'];
   const [historyTab, setHistoryTab] = useState(() => readPmPrefs().historyTab === 'local' ? 'local' : 'cloud');
   const [showHelp,   setShowHelp]   = useState(false);
-  const [sortBy,     setSortBy]     = useState(() => ['date', 'code', 'name'].includes(readPmPrefs().sortBy) ? readPmPrefs().sortBy : 'date');
+  const [sortBy,     setSortBy]     = useState(() => SORT_KEYS.includes(readPmPrefs().sortBy) ? readPmPrefs().sortBy : 'date');
+  const [sortDir,    setSortDir]    = useState(() => readPmPrefs().sortDir === 'asc' ? 'asc' : 'desc');
   const [search,     setSearch]     = useState('');
+  const [filters,    setFilters]    = useState({ rao: false, crc: false });
   const [viewMode,   setViewMode]   = useState(() => readPmPrefs().viewMode === 'list' ? 'list' : 'grid');
   const [creatingProject, setCreatingProject] = useState(false);
+  const searchRef = useRef(null);
   const [detailsProject, setDetailsProject] = useState(null);
   const [linkedCrcMap, setLinkedCrcMap] = useState({});
   const [raoProjectIds, setRaoProjectIds] = useState(new Set());
@@ -49,8 +54,32 @@ const ProjectManagerView = ({
 
   // Persister les préférences d'affichage
   useEffect(() => {
-    try { localStorage.setItem(PM_PREFS_KEY, JSON.stringify({ historyTab, sortBy, viewMode })); } catch { /* ignore */ }
-  }, [historyTab, sortBy, viewMode]);
+    try { localStorage.setItem(PM_PREFS_KEY, JSON.stringify({ historyTab, sortBy, sortDir, viewMode })); } catch { /* ignore */ }
+  }, [historyTab, sortBy, sortDir, viewMode]);
+
+  // Raccourci « / » : focus la recherche (ignoré si on est déjà dans un champ)
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable) return;
+      if (historyTab !== 'cloud') return;
+      e.preventDefault();
+      searchRef.current?.focus();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [historyTab]);
+
+  // Clic sur un en-tête de colonne (vue liste) : trie par cette clé, inverse le sens si déjà active
+  const handleSort = useCallback((key) => {
+    setSortBy(prev => {
+      if (prev === key) { setSortDir(d => d === 'asc' ? 'desc' : 'asc'); return prev; }
+      // Nouvelle colonne : sens par défaut (date = récent d'abord = desc, textes = asc)
+      setSortDir(key === 'date' ? 'desc' : 'asc');
+      return key;
+    });
+  }, []);
 
   // Charger les CRC liés + projets avec RAO
   useEffect(() => {
@@ -107,23 +136,51 @@ const ProjectManagerView = ({
     })();
   }, [companyId, cloud.cloudProjects]);
 
+  const folderColorMap = useMemo(() => buildFolderColorMap(fm.folders), [fm.folders]);
+  const folderNameOf = useCallback(
+    (id) => (id ? (fm.folders.find(f => f.id === id)?.name || '') : ''),
+    [fm.folders]
+  );
+
   const removeAccents = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const sortedProjects = [...fm.filteredProjects]
     .filter(p => {
-      if (!search.trim()) return true;
-      const q = removeAccents(search);
-      return removeAccents(p.name).includes(q)
+      if (search.trim()) {
+        const q = removeAccents(search);
+        const hit = removeAccents(p.name).includes(q)
           || removeAccents(p.code).includes(q)
           || removeAccents(p.location).includes(q);
+        if (!hit) return false;
+      }
+      if (filters.rao && !raoProjectIds.has(p.id)) return false;
+      if (filters.crc && !linkedCrcMap[p.id]) return false;
+      return true;
     })
     .sort((a, b) => {
-      if (sortBy === 'date') return new Date(b.lastSaved || 0) - new Date(a.lastSaved || 0);
-      if (sortBy === 'code') return (a.code || '').localeCompare(b.code || '', 'fr', { numeric: true });
-      if (sortBy === 'name') return (a.name || '').localeCompare(b.name || '', 'fr');
-      return 0;
+      const dir = sortDir === 'asc' ? 1 : -1;
+      let cmp = 0;
+      switch (sortBy) {
+        case 'date':     cmp = new Date(a.lastSaved || 0) - new Date(b.lastSaved || 0); break;
+        case 'code':     cmp = (a.code || '').localeCompare(b.code || '', 'fr', { numeric: true }); break;
+        case 'name':     cmp = (a.name || '').localeCompare(b.name || '', 'fr'); break;
+        case 'location': cmp = (a.location || '').localeCompare(b.location || '', 'fr'); break;
+        case 'folder':   cmp = folderNameOf(a.folderId).localeCompare(folderNameOf(b.folderId), 'fr'); break;
+        default:         cmp = 0;
+      }
+      return cmp * dir;
     });
 
-  const folderColorMap = useMemo(() => buildFolderColorMap(fm.folders), [fm.folders]);
+  // R\u00e9cents : 4 affaires les plus r\u00e9cemment sauvegard\u00e9es (toujours par date desc,
+  // ind\u00e9pendamment du tri courant), affich\u00e9es seulement en vue \u00ab Tous \u00bb sans filtre.
+  const recentProjects = useMemo(
+    () => [...cloud.cloudProjects]
+      .filter(p => p.lastSaved)
+      .sort((a, b) => new Date(b.lastSaved) - new Date(a.lastSaved))
+      .slice(0, 4),
+    [cloud.cloudProjects]
+  );
+  const showRecents = fm.selectedFolderId === '__all__' && !search.trim()
+    && !filters.rao && !filters.crc && recentProjects.length > 0;
 
   // ── Bibliothèque locale liée au projet ───────────────────────────────────
   // Décide si on doit afficher la modale avant d'ouvrir l'affaire.
@@ -349,120 +406,27 @@ const ProjectManagerView = ({
       <div className="flex-1 flex min-h-0">
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
 
-          {/* Filters bar */}
-          <div className="flex-none px-8 py-3 bg-white/60 backdrop-blur-sm border-b border-gray-200/50 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <h3 className="text-lg font-semibold text-gray-900">Mes Projets</h3>
-
-              {historyTab === 'cloud' && (
-                <div className="relative">
-                  <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    placeholder="Nom, n° ou lieu…"
-                    className="pl-7 pr-3 py-1.5 bg-gray-100 border border-gray-200/60 hover:border-gray-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 rounded-xl text-xs text-gray-700 placeholder-gray-400 outline-none transition-all w-44 focus:w-56"
-                    style={{ transition: 'width 0.2s ease, border-color 0.15s' }}
-                  />
-                  {search && (
-                    <button onClick={() => setSearch('')} aria-label="Effacer la recherche" className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">×</button>
-                  )}
-                </div>
-              )}
-
-              {historyTab === 'cloud' && cloud.cloudProjects.length > 0 && (
-                <span className="bg-gray-100 text-gray-500 border border-gray-200/60 text-xs font-medium px-2.5 py-0.5 rounded-full">
-                  {sortedProjects.length}
-                  {(fm.selectedFolderId !== '__all__' || search.trim()) && <span className="text-gray-300"> / {cloud.cloudProjects.length}</span>}
-                </span>
-              )}
-            </div>
-
-            <div className="flex items-center gap-3">
-              {/* Tabs */}
-              <div className="flex p-0.5 bg-gray-100 border border-gray-200/60 rounded-xl">
-                <button
-                  onClick={() => setHistoryTab('cloud')}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                    historyTab === 'cloud' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  <Cloud size={14} /> Cloud
-                </button>
-                <button
-                  onClick={() => setHistoryTab('local')}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                    historyTab === 'local' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  <Clock size={14} /> Local
-                </button>
-              </div>
-
-              {historyTab === 'cloud' && cloud.cloudProjects.length > 0 && (
-                <>
-                  <div className="h-5 w-px bg-gray-200/60" />
-                  <div className="flex items-center gap-0.5 bg-gray-100 border border-gray-200/60 rounded-xl p-0.5">
-                    <span className="flex items-center gap-1 text-[10px] text-gray-400 font-medium uppercase tracking-wider px-2">
-                      <ArrowUpDown size={10} /> Tri
-                    </span>
-                    {[{ id: 'date', label: 'Date' }, { id: 'code', label: 'N°' }, { id: 'name', label: 'Nom' }].map(opt => (
-                      <button
-                        key={opt.id}
-                        onClick={() => setSortBy(opt.id)}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
-                          sortBy === opt.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="h-5 w-px bg-gray-200/60" />
-                  <div className="flex items-center bg-gray-100 border border-gray-200/60 rounded-xl p-0.5">
-                    <button
-                      onClick={() => setViewMode('grid')}
-                      title="Vue en dalles"
-                      aria-label="Vue en dalles"
-                      className={`p-1.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                    >
-                      <LayoutGrid size={14} />
-                    </button>
-                    <button
-                      onClick={() => setViewMode('list')}
-                      title="Vue en liste"
-                      aria-label="Vue en liste"
-                      className={`p-1.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                    >
-                      <List size={14} />
-                    </button>
-                  </div>
-                </>
-              )}
-
-              <div className="h-5 w-px bg-gray-200/60" />
-
-              {historyTab === 'cloud' && (
-                <button
-                  onClick={cloud.loadCloudProjects}
-                  disabled={cloud.cloudLoading}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-all"
-                >
-                  <RefreshCw size={14} className={cloud.cloudLoading ? 'animate-spin' : ''} /> Actualiser
-                </button>
-              )}
-              {historyTab === 'local' && local.recentProjects.length > 0 && (
-                <button
-                  onClick={local.clearHistory}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-gray-500 hover:text-red-500 hover:bg-red-50 transition-all"
-                >
-                  <Trash2 size={14} /> Vider
-                </button>
-              )}
-            </div>
-          </div>
+          {/* Barre de commande */}
+          <PmCommandBar
+            historyTab={historyTab} setHistoryTab={setHistoryTab}
+            count={sortedProjects.length} total={cloud.cloudProjects.length}
+            search={search} setSearch={setSearch} searchRef={searchRef}
+            filters={filters} setFilters={setFilters}
+            activeFolder={fm.selectedFolderId !== '__all__'
+              ? {
+                  id: fm.selectedFolderId,
+                  name: fm.selectedFolderId === null ? 'Sans dossier' : folderNameOf(fm.selectedFolderId),
+                  color: fm.selectedFolderId ? (folderColorMap[fm.selectedFolderId]) : null,
+                }
+              : null}
+            onClearFolder={() => fm.setSelectedFolderId('__all__')}
+            sortBy={sortBy} sortDir={sortDir}
+            onSort={handleSort}
+            onToggleDir={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+            viewMode={viewMode} setViewMode={setViewMode}
+            cloudLoading={cloud.cloudLoading} onRefresh={cloud.loadCloudProjects}
+            localCount={local.recentProjects.length} onClearLocal={local.clearHistory}
+          />
 
           {/* Cloud tab */}
           {historyTab === 'cloud' && (
@@ -490,6 +454,14 @@ const ProjectManagerView = ({
                 handleDeleteFolder={fm.handleDeleteFolder}
               />
               <div className="flex-1 overflow-y-auto p-6">
+                {showRecents && (
+                  <PmRecents
+                    projects={recentProjects}
+                    folderColorMap={folderColorMap}
+                    activeId={project?.id}
+                    onOpen={(proj) => handleProjectIntent(proj, 'load', { silent: true })}
+                  />
+                )}
                 <PmProjectGrid
                   viewMode={viewMode}
                   cloudLoading={cloud.cloudLoading}
@@ -498,6 +470,9 @@ const ProjectManagerView = ({
                   filteredProjects={sortedProjects}
                   searchQuery={search}
                   onClearSearch={() => setSearch('')}
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onSort={handleSort}
                   selectedFolderId={fm.selectedFolderId}
                   setSelectedFolderId={fm.setSelectedFolderId}
                   project={project}

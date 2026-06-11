@@ -1,11 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { Cloud, Folder, Clock, RefreshCw, CloudOff, Trash2, RotateCcw, Info, ClipboardList, BarChart3, Copy, ExternalLink, User, SearchX, MoreHorizontal } from 'lucide-react';
+import { Cloud, Folder, Clock, RefreshCw, CloudOff, Trash2, RotateCcw, Info, ClipboardList, BarChart3, Copy, ExternalLink, User, SearchX, MoreHorizontal, ChevronUp, ChevronDown } from 'lucide-react';
 import { NEUTRAL_COLOR } from './folderColors';
 import { formatRelativeDate } from './relativeDate';
 
-// Actions révélées au hover sur desktop, mais toujours visibles sur tactile
-// (tablette/mobile : pas de hover → opacity-0 les rendait inaccessibles)
-const HOVER_REVEAL = 'opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100';
+// En-tête de colonne triable (vue liste)
+const SortHeader = ({ label, sortKey, sortBy, sortDir, onSort, className = '' }) => {
+  const active = sortBy === sortKey;
+  return (
+    <button
+      onClick={() => onSort?.(sortKey)}
+      className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+        active ? 'text-gray-700' : 'text-gray-400 hover:text-gray-600'
+      } ${className}`}
+    >
+      {label}
+      {active && (sortDir === 'asc' ? <ChevronUp size={11} /> : <ChevronDown size={11} />)}
+    </button>
+  );
+};
 
 const MenuItem = ({ icon: Icon, label, danger, onClick, disabled, spinning }) => (
   <button
@@ -24,6 +36,7 @@ const PmProjectGrid = ({
   viewMode = 'grid',
   cloudLoading, cloudError, cloudProjects, filteredProjects,
   searchQuery = '', onClearSearch,
+  sortBy = 'date', sortDir = 'desc', onSort,
   setSelectedFolderId,
   project, folders, folderColorMap = {},
   presenceByProject, deletingId,
@@ -130,16 +143,22 @@ const PmProjectGrid = ({
     return { date, dateStr, timeStr, isToday, projFolder, presence, saveHistory, fc, savedBy, savedByName, relative };
   };
 
-  // ── Vue LISTE ────────────────────────────────────────────────────────────
+  // ── Vue LISTE (pilotage : colonnes triables) ──────────────────────────────
   if (viewMode === 'list') {
+    const COLS = 'grid-cols-[minmax(0,2.2fr)_90px_minmax(0,1.1fr)_minmax(0,1.1fr)_130px_92px]';
     return (
       <div className="flex flex-col gap-0 border border-gray-200/60 rounded-2xl overflow-hidden bg-white">
-        <div className="grid grid-cols-[1fr_100px_140px_70px] gap-2 px-4 py-2 bg-gray-50 border-b border-gray-200/60 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-          <span>Nom du projet</span><span>N°</span><span>Dernière sauvegarde</span><span />
+        <div className={`grid ${COLS} gap-2 px-4 pl-6 py-2.5 bg-gray-50 border-b border-gray-200/60`}>
+          <SortHeader label="Nom du projet" sortKey="name" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
+          <SortHeader label="N°" sortKey="code" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
+          <SortHeader label="Lieu" sortKey="location" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
+          <SortHeader label="Dossier" sortKey="folder" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
+          <SortHeader label="Sauvegarde" sortKey="date" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
+          <span />
         </div>
         {filteredProjects.map((proj) => {
           const isActive = proj.id === project?.id;
-          const { dateStr, timeStr, isToday, projFolder, presence, fc, savedBy, savedByName, relative } = getProjectMeta(proj);
+          const { dateStr, timeStr, isToday, projFolder, presence, fc, savedBy, savedByName, relative, saveHistory } = getProjectMeta(proj);
           return (
             <div
               key={proj.id}
@@ -151,34 +170,29 @@ const PmProjectGrid = ({
               onClick={() => handleCardClick(proj)}
               onDoubleClick={() => handleCardDoubleClick(proj)}
               title="Clic : charger en session • Double-clic ou « Ouvrir » : Estima VRD • Glisser vers un dossier"
-              className={`group relative grid grid-cols-[1fr_100px_140px_70px] gap-2 items-center px-4 pl-6 py-2.5 cursor-pointer transition-all border-b border-gray-100 ${
+              className={`group relative grid ${COLS} gap-2 items-center px-4 pl-6 py-2.5 min-h-[48px] cursor-pointer transition-all border-b border-gray-100 last:border-b-0 ${
                 isActive ? fc.card : 'hover:bg-gray-50'
               }`}
             >
               {/* Left stripe */}
               <div className={`absolute left-0 top-0 bottom-0 w-1 ${fc.stripe}`} />
+
+              {/* Nom + badges */}
               <div className="flex items-center gap-2 min-w-0">
-                <span className={`w-2 h-2 rounded-full shrink-0 ${fc.dot}`} />
-                <div className="min-w-0 flex-1">
-                  <div className={`text-sm font-semibold truncate ${isActive ? fc.accent : 'text-gray-900'}`}>
-                    {proj.name || 'Projet sans nom'}
-                  </div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    {proj.location && <span className="text-[11px] text-gray-400 truncate">📍 {proj.location}</span>}
-                    {projFolder && <span className="flex items-center gap-1 text-[11px] text-gray-400"><Folder size={10} /> {projFolder.name}</span>}
-                    {raoProjectIds.has(proj.id) && (
-                      <button onClick={e => { e.stopPropagation(); onNavigateModule?.('rao_analysis'); }} className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-600 border border-blue-200/60 hover:bg-blue-100 transition-colors cursor-pointer" title="Ouvrir l'analyse des offres">
-                        <BarChart3 size={10} /> RAO
-                      </button>
-                    )}
-                    {linkedCrcMap[proj.id] && (
-                      <button onClick={e => { e.stopPropagation(); onNavigateModule?.('crc'); }} className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-200/60 hover:bg-emerald-100 transition-colors cursor-pointer" title={`Ouvrir CR : ${linkedCrcMap[proj.id].join(', ')}`}>
-                        <ClipboardList size={10} /> {linkedCrcMap[proj.id].length} CR
-                      </button>
-                    )}
-                  </div>
+                <div className={`text-sm font-semibold truncate ${isActive ? fc.accent : 'text-gray-900'}`}>
+                  {proj.name || 'Projet sans nom'}
                 </div>
-                {isActive && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${fc.badge}`}>Actif</span>}
+                {isActive && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md shrink-0 ${fc.badge}`}>Actif</span>}
+                {raoProjectIds.has(proj.id) && (
+                  <button onClick={e => { e.stopPropagation(); onNavigateModule?.('rao_analysis'); }} className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-600 border border-blue-200/60 hover:bg-blue-100 transition-colors shrink-0" title="Ouvrir l'analyse des offres">
+                    <BarChart3 size={10} /> RAO
+                  </button>
+                )}
+                {linkedCrcMap[proj.id] && (
+                  <button onClick={e => { e.stopPropagation(); onNavigateModule?.('crc'); }} className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-200/60 hover:bg-emerald-100 transition-colors shrink-0" title={`Ouvrir CR : ${linkedCrcMap[proj.id].join(', ')}`}>
+                    <ClipboardList size={10} /> {linkedCrcMap[proj.id].length} CR
+                  </button>
+                )}
                 {presence.length > 0 && presence.map(p => (
                   <span key={p.uid} title={`${p.displayName || p.email} est sur ce projet`}
                     className="flex items-center gap-1 bg-blue-50 text-blue-500 border border-blue-200/60 text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0">
@@ -187,11 +201,30 @@ const PmProjectGrid = ({
                   </span>
                 ))}
               </div>
+
+              {/* N° */}
               <span className="text-xs font-medium text-gray-600 truncate">{proj.code || <span className="text-gray-300">—</span>}</span>
+
+              {/* Lieu */}
+              <span className="text-xs text-gray-500 truncate" title={proj.location || ''}>
+                {proj.location || <span className="text-gray-300">—</span>}
+              </span>
+
+              {/* Dossier */}
+              <span className="flex items-center gap-1.5 text-xs text-gray-500 min-w-0">
+                {projFolder ? (
+                  <>
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${fc.dot}`} />
+                    <span className="truncate" title={projFolder.name}>{projFolder.name}</span>
+                  </>
+                ) : <span className="text-gray-300">—</span>}
+              </span>
+
+              {/* Sauvegarde + auteur */}
               <div className="text-xs text-gray-500 min-w-0" title={`Enregistré le ${dateStr} à ${timeStr}${savedBy ? ' par ' + savedBy : ''}`}>
                 <div className="flex items-center gap-1.5">
                   <Clock size={12} className={`shrink-0 ${isToday ? 'text-emerald-500' : 'text-gray-300'}`} />
-                  <span className={isToday ? 'text-gray-700 font-medium' : ''}>{relative}</span>
+                  <span className={`truncate ${isToday ? 'text-gray-700 font-medium' : ''}`}>{relative}</span>
                 </div>
                 {savedByName && (
                   <div className="flex items-center gap-1 text-gray-400 truncate pl-[18px]">
@@ -199,17 +232,41 @@ const PmProjectGrid = ({
                   </div>
                 )}
               </div>
+
+              {/* Actions */}
               <div className="flex items-center justify-end gap-1">
                 <button onClick={e => { e.stopPropagation(); onOpenInEstima?.(proj); }} title="Ouvrir dans Estima VRD"
                   className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-gray-900 text-white hover:bg-gray-700 active:scale-[0.97] transition-all shadow-sm">
                   <ExternalLink size={11} /> Ouvrir
                 </button>
-                <button onClick={e => { e.stopPropagation(); onInfoProject?.(proj); }} className={`p-1 rounded-lg text-gray-300 hover:text-indigo-500 hover:bg-indigo-50 transition-colors ${HOVER_REVEAL}`} title="Fiche projet" aria-label="Fiche projet"><Info size={13} /></button>
-                <button onClick={e => onDuplicateProject?.(proj, e)} className={`p-1 rounded-lg text-gray-300 hover:text-violet-500 hover:bg-violet-50 transition-colors ${HOVER_REVEAL}`} title="Dupliquer cette affaire" aria-label="Dupliquer cette affaire"><Copy size={13} /></button>
-                <button onClick={e => { e.stopPropagation(); onMoveProject(proj); }} className={`p-1 rounded-lg text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-colors ${HOVER_REVEAL}`} title="Déplacer" aria-label="Déplacer"><Folder size={13} /></button>
-                <button onClick={e => onDeleteProject(proj, e)} disabled={deletingId === proj.id} className={`p-1 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors ${HOVER_REVEAL}`} title="Supprimer" aria-label="Supprimer">
-                  {deletingId === proj.id ? <RefreshCw size={13} className="animate-spin" /> : <Trash2 size={13} />}
-                </button>
+                <div className="relative">
+                  <button
+                    onClick={e => { e.stopPropagation(); setOpenMenuId(openMenuId === proj.id ? null : proj.id); }}
+                    title="Plus d'actions" aria-label="Plus d'actions" aria-haspopup="menu" aria-expanded={openMenuId === proj.id}
+                    className={`p-1.5 rounded-lg transition-colors ${openMenuId === proj.id ? 'bg-gray-100 text-gray-700' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'}`}
+                  >
+                    <MoreHorizontal size={15} />
+                  </button>
+                  {openMenuId === proj.id && (
+                    <div onClick={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}
+                      className="absolute right-0 top-full mt-1 w-52 bg-white rounded-2xl shadow-lg border border-gray-200/70 p-1.5 z-40">
+                      <MenuItem icon={Info} label="Fiche projet"
+                        onClick={e => { e.stopPropagation(); setOpenMenuId(null); onInfoProject?.(proj); }} />
+                      <MenuItem icon={Copy} label="Dupliquer cette affaire"
+                        onClick={e => { setOpenMenuId(null); onDuplicateProject?.(proj, e); }} />
+                      <MenuItem icon={Folder} label="Déplacer vers un dossier"
+                        onClick={e => { e.stopPropagation(); setOpenMenuId(null); onMoveProject(proj); }} />
+                      {saveHistory.length > 1 && (
+                        <MenuItem icon={RotateCcw} label="Restaurer une version…"
+                          onClick={e => { e.stopPropagation(); setOpenMenuId(null); onRestoreSnapshot?.(proj.id, saveHistory[1]); }} />
+                      )}
+                      <div className="h-px bg-gray-100 my-1 mx-2" />
+                      <MenuItem icon={deletingId === proj.id ? RefreshCw : Trash2} label="Supprimer" danger
+                        disabled={deletingId === proj.id} spinning={deletingId === proj.id}
+                        onClick={e => { setOpenMenuId(null); onDeleteProject(proj, e); }} />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           );
