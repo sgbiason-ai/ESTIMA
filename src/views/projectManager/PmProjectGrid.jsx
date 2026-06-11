@@ -40,7 +40,8 @@ const PmProjectGrid = ({
   setSelectedFolderId,
   project, folders, folderColorMap = {},
   presenceByProject, deletingId,
-  onLoadProject, onOpenInEstima, onDeleteProject, onDuplicateProject, onMoveProject, onRestoreSnapshot, onInfoProject, linkedCrcMap = {}, raoProjectIds = new Set(), onNavigateModule,
+  selectedId, onSelectProject,
+  onOpenInEstima, onDeleteProject, onDuplicateProject, onMoveProject, onRestoreSnapshot, onInfoProject, linkedCrcMap = {}, raoProjectIds = new Set(), onNavigateModule,
 }) => {
   // Popover "Versions précédentes" : ouvrable au clic (tactile) en plus du hover
   const [openHistId, setOpenHistId] = useState(null);
@@ -60,13 +61,13 @@ const PmProjectGrid = ({
     };
   }, [openHistId, openMenuId]);
 
-  // Simple clic = sélection/aperçu (chargement silencieux dans la session, reste sur le Workspace).
-  // Double-clic OU bouton "Ouvrir" = ouverture dans Estima VRD. Plus de délai artificiel :
-  // le simple clic étant non-bloquant (pas de modale), il peut précéder un double-clic sans gêne.
-  const handleCardClick = (proj) => onLoadProject?.(proj);
+  // Simple clic = ouvre le panneau de détails (sélection visible, aucun effet de bord).
+  // Double-clic OU bouton "Ouvrir" = ouverture dans Estima VRD.
+  // « Charger en session » est un bouton explicite du panneau de détails.
+  const handleCardClick = (proj) => onSelectProject?.(proj);
   const handleCardDoubleClick = (proj) => {
     if (onOpenInEstima) onOpenInEstima(proj);
-    else onLoadProject?.(proj);
+    else onSelectProject?.(proj);
   };
 
   // ── Empty states (Apple-style) ───────────────────────────────────────────
@@ -169,10 +170,10 @@ const PmProjectGrid = ({
               onDragStart={(e) => { e.dataTransfer.setData('text/plain', proj.id); e.dataTransfer.effectAllowed = 'move'; }}
               onClick={() => handleCardClick(proj)}
               onDoubleClick={() => handleCardDoubleClick(proj)}
-              title="Clic : charger en session • Double-clic ou « Ouvrir » : Estima VRD • Glisser vers un dossier"
+              title="Clic : détails • Double-clic ou « Ouvrir » : Estima VRD • Glisser vers un dossier"
               className={`group relative grid ${COLS} gap-2 items-center px-4 pl-6 py-2.5 min-h-[48px] cursor-pointer transition-all border-b border-gray-100 last:border-b-0 ${
                 isActive ? fc.card : 'hover:bg-gray-50'
-              }`}
+              } ${selectedId === proj.id ? 'ring-2 ring-inset ring-blue-300' : ''}`}
             >
               {/* Left stripe */}
               <div className={`absolute left-0 top-0 bottom-0 w-1 ${fc.stripe}`} />
@@ -292,10 +293,10 @@ const PmProjectGrid = ({
             onDragStart={(e) => { e.dataTransfer.setData('text/plain', proj.id); e.dataTransfer.effectAllowed = 'move'; }}
             onClick={() => handleCardClick(proj)}
             onDoubleClick={() => handleCardDoubleClick(proj)}
-            title="Clic : charger en session • Double-clic ou « Ouvrir » : Estima VRD • Glisser vers un dossier"
+            title="Clic : détails • Double-clic ou « Ouvrir » : Estima VRD • Glisser vers un dossier"
             className={`group relative cursor-pointer border-2 rounded-2xl p-5 transition-all duration-200 flex flex-col h-full ${
               isActive ? fc.cardActive : `${fc.card} ${fc.cardHover} hover:shadow-lg hover:-translate-y-0.5`
-            }`}
+            } ${selectedId === proj.id ? 'ring-2 ring-blue-300' : ''}`}
           >
             {/* Left color stripe — arrondie pour suivre la carte (plus d'overflow-hidden,
                 afin que les menus kebab/versions puissent dépasser de la tuile) */}

@@ -17,6 +17,7 @@ import PmCommandBar      from './PmCommandBar';
 import PmRecents         from './PmRecents';
 import PmFolderSidebar   from './PmFolderSidebar';
 import PmProjectGrid     from './PmProjectGrid';
+import PmDetailsPanel    from './PmDetailsPanel';
 import ProjectDetailsModal from '../../components/modals/ProjectDetailsModal';
 import PmLocalHistory    from './PmLocalHistory';
 import LinkedLibraryModal from '../../components/modals/LinkedLibraryModal';
@@ -45,6 +46,8 @@ const ProjectManagerView = ({
   const [creatingProject, setCreatingProject] = useState(false);
   const searchRef = useRef(null);
   const [detailsProject, setDetailsProject] = useState(null);
+  // Slide-over de détails : affaire sélectionnée (clic sur ligne/tuile)
+  const [panelProject, setPanelProject] = useState(null);
   const [linkedCrcMap, setLinkedCrcMap] = useState({});
   const [raoProjectIds, setRaoProjectIds] = useState(new Set());
   // Modale de gestion de la bibliothèque locale liée à un projet
@@ -315,6 +318,29 @@ const ProjectManagerView = ({
     setLibModalCurrent(null);
   };
 
+  // ── Panneau de détails : rester synchrone avec la liste cloud ──
+  // (édition rapide, fiche, actualisation → données fraîches ; suppression → fermeture)
+  useEffect(() => {
+    if (!panelProject) return;
+    const fresh = cloud.cloudProjects.find(p => p.id === panelProject.id);
+    if (!fresh) setPanelProject(null);
+    else if (fresh !== panelProject) setPanelProject(fresh);
+  }, [cloud.cloudProjects, panelProject]);
+
+  // ── Édition rapide depuis le panneau (nom, n°, lieu, client) ──
+  const handleSaveQuickDetails = useCallback(async (projId, partial) => {
+    if (!companyId || !projId) return;
+    try {
+      await setDoc(doc(db, 'companies', companyId, 'projects', projId), partial, { merge: true });
+      cloud.setCloudProjects(prev => prev.map(p => p.id === projId ? { ...p, ...partial } : p));
+      if (project?.id === projId) setProject(prev => ({ ...prev, ...partial }));
+      toast.success('Affaire mise à jour.');
+    } catch (e) {
+      console.error('[ProjectManager] Erreur édition rapide:', e);
+      toast.error('Impossible d\'enregistrer les modifications.');
+    }
+  }, [companyId, cloud, project?.id, setProject]);
+
   // ── Fiche projet (info modale) ──
   const handleSaveDetails = useCallback(async (details) => {
     if (!detailsProject || !companyId) return;
@@ -430,7 +456,7 @@ const ProjectManagerView = ({
 
           {/* Cloud tab */}
           {historyTab === 'cloud' && (
-            <div className="flex-1 flex min-h-0">
+            <div className="flex-1 flex min-h-0 relative">
               <PmFolderSidebar
                 folders={fm.folders}
                 colorMap={folderColorMap}
@@ -459,7 +485,7 @@ const ProjectManagerView = ({
                     projects={recentProjects}
                     folderColorMap={folderColorMap}
                     activeId={project?.id}
-                    onOpen={(proj) => handleProjectIntent(proj, 'load', { silent: true })}
+                    onOpen={setPanelProject}
                   />
                 )}
                 <PmProjectGrid
@@ -480,7 +506,8 @@ const ProjectManagerView = ({
                   folderColorMap={folderColorMap}
                   presenceByProject={presenceByProject}
                   deletingId={cloud.deletingId}
-                  onLoadProject={(proj) => handleProjectIntent(proj, 'load', { silent: true })}
+                  selectedId={panelProject?.id}
+                  onSelectProject={setPanelProject}
                   onOpenInEstima={(proj) => handleProjectIntent(proj, 'openInEstima')}
                   onDeleteProject={cloud.handleDeleteCloudProject}
                   onDuplicateProject={cloud.handleDuplicateCloudProject}
@@ -492,6 +519,30 @@ const ProjectManagerView = ({
                   onNavigateModule={onNavigateModule}
                 />
               </div>
+
+              {/* Slide-over de détails */}
+              {panelProject && (
+                <PmDetailsPanel
+                  proj={panelProject}
+                  isSessionActive={panelProject.id === project?.id}
+                  folders={fm.folders}
+                  folderColorMap={folderColorMap}
+                  presence={presenceByProject[panelProject.id] || []}
+                  linkedCrcNames={linkedCrcMap[panelProject.id] || null}
+                  hasRao={raoProjectIds.has(panelProject.id)}
+                  deletingId={cloud.deletingId}
+                  onClose={() => setPanelProject(null)}
+                  onOpenInEstima={(proj) => handleProjectIntent(proj, 'openInEstima')}
+                  onLoadSession={(proj) => handleProjectIntent(proj, 'load', { silent: true })}
+                  onOpenFullDetails={setDetailsProject}
+                  onDuplicate={cloud.handleDuplicateCloudProject}
+                  onMove={fm.setMovingProject}
+                  onDelete={cloud.handleDeleteCloudProject}
+                  onRestore={cloud.handleRestoreSnapshot}
+                  onSaveQuick={handleSaveQuickDetails}
+                  onNavigateModule={onNavigateModule}
+                />
+              )}
             </div>
           )}
 

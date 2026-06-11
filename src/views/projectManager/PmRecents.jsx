@@ -1,12 +1,12 @@
 import React from 'react';
-import { Clock, ExternalLink } from 'lucide-react';
+import { Clock, ChevronRight } from 'lucide-react';
 import { NEUTRAL_COLOR } from './folderColors';
 import { formatRelativeDate } from './relativeDate';
 
 /**
  * PmRecents — bandeau des affaires récemment sauvegardées.
  * Affiché en tête de la vue « Tous » (sans recherche ni filtre).
- * Clic sur une tuile → onOpen (cohérent avec le panneau de détails à venir).
+ * Clic sur une tuile → ouvre le panneau de détails (onOpen).
  */
 const PmRecents = ({ projects, folderColorMap = {}, onOpen, activeId }) => {
   if (!projects?.length) return null;
@@ -24,7 +24,7 @@ const PmRecents = ({ projects, folderColorMap = {}, onOpen, activeId }) => {
             <button
               key={proj.id}
               onClick={() => onOpen?.(proj)}
-              title={proj.name || 'Projet sans nom'}
+              title={`${proj.name || 'Projet sans nom'} — voir les détails`}
               className={`group relative text-left bg-white border rounded-2xl p-3 pl-4 transition-all hover:shadow-md hover:-translate-y-0.5 overflow-hidden ${
                 isActive ? 'border-blue-300 ring-1 ring-blue-200' : 'border-gray-200/60 hover:border-gray-300'
               }`}
@@ -32,7 +32,7 @@ const PmRecents = ({ projects, folderColorMap = {}, onOpen, activeId }) => {
               <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl ${fc.stripe}`} />
               <div className="flex items-start justify-between gap-2">
                 <div className="text-xs font-semibold text-gray-900 truncate flex-1">{proj.name || 'Projet sans nom'}</div>
-                <ExternalLink size={12} className="text-gray-300 group-hover:text-gray-500 shrink-0 transition-colors" />
+                <ChevronRight size={13} className="text-gray-300 group-hover:text-gray-500 shrink-0 transition-colors" />
               </div>
               <div className="flex items-center gap-2 mt-1.5 text-[10px] text-gray-500">
                 {proj.code && <span className="font-medium text-gray-600">N° {proj.code}</span>}
