@@ -40,7 +40,8 @@ const GedVersionViewer = ({ archive, onBack, branding = null }) => {
   const qtyMaps = useMemo(() => {
     const items = flattenItems(snapshot?.chapters);
     const clientPercent = Number(snapshot?.clientPercent ?? 10);
-    const { studyQtyMaps } = computeQtyMaps(items, hasTranches, tranches, clientPercent);
+    const qtyThreshold = Number(snapshot?.clientQtyThreshold ?? 20);
+    const { studyQtyMaps } = computeQtyMaps(items, hasTranches, tranches, clientPercent, qtyThreshold);
     return studyQtyMaps;
   }, [snapshot, hasTranches, tranches]);
 

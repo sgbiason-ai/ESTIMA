@@ -14,7 +14,17 @@ const keyOf = (node) => {
   return k === undefined || k === null ? null : String(k);
 };
 
-const shouldScaleQty = (qty) => qty > 20 || qty < -20;
+// Seuil par défaut : les quantités entre -20 et 20 ne sont jamais majorées.
+// Paramétrable par projet via project.clientQtyThreshold (Calculateur de Marge).
+export const DEFAULT_QTY_THRESHOLD = 20;
+
+const safeThreshold = (t) => {
+  const n = Number(t);
+  return Number.isFinite(n) && n >= 0 ? n : DEFAULT_QTY_THRESHOLD;
+};
+
+const shouldScaleQty = (qty, threshold = DEFAULT_QTY_THRESHOLD) =>
+  qty > threshold || qty < -threshold;
 
 const roundDirectional = (v) => {
   if (v > 0) return Math.ceil(v);
@@ -22,10 +32,10 @@ const roundDirectional = (v) => {
   return 0;
 };
 
-export const calculateSafeClientQty = (rawQty, percent = 10) => {
+export const calculateSafeClientQty = (rawQty, percent = 10, threshold = DEFAULT_QTY_THRESHOLD) => {
   const qty = toNum(rawQty, 0);
   if (qty === 0) return 0;
-  if (!shouldScaleQty(qty)) return qty;
+  if (!shouldScaleQty(qty, safeThreshold(threshold))) return qty;
   const coef = 1 + (toNum(percent, 0) / 100);
   return roundDirectional(qty * coef);
 };
@@ -38,6 +48,7 @@ export const buildGlobalClientQtyMapFromStudyQty = (project, percent = 10) => {
   }
 
   const coef = 1 + (toNum(percent, 0) / 100);
+  const threshold = safeThreshold(project?.clientQtyThreshold);
 
   let totalInitial = 0;
   let totalClient = 0;
@@ -57,7 +68,8 @@ export const buildGlobalClientQtyMapFromStudyQty = (project, percent = 10) => {
 
         totalInitial += qtyStudy * price;
 
-        const qtyClient = shouldScaleQty(qtyStudy)
+        // Forfaits (isFixed) et quantités figées (qtyLocked) : jamais majorés.
+        const qtyClient = (!node.isFixed && !node.qtyLocked && shouldScaleQty(qtyStudy, threshold))
           ? roundDirectional(qtyStudy * coef)
           : qtyStudy;
 
@@ -478,10 +490,12 @@ export function checkPriceConsistency(chapters, bpuConfig = {}) {
 
 /**
  * Calcule les maps de quantités étude et client pour toutes les tranches.
+ * @param qtyThreshold seuil au-delà duquel les quantités sont majorées (défaut 20)
  */
-export function computeQtyMaps(items, hasTranches, tranches, effectiveClientPercent) {
+export function computeQtyMaps(items, hasTranches, tranches, effectiveClientPercent, qtyThreshold = DEFAULT_QTY_THRESHOLD) {
   const sMaps      = {};
   const cMaps      = {};
+  const threshold  = safeThreshold(qtyThreshold);
   const trancheIds = hasTranches ? tranches.map(t => t.id) : [];
 
   const calculateForContext = (tid = null) => {
@@ -507,9 +521,9 @@ export function computeQtyMaps(items, hasTranches, tranches, effectiveClientPerc
         if (typeof rawVal === 'string' && rawVal.startsWith('=')) {
           const resolved = evaluateFormula(rawVal, sMap, nameMap);
           if (resolved !== null) {
-            // Les qtés d'étude issues d'une formule ≥ |20| sont arrondies au
-            // plafond/plancher (les forfaits et petites qtés gardent leur valeur).
-            const rounded = (!item.isFixed && shouldScaleQty(resolved))
+            // Les qtés d'étude issues d'une formule au-delà du seuil sont arrondies
+            // au plafond/plancher (forfaits et petites qtés gardent leur valeur).
+            const rounded = (!item.isFixed && shouldScaleQty(resolved, threshold))
               ? roundDirectional(resolved)
               : resolved;
             if (rounded !== sMap[item.id]) {
@@ -525,9 +539,10 @@ export function computeQtyMaps(items, hasTranches, tranches, effectiveClientPerc
     items.forEach(item => {
       if (!item.id) return;
       const baseQty = sMap[item.id] ?? 0;
-      cMap[item.id] = item.isFixed
+      // Forfaits (isFixed) et quantités figées (qtyLocked) : jamais majorés.
+      cMap[item.id] = (item.isFixed || item.qtyLocked)
         ? baseQty
-        : calculateSafeClientQty(baseQty, effectiveClientPercent);
+        : calculateSafeClientQty(baseQty, effectiveClientPercent, threshold);
     });
 
     return { sMap, cMap };

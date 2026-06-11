@@ -1,7 +1,7 @@
 // src/components/ItemList.jsx
 import React, { useContext, memo, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Draggable, Droppable } from '@hello-pangea/dnd'; 
-import { GripVertical, Layers, Trash2, Plus, ShieldCheck, AlertCircle, AlertTriangle, FunctionSquare, Check, Boxes, Pencil, Target } from 'lucide-react';
+import { GripVertical, Layers, Trash2, Plus, ShieldCheck, AlertCircle, AlertTriangle, FunctionSquare, Check, Boxes, Pencil, Target, Lock, Unlock } from 'lucide-react';
 
 import { ProjectContext } from '../context/ProjectContext';
 import { EditableTitle, FormattedInput, OptionToggle } from './ProjectUI';
@@ -267,6 +267,9 @@ const ItemRow = memo(
     const displayedQty = viewMode === 'client' ? qtyClient : qtyStudy;
     const qtyFieldToUpdate = 'qty';
 
+    // Quantité figée : jamais majorée en mode rendu (indépendant du forfait isFixed).
+    const isQtyLocked = !!el.qtyLocked;
+
     const currentFormula = (activeTrancheId && activeTrancheId !== 'global') 
         ? el.quantitiesFormula?.[activeTrancheId] 
         : el.formula;
@@ -508,7 +511,29 @@ const ItemRow = memo(
             </div>
 
             {/* Quantité + FormulaInput */}
-            <div className="w-24 px-2 shrink-0 flex flex-col justify-center">
+            <div className="relative w-24 px-2 shrink-0 flex flex-col justify-center">
+              {/* Cadenas : fige la quantité (non majorée en mode rendu) */}
+              {(isQtyLocked || (!isReadOnly && !isGlobalMode)) && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (isReadOnly) return;
+                    onUpdate(parentId, el.id, 'qtyLocked', !isQtyLocked);
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onDoubleClick={(e) => e.stopPropagation()}
+                  title={isQtyLocked
+                    ? 'Quantité figée : non majorée en mode rendu (cliquer pour libérer)'
+                    : 'Figer la quantité : ne sera pas majorée en mode rendu'}
+                  className={`absolute left-2.5 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center transition-opacity
+                    ${isQtyLocked
+                      ? `opacity-100 ${viewMode === 'client' ? 'text-indigo-500' : 'text-slate-500'} ${isReadOnly ? 'cursor-default' : 'hover:text-slate-700'}`
+                      : 'opacity-0 group-hover:opacity-100 text-slate-300 hover:text-slate-600'}`}
+                >
+                  {isQtyLocked ? <Lock size={11} strokeWidth={2.5} /> : <Unlock size={11} strokeWidth={2} />}
+                </button>
+              )}
               {showComparison && isReadOnly && diffQty !== 0 ? (
                 <div className="text-right flex flex-col items-end leading-none">
                   <span className="text-xs font-black text-indigo-700">{qtyClient}</span>

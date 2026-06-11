@@ -179,7 +179,7 @@ const ProjectView = ({
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, itemId: null });
   const [showFormulaHelp, setShowFormulaHelp] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const [calculationAnalysis, setCalculationAnalysis] = useState({ totalStudy: 0, fixedTotal: 0, smallQtyTotal: 0 });
+  const [calculationAnalysis, setCalculationAnalysis] = useState({ totalStudy: 0, lines: [] });
   const [formulaMode, setFormulaMode] = useState({ isActive: false, callback: null });
 
   // ── SAUVEGARDE / OUVERTURE D'AFFAIRE ─────────────────────────────────────────
@@ -577,25 +577,27 @@ const ProjectView = ({
   };
 
   const handleOpenCalculation = () => {
-    let fixedSum = 0; let smallQtySum = 0;
+    // Lignes brutes pour la modale : la ventilation forfaits / petites quantités
+    // y est recalculée en live selon le seuil choisi par l'utilisateur.
+    const lines = [];
     const traverse = (nodes) => {
         nodes?.forEach(node => {
             if (node.type === 'item') {
                 const sMap = studyQtyMaps?.[activeTrancheId || 'global'];
                 const qty = sMap ? (sMap[node.id] || 0) : Number(node.qty || 0);
                 const lineTotal = qty * Number(node.price || 0);
-                if (node.isFixed) fixedSum += lineTotal;
-                else if (qty >= -20 && qty <= 20) smallQtySum += lineTotal;
+                lines.push({ qty, total: lineTotal, fixed: !!(node.isFixed || node.qtyLocked) });
             } else if (node.children) traverse(node.children);
         });
     };
     traverse(displayProject?.chapters);
-    setCalculationAnalysis({ totalStudy: projectStats?.study?.base || 0, fixedTotal: fixedSum, smallQtyTotal: smallQtySum });
+    setCalculationAnalysis({ totalStudy: projectStats?.study?.base || 0, lines });
     setShowCalculationModal(true);
   };
 
-  const handleApplyCalculation = (newPercent) => {
+  const handleApplyCalculation = (newPercent, newThreshold) => {
     updateProjectItem('root', 'root', 'clientPercent', newPercent);
+    if (newThreshold !== undefined) updateProjectItem('root', 'root', 'clientQtyThreshold', newThreshold);
     setShowCalculationModal(false);
   };
 
@@ -914,7 +916,7 @@ const ProjectView = ({
 
       <ProjectDetailsModal isOpen={showDetailsModal} onClose={() => setShowDetailsModal(false)} project={project} onSave={handleSaveDetails} branding={masterBranding} archives={archives} />
       {editItemTarget && <EditBpuModal item={editItemTarget} onClose={() => setEditItemTarget(null)} onUpdate={handleSaveEditedItem} units={units} categories={categories} bpuConfig={bpuConfig} existingItems={[]} masterCctp={masterCctp} projectOnly onSaveToLibrary={handleSaveItemToLibrary} libraryItems={allBpuItems} />}
-      <CalculationModal show={showCalculationModal} onClose={() => setShowCalculationModal(false)} onConfirm={handleApplyCalculation} analysis={calculationAnalysis} />
+      <CalculationModal show={showCalculationModal} onClose={() => setShowCalculationModal(false)} onConfirm={handleApplyCalculation} analysis={calculationAnalysis} defaultThreshold={Number(project?.clientQtyThreshold ?? 20)} />
       <ExportModal isOpen={exportModalState.show} onClose={() => setExportModalState(prev => ({ ...prev, show: false }))} onConfirm={handleConfirmExport} onPreviewPdf={handlePreviewPdf} format={exportModalState.format} type={exportModalState.type} hasTranches={hasTranches} tranches={tranches} activeTrancheId={activeTrancheId} />
       <ConfirmDeleteModal isOpen={deleteConfirm.show} onClose={() => setDeleteConfirm({ show: false, itemId: null })} onConfirm={() => { if(deleteConfirm.itemId) { handleRemoveItem(deleteConfirm.itemId); setDeleteConfirm({ show: false, itemId: null }); } }} />
       <FormulaHelpModal isOpen={showFormulaHelp} onClose={() => setShowFormulaHelp(false)} />

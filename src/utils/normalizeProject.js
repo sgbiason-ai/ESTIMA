@@ -65,6 +65,8 @@ function normalizeNode(node) {
     };
     // Article "libre" : saisi de zéro dans le projet (non lié au BPU, uid vide).
     if (node.isFree) item.isFree = true;
+    // Quantité figée : jamais majorée en mode rendu (indépendant du forfait).
+    if (node.qtyLocked) item.qtyLocked = true;
     // Composant de bloc : facteur de conversion mémorisé (PU moyen, affichage).
     if (node.blocFactor != null) item.blocFactor = num(node.blocFactor);
     return item;
@@ -256,6 +258,7 @@ export function normalizeProject(raw) {
 
     // Calcul
     clientPercent:  num(raw.clientPercent, 10),
+    clientQtyThreshold: num(raw.clientQtyThreshold, 20),
     tauxTVA:        num(raw.tauxTVA, 20),
     scoringConfig:  normalizeScoringConfig(raw.scoringConfig),
 

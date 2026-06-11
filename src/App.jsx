@@ -607,6 +607,7 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNav
         analysis={modals.calcModal.analysis}
         onClose={modals.closeCalcModal}
         onConfirm={modals.applyVentilation}
+        defaultThreshold={Number(project?.clientQtyThreshold ?? 20)}
       />
 
       <ProjectDetailsModal

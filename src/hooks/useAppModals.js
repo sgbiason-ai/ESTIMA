@@ -92,7 +92,9 @@ export const useAppModals = ({ project, setProject, setClientPercent, setViewMod
     if (!project?.chapters) return;
 
     let totalStudy = 0;
-    let fixedTotal = 0;
+    // Lignes brutes pour la modale : la ventilation forfaits / petites quantités
+    // y est recalculée en live selon le seuil choisi par l'utilisateur.
+    const lines = [];
 
     const analyzeRecursive = (nodes) => {
       nodes.forEach(node => {
@@ -100,7 +102,7 @@ export const useAppModals = ({ project, setProject, setClientPercent, setViewMod
           const q = Number(node.qty || 0);
           const amt = q * Number(node.price || 0);
           totalStudy += amt;
-          if (q <= 20) fixedTotal += amt;
+          lines.push({ qty: q, total: amt, fixed: !!(node.isFixed || node.qtyLocked) });
         } else if (node.children) {
           analyzeRecursive(node.children);
         }
@@ -108,13 +110,14 @@ export const useAppModals = ({ project, setProject, setClientPercent, setViewMod
     };
 
     analyzeRecursive(project.chapters);
-    setCalcModal({ show: true, analysis: { totalStudy, fixedTotal } });
+    setCalcModal({ show: true, analysis: { totalStudy, lines } });
   };
 
   const closeCalcModal = () => setCalcModal({ show: false, analysis: null });
 
-  const applyVentilation = (percent) => {
+  const applyVentilation = (percent, threshold) => {
     setClientPercent(percent);
+    if (threshold !== undefined) setProject(prev => ({ ...prev, clientQtyThreshold: threshold }));
     closeCalcModal();
     setViewMode('client');
   };

@@ -27,8 +27,9 @@ export const resolveStudyQtyMaps = (project) => {
   const tranches = project?.tranches || [];
   const hasTranches = tranches.length > 0;
   const clientPercent = Number(project?.clientPercent ?? 10);
+  const qtyThreshold = Number(project?.clientQtyThreshold ?? 20);
   const items = flattenItems(project?.chapters);
-  const { studyQtyMaps } = computeQtyMaps(items, hasTranches, tranches, clientPercent);
+  const { studyQtyMaps } = computeQtyMaps(items, hasTranches, tranches, clientPercent, qtyThreshold);
   return { studyQtyMaps, tranches, hasTranches };
 };
 
@@ -37,10 +38,11 @@ const buildExportContext = (snapshot) => {
   const tranches = snapshot?.tranches || [];
   const hasTranches = tranches.length > 0;
   const clientPercent = Number(snapshot?.clientPercent ?? 10);
+  const qtyThreshold = Number(snapshot?.clientQtyThreshold ?? 20);
   const bpuConfig = snapshot?.bpuConfig || { numberingMode: 'auto' };
 
   const items = flattenItems(snapshot?.chapters);
-  const { clientQtyMaps } = computeQtyMaps(items, hasTranches, tranches, clientPercent);
+  const { clientQtyMaps } = computeQtyMaps(items, hasTranches, tranches, clientPercent, qtyThreshold);
 
   const projectForExport = { ...snapshot, clientLogo: snapshot?.clientLogo };
 

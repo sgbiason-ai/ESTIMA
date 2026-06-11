@@ -39,6 +39,17 @@ describe('calculateSafeClientQty', () => {
   it('fonctionne avec percent = 0', () => {
     expect(calculateSafeClientQty(100, 0)).toBe(100);
   });
+  it('seuil personnalisé : 30 non majoré avec seuil 50, 51 majoré', () => {
+    expect(calculateSafeClientQty(30, 10, 50)).toBe(30);
+    expect(calculateSafeClientQty(51, 10, 50)).toBe(57); // 51*1.1=56.1 → ceil 57
+  });
+  it('seuil 0 : toute quantité non nulle est majorée', () => {
+    expect(calculateSafeClientQty(5, 10, 0)).toBe(6); // 5*1.1=5.5 → ceil 6
+  });
+  it('seuil invalide (NaN/négatif) : retombe sur 20', () => {
+    expect(calculateSafeClientQty(10, 10, NaN)).toBe(10);
+    expect(calculateSafeClientQty(21, 10, -5)).toBe(24); // 21*1.1=23.1 → ceil 24
+  });
 });
 
 // ── buildGlobalClientQtyMapFromStudyQty ───────────────────────────────────
@@ -76,6 +87,22 @@ describe('buildGlobalClientQtyMapFromStudyQty', () => {
     );
     expect(map.has('uid_custom')).toBe(true);
     expect(map.has('i1')).toBe(false);
+  });
+  it('respecte le seuil du projet (clientQtyThreshold)', () => {
+    const p = proj([{ type: 'item', id: 'i1', uid: 'i1', qty: 30, price: 50 }]);
+    p.clientQtyThreshold = 50;
+    const { map } = buildGlobalClientQtyMapFromStudyQty(p, 10);
+    expect(map.get('i1')).toBe(30); // 30 ≤ 50 → non majoré
+  });
+  it('ne majore jamais isFixed ni qtyLocked', () => {
+    const { map } = buildGlobalClientQtyMapFromStudyQty(
+      proj([
+        { type: 'item', id: 'f1', uid: 'f1', qty: 100, price: 50, isFixed: true },
+        { type: 'item', id: 'l1', uid: 'l1', qty: 100, price: 50, qtyLocked: true },
+      ]), 10
+    );
+    expect(map.get('f1')).toBe(100);
+    expect(map.get('l1')).toBe(100);
   });
 });
 
@@ -245,6 +272,23 @@ describe('computeQtyMaps', () => {
   it('isFixed jamais majoré', () => {
     const { clientQtyMaps } = computeQtyMaps([item('f', 100, { isFixed: true })], false, [], 10);
     expect(clientQtyMaps.global.f).toBe(100);
+  });
+
+  it('qtyLocked jamais majoré (quantité figée)', () => {
+    const { studyQtyMaps, clientQtyMaps } = computeQtyMaps([item('l', 100, { qtyLocked: true })], false, [], 10);
+    expect(studyQtyMaps.global.l).toBe(100);
+    expect(clientQtyMaps.global.l).toBe(100);
+  });
+
+  it('seuil personnalisé 50 : 30 non majoré, 60 majoré', () => {
+    const { clientQtyMaps } = computeQtyMaps([item('a', 30), item('b', 60)], false, [], 10, 50);
+    expect(clientQtyMaps.global.a).toBe(30);
+    expect(clientQtyMaps.global.b).toBe(66);    // 60*1.1=66
+  });
+
+  it('seuil personnalisé : formule décimale sous le seuil NON arrondie', () => {
+    const { studyQtyMaps } = computeQtyMaps([item('i1', '=100/3')], false, [], 10, 50);
+    expect(studyQtyMaps.global.i1).toBeCloseTo(33.333, 2); // 33.33 ≤ 50 → pas d'arrondi
   });
 
   it('formule simple résolue', () => {

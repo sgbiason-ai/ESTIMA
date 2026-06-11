@@ -12,10 +12,15 @@ export const useProjectCalculations = ({
   bpuConfig
 }) => {
   // --- CALCUL DU POURCENTAGE CLIENT ---
-  const effectiveClientPercent = project?.clientPercent !== undefined 
-      ? Number(project.clientPercent) 
+  const effectiveClientPercent = project?.clientPercent !== undefined
+      ? Number(project.clientPercent)
       : (clientPercent !== undefined ? Number(clientPercent) : 10);
-  
+
+  // --- SEUIL DE MAJORATION (quantités ≤ |seuil| jamais majorées) ---
+  const effectiveQtyThreshold = project?.clientQtyThreshold !== undefined
+      ? Number(project.clientQtyThreshold)
+      : 20;
+
   // --- CALCUL DES MAPS (QUANTITÉS) ---
   const { studyQtyMaps, clientQtyMaps } = useMemo(() => {
     const getItems = (chapters) => {
@@ -31,9 +36,9 @@ export const useProjectCalculations = ({
     };
     const allItems = getItems(project?.chapters);
     // Calcul délégué à la fonction pure testée (projectCalculations.js) —
-    // résolution des formules, arrondi étude ≥|20|, majoration client ±20, tranches.
-    return computeQtyMaps(allItems, hasTranches, tranches, effectiveClientPercent);
-  }, [project, hasTranches, tranches, effectiveClientPercent]);
+    // résolution des formules, arrondi étude au-delà du seuil, majoration client, tranches.
+    return computeQtyMaps(allItems, hasTranches, tranches, effectiveClientPercent, effectiveQtyThreshold);
+  }, [project, hasTranches, tranches, effectiveClientPercent, effectiveQtyThreshold]);
 
   const clientQtyMap = useMemo(() => {
     const data = clientQtyMaps[activeTrancheId || 'global'] || {};
