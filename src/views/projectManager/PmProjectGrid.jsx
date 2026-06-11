@@ -1,10 +1,24 @@
-import React, { useState } from 'react';
-import { Cloud, Folder, Clock, RefreshCw, CloudOff, Trash2, RotateCcw, Info, ClipboardList, BarChart3, Copy, ExternalLink, User, SearchX } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Cloud, Folder, Clock, RefreshCw, CloudOff, Trash2, RotateCcw, Info, ClipboardList, BarChart3, Copy, ExternalLink, User, SearchX, MoreHorizontal } from 'lucide-react';
 import { NEUTRAL_COLOR } from './folderColors';
+import { formatRelativeDate } from './relativeDate';
 
 // Actions révélées au hover sur desktop, mais toujours visibles sur tactile
 // (tablette/mobile : pas de hover → opacity-0 les rendait inaccessibles)
 const HOVER_REVEAL = 'opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100';
+
+const MenuItem = ({ icon: Icon, label, danger, onClick, disabled, spinning }) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors text-left disabled:opacity-50 ${
+      danger ? 'text-red-500 hover:bg-red-50' : 'text-gray-700 hover:bg-gray-100'
+    }`}
+  >
+    <Icon size={14} className={`shrink-0 ${spinning ? 'animate-spin' : ''}`} />
+    {label}
+  </button>
+);
 
 const PmProjectGrid = ({
   viewMode = 'grid',
@@ -17,6 +31,21 @@ const PmProjectGrid = ({
 }) => {
   // Popover "Versions précédentes" : ouvrable au clic (tactile) en plus du hover
   const [openHistId, setOpenHistId] = useState(null);
+  // Menu kebab « ⋯ » d'une tuile
+  const [openMenuId, setOpenMenuId] = useState(null);
+
+  // Fermeture des menus : clic extérieur + Échap (les déclencheurs font stopPropagation)
+  useEffect(() => {
+    if (!openHistId && !openMenuId) return undefined;
+    const close = () => { setOpenHistId(null); setOpenMenuId(null); };
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    document.addEventListener('click', close);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('click', close);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [openHistId, openMenuId]);
 
   // Simple clic = sélection/aperçu (chargement silencieux dans la session, reste sur le Workspace).
   // Double-clic OU bouton "Ouvrir" = ouverture dans Estima VRD. Plus de délai artificiel :
@@ -97,7 +126,8 @@ const PmProjectGrid = ({
     const fc = proj.folderId ? (folderColorMap[proj.folderId] || NEUTRAL_COLOR) : NEUTRAL_COLOR;
     const savedBy = proj.updatedBy || proj.savedBy || '';
     const savedByName = savedBy ? savedBy.split('@')[0] : '';
-    return { date, dateStr, timeStr, isToday, projFolder, presence, saveHistory, fc, savedBy, savedByName };
+    const relative = date ? formatRelativeDate(date) : '—';
+    return { date, dateStr, timeStr, isToday, projFolder, presence, saveHistory, fc, savedBy, savedByName, relative };
   };
 
   // ── Vue LISTE ────────────────────────────────────────────────────────────
@@ -109,7 +139,7 @@ const PmProjectGrid = ({
         </div>
         {filteredProjects.map((proj) => {
           const isActive = proj.id === project?.id;
-          const { dateStr, timeStr, isToday, projFolder, presence, fc, savedBy, savedByName } = getProjectMeta(proj);
+          const { dateStr, timeStr, isToday, projFolder, presence, fc, savedBy, savedByName, relative } = getProjectMeta(proj);
           return (
             <div
               key={proj.id}
@@ -120,7 +150,7 @@ const PmProjectGrid = ({
               onDragStart={(e) => { e.dataTransfer.setData('text/plain', proj.id); e.dataTransfer.effectAllowed = 'move'; }}
               onClick={() => handleCardClick(proj)}
               onDoubleClick={() => handleCardDoubleClick(proj)}
-              title="Cliquer pour aperçu • Double-clic pour ouvrir dans Estima VRD • Glisser vers un dossier"
+              title="Clic : charger en session • Double-clic ou « Ouvrir » : Estima VRD • Glisser vers un dossier"
               className={`group relative grid grid-cols-[1fr_100px_140px_70px] gap-2 items-center px-4 pl-6 py-2.5 cursor-pointer transition-all border-b border-gray-100 ${
                 isActive ? fc.card : 'hover:bg-gray-50'
               }`}
@@ -158,11 +188,10 @@ const PmProjectGrid = ({
                 ))}
               </div>
               <span className="text-xs font-medium text-gray-600 truncate">{proj.code || <span className="text-gray-300">—</span>}</span>
-              <div className="text-[11px] text-gray-400 min-w-0" title={`Enregistré le ${dateStr} à ${timeStr}${savedBy ? ' par ' + savedBy : ''}`}>
+              <div className="text-xs text-gray-500 min-w-0" title={`Enregistré le ${dateStr} à ${timeStr}${savedBy ? ' par ' + savedBy : ''}`}>
                 <div className="flex items-center gap-1.5">
                   <Clock size={12} className={`shrink-0 ${isToday ? 'text-emerald-500' : 'text-gray-300'}`} />
-                  <span className={isToday ? 'text-gray-600 font-medium' : ''}>{isToday ? "Aujourd'hui" : dateStr}</span>
-                  <span className="text-gray-300">{timeStr}</span>
+                  <span className={isToday ? 'text-gray-700 font-medium' : ''}>{relative}</span>
                 </div>
                 {savedByName && (
                   <div className="flex items-center gap-1 text-gray-400 truncate pl-[18px]">
@@ -172,7 +201,7 @@ const PmProjectGrid = ({
               </div>
               <div className="flex items-center justify-end gap-1">
                 <button onClick={e => { e.stopPropagation(); onOpenInEstima?.(proj); }} title="Ouvrir dans Estima VRD"
-                  className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-blue-600 bg-blue-50 border border-blue-200/60 hover:bg-blue-100 transition-colors ${HOVER_REVEAL}`}>
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-gray-900 text-white hover:bg-gray-700 active:scale-[0.97] transition-all shadow-sm">
                   <ExternalLink size={11} /> Ouvrir
                 </button>
                 <button onClick={e => { e.stopPropagation(); onInfoProject?.(proj); }} className={`p-1 rounded-lg text-gray-300 hover:text-indigo-500 hover:bg-indigo-50 transition-colors ${HOVER_REVEAL}`} title="Fiche projet" aria-label="Fiche projet"><Info size={13} /></button>
@@ -194,7 +223,7 @@ const PmProjectGrid = ({
     <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
       {filteredProjects.map((proj) => {
         const isActive = proj.id === project?.id;
-        const { dateStr, timeStr, isToday, projFolder, presence, saveHistory, fc, savedBy, savedByName } = getProjectMeta(proj);
+        const { dateStr, timeStr, isToday, projFolder, presence, saveHistory, fc, savedBy, savedByName, relative } = getProjectMeta(proj);
 
         return (
           <div
@@ -206,13 +235,14 @@ const PmProjectGrid = ({
             onDragStart={(e) => { e.dataTransfer.setData('text/plain', proj.id); e.dataTransfer.effectAllowed = 'move'; }}
             onClick={() => handleCardClick(proj)}
             onDoubleClick={() => handleCardDoubleClick(proj)}
-            title="Cliquer pour aperçu • Double-clic pour ouvrir dans Estima VRD • Glisser vers un dossier"
-            className={`group relative cursor-pointer border-2 rounded-2xl p-5 transition-all duration-200 flex flex-col h-full overflow-hidden ${
+            title="Clic : charger en session • Double-clic ou « Ouvrir » : Estima VRD • Glisser vers un dossier"
+            className={`group relative cursor-pointer border-2 rounded-2xl p-5 transition-all duration-200 flex flex-col h-full ${
               isActive ? fc.cardActive : `${fc.card} ${fc.cardHover} hover:shadow-lg hover:-translate-y-0.5`
             }`}
           >
-            {/* Left color stripe */}
-            <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${fc.stripe}`} />
+            {/* Left color stripe — arrondie pour suivre la carte (plus d'overflow-hidden,
+                afin que les menus kebab/versions puissent dépasser de la tuile) */}
+            <div className={`absolute left-0 top-0 bottom-0 w-1.5 rounded-l-[14px] ${fc.stripe}`} />
 
             {/* Header */}
             <div className="flex items-start justify-between gap-2 mb-2 pl-4">
@@ -255,10 +285,9 @@ const PmProjectGrid = ({
             <div className="mt-auto pt-2.5 border-t border-gray-100 space-y-1.5">
               {/* Ligne 1 : date + heure | historique */}
               <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 text-[11px] text-gray-400 min-w-0" title={`Enregistré le ${dateStr} à ${timeStr}${savedBy ? ' par ' + savedBy : ''}`}>
+                <div className="flex items-center gap-1.5 text-xs text-gray-500 min-w-0" title={`Enregistré le ${dateStr} à ${timeStr}${savedBy ? ' par ' + savedBy : ''}`}>
                   <Clock size={13} className={`shrink-0 ${isToday ? 'text-emerald-500' : 'text-gray-300'}`} />
-                  <span className={`shrink-0 ${isToday ? 'text-gray-600 font-medium' : ''}`}>{isToday ? "Aujourd'hui" : dateStr}</span>
-                  <span className="text-gray-300 shrink-0">{timeStr}</span>
+                  <span className={`truncate ${isToday ? 'text-gray-700 font-medium' : ''}`}>{relative}</span>
                 </div>
                 {saveHistory.length > 1 && (
                   <div className="relative group/hist shrink-0">
@@ -296,15 +325,38 @@ const PmProjectGrid = ({
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button onClick={e => { e.stopPropagation(); onOpenInEstima?.(proj); }} title="Ouvrir dans Estima VRD"
-                    className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-blue-600 bg-blue-50 border border-blue-200/60 hover:bg-blue-100 transition-colors ${HOVER_REVEAL}`}>
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-gray-900 text-white hover:bg-gray-700 active:scale-[0.97] transition-all shadow-sm">
                     <ExternalLink size={11} /> Ouvrir
                   </button>
-                  <button onClick={e => { e.stopPropagation(); onInfoProject?.(proj); }} className={`p-1 rounded-lg text-gray-300 hover:text-indigo-500 hover:bg-indigo-50 transition-colors ${HOVER_REVEAL}`} title="Fiche projet" aria-label="Fiche projet"><Info size={13} /></button>
-                  <button onClick={e => onDuplicateProject?.(proj, e)} className={`p-1 rounded-lg text-gray-300 hover:text-violet-500 hover:bg-violet-50 transition-colors ${HOVER_REVEAL}`} title="Dupliquer cette affaire" aria-label="Dupliquer cette affaire"><Copy size={13} /></button>
-                  <button onClick={e => { e.stopPropagation(); onMoveProject(proj); }} className={`p-1 rounded-lg text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-colors ${HOVER_REVEAL}`} title="Déplacer" aria-label="Déplacer"><Folder size={13} /></button>
-                  <button onClick={e => onDeleteProject(proj, e)} disabled={deletingId === proj.id} className={`p-1 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors ${HOVER_REVEAL}`} title="Supprimer" aria-label="Supprimer">
-                    {deletingId === proj.id ? <RefreshCw size={13} className="animate-spin" /> : <Trash2 size={13} />}
-                  </button>
+                  <div className="relative">
+                    <button
+                      onClick={e => { e.stopPropagation(); setOpenMenuId(openMenuId === proj.id ? null : proj.id); }}
+                      title="Plus d'actions" aria-label="Plus d'actions" aria-haspopup="menu" aria-expanded={openMenuId === proj.id}
+                      className={`p-1.5 rounded-lg transition-colors ${
+                        openMenuId === proj.id ? 'bg-gray-100 text-gray-700' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <MoreHorizontal size={15} />
+                    </button>
+                    {openMenuId === proj.id && (
+                      <div
+                        onClick={e => e.stopPropagation()}
+                        onDoubleClick={e => e.stopPropagation()}
+                        className="absolute right-0 bottom-full mb-1.5 w-52 bg-white rounded-2xl shadow-lg border border-gray-200/70 p-1.5 z-40"
+                      >
+                        <MenuItem icon={Info} label="Fiche projet"
+                          onClick={e => { e.stopPropagation(); setOpenMenuId(null); onInfoProject?.(proj); }} />
+                        <MenuItem icon={Copy} label="Dupliquer cette affaire"
+                          onClick={e => { setOpenMenuId(null); onDuplicateProject?.(proj, e); }} />
+                        <MenuItem icon={Folder} label="Déplacer vers un dossier"
+                          onClick={e => { e.stopPropagation(); setOpenMenuId(null); onMoveProject(proj); }} />
+                        <div className="h-px bg-gray-100 my-1 mx-2" />
+                        <MenuItem icon={deletingId === proj.id ? RefreshCw : Trash2} label="Supprimer" danger
+                          disabled={deletingId === proj.id} spinning={deletingId === proj.id}
+                          onClick={e => { setOpenMenuId(null); onDeleteProject(proj, e); }} />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

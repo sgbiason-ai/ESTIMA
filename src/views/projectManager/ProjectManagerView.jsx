@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { HelpCircle, PlusCircle, Clock, Cloud, RefreshCw, Trash2, ArrowUpDown, Search, LayoutGrid, List } from 'lucide-react';
 import { buildFolderColorMap } from './folderColors';
-import { toast, confirm } from '../../utils/globalUI';
+import { toast } from '../../utils/globalUI';
 import { generateId } from '../../utils/helpers';
 import { collection, getDocs, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -13,7 +13,7 @@ import { usePmFolders }          from './hooks/usePmFolders';
 
 import HelpPanel         from '../../components/help/HelpPanel';
 import MoveFolderModal   from './MoveFolderModal';
-import PmLeftColumn      from './PmLeftColumn';
+import PmToolbar         from './PmToolbar';
 import PmFolderSidebar   from './PmFolderSidebar';
 import PmProjectGrid     from './PmProjectGrid';
 import ProjectDetailsModal from '../../components/modals/ProjectDetailsModal';
@@ -148,7 +148,9 @@ const ProjectManagerView = ({
     } else {
       // En mode 'load' silent (sortie de la modale linkedLibrary), on saute la confirmation
       // "Ouvrir X ?" — l'utilisateur a déjà manifesté son intention via la modale précédente.
-      await cloud.handleLoadCloudProject(proj, { silent });
+      const wasActive = proj?.id === project?.id;
+      const ok = await cloud.handleLoadCloudProject(proj, { silent });
+      if (ok && silent && !wasActive) toast.success(`« ${proj.name || 'Sans nom'} » chargé en session.`);
     }
   };
 
@@ -273,8 +275,6 @@ const ProjectManagerView = ({
     }
   }, [detailsProject, companyId, cloud]);
 
-  const lastSaved = project?.lastSaved ? new Date(project.lastSaved).toLocaleString('fr-FR') : null;
-
   return (
     <div className="h-screen w-full bg-[#f5f5f7] overflow-hidden flex flex-col text-gray-900"
       >
@@ -291,6 +291,7 @@ const ProjectManagerView = ({
         <MoveFolderModal
           project={fm.movingProject}
           folders={fm.folders}
+          colorMap={folderColorMap}
           onMove={fm.handleMoveProject}
           onClose={() => fm.setMovingProject(null)}
         />
@@ -310,8 +311,8 @@ const ProjectManagerView = ({
 
 
       {/* ── Toolbar ───────────────────────────────────────────────────────── */}
-      <PmLeftColumn
-        project={project} lastSaved={lastSaved}
+      <PmToolbar
+        project={project} lastSavedIso={project?.lastSaved}
         cloudSaving={cloud.cloudSaving} cloudSaved={cloud.cloudSaved}
         onCloudSave={cloud.handleCloudSave} onExport={local.handleExport}
         onImportClick={() => local.fileInputRef.current?.click()} onClone={local.handleClone}
@@ -509,14 +510,7 @@ const ProjectManagerView = ({
                   onDeleteProject={cloud.handleDeleteCloudProject}
                   onDuplicateProject={cloud.handleDuplicateCloudProject}
                   onMoveProject={fm.setMovingProject}
-                  onRestoreSnapshot={async (projId, iso) => {
-                    const d = new Date(iso);
-                    const ok = await confirm(
-                      `Restaurer la version du ${d.toLocaleDateString('fr-FR')} à ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} ? La version actuelle de l'affaire sera remplacée.`,
-                      { danger: true }
-                    );
-                    if (ok) cloud.handleRestoreSnapshot(projId, iso);
-                  }}
+                  onRestoreSnapshot={cloud.handleRestoreSnapshot}
                   onInfoProject={setDetailsProject}
                   linkedCrcMap={linkedCrcMap}
                   raoProjectIds={raoProjectIds}
