@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Cloud, Folder, Clock, RefreshCw, CloudOff, Trash2, RotateCcw, Info, ClipboardList, BarChart3, Copy, ExternalLink, User, SearchX, MoreHorizontal, ChevronUp, ChevronDown } from 'lucide-react';
 import { NEUTRAL_COLOR } from './folderColors';
 import { formatRelativeDate } from './relativeDate';
+import { getStatusInfo, formatEuro } from './pmMeta';
 
 // En-tête de colonne triable (vue liste)
 const SortHeader = ({ label, sortKey, sortBy, sortDir, onSort, className = '' }) => {
@@ -141,12 +142,15 @@ const PmProjectGrid = ({
     const savedBy = proj.updatedBy || proj.savedBy || '';
     const savedByName = savedBy ? savedBy.split('@')[0] : '';
     const relative = date ? formatRelativeDate(date) : '—';
-    return { date, dateStr, timeStr, isToday, projFolder, presence, saveHistory, fc, savedBy, savedByName, relative };
+    const st = getStatusInfo(proj.status);
+    const euro = formatEuro(proj.totalHT);
+    const chapterCount = Array.isArray(proj.chapters) ? proj.chapters.length : null;
+    return { date, dateStr, timeStr, isToday, projFolder, presence, saveHistory, fc, savedBy, savedByName, relative, st, euro, chapterCount };
   };
 
   // ── Vue LISTE (pilotage : colonnes triables) ──────────────────────────────
   if (viewMode === 'list') {
-    const COLS = 'grid-cols-[minmax(0,2.2fr)_90px_minmax(0,1.1fr)_minmax(0,1.1fr)_130px_92px]';
+    const COLS = 'grid-cols-[minmax(0,2fr)_80px_minmax(0,1fr)_minmax(0,1fr)_105px_125px_92px]';
     return (
       <div className="flex flex-col gap-0 border border-gray-200/60 rounded-2xl overflow-hidden bg-white">
         <div className={`grid ${COLS} gap-2 px-4 pl-6 py-2.5 bg-gray-50 border-b border-gray-200/60`}>
@@ -154,12 +158,13 @@ const PmProjectGrid = ({
           <SortHeader label="N°" sortKey="code" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
           <SortHeader label="Lieu" sortKey="location" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
           <SortHeader label="Dossier" sortKey="folder" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
+          <SortHeader label="Montant HT" sortKey="amount" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="justify-end" />
           <SortHeader label="Sauvegarde" sortKey="date" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
           <span />
         </div>
         {filteredProjects.map((proj) => {
           const isActive = proj.id === project?.id;
-          const { dateStr, timeStr, isToday, projFolder, presence, fc, savedBy, savedByName, relative, saveHistory } = getProjectMeta(proj);
+          const { dateStr, timeStr, isToday, projFolder, presence, fc, savedBy, savedByName, relative, saveHistory, st, euro } = getProjectMeta(proj);
           return (
             <div
               key={proj.id}
@@ -184,6 +189,7 @@ const PmProjectGrid = ({
                   {proj.name || 'Projet sans nom'}
                 </div>
                 {isActive && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md shrink-0 ${fc.badge}`}>Actif</span>}
+                {st && <span className={`flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md border shrink-0 ${st.badge}`}><span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />{st.label}</span>}
                 {raoProjectIds.has(proj.id) && (
                   <button onClick={e => { e.stopPropagation(); onNavigateModule?.('rao_analysis'); }} className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-600 border border-blue-200/60 hover:bg-blue-100 transition-colors shrink-0" title="Ouvrir l'analyse des offres">
                     <BarChart3 size={10} /> RAO
@@ -219,6 +225,11 @@ const PmProjectGrid = ({
                     <span className="truncate" title={projFolder.name}>{projFolder.name}</span>
                   </>
                 ) : <span className="text-gray-300">—</span>}
+              </span>
+
+              {/* Montant HT */}
+              <span className="text-xs font-semibold text-gray-700 text-right tabular-nums truncate" title={euro ? `${euro} HT (hors options)` : 'Montant calculé à la prochaine sauvegarde Cloud'}>
+                {euro || <span className="text-gray-300 font-normal">—</span>}
               </span>
 
               {/* Sauvegarde + auteur */}
@@ -281,7 +292,7 @@ const PmProjectGrid = ({
     <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
       {filteredProjects.map((proj) => {
         const isActive = proj.id === project?.id;
-        const { dateStr, timeStr, isToday, projFolder, presence, saveHistory, fc, savedBy, savedByName, relative } = getProjectMeta(proj);
+        const { dateStr, timeStr, isToday, projFolder, presence, saveHistory, fc, savedBy, savedByName, relative, st, euro, chapterCount } = getProjectMeta(proj);
 
         return (
           <div
@@ -323,6 +334,7 @@ const PmProjectGrid = ({
 
             {/* Meta */}
             <div className="flex items-center gap-1.5 mb-2 h-[20px] flex-wrap overflow-hidden">
+              {st && <span className={`flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-lg border ${st.badge}`}><span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />{st.label}</span>}
               {proj.code && <span className="flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-lg bg-gray-100 text-gray-600 border border-gray-200/60">N° {proj.code}</span>}
               {proj.location && <span className="text-[11px] text-gray-400 flex items-center gap-1">📍 {proj.location}</span>}
               {raoProjectIds.has(proj.id) && (
@@ -336,7 +348,15 @@ const PmProjectGrid = ({
                 </button>
               )}
               {projFolder && <span className={`flex items-center gap-1 text-xs ml-auto ${fc.accent}`}><Folder size={10} /> {projFolder.name}</span>}
-              {!proj.code && !proj.location && !projFolder && !linkedCrcMap[proj.id] && !raoProjectIds.has(proj.id) && <span className="text-xs text-gray-300 italic">Aucune info complémentaire</span>}
+              {!st && !proj.code && !proj.location && !projFolder && !linkedCrcMap[proj.id] && !raoProjectIds.has(proj.id) && <span className="text-xs text-gray-300 italic">Aucune info complémentaire</span>}
+            </div>
+
+            {/* Montant HT · chapitres */}
+            <div className="flex items-baseline gap-1.5 mb-2 text-xs" title={euro ? `Total HT étude, hors options — recalculé à chaque sauvegarde Cloud` : 'Montant calculé à la prochaine sauvegarde Cloud'}>
+              {euro && <span className="font-bold text-gray-900">{euro} HT</span>}
+              {chapterCount !== null && (
+                <span className="text-gray-400">{euro ? '· ' : ''}{chapterCount} chapitre{chapterCount > 1 ? 's' : ''}</span>
+              )}
             </div>
 
             {/* Footer — 2 lignes : (date·heure | historique) puis (auteur | actions) */}

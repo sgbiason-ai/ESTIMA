@@ -3,6 +3,16 @@ import { collection, getDocs, deleteDoc, setDoc, doc as fsDoc } from 'firebase/f
 import { db } from '../../../firebase';
 import { toast, confirm } from '../../../utils/globalUI';
 import { getActiveLocalLibrary } from '../../../utils/localLibrary';
+import { sumNodeTotal } from '../../../utils/projectCalculations';
+
+// Total HT « étude » de l'affaire, hors chapitres PSE/options (comme les exports).
+// Dénormalisé sur le document à chaque Cloud Save → affichable en liste sans recalcul.
+const computeTotalHT = (chapters) => {
+  if (!Array.isArray(chapters)) return 0;
+  return Math.round(
+    chapters.filter(c => c && !c.isOption).reduce((sum, c) => sum + sumNodeTotal(c, false, null), 0)
+  );
+};
 
 /**
  * usePmCloudProjects
@@ -235,6 +245,7 @@ export const usePmCloudProjects = ({
         priceAnalysisData: analysisData,
         lastSaved: now,
         saveHistory,
+        totalHT: computeTotalHT(project.chapters),
         ...(linkedLibrary ? { linkedLibrary } : {}),
       };
 

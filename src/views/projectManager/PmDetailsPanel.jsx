@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { NEUTRAL_COLOR } from './folderColors';
 import { formatRelativeDate } from './relativeDate';
+import { PROJECT_STATUSES, formatEuroHT } from './pmMeta';
 import { getActiveLocalLibrary, backupActiveLocalLibrary, setActiveLocalLibrary, librariesMatch } from '../../utils/localLibrary';
 import { toast } from '../../utils/globalUI';
 
@@ -181,6 +182,26 @@ const PmDetailsPanel = ({
           </button>
         </div>
 
+        {/* Statut métier */}
+        <Section title="Statut de l'affaire">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {PROJECT_STATUSES.map(s => {
+              const active = proj.status === s.id;
+              return (
+                <button key={s.id}
+                  onClick={() => onSaveQuick(proj.id, { status: active ? null : s.id })}
+                  title={active ? `Retirer le statut « ${s.label} »` : `Marquer « ${s.label} »`}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all active:scale-[0.97] ${
+                    active ? s.badge : 'bg-white text-gray-500 border-gray-200/60 hover:bg-gray-50'
+                  }`}>
+                  <span className={`w-2 h-2 rounded-full ${s.dot}`} />
+                  {s.label}
+                </button>
+              );
+            })}
+          </div>
+        </Section>
+
         {/* Édition rapide */}
         <Section title="Édition rapide">
           <div className="space-y-2.5">
@@ -212,6 +233,13 @@ const PmDetailsPanel = ({
         {/* Activité */}
         <Section title="Activité">
           <div className="bg-gray-50 border border-gray-200/60 rounded-xl px-3.5 py-3 space-y-1.5">
+            {formatEuroHT(proj.totalHT) && (
+              <div className="flex items-center gap-2 text-xs" title="Total HT étude, hors options — recalculé à chaque sauvegarde Cloud">
+                <span className="text-gray-400 shrink-0 font-mono">€</span>
+                <span className="font-bold text-gray-900">{formatEuroHT(proj.totalHT)}</span>
+                {Array.isArray(proj.chapters) && <span className="text-gray-400">· {proj.chapters.length} chapitre{proj.chapters.length > 1 ? 's' : ''}</span>}
+              </div>
+            )}
             <div className="flex items-center gap-2 text-xs text-gray-600" title={savedFull || ''}>
               <Clock size={13} className="text-gray-400 shrink-0" />
               {date ? <>Sauvegardée {formatRelativeDate(date)} <span className="text-gray-400">({savedFull})</span></> : 'Jamais sauvegardée sur le Cloud'}

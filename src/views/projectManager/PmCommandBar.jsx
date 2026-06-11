@@ -4,6 +4,7 @@ import {
   LayoutGrid, List, BarChart3, ClipboardList, X, ChevronDown, Check,
 } from 'lucide-react';
 import { NEUTRAL_COLOR } from './folderColors';
+import { PROJECT_STATUSES, getStatusInfo } from './pmMeta';
 
 const SORT_OPTIONS = [
   { id: 'date', label: 'Date de sauvegarde' },
@@ -11,6 +12,7 @@ const SORT_OPTIONS = [
   { id: 'code', label: 'N° d\'affaire' },
   { id: 'location', label: 'Lieu' },
   { id: 'folder', label: 'Dossier' },
+  { id: 'amount', label: 'Montant HT' },
 ];
 
 /**
@@ -30,22 +32,32 @@ const PmCommandBar = ({
   localCount, onClearLocal,
 }) => {
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const sortMenuRef = useRef(null);
+  const statusMenuRef = useRef(null);
 
   useEffect(() => {
-    if (!sortMenuOpen) return undefined;
-    const onDown = (e) => { if (sortMenuRef.current && !sortMenuRef.current.contains(e.target)) setSortMenuOpen(false); };
-    const onKey = (e) => { if (e.key === 'Escape') setSortMenuOpen(false); };
+    if (!sortMenuOpen && !statusMenuOpen) return undefined;
+    const onDown = (e) => {
+      if (sortMenuRef.current && !sortMenuRef.current.contains(e.target)) setSortMenuOpen(false);
+      if (statusMenuRef.current && !statusMenuRef.current.contains(e.target)) setStatusMenuOpen(false);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') { setSortMenuOpen(false); setStatusMenuOpen(false); } };
     document.addEventListener('mousedown', onDown);
     window.addEventListener('keydown', onKey);
     return () => { document.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey); };
-  }, [sortMenuOpen]);
+  }, [sortMenuOpen, statusMenuOpen]);
+
+  const activeStatus = getStatusInfo(filters.status);
 
   const sortLabel = SORT_OPTIONS.find(o => o.id === sortBy)?.label || 'Trier';
   const fc = activeFolder?.color || NEUTRAL_COLOR;
 
   return (
-    <div className="flex-none px-6 sm:px-8 pt-3 pb-2.5 bg-white/60 backdrop-blur-sm border-b border-gray-200/50 space-y-2.5">
+    // z-10 obligatoire : le backdrop-blur crée un stacking context — sans z-index,
+    // le conteneur relative du contenu passe au-dessus et masque les dropdowns
+    // (statut, tri). Reste sous la toolbar (z-20) pour ne pas couvrir son menu Fichier.
+    <div className="relative z-10 flex-none px-6 sm:px-8 pt-3 pb-2.5 bg-white/60 backdrop-blur-sm border-b border-gray-200/50 space-y-2.5">
 
       {/* ── Ligne 1 : titre + onglets ── */}
       <div className="flex items-center justify-between gap-4">
@@ -127,6 +139,39 @@ const PmCommandBar = ({
               filters.crc ? 'bg-emerald-50 text-emerald-600 border-emerald-200/60' : 'bg-white text-gray-500 border-gray-200/60 hover:bg-gray-50'}`}>
             <ClipboardList size={13} /> CR {filters.crc && <X size={12} />}
           </button>
+
+          {/* Filtre statut */}
+          <div className="relative" ref={statusMenuRef}>
+            <button onClick={() => setStatusMenuOpen(o => !o)}
+              aria-haspopup="menu" aria-expanded={statusMenuOpen}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                activeStatus ? activeStatus.badge : 'bg-white text-gray-500 border-gray-200/60 hover:bg-gray-50'}`}>
+              {activeStatus ? (
+                <><span className={`w-2 h-2 rounded-full ${activeStatus.dot}`} /> {activeStatus.label}</>
+              ) : 'Statut'}
+              <ChevronDown size={12} className={`transition-transform ${statusMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {statusMenuOpen && (
+              <div className="absolute left-0 top-full mt-1.5 w-44 bg-white rounded-2xl shadow-lg border border-gray-200/70 p-1.5 z-50">
+                <button onClick={() => { setFilters(f => ({ ...f, status: null })); setStatusMenuOpen(false); }}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors text-left ${
+                    !filters.status ? 'bg-gray-100 text-gray-900' : 'text-gray-700 hover:bg-gray-100'}`}>
+                  <span className="flex-1">Tous les statuts</span>
+                  {!filters.status && <Check size={13} className="text-blue-600" />}
+                </button>
+                {PROJECT_STATUSES.map(s => (
+                  <button key={s.id}
+                    onClick={() => { setFilters(f => ({ ...f, status: f.status === s.id ? null : s.id })); setStatusMenuOpen(false); }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors text-left ${
+                      filters.status === s.id ? 'bg-gray-100 text-gray-900' : 'text-gray-700 hover:bg-gray-100'}`}>
+                    <span className={`w-2 h-2 rounded-full ${s.dot}`} />
+                    <span className="flex-1">{s.label}</span>
+                    {filters.status === s.id && <Check size={13} className="text-blue-600" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div className="flex-1" />
 

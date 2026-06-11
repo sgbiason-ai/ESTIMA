@@ -35,13 +35,13 @@ const ProjectManagerView = ({
   companyId, currentUserUid, onNavigateModule, setActiveTab,
   masterBranding = null,
 }) => {
-  const SORT_KEYS = ['date', 'code', 'name', 'location', 'folder'];
+  const SORT_KEYS = ['date', 'code', 'name', 'location', 'folder', 'amount'];
   const [historyTab, setHistoryTab] = useState(() => readPmPrefs().historyTab === 'local' ? 'local' : 'cloud');
   const [showHelp,   setShowHelp]   = useState(false);
   const [sortBy,     setSortBy]     = useState(() => SORT_KEYS.includes(readPmPrefs().sortBy) ? readPmPrefs().sortBy : 'date');
   const [sortDir,    setSortDir]    = useState(() => readPmPrefs().sortDir === 'asc' ? 'asc' : 'desc');
   const [search,     setSearch]     = useState('');
-  const [filters,    setFilters]    = useState({ rao: false, crc: false });
+  const [filters,    setFilters]    = useState({ rao: false, crc: false, status: null });
   const [viewMode,   setViewMode]   = useState(() => readPmPrefs().viewMode === 'list' ? 'list' : 'grid');
   const [creatingProject, setCreatingProject] = useState(false);
   const searchRef = useRef(null);
@@ -157,6 +157,7 @@ const ProjectManagerView = ({
       }
       if (filters.rao && !raoProjectIds.has(p.id)) return false;
       if (filters.crc && !linkedCrcMap[p.id]) return false;
+      if (filters.status && p.status !== filters.status) return false;
       return true;
     })
     .sort((a, b) => {
@@ -168,6 +169,7 @@ const ProjectManagerView = ({
         case 'name':     cmp = (a.name || '').localeCompare(b.name || '', 'fr'); break;
         case 'location': cmp = (a.location || '').localeCompare(b.location || '', 'fr'); break;
         case 'folder':   cmp = folderNameOf(a.folderId).localeCompare(folderNameOf(b.folderId), 'fr'); break;
+        case 'amount':   cmp = (Number(a.totalHT) || 0) - (Number(b.totalHT) || 0); break;
         default:         cmp = 0;
       }
       return cmp * dir;
@@ -183,7 +185,7 @@ const ProjectManagerView = ({
     [cloud.cloudProjects]
   );
   const showRecents = fm.selectedFolderId === '__all__' && !search.trim()
-    && !filters.rao && !filters.crc && recentProjects.length > 0;
+    && !filters.rao && !filters.crc && !filters.status && recentProjects.length > 0;
 
   // ── Bibliothèque locale liée au projet ───────────────────────────────────
   // Décide si on doit afficher la modale avant d'ouvrir l'affaire.
