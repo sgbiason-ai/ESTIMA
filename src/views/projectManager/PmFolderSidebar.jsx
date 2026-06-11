@@ -3,7 +3,7 @@ import {
   FolderPlus, RefreshCw, Layers, Folder,
   ChevronRight, ChevronDown, Edit2, Trash2,
 } from 'lucide-react';
-import { NEUTRAL_COLOR } from './folderColors';
+import { NEUTRAL_COLOR, FOLDER_PALETTE } from './folderColors';
 
 // Actions révélées au hover sur desktop, toujours visibles sur tactile (pas de hover sur tablette)
 const HOVER_REVEAL = 'opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100';
@@ -20,7 +20,7 @@ const PmFolderSidebar = ({
   folders, foldersLoading, selectedFolderId, setSelectedFolderId,
   expandedFolders, creatingFolder, setCreatingFolder, newFolderName, setNewFolderName,
   editingFolder, setEditingFolder, cloudProjects, rootFolders, getSubfolders,
-  toggleExpand, handleCreateFolder, handleRenameFolder, handleDeleteFolder,
+  toggleExpand, handleCreateFolder, handleRenameFolder, handleSetFolderColor, handleDeleteFolder,
   onProjectDrop, colorMap = {},
 }) => {
 
@@ -121,6 +121,27 @@ const PmFolderSidebar = ({
             </div>
           )}
         </div>
+
+        {/* Picker de couleur — visible pendant le renommage. onMouseDown preventDefault :
+            sans ça, le blur de l'input de renommage fermerait l'édition avant le clic. */}
+        {isEditing && typeof handleSetFolderColor === 'function' && (
+          <div className="flex items-center gap-1.5 py-1.5" style={{ paddingLeft: `${12 + depth * 16 + 22}px` }}>
+            {FOLDER_PALETTE.map((c, i) => (
+              <button
+                key={c.name}
+                onMouseDown={e => e.preventDefault()}
+                onClick={e => { e.stopPropagation(); handleSetFolderColor(folder.id, i); }}
+                title={`Couleur ${c.name}`}
+                aria-label={`Couleur ${c.name}`}
+                className={`w-4 h-4 rounded-full transition-all ${c.dot} ${
+                  (Number.isInteger(folder.colorIndex) ? folder.colorIndex : -1) === i
+                    ? 'ring-2 ring-offset-1 ring-gray-400 scale-110'
+                    : 'opacity-50 hover:opacity-100 hover:scale-110'
+                }`}
+              />
+            ))}
+          </div>
+        )}
 
         {creatingFolder?.parentId === folder.id && (
           <div className="flex items-center gap-1.5 px-3 py-1" style={{ paddingLeft: `${12 + (depth + 1) * 16 + 14}px` }}>

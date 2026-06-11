@@ -105,14 +105,32 @@ export const NEUTRAL_COLOR = {
 };
 
 /**
- * Retourne un mapping { folderId → couleur } stable basé sur l'ordre des dossiers.
+ * Retourne un mapping { folderId → couleur }.
+ * Priorité au champ persisté `colorIndex` (stable : ne bouge plus jamais) ;
+ * repli sur l'index alphabétique pour les dossiers pas encore migrés.
  */
 export function buildFolderColorMap(folders) {
   const map = {};
   folders.forEach((folder, idx) => {
-    map[folder.id] = FOLDER_PALETTE[idx % FOLDER_PALETTE.length];
+    const ci = Number.isInteger(folder.colorIndex) ? folder.colorIndex : idx;
+    map[folder.id] = FOLDER_PALETTE[((ci % FOLDER_PALETTE.length) + FOLDER_PALETTE.length) % FOLDER_PALETTE.length];
   });
   return map;
+}
+
+/**
+ * Choisit l'index de couleur le moins utilisé parmi les dossiers existants
+ * (pour qu'un nouveau dossier se distingue au maximum des voisins).
+ */
+export function pickLeastUsedColorIndex(folders) {
+  const counts = new Array(FOLDER_PALETTE.length).fill(0);
+  folders.forEach((f, idx) => {
+    const ci = Number.isInteger(f.colorIndex) ? f.colorIndex : idx;
+    counts[((ci % FOLDER_PALETTE.length) + FOLDER_PALETTE.length) % FOLDER_PALETTE.length]++;
+  });
+  let best = 0;
+  counts.forEach((c, i) => { if (c < counts[best]) best = i; });
+  return best;
 }
 
 export { FOLDER_PALETTE };

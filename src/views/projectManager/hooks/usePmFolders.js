@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { collection, getDocs, deleteDoc, addDoc, updateDoc, doc as fsDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { toast, confirm } from '../../../utils/globalUI';
+import { pickLeastUsedColorIndex } from '../folderColors';
 
 /**
  * usePmFolders
@@ -39,6 +40,20 @@ export const usePmFolders = ({
       const list = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+
+      // Migration paresseuse : figer la couleur des dossiers d'avant colorIndex.
+      // On persiste leur index alphabétique actuel (= couleur affichée jusqu'ici),
+      // pour que créer/renommer un dossier ne rebrasse plus les couleurs des autres.
+      const toMigrate = list
+        .map((f, idx) => ({ f, idx }))
+        .filter(({ f }) => !Number.isInteger(f.colorIndex));
+      if (toMigrate.length > 0) {
+        toMigrate.forEach(({ f, idx }) => { f.colorIndex = idx % 6; });
+        Promise.allSettled(toMigrate.map(({ f }) =>
+          updateDoc(fsDoc(db, 'companies', companyId, 'folders', f.id), { colorIndex: f.colorIndex })
+        )).catch(() => { /* silencieux — re-tentée au prochain chargement */ });
+      }
+
       setFolders(list);
     } catch (e) {
       console.error('Erreur chargement dossiers', e);
@@ -54,12 +69,14 @@ export const usePmFolders = ({
     const trimmed = newFolderName.trim();
     if (!trimmed || !companyId) return;
     try {
+      const colorIndex = pickLeastUsedColorIndex(folders);
       const docRef = await addDoc(collection(db, 'companies', companyId, 'folders'), {
         name:      trimmed,
         parentId:  creatingFolder?.parentId ?? null,
+        colorIndex,
         createdAt: new Date().toISOString(),
       });
-      const newFolder = { id: docRef.id, name: trimmed, parentId: creatingFolder?.parentId ?? null };
+      const newFolder = { id: docRef.id, name: trimmed, parentId: creatingFolder?.parentId ?? null, colorIndex };
       setFolders(prev => [...prev, newFolder].sort((a, b) => a.name.localeCompare(b.name, 'fr')));
       if (creatingFolder?.parentId) {
         setExpandedFolders(prev => new Set([...prev, creatingFolder.parentId]));
@@ -81,6 +98,17 @@ export const usePmFolders = ({
       setEditingFolder(null);
     } catch {
       toast.error('Erreur lors du renommage.');
+    }
+  };
+
+  // ── Changer la couleur ─────────────────────────────────────────────────────
+  const handleSetFolderColor = async (folderId, colorIndex) => {
+    if (!companyId || !folderId || !Number.isInteger(colorIndex)) return;
+    try {
+      await updateDoc(fsDoc(db, 'companies', companyId, 'folders', folderId), { colorIndex });
+      setFolders(prev => prev.map(f => f.id === folderId ? { ...f, colorIndex } : f));
+    } catch {
+      toast.error('Erreur lors du changement de couleur.');
     }
   };
 
@@ -177,6 +205,7 @@ export const usePmFolders = ({
     toggleExpand,
     handleCreateFolder,
     handleRenameFolder,
+    handleSetFolderColor,
     handleDeleteFolder,
     handleMoveProject,
   };

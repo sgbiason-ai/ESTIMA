@@ -479,6 +479,7 @@ const ProjectManagerView = ({
                 toggleExpand={fm.toggleExpand}
                 handleCreateFolder={fm.handleCreateFolder}
                 handleRenameFolder={fm.handleRenameFolder}
+                handleSetFolderColor={fm.handleSetFolderColor}
                 handleDeleteFolder={fm.handleDeleteFolder}
               />
               <div className="flex-1 overflow-y-auto p-6">
