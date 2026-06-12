@@ -3,6 +3,7 @@ import ExcelJS from 'exceljs';
 import { getItemRefMap, cleanText, normalizeUnitSymbol } from './helpers';
 import { roundEuro } from './financeFormat';
 import { saveFileWithPicker, FILE_TYPES, PICKER_IDS } from './fileSaver';
+import { computePseDeltas, buildPseNumbers, collectPseRoots, collectSubstitutions } from './projectCalculations';
 
 // ─── HELPERS IMAGE ────────────────────────────────────────────────────────────
 
@@ -128,7 +129,7 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
   }
 
   // ── TRAITEMENT NŒUDS ──
-  const processNodes = (nodes, ws, qtyMap, level = 0, mode = 'base', parentIsOption = false, subTotalCollector = null, _includePM = true) => {
+  const processNodes = (nodes, ws, qtyMap, level = 0, mode = 'base', parentIsOption = false, subTotalCollector = null, _includePM = true, cellRefMap = null) => {
     if (!nodes) return;
     nodes.forEach((node, index) => {
       const isEffectiveOption = parentIsOption || !!node.isOption;
@@ -170,7 +171,7 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
         if (level === 0) rowHeader.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
         else rowHeader.getCell(2).alignment = { horizontal: 'left', indent: 2 };
         const startChildRow = ws.lastRow.number + 1;
-        processNodes(node.children, ws, qtyMap, level + 1, mode, isEffectiveOption, null, _includePM);
+        processNodes(node.children, ws, qtyMap, level + 1, mode, isEffectiveOption, null, _includePM, cellRefMap);
         const endChildRow = ws.lastRow.number;
         if (endChildRow >= startChildRow) {
           const formula = `SUBTOTAL(9, F${startChildRow}:F${endChildRow})`;
@@ -201,6 +202,9 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
             }
             rowTotal.getCell(2).alignment = { horizontal: 'right' };
             rowTotal.getCell(6).numFmt = '#,##0.00 €';
+            // Mémorise la cellule de sous-total de ce (sous-)chapitre : la formule de
+            // delta d'une PSE substitution pourra référencer cette base.
+            if (cellRefMap) cellRefMap.set(String(node.id), `F${rowTotal.number}`);
           }
         }
       } else if (node.type === 'item') {
@@ -235,6 +239,8 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
         rowItem.getCell(1).alignment = { horizontal: 'center' };
         rowItem.getCell(5).numFmt = '#,##0.00 €';
         rowItem.eachCell(cell => cell.border = borders.dotted);
+        // Mémorise la cellule total de l'article (base potentielle d'une PSE substitution).
+        if (cellRefMap && !isPM) cellRefMap.set(String(node.id), `F${currentRowNum}`);
       }
     });
   };
@@ -314,7 +320,10 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
     });
 
     const mainSubTotalsRefs = [];
-    if (project.chapters) processNodes(project.chapters, worksheet, currentQtyMap, 0, 'base', false, mainSubTotalsRefs, includePM);
+    // Cellule de total de chaque prestation de base (id → 'F{row}') : sert aux
+    // formules de delta des PSE substitution (montant PSE − base).
+    const baseCellRefs = new Map();
+    if (project.chapters) processNodes(project.chapters, worksheet, currentQtyMap, 0, 'base', false, mainSubTotalsRefs, includePM, baseCellRefs);
 
     worksheet.addRow([]);
     const totalBaseFormula = mainSubTotalsRefs.length > 0 ? mainSubTotalsRefs.map(r => r.ref).join('+') : "0";
@@ -333,32 +342,70 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
         sheetName: safeSheetName,
         totalRow: rowTotalHT,
         chapters: Object.fromEntries(mainSubTotalsRefs.map(r => [r.chapterIndex, r.ref])),
+        pse: {}, // { [rootId]: ligne du net HT } — renseigné dans le bloc PSE ci-dessous
       };
     }
 
     if (project.chapters) {
-      project.chapters.forEach((chap, idx) => {
-        let isPseBlock = false; let pseTitle = ""; const pseSubTotalsRefs = [];
-        if (chap.isOption) { isPseBlock = true; pseTitle = `PSE n°${idx + 1} : ${chap.title.toUpperCase()}`; }
-        else {
-          const hasSubOptions = (n) => { if (n.isOption) return true; if (n.type === 'item') return !!n.isOption; if (n.children) return n.children.some(hasSubOptions); return false; };
-          if (hasSubOptions(chap)) { isPseBlock = true; pseTitle = `PSE SUR ${chap.title.toUpperCase()}`; }
+      // Une page/bloc par PSE (racine option), numérotée PSE n°1, n°2… comme l'écran et le PDF.
+      const getQty = (item) => {
+        const k = String(item.id);
+        return currentQtyMap.has(k) ? Number(currentQtyMap.get(k)) : Number(item.qty || 0);
+      };
+      const pseDeltas = computePseDeltas(project.chapters, getQty);
+      const pseNumbers = buildPseNumbers(project.chapters);
+      const pseRoots = collectPseRoots(project.chapters);
+      const nodeIndex = new Map();
+      (function idx(ns) { (ns || []).forEach(n => { if (n) { nodeIndex.set(n.id, n); if (n.children) idx(n.children); } }); })(project.chapters);
+
+      pseRoots.forEach((root) => {
+        const pseNo = pseNumbers.get(root.id);
+        const pseTitle = `PSE n°${pseNo} : ${(root.title || '').toUpperCase()}`;
+        const pseSubTotalsRefs = [];
+        worksheet.addRow([]); worksheet.addRow([]);
+        const headerPse = worksheet.addRow(['', pseTitle, '', '', '', '']);
+        headerPse.font = fonts.optionTitle;
+        const startPseRow = worksheet.lastRow.number + 1;
+        processNodes([root], worksheet, currentQtyMap, 0, 'option', false, pseSubTotalsRefs, includePM);
+        const endPseRow = worksheet.lastRow.number;
+        if (endPseRow < startPseRow || pseSubTotalsRefs.length === 0) return;
+
+        const montantFormula = pseSubTotalsRefs.map(r => r.ref).join('+'); // montant PSE plein
+        const substitutions = collectSubstitutions(root, pseDeltas);
+        worksheet.addRow([]);
+        let netRow;
+
+        if (substitutions.length > 0) {
+          // PSE substitution : valeur = montant PSE − prestation(s) de base remplacée(s),
+          // calculée PAR FORMULE (référence la cellule de la base → reste live).
+          const rowMontant = addTotalRow(worksheet, 'Montant PSE HT', montantFormula, false, true);
+          const dedCells = [];
+          substitutions.forEach(({ info }) => {
+            const baseNode = nodeIndex.get(info.baseId);
+            const baseName = baseNode ? (baseNode.type === 'item' ? baseNode.designation : baseNode.title) : '';
+            const baseRef = baseCellRefs.get(String(info.baseId));
+            const dedFormula = baseRef ? `-${baseRef}` : `-${roundEuro(info.baseTotal)}`;
+            const rowDed = addTotalRow(worksheet, `- Base remplacée : ${(baseName || '').toUpperCase()}`, dedFormula, false, true);
+            dedCells.push(`F${rowDed}`);
+          });
+          // Net HT = montant + Σ déductions ; libellé plus-value / moins-value DYNAMIQUE (IF).
+          const netFormula = `F${rowMontant}${dedCells.map(c => `+${c}`).join('')}`;
+          const rowNetHT = addTotalRow(worksheet, '', netFormula, false, true);
+          worksheet.getRow(rowNetHT).getCell(5).value = { formula: `IF(F${rowNetHT}>=0,"PLUS-VALUE HT PSE","MOINS-VALUE HT PSE")` };
+          worksheet.getRow(rowNetHT).getCell(5).alignment = { horizontal: 'right' };
+          const rowNetTTC = addTotalRow(worksheet, '', `F${rowNetHT}+ROUND(F${rowNetHT}*${tvaRate},2)`, false, true);
+          worksheet.getRow(rowNetTTC).getCell(5).value = { formula: `IF(F${rowNetHT}>=0,"PLUS-VALUE TTC PSE","MOINS-VALUE TTC PSE")` };
+          worksheet.getRow(rowNetTTC).getCell(5).alignment = { horizontal: 'right' };
+          netRow = rowNetHT;
+        } else {
+          // PSE simple : total plein.
+          const rowPseHT = addTotalRow(worksheet, `TOTAL HT (${pseTitle})`, montantFormula, false, true);
+          const rowPseTVA = addTotalRow(worksheet, tvaLabel, `ROUND(F${rowPseHT}*${tvaRate},2)`, false, true);
+          addTotalRow(worksheet, `TOTAL TTC (${pseTitle})`, `F${rowPseHT}+F${rowPseTVA}`, false, true);
+          netRow = rowPseHT;
         }
-        if (isPseBlock) {
-          worksheet.addRow([]); worksheet.addRow([]);
-          const headerPse = worksheet.addRow(['', pseTitle, '', '', '', '']);
-          headerPse.font = fonts.optionTitle;
-          const startPseRow = worksheet.lastRow.number + 1;
-          processNodes([chap], worksheet, currentQtyMap, 0, 'option', false, pseSubTotalsRefs, includePM);
-          const endPseRow = worksheet.lastRow.number;
-          if (endPseRow >= startPseRow && pseSubTotalsRefs.length > 0) {
-            const pseTotalFormula = pseSubTotalsRefs.map(r => r.ref).join('+');
-            worksheet.addRow([]);
-            const rowPseHT = addTotalRow(worksheet, `TOTAL HT (${pseTitle})`, pseTotalFormula, false, true);
-            const rowPseTVA = addTotalRow(worksheet, tvaLabel, `ROUND(F${rowPseHT}*${tvaRate},2)`, false, true);
-            addTotalRow(worksheet, `TOTAL TTC (${pseTitle})`, `F${rowPseHT}+F${rowPseTVA}`, false, true);
-          }
-        }
+        // Référence du net HT pour le récapitulatif (formule inter-feuilles).
+        if (summarySheet && summaryRefs[expId]) summaryRefs[expId].pse[root.id] = netRow;
       });
     }
   });
@@ -382,8 +429,31 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
       row.getCell(1).font = fonts.bold;
       for (let i = 2; i <= rowData.length; i++) row.getCell(i).numFmt = '#,##0.00 €';
     });
+
+    // ── Section PSE : chaque PSE par son numéro (net = montant ou plus/moins-value),
+    //    via formule inter-feuilles. Pas de total général PSE (PSE indépendantes). ──
+    const pseNumbers = buildPseNumbers(project.chapters);
+    const pseRoots = collectPseRoots(project.chapters)
+      .filter(root => selectedExports.some(expId => summaryRefs[expId]?.pse?.[root.id]));
+    if (pseRoots.length > 0) {
+      summarySheet.addRow([]);
+      const secRow = summarySheet.addRow(['OPTIONS / PRESTATIONS SUPPLÉMENTAIRES (PSE)', ...selectedExports.map(() => '')]);
+      secRow.getCell(1).font = fonts.optionTitle; secRow.getCell(1).fill = fills.totalPse;
+      pseRoots.forEach((root) => {
+        const no = pseNumbers.get(root.id);
+        const rowData = [`PSE n°${no} - ${(root.title || '').toUpperCase()}`];
+        selectedExports.forEach((expId) => {
+          const netRow = summaryRefs[expId]?.pse?.[root.id];
+          rowData.push(netRow ? { formula: `${quote(summaryRefs[expId].sheetName)}!F${netRow}` } : '');
+        });
+        const row = summarySheet.addRow(rowData);
+        row.getCell(1).font = fonts.totalPse;
+        for (let i = 2; i <= rowData.length; i++) row.getCell(i).numFmt = '#,##0.00 €';
+      });
+    }
+
     summarySheet.addRow([]);
-    const footData = ['TOTAL GÉNÉRAL HT'];
+    const footData = ['TOTAL GÉNÉRAL HT (Hors PSE)'];
     selectedExports.forEach((expId) => {
       const tr = summaryRefs[expId];
       footData.push(tr ? { formula: `${quote(tr.sheetName)}!F${tr.totalRow}` } : '');
