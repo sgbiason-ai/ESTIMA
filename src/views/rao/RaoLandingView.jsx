@@ -3,7 +3,7 @@ import {
   Search, BarChart3, Folder, FolderOpen, MapPin, Clock,
   FileSpreadsheet, FilePlus2, ChevronRight, Loader2, Trash2, X,
   CheckSquare, Square, Building2, TrendingDown, TrendingUp,
-  LayoutGrid, List, BarChartHorizontal,
+  LayoutGrid, List, BarChartHorizontal, GitBranch,
 } from 'lucide-react';
 import { collection, getDocs, doc, getDoc, deleteDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -57,33 +57,76 @@ const getItems = (chapters) => {
   return items;
 };
 
+// Statuts administratifs rendant une offre/variante non régulière (exclue du mieux-disant).
+const NON_REGULAR_STATUSES = ['irreguliere', 'inacceptable', 'inappropriee'];
+
+// Total d'une variante recalculé depuis ses offers/quantities (v.total peut être
+// obsolète ou absent) — même logique que usePriceAnalysis.handleImportVariant et
+// le desktop. Articles supprimés exclus, articles ajoutés (newItems) inclus.
+function computeVariantTotal(base, variant, items, qtyM) {
+  const mergedOffers = { ...(base.offers || {}), ...(variant.offers || {}) };
+  const mergedQty    = variant.quantities || {};
+  const removed      = new Set((variant.removedItems || []).map(it => it.itemId));
+  let totalMatched = 0;
+  items.forEach(it => {
+    if (removed.has(it.id)) return;
+    const pu  = Number(mergedOffers[it.id] ?? 0);
+    const qty = Number(mergedQty[it.id] ?? qtyM[it.id] ?? it.qty ?? 0);
+    totalMatched += qty * pu;
+  });
+  const totalNew = (variant.newItems || []).reduce((s, it) => s + Number(it.lineTotal || 0), 0);
+  return totalMatched + totalNew;
+}
+
 // Synthèse financière d'un RAO : mêmes fonctions pures que la vue d'analyse
 // (computeQtyMaps → computeChaptersData → computeAnalysisStats), tranche "global".
+// Les variantes retenues comptent comme des offres indépendantes (CCP R2151-8) :
+// elles entrent dans le classement et peuvent devenir le mieux-disant.
 function computeRaoSummary(proj, companies) {
   const base = { count: companies.length, names: companies.map(c => c.name || '?') };
   try {
     const tranches = proj.tranches || [];
+    const items = getItems(proj.chapters);
     const { clientQtyMaps } = computeQtyMaps(
-      getItems(proj.chapters),
+      items,
       tranches.length > 0,
       tranches,
       proj.clientPercent !== undefined ? Number(proj.clientPercent) : (proj.isDqeImport ? 0 : 10),
       Number(proj.clientQtyThreshold ?? 20)
     );
-    const chaptersData = computeChaptersData(proj, companies, clientQtyMaps.global || {});
+    const qtyM = clientQtyMaps.global || {};
+    const chaptersData = computeChaptersData(proj, companies, qtyM);
     const stats = computeAnalysisStats(chaptersData, companies, proj.scoringConfig);
-    const offers = companies
-      .map(c => ({ name: c.name || 'Entreprise', total: stats.companiesTotals[c.id] || 0 }))
-      .filter(t => t.total > 0)
-      .sort((a, b) => a.total - b.total);
+
+    // Offres = bases + variantes retenues (régulières par défaut, sauf adminConclusion non-régulier)
+    const offers = [];
+    let retainedCount = 0;
+    companies.forEach(c => {
+      const baseTotal = stats.companiesTotals[c.id] || 0;
+      if (baseTotal > 0) offers.push({ name: c.name || 'Entreprise', total: baseTotal, isVariant: false });
+      (c.variants || []).filter(v => v.retained).forEach((v, vi) => {
+        if (v.adminConclusion && NON_REGULAR_STATUSES.includes(v.adminConclusion)) return;
+        const vTotal = computeVariantTotal(c, v, items, qtyM);
+        if (vTotal > 0) {
+          retainedCount++;
+          offers.push({
+            name: `${c.name || 'Entreprise'} · ${v.label || `V${vi + 1}`}`,
+            total: vTotal,
+            isVariant: true,
+          });
+        }
+      });
+    });
+    offers.sort((a, b) => a.total - b.total);
+
     const best = offers[0] || null;
     const ecartPct = best && stats.totalEstimation > 0
       ? ((best.total - stats.totalEstimation) / stats.totalEstimation) * 100
       : null;
-    return { ...base, totalEstimation: stats.totalEstimation, best, ecartPct, offers };
+    return { ...base, retainedCount, totalEstimation: stats.totalEstimation, best, ecartPct, offers };
   } catch (e) {
     console.error('[RaoLanding] Erreur calcul synthèse:', e);
-    return { ...base, totalEstimation: 0, best: null, ecartPct: null, offers: [] };
+    return { ...base, retainedCount: 0, totalEstimation: 0, best: null, ecartPct: null, offers: [] };
   }
 }
 
@@ -766,6 +809,11 @@ function RaoCard({
               Autonome
             </span>
           )}
+          {summary?.retainedCount > 0 && (
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-violet-50 text-violet-600 border border-violet-200/60 text-[10px] font-bold uppercase" title="Variantes retenues prises en compte dans le classement">
+              <GitBranch size={10} /> {summary.retainedCount} variante{summary.retainedCount > 1 ? 's' : ''}
+            </span>
+          )}
         </div>
 
         {variant === 'bars' ? (
@@ -777,8 +825,13 @@ function RaoCard({
               <div className="flex items-center gap-2 mt-3">
                 <CompanyAvatars names={summary.names} />
                 {summary.best && (
-                  <span className="text-[11px] text-gray-400 truncate">
+                  <span className="text-[11px] text-gray-400 truncate flex items-center gap-1">
                     mieux-disant : <span className="text-gray-600 font-medium">{summary.best.name}</span>
+                    {summary.best.isVariant && (
+                      <span className="shrink-0 flex items-center gap-0.5 px-1 py-0.5 rounded bg-violet-100 text-violet-700 text-[9px] font-bold uppercase" title="Le mieux-disant est une variante retenue">
+                        <GitBranch size={9} /> var
+                      </span>
+                    )}
                   </span>
                 )}
               </div>
@@ -918,7 +971,12 @@ function RaoListRow({
       <div className="min-w-0">
         {summary?.best ? (
           <>
-            <p className="text-xs font-semibold text-gray-900">{formatMoney(summary.best.total)}</p>
+            <p className="text-xs font-semibold text-gray-900 flex items-center gap-1">
+              {formatMoney(summary.best.total)}
+              {summary.best.isVariant && (
+                <GitBranch size={11} className="text-violet-500 shrink-0" title="Variante retenue" />
+              )}
+            </p>
             <p className="text-[10px] text-gray-400 truncate">{summary.best.name}</p>
           </>
         ) : (
