@@ -3,7 +3,7 @@ import { confirm } from '../utils/globalUI';
 import * as XLSX from 'xlsx';
 import {
   Settings, Ruler, Trash2, Upload, FileSpreadsheet,
-  AlertTriangle, Edit2, X, Check, ListOrdered, Hash,
+  AlertTriangle, Edit2, X, Check, ListOrdered, ListTree, Hash,
   HelpCircle, Info, AlertCircle, FileJson, FileText, ArrowRight, Save,
   MousePointer2, Loader2
 } from 'lucide-react';
@@ -285,34 +285,43 @@ const SettingsView = ({
               <h3 className="font-black uppercase text-xs tracking-widest text-slate-700">Mode de Numérotation BPU</h3>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div 
-                onClick={() => toggleNumberingMode('auto')}
-                title="Cliquez pour activer le mode Automatique"
-                className={`cursor-pointer p-4 rounded-lg border-2 transition-all flex items-start gap-3 ${bpuConfig?.numberingMode !== 'manual' ? 'border-blue-500 bg-blue-50' : 'border-slate-100 hover:border-slate-300'}`}
-              >
-                <div className={`mt-1 p-1 rounded-full ${bpuConfig?.numberingMode !== 'manual' ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-400'}`}>
-                    <Check size={12} />
-                </div>
-                <div>
-                    <h4 className={`font-bold text-sm uppercase ${bpuConfig?.numberingMode !== 'manual' ? 'text-blue-800' : 'text-slate-600'}`}>Automatique</h4>
-                    <p className="text-[10px] text-slate-500 mt-1">Le logiciel numérote les prix séquentiellement (P.1, P.2, P.3...) lors de l'export.</p>
-                </div>
-              </div>
-
-              <div 
-                onClick={() => toggleNumberingMode('manual')}
-                title="Cliquez pour activer le mode Manuel (utilise la colonne A de votre Excel)"
-                className={`cursor-pointer p-4 rounded-lg border-2 transition-all flex items-start gap-3 ${bpuConfig?.numberingMode === 'manual' ? 'border-blue-500 bg-blue-50' : 'border-slate-100 hover:border-slate-300'}`}
-              >
-                <div className={`mt-1 p-1 rounded-full ${bpuConfig?.numberingMode === 'manual' ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-400'}`}>
-                    <Hash size={12} />
-                </div>
-                <div>
-                    <h4 className={`font-bold text-sm uppercase ${bpuConfig?.numberingMode === 'manual' ? 'text-blue-800' : 'text-slate-600'}`}>Manuelle / Personnalisée</h4>
-                    <p className="text-[10px] text-slate-500 mt-1">Utilise les numéros définis dans votre fichier Excel ou lors de la création.</p>
-                </div>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {(() => {
+                const activeMode = bpuConfig?.numberingMode === 'manual' ? 'manual'
+                  : bpuConfig?.numberingMode === 'hierarchical' ? 'hierarchical'
+                  : 'auto';
+                const card = (mode, Icon, title, desc, clickTitle) => {
+                  const isActive = activeMode === mode;
+                  return (
+                    <div
+                      onClick={() => toggleNumberingMode(mode)}
+                      title={clickTitle}
+                      className={`cursor-pointer p-4 rounded-lg border-2 transition-all flex items-start gap-3 ${isActive ? 'border-blue-500 bg-blue-50' : 'border-slate-100 hover:border-slate-300'}`}
+                    >
+                      <div className={`mt-1 p-1 rounded-full ${isActive ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-400'}`}>
+                          <Icon size={12} />
+                      </div>
+                      <div>
+                          <h4 className={`font-bold text-sm uppercase ${isActive ? 'text-blue-800' : 'text-slate-600'}`}>{title}</h4>
+                          <p className="text-[10px] text-slate-500 mt-1">{desc}</p>
+                      </div>
+                    </div>
+                  );
+                };
+                return (
+                  <>
+                    {card('auto', Check, 'Automatique',
+                      'Le logiciel numérote les prix séquentiellement (P.1, P.2, P.3...) lors de l\'export.',
+                      'Cliquez pour activer le mode Automatique')}
+                    {card('hierarchical', ListTree, 'Hiérarchique (DQE)',
+                      'Numéros qui suivent les chapitres (2.1, 2.1.3…). Un même prix garde le numéro de sa 1ʳᵉ occurrence (unicité).',
+                      'Cliquez pour activer la numérotation hiérarchique type DQE')}
+                    {card('manual', Hash, 'Manuelle / Personnalisée',
+                      'Utilise les numéros définis dans votre fichier Excel ou lors de la création.',
+                      'Cliquez pour activer le mode Manuel (utilise la colonne A de votre Excel)')}
+                  </>
+                );
+              })()}
             </div>
           </section>
 

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   PanelLeft, Receipt, HardHat, UserCheck, ArrowLeftRight,
   FileSpreadsheet, FileText, Calculator, Plus, Loader2,
-  CheckCircle2, CloudOff, FileSignature, Bookmark, ListOrdered, Hash,
+  CheckCircle2, CloudOff, FileSignature, Bookmark, ListOrdered, ListTree, Hash,
   FolderOpen, Save, Upload, Eye, Pencil, PlusCircle,
   BarChart3, Download, Info, Table2, FileOutput,
   Cloud, PanelLeftOpen, FileDown, ShieldCheck, ClipboardCheck, Undo2, ScanSearch, HelpCircle, FilePlus
@@ -50,13 +50,22 @@ const ProjectToolbar = ({
 }) => {
   const [activeTab, setActiveTab] = useState('accueil');
 
-  const isAutoNumbering = bpuConfig?.numberingMode !== 'manual';
+  // Trois modes de numérotation : auto (P.x), hiérarchique (DQE « 2.1.3 »), manuel (bpuNum).
+  const numberingMode = bpuConfig?.numberingMode === 'manual' ? 'manual'
+    : bpuConfig?.numberingMode === 'hierarchical' ? 'hierarchical'
+    : 'auto';
+  const NUMBERING_UI = {
+    auto:         { icon: ListOrdered, label: 'Auto N°',  title: 'Automatique (P.1, P.2…)', next: 'hierarchical' },
+    hierarchical: { icon: ListTree,    label: 'N° DQE',   title: 'Hiérarchique (2.1.3 — suit les chapitres, unicité de prix)', next: 'manual' },
+    manual:       { icon: Hash,        label: 'Manuel',        title: 'Manuelle (n° BPU saisis)', next: 'auto' },
+  };
+  const numberingUi = NUMBERING_UI[numberingMode];
 
   const toggleNumberingMode = () => {
     if (typeof setBpuConfig !== 'function') return;
     setBpuConfig(prev => ({
       ...(prev || {}),
-      numberingMode: isAutoNumbering ? 'manual' : 'auto'
+      numberingMode: numberingUi.next
     }));
   };
 
@@ -241,12 +250,12 @@ const ProjectToolbar = ({
               )}
               {!isReadOnly && currentMode === 'study' && (
                 <RibbonBtnLarge
-                  icon={isAutoNumbering ? ListOrdered : Hash}
-                  label={isAutoNumbering ? 'Auto N\u00b0' : 'Manuel'}
+                  icon={numberingUi.icon}
+                  label={numberingUi.label}
                   onClick={toggleNumberingMode}
-                  active={!isAutoNumbering}
+                  active={numberingMode !== 'auto'}
                   accent="text-slate-500"
-                  title={`Numérotation : ${isAutoNumbering ? 'Automatique' : 'Manuelle'}`}
+                  title={`Numérotation : ${numberingUi.title} — cliquer pour changer de mode`}
                 />
               )}
             </RibbonGroup>

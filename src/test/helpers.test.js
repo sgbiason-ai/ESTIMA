@@ -244,4 +244,22 @@ describe('getItemRefMap', () => {
   it('retourne map vide pour projet null', () => {
     expect(getItemRefMap(null).size).toBe(0);
   });
+
+  it('mode hiérarchique (project.bpuConfig) : numéros DQE par position, clé désignation', () => {
+    const project = {
+      bpuConfig: { numberingMode: 'hierarchical' },
+      chapters: [{
+        type: 'chapter', id: 'c1',
+        children: [
+          { type: 'item', id: 'i1', designation: 'Alpha', unit: 'u', price: 1 },
+          { type: 'chapter', id: 's1', children: [
+            { type: 'item', id: 'i2', designation: 'Beta', unit: 'u', price: 2 },
+          ]},
+        ],
+      }],
+    };
+    const map = getItemRefMap(project);
+    expect(map.get('ALPHA')).toBe('1.1');
+    expect(map.get('BETA')).toBe('1.2.1'); // sous-chapitre 1.2 (séquence partagée) → article 1.2.1
+  });
 });

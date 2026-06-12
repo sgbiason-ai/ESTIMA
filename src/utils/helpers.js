@@ -1,5 +1,6 @@
 // src/utils/helpers.js
 import DOMPurify from 'dompurify';
+import { buildRefMap } from './projectCalculations';
 
 export const generateId = () => Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
 
@@ -48,9 +49,30 @@ export const getUniqueBpuCatalog = (project) => {
 export const getItemRefMap = (project) => {
   const refMap = new Map();
   if (!project || !project.chapters) return refMap;
+
+  // Mode hiérarchique (DQE « 2.1.3 ») : numéros par position, alignés sur l'écran.
+  // Map clé désignation → numéro, comme attendu par les générateurs PDF/Excel.
+  if (project?.bpuConfig?.numberingMode === 'hierarchical') {
+    const idMap = buildRefMap(project.chapters, project.bpuConfig);
+    const walk = (nodes) => {
+      if (!Array.isArray(nodes)) return;
+      nodes.forEach(node => {
+        if (!node) return;
+        if (node.type === 'item') {
+          const key = (node.designation || '').trim().toUpperCase();
+          const ref = idMap.get(node.id);
+          if (key && ref && !refMap.has(key)) refMap.set(key, ref);
+        }
+        if (node.children) walk(node.children);
+      });
+    };
+    walk(project.chapters);
+    return refMap;
+  }
+
   let counter = 1;
   const traverse = (items) => {
-    if (!items) return; 
+    if (!items) return;
     items.forEach(item => {
       if (item.type === 'item') {
         const key = (item.designation || "").trim().toUpperCase();

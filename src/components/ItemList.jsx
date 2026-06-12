@@ -1,7 +1,7 @@
 // src/components/ItemList.jsx
 import React, { useContext, memo, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Draggable, Droppable } from '@hello-pangea/dnd'; 
-import { GripVertical, Layers, Trash2, Plus, ShieldCheck, AlertCircle, AlertTriangle, FunctionSquare, Check, Boxes, Pencil, Target, Lock, Unlock } from 'lucide-react';
+import { GripVertical, Layers, Trash2, Plus, ShieldCheck, AlertCircle, AlertTriangle, FunctionSquare, Check, Boxes, Pencil, Target, Lock, Unlock, ChevronDown, ChevronRight, Link2 } from 'lucide-react';
 
 import { ProjectContext } from '../context/ProjectContext';
 import { EditableTitle, FormattedInput, OptionToggle } from './ProjectUI';
@@ -256,8 +256,19 @@ const ItemRow = memo(
     hasMultiSelection,
     onToggleMultiSelection,
     priceIssue,
+    dupInfo,
+    onRevealItem,
   }) => {
     const draggableId = `item:${stableKey}`;
+
+    // ── Prix répété : indicateur sur les occurrences suivantes (pas la 1ʳᵉ) ──
+    const isRepeatedPrice = !!dupInfo && dupInfo.index > 0;
+    const nextDupId = dupInfo ? dupInfo.ids[(dupInfo.index + 1) % dupInfo.count] : null;
+    const dupTooltip = dupInfo
+      ? `Prix répété — utilisé ${dupInfo.count} fois :\n${dupInfo.labels
+          .map((l, i) => `${i + 1}. ${l}${i === 0 ? ' (1ʳᵉ occurrence)' : ''}${i === dupInfo.index ? ' ← ici' : ''}`)
+          .join('\n')}\nCliquer : aller à l'occurrence suivante`
+      : '';
 
     const qtyStudy = el.studyQty !== undefined ? Number(el.studyQty) : Number(el.qty || 0);
     const qtyClient = clientQtyMap?.has(String(el.id)) 
@@ -422,6 +433,17 @@ const ItemRow = memo(
                   <AlertTriangle size={12} strokeWidth={2.2} />
                 </span>
               )}
+              {isRepeatedPrice && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onRevealItem?.(nextDupId); }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  title={dupTooltip}
+                  className="shrink-0 text-violet-500 hover:text-violet-700 transition-colors cursor-pointer"
+                >
+                  <Link2 size={11} strokeWidth={2.5} />
+                </button>
+              )}
               {bpuConfig?.numberingMode === 'manual' ? (
                 el.bpuNum ? (
                   <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-1.5 rounded">{el.bpuNum}</span>
@@ -431,7 +453,10 @@ const ItemRow = memo(
                   </div>
                 )
               ) : (
-                <span className="text-[10px] font-mono font-bold text-emerald-600">
+                <span
+                  className={`text-[10px] font-mono font-bold ${isRepeatedPrice ? 'text-violet-600' : 'text-emerald-600'}`}
+                  title={isRepeatedPrice ? dupTooltip : undefined}
+                >
                   {refMap.get(String(el.uid)) || refMap.get(el.id) || 'P.--'}
                 </span>
               )}
@@ -617,9 +642,35 @@ const ItemRow = memo(
 // --------------------
 // SUBCHAPTER ROW
 // --------------------
-const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly, viewMode, clientQtyMap, bpuConfig, onUpdate, onSelect, onModal, stableKey, activeTrancheId, isGlobalMode, insertTargetId }) => {
+
+// Nombre d'articles descendants (tous niveaux) — affiché quand le sous-chapitre est replié.
+const countTreeItems = (nodes) => {
+  let n = 0;
+  const walk = (arr) => {
+    if (!Array.isArray(arr)) return;
+    arr.forEach(x => {
+      if (!x) return;
+      if (x.type === 'item') n++;
+      else if (x.children) walk(x.children);
+    });
+  };
+  walk(nodes);
+  return n;
+};
+
+// Fond des sous-chapitres dégradé selon la profondeur : niveau 1 le plus sombre,
+// puis de plus en plus clair — la hiérarchie se lit à la couleur.
+const DEPTH_BG = [
+  'bg-slate-200/70 border border-slate-300 shadow-sm',
+  'bg-slate-100 border border-slate-200 shadow-sm',
+  'bg-slate-50 border border-slate-200 shadow-sm',
+];
+
+const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly, viewMode, clientQtyMap, bpuConfig, onUpdate, onSelect, onModal, stableKey, activeTrancheId, isGlobalMode, insertTargetId, treeNumber, collapsed, onToggleCollapse }) => {
   const draggableId = `chapter:${stableKey}`;
   const total = sumNodeTotal(el, viewMode === 'client', clientQtyMap);
+  const depthBg = DEPTH_BG[Math.min(level, DEPTH_BG.length - 1)];
+  const nbLines = collapsed ? countTreeItems(el.children) : 0;
 
   // ── Bloc (ouvrage composite) : en-tête porteur d'une surface (Qté + unité) ──
   const isBloc = !!el.isBloc;
@@ -662,7 +713,7 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
           data-subchapter-id={String(el.id)}
           className={`flex flex-col border-b border-slate-200 rounded-lg mb-2 mt-2 overflow-hidden transition-all ${
             snapshot.isDragging ? 'shadow-xl bg-white z-50' : ''
-          } ${el.id === insertTargetId ? 'outline outline-2 outline-blue-500 -outline-offset-2' : 'outline-none'} ${el.isOption ? 'bg-slate-50 border-dashed border-slate-300' : 'bg-slate-100 border border-slate-200 shadow-sm'}`}
+          } ${el.id === insertTargetId ? 'outline outline-2 outline-blue-500 -outline-offset-2' : 'outline-none'} ${el.isOption ? 'bg-slate-50 border-dashed border-slate-300' : depthBg}`}
         >
           {/* Droppable étendu : englobe header + enfants pour que hello-pangea-dnd détecte le sous-chapitre */}
           {/* comme cible dès le survol du header (items s'écartent + surbrillance native). */}
@@ -702,9 +753,16 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
                     {!isReadOnly && <GripVertical size={14} />}
                   </div>
 
-                  <div className="w-16 text-[10px] font-mono font-black text-slate-500 shrink-0 text-center">-</div>
+                  <div className="w-16 text-[10px] font-mono font-black text-slate-600 shrink-0 text-center tracking-tight" title="Numéro hiérarchique">{treeNumber || '-'}</div>
 
                   <div className="flex-1 px-2 flex items-center gap-2" style={{ paddingLeft: `${level * 20 + 8}px` }}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onToggleCollapse?.(el.id); }}
+                      className="shrink-0 p-0.5 rounded text-slate-500 hover:text-slate-800 hover:bg-black/10 transition-colors"
+                      title={collapsed ? 'Déplier le sous-chapitre' : 'Replier le sous-chapitre'}
+                    >
+                      {collapsed ? <ChevronRight size={13} strokeWidth={2.5} /> : <ChevronDown size={13} strokeWidth={2.5} />}
+                    </button>
                     {isBloc
                       ? <Boxes size={14} className="shrink-0 text-indigo-600" />
                       : <Layers size={14} className={`shrink-0 ${el.isOption ? 'text-slate-400' : 'text-emerald-600'}`} />}
@@ -722,6 +780,11 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
                       onClick={() => onUpdate(parentId, el.id, 'isOption', !el.isOption)}
                       disabled={isReadOnly}
                     />
+                    {collapsed && (
+                      <span className="shrink-0 text-[9px] font-bold text-slate-500 bg-white/70 border border-slate-200 px-1.5 py-0.5 rounded-full">
+                        {nbLines} ligne{nbLines > 1 ? 's' : ''}
+                      </span>
+                    )}
                     {!isReadOnly && el.id === insertTargetId && (
                       <span className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-500 text-white text-[8px] font-black uppercase tracking-wider shadow-sm" title="Les nouveaux articles (libre ou bibliothèque) seront insérés dans ce sous-chapitre">
                         <Target size={9} /> Insertion ici
@@ -776,15 +839,19 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
                   )}
                 </div>
 
-                <div className={`pl-4 border-l ml-4 min-h-[40px] ${el.isOption ? 'border-slate-300 opacity-70' : 'border-slate-300'}`}>
-                  <ItemList items={el.children} parentId={el.id} level={level + 1} bpuConfig={bpuConfig} />
-                  {providedDrop.placeholder}
-                  {(!el.children || el.children.length === 0) && (
-                    <div className={snapshotDrop.isDraggingOver ? 'h-8 flex items-center text-[9px] italic pl-2 text-emerald-500 font-semibold' : 'h-8 flex items-center text-[9px] italic pl-2 text-slate-400'}>
-                      {snapshotDrop.isDraggingOver ? 'Déposer ici ↓' : (!isReadOnly ? 'Glisser ici...': '')}
-                    </div>
-                  )}
-                </div>
+                {collapsed ? (
+                  <div className="ml-4">{providedDrop.placeholder}</div>
+                ) : (
+                  <div className={`pl-4 border-l ml-4 min-h-[40px] ${el.isOption ? 'border-slate-300 opacity-70' : 'border-slate-300'}`}>
+                    <ItemList items={el.children} parentId={el.id} level={level + 1} bpuConfig={bpuConfig} parentNumber={treeNumber} />
+                    {providedDrop.placeholder}
+                    {(!el.children || el.children.length === 0) && (
+                      <div className={snapshotDrop.isDraggingOver ? 'h-8 flex items-center text-[9px] italic pl-2 text-emerald-500 font-semibold' : 'h-8 flex items-center text-[9px] italic pl-2 text-slate-400'}>
+                        {snapshotDrop.isDraggingOver ? 'Déposer ici ↓' : (!isReadOnly ? 'Glisser ici...': '')}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </Droppable>
@@ -797,7 +864,7 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
 // --------------------
 // ITEMLIST (ORCHESTRATEUR)
 // --------------------
-const ItemList = ({ items, parentId, level = 0, bpuConfig }) => {
+const ItemList = ({ items, parentId, level = 0, bpuConfig, parentNumber = '' }) => {
   const {
     selection, setSelection, updateProjectItem, setModal, addSubChapter,
     refMap, viewMode, showComparison, clientQtyMap, isGlobalMode,
@@ -806,6 +873,8 @@ const ItemList = ({ items, parentId, level = 0, bpuConfig }) => {
     multiSelection, toggleMultiSelection,
     priceIssueIds,
     insertTargetId,
+    collapsedIds, toggleCollapsed,
+    duplicateIndex, revealAndFlashItem,
   } = useContext(ProjectContext);
 
   const hasMultiSelection = multiSelection && multiSelection.size > 0;
@@ -821,6 +890,10 @@ const ItemList = ({ items, parentId, level = 0, bpuConfig }) => {
     seen.set(base, count);
     return count === 1 ? base : `${base}__dup${count}`;
   };
+
+  // Numérotation hiérarchique : seuls les sous-chapitres comptent (les articles
+  // gardent leur référence P.x). Chapitre « 2 » → sous-chapitres « 2.1 », « 2.2 »…
+  let subCounter = 0;
 
   return items.map((el, index) => {
     if (!el) return null;
@@ -857,9 +930,19 @@ const ItemList = ({ items, parentId, level = 0, bpuConfig }) => {
           hasMultiSelection={hasMultiSelection}
           onToggleMultiSelection={toggleMultiSelection}
           priceIssue={priceIssueIds?.has(el.id) || false}
+          dupInfo={duplicateIndex?.get(el.id) || null}
+          onRevealItem={revealAndFlashItem}
         />
       );
     }
+
+    subCounter += 1;
+    // Mode hiérarchique : le numéro vient du refMap (séquence partagée avec les articles,
+    // alignée sur la numérotation DQE). Sinon : compteur local de sous-chapitres.
+    const localNumber = parentNumber ? `${parentNumber}.${subCounter}` : String(subCounter);
+    const treeNumber = bpuConfig?.numberingMode === 'hierarchical'
+      ? (refMap.get(el.id) || localNumber)
+      : localNumber;
 
     return (
       <SubChapterRow
@@ -881,6 +964,9 @@ const ItemList = ({ items, parentId, level = 0, bpuConfig }) => {
         activeTrancheId={activeTrancheId}
         isGlobalMode={isGlobalMode}
         insertTargetId={insertTargetId}
+        treeNumber={treeNumber}
+        collapsed={collapsedIds?.has(el.id) || false}
+        onToggleCollapse={toggleCollapsed}
       />
     );
   });

@@ -11,6 +11,7 @@ import {
   computePriceScore,
   detectAtypicalPrice,
   buildRefMap,
+  buildDuplicateIndex,
   checkPriceConsistency,
 } from '../utils/projectCalculations';
 
@@ -432,6 +433,120 @@ describe('buildRefMap', () => {
 
   it('défaut (config vide) = mode auto', () => {
     expect(buildRefMap(chapters, {}).get('i1')).toBe('P.1');
+  });
+
+  // ── Mode hiérarchique (numérotation DQE « 2.1.3 ») ──
+  describe('mode hiérarchique', () => {
+    it('séquence partagée : articles ET sous-chapitres consomment les rangs dans l\'ordre', () => {
+      const ch = [
+        { type: 'chapter', id: 'c1', children: [
+          { type: 'item', id: 'a', uid: 'A', designation: 'A', unit: 'u', price: 1 },
+          { type: 'chapter', id: 's1', children: [
+            { type: 'item', id: 'b', uid: 'B', designation: 'B', unit: 'u', price: 2 },
+          ]},
+          { type: 'item', id: 'c', uid: 'C', designation: 'C', unit: 'u', price: 3 },
+        ]},
+        { type: 'chapter', id: 'c2', children: [
+          { type: 'item', id: 'd', uid: 'D', designation: 'D', unit: 'u', price: 4 },
+        ]},
+      ];
+      const m = buildRefMap(ch, { numberingMode: 'hierarchical' });
+      expect(m.get('c1')).toBe('1');
+      expect(m.get('a')).toBe('1.1');
+      expect(m.get('s1')).toBe('1.2');   // le sous-chapitre prend le rang suivant l'article
+      expect(m.get('b')).toBe('1.2.1');
+      expect(m.get('c')).toBe('1.3');    // l'article après le sous-chapitre continue la séquence
+      expect(m.get('c2')).toBe('2');
+      expect(m.get('d')).toBe('2.1');
+    });
+
+    it('unicité : la 2ᵉ occurrence garde le numéro de la 1ʳᵉ et ne consomme pas de rang', () => {
+      const ch = [
+        { type: 'chapter', id: 'c1', children: [
+          { type: 'chapter', id: 's1', children: [
+            { type: 'item', id: 'x1', uid: 'X', designation: 'X', unit: 'u', price: 1 },
+            { type: 'item', id: 'y1', uid: 'Y', designation: 'Y', unit: 'u', price: 2 },
+          ]},
+        ]},
+        { type: 'chapter', id: 'c2', children: [
+          { type: 'item', id: 'x2', uid: 'X', designation: 'X', unit: 'u', price: 1 }, // doublon
+          { type: 'item', id: 'z', uid: 'Z', designation: 'Z', unit: 'u', price: 3 },
+        ]},
+      ];
+      const m = buildRefMap(ch, { numberingMode: 'hierarchical' });
+      expect(m.get('x1')).toBe('1.1.1');
+      expect(m.get('x2')).toBe('1.1.1'); // même numéro partout
+      expect(m.get('z')).toBe('2.1');    // pas de trou : z prend le 1er rang du chapitre 2
+    });
+
+    it('unicité par clé de repli (désignation|unité|prix) sans uid', () => {
+      const ch = [
+        { type: 'chapter', id: 'c1', children: [
+          { type: 'item', id: 'p1', designation: 'Béton', unit: 'm3', price: 100 },
+          { type: 'item', id: 'p2', designation: 'Béton', unit: 'm3', price: 100 }, // même clé
+          { type: 'item', id: 'p3', designation: 'Béton', unit: 'm3', price: 120 }, // prix ≠ → clé ≠
+        ]},
+      ];
+      const m = buildRefMap(ch, { numberingMode: 'hierarchical' });
+      expect(m.get('p1')).toBe('1.1');
+      expect(m.get('p2')).toBe('1.1');
+      expect(m.get('p3')).toBe('1.2');
+    });
+
+    it('le bpuNum est ignoré en mode hiérarchique (numérotation par position)', () => {
+      const m = buildRefMap(chapters, { numberingMode: 'hierarchical' });
+      expect(m.get('i1')).toBe('1.1');   // pas « 1.01 » du bpuNum
+      expect(m.get('i2')).toBe('1.2');
+      expect(m.get('c2')).toBe('1.3');
+      expect(m.get('i3')).toBe('1.1');   // même uid que i1 → unicité
+    });
+  });
+});
+
+// ── buildDuplicateIndex ─────────────────────────────────────────────────────
+describe('buildDuplicateIndex', () => {
+  const chapters = [
+    { type: 'chapter', id: 'c1', title: 'TERRASSEMENTS', children: [
+      { type: 'item', id: 'i1', uid: 'A', designation: 'Déblai', unit: 'm3', price: 10 },
+      { type: 'item', id: 'i2', uid: 'B', designation: 'Remblai', unit: 'm3', price: 20 },
+      { type: 'chapter', id: 's1', title: 'Sous-chap', children: [
+        { type: 'item', id: 'i3', uid: 'A', designation: 'Déblai', unit: 'm3', price: 10 },
+      ]},
+    ]},
+    { type: 'chapter', id: 'c2', title: 'VOIRIE', children: [
+      { type: 'item', id: 'i4', uid: 'A', designation: 'Déblai', unit: 'm3', price: 10 },
+    ]},
+  ];
+
+  it('recense uniquement les prix répétés, avec rang et occurrences ordonnées', () => {
+    const idx = buildDuplicateIndex(chapters);
+    expect(idx.has('i2')).toBe(false);            // prix unique → absent
+    expect(idx.get('i1')).toMatchObject({ count: 3, index: 0 });
+    expect(idx.get('i3')).toMatchObject({ count: 3, index: 1 });
+    expect(idx.get('i4')).toMatchObject({ count: 3, index: 2 });
+    expect(idx.get('i1').ids).toEqual(['i1', 'i3', 'i4']);
+  });
+
+  it('labels = titre du chapitre racine de chaque occurrence (sous-chapitre inclus)', () => {
+    const idx = buildDuplicateIndex(chapters);
+    expect(idx.get('i1').labels).toEqual(['TERRASSEMENTS', 'TERRASSEMENTS', 'VOIRIE']);
+  });
+
+  it('clé de repli sans uid : désignation|unité|prix (prix différent → pas un doublon)', () => {
+    const ch = [{ type: 'chapter', id: 'c', title: 'CH', children: [
+      { type: 'item', id: 'p1', designation: 'Béton', unit: 'm3', price: 100 },
+      { type: 'item', id: 'p2', designation: 'Béton', unit: 'm3', price: 100 },
+      { type: 'item', id: 'p3', designation: 'Béton', unit: 'm3', price: 120 },
+    ]}];
+    const idx = buildDuplicateIndex(ch);
+    expect(idx.get('p1')?.count).toBe(2);
+    expect(idx.get('p2')?.index).toBe(1);
+    expect(idx.has('p3')).toBe(false);
+  });
+
+  it('arbre vide ou null → index vide', () => {
+    expect(buildDuplicateIndex([]).size).toBe(0);
+    expect(buildDuplicateIndex(null).size).toBe(0);
   });
 });
 

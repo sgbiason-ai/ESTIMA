@@ -1,6 +1,6 @@
 // src/hooks/useProjectCalculations.js
 import { useMemo, useEffect } from 'react';
-import { computeQtyMaps } from '../utils/projectCalculations';
+import { computeQtyMaps, buildRefMap, buildDuplicateIndex } from '../utils/projectCalculations';
 
 export const useProjectCalculations = ({
   project,
@@ -82,6 +82,29 @@ export const useProjectCalculations = ({
 
   // --- NUMÉROTATION ---
   const refMap = useMemo(() => {
+      // Mode hiérarchique (DQE « 2.1.3 ») : la fonction pure testée fait foi
+      // (séquence partagée articles/sous-chapitres + unicité de prix).
+      // On ajoute les alias designation/uid → numéro utilisés par l'affichage ligne.
+      if (bpuConfig?.numberingMode === 'hierarchical') {
+        const map = buildRefMap(displayProject?.chapters || [], bpuConfig);
+        const addAliases = (nodes) => {
+          if (!Array.isArray(nodes)) return;
+          nodes.forEach((node) => {
+            if (!node) return;
+            if (node.type === 'item') {
+              const ref = map.get(node.id);
+              if (ref) {
+                if (node.designation) map.set(node.designation.trim().toUpperCase(), ref);
+                if (node.uid) map.set(node.uid, ref);
+              }
+            }
+            if (node.children) addAliases(node.children);
+          });
+        };
+        addAliases(displayProject?.chapters || []);
+        return map;
+      }
+
       const map = new Map();
       const registry = new Map();
       let counter = 1;
@@ -124,6 +147,12 @@ export const useProjectCalculations = ({
       traverse(displayProject?.chapters || []);
       return map;
     }, [displayProject, bpuConfig]);
+
+  // --- PRIX RÉPÉTÉS (indicateur visuel tableau + bordereau) ---
+  const duplicateIndex = useMemo(
+    () => buildDuplicateIndex(displayProject?.chapters || []),
+    [displayProject]
+  );
 
   // --- SAUVEGARDE DES RENDUS QUANTITÉS ---
   useEffect(() => {
@@ -195,6 +224,7 @@ export const useProjectCalculations = ({
     clientQtyMaps,
     displayProject,
     refMap,
+    duplicateIndex,
     projectStats,
     currentStats,
     totalBase,

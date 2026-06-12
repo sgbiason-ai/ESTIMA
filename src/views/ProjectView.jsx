@@ -4,7 +4,7 @@ import PropTypes from 'prop-types';
 import { useStableHash } from '../hooks/useStableHash';
 import { useRobustSave } from '../hooks/useRobustSave';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { Plus, Trash2, GripVertical, Layers, HelpCircle, AlertTriangle, Target } from 'lucide-react';
+import { Plus, Trash2, GripVertical, Layers, HelpCircle, AlertTriangle, Target, ChevronDown, ChevronRight } from 'lucide-react';
 
 import { ProjectContext } from '../context/ProjectContext';
 import { EditableTitle, OptionToggle } from '../components/ProjectUI';
@@ -278,9 +278,24 @@ const ProjectView = ({
 
   const { activeTrancheId, setActiveTrancheId, tranches, hasTranches, isGlobalMode, addTranche, removeTranche } = useProjectTranches(project, updateProjectItem);
 
-  const { studyQtyMaps, clientQtyMap, clientQtyMaps, displayProject, refMap, projectStats, currentStats, totalBase, totalOption } = useProjectCalculations({
+  const { studyQtyMaps, clientQtyMap, clientQtyMaps, displayProject, refMap, duplicateIndex, projectStats, currentStats, totalBase, totalOption } = useProjectCalculations({
     project: viewedProject, clientPercent, hasTranches, tranches, activeTrancheId, currentMode, bpuConfig
   });
+
+  // Nombre d'articles descendants (tous niveaux) — affiché quand le chapitre est replié.
+  const countTreeItems = (nodes) => {
+    let n = 0;
+    const walk = (arr) => {
+      if (!Array.isArray(arr)) return;
+      arr.forEach(x => {
+        if (!x) return;
+        if (x.type === 'item') n++;
+        else if (x.children) walk(x.children);
+      });
+    };
+    walk(nodes);
+    return n;
+  };
 
   const flattenItems = (nodes, result = []) => {
     nodes?.forEach(node => {
@@ -734,12 +749,68 @@ const ProjectView = ({
   );
   const priceIssueIds = useMemo(() => new Set(priceCheck.flaggedItemIds), [priceCheck]);
 
+  // ── Arborescence : chapitres / sous-chapitres repliés (persisté par projet) ──
+  const [collapsedIds, setCollapsedIds] = useState(() => new Set());
+  useEffect(() => {
+    if (!project?.id) { setCollapsedIds(new Set()); return; }
+    try {
+      const raw = localStorage.getItem(`estima_collapsed_${project.id}`);
+      setCollapsedIds(raw ? new Set(JSON.parse(raw)) : new Set());
+    } catch { setCollapsedIds(new Set()); }
+  }, [project?.id]);
+  const toggleCollapsed = (id) => {
+    setCollapsedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      if (project?.id) {
+        try { localStorage.setItem(`estima_collapsed_${project.id}`, JSON.stringify([...next])); } catch { /* quota plein : on continue sans persister */ }
+      }
+      return next;
+    });
+  };
+
+  // ── Navigation vers une occurrence d'un prix répété ───────────────────────
+  // Déplie les chapitres/sous-chapitres ancêtres si besoin, puis scroll + flash.
+  const revealAndFlashItem = (itemId) => {
+    const path = [];
+    const findPath = (nodes, trail) => {
+      for (const n of nodes || []) {
+        if (!n) continue;
+        if (n.id === itemId) { path.push(...trail); return true; }
+        if (n.children && findPath(n.children, [...trail, n.id])) return true;
+      }
+      return false;
+    };
+    findPath(displayProject?.chapters || [], []);
+
+    setCollapsedIds(prev => {
+      if (!path.some(id => prev.has(id))) return prev;
+      const next = new Set(prev);
+      path.forEach(id => next.delete(id));
+      if (project?.id) {
+        try { localStorage.setItem(`estima_collapsed_${project.id}`, JSON.stringify([...next])); } catch { /* ignore */ }
+      }
+      return next;
+    });
+
+    // Laisse le re-render déplier avant de scroller.
+    setTimeout(() => {
+      const el = document.getElementById(`estima-item-${itemId}`);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('ring-2', 'ring-inset', 'ring-violet-400', 'bg-violet-50');
+      setTimeout(() => el.classList.remove('ring-2', 'ring-inset', 'ring-violet-400', 'bg-violet-50'), 1500);
+    }, 90);
+  };
+
   const contextValue = {
       selection, setSelection, updateProjectItem: handleUpdateItem, removeProjectItem: handleRemoveItem,
       setModal: handleModalIntercept, addSubChapter, refMap, viewMode: currentMode, showComparison,
       clientQtyMap, activeTrancheId, isGlobalMode, bpuConfig, onOpenCalculation: handleOpenCalculation,
       formulaMode, setFormulaMode, allItems, sourceIds: project?.sourceIds || [],
       multiSelection, toggleMultiSelection, priceIssueIds, insertTargetId,
+      collapsedIds, toggleCollapsed,
+      duplicateIndex, revealAndFlashItem,
       onEditItem: (item) => {
         const bpuSource = allBpuItems?.find(b => String(b.id) === String(item?.uid) || String(b.uid) === String(item?.uid));
         setEditItemTarget({
@@ -851,6 +922,8 @@ const ProjectView = ({
                     <div ref={provided.innerRef} {...provided.droppableProps} className="p-4 space-y-8">
                       {displayProject?.chapters?.map((chap, index) => {
                         const chapTotal = currentStats?.chapters?.[chap.id] || 0;
+                        const isCollapsed = collapsedIds.has(chap.id);
+                        const nbLines = isCollapsed ? countTreeItems(chap.children) : 0;
                         return (
                           <Draggable key={chap.id} draggableId={`chapter:${chap.id}`} index={index} isDragDisabled={isReadOnly}>
                             {(provided, snapshot) => (
@@ -861,6 +934,9 @@ const ProjectView = ({
                                       <button onClick={(e) => { e.stopPropagation(); handleModalIntercept({ show: true, target: { type: 'chapter', id: chap.id } }); }} className={`p-1 ${chap.isOption ? 'text-slate-400 hover:text-red-500' : 'text-white/40 hover:text-red-300'}`} title="Supprimer le chapitre"><Trash2 size={16} /></button>
                                     )}
                                     <div {...provided.dragHandleProps} className={`p-1 ${isReadOnly ? 'opacity-0 pointer-events-none' : chap.isOption ? 'text-slate-400 hover:text-slate-600' : 'text-white/40 hover:text-white cursor-grab active:cursor-grabbing'}`}>{!isReadOnly && <GripVertical size={18} />}</div>
+                                    <button onClick={(e) => { e.stopPropagation(); toggleCollapsed(chap.id); }} className={`p-1 rounded-md transition-colors ${chap.isOption ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-200' : 'text-white/50 hover:text-white hover:bg-white/10'}`} title={isCollapsed ? 'Déplier le chapitre' : 'Replier le chapitre'}>
+                                      {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                                    </button>
                                     <span className={`w-6 h-6 rounded flex items-center justify-center font-mono text-[10px] font-black ${chap.isOption ? 'bg-slate-200 text-slate-500' : 'bg-white/20 text-white'}`}>{index + 1}</span>
                                     <EditableTitle value={chap.title} onSave={(val) => updateProjectItem('root', chap.id, 'title', val)} disabled={isReadOnly} className="font-black uppercase tracking-widest text-[11px] hover:bg-white/10" />
                                     <OptionToggle isOption={chap.isOption} onClick={() => updateProjectItem('root', chap.id, 'isOption', !chap.isOption)} disabled={isReadOnly} />
@@ -871,6 +947,9 @@ const ProjectView = ({
                                     )}
                                   </div>
                                   <div className="flex items-center gap-4">
+                                    {isCollapsed && (
+                                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${chap.isOption ? 'bg-slate-200 text-slate-500' : 'bg-white/15 text-white/80'}`}>{nbLines} ligne{nbLines > 1 ? 's' : ''}</span>
+                                    )}
                                     <span className={`font-mono font-black text-xs px-3 py-1 rounded-full ${chap.isOption ? 'bg-slate-200 text-slate-600 line-through decoration-slate-400' : 'bg-black/20 text-white'}`}>{formatPrice(chapTotal)}</span>
                                     {!isReadOnly && (
                                       <button onClick={(e) => { e.stopPropagation(); addSubChapter(chap.id); }} className={`p-1.5 rounded-md ${chap.isOption ? 'hover:bg-slate-200 text-slate-500' : 'hover:bg-white/20 text-white'}`} title="Ajouter un sous-chapitre"><Plus size={16} /></button>
@@ -880,10 +959,10 @@ const ProjectView = ({
                                 <div className={`flex flex-col w-full ${chap.isOption ? 'opacity-80' : ''}`}>
                                   <Droppable droppableId={chap.id} type="ITEM" isDropDisabled={isReadOnly}>
                                     {(providedItem, snapshotItem) => (
-                                      <div ref={providedItem.innerRef} {...providedItem.droppableProps} className={`flex flex-col w-full min-h-[50px] transition-colors ${snapshotItem.isDraggingOver ? 'bg-emerald-50/50' : chap.isOption ? 'bg-slate-50/30' : 'bg-white'}`}>
-                                        <ItemList items={chap.children} parentId={chap.id} bpuConfig={bpuConfig} readOnly={isGlobalMode} />
+                                      <div ref={providedItem.innerRef} {...providedItem.droppableProps} className={`flex flex-col w-full ${isCollapsed ? '' : 'min-h-[50px]'} transition-colors ${snapshotItem.isDraggingOver ? 'bg-emerald-50/50' : chap.isOption ? 'bg-slate-50/30' : 'bg-white'}`}>
+                                        {!isCollapsed && <ItemList items={chap.children} parentId={chap.id} bpuConfig={bpuConfig} readOnly={isGlobalMode} parentNumber={String(index + 1)} />}
                                         {providedItem.placeholder}
-                                        {(!chap.children || chap.children.length === 0) && !snapshotItem.isDraggingOver && <div className="p-8 text-center border-t border-slate-100 text-slate-400 font-bold text-[10px] uppercase tracking-widest">Chapitre vide</div>}
+                                        {!isCollapsed && (!chap.children || chap.children.length === 0) && !snapshotItem.isDraggingOver && <div className="p-8 text-center border-t border-slate-100 text-slate-400 font-bold text-[10px] uppercase tracking-widest">Chapitre vide</div>}
                                       </div>
                                     )}
                                   </Droppable>

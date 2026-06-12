@@ -337,9 +337,15 @@ export function recalculateProject(chapters, tranches = []) {
 /**
  * Construit la map de numérotation des articles { itemId → réf }.
  * Reproduit la logique du hook useProjectCalculations (source de vérité) :
- *   - mode 'manual' : on utilise le bpuNum saisi (repli auto si vide)
- *   - sinon (auto)  : P.1, P.2… attribué par clé (uid, sinon désignation|unité|prix),
- *                     un même article (même clé) garde le même numéro.
+ *   - mode 'manual'       : on utilise le bpuNum saisi (repli auto si vide)
+ *   - mode 'hierarchical' : numérotation DQE « 2.1.3 » qui suit les chapitres.
+ *       Séquence PARTAGÉE à chaque niveau : articles ET sous-chapitres consomment
+ *       les rangs dans l'ordre d'affichage (jamais de collision article/sous-chapitre).
+ *       Unicité de prix : un article déjà numéroté (même clé) garde le numéro de sa
+ *       1ʳᵉ occurrence et ne consomme PAS de rang à sa nouvelle position (pas de trou).
+ *       Les chapitres et sous-chapitres sont aussi dans la map (id → « 2 », « 2.1 »…).
+ *   - sinon (auto)        : P.1, P.2… attribué par clé (uid, sinon désignation|unité|prix),
+ *                           un même article (même clé) garde le même numéro.
  * Pure : aucune dépendance React. Utilisée par le viewer de version figée pour
  * respecter le mode de numérotation tel qu'il était au moment du gel.
  */
@@ -354,6 +360,37 @@ export function buildRefMap(chapters, bpuConfig = {}) {
     const p = Number(node?.price || 0);
     return `FALLBACK:${d}|${u}|${p}`;
   };
+
+  if (bpuConfig?.numberingMode === 'hierarchical') {
+    const walk = (nodes, prefix) => {
+      if (!Array.isArray(nodes)) return;
+      let rank = 0;
+      nodes.forEach((node) => {
+        if (!node) return;
+        if (node.type === 'item') {
+          const key = buildKey(node);
+          if (registry.has(key)) {
+            // Unicité : numéro de la 1ʳᵉ occurrence, le rang n'est pas consommé ici.
+            map.set(node.id, registry.get(key));
+          } else {
+            rank += 1;
+            const ref = prefix ? `${prefix}.${rank}` : String(rank);
+            registry.set(key, ref);
+            map.set(node.id, ref);
+          }
+        } else {
+          // Chapitre / sous-chapitre / bloc : consomme un rang dans la séquence partagée.
+          rank += 1;
+          const num = prefix ? `${prefix}.${rank}` : String(rank);
+          map.set(node.id, num);
+          if (node.children) walk(node.children, num);
+        }
+      });
+    };
+    walk(chapters || [], '');
+    return map;
+  }
+
   const traverse = (nodes) => {
     if (!Array.isArray(nodes)) return;
     nodes.forEach((node) => {
@@ -378,6 +415,59 @@ export function buildRefMap(chapters, bpuConfig = {}) {
   };
   traverse(chapters || []);
   return map;
+}
+
+// ─── INDEX DES PRIX RÉPÉTÉS ───────────────────────────────────────────────────
+
+/**
+ * Recense les articles dont le prix apparaît plusieurs fois dans le devis
+ * (même clé d'unicité que la numérotation : uid, sinon désignation|unité|prix).
+ * Ne retourne QUE les clés répétées (count ≥ 2).
+ *
+ * @returns Map<itemId, { count, index, ids, labels }>
+ *   - count  : nombre total d'occurrences de ce prix
+ *   - index  : rang de CETTE occurrence (0 = première, celle qui fixe le numéro)
+ *   - ids    : ids de toutes les occurrences dans l'ordre du devis (navigation)
+ *   - labels : titre du chapitre racine de chaque occurrence (info-bulle)
+ * Pure : aucune dépendance React.
+ */
+export function buildDuplicateIndex(chapters) {
+  const buildKey = (node) => {
+    if (node?.uid) return `UID:${String(node.uid)}`;
+    const d = (node?.designation || '').trim().toUpperCase();
+    const u = (node?.unit || '').trim().toUpperCase();
+    const p = Number(node?.price || 0);
+    return `FALLBACK:${d}|${u}|${p}`;
+  };
+
+  const groups = new Map(); // clé → [{ id, rootTitle }]
+  const walk = (nodes, rootTitle) => {
+    if (!Array.isArray(nodes)) return;
+    nodes.forEach((node) => {
+      if (!node) return;
+      if (node.type === 'item') {
+        const key = buildKey(node);
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push({ id: node.id, rootTitle });
+      }
+      if (node.children) walk(node.children, rootTitle);
+    });
+  };
+  (chapters || []).forEach((chap) => {
+    if (!chap) return;
+    walk(chap.children || [], chap.title || 'Chapitre');
+  });
+
+  const result = new Map();
+  groups.forEach((list) => {
+    if (list.length < 2) return;
+    const ids = list.map((o) => o.id);
+    const labels = list.map((o) => o.rootTitle);
+    list.forEach((o, index) => {
+      result.set(o.id, { count: list.length, index, ids, labels });
+    });
+  });
+  return result;
 }
 
 // ─── VÉRIFICATION D'UNICITÉ DES NUMÉROS DE PRIX ───────────────────────────────

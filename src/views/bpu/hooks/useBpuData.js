@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { getUniqueBpuCatalog } from '../../../utils/helpers';
+import { buildRefMap, buildDuplicateIndex } from '../../../utils/projectCalculations';
 import { confirm } from '../../../utils/globalUI';
 
 /**
@@ -58,6 +59,29 @@ export const useBpuData = ({ project, setProject, bpuConfig, units }) => {
 
   // ── NUMÉROTATION (refMap) ────────────────────────────────────────────────────
   const refMap = useMemo(() => {
+    // Mode hiérarchique (DQE « 2.1.3 ») : mêmes numéros que le tableau d'estimation
+    // (fonction pure partagée — séquence partagée articles/sous-chapitres + unicité).
+    // Alias designation/uid → numéro, comme pour les autres modes ci-dessous.
+    if (bpuConfig?.numberingMode === 'hierarchical') {
+      const map = buildRefMap(project?.chapters || [], bpuConfig);
+      const addAliases = (nodes) => {
+        if (!Array.isArray(nodes)) return;
+        nodes.forEach((node) => {
+          if (!node) return;
+          if (node.type === 'item') {
+            const ref = map.get(node.id);
+            if (ref) {
+              if (node.designation) map.set(node.designation.trim().toUpperCase(), ref);
+              if (node.uid) map.set(node.uid, ref);
+            }
+          }
+          if (node.children) addAliases(node.children);
+        });
+      };
+      addAliases(project?.chapters || []);
+      return map;
+    }
+
     const map = new Map();
     const registry = new Map();
     let counter = 1;
@@ -118,16 +142,25 @@ export const useBpuData = ({ project, setProject, bpuConfig, units }) => {
     };
   }, [units]);
 
+  // ── PRIX RÉPÉTÉS (badge « ×N » sur la ligne du bordereau) ───────────────────
+  const duplicateIndex = useMemo(
+    () => buildDuplicateIndex(project?.chapters || []),
+    [project]
+  );
+
   // ── CATALOGUE TRIÉ AVEC OVERRIDES ───────────────────────────────────────────
   const sortedCatalog = useMemo(() => {
     if (!project) return [];
     const list = getUniqueBpuCatalog ? getUniqueBpuCatalog(project) : [];
 
+    const getRef = (item) =>
+      refMap.get(item.id) ||
+      refMap.get(item.uid) ||
+      refMap.get((item.designation || '').trim().toUpperCase()) ||
+      '';
+
     const getAutoNum = (item) => {
-      const ref =
-        refMap.get(item.id) ||
-        refMap.get(item.uid) ||
-        refMap.get((item.designation || '').trim().toUpperCase());
+      const ref = getRef(item);
       if (!ref) return 999999;
       const match = String(ref).match(/([0-9]+(\.[0-9]+)?)/);
       return match ? parseFloat(match[0]) : 999999;
@@ -140,6 +173,15 @@ export const useBpuData = ({ project, setProject, bpuConfig, units }) => {
           undefined,
           { numeric: true, sensitivity: 'base' }
         );
+      }
+      if (bpuConfig?.numberingMode === 'hierarchical') {
+        // Tri segment par segment (2.1.2 avant 2.1.10) ; réfs vides à la fin.
+        const refA = getRef(a);
+        const refB = getRef(b);
+        if (!refA && !refB) return 0;
+        if (!refA) return 1;
+        if (!refB) return -1;
+        return refA.localeCompare(refB, undefined, { numeric: true, sensitivity: 'base' });
       }
       return getAutoNum(a) - getAutoNum(b);
     });
@@ -157,12 +199,13 @@ export const useBpuData = ({ project, setProject, bpuConfig, units }) => {
       return {
         ...item,
         _displayNum: displayNum,
+        _usageCount: duplicateIndex.get(item.id)?.count || 1,
         _overrideDesignation: ov.designation,
         _overrideDescription: ov.description,
         _hasOverride: ov.designation !== undefined || ov.description !== undefined,
       };
     });
-  }, [project, bpuConfig, forceManualSort, refMap]);
+  }, [project, bpuConfig, forceManualSort, refMap, duplicateIndex]);
 
   return {
     // Tri

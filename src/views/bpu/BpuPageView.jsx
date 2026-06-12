@@ -189,10 +189,20 @@ const BpuPageView = ({
                     <div key={idx} data-bpu-item-id={item.id} className="flex border-b border-slate-200 last:border-b-0 text-[10px] break-inside-avoid">
                       {/* Numéro */}
                       <div
-                        className="p-3 border-r border-slate-200 bg-slate-100 text-center font-bold flex items-center justify-center text-slate-600 text-[12px]"
+                        className="p-3 border-r border-slate-200 bg-slate-100 text-center font-bold flex flex-col items-center justify-center gap-0.5 text-slate-600 text-[12px]"
                         style={{ width: `${COL_NUM_WIDTH}px` }}
                       >
                         {item.isSuite ? <span className="text-[8px] text-slate-300 italic">...</span> : displayNum}
+                        {/* Badge écran uniquement (data-ui → retiré de la capture PDF, absent du Word) */}
+                        {!item.isSuite && item._usageCount > 1 && (
+                          <span
+                            data-ui
+                            title={`Prix utilisé ${item._usageCount} fois dans le devis`}
+                            className="print:hidden inline-flex items-center gap-0.5 text-[8px] font-black text-violet-600 bg-violet-50 border border-violet-200 rounded px-1"
+                          >
+                            ×{item._usageCount}
+                          </span>
+                        )}
                       </div>
 
                       {/* Désignation + description */}
