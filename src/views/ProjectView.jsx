@@ -640,7 +640,7 @@ const ProjectView = ({
   };
 
   const handleModalIntercept = (modalData) => {
-    if (['item', 'chapter', 'subChapter'].includes(modalData?.target?.type)) {
+    if (['item', 'chapter', 'subchapter'].includes(modalData?.target?.type)) {
         setDeleteConfirm({ show: true, itemId: modalData.target.id });
     } else {
         setModal(modalData);
