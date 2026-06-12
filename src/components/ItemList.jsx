@@ -674,6 +674,10 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
   // PSE substitution : on affiche le delta (montant PSE − base) au lieu du total plein.
   const isSubPse = !!el.isOption && el.pseMode === 'substitution' && pseInfo && !pseInfo.missing;
   const displayTotal = isSubPse ? pseInfo.delta : total;
+  // Plus-value (delta ≥ 0) / moins-value (delta < 0) — terminologie alignée sur PDF/Excel.
+  const pseTotalTitle = isSubPse
+    ? `${displayTotal >= 0 ? 'Plus-value' : 'Moins-value'} PSE (montant PSE − prestation de base remplacée)`
+    : undefined;
 
   // ── Bloc (ouvrage composite) : en-tête porteur d'une surface (Qté + unité) ──
   const isBloc = !!el.isBloc;
@@ -840,14 +844,14 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
                         <span className="text-[11px] font-mono font-black text-indigo-700">{formatPrice(blocPuMoyen)}</span>
                         <span className="block text-[8px] font-bold text-indigo-400 uppercase tracking-tight">/{normalizeUnitSymbol(el.unit)} moy.</span>
                       </div>
-                      <div className={`w-28 text-right px-3 text-[11px] font-mono font-black ${isSubPse ? 'text-violet-700' : el.isOption ? 'text-slate-500 line-through' : 'text-indigo-800'}`} title={isSubPse ? 'Surcoût PSE (montant PSE − prestation de base)' : undefined}>
+                      <div className={`w-28 text-right px-3 text-[11px] font-mono font-black ${isSubPse ? 'text-violet-700' : el.isOption ? 'text-slate-500 line-through' : 'text-indigo-800'}`} title={pseTotalTitle}>
                         {isSubPse && displayTotal >= 0 ? '+' : ''}{formatPrice(displayTotal)}
                       </div>
                       <div className="w-10 shrink-0" />
                     </>
                   ) : (
                     <>
-                      <div className={`w-28 text-right px-3 text-[11px] font-mono font-black ${isSubPse ? 'text-violet-700' : el.isOption ? 'text-slate-500 line-through' : 'text-emerald-800'}`} title={isSubPse ? 'Surcoût PSE (montant PSE − prestation de base)' : undefined}>
+                      <div className={`w-28 text-right px-3 text-[11px] font-mono font-black ${isSubPse ? 'text-violet-700' : el.isOption ? 'text-slate-500 line-through' : 'text-emerald-800'}`} title={pseTotalTitle}>
                         {isSubPse && displayTotal >= 0 ? '+' : ''}{formatPrice(displayTotal)}
                       </div>
                       <div className="w-10 shrink-0">{null}</div>

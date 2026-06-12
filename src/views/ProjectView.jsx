@@ -974,7 +974,7 @@ const ProjectView = ({
                                           ? 'bg-slate-200 text-slate-600 line-through decoration-slate-400'
                                           : 'bg-black/20 text-white';
                                       return (
-                                        <span className={`font-mono font-black text-xs px-3 py-1 rounded-full ${cls}`} title={isSub ? 'Surcoût de la PSE (montant PSE − prestation de base)' : undefined}>
+                                        <span className={`font-mono font-black text-xs px-3 py-1 rounded-full ${cls}`} title={isSub ? `${chapTotal >= 0 ? 'Plus-value' : 'Moins-value'} PSE (montant PSE − prestation de base remplacée)` : undefined}>
                                           {isSub && chapTotal >= 0 ? '+' : ''}{formatPrice(chapTotal)}
                                         </span>
                                       );
