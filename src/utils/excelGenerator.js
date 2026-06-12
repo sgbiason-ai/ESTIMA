@@ -57,6 +57,10 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
   let projectRefMap = new Map();
   try { if (project?.chapters) projectRefMap = getItemRefMap(project); } catch { /* ignore */ }
 
+  // Label du total général : on ne précise « (Hors PSE) » que s'il existe des PSE.
+  const hasPse = collectPseRoots(project?.chapters || []).length > 0;
+  const totalHtLabel = hasPse ? 'TOTAL GÉNÉRAL HT (Hors PSE)' : 'TOTAL GÉNÉRAL HT';
+
   const getTrancheName = (id) => id === 'global' ? 'GLOBAL' : tranches.find(t => t.id === id)?.name || id;
 
   // ── STYLES ──
@@ -331,7 +335,7 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
     const tvaRatePct = Number(project?.tauxTVA ?? 20);
     const tvaRate = tvaRatePct / 100;
     const tvaLabel = `TVA (${String(tvaRatePct).replace('.', ',')}%)`;
-    const rowTotalHT = addTotalRow(worksheet, 'TOTAL GÉNÉRAL HT (Hors PSE)', totalBaseFormula, false);
+    const rowTotalHT = addTotalRow(worksheet, totalHtLabel, totalBaseFormula, false);
     // TTC = HT + TVA (et non HT × taux recalculé) pour garantir HT + TVA = TTC (audit F1).
     const rowTotalTVA = addTotalRow(worksheet, tvaLabel, `ROUND(F${rowTotalHT}*${tvaRate},2)`, false);
     addTotalRow(worksheet, 'TOTAL GÉNÉRAL TTC', `F${rowTotalHT}+F${rowTotalTVA}`, true);
@@ -453,7 +457,7 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
     }
 
     summarySheet.addRow([]);
-    const footData = ['TOTAL GÉNÉRAL HT (Hors PSE)'];
+    const footData = [totalHtLabel];
     selectedExports.forEach((expId) => {
       const tr = summaryRefs[expId];
       footData.push(tr ? { formula: `${quote(tr.sheetName)}!F${tr.totalRow}` } : '');
