@@ -37,6 +37,7 @@ import {
   FollowPosition, UserInteractionDetector, FitBoundsOnce,
 } from './siteVisits/MapSubComponents';
 import { VisitInfoModal, ObsEditModal } from './siteVisits/SiteVisitModals';
+import ImageLightbox from './siteVisits/ImageLightbox';
 import { usePresence, useCoEditors } from '../hooks/usePresence';
 import CoEditBanner from '../components/common/CoEditBanner';
 
@@ -88,6 +89,7 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [editingObs, setEditingObs] = useState(null);
   const [exporting, setExporting] = useState(false);
+  const [lightbox, setLightbox] = useState(null); // { images: [...], index: number }
 
   // ── Segments + OSRM ──
   const [routeCache, setRouteCache] = useState({});
@@ -465,7 +467,7 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
       if (lat == null) { for (const img of (obs.images || [])) { if (typeof img === 'object' && img.lat != null) { lat = img.lat; lng = img.lng; break; } } }
       if (lat == null && coordinates.length > 0) { const pos = Math.min(Math.floor((idx / Math.max(observations.length, 1)) * coordinates.length), coordinates.length - 1); lat = coordinates[pos].lat; lng = coordinates[pos].lng; }
       if (lat == null) return null;
-      return { lat, lng, number: idx + 1, text: stripHtml(obs.text || '').slice(0, 100) };
+      return { lat, lng, number: idx + 1, text: stripHtml(obs.text || '').slice(0, 100), isSegment: !!(obs.segmentFrom && obs.segmentTo) };
     }).filter(Boolean);
   }, [observations, coordinates]);
 
@@ -533,6 +535,7 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
             <Marker
               position={route ? route.coordinates[Math.floor(route.coordinates.length / 2)] : [(obs.segmentFrom.lat + obs.segmentTo.lat) / 2, (obs.segmentFrom.lng + obs.segmentTo.lng) / 2]}
               icon={createSegmentIcon(idx + 1)}
+              zIndexOffset={1000}
               eventHandlers={{ click: () => { setHighlightedObs(idx + 1); zoomToSegment(obs); } }}
             >
               <Popup>
@@ -550,8 +553,9 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
       })}
 
       {/* Obs markers (sans segment) */}
-      {obsMarkers.filter((_, i) => !observations[i]?.segmentFrom).map((m) => (
+      {obsMarkers.filter((m) => !m.isSegment).map((m) => (
         <Marker key={`obs-${m.number}`} position={[m.lat, m.lng]} icon={createObsIcon(m.number, highlightedObs === m.number)}
+          zIndexOffset={1000}
           eventHandlers={{ click: () => setHighlightedObs(m.number) }}>
           <Popup><div className="text-xs max-w-[180px]">{m.text || `Observation ${m.number}`}</div></Popup>
         </Marker>
@@ -567,7 +571,8 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
         <Marker key={`photo-${i}`} position={[p.lat, p.lng]} icon={createDot('#3b82f6', 10)}>
           <Popup>
             <div className="text-xs max-w-[180px]">
-              {p.src && <img src={p.src} alt="" className="w-full rounded mb-1" />}
+              {p.src && <img src={p.src} alt="" className="w-full rounded mb-1 cursor-zoom-in hover:opacity-90 transition"
+                onClick={() => setLightbox({ images: [p.src], index: 0 })} />}
             </div>
           </Popup>
         </Marker>
@@ -821,7 +826,9 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
                               const hasGps = typeof img === 'object' && img.lat != null;
                               return (
                                 <div key={imgIdx} className="flex flex-col items-center">
-                                  <img src={imgSrc} alt="" className="w-20 h-20 object-cover rounded-lg border border-gray-200" loading="lazy" />
+                                  <img src={imgSrc} alt="" loading="lazy"
+                                    className="w-20 h-20 object-cover rounded-lg border border-gray-200 cursor-zoom-in hover:ring-2 hover:ring-blue-300 hover:opacity-95 transition"
+                                    onClick={(e) => { e.stopPropagation(); setLightbox({ images, index: imgIdx }); }} />
                                   {hasGps && (
                                     <a href={`https://www.google.com/maps?q=${img.lat},${img.lng}`} target="_blank" rel="noreferrer"
                                       className="text-[9px] italic text-blue-500 hover:underline mt-0.5" onClick={(e) => e.stopPropagation()}>Localisation</a>
@@ -1010,6 +1017,11 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Lightbox photo (fiches + popups carte) ── */}
+      {lightbox && (
+        <ImageLightbox images={lightbox.images} index={lightbox.index} onClose={() => setLightbox(null)} />
       )}
 
       {/* ── Toast ── */}
