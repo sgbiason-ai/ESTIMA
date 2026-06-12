@@ -4,7 +4,7 @@ import { Draggable, Droppable } from '@hello-pangea/dnd';
 import { GripVertical, Layers, Trash2, Plus, ShieldCheck, AlertCircle, AlertTriangle, FunctionSquare, Check, Boxes, Pencil, Target, Lock, Unlock, ChevronDown, ChevronRight, Link2 } from 'lucide-react';
 
 import { ProjectContext } from '../context/ProjectContext';
-import { EditableTitle, FormattedInput, OptionToggle } from './ProjectUI';
+import { EditableTitle, FormattedInput, OptionToggle, PseModeControl } from './ProjectUI';
 import { formatPrice, cleanText, normalizeUnitSymbol } from '../utils/helpers';
 import { safeEvalMathExpr } from '../utils/projectCalculations';
 
@@ -666,11 +666,14 @@ const DEPTH_BG = [
   'bg-slate-50 border border-slate-200 shadow-sm',
 ];
 
-const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly, viewMode, clientQtyMap, bpuConfig, onUpdate, onSelect, onModal, stableKey, activeTrancheId, isGlobalMode, insertTargetId, treeNumber, collapsed, onToggleCollapse }) => {
+const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly, viewMode, clientQtyMap, bpuConfig, onUpdate, onSelect, onModal, stableKey, activeTrancheId, isGlobalMode, insertTargetId, treeNumber, collapsed, onToggleCollapse, pseInfo, pseNumber, pseCandidates, onPseChange }) => {
   const draggableId = `chapter:${stableKey}`;
   const total = sumNodeTotal(el, viewMode === 'client', clientQtyMap);
   const depthBg = DEPTH_BG[Math.min(level, DEPTH_BG.length - 1)];
   const nbLines = collapsed ? countTreeItems(el.children) : 0;
+  // PSE substitution : on affiche le delta (montant PSE − base) au lieu du total plein.
+  const isSubPse = !!el.isOption && el.pseMode === 'substitution' && pseInfo && !pseInfo.missing;
+  const displayTotal = isSubPse ? pseInfo.delta : total;
 
   // ── Bloc (ouvrage composite) : en-tête porteur d'une surface (Qté + unité) ──
   const isBloc = !!el.isBloc;
@@ -777,9 +780,22 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
                     )}
                     <OptionToggle
                       isOption={!!el.isOption}
+                      pseNumber={pseNumber}
                       onClick={() => onUpdate(parentId, el.id, 'isOption', !el.isOption)}
                       disabled={isReadOnly}
                     />
+                    {el.isOption && (
+                      <PseModeControl
+                        mode={el.pseMode || 'simple'}
+                        baseId={el.pseBaseId || ''}
+                        candidates={pseCandidates || []}
+                        baseRef={pseInfo?.baseRef || ''}
+                        baseLabel={pseInfo?.baseLabel || ''}
+                        baseMissing={!!pseInfo?.missing}
+                        disabled={isReadOnly}
+                        onChange={onPseChange}
+                      />
+                    )}
                     {collapsed && (
                       <span className="shrink-0 text-[9px] font-bold text-slate-500 bg-white/70 border border-slate-200 px-1.5 py-0.5 rounded-full">
                         {nbLines} ligne{nbLines > 1 ? 's' : ''}
@@ -824,15 +840,15 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
                         <span className="text-[11px] font-mono font-black text-indigo-700">{formatPrice(blocPuMoyen)}</span>
                         <span className="block text-[8px] font-bold text-indigo-400 uppercase tracking-tight">/{normalizeUnitSymbol(el.unit)} moy.</span>
                       </div>
-                      <div className={`w-28 text-right px-3 text-[11px] font-mono font-black ${el.isOption ? 'text-slate-500 line-through' : 'text-indigo-800'}`}>
-                        {formatPrice(total)}
+                      <div className={`w-28 text-right px-3 text-[11px] font-mono font-black ${isSubPse ? 'text-violet-700' : el.isOption ? 'text-slate-500 line-through' : 'text-indigo-800'}`} title={isSubPse ? 'Surcoût PSE (montant PSE − prestation de base)' : undefined}>
+                        {isSubPse && displayTotal >= 0 ? '+' : ''}{formatPrice(displayTotal)}
                       </div>
                       <div className="w-10 shrink-0" />
                     </>
                   ) : (
                     <>
-                      <div className={`w-28 text-right px-3 text-[11px] font-mono font-black ${el.isOption ? 'text-slate-500 line-through' : 'text-emerald-800'}`}>
-                        {formatPrice(total)}
+                      <div className={`w-28 text-right px-3 text-[11px] font-mono font-black ${isSubPse ? 'text-violet-700' : el.isOption ? 'text-slate-500 line-through' : 'text-emerald-800'}`} title={isSubPse ? 'Surcoût PSE (montant PSE − prestation de base)' : undefined}>
+                        {isSubPse && displayTotal >= 0 ? '+' : ''}{formatPrice(displayTotal)}
                       </div>
                       <div className="w-10 shrink-0">{null}</div>
                     </>
@@ -875,6 +891,7 @@ const ItemList = ({ items, parentId, level = 0, bpuConfig, parentNumber = '' }) 
     insertTargetId,
     collapsedIds, toggleCollapsed,
     duplicateIndex, revealAndFlashItem,
+    pseDeltaMap, pseCandidatesFor, pseNumbers,
   } = useContext(ProjectContext);
 
   const hasMultiSelection = multiSelection && multiSelection.size > 0;
@@ -967,6 +984,13 @@ const ItemList = ({ items, parentId, level = 0, bpuConfig, parentNumber = '' }) 
         treeNumber={treeNumber}
         collapsed={collapsedIds?.has(el.id) || false}
         onToggleCollapse={toggleCollapsed}
+        pseInfo={pseDeltaMap?.get(el.id) || null}
+        pseNumber={pseNumbers?.get(el.id) || null}
+        pseCandidates={el.isOption && pseCandidatesFor ? pseCandidatesFor(el.id) : []}
+        onPseChange={(m, baseId) => {
+          updateProjectItem(parentId, el.id, 'pseMode', m === 'substitution' ? 'substitution' : '');
+          updateProjectItem(parentId, el.id, 'pseBaseId', m === 'substitution' ? baseId : '');
+        }}
       />
     );
   });

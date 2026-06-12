@@ -1,6 +1,6 @@
 // src/hooks/useProjectCalculations.js
 import { useMemo, useEffect } from 'react';
-import { computeQtyMaps, buildRefMap, buildDuplicateIndex } from '../utils/projectCalculations';
+import { computeQtyMaps, buildRefMap, buildDuplicateIndex, computePseDeltas, buildPseNumbers } from '../utils/projectCalculations';
 
 export const useProjectCalculations = ({
   project,
@@ -154,6 +154,80 @@ export const useProjectCalculations = ({
     [displayProject]
   );
 
+  // --- PSE : numérotation séquentielle (PSE n°1, n°2…) ---
+  const pseNumbers = useMemo(
+    () => buildPseNumbers(displayProject?.chapters || []),
+    [displayProject]
+  );
+
+  // --- PSE SUBSTITUTION : delta affiché (mode courant) + libellé de la base ---
+  const pseDeltaMap = useMemo(() => {
+    const qtyOf = (node) =>
+      currentMode === 'client'
+        ? (clientQtyMap.get(String(node.id)) || 0)
+        : (studyQtyMaps[activeTrancheId || 'global']?.[node.id] ?? 0);
+    const raw = computePseDeltas(displayProject?.chapters || [], qtyOf);
+    // Enrichit chaque PSE avec la référence + le libellé de sa base (info-bulle / note).
+    const index = new Map();
+    const collect = (nodes) => {
+      if (!Array.isArray(nodes)) return;
+      nodes.forEach((n) => { if (n) { index.set(n.id, n); if (n.children) collect(n.children); } });
+    };
+    collect(displayProject?.chapters || []);
+    const out = new Map();
+    raw.forEach((info, pseId) => {
+      const base = index.get(info.baseId);
+      out.set(pseId, {
+        ...info,
+        baseRef: refMap.get(info.baseId) || refMap.get(base?.uid) || '',
+        baseLabel: base ? (base.type === 'item' ? base.designation : base.title) : '',
+      });
+    });
+    return out;
+  }, [displayProject, currentMode, clientQtyMap, studyQtyMaps, activeTrancheId, refMap]);
+
+  // --- PSE SUBSTITUTION : éléments de base sélectionnables, par PSE ---
+  // Renvoie une fonction pseCandidatesFor(pseId) → liste des articles + (sous-)chapitres
+  // non-option, en excluant la PSE elle-même, ses descendants et ses ancêtres.
+  const pseCandidatesFor = useMemo(() => {
+    const index = new Map();
+    const parentOf = new Map();
+    const baseList = [];
+    const walk = (nodes, parentId, parentIsOption) => {
+      if (!Array.isArray(nodes)) return;
+      nodes.forEach((n) => {
+        if (!n) return;
+        index.set(n.id, n);
+        if (parentId != null) parentOf.set(n.id, parentId);
+        const effOption = parentIsOption || !!n.isOption;
+        if (!effOption) {
+          baseList.push({
+            id: n.id,
+            ref: refMap.get(n.id) || refMap.get(n.uid) || '',
+            label: n.type === 'item' ? (n.designation || 'Article') : (n.title || 'Chapitre'),
+            kind: n.type === 'item' ? 'article' : (n.isBloc ? 'bloc' : 'chapitre'),
+          });
+        }
+        if (n.children) walk(n.children, n.id, effOption);
+      });
+    };
+    walk(displayProject?.chapters || [], null, false);
+
+    return (pseId) => {
+      const excluded = new Set([pseId]);
+      // descendants
+      const addDesc = (id) => {
+        const node = index.get(id);
+        (node?.children || []).forEach((c) => { if (c) { excluded.add(c.id); addDesc(c.id); } });
+      };
+      addDesc(pseId);
+      // ancêtres
+      let cur = parentOf.get(pseId);
+      while (cur != null) { excluded.add(cur); cur = parentOf.get(cur); }
+      return baseList.filter((c) => !excluded.has(c.id));
+    };
+  }, [displayProject, refMap]);
+
   // --- SAUVEGARDE DES RENDUS QUANTITÉS ---
   useEffect(() => {
     if (!project?.id) return;
@@ -173,7 +247,14 @@ export const useProjectCalculations = ({
   // --- STATISTIQUES ---
   const projectStats = useMemo(() => {
     if (!displayProject || !displayProject.chapters) return { study: { base: 0, option: 0, chapters: {} }, client: { base: 0, option: 0, chapters: {} } };
+    const qtyOf = (node, isClientMode) => {
+        if (isClientMode) return clientQtyMap.get(String(node.id)) || 0;
+        const sVal = studyQtyMaps[activeTrancheId || 'global'];
+        return sVal ? (sVal[node.id] ?? 0) : 0;
+    };
     const processMode = (isClientMode) => {
+        // PSE substitution : delta = montant PSE − montant base, compté UNE fois.
+        const pseDeltas = computePseDeltas(displayProject.chapters, (it) => qtyOf(it, isClientMode));
         let globalBase = 0;
         let globalOption = 0;
         const chapterStats = {};
@@ -182,15 +263,14 @@ export const useProjectCalculations = ({
                 let b = 0;
                 let o = 0;
                 const isEffectiveOption = parentIsOption || !!node.isOption;
+                // PSE substitution valide : on compte le delta et on NE descend PAS
+                // dans le sous-arbre (sinon double comptage). La base reste au Total Base.
+                const pse = pseDeltas.get(node.id);
+                if (pse && !pse.missing) {
+                    return { base: 0, option: pse.delta };
+                }
                 if (node.type === 'item') {
-                    let q = 0;
-                    if (isClientMode) {
-                         q = clientQtyMap.get(String(node.id)) || 0;
-                    } else {
-                        // ✅ Toujours lire depuis studyQtyMaps (résout les formules, y compris tranches)
-                        const sVal = studyQtyMaps[activeTrancheId || 'global'];
-                        q = sVal ? (sVal[node.id] ?? 0) : 0;
-                    }
+                    const q = qtyOf(node, isClientMode);
                     const p = Number(node.price || 0);
                     const lineTotal = q * p;
                     if (isEffectiveOption) o += lineTotal; else b += lineTotal;
@@ -204,7 +284,7 @@ export const useProjectCalculations = ({
                 return { base: b, option: o };
             };
             const { base, option } = calcNode(chap, false);
-            chapterStats[chap.id] = base + option; 
+            chapterStats[chap.id] = base + option;
             globalBase += base;
             globalOption += option;
         });
@@ -225,6 +305,9 @@ export const useProjectCalculations = ({
     displayProject,
     refMap,
     duplicateIndex,
+    pseDeltaMap,
+    pseCandidatesFor,
+    pseNumbers,
     projectStats,
     currentStats,
     totalBase,

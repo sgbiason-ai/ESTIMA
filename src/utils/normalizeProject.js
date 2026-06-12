@@ -80,6 +80,12 @@ function normalizeNode(node) {
     isOption: bool(node.isOption),
     children: arr(node.children).map(normalizeNode).filter(Boolean),
   };
+  // PSE substitution : la PSE (option) remplace une prestation de base ; son prix
+  // affiché = montant PSE − montant base. pseMode absent ou 'simple' = PSE classique.
+  if (node.pseMode === 'substitution') {
+    chapter.pseMode = 'substitution';
+    chapter.pseBaseId = str(node.pseBaseId);
+  }
   // Sous-chapitre "bloc" (ouvrage composite) : conserver unité + surface (Qté/tranches).
   if (node.isBloc) {
     chapter.isBloc = true;

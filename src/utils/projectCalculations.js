@@ -417,6 +417,136 @@ export function buildRefMap(chapters, bpuConfig = {}) {
   return map;
 }
 
+// ─── NUMÉROTATION DES PSE ──────────────────────────────────────────────────────
+
+/**
+ * Numérote les PSE en séquence (PSE n°1, n°2…) dans l'ordre du document.
+ * Une « PSE » = la racine d'un sous-arbre option : un nœud `isOption` dont
+ * aucun ancêtre n'est option (les éléments sous une PSE n'ont pas de numéro propre).
+ *
+ * @returns Map<nodeId, number> (uniquement les racines PSE)
+ * Pure : aucune dépendance React.
+ */
+export function buildPseNumbers(chapters) {
+  const map = new Map();
+  let n = 0;
+  const walk = (nodes, parentIsOption) => {
+    if (!Array.isArray(nodes)) return;
+    nodes.forEach((node) => {
+      if (!node) return;
+      const isRoot = !parentIsOption && !!node.isOption;
+      if (isRoot) { n += 1; map.set(node.id, n); }
+      if (node.children) walk(node.children, parentIsOption || !!node.isOption);
+    });
+  };
+  walk(chapters || [], false);
+  return map;
+}
+
+// ─── PSE SUBSTITUTION (delta = montant PSE − montant base) ────────────────────
+
+/**
+ * Calcule le delta de chaque PSE « substitution » : montant de la PSE moins
+ * montant de la prestation de base qu'elle remplace.
+ *
+ * Une PSE substitution est un (sous-)chapitre `isOption` portant
+ * `pseMode === 'substitution'` et `pseBaseId` (id de l'article ou du
+ * sous-chapitre de base remplacé). Le delta peut être négatif (moins-value).
+ *
+ * @param chapters    arbre du projet
+ * @param getItemQty  (item) => quantité dans le mode voulu (étude ou client).
+ *                    Par défaut : item.qty (utile pour les tests).
+ * @returns Map<pseId, { delta, pseTotal, baseTotal, baseId, missing }>
+ *   - missing : base introuvable / invalide (soi-même, ancêtre ou descendant) →
+ *               on retombe sur le montant plein de la PSE (delta = pseTotal).
+ * Pure : aucune dépendance React.
+ */
+export function computePseDeltas(chapters, getItemQty = (it) => Number(it?.qty || 0)) {
+  const index = new Map();
+  const parentOf = new Map();
+  const build = (nodes, parentId) => {
+    if (!Array.isArray(nodes)) return;
+    nodes.forEach((n) => {
+      if (!n) return;
+      index.set(n.id, n);
+      if (parentId != null) parentOf.set(n.id, parentId);
+      if (n.children) build(n.children, n.id);
+    });
+  };
+  build(chapters, null);
+
+  const nodeTotal = (n) => {
+    if (!n) return 0;
+    if (n.type === 'item') return getItemQty(n) * Number(n.price || 0);
+    let s = 0;
+    (n.children || []).forEach((c) => { s += nodeTotal(c); });
+    return s;
+  };
+
+  // ancId est-il un ancêtre de nodeId ?
+  const isAncestor = (ancId, nodeId) => {
+    let cur = parentOf.get(nodeId);
+    while (cur != null) {
+      if (cur === ancId) return true;
+      cur = parentOf.get(cur);
+    }
+    return false;
+  };
+
+  const result = new Map();
+  const walk = (nodes) => {
+    if (!Array.isArray(nodes)) return;
+    nodes.forEach((n) => {
+      if (!n) return;
+      if (n.isOption && n.pseMode === 'substitution' && n.pseBaseId) {
+        const base = index.get(n.pseBaseId);
+        const pseTotal = nodeTotal(n);
+        const invalid =
+          !base ||
+          n.pseBaseId === n.id ||
+          isAncestor(n.id, n.pseBaseId) ||   // base descendante de la PSE
+          isAncestor(n.pseBaseId, n.id);     // base ancêtre de la PSE
+        if (invalid) {
+          result.set(n.id, { delta: pseTotal, pseTotal, baseTotal: 0, baseId: n.pseBaseId, missing: true });
+        } else {
+          const baseTotal = nodeTotal(base);
+          result.set(n.id, { delta: pseTotal - baseTotal, pseTotal, baseTotal, baseId: n.pseBaseId, missing: false });
+        }
+      }
+      if (n.children) walk(n.children);
+    });
+  };
+  walk(chapters);
+  return result;
+}
+
+// Racines PSE dans l'ordre du document : nœud `isOption` sans ancêtre option.
+// (Les éléments sous une PSE font partie de cette PSE, pas une PSE distincte.)
+// Partagé par les générateurs PDF et Excel.
+export function collectPseRoots(nodes, parentIsOption = false, acc = []) {
+  if (!Array.isArray(nodes)) return acc;
+  nodes.forEach((n) => {
+    if (!n) return;
+    if (!parentIsOption && n.isOption) acc.push(n);
+    else if (n.children) collectPseRoots(n.children, parentIsOption || !!n.isOption, acc);
+  });
+  return acc;
+}
+
+// PSE substitution VALIDES contenues dans un sous-arbre, sans descendre dans leur
+// propre sous-arbre (il appartient à la PSE). Retourne [{ node, info }] (info = entrée
+// de computePseDeltas). Partagé PDF/Excel.
+export function collectSubstitutions(node, pseDeltas, acc = []) {
+  if (!node) return acc;
+  const info = pseDeltas.get(node.id);
+  if (info && !info.missing && node.isOption && node.pseMode === 'substitution') {
+    acc.push({ node, info });
+    return acc;
+  }
+  (node.children || []).forEach((c) => collectSubstitutions(c, pseDeltas, acc));
+  return acc;
+}
+
 // ─── INDEX DES PRIX RÉPÉTÉS ───────────────────────────────────────────────────
 
 /**

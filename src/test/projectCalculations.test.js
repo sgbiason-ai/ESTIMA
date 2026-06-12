@@ -12,6 +12,8 @@ import {
   detectAtypicalPrice,
   buildRefMap,
   buildDuplicateIndex,
+  computePseDeltas,
+  buildPseNumbers,
   checkPriceConsistency,
 } from '../utils/projectCalculations';
 
@@ -547,6 +549,101 @@ describe('buildDuplicateIndex', () => {
   it('arbre vide ou null → index vide', () => {
     expect(buildDuplicateIndex([]).size).toBe(0);
     expect(buildDuplicateIndex(null).size).toBe(0);
+  });
+});
+
+// ── computePseDeltas (PSE substitution) ─────────────────────────────────────
+describe('computePseDeltas', () => {
+  // Base = article P (200×10=2000) ; PSE substitution = sous-chapitre (1×2600=2600)
+  const project = [
+    { type: 'chapter', id: 'c1', title: 'VOIRIE', children: [
+      { type: 'item', id: 'base', uid: 'B', designation: 'Bicouche', unit: 'm2', price: 10, qty: 200 },
+      { type: 'chapter', id: 'pse', title: 'VARIANTE ENROBÉ', isOption: true, pseMode: 'substitution', pseBaseId: 'base', children: [
+        { type: 'item', id: 'p1', designation: 'BBSG', unit: 'm2', price: 13, qty: 200 },
+      ]},
+    ]},
+  ];
+
+  it('delta = montant PSE − montant base', () => {
+    const m = computePseDeltas(project);
+    // PSE = 200×13 = 2600 ; base = 200×10 = 2000 → delta = 600
+    expect(m.get('pse')).toMatchObject({ pseTotal: 2600, baseTotal: 2000, delta: 600, missing: false });
+  });
+
+  it('delta négatif (moins-value) conservé tel quel', () => {
+    const p = JSON.parse(JSON.stringify(project));
+    p[0].children[1].children[0].price = 8; // PSE = 1600 < base 2000
+    expect(computePseDeltas(p).get('pse').delta).toBe(-400);
+  });
+
+  it('quantités propres via getItemQty (mode client)', () => {
+    // base ×1.1 = 220, pse ×1.1 = 220 → 220×13 − 220×10 = 660
+    const clientQty = { base: 220, p1: 220 };
+    const m = computePseDeltas(project, (it) => clientQty[it.id] ?? Number(it.qty || 0));
+    expect(m.get('pse').delta).toBe(660);
+  });
+
+  it('base introuvable → missing, repli sur montant plein', () => {
+    const p = JSON.parse(JSON.stringify(project));
+    p[0].children[1].pseBaseId = 'inexistant';
+    expect(computePseDeltas(p).get('pse')).toMatchObject({ missing: true, delta: 2600 });
+  });
+
+  it('base = descendant de la PSE → invalide (missing)', () => {
+    const p = JSON.parse(JSON.stringify(project));
+    p[0].children[1].pseBaseId = 'p1'; // p1 est dans la PSE
+    expect(computePseDeltas(p).get('pse').missing).toBe(true);
+  });
+
+  it('PSE simple (sans pseMode) ou non-option → absente de la map', () => {
+    const p = [
+      { type: 'chapter', id: 'c', title: 'C', children: [
+        { type: 'chapter', id: 's1', isOption: true, children: [{ type: 'item', id: 'i', price: 5, qty: 2 }] }, // PSE simple
+        { type: 'chapter', id: 's2', pseMode: 'substitution', pseBaseId: 'x', children: [] }, // pas option
+      ]},
+    ];
+    const m = computePseDeltas(p);
+    expect(m.has('s1')).toBe(false);
+    expect(m.has('s2')).toBe(false);
+  });
+});
+
+// ── buildPseNumbers ─────────────────────────────────────────────────────────
+describe('buildPseNumbers', () => {
+  it('numérote chaque racine PSE en séquence, dans l\'ordre du document', () => {
+    const ch = [
+      { type: 'chapter', id: 'c1', children: [
+        { type: 'item', id: 'i1' },
+        { type: 'chapter', id: 'pseA', isOption: true, children: [{ type: 'item', id: 'a1' }] }, // PSE n°1
+      ]},
+      { type: 'chapter', id: 'c2', isOption: true, children: [ // PSE n°2 (chapitre entier)
+        { type: 'item', id: 'b1' },
+      ]},
+      { type: 'chapter', id: 'c3', children: [
+        { type: 'chapter', id: 'pseC', isOption: true, children: [] }, // PSE n°3
+      ]},
+    ];
+    const m = buildPseNumbers(ch);
+    expect(m.get('pseA')).toBe(1);
+    expect(m.get('c2')).toBe(2);
+    expect(m.get('pseC')).toBe(3);
+    expect(m.size).toBe(3);
+  });
+
+  it('un élément sous une PSE n\'a pas de numéro propre (seule la racine compte)', () => {
+    const ch = [
+      { type: 'chapter', id: 'c', isOption: true, children: [
+        { type: 'chapter', id: 'sub', isOption: true, children: [] }, // sous une PSE → pas racine
+      ]},
+    ];
+    const m = buildPseNumbers(ch);
+    expect(m.get('c')).toBe(1);
+    expect(m.has('sub')).toBe(false);
+    expect(m.size).toBe(1);
+  });
+
+  it('aucune PSE → map vide', () => {
+    expect(buildPseNumbers([{ type: 'chapter', id: 'c', children: [] }]).size).toBe(0);
   });
 });
 

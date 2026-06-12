@@ -7,7 +7,7 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Plus, Trash2, GripVertical, Layers, HelpCircle, AlertTriangle, Target, ChevronDown, ChevronRight } from 'lucide-react';
 
 import { ProjectContext } from '../context/ProjectContext';
-import { EditableTitle, OptionToggle } from '../components/ProjectUI';
+import { EditableTitle, OptionToggle, PseModeControl } from '../components/ProjectUI';
 import ItemList from '../components/ItemList';
 import { formatPrice, generateId } from '../utils/helpers';
 import { toast, confirm } from '../utils/globalUI';
@@ -278,7 +278,7 @@ const ProjectView = ({
 
   const { activeTrancheId, setActiveTrancheId, tranches, hasTranches, isGlobalMode, addTranche, removeTranche } = useProjectTranches(project, updateProjectItem);
 
-  const { studyQtyMaps, clientQtyMap, clientQtyMaps, displayProject, refMap, duplicateIndex, projectStats, currentStats, totalBase, totalOption } = useProjectCalculations({
+  const { studyQtyMaps, clientQtyMap, clientQtyMaps, displayProject, refMap, duplicateIndex, pseDeltaMap, pseCandidatesFor, pseNumbers, projectStats, currentStats, totalBase } = useProjectCalculations({
     project: viewedProject, clientPercent, hasTranches, tranches, activeTrancheId, currentMode, bpuConfig
   });
 
@@ -811,6 +811,7 @@ const ProjectView = ({
       multiSelection, toggleMultiSelection, priceIssueIds, insertTargetId,
       collapsedIds, toggleCollapsed,
       duplicateIndex, revealAndFlashItem,
+      pseDeltaMap, pseCandidatesFor, pseNumbers,
       onEditItem: (item) => {
         const bpuSource = allBpuItems?.find(b => String(b.id) === String(item?.uid) || String(b.uid) === String(item?.uid));
         setEditItemTarget({
@@ -939,7 +940,22 @@ const ProjectView = ({
                                     </button>
                                     <span className={`w-6 h-6 rounded flex items-center justify-center font-mono text-[10px] font-black ${chap.isOption ? 'bg-slate-200 text-slate-500' : 'bg-white/20 text-white'}`}>{index + 1}</span>
                                     <EditableTitle value={chap.title} onSave={(val) => updateProjectItem('root', chap.id, 'title', val)} disabled={isReadOnly} className="font-black uppercase tracking-widest text-[11px] hover:bg-white/10" />
-                                    <OptionToggle isOption={chap.isOption} onClick={() => updateProjectItem('root', chap.id, 'isOption', !chap.isOption)} disabled={isReadOnly} />
+                                    <OptionToggle isOption={chap.isOption} pseNumber={pseNumbers.get(chap.id)} onClick={() => updateProjectItem('root', chap.id, 'isOption', !chap.isOption)} disabled={isReadOnly} />
+                                    {chap.isOption && (
+                                      <PseModeControl
+                                        mode={chap.pseMode || 'simple'}
+                                        baseId={chap.pseBaseId || ''}
+                                        candidates={pseCandidatesFor(chap.id)}
+                                        baseRef={pseDeltaMap.get(chap.id)?.baseRef || ''}
+                                        baseLabel={pseDeltaMap.get(chap.id)?.baseLabel || ''}
+                                        baseMissing={!!pseDeltaMap.get(chap.id)?.missing}
+                                        disabled={isReadOnly}
+                                        onChange={(m, baseId) => {
+                                          updateProjectItem('root', chap.id, 'pseMode', m === 'substitution' ? 'substitution' : '');
+                                          updateProjectItem('root', chap.id, 'pseBaseId', m === 'substitution' ? baseId : '');
+                                        }}
+                                      />
+                                    )}
                                     {!isReadOnly && chap.id === insertTargetId && (
                                       <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shrink-0" title="Les nouveaux articles (libre ou bibliothèque) seront insérés dans ce chapitre">
                                         <Target size={10} /> Insertion ici
@@ -950,7 +966,19 @@ const ProjectView = ({
                                     {isCollapsed && (
                                       <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${chap.isOption ? 'bg-slate-200 text-slate-500' : 'bg-white/15 text-white/80'}`}>{nbLines} ligne{nbLines > 1 ? 's' : ''}</span>
                                     )}
-                                    <span className={`font-mono font-black text-xs px-3 py-1 rounded-full ${chap.isOption ? 'bg-slate-200 text-slate-600 line-through decoration-slate-400' : 'bg-black/20 text-white'}`}>{formatPrice(chapTotal)}</span>
+                                    {(() => {
+                                      const isSub = chap.isOption && chap.pseMode === 'substitution' && !pseDeltaMap.get(chap.id)?.missing;
+                                      const cls = isSub
+                                        ? 'bg-violet-100 text-violet-700'
+                                        : chap.isOption
+                                          ? 'bg-slate-200 text-slate-600 line-through decoration-slate-400'
+                                          : 'bg-black/20 text-white';
+                                      return (
+                                        <span className={`font-mono font-black text-xs px-3 py-1 rounded-full ${cls}`} title={isSub ? 'Surcoût de la PSE (montant PSE − prestation de base)' : undefined}>
+                                          {isSub && chapTotal >= 0 ? '+' : ''}{formatPrice(chapTotal)}
+                                        </span>
+                                      );
+                                    })()}
                                     {!isReadOnly && (
                                       <button onClick={(e) => { e.stopPropagation(); addSubChapter(chap.id); }} className={`p-1.5 rounded-md ${chap.isOption ? 'hover:bg-slate-200 text-slate-500' : 'hover:bg-white/20 text-white'}`} title="Ajouter un sous-chapitre"><Plus size={16} /></button>
                                     )}
@@ -978,7 +1006,7 @@ const ProjectView = ({
                 </Droppable>
               </div>
 
-              <ProjectFooterStats totalBase={totalBase} totalOption={totalOption} currentMode={currentMode} theme={theme} />
+              <ProjectFooterStats totalBase={totalBase} currentMode={currentMode} theme={theme} />
 
             </div>
           </DragDropContext>

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Check, X } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Check, X, ArrowLeftRight, ChevronDown, Search, AlertTriangle } from 'lucide-react';
 
 // --- LE COMPOSANT MANQUANT (A AJOUTER) ---
 export const FormattedInput = ({ value, onChange, onBlur, className, placeholder, ...props }) => {
@@ -52,11 +52,132 @@ export const EditableTitle = ({ value, onSave, className, disabled }) => {
   return <span onDoubleClick={(e) => { e.stopPropagation(); !disabled && setIsEditing(true); }} className={`cursor-text ${className} ${disabled ? 'cursor-default' : ''}`} title={!disabled ? "Double-cliquer pour éditer" : ""}>{value}</span>;
 };
 
-export const OptionToggle = ({ isOption, onClick, disabled }) => {
+/**
+ * Contrôle du type de PSE : « simple » ou « substitution ».
+ * Visible uniquement quand l'élément est déjà une PSE (isOption).
+ * En substitution, ouvre un sélecteur de la prestation de base remplacée.
+ *
+ * @param mode        'simple' | 'substitution'
+ * @param baseId      id de la base remplacée (si substitution)
+ * @param candidates  [{ id, ref, label, kind }] éléments de base sélectionnables
+ * @param baseRef     réf de la base remplacée (affichée sur le toggle)
+ * @param baseLabel   libellé de la base remplacée (affiché sur le toggle)
+ * @param baseMissing true si la base liée est introuvable (alerte)
+ * @param onChange    (mode, baseId) => void
+ */
+export const PseModeControl = ({ mode = 'simple', baseId = '', candidates = [], baseRef = '', baseLabel = '', baseMissing = false, onChange, disabled }) => {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const ref = useRef(null);
+  const isSub = mode === 'substitution';
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [open]);
+
+  const selected = candidates.find((c) => c.id === baseId);
+  const filtered = query
+    ? candidates.filter((c) => `${c.ref} ${c.label}`.toLowerCase().includes(query.toLowerCase()))
+    : candidates;
+
+  // Libellé de la base remplacée porté DIRECTEMENT par le toggle (toggle + pastille
+  // fusionnés pour gagner de la place). Source : props (pseDeltaMap) sinon sélection.
+  const effRef = baseRef || selected?.ref || '';
+  const effLabel = baseLabel || selected?.label || '';
+  const baseText = [effRef, effLabel].filter(Boolean).join(' · ');
+  const btnLabel = !isSub ? 'Simple' : (baseMissing ? 'base introuvable' : (baseText || 'substit.'));
+  const btnTitle = !isSub
+    ? "Type de PSE : simple ou substitution d'une prestation de base"
+    : (baseMissing
+        ? 'Prestation de base introuvable — la PSE est comptée au montant plein. Re-sélectionnez la base.'
+        : (baseText ? `PSE en remplacement de ${baseText}` : 'Choisir la prestation de base remplacée'));
+
+  return (
+    <div className="relative" ref={ref} onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={(e) => { e.stopPropagation(); !disabled && setOpen((o) => !o); }}
+        title={btnTitle}
+        className={`flex items-center gap-1 px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border transition-all max-w-[210px] ${
+          isSub
+            ? (baseMissing ? 'bg-amber-500 border-amber-400 text-white' : 'bg-violet-600 border-violet-500 text-white')
+            : 'bg-white/10 border-white/20 text-white/70 hover:bg-white/20 hover:text-white'
+        } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer active:scale-95'}`}
+      >
+        {isSub ? (baseMissing ? <AlertTriangle size={10} className="shrink-0" /> : <ArrowLeftRight size={10} className="shrink-0" />) : null}
+        <span className="truncate">{btnLabel}</span>
+        <ChevronDown size={10} className="opacity-70 shrink-0" />
+      </button>
+
+      {open && (
+        <div className="absolute z-50 mt-1 left-0 w-72 bg-white rounded-xl shadow-2xl border border-slate-200 p-2 text-slate-700">
+          <div className="flex gap-1 mb-2">
+            <button
+              type="button"
+              onClick={() => { onChange?.('simple', ''); setOpen(false); }}
+              className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-colors ${!isSub ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+            >
+              PSE simple
+            </button>
+            <button
+              type="button"
+              onClick={() => onChange?.('substitution', baseId)}
+              className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-colors ${isSub ? 'bg-violet-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+            >
+              Substitution
+            </button>
+          </div>
+
+          {isSub && (
+            <>
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-100 rounded-lg mb-1.5">
+                <Search size={12} className="text-slate-400" />
+                <input
+                  autoFocus
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Rechercher une prestation de base…"
+                  className="flex-1 bg-transparent text-[11px] outline-none placeholder:text-slate-400"
+                />
+              </div>
+              <div className="max-h-56 overflow-y-auto">
+                {filtered.length === 0 && (
+                  <div className="px-2 py-3 text-[10px] text-slate-400 italic text-center">Aucune prestation de base disponible</div>
+                )}
+                {filtered.map((c) => (
+                  <button
+                    type="button"
+                    key={c.id}
+                    onClick={() => { onChange?.('substitution', c.id); setOpen(false); }}
+                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-colors ${c.id === baseId ? 'bg-violet-50 ring-1 ring-violet-200' : 'hover:bg-slate-100'}`}
+                  >
+                    <span className="shrink-0 text-[9px] font-mono font-bold text-slate-400 w-12 truncate">{c.ref || '—'}</span>
+                    <span className="flex-1 text-[11px] font-semibold text-slate-700 truncate uppercase">{c.label}</span>
+                    <span className="shrink-0 text-[8px] font-bold uppercase text-slate-300">{c.kind}</span>
+                    {c.id === baseId && <Check size={12} className="text-violet-600 shrink-0" />}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const OptionToggle = ({ isOption, onClick, disabled, pseNumber = null }) => {
+  // Quand c'est une PSE, le toggle porte directement son numéro (PSE n°X) :
+  // toggle + pastille fusionnés pour gagner de la place.
+  const label = isOption ? (pseNumber ? `PSE n°${pseNumber}` : 'PSE') : 'BASE';
   return (
     <button onClick={(e) => { e.stopPropagation(); !disabled && onClick(); }} disabled={disabled} className={`relative flex items-center gap-1.5 px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border transition-all duration-200 ${isOption ? 'bg-blue-600 border-blue-500 text-white shadow-md pl-2 pr-2' : 'bg-white/10 border-white/20 text-white/60 hover:bg-white/20 hover:text-white pl-2 pr-2'} ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer active:scale-95'}`} title={isOption ? "Désactiver PSE" : "Activer en PSE"}>
       <div className={`w-2 h-2 rounded-full transition-colors ${isOption ? 'bg-white animate-pulse' : 'bg-white/20'}`} />
-      <span>{isOption ? 'PSE' : 'BASE'}</span>
+      <span>{label}</span>
     </button>
   );
 };
