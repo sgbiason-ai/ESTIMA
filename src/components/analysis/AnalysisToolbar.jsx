@@ -5,7 +5,7 @@ import {
   FileDown, Database, Save, Download, FileUp
 } from 'lucide-react';
 
-import { RibbonGroup, RibbonBtnLarge, RibbonBtnSmall } from '../common/RibbonParts';
+import { RibbonGroup, RibbonBtnLarge, RibbonBtnSmall, RibbonContainer, RibbonSpacer } from '../common/RibbonParts';
 
 /* ════════════════════════════════════════════════════════════════════
    ANALYSIS TOOLBAR — Ribbon style Office
@@ -41,8 +41,8 @@ const AnalysisToolbar = ({
 
       {/* Bandeau titre "Analyse Financière" supprimé — le sous-onglet en haut suffit comme repère */}
 
-      {/* ═══════ CONTENU DU RIBBON ═══════ */}
-      <div className="flex items-stretch bg-[#f3f3f3] border-b border-slate-200 min-h-[78px]">
+      {/* ═══════ CONTENU DU RIBBON (adaptatif : compact puis 2 lignes) ═══════ */}
+      <RibbonContainer>
 
         {/* ── Tranches ── */}
         <RibbonGroup label="Tranche">
@@ -126,7 +126,7 @@ const AnalysisToolbar = ({
         </RibbonGroup>
 
         {/* ── Spacer ── */}
-        <div className="flex-1 min-w-[16px]" />
+        <RibbonSpacer />
 
         {/* ── Données ── */}
         <RibbonGroup label="Données">
@@ -188,7 +188,7 @@ const AnalysisToolbar = ({
             <input type="file" ref={jsonInputRef} accept=".json" onChange={onImportJson} className="hidden" />
           </div>
         </RibbonGroup>
-      </div>
+      </RibbonContainer>
 
       {/* ── Menu déroulant Notation ── */}
       {showScoringSettings && (

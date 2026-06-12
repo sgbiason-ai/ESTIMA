@@ -239,3 +239,28 @@ button {
   border-top: 0.4pt solid #cdd9e7;
   padding-top: 3mm;
 }
+/* ── Ribbon Office : mode compact (largeur insuffisante) ──────────────
+   Appliqué par RibbonContainer (RibbonParts.jsx) quand le contenu déborde :
+   les libellés des gros boutons sont masqués (tooltip conservé) et les
+   boutons resserrés. Si même compact ça déborde, le conteneur passe en
+   flex-wrap (2e ligne). */
+.ribbon-compact .ribbon-lbl-lg {
+  display: none;
+}
+.ribbon-compact .ribbon-btn-lg {
+  min-width: 0;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+/* Groupes resserrés en compact (gagne ~16px de marge par groupe). */
+.ribbon-compact .ribbon-grp-inner {
+  padding-left: 8px;
+  padding-right: 8px;
+  gap: 4px;
+}
+/* En mode 2 lignes, les ressorts flex-1 sont neutralisés pour laisser les
+   groupes couler naturellement de gauche à droite. */
+.ribbon-wrap .ribbon-spacer {
+  flex: 0 0 0%;
+  min-width: 0;
+}

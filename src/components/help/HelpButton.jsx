@@ -10,10 +10,10 @@ const HelpButton = ({ onClick, variant = 'header', label = 'Aide', className = '
       <button
         onClick={onClick}
         title="Afficher l'aide"
-        className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-colors ${className}`}
+        className={`ribbon-btn-lg flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-colors ${className}`}
       >
         <HelpCircle size={20} strokeWidth={1.5} />
-        <span className="text-[10px] font-medium">{label}</span>
+        <span className="ribbon-lbl-lg text-[10px] font-medium">{label}</span>
       </button>
     );
   }

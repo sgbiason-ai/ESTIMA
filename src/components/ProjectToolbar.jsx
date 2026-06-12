@@ -8,7 +8,7 @@ import {
   Cloud, PanelLeftOpen, FileDown, ShieldCheck, ClipboardCheck, Undo2, ScanSearch, HelpCircle, FilePlus
 } from 'lucide-react';
 
-import { RibbonGroup, RibbonBtnLarge, RibbonBtnSmall } from './common/RibbonParts';
+import { RibbonGroup, RibbonBtnLarge, RibbonBtnSmall, RibbonContainer, RibbonSpacer } from './common/RibbonParts';
 import MiniPhaseStepper from './project/MiniPhaseStepper';
 
 /* ════════════════════════════════════════════════════════════════════
@@ -134,8 +134,8 @@ const ProjectToolbar = ({
         </div>
       </div>
 
-      {/* ═══════ CONTENU DU RIBBON ═══════ */}
-      <div className="flex items-stretch bg-[#f3f3f3] border-b border-slate-200 min-h-[78px]">
+      {/* ═══════ CONTENU DU RIBBON (adaptatif : compact puis 2 lignes) ═══════ */}
+      <RibbonContainer>
 
         {/* ── Tab Accueil ── */}
         {activeTab === 'accueil' && (
@@ -252,7 +252,7 @@ const ProjectToolbar = ({
             </RibbonGroup>
 
             {/* ─── SPACER GAUCHE ─── */}
-            <div className="flex-1 min-w-[16px]" />
+            <RibbonSpacer />
 
 
             {/* ─── TOGGLE CENTRAL ─── */}
@@ -287,7 +287,7 @@ const ProjectToolbar = ({
             </div>
 
             {/* ─── SPACER DROIT ─── */}
-            <div className="flex-1 min-w-[16px]" />
+            <RibbonSpacer />
 
             {/* ─── ZONE DROITE ─── */}
 
@@ -343,7 +343,7 @@ const ProjectToolbar = ({
           </>
         )}
 
-      </div>
+      </RibbonContainer>
     </header>
   );
 };
