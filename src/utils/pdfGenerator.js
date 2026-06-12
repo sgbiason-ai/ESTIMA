@@ -8,6 +8,7 @@ import { getItemRefMap, normalizeUnitSymbol } from './helpers';
 import { saveFileWithPicker, FILE_TYPES, PICKER_IDS } from './fileSaver';
 import { sanitizeFilename, loadLogos, drawCoverPage as _drawCoverPage } from './pdf/pdfSharedHelpers';
 import { buildTheme } from './pdf/buildTheme';
+import { computePseDeltas, buildPseNumbers, collectPseRoots, collectSubstitutions } from './projectCalculations';
 import { getCurrentPhaseCode } from './phaseModel';
 import { computeVatBreakdown } from './financeFormat';
 
@@ -63,6 +64,35 @@ const collectData = (nodes, isParentOption, level, mode, projectRefMap, currentQ
     }
   });
   return { rows, total };
+};
+
+// ─── PSE SUBSTITUTION ──────────────────────────────────────────────────────────
+// Quantité d'un article telle qu'utilisée par collectData (map du tranche/export,
+// repli sur node.qty) — sert à computePseDeltas pour aligner le PDF sur l'écran.
+const qtyFromMap = (currentQtyMap) => (item) => {
+  const k = String(item?.id);
+  return currentQtyMap?.has(k) ? Number(currentQtyMap.get(k)) : Number(item?.qty || 0);
+};
+
+// Index id → nœud (pour retrouver le libellé de la prestation de base).
+const buildNodeIndex = (chapters) => {
+  const map = new Map();
+  const walk = (nodes) => {
+    (nodes || []).forEach((n) => { if (n) { map.set(n.id, n); if (n.children) walk(n.children); } });
+  };
+  walk(chapters);
+  return map;
+};
+
+// Réf + libellé lisibles d'une prestation de base (article ou sous-chapitre).
+const baseLabelOf = (baseId, nodeIndex, projectRefMap) => {
+  const node = nodeIndex.get(baseId);
+  if (!node) return { ref: '', label: '' };
+  if (node.type === 'item') {
+    const ref = projectRefMap.get((node.designation || '').trim().toUpperCase()) || '';
+    return { ref, label: node.designation || '' };
+  }
+  return { ref: '', label: node.title || '' };
 };
 
 // ─── PAGE DE GARDE ────────────────────────────────────────────────────────────
@@ -208,14 +238,46 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
     const totals = new Array(summaryExports.length).fill(0);
 
     if (project.chapters) {
-      const buildSummaryRows = (nodes, level, mode) => {
+      // PSE substitution : deltas par export (récap aligné sur l'écran + page PSE).
+      const pseDeltasByExport = {};
+      summaryExports.forEach((expId) => {
+        pseDeltasByExport[expId] = computePseDeltas(
+          project.chapters,
+          qtyFromMap(new Map(Object.entries(clientQtyMaps[expId] || {})))
+        );
+      });
+      // Déduction « base remplacée » contenue dans un nœud (pour un export donné).
+      const substDeductionFor = (node, expId) =>
+        collectSubstitutions(node, pseDeltasByExport[expId]).reduce((s, { info }) => s + info.baseTotal, 0);
+      // Le nœud est-il lui-même une PSE substitution valide ? (missing est structurel)
+      const isValidSubstitution = (node) => {
+        if (!(node.isOption && node.pseMode === 'substitution')) return false;
+        const info = pseDeltasByExport[summaryExports[0]]?.get(node.id);
+        return !!info && !info.missing;
+      };
+      // Numéros de PSE (PSE n°1, n°2…) — mêmes racines que les pages PSE et l'écran.
+      const pseNumbersSummary = buildPseNumbers(project.chapters);
+
+      const buildSummaryRows = (nodes, level, mode, parentIsOption = false) => {
         let rows = [];
         nodes.forEach((node, nodeIdx) => {
           if (node.children) {
-            const rawTitle = (node.title || node.designation || '');
+            const effOption = parentIsOption || !!node.isOption;
+            // En mode PSE : un conteneur de base (non-option) ne s'affiche pas en tant
+            // que PSE — on descend chercher les racines PSE à l'intérieur, au même niveau.
+            if (mode === 'option' && !effOption) {
+              rows.push(...buildSummaryRows(node.children, level, mode, false));
+              return;
+            }
+            const subst = mode === 'option' && isValidSubstitution(node);
+            const isPseRoot = mode === 'option' && pseNumbersSummary.has(node.id);
+            // Plus-value (delta ≥ 0) / moins-value (delta < 0) — signe de la colonne « global ».
+            const substDelta = subst ? (pseDeltasByExport[summaryExports[0]]?.get(node.id)?.delta ?? 0) : 0;
+            const substSuffix = subst ? (substDelta >= 0 ? ' (PLUS-VALUE)' : ' (MOINS-VALUE)') : '';
+            const rawTitle = (node.title || node.designation || '') + substSuffix;
             const chapPrefix = (level === 0 && mode === 'base') ? `${nodeIdx + 1}. ` : '';
-            const title = (mode === 'option' && level === 0)
-              ? `PSE - ${rawTitle}`.toUpperCase()
+            const title = isPseRoot
+              ? `PSE n°${pseNumbersSummary.get(node.id)} - ${rawTitle}`.toUpperCase()
               : `${chapPrefix}${rawTitle}`.toUpperCase();
             const rowData = [];
             let hasContent = false;
@@ -223,8 +285,10 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
             summaryExports.forEach((expId) => {
               const map = new Map(Object.entries(clientQtyMaps[expId] || {}));
               const nodeData = collectData([node], false, 0, mode, projectRefMap, map, bpuConfig, includePM);
-              if (nodeData.total !== 0) hasContent = true;
-              cellTotals.push(nodeData.total);
+              // En mode PSE : on retranche les prestations de base remplacées (delta).
+              const t = mode === 'option' ? nodeData.total - substDeductionFor(node, expId) : nodeData.total;
+              if (t !== 0) hasContent = true;
+              cellTotals.push(t);
             });
             if (hasContent) {
               rowData.push({
@@ -249,7 +313,11 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
                 });
               });
               rows.push(rowData);
-              rows.push(...buildSummaryRows(node.children, level + 1, mode));
+              // Une PSE substitution s'affiche en une seule ligne (son surcoût) :
+              // on NE descend PAS dans son sous-arbre (déjà inclus dans le delta).
+              if (!(mode === 'option' && isValidSubstitution(node))) {
+                rows.push(...buildSummaryRows(node.children, level + 1, mode, effOption));
+              }
             }
           }
         });
@@ -383,19 +451,20 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
       doc.text(`TOTAL GÉNÉRAL TTC : ${cleanFormat(ttc)} €`, rightAlignX, currentY + 19, { align: 'right' });
     }
 
-    // Pages PSE
+    // Pages PSE — une page numérotée par PSE (racine option), avec son propre total.
     if (project.chapters) {
-      let pseCounter = 1;
-      project.chapters.forEach((chap, chapIndex) => {
+      // Deltas PSE substitution pour CE tranche/export (aligné sur l'écran).
+      const pseDeltas = computePseDeltas(project.chapters, qtyFromMap(currentMap));
+      const pseNodeIndex = buildNodeIndex(project.chapters);
+      const pseNumbers = buildPseNumbers(project.chapters);
+      const pseRoots = collectPseRoots(project.chapters);
+      pseRoots.forEach((chap) => {
+        const pseNo = pseNumbers.get(chap.id);
         const pseData = collectData([chap], false, 0, 'option', projectRefMap, currentMap, bpuConfig, includePM);
         if (pseData && pseData.rows.length > 0 && (isDQE || pseData.total !== 0)) {
           doc.addPage();
           doc.setFontSize(10); doc.setTextColor(...THEME.pse); doc.setFont("Helvetica", "bold");
-          doc.text(`PSE n°${pseCounter} : ${chapIndex + 1}. ${chap.title.toUpperCase()} - ${currentHeaderTrancheName}`, 14, 52);
-          pseCounter++;
-          // ── Préfixe numéro de chapitre sur le HEADER racine PSE ──
-          const firstPseHeader = pseData.rows.find(r => r.type === 'HEADER' && r.level === 0);
-          if (firstPseHeader) firstPseHeader.designation = `${chapIndex + 1}. ${firstPseHeader.designation.trim()}`;
+          doc.text(`PSE n°${pseNo} : ${(chap.title || '').toUpperCase()} - ${currentHeaderTrancheName}`, 14, 52);
           autoTable(doc, {
             ...tableConfig,
             startY: 58,
@@ -433,10 +502,46 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
           if (!isDQE) {
             const marginX = 10;
             const rightAlignX = doc.internal.pageSize.width - marginX;
+            const labelX = 78; // libellés alignés à gauche, montants alignés à droite
             let pY = doc.lastAutoTable.finalY + 10;
             doc.setFontSize(9);
-            doc.text(`TOTAL HT PSE : ${cleanFormat(pseData.total)} €`, rightAlignX, pY, { align: 'right' });
-            doc.text(`TOTAL TTC PSE : ${cleanFormat(pseData.total * 1.2)} €`, rightAlignX, pY + 8, { align: 'right' });
+
+            // Une ligne « libellé … montant » : libellé tronqué pour ne jamais déborder
+            // sur la colonne montant (montants jusqu'à 6 chiffres).
+            const totalLine = (label, amount, y) => {
+              const max = 50;
+              const lbl = label.length > max ? label.slice(0, max - 1) + '…' : label;
+              doc.text(lbl, labelX, y);
+              doc.text(amount, rightAlignX, y, { align: 'right' });
+            };
+
+            // PSE substitution : valeur = montant PSE − prestation(s) de base remplacée(s).
+            const substitutions = collectSubstitutions(chap, pseDeltas);
+
+            if (substitutions.length > 0) {
+              const deduction = substitutions.reduce((s, { info }) => s + info.baseTotal, 0);
+              const valeur = pseData.total - deduction; // delta signé (Σ substitutions + PSE simples)
+              const isPlus = valeur >= 0;
+              const motHT = isPlus ? 'PLUS-VALUE HT PSE' : 'MOINS-VALUE HT PSE';
+              const motTTC = isPlus ? 'PLUS-VALUE TTC PSE' : 'MOINS-VALUE TTC PSE';
+
+              doc.setFont('Helvetica', 'normal'); doc.setTextColor(...THEME.lightText);
+              totalLine('Montant PSE HT', `${cleanFormat(pseData.total)} €`, pY);
+              pY += 6;
+              substitutions.forEach(({ info }) => {
+                const { ref, label } = baseLabelOf(info.baseId, pseNodeIndex, projectRefMap);
+                const name = [ref, label].filter(Boolean).join(' ');
+                totalLine(`- Base remplacée : ${name}`, `-${cleanFormat(info.baseTotal)} €`, pY);
+                pY += 6;
+              });
+              doc.setFont('Helvetica', 'bold'); doc.setTextColor(...THEME.pse);
+              totalLine(motHT, `${isPlus ? '+' : ''}${cleanFormat(valeur)} €`, pY + 1);
+              totalLine(motTTC, `${isPlus ? '+' : ''}${cleanFormat(valeur * 1.2)} €`, pY + 9);
+              doc.setFont('Helvetica', 'normal');
+            } else {
+              totalLine('TOTAL HT PSE', `${cleanFormat(pseData.total)} €`, pY);
+              totalLine('TOTAL TTC PSE', `${cleanFormat(pseData.total * 1.2)} €`, pY + 8);
+            }
           }
         }
       });
