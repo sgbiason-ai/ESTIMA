@@ -107,7 +107,7 @@ const OptionsStep = ({ isPdf, hasTranches, tranches, includeCover, setIncludeCov
 };
 
 // Étape 2 : Prévisualisation PDF
-const PreviewStep = ({ blobUrl, suggestedName, onBack, onSave }) => {
+const PreviewStep = ({ blobUrl, suggestedName, onBack, onSave, onClose }) => {
   const [zoom, setZoom] = useState(100);
 
   return (
@@ -169,20 +169,28 @@ const PreviewStep = ({ blobUrl, suggestedName, onBack, onSave }) => {
       </div>
 
       {/* Footer */}
-      <div className="px-5 py-4 border-t border-white/8 flex justify-end gap-2" style={{ background: 'rgba(255,255,255,0.02)' }}>
+      <div className="px-5 py-4 border-t border-white/8 flex justify-between items-center gap-2" style={{ background: 'rgba(255,255,255,0.02)' }}>
         <button
-          onClick={onBack}
+          onClick={onClose}
           className="px-4 py-2 text-xs font-bold text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all"
         >
-          Modifier les options
+          Annuler
         </button>
-        <button
-          onClick={onSave}
-          className="flex items-center gap-2 px-5 py-2 text-xs font-black uppercase tracking-widest text-white rounded-lg transition-all active:scale-95"
-          style={{ background: 'linear-gradient(135deg,#ef4444,#dc2626)', boxShadow: '0 0 16px rgba(239,68,68,0.25)' }}
-        >
-          <Download size={13} /> Sauvegarder
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onBack}
+            className="px-4 py-2 text-xs font-bold text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all"
+          >
+            Modifier les options
+          </button>
+          <button
+            onClick={onSave}
+            className="flex items-center gap-2 px-5 py-2 text-xs font-black uppercase tracking-widest text-white rounded-lg transition-all active:scale-95"
+            style={{ background: 'linear-gradient(135deg,#ef4444,#dc2626)', boxShadow: '0 0 16px rgba(239,68,68,0.25)' }}
+          >
+            <Download size={13} /> Sauvegarder
+          </button>
+        </div>
       </div>
     </>
   );
@@ -366,6 +374,7 @@ const ExportModal = ({
             suggestedName={previewData?.suggestedName}
             onBack={handleBack}
             onSave={handleSave}
+            onClose={onClose}
           />
         )}
       </div>
