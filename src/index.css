@@ -264,3 +264,15 @@ button {
   flex: 0 0 0%;
   min-width: 0;
 }
+
+/* 8. CONFINEMENT Z-INDEX DES CARTES LEAFLET
+   Les panes Leaflet montent jusqu'à z-index 700 (et les contrôles 1000) sans
+   contexte d'empilement propre, ce qui les fait passer AU-DESSUS des modales
+   (confirm = z-60, etc.). On force un contexte d'empilement bas sur le conteneur
+   pour enfermer ces z-index internes sous les overlays applicatifs. Les overlays
+   posés volontairement sur la carte (panneaux, plein écran, lightbox) gardent
+   leur z-index propre dans leur parent et restent au-dessus. */
+.leaflet-container {
+  position: relative;
+  z-index: 0;
+}
