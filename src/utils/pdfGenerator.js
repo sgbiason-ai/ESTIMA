@@ -154,6 +154,10 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
   let projectRefMap = new Map();
   try { if (project?.chapters) projectRefMap = getItemRefMap(project); } catch { /* ignore */ }
 
+  // Label du total général : on ne précise « (Hors PSE) » que s'il existe des PSE.
+  const hasPse = collectPseRoots(project?.chapters || []).length > 0;
+  const totalHtLabel = hasPse ? 'TOTAL GÉNÉRAL HT (Hors PSE)' : 'TOTAL GÉNÉRAL HT';
+
   const drawHeader = () => {
     if (includeCover && doc.internal.getCurrentPageInfo().pageNumber === 1) return;
     const pageWidth = doc.internal.pageSize.width;
@@ -339,7 +343,7 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
       }
     }
 
-    const foot = [["TOTAL GÉNÉRAL HT (Hors PSE)", ...totals.map(t => ({ content: isDQE ? '' : cleanFormat(t) + " €", styles: { halign: 'right' } }))]];
+    const foot = [[totalHtLabel, ...totals.map(t => ({ content: isDQE ? '' : cleanFormat(t) + " €", styles: { halign: 'right' } }))]];
 
     // Largeurs de colonnes proportionnelles : désignation + N colonnes de prix
     const pageContentWidth = doc.internal.pageSize.width - 20; // 10mm margins each side
@@ -377,6 +381,9 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
     let globalTotal = 0;
 
     if (project.chapters) {
+      // Tous les chapitres dans UN SEUL tableau : l'en-tête de colonnes (N° · DÉSIGNATION…)
+      // n'est alors réimprimé qu'en haut de chaque page (autoTable), et non à chaque chapitre.
+      const allDetailRows = [];
       project.chapters.forEach((chap, chapIndex) => {
         const chapData = collectData([chap], false, 0, 'base', projectRefMap, currentMap, bpuConfig, includePM);
         if (chapData.rows.length === 0 || (!isDQE && chapData.total === 0 && !includePM)) return;
@@ -387,19 +394,16 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
         const rootSubtotal = chapData.rows.findLast(r => r.type === 'SUBTOTAL' && r.level === 0);
         if (rootSubtotal) rootSubtotal.designation = `SOUS-TOTAL ${chapIndex + 1}. ${(chap.title || '').toUpperCase()}`;
 
-        const estimatedHeight = chapData.rows.length * 6;
-        const pageBottom = doc.internal.pageSize.height - 30;
-        if (currentY + estimatedHeight > pageBottom && estimatedHeight < pageBottom - 50) {
-          doc.addPage(); currentY = 58;
-        }
+        allDetailRows.push(...chapData.rows.filter(row => !(row.type === 'SUBTOTAL' && row.total === 0)));
+        globalTotal += chapData.total;
+      });
 
-        const filteredChapRows = chapData.rows.filter(row => !(row.type === 'SUBTOTAL' && row.total === 0));
-
+      if (allDetailRows.length > 0) {
         autoTable(doc, {
           ...tableConfig,
           startY: currentY,
           head: [["N°", "DÉSIGNATION DES OUVRAGES", "U", "QTÉ", "P.U. HT", "TOTAL HT"]],
-          body: filteredChapRows.map(row => {
+          body: allDetailRows.map(row => {
             if (row.type === 'HEADER') return [safeRender(row.designation), '', '', '', '', ''];
             if (row.type === 'SUBTOTAL') return ['', safeRender(row.designation), '', '', '', isDQE ? '' : cleanFormat(row.total) + " €"];
             const displayQty = row.qty === 0 ? "PM" : row.qty;
@@ -410,7 +414,7 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
           }),
           didParseCell: (data) => {
             if (data.section === 'body') {
-              const row = filteredChapRows[data.row.index];
+              const row = allDetailRows[data.row.index];
               if (row.type === 'HEADER') {
                 data.cell.styles.halign = 'left'; data.cell.colSpan = 6; data.cell.styles.fontStyle = 'bold';
                 data.cell.styles.cellPadding = { left: 5, top: 2, bottom: 2 };
@@ -428,10 +432,8 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
             }
           }
         });
-
         currentY = doc.lastAutoTable.finalY + 5;
-        globalTotal += chapData.total;
-      });
+      }
     }
 
     if (!isDQE) {
@@ -444,7 +446,7 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
       const tvaRatePct = Number(project?.tauxTVA ?? 20);
       const { ht, tva, ttc } = computeVatBreakdown(globalTotal, tvaRatePct / 100);
       doc.setFontSize(9); doc.setFont("Helvetica", "bold");
-      doc.text(`TOTAL GÉNÉRAL HT (Hors PSE) : ${cleanFormat(ht)} €`, rightAlignX, currentY + 5, { align: 'right' });
+      doc.text(`${totalHtLabel} : ${cleanFormat(ht)} €`, rightAlignX, currentY + 5, { align: 'right' });
       doc.setFont("Helvetica", "normal");
       doc.text(`T.V.A. (${String(tvaRatePct).replace('.', ',')}%) : ${cleanFormat(tva)} €`, rightAlignX, currentY + 11, { align: 'right' });
       doc.setFontSize(11); doc.setFont("Helvetica", "bold");
