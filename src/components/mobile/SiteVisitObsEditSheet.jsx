@@ -60,8 +60,11 @@ export default function SiteVisitObsEditSheet({ obs, onUpdate, onDelete, onClose
     setImages(prev => prev.filter((_, i) => i !== idx));
   };
 
-  // Supprimer l'observation : nettoyer ses photos Storage.
-  const handleDeleteObs = () => {
+  // Supprimer l'observation : confirmation puis nettoyage des photos Storage.
+  const handleDeleteObs = async () => {
+    const { confirm } = await import('../../utils/globalUI');
+    const ok = await confirm('Supprimer cette observation ?', { danger: true });
+    if (!ok) return;
     for (const img of images) deleteSiteVisitImage(img);
     onDelete(obs.id);
     onClose();
@@ -78,7 +81,19 @@ export default function SiteVisitObsEditSheet({ obs, onUpdate, onDelete, onClose
       </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-4 pb-6">
+        <div className="flex-1 overflow-y-auto px-4 pb-4">
+          {/* Bouton ajouter photo — en haut, agrandi */}
+          <button
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+            className="flex items-center justify-center gap-2.5 w-full mt-3 py-4 bg-blue-50 border border-blue-200 rounded-2xl text-[15px] font-semibold text-blue-600 active:bg-blue-100 transition disabled:opacity-50"
+          >
+            <Icon name="camera" size={22} color="#2563eb" />
+            {uploading ? 'Téléversement…' : 'Ajouter une photo'}
+          </button>
+          <input ref={fileRef} type="file" accept="image/*" multiple capture="environment" className="hidden"
+            onChange={handleAddPhotos} />
+
           {/* Texte */}
           <textarea
             value={text}
@@ -87,7 +102,7 @@ export default function SiteVisitObsEditSheet({ obs, onUpdate, onDelete, onClose
             className="w-full min-h-[120px] p-3 bg-gray-50 border border-gray-200 rounded-xl text-[14px] text-gray-800 placeholder-gray-400 resize-none focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 mt-3"
           />
 
-          {/* Photos */}
+          {/* Photos — vignettes sous la note */}
           {images.length > 0 && (
             <div className="grid grid-cols-3 gap-2 mt-3">
               {images.map((img, idx) => {
@@ -105,24 +120,15 @@ export default function SiteVisitObsEditSheet({ obs, onUpdate, onDelete, onClose
               })}
             </div>
           )}
+        </div>
 
-          {/* Bouton ajouter photo */}
-          <button
-            onClick={() => fileRef.current?.click()}
-            className="flex items-center justify-center gap-2 w-full mt-3 py-3 bg-gray-100 rounded-xl text-[13px] font-medium text-gray-600 active:bg-gray-200 transition"
-          >
-            <Icon name="camera" size={16} color="#6b7280" />
-            {uploading ? 'Téléversement…' : 'Ajouter des photos'}
-          </button>
-          <input ref={fileRef} type="file" accept="image/*" multiple capture="environment" className="hidden"
-            onChange={handleAddPhotos} />
-
-          {/* Supprimer */}
+        {/* Footer — Supprimer épinglé en bas (avec confirmation) */}
+        <div className="shrink-0 px-4 py-3 border-t border-gray-200/60 bg-white">
           <button
             onClick={handleDeleteObs}
-            className="flex items-center justify-center gap-2 w-full mt-4 py-3 rounded-xl text-[13px] font-medium text-red-500 hover:bg-red-50 transition"
+            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-[14px] font-semibold text-red-600 bg-red-50 active:bg-red-100 transition"
           >
-            <Icon name="trash" size={14} color="#ef4444" />
+            <Icon name="trash" size={16} color="#dc2626" />
             Supprimer cette observation
           </button>
         </div>

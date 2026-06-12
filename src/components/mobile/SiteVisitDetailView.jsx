@@ -243,12 +243,19 @@ export default function SiteVisitDetailView({ visit, onSave, saveStatus, onToast
                 {localVisit.client && (<><span className="text-gray-300">·</span><span>{localVisit.client}</span></>)}
               </div>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2 shrink-0" onClick={e => e.stopPropagation()}>
               <span className="text-[12px] text-gray-400">{dateFr(localVisit.date)}</span>
-              <button onClick={handleExportPdf} className="p-1.5 rounded-lg bg-red-50 active:bg-red-100 transition">
-                <Icon name="download" size={14} color="#ef4444" />
+              {/* PDF — agrandi + libellé, séparé de l'édition */}
+              <button onClick={handleExportPdf}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-50 text-red-600 text-[13px] font-bold active:bg-red-100 active:scale-[0.97] transition">
+                <Icon name="download" size={16} color="#ef4444" />
+                PDF
               </button>
-              <Icon name="edit" size={14} color="#9ca3af" />
+              {/* Édition — bouton dédié */}
+              <button onClick={() => setEditingInfo(true)}
+                className="p-2 rounded-xl bg-gray-100 active:bg-gray-200 transition">
+                <Icon name="edit" size={16} color="#6b7280" />
+              </button>
             </div>
           </div>
         )}
