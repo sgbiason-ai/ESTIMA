@@ -97,7 +97,8 @@ const ProjectManagerView = ({
           if (data.linkedProjectId) {
             const nom = data.crrConfig?.chantierInfo?.nom || 'CR';
             if (!map[data.linkedProjectId]) map[data.linkedProjectId] = [];
-            map[data.linkedProjectId].push(nom);
+            // id conservé pour le deep-link vers le module CRC (pastille CR)
+            map[data.linkedProjectId].push({ id: d.id, nom });
           }
         });
         setLinkedCrcMap(map);
@@ -344,6 +345,20 @@ const ProjectManagerView = ({
     }
   }, [companyId, cloud, project?.id, setProject]);
 
+  // ── Deep-link pastilles RAO / CR : ouvrir le module SUR l'affaire cliquée ──
+  // Handoff one-shot via sessionStorage, consommé au montage du module cible.
+  const handleOpenRao = (proj) => {
+    try { sessionStorage.setItem('estima_open_rao_project_id', proj.id); } catch { /* ignore */ }
+    onNavigateModule?.('rao_analysis');
+  };
+  const handleOpenCrc = (proj) => {
+    const crcs = linkedCrcMap[proj.id] || [];
+    try {
+      if (crcs[0]?.id) sessionStorage.setItem('estima_open_crc_chantier_id', crcs[0].id);
+    } catch { /* ignore */ }
+    onNavigateModule?.('crc');
+  };
+
   // ── Fiche projet (info modale) ──
   const handleSaveDetails = useCallback(async (details) => {
     if (!detailsProject || !companyId) return;
@@ -521,7 +536,8 @@ const ProjectManagerView = ({
                   onInfoProject={setDetailsProject}
                   linkedCrcMap={linkedCrcMap}
                   raoProjectIds={raoProjectIds}
-                  onNavigateModule={onNavigateModule}
+                  onOpenRao={handleOpenRao}
+                  onOpenCrc={handleOpenCrc}
                 />
               </div>
 
@@ -533,7 +549,7 @@ const ProjectManagerView = ({
                   folders={fm.folders}
                   folderColorMap={folderColorMap}
                   presence={presenceByProject[panelProject.id] || []}
-                  linkedCrcNames={linkedCrcMap[panelProject.id] || null}
+                  linkedCrcs={linkedCrcMap[panelProject.id] || null}
                   hasRao={raoProjectIds.has(panelProject.id)}
                   deletingId={cloud.deletingId}
                   onClose={() => setPanelProject(null)}
@@ -545,7 +561,8 @@ const ProjectManagerView = ({
                   onDelete={cloud.handleDeleteCloudProject}
                   onRestore={cloud.handleRestoreSnapshot}
                   onSaveQuick={handleSaveQuickDetails}
-                  onNavigateModule={onNavigateModule}
+                  onOpenRao={handleOpenRao}
+                  onOpenCrc={handleOpenCrc}
                 />
               )}
             </div>

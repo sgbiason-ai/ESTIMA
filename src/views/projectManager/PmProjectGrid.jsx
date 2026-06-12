@@ -42,7 +42,7 @@ const PmProjectGrid = ({
   project, folders, folderColorMap = {},
   presenceByProject, deletingId,
   selectedId, onSelectProject,
-  onOpenInEstima, onDeleteProject, onDuplicateProject, onMoveProject, onRestoreSnapshot, onInfoProject, linkedCrcMap = {}, raoProjectIds = new Set(), onNavigateModule,
+  onOpenInEstima, onDeleteProject, onDuplicateProject, onMoveProject, onRestoreSnapshot, onInfoProject, linkedCrcMap = {}, raoProjectIds = new Set(), onOpenRao, onOpenCrc,
 }) => {
   // Popover "Versions précédentes" : ouvrable au clic (tactile) en plus du hover
   const [openHistId, setOpenHistId] = useState(null);
@@ -191,12 +191,12 @@ const PmProjectGrid = ({
                 {isActive && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md shrink-0 ${fc.badge}`}>Actif</span>}
                 {st && <span className={`flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md border shrink-0 ${st.badge}`}><span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />{st.label}</span>}
                 {raoProjectIds.has(proj.id) && (
-                  <button onClick={e => { e.stopPropagation(); onNavigateModule?.('rao_analysis'); }} className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-600 border border-blue-200/60 hover:bg-blue-100 transition-colors shrink-0" title="Ouvrir l'analyse des offres">
+                  <button onClick={e => { e.stopPropagation(); onOpenRao?.(proj); }} className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-600 border border-blue-200/60 hover:bg-blue-100 transition-colors shrink-0" title="Ouvrir l'analyse des offres de cette affaire">
                     <BarChart3 size={10} /> RAO
                   </button>
                 )}
                 {linkedCrcMap[proj.id] && (
-                  <button onClick={e => { e.stopPropagation(); onNavigateModule?.('crc'); }} className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-200/60 hover:bg-emerald-100 transition-colors shrink-0" title={`Ouvrir CR : ${linkedCrcMap[proj.id].join(', ')}`}>
+                  <button onClick={e => { e.stopPropagation(); onOpenCrc?.(proj); }} className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-200/60 hover:bg-emerald-100 transition-colors shrink-0" title={`Ouvrir le chantier : ${linkedCrcMap[proj.id].map(c => c.nom).join(', ')}`}>
                     <ClipboardList size={10} /> {linkedCrcMap[proj.id].length} CR
                   </button>
                 )}
@@ -338,12 +338,12 @@ const PmProjectGrid = ({
               {proj.code && <span className="flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-lg bg-gray-100 text-gray-600 border border-gray-200/60">N° {proj.code}</span>}
               {proj.location && <span className="text-[11px] text-gray-400 flex items-center gap-1">📍 {proj.location}</span>}
               {raoProjectIds.has(proj.id) && (
-                <button onClick={e => { e.stopPropagation(); onNavigateModule?.('rao_analysis'); }} className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-lg bg-blue-50 text-blue-600 border border-blue-200/60 hover:bg-blue-100 transition-colors cursor-pointer" title="Ouvrir l'analyse des offres">
+                <button onClick={e => { e.stopPropagation(); onOpenRao?.(proj); }} className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-lg bg-blue-50 text-blue-600 border border-blue-200/60 hover:bg-blue-100 transition-colors cursor-pointer" title="Ouvrir l'analyse des offres de cette affaire">
                   <BarChart3 size={10} /> RAO
                 </button>
               )}
               {linkedCrcMap[proj.id] && (
-                <button onClick={e => { e.stopPropagation(); onNavigateModule?.('crc'); }} className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200/60 hover:bg-emerald-100 transition-colors cursor-pointer" title={`Ouvrir CR : ${linkedCrcMap[proj.id].join(', ')}`}>
+                <button onClick={e => { e.stopPropagation(); onOpenCrc?.(proj); }} className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200/60 hover:bg-emerald-100 transition-colors cursor-pointer" title={`Ouvrir le chantier : ${linkedCrcMap[proj.id].map(c => c.nom).join(', ')}`}>
                   <ClipboardList size={10} /> {linkedCrcMap[proj.id].length} CR
                 </button>
               )}

@@ -69,6 +69,20 @@ export default function RaoAnalysisView({ user, companyId, onBackToHub }) {
     setMode('landing');
   }, []);
 
+  // Deep-link depuis le Workspace (pastille RAO d'une affaire) : handoff one-shot
+  // via sessionStorage → on saute le landing et on ouvre directement l'analyse.
+  const handoffConsumedRef = useRef(false);
+  React.useEffect(() => {
+    if (handoffConsumedRef.current || !companyId) return;
+    handoffConsumedRef.current = true;
+    let projId = null;
+    try {
+      projId = sessionStorage.getItem('estima_open_rao_project_id');
+      if (projId) sessionStorage.removeItem('estima_open_rao_project_id');
+    } catch { /* ignore */ }
+    if (projId) handleSelectProject({ id: projId });
+  }, [companyId, handleSelectProject]);
+
   const handleNewRao = useCallback(async () => {
     // 1. Demander le nom du projet (l'import du fichier MOE suit obligatoirement)
     const projectName = await prompt(

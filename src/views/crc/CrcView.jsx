@@ -78,9 +78,25 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
         if (brandSnap.exists()) setBranding(brandSnap.data().config);
         const libSnap = await getDoc(doc(db, 'companies', companyId, 'resources', 'participantLibrary'));
         if (libSnap.exists()) setParticipantLibrary(libSnap.data().contacts || []);
-        // Dernier chantier CRC : Firestore prefs + migration one-shot depuis localStorage
+        // Deep-link depuis le Workspace (pastille CR d'une affaire) : prioritaire,
+        // one-shot via sessionStorage — devient aussi le chantier mémorisé.
         let lastId = null;
-        if (user?.uid) {
+        try {
+          const handoff = sessionStorage.getItem('estima_open_crc_chantier_id');
+          if (handoff) {
+            sessionStorage.removeItem('estima_open_crc_chantier_id');
+            lastId = handoff;
+            if (user?.uid) {
+              setDoc(
+                doc(db, 'users', user.uid, 'preferences', 'modules'),
+                { crc: handoff, updatedAt: serverTimestamp() },
+                { merge: true }
+              ).catch(() => {});
+            }
+          }
+        } catch { /* ignore */ }
+        // Dernier chantier CRC : Firestore prefs + migration one-shot depuis localStorage
+        if (!lastId && user?.uid) {
           const prefsRef = doc(db, 'users', user.uid, 'preferences', 'modules');
           const prefsSnap = await getDoc(prefsRef);
           lastId = prefsSnap.exists() ? prefsSnap.data().crc : null;

@@ -43,14 +43,14 @@ const PmDetailsPanel = ({
   proj,
   isSessionActive,
   folders, folderColorMap = {},
-  presence = [], linkedCrcNames, hasRao,
+  presence = [], linkedCrcs, hasRao,
   deletingId,
   onClose,
   onOpenInEstima, onLoadSession,
   onOpenFullDetails,
   onDuplicate, onMove, onDelete, onRestore,
   onSaveQuick,
-  onNavigateModule,
+  onOpenRao, onOpenCrc,
 }) => {
   const [form, setForm] = useState({ name: '', code: '', location: '', client: '' });
   const [saving, setSaving] = useState(false);
@@ -249,18 +249,18 @@ const PmDetailsPanel = ({
                 <User size={13} className="text-gray-400 shrink-0" /> {savedBy}
               </div>
             )}
-            {(hasRao || linkedCrcNames) && (
+            {(hasRao || linkedCrcs) && (
               <div className="flex items-center gap-1.5 pt-1 flex-wrap">
                 {hasRao && (
-                  <button onClick={() => onNavigateModule?.('rao_analysis')}
-                    className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg bg-blue-50 text-blue-600 border border-blue-200/60 hover:bg-blue-100 transition-colors" title="Ouvrir l'analyse des offres">
+                  <button onClick={() => onOpenRao?.(proj)}
+                    className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg bg-blue-50 text-blue-600 border border-blue-200/60 hover:bg-blue-100 transition-colors" title="Ouvrir l'analyse des offres de cette affaire">
                     <BarChart3 size={11} /> Analyse RAO
                   </button>
                 )}
-                {linkedCrcNames && (
-                  <button onClick={() => onNavigateModule?.('crc')}
-                    className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200/60 hover:bg-emerald-100 transition-colors" title={`Ouvrir CR : ${linkedCrcNames.join(', ')}`}>
-                    <ClipboardList size={11} /> {linkedCrcNames.length} compte{linkedCrcNames.length > 1 ? 's' : ''}-rendu{linkedCrcNames.length > 1 ? 's' : ''}
+                {linkedCrcs && (
+                  <button onClick={() => onOpenCrc?.(proj)}
+                    className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200/60 hover:bg-emerald-100 transition-colors" title={`Ouvrir le chantier : ${linkedCrcs.map(c => c.nom).join(', ')}`}>
+                    <ClipboardList size={11} /> {linkedCrcs.length} compte{linkedCrcs.length > 1 ? 's' : ''}-rendu{linkedCrcs.length > 1 ? 's' : ''}
                   </button>
                 )}
               </div>
