@@ -323,25 +323,25 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
 
   return (
     <div className="fixed inset-0 z-modal flex items-center justify-center p-3">
-      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={isProjectSavedAndValid ? onClose : undefined} />
+      <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={isProjectSavedAndValid ? onClose : undefined} />
 
       <div ref={modalRef} className="relative bg-white rounded-2xl shadow-2xl w-[96vw] max-w-[1600px] h-[94vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-white/20 ring-1 ring-black/5 will-change-transform flex flex-col">
         
         {/* HEADER — pleine largeur */}
-        <div className="bg-slate-900 px-6 py-4 flex justify-between items-center border-b border-slate-800 cursor-move select-none group shrink-0" onMouseDown={handleMouseDown}>
+        <div className="bg-white/80 backdrop-blur-xl px-6 py-4 flex justify-between items-center border-b border-gray-200/60 cursor-move select-none group shrink-0" onMouseDown={handleMouseDown}>
           <div className="flex items-center gap-3">
-            <div className="bg-indigo-500/20 p-2 rounded-lg border border-indigo-500/30">
-              <FileSignature size={20} className="text-indigo-400" />
+            <div className="bg-indigo-50 p-2 rounded-lg border border-indigo-100">
+              <FileSignature size={20} className="text-indigo-600" />
             </div>
             <div>
-              <h2 className="text-lg font-black text-white uppercase tracking-wide leading-none flex items-center gap-2">
-                Fiche Projet <Move size={14} className="text-slate-600 opacity-50 group-hover:opacity-100 transition-opacity" />
+              <h2 className="text-lg font-black text-gray-900 uppercase tracking-wide leading-none flex items-center gap-2">
+                Fiche Projet <Move size={14} className="text-gray-400 opacity-50 group-hover:opacity-100 transition-opacity" />
               </h2>
-              <p className="text-[10px] text-slate-400 mt-1 font-medium">Informations générales & administratives</p>
+              <p className="text-[10px] text-gray-400 mt-1 font-medium">Informations générales & administratives</p>
             </div>
           </div>
           {isProjectSavedAndValid && (
-            <button type="button" onClick={onClose} className="text-slate-500 hover:text-white hover:bg-white/10 p-2 rounded-full transition-all" onMouseDown={(e) => e.stopPropagation()}>
+            <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-900 hover:bg-gray-100 p-2 rounded-full transition-all" onMouseDown={(e) => e.stopPropagation()}>
               <X size={20} />
             </button>
           )}
@@ -729,9 +729,9 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
                   form="project-form"
                   disabled={!isFormValid}
                   title={!isFormValid ? `Champs requis : ${Object.values(errors).join(' — ')}` : 'Enregistrer le projet'}
-                  className={`px-6 py-2.5 rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all ${
+                  className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all ${
                     isFormValid
-                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:scale-[1.02]'
+                      ? 'bg-indigo-600 text-white hover:bg-indigo-700 hover:shadow-lg active:scale-[0.98]'
                       : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                   }`}
                 >
@@ -742,13 +742,13 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
           </div>{/* fin colonne gauche */}
 
           {/* COL DROITE : volet aperçu rabattable */}
-          <div className={`shrink-0 border-l border-slate-200 bg-slate-900 flex flex-col overflow-hidden transition-all duration-300 ease-in-out ${previewOpen ? 'w-[320px]' : 'w-0 border-l-0'}`}>
+          <div className={`shrink-0 border-l border-gray-200/60 bg-[#f5f5f7] flex flex-col overflow-hidden transition-all duration-300 ease-in-out ${previewOpen ? 'w-[320px]' : 'w-0 border-l-0'}`}>
             {/* Titre + sélecteur type doc */}
-            <div className="px-4 py-3 border-b border-slate-700 shrink-0 min-w-[320px]">
+            <div className="px-4 py-3 border-b border-gray-200/60 shrink-0 min-w-[320px]">
               <div className="flex items-center gap-2 mb-2.5">
-                <Eye size={13} className="text-indigo-400" />
-                <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Aperçu page de garde</span>
-                {previewLoading && <RefreshCw size={10} className="text-indigo-400 animate-spin ml-auto" />}
+                <Eye size={13} className="text-indigo-600" />
+                <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Aperçu page de garde</span>
+                {previewLoading && <RefreshCw size={10} className="text-indigo-600 animate-spin ml-auto" />}
               </div>
               <div className="flex gap-1">
                 {['CCTP', 'RC', 'BPU / DQE', 'RAO'].map(type => (
@@ -756,10 +756,10 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
                     key={type}
                     type="button"
                     onClick={() => setPreviewDocType(type)}
-                    className={`flex-1 py-1 rounded text-[9px] font-black uppercase tracking-wider transition-all ${
+                    className={`flex-1 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
                       previewDocType === type
                         ? 'bg-indigo-600 text-white shadow-sm'
-                        : 'bg-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-700'
+                        : 'bg-gray-100 text-gray-600 hover:text-gray-900 hover:bg-gray-200'
                     }`}
                   >
                     {type}
@@ -775,17 +775,17 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
                   <img
                     src={previewUrl}
                     alt="Aperçu page de garde"
-                    className={`w-full h-full object-cover rounded shadow-2xl ring-1 ring-white/10 transition-opacity duration-300 ${previewLoading ? 'opacity-50' : 'opacity-100'}`}
+                    className={`w-full h-full object-cover rounded-xl shadow-lg ring-1 ring-gray-200/60 transition-opacity duration-300 ${previewLoading ? 'opacity-50' : 'opacity-100'}`}
                   />
                 ) : (
-                  <div className="w-full h-full bg-slate-800 rounded flex items-center justify-center">
-                    <RefreshCw size={20} className="text-slate-600 animate-spin" />
+                  <div className="w-full h-full bg-gray-100 rounded-xl flex items-center justify-center">
+                    <RefreshCw size={20} className="text-gray-400 animate-spin" />
                   </div>
                 )}
                 {previewLoading && previewUrl && (
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="bg-slate-900/70 rounded-full p-2">
-                      <RefreshCw size={14} className="text-indigo-400 animate-spin" />
+                    <div className="bg-white/80 backdrop-blur rounded-full p-2">
+                      <RefreshCw size={14} className="text-indigo-600 animate-spin" />
                     </div>
                   </div>
                 )}
@@ -793,7 +793,7 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
             </div>
 
             {/* Footer volet : export + infos */}
-            <div className="px-4 py-2.5 border-t border-slate-700 shrink-0 min-w-[320px]">
+            <div className="px-4 py-2.5 border-t border-gray-200/60 shrink-0 min-w-[320px]">
               <button
                 type="button"
                 onClick={handleExportCoverPdf}
@@ -813,7 +813,7 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
                   </>
                 )}
               </button>
-              <p className="text-[9px] text-slate-500 text-center leading-relaxed">
+              <p className="text-[9px] text-gray-400 text-center leading-relaxed">
                 Mis à jour en temps réel · 150 DPI · Format A4
               </p>
             </div>

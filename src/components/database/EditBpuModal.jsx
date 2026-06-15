@@ -195,8 +195,8 @@ const EditBpuModal = ({ item, onClose, onUpdate, units, categories = [], bpuConf
   }`;
 
   return (
-    <div className={`fixed inset-0 z-modal flex items-center justify-center bg-slate-900/80 backdrop-blur-sm ${isFullScreen ? 'p-0' : 'p-4'}`}>
-      <div className={`bg-white w-full shadow-2xl overflow-hidden border border-slate-200 flex flex-col relative transition-all duration-300 ${isFullScreen ? 'h-full rounded-none' : 'max-w-7xl h-[90vh] rounded-xl'}`}>
+    <div className={`fixed inset-0 z-modal flex items-center justify-center bg-black/20 backdrop-blur-sm ${isFullScreen ? 'p-0' : 'p-4'}`}>
+      <div className={`bg-white w-full shadow-2xl overflow-hidden border border-gray-200/60 flex flex-col relative transition-all duration-300 ${isFullScreen ? 'h-full rounded-none' : 'max-w-7xl h-[90vh] rounded-3xl'}`}>
         
         <CctpSelectorModal 
             isOpen={showCctpSelector}
@@ -206,23 +206,23 @@ const EditBpuModal = ({ item, onClose, onUpdate, units, categories = [], bpuConf
             onSelect={addCctpRef}
         />
 
-        <header className={`bg-slate-900 px-6 flex justify-between items-center text-white shrink-0 shadow-md transition-all duration-300 ${isFullScreen ? 'py-2 h-10' : 'py-4'}`}>
+        <header className={`bg-white/80 backdrop-blur-xl px-6 flex justify-between items-center border-b border-gray-200/60 shrink-0 transition-all duration-300 ${isFullScreen ? 'py-2 h-10' : 'py-4'}`}>
           <div className="flex items-center gap-3">
-            <Edit2 size={isFullScreen ? 14 : 18} className={projectOnly ? 'text-amber-400' : 'text-emerald-400'} />
-            <h3 className={`font-black uppercase tracking-[0.2em] text-white ${isFullScreen ? 'text-[10px]' : 'text-xs'}`}>
+            <Edit2 size={isFullScreen ? 14 : 18} className={projectOnly ? 'text-amber-600' : 'text-emerald-600'} />
+            <h3 className={`font-black uppercase tracking-[0.2em] text-gray-900 ${isFullScreen ? 'text-[10px]' : 'text-xs'}`}>
               {projectOnly ? 'Modifier dans le projet' : 'Édition Grand Format'}
             </h3>
             {projectOnly && !isFullScreen && (
-              <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200">
                 Projet uniquement
               </span>
             )}
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setIsFullScreen(!isFullScreen)} className="hover:bg-white/10 p-1.5 rounded-full transition-colors text-slate-300 hover:text-white">
+            <button onClick={() => setIsFullScreen(!isFullScreen)} className="hover:bg-gray-100 p-1.5 rounded-full transition-colors text-gray-500 hover:text-gray-900">
                 {isFullScreen ? <Minimize2 size={16} /> : <Maximize2 size={20} />}
             </button>
-            <button onClick={onClose} className="hover:bg-white/10 p-1.5 rounded-full transition-colors"><X size={isFullScreen ? 18 : 24} /></button>
+            <button onClick={onClose} className="hover:bg-gray-100 p-1.5 rounded-full transition-colors text-gray-500 hover:text-gray-900"><X size={isFullScreen ? 18 : 24} /></button>
           </div>
         </header>
 
@@ -398,7 +398,7 @@ const EditBpuModal = ({ item, onClose, onUpdate, units, categories = [], bpuConf
 
         <footer className={`flex justify-end gap-4 border-t border-slate-200 bg-white shrink-0 z-20 transition-all duration-300 ${isFullScreen ? 'p-3' : 'p-6'}`}>
           <button type="button" onClick={onClose} className="px-6 py-2 text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-slate-800 transition-colors">Annuler</button>
-          <button onClick={handleSubmit} className={`text-white px-8 py-3 rounded-lg text-[11px] font-black uppercase tracking-[0.2em] shadow-lg hover:shadow-xl transition-all flex items-center gap-2 transform active:scale-95 ${projectOnly ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
+          <button onClick={handleSubmit} className={`text-white px-8 py-3 rounded-xl text-[11px] font-black uppercase tracking-[0.2em] hover:shadow-lg transition-all flex items-center gap-2 transform active:scale-95 ${projectOnly ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
             <Save size={16} /> {projectOnly ? 'Appliquer au projet' : 'Enregistrer les modifications'}
           </button>
         </footer>

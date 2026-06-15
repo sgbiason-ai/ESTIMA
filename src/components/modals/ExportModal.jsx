@@ -25,8 +25,8 @@ const OptionsStep = ({ isPdf, hasTranches, tranches, includeCover, setIncludeCov
 
         {/* Sélection des tranches */}
         {hasTranches && (
-          <div className="rounded-lg border border-white/8 overflow-hidden">
-            <div className="px-3 py-2 bg-white/3 border-b border-white/8 text-[9px] font-bold text-white/40 uppercase tracking-widest">
+          <div className="rounded-lg border border-gray-200/60 overflow-hidden">
+            <div className="px-3 py-2 bg-gray-50 border-b border-gray-200/60 text-[9px] font-bold text-gray-400 uppercase tracking-widest">
               Données à exporter
             </div>
             <div className="p-2 space-y-1 max-h-36 overflow-y-auto">
@@ -34,10 +34,10 @@ const OptionsStep = ({ isPdf, hasTranches, tranches, includeCover, setIncludeCov
                 <div
                   key={opt.id}
                   onClick={() => handleToggleExport(opt.id)}
-                  className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-white/4 cursor-pointer transition-colors"
+                  className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
                 >
                   <Checkbox checked={selectedExports.includes(opt.id)} color="sky" />
-                  <span className={`text-sm font-medium ${selectedExports.includes(opt.id) ? 'text-white/90' : 'text-white/40'}`}>
+                  <span className={`text-sm font-medium ${selectedExports.includes(opt.id) ? 'text-gray-900' : 'text-gray-400'}`}>
                     {opt.name}
                   </span>
                 </div>
@@ -68,10 +68,10 @@ const OptionsStep = ({ isPdf, hasTranches, tranches, includeCover, setIncludeCov
       </div>
 
       {/* Footer */}
-      <div className="px-5 py-4 border-t border-white/8 flex justify-end gap-2" style={{ background: 'rgba(255,255,255,0.02)' }}>
+      <div className="px-5 py-4 border-t border-gray-200/60 bg-gray-50 flex justify-end gap-2">
         <button
           onClick={onClose}
-          className="px-4 py-2 text-xs font-bold text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all"
+          className="px-4 py-2 text-xs font-bold text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-all"
         >
           Annuler
         </button>
@@ -80,8 +80,7 @@ const OptionsStep = ({ isPdf, hasTranches, tranches, includeCover, setIncludeCov
           <button
             onClick={onGenerate}
             disabled={!canGenerate || isGenerating}
-            className="flex items-center gap-2 px-4 py-2 text-xs font-black uppercase tracking-widest text-white rounded-lg transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{ background: 'linear-gradient(135deg,#ef4444,#dc2626)', boxShadow: '0 0 16px rgba(239,68,68,0.25)' }}
+            className="flex items-center gap-2 px-4 py-2 text-xs font-black uppercase tracking-widest text-white rounded-xl bg-red-500 hover:bg-red-600 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {isGenerating
               ? <><Loader2 size={13} className="animate-spin" /> Génération...</>
@@ -92,8 +91,7 @@ const OptionsStep = ({ isPdf, hasTranches, tranches, includeCover, setIncludeCov
           <button
             onClick={onGenerate}
             disabled={!canGenerate || isGenerating}
-            className="flex items-center gap-2 px-4 py-2 text-xs font-black uppercase tracking-widest text-white rounded-lg transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{ background: 'linear-gradient(135deg,#10b981,#059669)', boxShadow: '0 0 16px rgba(16,185,129,0.25)' }}
+            className="flex items-center gap-2 px-4 py-2 text-xs font-black uppercase tracking-widest text-white rounded-xl bg-emerald-500 hover:bg-emerald-600 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {isGenerating
               ? <><Loader2 size={13} className="animate-spin" /> Génération...</>
@@ -113,10 +111,10 @@ const PreviewStep = ({ blobUrl, suggestedName, onBack, onSave, onClose }) => {
   return (
     <>
       {/* Toolbar preview */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-white/8" style={{ background: 'rgba(255,255,255,0.02)' }}>
+      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200/60 bg-white/80 backdrop-blur-xl">
         <button
           onClick={onBack}
-          className="flex items-center gap-1.5 text-xs font-bold text-white/50 hover:text-white/80 transition-colors"
+          className="flex items-center gap-1.5 text-xs font-bold text-gray-500 hover:text-gray-900 transition-colors"
         >
           <ArrowLeft size={13} /> Retour
         </button>
@@ -124,33 +122,33 @@ const PreviewStep = ({ blobUrl, suggestedName, onBack, onSave, onClose }) => {
         <div className="flex items-center gap-1">
           <button
             onClick={() => setZoom(z => Math.max(50, z - 10))}
-            className="w-7 h-7 flex items-center justify-center rounded-lg border border-white/8 text-white/40 hover:text-white/70 hover:bg-white/5 transition-all"
+            className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200/60 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all"
           >
             <ZoomOut size={12} />
           </button>
-          <span className="text-[10px] font-bold text-white/40 w-12 text-center tabular-nums">{zoom}%</span>
+          <span className="text-[10px] font-bold text-gray-500 w-12 text-center tabular-nums">{zoom}%</span>
           <button
             onClick={() => setZoom(z => Math.min(200, z + 10))}
-            className="w-7 h-7 flex items-center justify-center rounded-lg border border-white/8 text-white/40 hover:text-white/70 hover:bg-white/5 transition-all"
+            className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200/60 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all"
           >
             <ZoomIn size={12} />
           </button>
           <button
             onClick={() => setZoom(100)}
-            className="w-7 h-7 flex items-center justify-center rounded-lg border border-white/8 text-white/40 hover:text-white/70 hover:bg-white/5 transition-all ml-1"
+            className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200/60 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all ml-1"
             title="Réinitialiser le zoom"
           >
             <RotateCw size={11} />
           </button>
         </div>
 
-        <span className="text-[10px] text-white/30 font-medium truncate max-w-[160px]">{suggestedName}</span>
+        <span className="text-[10px] text-gray-400 font-medium truncate max-w-[160px]">{suggestedName}</span>
       </div>
 
       {/* Iframe PDF */}
       <div
         className="flex-1 overflow-auto"
-        style={{ background: '#0d1117', minHeight: 0 }}
+        style={{ background: '#f5f5f7', minHeight: 0 }}
       >
         <div
           className="mx-auto transition-all duration-200 origin-top"
@@ -169,24 +167,23 @@ const PreviewStep = ({ blobUrl, suggestedName, onBack, onSave, onClose }) => {
       </div>
 
       {/* Footer */}
-      <div className="px-5 py-4 border-t border-white/8 flex justify-between items-center gap-2" style={{ background: 'rgba(255,255,255,0.02)' }}>
+      <div className="px-5 py-4 border-t border-gray-200/60 bg-gray-50 flex justify-between items-center gap-2">
         <button
           onClick={onClose}
-          className="px-4 py-2 text-xs font-bold text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all"
+          className="px-4 py-2 text-xs font-bold text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-all"
         >
           Annuler
         </button>
         <div className="flex items-center gap-2">
           <button
             onClick={onBack}
-            className="px-4 py-2 text-xs font-bold text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all"
+            className="px-4 py-2 text-xs font-bold text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-all"
           >
             Modifier les options
           </button>
           <button
             onClick={onSave}
-            className="flex items-center gap-2 px-5 py-2 text-xs font-black uppercase tracking-widest text-white rounded-lg transition-all active:scale-95"
-            style={{ background: 'linear-gradient(135deg,#ef4444,#dc2626)', boxShadow: '0 0 16px rgba(239,68,68,0.25)' }}
+            className="flex items-center gap-2 px-5 py-2 text-xs font-black uppercase tracking-widest text-white rounded-xl bg-red-500 hover:bg-red-600 transition-all active:scale-95"
           >
             <Download size={13} /> Sauvegarder
           </button>
@@ -206,7 +203,7 @@ const Checkbox = ({ checked, color }) => {
     sky:     'bg-sky-500     border-sky-500',
   };
   return (
-    <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0 ${checked ? colors[color] : 'bg-white/5 border-white/15'}`}>
+    <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0 ${checked ? colors[color] : 'bg-white border-gray-300'}`}>
       {checked && <Check size={9} className="text-white" strokeWidth={3} />}
     </div>
   );
@@ -214,21 +211,21 @@ const Checkbox = ({ checked, color }) => {
 
 const OptionRow = ({ checked, onChange, color, label, desc }) => {
   const borders = {
-    emerald: 'border-emerald-500/40 bg-emerald-500/8',
-    indigo:  'border-indigo-500/40  bg-indigo-500/8',
-    amber:   'border-amber-500/40   bg-amber-500/8',
+    emerald: 'border-emerald-300 bg-emerald-50',
+    indigo:  'border-indigo-300  bg-indigo-50',
+    amber:   'border-amber-300   bg-amber-50',
   };
   return (
     <div
       onClick={() => onChange(!checked)}
-      className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-        checked ? borders[color] : 'border-white/8 hover:border-white/15 hover:bg-white/3'
+      className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+        checked ? borders[color] : 'border-gray-200/60 hover:border-gray-300 hover:bg-gray-50'
       }`}
     >
       <Checkbox checked={checked} color={color} />
       <div>
-        <div className={`text-sm font-bold ${checked ? 'text-white/90' : 'text-white/50'}`}>{label}</div>
-        {desc && <div className={`text-[10px] mt-0.5 ${checked ? 'text-white/40' : 'text-white/25'}`}>{desc}</div>}
+        <div className={`text-sm font-bold ${checked ? 'text-gray-900' : 'text-gray-500'}`}>{label}</div>
+        {desc && <div className={`text-[10px] mt-0.5 ${checked ? 'text-gray-500' : 'text-gray-400'}`}>{desc}</div>}
       </div>
     </div>
   );
@@ -318,13 +315,12 @@ const ExportModal = ({
   const isPreview = step === 'preview';
 
   return (
-    <div className="fixed inset-0 z-modal flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: isPreview ? 'none' : 'blur(8px)', padding: isPreview ? '0' : '16px' }}>
+    <div className="fixed inset-0 z-modal flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.2)', backdropFilter: isPreview ? 'none' : 'blur(4px)', padding: isPreview ? '0' : '16px' }}>
       <div
-        className="flex flex-col rounded-xl overflow-hidden shadow-2xl transition-all duration-300"
+        className="flex flex-col rounded-3xl overflow-hidden shadow-2xl transition-all duration-300"
         style={{
-          background: 'linear-gradient(180deg, rgba(12,20,30,0.99) 0%, rgba(8,15,22,0.99) 100%)',
-          border: isPreview ? 'none' : '1px solid rgba(255,255,255,0.08)',
-          boxShadow: '0 0 0 1px rgba(255,255,255,0.04), 0 32px 64px rgba(0,0,0,0.6)',
+          background: '#ffffff',
+          border: isPreview ? 'none' : '1px solid rgba(229,231,235,0.6)',
           width: isPreview ? '100vw' : '380px',
           maxHeight: isPreview ? '100vh' : '92vh',
           height: isPreview ? '100vh' : 'auto',
@@ -332,19 +328,19 @@ const ExportModal = ({
         }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/8 shrink-0">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200/60 shrink-0">
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${isPdf ? 'bg-red-500/12 text-red-400' : 'bg-emerald-500/12 text-emerald-400'}`}>
+            <div className={`p-2 rounded-lg ${isPdf ? 'bg-red-50 text-red-500' : 'bg-emerald-50 text-emerald-600'}`}>
               <Icon size={18} strokeWidth={1.5} />
             </div>
             <div>
-              <h3 className="text-sm font-black uppercase tracking-widest text-white/90">{title}</h3>
-              <p className="text-[9px] font-bold text-white/35 uppercase tracking-widest mt-0.5">
+              <h3 className="text-sm font-black uppercase tracking-widest text-gray-900">{title}</h3>
+              <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">
                 {type}{isPreview ? ' — Prévisualisation' : ''}
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/5 transition-all">
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-all">
             <X size={16} strokeWidth={1.5} />
           </button>
         </div>
