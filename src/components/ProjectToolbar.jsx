@@ -266,7 +266,7 @@ const ProjectToolbar = ({
 
             {/* ─── TOGGLE CENTRAL ─── */}
             <div className="flex flex-col items-center justify-center shrink-0 px-3">
-              <div className="relative flex items-center bg-slate-200/80 rounded-lg p-[3px] shadow-inner">
+              <div className="relative flex items-center bg-gray-100 rounded-xl p-[3px]">
                 <div className={`absolute top-[3px] bottom-[3px] w-[calc(50%-3px)] rounded-md shadow-md transition-all duration-250 ease-out
                   ${currentMode === 'study'
                     ? 'left-[3px] bg-gradient-to-b from-emerald-500 to-emerald-600'

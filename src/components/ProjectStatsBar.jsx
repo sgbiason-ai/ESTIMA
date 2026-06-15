@@ -10,21 +10,21 @@ const ProjectStatsBar = ({
   handleAutoSort
 }) => {
   return (
-    <div className="bg-slate-900 text-white px-6 py-2 flex items-center justify-between text-[10px] font-bold uppercase tracking-widest border-b border-slate-800 shrink-0 shadow-inner">
+    <div className="bg-white/80 backdrop-blur-xl text-gray-900 px-6 py-2 flex items-center justify-between text-[10px] font-bold uppercase tracking-widest border-b border-gray-200/60 shrink-0">
        <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
-              <span className="text-slate-500">Étude HT:</span>
-              <span className="text-emerald-400 font-mono text-xs">{formatPrice(projectStats.study.base)}</span>
+              <span className="text-gray-400">Étude HT:</span>
+              <span className="text-emerald-600 font-mono text-xs">{formatPrice(projectStats.study.base)}</span>
           </div>
-          <div className="h-3 w-px bg-slate-700" />
+          <div className="h-3 w-px bg-gray-200" />
           <div className="flex items-center gap-2">
-              <span className="text-slate-500">Rendu HT:</span>
-              <span className="text-indigo-400 font-mono text-xs">{formatPrice(projectStats.client.base)}</span>
+              <span className="text-gray-400">Rendu HT:</span>
+              <span className="text-indigo-600 font-mono text-xs">{formatPrice(projectStats.client.base)}</span>
           </div>
-          <div className="h-3 w-px bg-slate-700" />
+          <div className="h-3 w-px bg-gray-200" />
           <div className="flex items-center gap-2">
-              <span className="text-slate-500">Avaloir Global:</span>
-              <span className="text-amber-400 font-mono text-xs">
+              <span className="text-gray-400">Avaloir Global:</span>
+              <span className="text-amber-600 font-mono text-xs">
               {(() => {
                   const base = projectStats.study.base;
                   const current = projectStats.client.base;
@@ -41,7 +41,7 @@ const ProjectStatsBar = ({
        {bpuConfig?.numberingMode === 'manual' && !isReadOnly && (
          <button 
            onClick={handleAutoSort}
-           className="flex items-center gap-1.5 px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded border border-slate-700 transition-colors"
+           className="flex items-center gap-1.5 px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900 rounded-xl border border-gray-200/60 transition-colors duration-200"
            title="Trier tous les chapitres et articles par numéro BPU croissant"
          >
            <ArrowDownNarrowWide size={12} />

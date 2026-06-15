@@ -87,9 +87,9 @@ const ChapterEditorModal = ({ isOpen, onClose, node, onSave, availableVariables 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-modal flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-modal flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm animate-in fade-in duration-200">
       <div
-        className={`bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300 ${isFullScreen ? 'w-[98vw] h-[95vh]' : 'w-full max-w-5xl h-[85vh]'}`}
+        className={`bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300 ${isFullScreen ? 'w-[98vw] h-[95vh]' : 'w-full max-w-5xl h-[85vh]'}`}
       >
         {/* --- EN-TÊTE --- */}
         <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-slate-50 shrink-0">
@@ -190,7 +190,7 @@ const ChapterEditorModal = ({ isOpen, onClose, node, onSave, availableVariables 
             </button>
             <button
                 onClick={handleSave}
-                className="px-6 py-2.5 rounded-lg text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-200 flex items-center gap-2 transition-all active:scale-95"
+                className="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 hover:shadow-lg flex items-center gap-2 transition-all active:scale-95"
             >
                 <Save size={18} /> Enregistrer
             </button>

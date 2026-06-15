@@ -51,8 +51,8 @@ export default function CalculationModal({ show, onClose, onConfirm, analysis, d
   const isImpossible = variableBase === 0;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+    <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
         <div className="bg-emerald-600 p-4 flex items-center gap-3 text-white">
           <Calculator size={24} />
           <h2 className="font-black uppercase tracking-widest text-sm">Calculateur de Marge</h2>

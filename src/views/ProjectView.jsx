@@ -1046,8 +1046,8 @@ const ProjectView = ({
 
       {/* Garde à l'export : avertir si des numéros de prix sont incohérents */}
       {exportGuard.show && (
-        <div className="fixed inset-0 z-modal-stack flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-[440px] border border-slate-200 p-6">
+        <div className="fixed inset-0 z-modal-stack flex items-center justify-center bg-black/20 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-2xl w-[440px] border border-gray-200/60 p-6">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
                 <AlertTriangle size={20} className="text-amber-600" />
@@ -1065,13 +1065,13 @@ const ProjectView = ({
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => { const { format, type } = exportGuard; setExportGuard(g => ({ ...g, show: false })); setExportModalState({ show: true, format, type }); }}
-                className="px-4 py-2 text-[11px] font-bold uppercase tracking-wide border border-slate-300 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"
+                className="px-4 py-2 text-[11px] font-bold uppercase tracking-wide border border-gray-200/60 rounded-xl hover:bg-gray-100 text-gray-600 transition-colors"
               >
                 Exporter quand même
               </button>
               <button
                 onClick={() => { setExportGuard(g => ({ ...g, show: false })); setShowPriceCheck(true); }}
-                className="px-4 py-2 text-[11px] font-bold uppercase tracking-wide bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors shadow-sm"
+                className="px-4 py-2 text-[11px] font-bold uppercase tracking-wide bg-violet-600 text-white rounded-xl hover:bg-violet-700 transition-colors"
               >
                 Corriger d'abord
               </button>
@@ -1081,7 +1081,7 @@ const ProjectView = ({
       )}
 
       {!isReadOnly && (
-        <button onClick={() => setShowFormulaHelp(true)} className="fixed bottom-20 right-6 z-[9000] flex items-center gap-2 px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 group">
+        <button onClick={() => setShowFormulaHelp(true)} className="fixed bottom-20 right-6 z-[9000] flex items-center gap-2 px-3 py-2.5 bg-white/90 backdrop-blur-xl hover:bg-gray-100 text-gray-700 hover:text-gray-900 border border-gray-200/60 rounded-full hover:shadow-lg transition-all duration-200 group">
           <HelpCircle size={16} />
           <span className="text-[11px] font-bold uppercase tracking-wide max-w-0 overflow-hidden group-hover:max-w-[120px] transition-all duration-300 whitespace-nowrap">Aide formules</span>
         </button>

@@ -6,8 +6,8 @@ const ConfirmDeleteModal = ({ isOpen, onClose, onConfirm }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-modal-stack flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+    <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-modal-stack flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
         <div className="bg-red-50 p-4 flex items-center gap-3 border-b border-red-100">
           <div className="p-2 bg-red-100 rounded-full text-red-600">
             <AlertTriangle size={20} />

@@ -18,7 +18,7 @@ const TranchesBar = ({
   if (!hasTranches && isReadOnly) return null;
 
   return (
-    <div className={`px-6 flex items-center gap-2 border-b border-slate-200 overflow-x-auto ${theme.bg} z-10 shadow-sm`}>
+    <div className={`px-6 flex items-center gap-2 border-b border-gray-200/60 overflow-x-auto ${theme.bg} z-10`}>
       {/* Onglet Global */}
       <button
         onClick={() => setActiveTrancheId('global')}
