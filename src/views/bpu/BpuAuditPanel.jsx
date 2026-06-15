@@ -2,44 +2,44 @@ import React, { useState, useMemo } from 'react';
 import { RefreshCw, AlertTriangle, CheckCircle2, X, AlertCircle, FileWarning, DollarSign, Ruler, PenLine, DatabaseBackup, RotateCcw } from 'lucide-react';
 
 const ISSUE_ICONS = {
-  missing: <AlertCircle size={13} className="text-red-400 shrink-0" />,
-  no_description: <FileWarning size={13} className="text-amber-400 shrink-0" />,
-  price_diff: <DollarSign size={13} className="text-blue-400 shrink-0" />,
-  unit_diff: <Ruler size={13} className="text-purple-400 shrink-0" />,
-  desc_diff: <DatabaseBackup size={13} className="text-cyan-400 shrink-0" />,
-  override: <PenLine size={13} className="text-amber-400 shrink-0" />,
+  missing: <AlertCircle size={13} className="text-red-500 shrink-0" />,
+  no_description: <FileWarning size={13} className="text-amber-600 shrink-0" />,
+  price_diff: <DollarSign size={13} className="text-blue-600 shrink-0" />,
+  unit_diff: <Ruler size={13} className="text-purple-600 shrink-0" />,
+  desc_diff: <DatabaseBackup size={13} className="text-cyan-600 shrink-0" />,
+  override: <PenLine size={13} className="text-amber-600 shrink-0" />,
 };
 
 const ISSUE_COLORS = {
-  missing: 'text-red-300',
-  no_description: 'text-amber-300',
-  price_diff: 'text-blue-300',
-  unit_diff: 'text-purple-300',
-  desc_diff: 'text-cyan-300',
-  override: 'text-amber-300',
+  missing: 'text-red-600',
+  no_description: 'text-amber-700',
+  price_diff: 'text-blue-700',
+  unit_diff: 'text-purple-700',
+  desc_diff: 'text-cyan-700',
+  override: 'text-amber-700',
 };
 
 const RESTORABLE_TYPES = new Set(['price_diff', 'unit_diff', 'desc_diff', 'override']);
 
 const FILTER_DEFS = [
   { type: 'no_description', statKey: 'noDescription', icon: <FileWarning size={10} />, label: 'sans description',
-    base: 'bg-amber-500/10 border-amber-500/20 text-amber-400 hover:bg-amber-500/20',
-    active: 'bg-amber-500/30 border-amber-400 text-amber-300 ring-1 ring-amber-400/50' },
+    base: 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100',
+    active: 'bg-amber-100 border-amber-300 text-amber-800 ring-1 ring-amber-200' },
   { type: 'price_diff', statKey: 'priceDiff', icon: <DollarSign size={10} />, label: 'prix modifiés',
-    base: 'bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20',
-    active: 'bg-blue-500/30 border-blue-400 text-blue-300 ring-1 ring-blue-400/50' },
+    base: 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100',
+    active: 'bg-blue-100 border-blue-300 text-blue-800 ring-1 ring-blue-200' },
   { type: 'unit_diff', statKey: 'unitDiff', icon: <Ruler size={10} />, label: 'unités modifiées',
-    base: 'bg-purple-500/10 border-purple-500/20 text-purple-400 hover:bg-purple-500/20',
-    active: 'bg-purple-500/30 border-purple-400 text-purple-300 ring-1 ring-purple-400/50' },
+    base: 'bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100',
+    active: 'bg-purple-100 border-purple-300 text-purple-800 ring-1 ring-purple-200' },
   { type: 'desc_diff', statKey: 'descDiff', icon: <DatabaseBackup size={10} />, label: 'desc. modifiées',
-    base: 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400 hover:bg-cyan-500/20',
-    active: 'bg-cyan-500/30 border-cyan-400 text-cyan-300 ring-1 ring-cyan-400/50' },
+    base: 'bg-cyan-50 border-cyan-200 text-cyan-700 hover:bg-cyan-100',
+    active: 'bg-cyan-100 border-cyan-300 text-cyan-800 ring-1 ring-cyan-200' },
   { type: 'override', statKey: 'overrides', icon: <PenLine size={10} />, label: 'surchargés',
-    base: 'bg-amber-500/10 border-amber-500/20 text-amber-400 hover:bg-amber-500/20',
-    active: 'bg-amber-500/30 border-amber-400 text-amber-300 ring-1 ring-amber-400/50' },
+    base: 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100',
+    active: 'bg-amber-100 border-amber-300 text-amber-800 ring-1 ring-amber-200' },
   { type: 'missing', statKey: 'missing', icon: <AlertCircle size={10} />, label: 'absents BPU',
-    base: 'bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20',
-    active: 'bg-red-500/30 border-red-400 text-red-300 ring-1 ring-red-400/50' },
+    base: 'bg-red-50 border-red-200 text-red-600 hover:bg-red-100',
+    active: 'bg-red-100 border-red-300 text-red-700 ring-1 ring-red-200' },
 ];
 
 const scrollToItem = (itemId) => {
@@ -148,41 +148,41 @@ const BpuAuditPanel = ({ audit, onClose, onSyncDescriptions, onRestoreIssues }) 
   const allVisibleSelected = itemsRestorable.length > 0 && itemsRestorable.every(it => selectedIds.has(it.id));
 
   return (
-    <div className="w-[340px] bg-slate-900 border-l border-slate-700 flex flex-col shrink-0 overflow-hidden relative">
+    <div className="w-[340px] bg-white border-l border-gray-200/60 flex flex-col shrink-0 overflow-hidden relative">
       {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b border-slate-700 bg-slate-800/50">
+      <div className="flex items-center justify-between p-3 border-b border-gray-200/60 bg-white/80 backdrop-blur-xl">
         <div className="flex items-center gap-2">
           {audit.stats.errors > 0
-            ? <AlertTriangle size={15} className="text-amber-400" />
-            : <CheckCircle2 size={15} className="text-emerald-400" />
+            ? <AlertTriangle size={15} className="text-amber-600" />
+            : <CheckCircle2 size={15} className="text-emerald-600" />
           }
-          <span className="text-[10px] font-bold text-white uppercase tracking-wider">
+          <span className="text-[10px] font-bold text-gray-900 uppercase tracking-wider">
             Audit — {audit.stats.total} articles
           </span>
         </div>
-        <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors p-1 rounded hover:bg-slate-700">
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-900 transition-colors p-1 rounded hover:bg-gray-100">
           <X size={14} />
         </button>
       </div>
 
       {/* Statistiques */}
-      <div className="grid grid-cols-3 gap-1.5 p-2.5 border-b border-slate-700/50">
-        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-1.5 text-center">
-          <div className="text-base font-black text-emerald-400">{audit.stats.ok}</div>
-          <div className="text-[8px] font-bold text-emerald-400/70 uppercase">Conformes</div>
+      <div className="grid grid-cols-3 gap-1.5 p-2.5 border-b border-gray-200/60">
+        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-1.5 text-center">
+          <div className="text-base font-black text-emerald-600">{audit.stats.ok}</div>
+          <div className="text-[8px] font-bold text-emerald-700 uppercase">Conformes</div>
         </div>
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-1.5 text-center">
-          <div className="text-base font-black text-amber-400">{audit.stats.errors}</div>
-          <div className="text-[8px] font-bold text-amber-400/70 uppercase">Alertes</div>
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-1.5 text-center">
+          <div className="text-base font-black text-amber-600">{audit.stats.errors}</div>
+          <div className="text-[8px] font-bold text-amber-700 uppercase">Alertes</div>
         </div>
-        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-1.5 text-center">
-          <div className="text-base font-black text-red-400">{audit.stats.missing}</div>
-          <div className="text-[8px] font-bold text-red-400/70 uppercase">Absents</div>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-1.5 text-center">
+          <div className="text-base font-black text-red-500">{audit.stats.missing}</div>
+          <div className="text-[8px] font-bold text-red-600 uppercase">Absents</div>
         </div>
       </div>
 
       {/* Filtres par type */}
-      <div className="flex flex-wrap gap-1 px-2.5 py-2 border-b border-slate-700/50">
+      <div className="flex flex-wrap gap-1 px-2.5 py-2 border-b border-gray-200/60">
         {FILTER_DEFS.map(f => {
           const count = audit.stats[f.statKey];
           if (!count) return null;
@@ -202,13 +202,13 @@ const BpuAuditPanel = ({ audit, onClose, onSyncDescriptions, onRestoreIssues }) 
         {activeFilter && (
           <button
             onClick={() => setActiveFilter(null)}
-            className="flex items-center gap-1 px-1.5 py-0.5 bg-slate-700 border border-slate-600 rounded text-[8px] font-bold text-slate-300 hover:bg-slate-600 transition-all"
+            className="flex items-center gap-1 px-1.5 py-0.5 bg-gray-100 border border-gray-200/60 rounded text-[8px] font-bold text-gray-600 hover:bg-gray-200 transition-all"
           >
             <X size={8} /> Tous
           </button>
         )}
         {audit.stats.errors === 0 && (
-          <span className="flex items-center gap-1 px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded text-[8px] font-bold text-emerald-400">
+          <span className="flex items-center gap-1 px-2 py-0.5 bg-emerald-50 border border-emerald-200 rounded text-[8px] font-bold text-emerald-600">
             <CheckCircle2 size={10} /> Tout est conforme
           </span>
         )}
@@ -216,15 +216,15 @@ const BpuAuditPanel = ({ audit, onClose, onSyncDescriptions, onRestoreIssues }) 
 
       {/* Bouton "tout sélectionner" / "désélectionner" */}
       {itemsRestorable.length > 0 && (
-        <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-slate-700/50 bg-slate-800/30">
+        <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-gray-200/60 bg-gray-50">
           <button
             onClick={allVisibleSelected ? clearSelection : selectAllVisible}
-            className="text-[9px] font-bold text-slate-300 hover:text-white uppercase tracking-wide transition-colors"
+            className="text-[9px] font-bold text-gray-600 hover:text-gray-900 uppercase tracking-wide transition-colors"
           >
             {allVisibleSelected ? 'Tout désélectionner' : `Tout sélectionner (${itemsRestorable.length})`}
           </button>
           {hasSelection && (
-            <span className="text-[9px] font-bold text-emerald-400">{selectedIds.size} sélectionné{selectedIds.size > 1 ? 's' : ''}</span>
+            <span className="text-[9px] font-bold text-emerald-600">{selectedIds.size} sélectionné{selectedIds.size > 1 ? 's' : ''}</span>
           )}
         </div>
       )}
@@ -240,8 +240,8 @@ const BpuAuditPanel = ({ audit, onClose, onSyncDescriptions, onRestoreIssues }) 
           return (
             <div
               key={item.id}
-              className={`relative bg-slate-800/50 border rounded-lg p-2 transition-all group ${
-                isSelected ? 'border-emerald-500/60 ring-1 ring-emerald-500/40 bg-emerald-500/5' : 'border-slate-700/50 hover:bg-slate-700/50 hover:border-slate-600'
+              className={`relative bg-white border rounded-lg p-2 transition-all group ${
+                isSelected ? 'border-emerald-300 ring-1 ring-emerald-200 bg-emerald-50' : 'border-gray-200/60 hover:bg-gray-50 hover:border-gray-300'
               }`}
             >
               <div className="flex items-start gap-1.5 mb-0.5">
@@ -250,7 +250,7 @@ const BpuAuditPanel = ({ audit, onClose, onSyncDescriptions, onRestoreIssues }) 
                     type="checkbox"
                     checked={isSelected}
                     onChange={() => toggleSelect(item.id)}
-                    className="mt-0.5 w-3 h-3 rounded border-slate-500 bg-slate-700 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-slate-900 cursor-pointer shrink-0"
+                    className="mt-0.5 w-3 h-3 rounded border-gray-300 bg-white text-emerald-600 focus:ring-emerald-200 cursor-pointer shrink-0"
                   />
                 )}
                 {!canRestore && <span className="w-3 shrink-0" />}
@@ -258,14 +258,14 @@ const BpuAuditPanel = ({ audit, onClose, onSyncDescriptions, onRestoreIssues }) 
                   onClick={() => scrollToItem(item.id)}
                   className="flex items-center gap-1.5 flex-1 min-w-0 text-left"
                 >
-                  <span className="text-[9px] font-black text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded tabular-nums shrink-0">{item.ref}</span>
-                  <span className="text-[10px] font-bold text-slate-200 truncate group-hover:text-white">{item.designation}</span>
+                  <span className="text-[9px] font-black text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded tabular-nums shrink-0">{item.ref}</span>
+                  <span className="text-[10px] font-bold text-gray-800 truncate group-hover:text-gray-900">{item.designation}</span>
                 </button>
                 {canRestore && onRestoreIssues && (
                   <button
                     onClick={() => handleRestoreOneItem(item)}
                     title={`Restaurer tout (${restorableInItem.length} champ${restorableInItem.length > 1 ? 's' : ''})`}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 shrink-0"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-emerald-100 text-emerald-600 hover:text-emerald-700 shrink-0"
                   >
                     <RotateCcw size={11} />
                   </button>
@@ -282,7 +282,7 @@ const BpuAuditPanel = ({ audit, onClose, onSyncDescriptions, onRestoreIssues }) 
                         <button
                           onClick={() => handleRestoreSingleIssue(item.id, issue)}
                           title="Restaurer ce champ depuis la base BPU"
-                          className="opacity-0 group-hover/issue:opacity-100 transition-opacity p-0.5 rounded hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 shrink-0"
+                          className="opacity-0 group-hover/issue:opacity-100 transition-opacity p-0.5 rounded hover:bg-emerald-100 text-emerald-600 hover:text-emerald-700 shrink-0"
                         >
                           <RotateCcw size={9} />
                         </button>
@@ -295,32 +295,32 @@ const BpuAuditPanel = ({ audit, onClose, onSyncDescriptions, onRestoreIssues }) 
           );
         })}
         {filteredIssues.length === 0 && audit.stats.errors > 0 && (
-          <div className="p-4 text-center text-slate-500 text-[10px] italic">Aucun résultat pour ce filtre</div>
+          <div className="p-4 text-center text-gray-400 text-[10px] italic">Aucun résultat pour ce filtre</div>
         )}
       </div>
 
       {/* Footer dynamique : barre d'action sélection OU sync descriptions */}
       {hasSelection ? (
-        <div className="p-2.5 border-t border-slate-700 bg-emerald-500/10 flex items-center gap-2">
+        <div className="p-2.5 border-t border-gray-200/60 bg-emerald-50 flex items-center gap-2">
           <button
             onClick={handleRestoreSelection}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-[10px] uppercase tracking-wide transition-all shadow-md hover:shadow-lg active:scale-[0.98]"
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-wide transition-all hover:shadow-lg active:scale-[0.98]"
           >
             <RotateCcw size={12} />
             Restaurer ({selectedIds.size})
           </button>
           <button
             onClick={clearSelection}
-            className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg font-bold text-[10px] uppercase tracking-wide transition-all"
+            className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-[10px] uppercase tracking-wide transition-all"
           >
             Annuler
           </button>
         </div>
       ) : (
-        <div className="p-2.5 border-t border-slate-700 bg-slate-800/30">
+        <div className="p-2.5 border-t border-gray-200/60 bg-gray-50">
           <button
             onClick={onSyncDescriptions}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-bold text-[10px] uppercase tracking-wide transition-all shadow-md hover:shadow-lg active:scale-[0.98]"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-wide transition-all hover:shadow-lg active:scale-[0.98]"
           >
             <RefreshCw size={12} />
             Synchroniser les descriptions
@@ -330,32 +330,32 @@ const BpuAuditPanel = ({ audit, onClose, onSyncDescriptions, onRestoreIssues }) 
 
       {/* Modal de confirmation pour restauration multi */}
       {confirmBatch && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-3">
-          <div className="bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-4 w-full max-w-[300px]">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm p-3">
+          <div className="bg-white border border-gray-200/60 rounded-2xl shadow-2xl p-4 w-full max-w-[300px]">
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0">
-                <AlertTriangle size={14} className="text-amber-400" />
+              <div className="w-8 h-8 rounded-full bg-amber-100 border border-amber-200 flex items-center justify-center shrink-0">
+                <AlertTriangle size={14} className="text-amber-600" />
               </div>
               <div className="min-w-0">
-                <h3 className="text-[11px] font-bold text-white">Confirmer la restauration ?</h3>
-                <p className="text-[9px] text-slate-400 mt-0.5">
+                <h3 className="text-[11px] font-bold text-gray-900">Confirmer la restauration ?</h3>
+                <p className="text-[9px] text-gray-500 mt-0.5">
                   {confirmBatch.count} articles • {confirmBatch.list.length} champ{confirmBatch.list.length > 1 ? 's' : ''}
                 </p>
               </div>
             </div>
-            <p className="text-[10px] text-slate-300 bg-amber-500/10 border border-amber-500/20 rounded-lg p-2 mb-3">
+            <p className="text-[10px] text-gray-700 bg-amber-50 border border-amber-200 rounded-lg p-2 mb-3">
               Les valeurs locales seront remplacées par celles de la base BPU.
             </p>
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setConfirmBatch(null)}
-                className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition-colors"
+                className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-colors"
               >
                 Annuler
               </button>
               <button
                 onClick={confirmAndExecute}
-                className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors shadow-sm"
+                className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition-colors"
               >
                 Confirmer
               </button>
