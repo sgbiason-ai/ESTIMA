@@ -3,9 +3,12 @@ import React, { useState, useMemo, useRef, useEffect, useCallback, memo } from '
 import { createPortal } from 'react-dom';
 import { Package, PanelLeftClose, Search, Filter, Boxes, ChevronDown } from 'lucide-react';
 import { formatPrice, cleanText, normalizeUnitSymbol, sanitizeHtml } from '../utils/helpers';
-import { buildBlocSubChapter, blocUnitPrice, getBlocArticles, getBlocKind } from '../utils/blocPricing';
+import { buildBlocSubChapter, blocUnitPrice, getBlocArticles, getBlocKind, isBlocRef } from '../utils/blocPricing';
 import { useToast } from '../contexts/ToastContext';
 import { useDialog } from '../contexts/DialogContext';
+
+// Nombre max de composants listés dans l'aperçu d'un bloc (au-delà : « +N autres »).
+const BLOC_PREVIEW_MAX = 8;
 
 // ── Carte article BPU memoisee ─────────────────────────────────────────────
 // Un changement de bpuSearch / selectedCategory provoque un nouveau filtrage,
@@ -60,7 +63,7 @@ const BpuSidebar = ({
   const { choose } = useDialog();
   // Ces états ne vivent désormais QUE dans la sidebar, ce qui allège ProjectView !
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [tooltipState, setTooltipState] = useState({ visible: false, item: null, style: {} });
+  const [tooltipState, setTooltipState] = useState({ visible: false, type: 'article', item: null, bloc: null, style: {} });
   const [blocsOpen, setBlocsOpen] = useState(true);
   const [blocKindFilter, setBlocKindFilter] = useState('all'); // 'all' | 'formula' | 'aggregate'
   const tooltipTimer = useRef(null);
@@ -156,16 +159,56 @@ const BpuSidebar = ({
 
   const numberingManual = bpuConfig?.numberingMode === 'manual';
 
+  // Position du tooltip (article ou bloc) : à droite de la carte, ancré en haut ou
+  // en bas selon la moitié d'écran survolée. rect lu de façon synchrone au survol.
+  const tooltipStyleFor = (el) => {
+    const rect = el.getBoundingClientRect();
+    const wh = window.innerHeight;
+    const bottomHalf = rect.top > wh / 2;
+    return {
+      position: 'fixed',
+      left: `${rect.right + 10}px`,
+      top: bottomHalf ? 'auto' : `${rect.top}px`,
+      bottom: bottomHalf ? `${wh - rect.bottom}px` : 'auto',
+    };
+  };
+
   const handleBpuHover = (e, item) => {
     if (tooltipTimer.current) clearTimeout(tooltipTimer.current);
-    const rect = e.currentTarget.getBoundingClientRect();
-    const windowHeight = window.innerHeight;
-    const isBottomHalf = rect.top > windowHeight / 2;
+    const style = tooltipStyleFor(e.currentTarget);
     tooltipTimer.current = setTimeout(() => {
-      setTooltipState({
-        visible: true, item: item,
-        style: { position: 'fixed', left: `${rect.right + 10}px`, top: isBottomHalf ? 'auto' : `${rect.top}px`, bottom: isBottomHalf ? `${windowHeight - rect.bottom}px` : 'auto' }
-      });
+      setTooltipState({ visible: true, type: 'article', item, bloc: null, style });
+    }, 1000);
+  };
+
+  // Aperçu d'un bloc : en-tête (type + unité + nom + nb) puis la liste de ses
+  // composants (désignation + unité). Les sous-blocs sont marqués « (bloc) », les
+  // références non résolues signalées. Liste tronquée au-delà de BLOC_PREVIEW_MAX.
+  const handleBlocHover = (e, bloc) => {
+    if (tooltipTimer.current) clearTimeout(tooltipTimer.current);
+    const style = tooltipStyleFor(e.currentTarget);
+    const comps = getBlocArticles(bloc);
+    const lines = comps.map((c) => {
+      if (isBlocRef(c)) {
+        const child = blocsByIdMap[String(c.id)];
+        return child
+          ? { label: child.name || 'Bloc', unit: child.unit ? normalizeUnitSymbol(child.unit) : '', isBloc: true }
+          : { label: 'Bloc introuvable', missing: true };
+      }
+      const art = bpuById[String(c.id)];
+      return art
+        ? { label: cleanText(art.designation) || '—', unit: normalizeUnitSymbol(art.unit) }
+        : { label: 'Article introuvable', missing: true };
+    });
+    const blocData = {
+      name: bloc.name || 'Bloc',
+      isAgg: getBlocKind(bloc) === 'aggregate',
+      unit: bloc.unit ? normalizeUnitSymbol(bloc.unit) : '',
+      count: comps.length,
+      lines,
+    };
+    tooltipTimer.current = setTimeout(() => {
+      setTooltipState({ visible: true, type: 'bloc', item: null, bloc: blocData, style });
     }, 1000);
   };
 
@@ -352,9 +395,8 @@ const BpuSidebar = ({
                   <button
                     key={bloc.id}
                     onClick={() => handleInsertBloc(bloc)}
-                    title={isAgg
-                      ? `Insérer l'agrégat « ${bloc.name} » (${count} article${count > 1 ? 's' : ''}) — au choix : chapitre ou sous-chapitre`
-                      : `Insérer le bloc calculé « ${bloc.name} » (${count} article${count > 1 ? 's' : ''}) en sous-chapitre (porte la surface)`}
+                    onMouseEnter={(e) => handleBlocHover(e, bloc)}
+                    onMouseLeave={handleBpuLeave}
                     className={`w-full group flex items-center gap-2.5 p-2 bg-white border border-slate-200 rounded-lg shadow-sm hover:shadow-md cursor-pointer transition-all duration-200 active:scale-[0.98] text-left ${C.card}`}
                   >
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${C.icon}`}>
@@ -380,13 +422,52 @@ const BpuSidebar = ({
         )}
       </div>
 
-      {/* Tooltip rendu via portal pour passer au-dessus du sticky header */}
-      {tooltipState.visible && tooltipState.item && createPortal(
-        <div className="z-tooltip w-72 p-3 bg-slate-800 text-white rounded-xl shadow-2xl border border-slate-600 animate-in fade-in zoom-in-95 duration-200 flex flex-col gap-2 pointer-events-none" style={tooltipState.style}>
-          <div className={`absolute -left-2 w-4 h-4 bg-slate-800 transform rotate-45 border-l border-b border-slate-600 ${tooltipState.style.bottom !== 'auto' ? 'bottom-4' : 'top-4'}`} />
-          <div className="shrink-0 font-bold text-xs text-emerald-400 uppercase tracking-wider border-b border-slate-600 pb-2">Article Bibliothèque</div>
-          <div className="text-xs font-bold" dangerouslySetInnerHTML={{ __html: sanitizeHtml(tooltipState.item.designation || '') }} />
-          <div className={`text-[10px] text-slate-400 ${tooltipState.item.description ? '' : 'hidden'}`} dangerouslySetInnerHTML={{ __html: sanitizeHtml(tooltipState.item.description || '') }} />
+      {/* Tooltip rendu via portal pour passer au-dessus du sticky header.
+          Style Estima (Apple light) : carte blanche, coins arrondis, ombre douce.
+          Deux variantes : article (désignation + description) ou bloc (contenu). */}
+      {tooltipState.visible && createPortal(
+        <div className="z-tooltip w-72 p-3 bg-white text-gray-900 rounded-2xl shadow-2xl border border-gray-200/60 ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-200 flex flex-col gap-2 pointer-events-none" style={tooltipState.style}>
+          <div className={`absolute -left-1.5 w-3.5 h-3.5 bg-white transform rotate-45 border-l border-b border-gray-200/60 ${tooltipState.style.bottom !== 'auto' ? 'bottom-4' : 'top-4'}`} />
+          {tooltipState.type === 'bloc' && tooltipState.bloc ? (
+            <>
+              <div className="shrink-0 flex items-center gap-1.5 border-b border-gray-100 pb-2">
+                <span className={`px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-wider ${tooltipState.bloc.isAgg ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}`}>
+                  {tooltipState.bloc.isAgg ? 'Agrégat' : 'Calculé'}
+                </span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Bloc</span>
+                {tooltipState.bloc.unit && <span className="ml-auto text-[10px] font-mono font-bold text-gray-400">{tooltipState.bloc.unit}</span>}
+              </div>
+              <div className="text-xs font-bold uppercase leading-snug text-gray-900">{tooltipState.bloc.name}</div>
+              <div className="text-[10px] text-gray-400 -mt-1">{tooltipState.bloc.count} article{tooltipState.bloc.count > 1 ? 's' : ''}</div>
+              {tooltipState.bloc.lines.length > 0 ? (
+                <div className="flex flex-col gap-0.5">
+                  {tooltipState.bloc.lines.slice(0, BLOC_PREVIEW_MAX).map((l, i) => (
+                    <div key={i} className="flex items-center justify-between gap-2 text-[10px]">
+                      <span className={`truncate ${l.missing ? 'text-amber-600 italic' : 'text-gray-700'}`}>• {l.label}{l.isBloc ? ' (bloc)' : ''}</span>
+                      {l.unit && <span className="shrink-0 font-mono font-bold text-gray-400 uppercase">{l.unit}</span>}
+                    </div>
+                  ))}
+                  {tooltipState.bloc.lines.length > BLOC_PREVIEW_MAX && (
+                    <div className="text-[10px] text-gray-400 italic pt-0.5">… +{tooltipState.bloc.lines.length - BLOC_PREVIEW_MAX} autre{tooltipState.bloc.lines.length - BLOC_PREVIEW_MAX > 1 ? 's' : ''}</div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-[10px] text-gray-400 italic">Bloc vide</div>
+              )}
+              <div className="shrink-0 text-[9px] text-gray-400 border-t border-gray-100 pt-1.5 mt-0.5">
+                {tooltipState.bloc.isAgg ? 'Insertion : chapitre ou sous-chapitre' : 'Insertion : sous-chapitre (porte la surface)'}
+              </div>
+            </>
+          ) : tooltipState.item ? (
+            <>
+              <div className="shrink-0 flex items-center gap-1.5 border-b border-gray-100 pb-2">
+                <span className="px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-700">Article</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Bibliothèque</span>
+              </div>
+              <div className="text-xs font-bold text-gray-900" dangerouslySetInnerHTML={{ __html: sanitizeHtml(tooltipState.item.designation || '') }} />
+              <div className={`text-[10px] text-gray-500 ${tooltipState.item.description ? '' : 'hidden'}`} dangerouslySetInnerHTML={{ __html: sanitizeHtml(tooltipState.item.description || '') }} />
+            </>
+          ) : null}
         </div>,
         document.body
       )}

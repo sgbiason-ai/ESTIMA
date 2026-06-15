@@ -187,8 +187,9 @@ export const useProjectCalculations = ({
   }, [displayProject, currentMode, clientQtyMap, studyQtyMaps, activeTrancheId, refMap]);
 
   // --- PSE SUBSTITUTION : éléments de base sélectionnables, par PSE ---
-  // Renvoie une fonction pseCandidatesFor(pseId) → liste des articles + (sous-)chapitres
-  // non-option, en excluant la PSE elle-même, ses descendants et ses ancêtres.
+  // Renvoie une fonction pseCandidatesFor(pseId) → liste des chapitres / sous-chapitres
+  // non-option (les articles sont exclus : une PSE ne peut viser qu'un sous-chapitre),
+  // en excluant la PSE elle-même, ses descendants et ses ancêtres.
   const pseCandidatesFor = useMemo(() => {
     const index = new Map();
     const parentOf = new Map();
@@ -200,12 +201,12 @@ export const useProjectCalculations = ({
         index.set(n.id, n);
         if (parentId != null) parentOf.set(n.id, parentId);
         const effOption = parentIsOption || !!n.isOption;
-        if (!effOption) {
+        if (!effOption && n.type !== 'item') {
           baseList.push({
             id: n.id,
             ref: refMap.get(n.id) || refMap.get(n.uid) || '',
-            label: n.type === 'item' ? (n.designation || 'Article') : (n.title || 'Chapitre'),
-            kind: n.type === 'item' ? 'article' : (n.isBloc ? 'bloc' : 'chapitre'),
+            label: n.title || 'Chapitre',
+            kind: n.isBloc ? 'bloc' : 'chapitre',
           });
         }
         if (n.children) walk(n.children, n.id, effOption);

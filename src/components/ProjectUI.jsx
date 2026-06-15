@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, X, ArrowLeftRight, ChevronDown, Search, AlertTriangle } from 'lucide-react';
 
 // --- LE COMPOSANT MANQUANT (A AJOUTER) ---
@@ -69,11 +70,52 @@ export const PseModeControl = ({ mode = 'simple', baseId = '', candidates = [], 
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const ref = useRef(null);
+  const btnRef = useRef(null);
+  const popRef = useRef(null);
+  const [pos, setPos] = useState({ top: 0, left: 0, placement: 'bottom' });
   const isSub = mode === 'substitution';
+
+  // Le menu est portalisé dans <body> pour échapper à `overflow-hidden` des
+  // conteneurs chapitre/sous-chapitre qui le tronquent. Positionnement fixe
+  // calculé depuis le bouton, avec bascule vers le haut si la place manque.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const compute = () => {
+      const btn = btnRef.current;
+      if (!btn) return;
+      const rect = btn.getBoundingClientRect();
+      const popW = 288; // w-72
+      const popH = popRef.current?.offsetHeight || 320;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const spaceBelow = vh - rect.bottom;
+      const placeAbove = spaceBelow < popH + 12 && rect.top > popH + 12;
+      let top = placeAbove ? rect.top - popH - 4 : rect.bottom + 4;
+      let left = rect.left;
+      // Clamp horizontal pour rester dans la viewport (marge 8px).
+      if (left + popW > vw - 8) left = vw - popW - 8;
+      if (left < 8) left = 8;
+      // Clamp vertical de sécurité.
+      if (top < 8) top = 8;
+      if (top + popH > vh - 8) top = Math.max(8, vh - popH - 8);
+      setPos({ top, left, placement: placeAbove ? 'top' : 'bottom' });
+    };
+    compute();
+    window.addEventListener('resize', compute);
+    window.addEventListener('scroll', compute, true);
+    return () => {
+      window.removeEventListener('resize', compute);
+      window.removeEventListener('scroll', compute, true);
+    };
+  }, [open, isSub, candidates.length]);
 
   useEffect(() => {
     if (!open) return;
-    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const onDoc = (e) => {
+      if (ref.current && ref.current.contains(e.target)) return;
+      if (popRef.current && popRef.current.contains(e.target)) return;
+      setOpen(false);
+    };
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
   }, [open]);
@@ -98,6 +140,7 @@ export const PseModeControl = ({ mode = 'simple', baseId = '', candidates = [], 
   return (
     <div className="relative" ref={ref} onClick={(e) => e.stopPropagation()}>
       <button
+        ref={btnRef}
         type="button"
         disabled={disabled}
         onClick={(e) => { e.stopPropagation(); !disabled && setOpen((o) => !o); }}
@@ -113,13 +156,19 @@ export const PseModeControl = ({ mode = 'simple', baseId = '', candidates = [], 
         <ChevronDown size={10} className="opacity-70 shrink-0" />
       </button>
 
-      {open && (
-        <div className="absolute z-50 mt-1 left-0 w-72 bg-white rounded-xl shadow-2xl border border-slate-200 p-2 text-slate-700">
+      {open && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={popRef}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, width: 288, zIndex: 1000 }}
+          className="bg-white rounded-xl shadow-2xl border border-slate-200 p-2 text-slate-700"
+        >
           <div className="flex gap-1 mb-2">
             <button
               type="button"
               onClick={() => { onChange?.('simple', ''); setOpen(false); }}
-              className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-colors ${!isSub ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+              className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-colors ${!isSub ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
             >
               PSE simple
             </button>
@@ -164,7 +213,8 @@ export const PseModeControl = ({ mode = 'simple', baseId = '', candidates = [], 
               </div>
             </>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
