@@ -4,7 +4,7 @@ import { Draggable, Droppable } from '@hello-pangea/dnd';
 import { GripVertical, Layers, Trash2, Plus, ShieldCheck, AlertCircle, AlertTriangle, FunctionSquare, Check, Boxes, Pencil, Target, Lock, Unlock, ChevronDown, ChevronRight, Link2 } from 'lucide-react';
 
 import { ProjectContext } from '../context/ProjectContext';
-import { EditableTitle, FormattedInput, OptionToggle, PseModeControl } from './ProjectUI';
+import { EditableTitle, FormattedInput, OptionToggle, PseModeControl, PseDescriptionEditor } from './ProjectUI';
 import { formatPrice, cleanText, normalizeUnitSymbol } from '../utils/helpers';
 import { safeEvalMathExpr } from '../utils/projectCalculations';
 
@@ -858,6 +858,14 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
                     </>
                   )}
                 </div>
+
+                {el.isOption && !collapsed && (
+                  <PseDescriptionEditor
+                    value={el.pseDescription || ''}
+                    onChange={(html) => onUpdate(parentId, el.id, 'pseDescription', html)}
+                    disabled={isReadOnly}
+                  />
+                )}
 
                 {collapsed ? (
                   <div className="ml-4">{providedDrop.placeholder}</div>

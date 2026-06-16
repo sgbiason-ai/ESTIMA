@@ -7,7 +7,7 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Plus, Trash2, GripVertical, Layers, HelpCircle, AlertTriangle, Target, ChevronDown, ChevronRight } from 'lucide-react';
 
 import { ProjectContext } from '../context/ProjectContext';
-import { EditableTitle, OptionToggle, PseModeControl } from '../components/ProjectUI';
+import { EditableTitle, OptionToggle, PseModeControl, PseDescriptionEditor } from '../components/ProjectUI';
 import ItemList from '../components/ItemList';
 import { formatPrice, generateId } from '../utils/helpers';
 import { toast, confirm } from '../utils/globalUI';
@@ -984,6 +984,13 @@ const ProjectView = ({
                                     )}
                                   </div>
                                 </div>
+                                {chap.isOption && !isCollapsed && (
+                                  <PseDescriptionEditor
+                                    value={chap.pseDescription || ''}
+                                    onChange={(html) => updateProjectItem('root', chap.id, 'pseDescription', html)}
+                                    disabled={isReadOnly}
+                                  />
+                                )}
                                 <div className={`flex flex-col w-full ${chap.isOption ? 'opacity-80' : ''}`}>
                                   <Droppable droppableId={chap.id} type="ITEM" isDropDisabled={isReadOnly}>
                                     {(providedItem, snapshotItem) => (

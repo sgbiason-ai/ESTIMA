@@ -11,6 +11,7 @@ import { buildTheme } from './pdf/buildTheme';
 import { computePseDeltas, buildPseNumbers, collectPseRoots, collectSubstitutions } from './projectCalculations';
 import { getCurrentPhaseCode } from './phaseModel';
 import { computeVatBreakdown } from './financeFormat';
+import { htmlToPlainText } from './richText';
 
 const cleanFormat = (num) => {
   if (num === undefined || num === null || num === '' || isNaN(num)) return "0,00";
@@ -317,6 +318,17 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
                 });
               });
               rows.push(rowData);
+              // Description de la PSE sous sa ligne (récap), si renseignée.
+              if (isPseRoot && node.pseDescription) {
+                const descTxt = htmlToPlainText(node.pseDescription);
+                if (descTxt) {
+                  rows.push([{
+                    content: descTxt,
+                    colSpan: summaryExports.length + 1,
+                    styles: { fontSize: 6.5, fontStyle: 'italic', textColor: THEME.lightText, halign: 'left', cellPadding: { left: 8, top: 0, bottom: 2, right: 2 } }
+                  }]);
+                }
+              }
               // Une PSE substitution s'affiche en une seule ligne (son surcoût) :
               // on NE descend PAS dans son sous-arbre (déjà inclus dans le delta).
               if (!(mode === 'option' && isValidSubstitution(node))) {
@@ -474,9 +486,26 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
           doc.addPage();
           doc.setFontSize(10); doc.setTextColor(...THEME.pse); doc.setFont("Helvetica", "bold");
           doc.text(`PSE n°${pseNo} : ${(chap.title || '').toUpperCase()} - ${currentHeaderTrancheName}`, 14, 52);
+
+          // Description / justification de la PSE (texte riche → puces + sauts de ligne).
+          let pseTableStartY = 58;
+          const pseDescText = htmlToPlainText(chap.pseDescription);
+          if (pseDescText) {
+            autoTable(doc, {
+              startY: 56,
+              margin: { left: 10, right: 10 },
+              theme: 'plain',
+              styles: { font: 'Helvetica', fontSize: 8, textColor: THEME.text, cellPadding: { left: 3, right: 3, top: 2, bottom: 2 }, overflow: 'linebreak' },
+              head: [[{ content: 'DESCRIPTION', styles: { fontStyle: 'bold', fontSize: 7, textColor: THEME.pse, cellPadding: { left: 3, top: 1, bottom: 0 } } }]],
+              body: [[{ content: pseDescText, styles: { fillColor: THEME.pseBg } }]],
+              didDrawPage: drawHeader,
+            });
+            pseTableStartY = doc.lastAutoTable.finalY + 3;
+          }
+
           autoTable(doc, {
             ...tableConfig,
-            startY: 58,
+            startY: pseTableStartY,
             head: [["N°", "DÉSIGNATION", "U", "QTÉ", "P.U. HT", "TOTAL HT"]],
             headStyles: { ...tableConfig.headStyles, fillColor: THEME.pse },
             body: (() => {

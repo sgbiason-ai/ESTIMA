@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, X, ArrowLeftRight, ChevronDown, Search, AlertTriangle } from 'lucide-react';
+import { Check, X, ArrowLeftRight, ChevronDown, Search, AlertTriangle, FileText } from 'lucide-react';
+import RichTextEditor from './common/RichTextEditor';
 
 // --- LE COMPOSANT MANQUANT (A AJOUTER) ---
 export const FormattedInput = ({ value, onChange, onBlur, className, placeholder, ...props }) => {
@@ -229,6 +230,56 @@ export const OptionToggle = ({ isOption, onClick, disabled, pseNumber = null }) 
       <div className={`w-2 h-2 rounded-full transition-colors ${isOption ? 'bg-white animate-pulse' : 'bg-white/20'}`} />
       <span>{label}</span>
     </button>
+  );
+};
+
+// ─── DESCRIPTION / JUSTIFICATION D'UNE PSE ────────────────────────────────────
+// Champ repliable sous l'en-tête d'une PSE (chapitre ou sous-chapitre option).
+// Texte riche (gras, souligné, listes) persisté dans node.pseDescription et repris
+// dans les exports (page PSE du PDF, bloc Excel, récapitulatif).
+export const PseDescriptionEditor = ({ value, onChange, disabled = false }) => {
+  const hasText = !!(value && value.replace(/<[^>]*>/g, '').split(String.fromCharCode(160)).join('').trim());
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="ml-8 mr-2 mt-1 mb-2" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:text-blue-600 transition-colors"
+        title="Décrire / justifier cette PSE — repris dans les exports (PDF, Excel, récap)"
+      >
+        <FileText size={12} />
+        Description PSE
+        {hasText && !open && (
+          <span className="ml-1 px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-[8px] normal-case font-semibold tracking-normal">renseignée</span>
+        )}
+        <ChevronDown size={12} className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="mt-1.5">
+          {disabled ? (
+            hasText ? (
+              <div
+                className="text-[11px] text-slate-700 bg-white border border-slate-200 rounded-md p-3 leading-relaxed [&_b]:font-bold [&_strong]:font-bold [&_ul]:list-disc [&_ul]:pl-5"
+                dangerouslySetInnerHTML={{ __html: value }}
+              />
+            ) : (
+              <p className="text-[11px] italic text-slate-400 px-1">Aucune description.</p>
+            )
+          ) : (
+            <div className="h-44">
+              <RichTextEditor
+                value={value || ''}
+                onChange={onChange}
+                placeholder="Expliquez clairement la PSE : objet, prestations incluses, conditions, intérêt pour le maître d'ouvrage…"
+              />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 };
 

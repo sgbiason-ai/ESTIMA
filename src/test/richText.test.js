@@ -1,0 +1,28 @@
+import { describe, it, expect } from 'vitest';
+import { htmlToPlainText } from '../utils/richText';
+
+describe('htmlToPlainText', () => {
+  it('retourne une chaîne vide pour une entrée vide / nulle', () => {
+    expect(htmlToPlainText('')).toBe('');
+    expect(htmlToPlainText(null)).toBe('');
+    expect(htmlToPlainText('<p></p>')).toBe('');
+  });
+
+  it('convertit les <br> et </p> en sauts de ligne', () => {
+    expect(htmlToPlainText('<p>Ligne 1</p><p>Ligne 2</p>')).toBe('Ligne 1\nLigne 2');
+    expect(htmlToPlainText('A<br>B')).toBe('A\nB');
+  });
+
+  it('préfixe les <li> par une puce', () => {
+    const out = htmlToPlainText('<ul><li>Un</li><li>Deux</li></ul>');
+    expect(out).toBe('• Un\n• Deux');
+  });
+
+  it('retire le gras / souligné mais conserve le texte', () => {
+    expect(htmlToPlainText('<b>Gras</b> et <u>souligné</u>')).toBe('Gras et souligné');
+  });
+
+  it('normalise les espaces et les retours à la ligne multiples', () => {
+    expect(htmlToPlainText('<p>A</p><p></p><p></p><p>B</p>')).toBe('A\n\nB');
+  });
+});

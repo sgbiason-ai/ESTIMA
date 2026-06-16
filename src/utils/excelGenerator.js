@@ -4,6 +4,7 @@ import { getItemRefMap, cleanText, normalizeUnitSymbol } from './helpers';
 import { roundEuro } from './financeFormat';
 import { saveFileWithPicker, FILE_TYPES, PICKER_IDS } from './fileSaver';
 import { computePseDeltas, buildPseNumbers, collectPseRoots, collectSubstitutions } from './projectCalculations';
+import { htmlToPlainText } from './richText';
 
 // ─── HELPERS IMAGE ────────────────────────────────────────────────────────────
 
@@ -369,6 +370,13 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
         worksheet.addRow([]); worksheet.addRow([]);
         const headerPse = worksheet.addRow(['', pseTitle, '', '', '', '']);
         headerPse.font = fonts.optionTitle;
+        // Description / justification de la PSE (texte riche → texte simple + puces).
+        const pseDescText = htmlToPlainText(root.pseDescription);
+        if (pseDescText) {
+          const dRow = worksheet.addRow(['', pseDescText, '', '', '', '']);
+          dRow.getCell(2).font = { name: 'Aptos', size: 9, italic: true, color: { argb: 'FF6B7280' } };
+          dRow.getCell(2).alignment = { wrapText: true, vertical: 'top' };
+        }
         const startPseRow = worksheet.lastRow.number + 1;
         processNodes([root], worksheet, currentQtyMap, 0, 'option', false, pseSubTotalsRefs, includePM);
         const endPseRow = worksheet.lastRow.number;
@@ -467,6 +475,12 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
         const row = summarySheet.addRow(rowData);
         row.getCell(1).font = fonts.totalPse;
         for (let i = 2; i <= rowData.length; i++) row.getCell(i).numFmt = '#,##0.00 €';
+        const recapDesc = htmlToPlainText(root.pseDescription);
+        if (recapDesc) {
+          const dRow = summarySheet.addRow([recapDesc, ...selectedExports.map(() => '')]);
+          dRow.getCell(1).font = { name: 'Aptos', size: 8, italic: true, color: { argb: 'FF6B7280' } };
+          dRow.getCell(1).alignment = { wrapText: true, vertical: 'top' };
+        }
       });
     }
   }

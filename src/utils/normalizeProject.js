@@ -86,6 +86,11 @@ function normalizeNode(node) {
     chapter.pseMode = 'substitution';
     chapter.pseBaseId = str(node.pseBaseId);
   }
+  // Description / justification de la PSE (HTML riche : gras, listes). Persistée
+  // par projet, reprise dans les exports (page PSE PDF, bloc Excel, récap).
+  if (node.isOption && node.pseDescription) {
+    chapter.pseDescription = str(node.pseDescription);
+  }
   // Sous-chapitre "bloc" (ouvrage composite) : conserver unité + surface (Qté/tranches).
   if (node.isBloc) {
     chapter.isBloc = true;
