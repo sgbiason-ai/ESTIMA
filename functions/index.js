@@ -269,3 +269,48 @@ exports.deleteSmtpConfig = onCall({ cors: true }, async (request) => {
   logger.info('SMTP config deleted', { uid });
   return { success: true };
 });
+
+// ─── backfillMemberEmails ───────────────────────────────────────────────────
+// Renseigne email/displayName des profils /users depuis Firebase Authentication.
+// Le client ne peut pas lire l'email d'un AUTRE utilisateur (pas de listUsers
+// côté navigateur) : seul l'Admin SDK y accède. Réservé au super-admin applicatif.
+const APP_SUPER_ADMIN_EMAIL = 'samuel.biason@papyrus-be.fr';
+
+exports.backfillMemberEmails = onCall({ cors: true }, async (request) => {
+  requireAuth(request);
+  if (request.auth.token.email !== APP_SUPER_ADMIN_EMAIL) {
+    throw new HttpsError('permission-denied', 'Réservé au super-administrateur.');
+  }
+
+  const db = admin.firestore();
+  const docs = (await db.collection('users').get()).docs;
+
+  let updated = 0;
+  const orphans = []; // docs /users sans compte Auth correspondant
+
+  // getUsers accepte jusqu'à 100 identifiants par appel → on traite par paquets.
+  for (let i = 0; i < docs.length; i += 100) {
+    const chunk = docs.slice(i, i + 100);
+    const res = await admin.auth().getUsers(chunk.map(d => ({ uid: d.id })));
+    const byUid = new Map(res.users.map(u => [u.uid, u]));
+    res.notFound.forEach(nf => orphans.push(nf.uid));
+
+    await Promise.all(chunk.map(async (d) => {
+      const authUser = byUid.get(d.id);
+      if (!authUser) return;
+      const data = d.data() || {};
+      const patch = {};
+      if (authUser.email && data.email !== authUser.email) patch.email = authUser.email;
+      if (authUser.displayName && data.displayName !== authUser.displayName) patch.displayName = authUser.displayName;
+      if (Object.keys(patch).length) {
+        await d.ref.set(patch, { merge: true });
+        updated++;
+      }
+    }));
+  }
+
+  logger.info('backfillMemberEmails', {
+    by: request.auth.token.email, total: docs.length, updated, orphans: orphans.length,
+  });
+  return { total: docs.length, updated, orphans };
+});

@@ -8,9 +8,10 @@ import { generateId } from '../utils/helpers';
 import {
   Building2, UserPlus, Trash2, RefreshCw,
   ChevronDown, ChevronRight, Copy, Check,
-  HelpCircle, TrendingUp, BarChart2, Plus, ShieldCheck, MessageSquare,
+  HelpCircle, TrendingUp, BarChart2, Plus, ShieldCheck, MessageSquare, Mail,
 } from 'lucide-react';
 import { confirm } from '../utils/globalUI';
+import { backfillMemberEmails } from '../services/adminService';
 
 import DeleteCompanyModal from './admin/DeleteCompanyModal';
 import HelpPanel from '../components/help/HelpPanel';
@@ -50,6 +51,8 @@ const AdminView = ({ currentUserEmail }) => {
   const [copiedId, setCopiedId]     = useState(null);
   const [showSimulator, setShowSimulator] = useState(false);
   const [activeTab, setActiveTab]   = useState('companies');
+  const [memberSearch, setMemberSearch] = useState('');
+  const [syncing, setSyncing]       = useState(false);
 
   const showFeedback = (type, msg) => {
     setFeedback({ type, msg });
@@ -176,6 +179,27 @@ const AdminView = ({ currentUserEmail }) => {
     setTimeout(() => setCopiedId(null), 1500);
   };
 
+  // Synchronise email/nom de tous les membres depuis Firebase Auth (Cloud Function)
+  const handleSyncEmails = async () => {
+    setSyncing(true);
+    try {
+      const res = await backfillMemberEmails();
+      await loadData({ silent: true });
+      const orphanMsg = res?.orphans?.length ? ` ${res.orphans.length} orphelin(s) détecté(s).` : '';
+      showFeedback('success', `${res?.updated ?? 0} email(s) synchronisé(s) sur ${res?.total ?? 0} compte(s).${orphanMsg}`);
+    } catch (e) {
+      showFeedback('error', `Synchronisation impossible : ${e?.message || 'erreur inconnue'}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // Recherche de membre (email / nom / UID) — filtre transverse aux entreprises
+  const memberTerm = memberSearch.trim().toLowerCase();
+  const matchMember = (u) =>
+    !memberTerm ||
+    [u.uid, u.email, u.displayName].some(v => v && String(v).toLowerCase().includes(memberTerm));
+
   return (
     <div className="flex-1 flex flex-col h-full bg-[#f5f5f7] overflow-auto p-6 gap-4"
       >
@@ -250,9 +274,23 @@ const AdminView = ({ currentUserEmail }) => {
       {activeTab === 'companies' && (
         <div className="flex-1 flex flex-col gap-4 min-h-0">
           <div className="bg-white border border-gray-200/60 rounded-2xl overflow-hidden flex-1 flex flex-col min-h-0">
-            <div className="px-5 py-4 border-b border-gray-200/60 flex items-center justify-between shrink-0">
-              <h2 className="text-sm font-bold text-gray-900">Entreprises ({companies.length})</h2>
-              <p className="text-gray-400 text-xs">Cliquez sur une entreprise pour voir ses membres</p>
+            <div className="px-5 py-4 border-b border-gray-200/60 flex items-center justify-between gap-3 shrink-0">
+              <h2 className="text-sm font-bold text-gray-900 shrink-0">Entreprises ({companies.length})</h2>
+              <div className="flex items-center gap-2 min-w-0">
+                <input
+                  value={memberSearch}
+                  onChange={e => setMemberSearch(e.target.value)}
+                  placeholder="Rechercher un membre (email, nom, UID)…"
+                  className="flex-1 max-w-xs bg-gray-50 border border-gray-200/60 rounded-xl px-3 py-1.5 text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 focus:bg-white transition-all" />
+                {isSuper && (
+                  <button onClick={handleSyncEmails} disabled={syncing}
+                    title="Renseigne les emails/noms des membres depuis Firebase Auth"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 transition-colors shrink-0">
+                    {syncing ? <RefreshCw size={13} className="animate-spin" /> : <Mail size={13} />}
+                    <span className="hidden sm:inline">{syncing ? 'Synchronisation…' : 'Synchroniser les emails'}</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {companies.length === 0 ? (
@@ -260,8 +298,12 @@ const AdminView = ({ currentUserEmail }) => {
             ) : (
               <div className="divide-y divide-gray-100 overflow-y-auto flex-1">
                 {companies.map(company => {
-                  const members = users.filter(u => u.companyId === company.id);
-                  const isExpanded = expandedId === company.id;
+                  const allMembers = users.filter(u => u.companyId === company.id);
+                  const members = memberTerm ? allMembers.filter(matchMember) : allMembers;
+                  // Pendant une recherche : masquer les entreprises sans match et
+                  // déplier d'office celles qui en ont.
+                  if (memberTerm && members.length === 0) return null;
+                  const isExpanded = memberTerm ? true : expandedId === company.id;
                   const isDeleting = deletingId === company.id;
                   return (
                     <div key={company.id}>
@@ -281,8 +323,8 @@ const AdminView = ({ currentUserEmail }) => {
                             </button>
                           </div>
                         </div>
-                        <span className={`text-xs px-2.5 py-1 rounded-lg shrink-0 font-medium ${members.length > 0 ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-400'}`}>
-                          {members.length} membre{members.length !== 1 ? 's' : ''}
+                        <span className={`text-xs px-2.5 py-1 rounded-lg shrink-0 font-medium ${allMembers.length > 0 ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-400'}`}>
+                          {allMembers.length} membre{allMembers.length !== 1 ? 's' : ''}
                         </span>
                         <button onClick={e => { e.stopPropagation(); setCompanyToDelete(company); }}
                           disabled={isDeleting} title="Supprimer cette entreprise"
@@ -301,7 +343,20 @@ const AdminView = ({ currentUserEmail }) => {
                                 {members.map(u => (
                                   <div key={u.uid} className="flex items-center gap-3 px-4 py-3 bg-white border border-gray-200/60 rounded-xl">
                                     <div className="flex-1 min-w-0">
-                                      <p className="text-xs font-mono text-gray-600 truncate">{u.uid}</p>
+                                      <div className="flex items-center gap-1.5">
+                                        <p className="text-xs font-semibold text-gray-800 truncate">
+                                          {u.email || u.displayName || <span className="font-mono text-gray-600">{u.uid}</span>}
+                                        </p>
+                                        <button onClick={() => copyToClipboard(u.uid, u.uid)}
+                                          className="text-gray-300 hover:text-gray-500 transition-colors shrink-0" title="Copier l'UID">
+                                          {copiedId === u.uid ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
+                                        </button>
+                                      </div>
+                                      {(u.email || u.displayName) && (
+                                        <p className="text-[10px] font-mono text-gray-400 truncate mt-0.5">
+                                          {u.displayName && u.email ? `${u.displayName} · ${u.uid}` : u.uid}
+                                        </p>
+                                      )}
                                       <p className="text-[10px] text-gray-400 mt-0.5">
                                         Assigné le {u.assignedAt ? new Date(u.assignedAt).toLocaleDateString('fr-FR') : '—'}
                                       </p>

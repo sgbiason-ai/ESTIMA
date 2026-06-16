@@ -1,7 +1,7 @@
 // src/hooks/useAppAuth.js
 import { useState, useEffect, useRef } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 
 export const useAppAuth = () => {
@@ -61,6 +61,19 @@ export const useAppAuth = () => {
           setIsAdmin(data.isAdmin === true);
           setUserModules(Array.isArray(data.modules) ? data.modules : null);
           setUserMobileModules(Array.isArray(data.mobileModules) ? data.mobileModules : null);
+
+          // Self-heal : renseigne email/nom dans le profil pour que le module
+          // Administration affiche « qui est qui » au lieu de l'UID brut. L'user
+          // écrit son PROPRE doc sans toucher isAdmin → autorisé par les règles.
+          // Best-effort, non bloquant.
+          const freshEmail = currentUser.email || null;
+          const freshName = currentUser.displayName || null;
+          const patch = {};
+          if (freshEmail && data.email !== freshEmail) patch.email = freshEmail;
+          if (freshName && data.displayName !== freshName) patch.displayName = freshName;
+          if (Object.keys(patch).length) {
+            updateDoc(doc(db, 'users', currentUser.uid), patch).catch(() => { /* non bloquant */ });
+          }
         } else {
           // Utilisateur authentifié mais pas encore assigné à une entreprise
           console.warn('Profil utilisateur introuvable dans Firestore (/users/' + currentUser.uid + ')');

@@ -94,6 +94,9 @@ export default function App() {
   // ── 0c. Module actif (null = Hub) ─────────────────────────────────────────
   const [activeModule, setActiveModule] = useState(null);
 
+  // ── 0d. Feedback "Copié" pour l'identifiant (écran compte non rattaché) ────
+  const [idCopied, setIdCopied] = useState(false);
+
   // ── 1. Auth ─────────────────────────────────────────────────────────────────
   const { user, companyId, isAdmin, userModules, userMobileModules, authLoading, handleLogout } = useAppAuth();
 
@@ -159,12 +162,31 @@ export default function App() {
 
   if (!companyId) {
     return (
-      <div className="flex h-screen items-center justify-center flex-col gap-4" style={{ background: '#f5f5f7' }}>
-        <div className="text-2xl font-bold text-gray-900">Compte non configuré</div>
-        <p className="text-gray-500 text-sm max-w-sm text-center">
+      <div className="flex h-screen items-center justify-center flex-col gap-4 px-6" style={{ background: '#f5f5f7' }}>
+        <div className="text-2xl font-bold text-gray-900">Compte non rattaché</div>
+        <p className="text-gray-500 text-sm max-w-md text-center">
           Votre compte n'est pas encore associé à une entreprise.
-          Contactez l'administrateur de l'application.
+          Communiquez les informations ci-dessous à l'administrateur de l'application pour qu'il vous donne accès.
         </p>
+        <div className="w-full max-w-md rounded-2xl border border-gray-200/70 bg-white p-4 text-left space-y-3">
+          {user.email && (
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold shrink-0">Email</span>
+              <span className="text-sm text-gray-800 truncate">{user.email}</span>
+            </div>
+          )}
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold shrink-0">Identifiant</span>
+            <button
+              onClick={() => { navigator.clipboard?.writeText(user.uid); setIdCopied(true); setTimeout(() => setIdCopied(false), 1500); }}
+              className="flex items-center gap-2 min-w-0 text-xs font-mono text-gray-700 hover:text-gray-900 transition-colors"
+              title="Copier l'identifiant"
+            >
+              <span className="truncate">{user.uid}</span>
+              <span className="shrink-0 text-[10px] font-sans font-semibold text-blue-500">{idCopied ? 'Copié ✓' : 'Copier'}</span>
+            </button>
+          </div>
+        </div>
         <button
           onClick={handleLogout}
           className="px-6 py-2 rounded-xl text-sm font-medium transition-colors"
