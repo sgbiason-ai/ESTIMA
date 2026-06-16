@@ -2,15 +2,23 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '3.3.0';
+export const APP_VERSION = '3.3.1';
 
 export const CHANGELOG = [
+  {
+    version: '3.3.1',
+    date: '2026-06-16',
+    title: 'Estimation : récap exports (TOTAL hors PSE) & Calculateur de Marge persistant',
+    highlights: [
+      'Estimation (exports PDF & Excel) : dans le récapitulatif financier multi-tranches, le « TOTAL GÉNÉRAL HT (Hors PSE) » est désormais affiché juste après la base — donc avant la liste des PSE, qui passe en dessous. Le total ne porte que sur la base (jamais sur les PSE), et l\'enchaînement « base → total → PSE » lève toute ambiguïté de lecture (le total n\'inclut pas les options listées en dessous)',
+      'Estimation (Calculateur de Marge) : les réglages saisis sont désormais conservés. Le pourcentage appliqué aux lignes variables est pré-rempli à la réouverture avec la dernière valeur du projet (comme le seuil de quantité, déjà mémorisé) — plus besoin de le ressaisir à chaque ouverture. Les deux réglages restent persistés par projet',
+    ],
+  },
   {
     version: '3.3.0',
     date: '2026-06-12',
     title: 'Estimation : PSE substitution, numérotation hiérarchique & arborescence',
     highlights: [
-      'Estimation (exports PDF & Excel) : dans le récapitulatif financier multi-tranches, le « TOTAL GÉNÉRAL HT (Hors PSE) » est désormais affiché juste après la base — donc avant la liste des PSE, qui passe en dessous. Le total ne porte que sur la base (jamais sur les PSE), et l\'enchaînement « base → total → PSE » lève toute ambiguïté de lecture (le total n\'inclut pas les options listées en dessous)',
       'Estimation : harmonisation visuelle « Apple light ». Plusieurs éléments du module qui restaient en fond sombre passent au style clair du reste de l\'application : le bandeau de statistiques en haut (Étude / Rendu / Avaloir), le panneau d\'audit du bordereau, et les en-têtes / volets sombres de plusieurs fenêtres (Export PDF/Excel et son aperçu, Fiche Projet et son aperçu de page de garde, Aide aux formules, Édition d\'un prix). Les boutons d\'export perdent leur halo coloré « néon », les voiles de fenêtre s\'allègent (moins assombris) et les coins des fenêtres s\'arrondissent comme partout ailleurs. Aucune fonctionnalité changée — uniquement l\'apparence, plus cohérente et reposante.',
       'Estimation (bibliothèque) : aperçu du contenu d\'un bloc au survol. Comme pour les articles, survoler un bloc dans le volet de gauche affiche désormais une bulle décrivant ce qu\'il contient — son type (Calculé / Agrégat) et son unité, le nombre d\'articles, puis la liste de ses articles avec leur unité (les sous-blocs sont marqués « (bloc) », les références introuvables signalées). La bulle rappelle aussi où le bloc s\'insère (sous-chapitre porteur de la surface pour un bloc calculé, chapitre ou sous-chapitre pour un agrégat)',
       'Estimation : les PSE sont désormais numérotées (PSE n°1, n°2…) — le bouton « PSE » de chaque chapitre/sous-chapitre porte directement son numéro (« PSE n°1 »), dans l\'ordre du document, et ce numéro est repris dans le PDF (page PSE dédiée et tableau récapitulatif). Chaque PSE conserve son propre total (montant ou surcoût pour une substitution), mais le « Total PSE » agrégé du pied de page est supprimé : les PSE sont des prestations indépendantes, parfois exclusives, qu\'on n\'additionne pas entre elles. Dans le PDF, chaque PSE fait l\'objet de sa propre page numérotée avec son total, et le récapitulatif liste chaque PSE par son numéro sans somme générale',

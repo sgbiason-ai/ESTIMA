@@ -3,16 +3,20 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Calculator, AlertTriangle, ArrowRight, Lock } from 'lucide-react';
 import { formatPrice } from '../../utils/helpers';
 
-export default function CalculationModal({ show, onClose, onConfirm, analysis, defaultThreshold = 20 }) {
-  // Par défaut, on propose +10% d'augmentation sur les lignes variables
-  const [appliedPercent, setAppliedPercent] = useState(10);
+export default function CalculationModal({ show, onClose, onConfirm, analysis, defaultThreshold = 20, defaultPercent = 10 }) {
+  // % d'augmentation sur les lignes variables — pré-rempli avec la dernière valeur du projet
+  const [appliedPercent, setAppliedPercent] = useState(defaultPercent);
   // Seuil de quantité : les quantités entre -seuil et +seuil ne sont jamais majorées
   const [threshold, setThreshold] = useState(defaultThreshold);
 
-  // Resynchronise le seuil sur la valeur du projet à chaque ouverture
+  // Resynchronise le seuil ET le pourcentage sur les valeurs du projet à chaque ouverture
+  // (les deux réglages sont persistés par projet : on les retrouve à la réouverture).
   useEffect(() => {
-    if (show) setThreshold(defaultThreshold);
-  }, [show, defaultThreshold]);
+    if (show) {
+      setThreshold(defaultThreshold);
+      setAppliedPercent(defaultPercent);
+    }
+  }, [show, defaultThreshold, defaultPercent]);
 
   const tNum = Number(threshold);
   const tSafe = Number.isFinite(tNum) && tNum >= 0 ? tNum : 0;

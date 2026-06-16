@@ -1023,7 +1023,7 @@ const ProjectView = ({
 
       <ProjectDetailsModal isOpen={showDetailsModal} onClose={() => setShowDetailsModal(false)} project={project} onSave={handleSaveDetails} branding={masterBranding} archives={archives} />
       {editItemTarget && <EditBpuModal item={editItemTarget} onClose={() => setEditItemTarget(null)} onUpdate={handleSaveEditedItem} units={units} categories={categories} bpuConfig={bpuConfig} existingItems={[]} masterCctp={masterCctp} projectOnly onSaveToLibrary={handleSaveItemToLibrary} libraryItems={allBpuItems} />}
-      <CalculationModal show={showCalculationModal} onClose={() => setShowCalculationModal(false)} onConfirm={handleApplyCalculation} analysis={calculationAnalysis} defaultThreshold={Number(project?.clientQtyThreshold ?? 20)} />
+      <CalculationModal show={showCalculationModal} onClose={() => setShowCalculationModal(false)} onConfirm={handleApplyCalculation} analysis={calculationAnalysis} defaultThreshold={Number(project?.clientQtyThreshold ?? 20)} defaultPercent={Number(project?.clientPercent ?? clientPercent ?? 10)} />
       <ExportModal isOpen={exportModalState.show} onClose={() => setExportModalState(prev => ({ ...prev, show: false }))} onConfirm={handleConfirmExport} onPreviewPdf={handlePreviewPdf} format={exportModalState.format} type={exportModalState.type} hasTranches={hasTranches} tranches={tranches} activeTrancheId={activeTrancheId} />
       <ConfirmDeleteModal isOpen={deleteConfirm.show} onClose={() => setDeleteConfirm({ show: false, itemId: null })} onConfirm={() => { if(deleteConfirm.itemId) { handleRemoveItem(deleteConfirm.itemId); setDeleteConfirm({ show: false, itemId: null }); } }} />
       <FormulaHelpModal isOpen={showFormulaHelp} onClose={() => setShowFormulaHelp(false)} />
