@@ -133,6 +133,18 @@ export const useDatabase = (user, companyId) => {
           await loadLightData();
           break;
         } catch (error) {
+          // Erreur de droits : déterministe, retenter ne sert à rien. On échoue
+          // vite avec un message juste (≠ « réseau ») : typiquement des règles
+          // Firestore non déployées pour une collection lue ici (categories /
+          // units / blocs). Cf. mémoire « dérive de déploiement des règles ».
+          if (error?.code === 'permission-denied') {
+            console.error('Erreur chargement Firebase (droits) :', error);
+            if (!cancelled) {
+              toast.error('Accès refusé à la base de données. Contactez votre administrateur.', { title: 'Accès refusé' });
+            }
+            break;
+          }
+          // Autres erreurs (réseau / indisponibilité) : retry silencieux.
           if (attempt >= retryDelays.length) {
             console.error('Erreur chargement Firebase :', error);
             if (!cancelled) {
