@@ -4,7 +4,24 @@ import { getItemRefMap, cleanText, normalizeUnitSymbol } from './helpers';
 import { roundEuro } from './financeFormat';
 import { saveFileWithPicker, FILE_TYPES, PICKER_IDS } from './fileSaver';
 import { computePseDeltas, buildPseNumbers, collectPseRoots, collectSubstitutions } from './projectCalculations';
-import { htmlToPlainText } from './richText';
+import { htmlToPlainText, htmlToRichBlocks } from './richText';
+
+// Description PSE (HTML riche) → richText ExcelJS (gras/souligné préservés, puces,
+// sauts de ligne entre blocs). Retourne null si vide.
+const pseDescriptionRichText = (html) => {
+  const blocks = htmlToRichBlocks(html);
+  if (!blocks.length) return null;
+  const baseFont = { name: 'Aptos', size: 9, color: { argb: 'FF374151' } };
+  const richText = [];
+  blocks.forEach((b, i) => {
+    if (i > 0) richText.push({ font: baseFont, text: '\n' });
+    if (b.type === 'li') richText.push({ font: baseFont, text: '• ' });
+    b.runs.forEach((r) => {
+      richText.push({ font: { ...baseFont, bold: !!r.bold, underline: !!r.underline }, text: r.text });
+    });
+  });
+  return richText;
+};
 
 // ─── HELPERS IMAGE ────────────────────────────────────────────────────────────
 
@@ -370,12 +387,13 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
         worksheet.addRow([]); worksheet.addRow([]);
         const headerPse = worksheet.addRow(['', pseTitle, '', '', '', '']);
         headerPse.font = fonts.optionTitle;
-        // Description / justification de la PSE (texte riche → texte simple + puces).
-        const pseDescText = htmlToPlainText(root.pseDescription);
-        if (pseDescText) {
-          const dRow = worksheet.addRow(['', pseDescText, '', '', '', '']);
-          dRow.getCell(2).font = { name: 'Aptos', size: 9, italic: true, color: { argb: 'FF6B7280' } };
-          dRow.getCell(2).alignment = { wrapText: true, vertical: 'top' };
+        // Description / justification de la PSE — rendu fidèle (gras/souligné/puces),
+        // centré en hauteur dans la cellule.
+        const pseDescRich = pseDescriptionRichText(root.pseDescription);
+        if (pseDescRich) {
+          const dRow = worksheet.addRow(['', '', '', '', '', '']);
+          dRow.getCell(2).value = { richText: pseDescRich };
+          dRow.getCell(2).alignment = { wrapText: true, vertical: 'middle' };
         }
         const startPseRow = worksheet.lastRow.number + 1;
         processNodes([root], worksheet, currentQtyMap, 0, 'option', false, pseSubTotalsRefs, includePM);
@@ -479,7 +497,7 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
         if (recapDesc) {
           const dRow = summarySheet.addRow([recapDesc, ...selectedExports.map(() => '')]);
           dRow.getCell(1).font = { name: 'Aptos', size: 8, italic: true, color: { argb: 'FF6B7280' } };
-          dRow.getCell(1).alignment = { wrapText: true, vertical: 'top' };
+          dRow.getCell(1).alignment = { wrapText: true, vertical: 'middle' };
         }
       });
     }

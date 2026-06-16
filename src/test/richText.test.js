@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { htmlToPlainText } from '../utils/richText';
+import { htmlToPlainText, htmlToRichBlocks } from '../utils/richText';
 
 describe('htmlToPlainText', () => {
   it('retourne une chaîne vide pour une entrée vide / nulle', () => {
@@ -24,5 +24,32 @@ describe('htmlToPlainText', () => {
 
   it('normalise les espaces et les retours à la ligne multiples', () => {
     expect(htmlToPlainText('<p>A</p><p></p><p></p><p>B</p>')).toBe('A\n\nB');
+  });
+});
+
+describe('htmlToRichBlocks', () => {
+  it('retourne un tableau vide pour une entrée vide', () => {
+    expect(htmlToRichBlocks('')).toEqual([]);
+    expect(htmlToRichBlocks(null)).toEqual([]);
+  });
+
+  it('marque le gras et le souligné au niveau du run', () => {
+    const blocks = htmlToRichBlocks('Normal <b>gras</b> <u>souligné</u>');
+    const runs = blocks.flatMap((b) => b.runs);
+    expect(runs.find((r) => r.text.includes('gras')).bold).toBe(true);
+    expect(runs.find((r) => r.text.includes('souligné')).underline).toBe(true);
+    expect(runs.find((r) => r.text.includes('Normal')).bold).toBe(false);
+  });
+
+  it('produit un bloc de type "li" par puce', () => {
+    const blocks = htmlToRichBlocks('<ul><li>Un</li><li><b>Deux</b></li></ul>');
+    expect(blocks.map((b) => b.type)).toEqual(['li', 'li']);
+    expect(blocks[1].runs[0].bold).toBe(true);
+  });
+
+  it('fusionne les runs adjacents de même style', () => {
+    const blocks = htmlToRichBlocks('<b>A</b><b>B</b>');
+    expect(blocks[0].runs).toHaveLength(1);
+    expect(blocks[0].runs[0].text).toBe('AB');
   });
 });

@@ -11,11 +11,91 @@ import { buildTheme } from './pdf/buildTheme';
 import { computePseDeltas, buildPseNumbers, collectPseRoots, collectSubstitutions } from './projectCalculations';
 import { getCurrentPhaseCode } from './phaseModel';
 import { computeVatBreakdown } from './financeFormat';
-import { htmlToPlainText } from './richText';
+import { htmlToPlainText, htmlToRichBlocks } from './richText';
 
 const cleanFormat = (num) => {
   if (num === undefined || num === null || num === '' || isNaN(num)) return "0,00";
   return new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num).replace(/\s/g, ' ');
+};
+
+// ─── RENDU FIDÈLE D'UN TEXTE RICHE (gras / souligné / puces) ──────────────────
+// Mise en page mot à mot avec retour à la ligne, à partir des blocs de
+// htmlToRichBlocks. Retourne un tableau de lignes prêtes à dessiner.
+const layoutRichBlocks = (doc, blocks, { maxWidth, fontSize, font = 'Helvetica' }) => {
+  const lines = [];
+  blocks.forEach((block) => {
+    const isLi = block.type === 'li';
+    const indent = isLi ? 3 : 0;
+    const bulletW = isLi ? doc.getTextWidth('• ') : 0;
+    const lineStartX = indent + bulletW;
+    let line = { items: [], bullet: isLi, indent };
+    let curX = lineStartX;
+    const wrap = () => { lines.push(line); line = { items: [], bullet: false, indent }; curX = lineStartX; };
+    block.runs.forEach((run) => {
+      doc.setFont(font, run.bold ? 'bold' : 'normal');
+      doc.setFontSize(fontSize);
+      const words = run.text.split(/(\s+)/).filter((w) => w !== '');
+      words.forEach((word) => {
+        const isSpace = /^\s+$/.test(word);
+        const w = doc.getTextWidth(word);
+        if (curX + w > maxWidth && curX > lineStartX) { wrap(); if (isSpace) return; }
+        if (isSpace && curX === lineStartX) return;
+        line.items.push({ text: word, bold: run.bold, underline: run.underline, x: curX, w });
+        curX += w;
+      });
+    });
+    lines.push(line); // fin de bloc
+  });
+  return lines;
+};
+
+const drawRichLines = (doc, lines, { x, startY, lineHeight, fontSize, font = 'Helvetica', color }) => {
+  let y = startY;
+  lines.forEach((line) => {
+    if (line.bullet) {
+      doc.setFont(font, 'normal'); doc.setFontSize(fontSize); doc.setTextColor(...color);
+      doc.text('•', x + line.indent, y);
+    }
+    line.items.forEach((it) => {
+      doc.setFont(font, it.bold ? 'bold' : 'normal'); doc.setFontSize(fontSize); doc.setTextColor(...color);
+      doc.text(it.text, x + it.x, y);
+      if (it.underline) {
+        doc.setDrawColor(...color); doc.setLineWidth(0.2);
+        doc.line(x + it.x, y + 0.6, x + it.x + it.w, y + 0.6);
+      }
+    });
+    y += lineHeight;
+  });
+  return y;
+};
+
+// Encadré « DESCRIPTION » de la page PSE : rendu fidèle + texte centré en hauteur.
+// Lève une erreur si le bloc ne tient pas sur la page (repli texte simple paginé).
+const drawPseDescriptionBox = (doc, blocks, THEME, startY) => {
+  const pageW = doc.internal.pageSize.width;
+  const pageH = doc.internal.pageSize.height;
+  const marginX = 10, pad = 3, fontSize = 8, lineHeight = 4.2, labelH = 4.5;
+
+  const innerX = marginX + pad;
+  const maxWidth = pageW - 2 * marginX - 2 * pad;
+  const lines = layoutRichBlocks(doc, blocks, { maxWidth, fontSize });
+  const textH = Math.max(lines.length * lineHeight, lineHeight);
+  const innerH = Math.max(textH, 10);                 // hauteur mini pour l'effet de centrage
+  const boxH = pad + labelH + innerH + pad;
+
+  if (startY + boxH > pageH - 16) throw new Error('PSE description trop haute pour la page');
+
+  doc.setFillColor(...THEME.pseBg);
+  doc.rect(marginX, startY, pageW - 2 * marginX, boxH, 'F');
+
+  doc.setFont('Helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(...THEME.pse);
+  doc.text('DESCRIPTION', innerX, startY + pad + 2.8);
+
+  const textAreaTop = startY + pad + labelH;
+  const firstBaseline = textAreaTop + (innerH - textH) / 2 + lineHeight * 0.72; // centrage vertical
+  drawRichLines(doc, lines, { x: innerX, startY: firstBaseline, lineHeight, fontSize, color: THEME.text });
+
+  return startY + boxH + 3;
 };
 
 // ─── COLLECTE DES DONNÉES ─────────────────────────────────────────────────────
@@ -325,7 +405,7 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
                   rows.push([{
                     content: descTxt,
                     colSpan: summaryExports.length + 1,
-                    styles: { fontSize: 6.5, fontStyle: 'italic', textColor: THEME.lightText, halign: 'left', cellPadding: { left: 8, top: 0, bottom: 2, right: 2 } }
+                    styles: { fontSize: 6.5, fontStyle: 'italic', textColor: THEME.lightText, halign: 'left', valign: 'middle', cellPadding: { left: 8, top: 0, bottom: 2, right: 2 } }
                   }]);
                 }
               }
@@ -487,20 +567,25 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
           doc.setFontSize(10); doc.setTextColor(...THEME.pse); doc.setFont("Helvetica", "bold");
           doc.text(`PSE n°${pseNo} : ${(chap.title || '').toUpperCase()} - ${currentHeaderTrancheName}`, 14, 52);
 
-          // Description / justification de la PSE (texte riche → puces + sauts de ligne).
+          // Description / justification de la PSE — rendu fidèle (gras/souligné/puces),
+          // texte centré en hauteur ; repli texte simple paginé si trop haute.
           let pseTableStartY = 58;
-          const pseDescText = htmlToPlainText(chap.pseDescription);
-          if (pseDescText) {
-            autoTable(doc, {
-              startY: 56,
-              margin: { left: 10, right: 10 },
-              theme: 'plain',
-              styles: { font: 'Helvetica', fontSize: 8, textColor: THEME.text, cellPadding: { left: 3, right: 3, top: 2, bottom: 2 }, overflow: 'linebreak' },
-              head: [[{ content: 'DESCRIPTION', styles: { fontStyle: 'bold', fontSize: 7, textColor: THEME.pse, cellPadding: { left: 3, top: 1, bottom: 0 } } }]],
-              body: [[{ content: pseDescText, styles: { fillColor: THEME.pseBg } }]],
-              didDrawPage: drawHeader,
-            });
-            pseTableStartY = doc.lastAutoTable.finalY + 3;
+          const pseBlocks = htmlToRichBlocks(chap.pseDescription);
+          if (pseBlocks.length) {
+            try {
+              pseTableStartY = drawPseDescriptionBox(doc, pseBlocks, THEME, 55);
+            } catch {
+              autoTable(doc, {
+                startY: 56,
+                margin: { left: 10, right: 10 },
+                theme: 'plain',
+                styles: { font: 'Helvetica', fontSize: 8, textColor: THEME.text, cellPadding: { left: 3, right: 3, top: 2, bottom: 2 }, overflow: 'linebreak', valign: 'middle' },
+                head: [[{ content: 'DESCRIPTION', styles: { fontStyle: 'bold', fontSize: 7, textColor: THEME.pse, cellPadding: { left: 3, top: 1, bottom: 0 } } }]],
+                body: [[{ content: htmlToPlainText(chap.pseDescription), styles: { fillColor: THEME.pseBg } }]],
+                didDrawPage: drawHeader,
+              });
+              pseTableStartY = doc.lastAutoTable.finalY + 3;
+            }
           }
 
           autoTable(doc, {
