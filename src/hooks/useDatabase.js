@@ -80,52 +80,76 @@ export const useDatabase = (user, companyId) => {
     setIsBpuLoaded(false);
     setBpu([]);
 
-    const fetchLightData = async () => {
-      try {
-        setIsLoading(true);
+    let cancelled = false;
 
-        const catSnap = await getDocs(col(companyId, 'categories'));
-        const catData = catSnap.docs.map(d => d.data());
-        if (catData.length === 0) {
-          const defaults = [
-            { id: 'cat1', name: 'TERRASSEMENT', color: CAT_COLORS[0] },
-            { id: 'cat2', name: 'RÉSEAUX HUMIDES', color: CAT_COLORS[1] },
-          ];
-          await Promise.all(defaults.map(c => setDoc(dref(companyId, 'categories', c.id), c)));
-          setCategories(defaults);
-        } else {
-          const withColors = await ensureCategoryColors(catData);
-          setCategories(withColors);
-        }
-
-        const unitSnap = await getDocs(col(companyId, 'units'));
-        const unitData = unitSnap.docs.map(d => d.data());
-        if (unitData.length > 0) {
-          setUnits(unitData);
-        } else {
-          const defaultUnits = [
-            { symbol: 'u',   label: 'Unité' },
-            { symbol: 'm³',  label: 'Mètre cube' },
-            { symbol: 'ml',  label: 'Mètre linéaire' },
-            { symbol: 'm²',  label: 'Mètre carré' },
-            { symbol: 't',   label: 'Tonne' },
-            { symbol: 'ens', label: 'Ensemble' },
-          ];
-          await Promise.all(defaultUnits.map(u => setDoc(dref(companyId, 'units', u.symbol), u)));
-          setUnits(defaultUnits);
-        }
-
-        const blocSnap = await getDocs(col(companyId, 'blocs'));
-        setBlocs(blocSnap.docs.map(d => d.data()));
-      } catch (error) {
-        console.error('Erreur chargement Firebase :', error);
-        toast.error('Impossible de charger les données. Vérifiez votre connexion.', { title: 'Erreur réseau' });
-      } finally {
-        setIsLoading(false);
+    // Charge les données légères (catégories, unités, blocs).
+    // Peut lever : la gestion d'erreur est centralisée dans fetchWithRetry.
+    const loadLightData = async () => {
+      const catSnap = await getDocs(col(companyId, 'categories'));
+      const catData = catSnap.docs.map(d => d.data());
+      if (catData.length === 0) {
+        const defaults = [
+          { id: 'cat1', name: 'TERRASSEMENT', color: CAT_COLORS[0] },
+          { id: 'cat2', name: 'RÉSEAUX HUMIDES', color: CAT_COLORS[1] },
+        ];
+        await Promise.all(defaults.map(c => setDoc(dref(companyId, 'categories', c.id), c)));
+        if (!cancelled) setCategories(defaults);
+      } else {
+        const withColors = await ensureCategoryColors(catData);
+        if (!cancelled) setCategories(withColors);
       }
+
+      const unitSnap = await getDocs(col(companyId, 'units'));
+      const unitData = unitSnap.docs.map(d => d.data());
+      if (unitData.length > 0) {
+        if (!cancelled) setUnits(unitData);
+      } else {
+        const defaultUnits = [
+          { symbol: 'u',   label: 'Unité' },
+          { symbol: 'm³',  label: 'Mètre cube' },
+          { symbol: 'ml',  label: 'Mètre linéaire' },
+          { symbol: 'm²',  label: 'Mètre carré' },
+          { symbol: 't',   label: 'Tonne' },
+          { symbol: 'ens', label: 'Ensemble' },
+        ];
+        await Promise.all(defaultUnits.map(u => setDoc(dref(companyId, 'units', u.symbol), u)));
+        if (!cancelled) setUnits(defaultUnits);
+      }
+
+      const blocSnap = await getDocs(col(companyId, 'blocs'));
+      if (!cancelled) setBlocs(blocSnap.docs.map(d => d.data()));
     };
 
-    fetchLightData();
+    // Retry silencieux : un getDocs « one-shot » échoue parfois une seule fois
+    // au démarrage (renégociation long-polling sur Wi-Fi d'entreprise / 4G)
+    // alors que le réseau est OK par ailleurs. On retente discrètement avant
+    // d'alarmer : le toast « Erreur réseau » n'apparaît plus que sur une vraie
+    // panne (toutes les tentatives épuisées).
+    const fetchWithRetry = async () => {
+      setIsLoading(true);
+      const retryDelays = [800, 2000]; // 1 tentative immédiate + 2 retries
+      for (let attempt = 0; !cancelled; attempt++) {
+        try {
+          await loadLightData();
+          break;
+        } catch (error) {
+          if (attempt >= retryDelays.length) {
+            console.error('Erreur chargement Firebase :', error);
+            if (!cancelled) {
+              toast.error('Impossible de charger les données. Vérifiez votre connexion.', { title: 'Erreur réseau' });
+            }
+            break;
+          }
+          console.warn(`[useDatabase] Chargement échoué (tentative ${attempt + 1}/${retryDelays.length + 1}), nouvel essai…`, error?.code || error);
+          await new Promise((r) => setTimeout(r, retryDelays[attempt]));
+        }
+      }
+      if (!cancelled) setIsLoading(false);
+    };
+
+    fetchWithRetry();
+
+    return () => { cancelled = true; };
   }, [user, companyId]);
 
   // ─── CHARGEMENT BPU À LA DEMANDE ──────────────────────────────────────────

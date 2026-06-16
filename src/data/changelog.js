@@ -12,6 +12,7 @@ export const CHANGELOG = [
     highlights: [
       'Estimation (exports PDF & Excel) : dans le récapitulatif financier multi-tranches, le « TOTAL GÉNÉRAL HT (Hors PSE) » est désormais affiché juste après la base — donc avant la liste des PSE, qui passe en dessous. Le total ne porte que sur la base (jamais sur les PSE), et l\'enchaînement « base → total → PSE » lève toute ambiguïté de lecture (le total n\'inclut pas les options listées en dessous)',
       'Estimation (Calculateur de Marge) : les réglages saisis sont désormais conservés. Le pourcentage appliqué aux lignes variables est pré-rempli à la réouverture avec la dernière valeur du projet (comme le seuil de quantité, déjà mémorisé) — plus besoin de le ressaisir à chaque ouverture. Les deux réglages restent persistés par projet',
+      'Bibliothèque de prix : fin des fausses alertes « Erreur réseau » au démarrage. Sur un Wi-Fi d\'entreprise ou en 4G, le chargement initial de la base pouvait afficher brièvement une boîte « Erreur réseau » alors que tout fonctionnait normalement (simple renégociation de la liaison Firestore). L\'application retente désormais discrètement le chargement avant de signaler quoi que ce soit : le message n\'apparaît plus que si la base est réellement injoignable',
     ],
   },
   {
