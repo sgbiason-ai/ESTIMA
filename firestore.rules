@@ -9,9 +9,20 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
+    // True si le caller est authentifié ET possède un doc /users/{uid}.
+    // Garde indispensable : sans elle, getUserData() lève une erreur quand le
+    // profil n'existe pas encore, ce qui fait échouer TOUTE la règle en
+    // permission-denied — y compris la lecture par l'utilisateur de son propre
+    // profil (bootstrap de l'app, useAppAuth). Le && court-circuite donc
+    // getUserData() n'est appelé que si le doc existe.
+    function userExists() {
+      return request.auth != null
+             && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
     // True if the caller belongs to the given company
     function isCompanyMember(companyId) {
-      return request.auth != null && getUserData().companyId == companyId;
+      return userExists() && getUserData().companyId == companyId;
     }
 
     // True if the caller is an admin of the given company
@@ -21,7 +32,7 @@ service cloud.firestore {
 
     // True if the caller is a super-admin (isAdmin flag on their profile)
     function isSuperAdmin() {
-      return request.auth != null && getUserData().isAdmin == true;
+      return userExists() && getUserData().isAdmin == true;
     }
 
     // True if the caller is the application-level super-admin (by email).
