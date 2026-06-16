@@ -240,6 +240,7 @@ export function normalizeProject(raw) {
     clientCity:     str(raw.clientCity),
     clientZip:      str(raw.clientZip),
     clientLogo:     str(raw.clientLogo),
+    coTraitantLogos: arr(raw.coTraitantLogos).filter((l) => typeof l === 'string' && l),
 
     // Projet
     code:           str(raw.code),

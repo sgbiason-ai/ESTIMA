@@ -21,6 +21,10 @@ const DOC_PREVIEWS = {
   'RAO':       { label: "RAPPORT D'ANALYSE DES OFFRES", overrides: { primary: RAO_VERT, accent: RAO_VERT } },
 };
 
+// Nombre max de logos co-traitants (groupement) côté MOE, en plus du logo principal.
+// Bumper à 2 pour autoriser un 3ᵉ logo (mandataire + 2 co-traitants).
+const MAX_COTRAITANT_LOGOS = 1;
+
 // ─── SOUS-COMPOSANTS UI ───────────────────────────────────────────────────────
 
 const ModernInput = ({ label, name, value, onChange, icon: Icon, type = "text", placeholder, disabled = false, required = false, className = "", error }) => (
@@ -166,7 +170,7 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
     client: '', clientAddress: '', clientZip: '', clientCity: '',
     moe: 'PAPYRUS', moeAddress: '', code: '', location: '', marketType: 'Privé', tauxTVA: 20,
     phase: 'DCE', dateRemise: '', timeRemise: '', duration: '', prepPeriod: '1 mois',
-    clientLogo: null, projectDescription: '', hasPSE: 'ne comporte pas', department: '',
+    clientLogo: null, coTraitantLogos: [], projectDescription: '', hasPSE: 'ne comporte pas', department: '',
     lotName: '', spsLevel: 'II', startDate: '', validityDays: 120, platformUrl: '',
     showSignatures: true,
     signatories: ['', '', '', ''],
@@ -272,6 +276,7 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
         duration: project.duration || '',
         prepPeriod: project.prepPeriod || '1 mois',
         clientLogo: project.clientLogo || null,
+        coTraitantLogos: Array.isArray(project.coTraitantLogos) ? project.coTraitantLogos.filter(Boolean) : [],
         projectDescription: project.projectDescription || '',
         hasPSE: project.hasPSE || 'ne comporte pas',
         department: project.department || '',
@@ -296,6 +301,19 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // ── Logos co-traitants (groupement) ──
+  const addCoTraitant = () => setFormData(prev => {
+    const list = prev.coTraitantLogos || [];
+    if (list.length >= MAX_COTRAITANT_LOGOS) return prev;
+    return { ...prev, coTraitantLogos: [...list, null] };
+  });
+  const setCoTraitantLogo = (idx, val) => setFormData(prev => {
+    const list = [...(prev.coTraitantLogos || [])];
+    if (val === null) list.splice(idx, 1);  // suppression : on retire l'emplacement
+    else list[idx] = val;
+    return { ...prev, coTraitantLogos: list };
+  });
+
   const getErrors = (data) => {
     const errs = {};
     if (!data.name || data.name.trim().length < 3) errs.name = "Minimum 3 caractères.";
@@ -317,7 +335,11 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
     e.preventDefault();
     if (!isFormValid) return;
     const tauxTVA = Number(formData.tauxTVA);
-    onSave({ ...formData, tauxTVA: Number.isFinite(tauxTVA) ? tauxTVA : 20 });
+    onSave({
+      ...formData,
+      tauxTVA: Number.isFinite(tauxTVA) ? tauxTVA : 20,
+      coTraitantLogos: (formData.coTraitantLogos || []).filter(Boolean),
+    });
     onClose();
   };
 
@@ -396,6 +418,31 @@ const ProjectDetailsModal = ({ isOpen, onClose, project, onSave, branding = null
                   <p className="text-[10px] font-bold text-slate-500">Logo MOE (ton entreprise)</p>
                   <p className="text-[9px] text-slate-400">Géré dans le module Branding</p>
                 </div>
+              </div>
+
+              {/* Logos co-traitants (groupement) — empilés sous ton logo MOE sur la page de garde */}
+              <div className="flex flex-col gap-2 border-t border-slate-100 pt-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 ml-1">Co-traitants (groupement)</p>
+                  {(formData.coTraitantLogos?.length || 0) < MAX_COTRAITANT_LOGOS && (
+                    <button type="button" onClick={addCoTraitant}
+                      className="flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-700">
+                      <Plus size={11} /> Ajouter
+                    </button>
+                  )}
+                </div>
+                {(formData.coTraitantLogos || []).map((logo, i) => (
+                  <LogoUpload
+                    key={i}
+                    label={`Logo co-traitant ${i + 1}`}
+                    value={logo}
+                    onChange={(val) => setCoTraitantLogo(i, val)}
+                    hint="JPEG, PNG — empilé sous ton logo"
+                  />
+                ))}
+                {(formData.coTraitantLogos?.length || 0) === 0 && (
+                  <p className="text-[9px] text-slate-300 ml-1">Aucun — ajoute un logo si tu réponds en groupement.</p>
+                )}
               </div>
             </div>
 

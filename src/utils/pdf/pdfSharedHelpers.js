@@ -119,13 +119,18 @@ const loadImageForPdf = async (source) => {
   return img;
 };
 
-/** Charge le logo MOE + logo client en parallèle. Retourne { logoMoe, logoClient }. */
+/**
+ * Charge le logo MOE + logo client + logos co-traitants (groupement) en parallèle.
+ * Retourne { logoMoe, logoClient, logoCoTraitants: HTMLImageElement[] }.
+ */
 export const loadLogos = async (branding, project) => {
-  const [logoMoe, logoClient] = await Promise.all([
+  const coSrcs = Array.isArray(project?.coTraitantLogos) ? project.coTraitantLogos.filter(Boolean) : [];
+  const [logoMoe, logoClient, ...coLogos] = await Promise.all([
     loadImageForPdf(branding?.logo || '/logo.jpg').catch(() => null),
     project?.clientLogo ? loadImageForPdf(project.clientLogo).catch(() => null) : Promise.resolve(null),
+    ...coSrcs.map((src) => loadImageForPdf(src).catch(() => null)),
   ]);
-  return { logoMoe, logoClient };
+  return { logoMoe, logoClient, logoCoTraitants: coLogos.filter(Boolean) };
 };
 
 /**
@@ -277,14 +282,20 @@ export const drawCoverPage = (doc, config, theme, logos) => {
     branding, today,
     extraBlocks = [],
   } = config;
-  const { logoMoe, logoClient } = logos;
+  const { logoMoe, logoClient, logoCoTraitants = [] } = logos;
 
   // Bande gauche primary
   doc.setFillColor(...theme.primary);
   doc.rect(0, 0, 6, pageHeight, 'F');
 
-  // Logos
-  if (logoMoe) renderLogo(doc, logoMoe, 18, 18, 45, 25);
+  // Logos — MOE en haut à gauche, co-traitants (groupement) empilés dessous
+  let leftLogoY = 18;
+  if (logoMoe) { renderLogo(doc, logoMoe, 18, leftLogoY, 45, 25); leftLogoY += 25 + 3; }
+  logoCoTraitants.forEach((logo) => {
+    if (!logo) return;
+    renderLogo(doc, logo, 18, leftLogoY, 45, 18);
+    leftLogoY += 18 + 3;
+  });
   if (logoClient) {
     const maxW = 45; const maxH = 25;
     const ratio = logoClient.width / logoClient.height;

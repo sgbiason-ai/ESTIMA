@@ -110,7 +110,7 @@ const getImageDimensions = (base64Data) => {
 //   - Nom société dans le bandeau
 //   - Pied de page avec les coordonnées MOE
 
-const drawCoverPage = (doc, project, logoMoeData, logoMoeDims, logoClientData, logoClientDims, title, today, branding = null) => {
+const drawCoverPage = (doc, project, logoMoeData, logoMoeDims, logoClientData, logoClientDims, title, today, branding = null, coTraitantLogos = []) => {
   const pageWidth  = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const centerX = pageWidth / 2;
@@ -141,6 +141,18 @@ const drawCoverPage = (doc, project, logoMoeData, logoMoeDims, logoClientData, l
     // Logo centré verticalement dans le bandeau (hauteur 25)
     doc.addImage(logoMoeData, 'JPEG', 14, (25 - h) / 2, w, h);
   }
+
+  // ── Logos co-traitants (groupement) — empilés sous le bandeau, à gauche ──
+  let coY = 30;
+  (coTraitantLogos || []).forEach(({ data, dims }) => {
+    if (!data || !dims) return;
+    const ratio = dims.width / dims.height;
+    const maxW = 50; const maxH = 16;
+    let w = maxW; let h = w / ratio;
+    if (h > maxH) { h = maxH; w = h * ratio; }
+    doc.addImage(data, 'JPEG', 14, coY, w, h);
+    coY += h + 3;
+  });
 
   // ── Logo Client (en dessous du bandeau, à droite) ──
   if (logoClientData && logoClientDims) {
@@ -269,8 +281,17 @@ export const generateAnalysisPDF = async ({
   const logoClientData = project.clientLogo ? await loadLogoAsBase64(project.clientLogo) : null;
   const logoClientDims = logoClientData ? await getImageDimensions(logoClientData) : null;
 
+  // Logos co-traitants (groupement) — base64 + dimensions
+  const coTraitantSources = Array.isArray(project.coTraitantLogos) ? project.coTraitantLogos.filter(Boolean) : [];
+  const coTraitantLogos = [];
+  for (const src of coTraitantSources) {
+    const data = await loadLogoAsBase64(src);
+    const dims = data ? await getImageDimensions(data) : null;
+    if (data && dims) coTraitantLogos.push({ data, dims });
+  }
+
   // Page de garde A4 — [MODIFIÉ] : on passe `branding`
-  drawCoverPage(doc, project, logoMoeData, logoMoeDims, logoClientData, logoClientDims, "RAPPORT D'ANALYSE DES OFFRES", dateStr, branding);
+  drawCoverPage(doc, project, logoMoeData, logoMoeDims, logoClientData, logoClientDims, "RAPPORT D'ANALYSE DES OFFRES", dateStr, branding, coTraitantLogos);
 
   // Passage A3 paysage
   doc.addPage('a3', 'l');

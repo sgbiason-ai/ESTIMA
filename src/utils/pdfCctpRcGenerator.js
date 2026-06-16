@@ -160,7 +160,7 @@ const drawPageFooter = (doc, num, total, THEME, fontB) => {
 
 // ─── PAGE DE GARDE ───────────────────────────────────────────────────────────
 
-const drawCoverPage = (doc, project, logoMoe, logoClient, docLabel, today, branding, THEME) => {
+const drawCoverPage = (doc, project, logoMoe, logoClient, docLabel, today, branding, THEME, logoCoTraitants = []) => {
   const W=PW, H=PH;
   const fH = branding?.fonts?.headings || 'Helvetica';
   const fB = branding?.fonts?.main     || 'Helvetica';
@@ -168,14 +168,24 @@ const drawCoverPage = (doc, project, logoMoe, logoClient, docLabel, today, brand
   doc.setFillColor(255,255,255); doc.rect(0,0,W,H,'F');
   doc.setFillColor(...THEME.primary); doc.rect(0,0,5,H,'F');
 
-  const addLogo = (img, left) => {
+  const addLogoAt = (img, x, y, mxW, mxH) => {
     if (!img) return;
-    const mxW=45, mxH=25, r=img.width/img.height;
+    const r=img.width/img.height;
     let w=mxW, h=w/r;
     if (h>mxH) { h=mxH; w=h*r; }
-    doc.addImage(img, 'JPEG', left?18:W-18-w, 18+(mxH-h)/2, w, h);
+    doc.addImage(img, 'JPEG', x, y+(mxH-h)/2, w, h);
   };
-  addLogo(logoMoe, true); addLogo(logoClient, false);
+  // MOE en haut à gauche + co-traitants (groupement) empilés dessous
+  let leftY = 18;
+  if (logoMoe) { addLogoAt(logoMoe, 18, leftY, 45, 25); leftY += 25 + 3; }
+  (logoCoTraitants || []).forEach((img) => { if (img) { addLogoAt(img, 18, leftY, 45, 18); leftY += 18 + 3; } });
+  // Logo client à droite
+  if (logoClient) {
+    const r=logoClient.width/logoClient.height;
+    let w=45, h=w/r;
+    if (h>25) { h=25; w=h*r; }
+    addLogoAt(logoClient, W-18-w, 18, w, 25);
+  }
 
   doc.setFont(fH,'bold'); doc.setFontSize(9); doc.setTextColor(...THEME.lightText);
   doc.text(docLabel.toUpperCase(), W-18, 52, {align:'right'});
@@ -494,7 +504,7 @@ export const generatePdfCctpRc = async (
   const today    = new Date().toLocaleDateString('fr-FR');
   const doc      = new jsPDF({ unit:'mm', format:'a4' });
 
-  const { logoMoe, logoClient } = await loadLogos(branding, project);
+  const { logoMoe, logoClient, logoCoTraitants } = await loadLogos(branding, project);
 
   const ctx = {
     doc, project, logoMoe, docLabel, THEME, branding, today,
@@ -504,7 +514,7 @@ export const generatePdfCctpRc = async (
   };
 
   // 1. Page de garde
-  drawCoverPage(doc, project, logoMoe, logoClient, docLabel, today, branding, THEME);
+  drawCoverPage(doc, project, logoMoe, logoClient, docLabel, today, branding, THEME, logoCoTraitants);
 
   // 2. Sommaire
   doc.addPage(); drawPageHeader(doc, ctx);

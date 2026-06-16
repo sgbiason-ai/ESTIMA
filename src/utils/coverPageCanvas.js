@@ -98,9 +98,11 @@ export const buildCoverPageCanvas = async (project, docLabel, branding = null, t
 
   // ── Chargement logos ────────────────────────────────────────────────────────
   const moeLogoSrc = branding?.logo || null;
-  const [logoMoe, logoClient] = await Promise.all([
+  const coTraitantSrcs = Array.isArray(project.coTraitantLogos) ? project.coTraitantLogos.filter(Boolean) : [];
+  const [logoMoe, logoClient, ...logoCoTraitants] = await Promise.all([
     loadImage(moeLogoSrc),
     loadImage(project.clientLogo || null),
+    ...coTraitantSrcs.map(loadImage),
   ]);
 
   // ── 1. Bande de couleur gauche ──────────────────────────────────────────────
@@ -108,18 +110,26 @@ export const buildCoverPageCanvas = async (project, docLabel, branding = null, t
   ctx.fillRect(0, 0, px(6), canvas.height);
 
   // ── 2. Logos ────────────────────────────────────────────────────────────────
-  const renderLogo = (img, isLeft) => {
+  // Dessine un logo dans une zone (x, y, maxW, maxH) en mm, centré verticalement.
+  const drawLogoAt = (img, x, y, maxW, maxH) => {
     if (!img) return;
-    const maxW = 45; const maxH = 25; // mm
     const ratio = img.naturalWidth / img.naturalHeight;
     let lw = maxW; let lh = lw / ratio;
     if (lh > maxH) { lh = maxH; lw = lh * ratio; }
-    const yPos = 18 + (maxH - lh) / 2;
-    const xPos = isLeft ? 18 : PW - 18 - lw;
-    ctx.drawImage(img, px(xPos), px(yPos), px(lw), px(lh));
+    const yPos = y + (maxH - lh) / 2;
+    ctx.drawImage(img, px(x), px(yPos), px(lw), px(lh));
   };
-  renderLogo(logoMoe, true);
-  renderLogo(logoClient, false);
+  // MOE en haut à gauche + co-traitants (groupement) empilés dessous
+  let leftY = 18;
+  if (logoMoe) { drawLogoAt(logoMoe, 18, leftY, 45, 25); leftY += 25 + 3; }
+  logoCoTraitants.forEach((img) => { if (img) { drawLogoAt(img, 18, leftY, 45, 18); leftY += 18 + 3; } });
+  // Logo client à droite
+  if (logoClient) {
+    const ratio = logoClient.naturalWidth / logoClient.naturalHeight;
+    let lw = 45; let lh = lw / ratio;
+    if (lh > 25) { lh = 25; lw = lh * ratio; }
+    drawLogoAt(logoClient, PW - 18 - lw, 18, lw, 25);
+  }
 
   // ── 3. Type de document (droite) ─ zone vide tolérée → cover générique ─────
   if (docLabel) {

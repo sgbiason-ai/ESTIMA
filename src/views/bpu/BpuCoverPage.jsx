@@ -29,13 +29,17 @@ const BpuCoverPage = ({ project, branding, resolvedLogo, onLogoError }) => {
       }}
     >
       {/* Logo(s) en haut (seul ajout vs Word) */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '70px', marginBottom: '40px' }}>
-        <div style={{ height: '100%', display: 'flex', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', minHeight: '70px', marginBottom: '40px' }}>
+        {/* MOE + co-traitants (groupement) empilés à gauche */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
           {resolvedLogo && (
-            <img src={resolvedLogo} alt="logo MOE" style={{ maxHeight: '100%', maxWidth: '260px', objectFit: 'contain' }} onError={onLogoError} loading="lazy" />
+            <img src={resolvedLogo} alt="logo MOE" style={{ maxHeight: '70px', maxWidth: '260px', objectFit: 'contain' }} onError={onLogoError} loading="lazy" />
           )}
+          {(project?.coTraitantLogos || []).filter(Boolean).map((logo, i) => (
+            <img key={i} src={logo} alt={`logo co-traitant ${i + 1}`} style={{ maxHeight: '52px', maxWidth: '220px', objectFit: 'contain' }} loading="lazy" />
+          ))}
         </div>
-        <div style={{ height: '70%', display: 'flex', alignItems: 'center' }}>
+        <div style={{ height: '50px', display: 'flex', alignItems: 'center' }}>
           {project?.clientLogo && (
             <img src={project.clientLogo} alt="logo client" style={{ maxHeight: '100%', maxWidth: '200px', objectFit: 'contain' }} loading="lazy" />
           )}

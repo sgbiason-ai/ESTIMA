@@ -137,7 +137,7 @@ const drawJustifiedText = (doc, text, x, y, maxWidth, lineH = 4.5) => {
 };
 
 // ─── PAGE DE GARDE RAO — utilise drawCoverPage partagé + bloc consultation ──
-const drawCoverPageRao = (doc, project, consultation, logoMoe, logoClient, today, branding, THEME) => {
+const drawCoverPageRao = (doc, project, consultation, logoMoe, logoClient, today, branding, THEME, logoCoTraitants = []) => {
   // Formater la date de remise
   let remiseStr = '—';
   if (consultation?.dateRemise) {
@@ -180,7 +180,7 @@ const drawCoverPageRao = (doc, project, consultation, logoMoe, logoClient, today
         ],
       }] : []),
     ],
-  }, THEME, { logoMoe, logoClient });
+  }, THEME, { logoMoe, logoClient, logoCoTraitants });
 };
 
 // ── EN-TÊTE : bande verte pleine + titre blanc ────────────────────────────
@@ -302,7 +302,7 @@ export const generateRaoPDF = async (optionsParams) => {
 
   const THEME = buildTheme(branding);
 
-  const { logoMoe, logoClient } = await loadLogos(branding, project);
+  const { logoMoe, logoClient, logoCoTraitants } = await loadLogos(branding, project);
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const companiesData = rao.companies || {};
@@ -381,7 +381,7 @@ export const generateRaoPDF = async (optionsParams) => {
   };
 
   // ── PAGE 1 : COUVERTURE ──
-  drawCoverPageRao(doc, project, consultation, logoMoe, logoClient, today, branding, THEME);
+  drawCoverPageRao(doc, project, consultation, logoMoe, logoClient, today, branding, THEME, logoCoTraitants);
 
   // ── PAGE 2 : SOMMAIRE ──
   // On insère une page placeholder pour le sommaire — on la remplira à la fin

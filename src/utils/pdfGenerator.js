@@ -99,7 +99,7 @@ const baseLabelOf = (baseId, nodeIndex, projectRefMap) => {
 // ─── PAGE DE GARDE ────────────────────────────────────────────────────────────
 // Utilise drawCoverPage partagé depuis pdfSharedHelpers.js
 
-const drawCoverPage = (doc, project, logoMoe, logoClient, type, today, branding = null) => {
+const drawCoverPage = (doc, project, logoMoe, logoClient, type, today, branding = null, logoCoTraitants = []) => {
   const THEME = buildTheme(branding);
   const docType = type === 'DQE' ? 'DÉTAIL QUANTITATIF ET ESTIMATIF' : 'ESTIMATION CONFIDENTIELLE DES TRAVAUX';
 
@@ -118,7 +118,7 @@ const drawCoverPage = (doc, project, logoMoe, logoClient, type, today, branding 
     signatories: project.signatories || ['', '', '', ''],
     branding,
     today,
-  }, THEME, { logoMoe, logoClient });
+  }, THEME, { logoMoe, logoClient, logoCoTraitants });
 };
 
 // ─── FONCTION PRINCIPALE ──────────────────────────────────────────────────────
@@ -131,7 +131,7 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
   const THEME = buildTheme(branding);
 
   // Chargement des logos (fonction partagée)
-  const { logoMoe, logoClient } = await loadLogos(branding, project);
+  const { logoMoe, logoClient, logoCoTraitants } = await loadLogos(branding, project);
 
   const phaseLabel = getCurrentPhaseCode(project).toUpperCase();
   const isDQE = type === 'DQE';
@@ -149,7 +149,7 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
 
   if (includeCover) {
     // [MODIFIÉ] On passe `branding` en plus
-    drawCoverPage(doc, project, logoMoe, logoClient, type, today, branding);
+    drawCoverPage(doc, project, logoMoe, logoClient, type, today, branding, logoCoTraitants);
   }
 
   let projectRefMap = new Map();

@@ -12,7 +12,7 @@ export const generateCoverPagePDF = async (project, branding = null) => {
   const doc = new jsPDF();
   const today = new Date().toLocaleDateString('fr-FR');
   const THEME = buildTheme(branding);
-  const { logoMoe, logoClient } = await loadLogos(branding, project);
+  const { logoMoe, logoClient, logoCoTraitants } = await loadLogos(branding, project);
 
   drawCoverPage(doc, {
     docType: '', // page de garde générique
@@ -29,7 +29,7 @@ export const generateCoverPagePDF = async (project, branding = null) => {
     signatories: project?.signatories || ['', '', '', ''],
     branding,
     today,
-  }, THEME, { logoMoe, logoClient });
+  }, THEME, { logoMoe, logoClient, logoCoTraitants });
 
   const fileName = `Page_de_garde_${sanitizeFilename(project?.name || 'projet')}.pdf`;
   const blob = doc.output('blob');
