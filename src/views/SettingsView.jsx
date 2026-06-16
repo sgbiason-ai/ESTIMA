@@ -100,10 +100,15 @@ const SettingsView = ({
     }
 
     const count = Array.isArray(data.bpu) ? data.bpu.length : 0;
+    const catCount = Array.isArray(data.categories) ? data.categories.length : 0;
     const libName = data?.meta?.activeDbName || file.name.replace(/\.json$/i, '');
+    const summary = [
+      count ? `${count} article(s)` : null,
+      catCount ? `${catCount} dossier(s)` : null,
+    ].filter(Boolean).join(' · ') || 'contenu vide';
 
     const mode = await choose(
-      `« ${libName} » — ${count} article(s). Comment l'intégrer à la bibliothèque Cloud ?`,
+      `« ${libName} » — ${summary}. Comment l'intégrer à la bibliothèque Cloud ?`,
       [
         { key: 'merge', label: 'Fusionner', description: 'Ajoute les nouveaux articles et met à jour ceux de même référence. Conserve le reste de la bibliothèque.' },
         { key: 'replace', label: 'Remplacer toute la bibliothèque', description: 'Vide la bibliothèque Cloud puis charge uniquement ce fichier. Action irréversible.', danger: true },
