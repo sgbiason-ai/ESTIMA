@@ -844,6 +844,7 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNav
                 saveUnit={db.saveUnit}
                 deleteUnit={db.deleteUnit}
                 importFromExcel={db.importFromExcel}
+                handleImportDatabase={db.handleImportDatabase}
                 clearBpu={db.clearBpu}
                 bpuConfig={bpuConfig}
                 setBpuConfig={setBpuConfig}

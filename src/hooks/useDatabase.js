@@ -539,43 +539,104 @@ export const useDatabase = (user, companyId) => {
     reader.readAsArrayBuffer(file);
   };
 
-  const handleImportDatabase = async (importedData) => {
+  // Supprime une liste de documents d'une collection par batch (500 max / batch Firestore)
+  const deleteDocsInBatches = async (colName, ids) => {
+    for (let i = 0; i < ids.length; i += 450) {
+      const batch = writeBatch(db);
+      ids.slice(i, i + 450).forEach(id => batch.delete(dref(companyId, colName, id)));
+      await batch.commit();
+    }
+  };
+
+  // Écrit (set) une liste de documents par batch
+  const setDocsInBatches = async (colName, items, idOf) => {
+    for (let i = 0; i < items.length; i += 450) {
+      const batch = writeBatch(db);
+      items.slice(i, i + 450).forEach(item => batch.set(dref(companyId, colName, idOf(item)), item));
+      await batch.commit();
+    }
+  };
+
+  /**
+   * Importe une base JSON vers le Cloud.
+   * @param {{bpu?:Array, categories?:Array, units?:Array}} importedData
+   * @param {'merge'|'replace'} [mode='merge']
+   *   - merge   : ajoute les articles/dossiers et met à jour ceux de même id ; conserve le reste.
+   *   - replace : vide la bibliothèque Cloud (bpu + catégories présentes dans l'import) puis charge le JSON.
+   * Les unités sont toujours fusionnées (jamais supprimées → ne casse pas les articles existants).
+   */
+  const handleImportDatabase = async (importedData, mode = 'merge') => {
     if (!companyId) return;
     if (!importedData || (!importedData.bpu && !importedData.categories)) {
       toast.error('Le fichier importé est invalide ou vide.', { title: 'Import impossible' });
       return;
     }
-    const ok = await confirm('Importer et écraser les données existantes sur le Cloud ?', {
-      title: 'Importer la base',
-      danger: true,
-      confirmLabel: 'Importer',
-    });
-    if (!ok) return;
+    const now = new Date().toISOString();
 
     try {
       setIsLoading(true);
-      if (importedData.categories) {
-        await Promise.all(importedData.categories.map(cat => setDoc(dref(companyId, 'categories', cat.id), cat)));
-        setCategories(importedData.categories);
+
+      // ── UNITÉS (toujours fusionnées) ──────────────────────────────────────
+      if (Array.isArray(importedData.units) && importedData.units.length) {
+        await Promise.all(importedData.units.map(u => setDoc(dref(companyId, 'units', unitDocId(u.symbol)), u)));
+        setUnits(prev => {
+          const map = new Map(prev.map(u => [u.symbol, u]));
+          importedData.units.forEach(u => map.set(u.symbol, u));
+          return Array.from(map.values());
+        });
       }
-      if (importedData.units) {
-        await Promise.all(importedData.units.map(unit => setDoc(dref(companyId, 'units', unit.symbol), unit)));
-        setUnits(importedData.units);
+
+      // ── CATÉGORIES ────────────────────────────────────────────────────────
+      if (Array.isArray(importedData.categories) && importedData.categories.length) {
+        if (mode === 'replace') {
+          const incoming = new Set(importedData.categories.map(c => c.id));
+          await deleteDocsInBatches('categories', categories.filter(c => !incoming.has(c.id)).map(c => c.id));
+        }
+        await Promise.all(importedData.categories.map(c => setDoc(dref(companyId, 'categories', c.id), c)));
+        setCategories(prev => {
+          if (mode === 'replace') return importedData.categories;
+          const map = new Map(prev.map(c => [c.id, c]));
+          importedData.categories.forEach(c => map.set(c.id, c));
+          return Array.from(map.values());
+        });
       }
-      if (importedData.bpu) {
-        const cleanedItems = importedData.bpu.map(item => ({
+
+      // ── BPU ───────────────────────────────────────────────────────────────
+      if (Array.isArray(importedData.bpu) && importedData.bpu.length) {
+        // Id sécurisé Firestore (interdit '/') — on garde la réf métier dans bpuNum
+        const cleaned = importedData.bpu.map(item => ({
           ...item,
-          id: String(item.id || generateId()),
-          updatedAt: new Date().toISOString(),
+          id: String(item.id || generateId()).replace(/\//g, '∕'),
+          updatedAt: now,
         }));
-        await Promise.all(cleanedItems.map(item => setDoc(dref(companyId, 'bpu', item.id), item)));
-        setBpu(cleanedItems);
+
+        if (mode === 'replace') {
+          // On lit les ids réellement présents sur le Cloud (le BPU local peut être non chargé)
+          const snap = await getDocs(col(companyId, 'bpu'));
+          await deleteDocsInBatches('bpu', snap.docs.map(d => d.id));
+        }
+
+        await setDocsInBatches('bpu', cleaned, item => item.id);
+
+        setBpu(prev => {
+          if (mode === 'replace') return cleaned;
+          const map = new Map(prev.map(i => [i.id, i]));
+          cleaned.forEach(i => map.set(i.id, i));
+          return Array.from(map.values());
+        });
+        setIsBpuLoaded(true);
       }
+
       setDatabaseVersion(v => v + 1);
-      toast.success('Base de données importée avec succès !', { title: 'Import terminé' });
+      toast.success(
+        mode === 'replace' ? 'Bibliothèque remplacée avec succès !' : 'Bibliothèque importée (fusion) avec succès !',
+        { title: 'Import terminé' }
+      );
     } catch (error) {
       console.error('Erreur import base :', error);
       toast.error("Une erreur est survenue pendant l'import.", { title: 'Erreur' });
+      // L'état local peut être désynchronisé du Cloud → forcer un rechargement au prochain accès
+      setIsBpuLoaded(false);
     } finally {
       setIsLoading(false);
     }

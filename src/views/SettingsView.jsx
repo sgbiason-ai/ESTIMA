@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { confirm } from '../utils/globalUI';
+import { confirm, toast } from '../utils/globalUI';
+import { useDialog } from '../contexts/DialogContext';
 import * as XLSX from 'xlsx';
 import {
   Settings, Ruler, Trash2, Upload, FileSpreadsheet,
@@ -16,10 +17,12 @@ const SettingsView = ({
   saveUnit,
   deleteUnit,
   importFromExcel,
+  handleImportDatabase,
   clearBpu,
   bpuConfig,
   setBpuConfig,
 }) => {
+  const { choose } = useDialog();
   // --- ÉTATS LOCAUX ---
   const [symb, setSymb] = useState("");
   const [lab, setLab] = useState("");
@@ -38,6 +41,7 @@ const SettingsView = ({
   const fileInputRef = useRef(null);
   const jsonInputRef = useRef(null);
   const pdfInputRef = useRef(null);
+  const jsonImportRef = useRef(null);
 
   // --- ACTIONS ---
   const handleSubmit = (e) => {
@@ -70,8 +74,53 @@ const SettingsView = ({
     const file = e.target.files[0];
     if (file) {
       importFromExcel(file);
-      e.target.value = null; 
+      e.target.value = null;
     }
+  };
+
+  // --- IMPORT JSON DIRECT VERS LA BIBLIOTHÈQUE CLOUD ---
+  // Accepte un export complet ({bpu, categories, units}) ou un tableau d'articles brut.
+  const handleImportJsonToCloud = async (e) => {
+    const file = e.target.files[0];
+    e.target.value = null;
+    if (!file) return;
+
+    let parsed;
+    try {
+      parsed = JSON.parse(await file.text());
+    } catch {
+      toast.error('Fichier JSON invalide.', { title: 'Import impossible' });
+      return;
+    }
+
+    const data = Array.isArray(parsed) ? { bpu: parsed } : parsed;
+    if (!data || (!Array.isArray(data.bpu) && !Array.isArray(data.categories))) {
+      toast.error('Le fichier ne contient ni articles ni dossiers.', { title: 'Import impossible' });
+      return;
+    }
+
+    const count = Array.isArray(data.bpu) ? data.bpu.length : 0;
+    const libName = data?.meta?.activeDbName || file.name.replace(/\.json$/i, '');
+
+    const mode = await choose(
+      `« ${libName} » — ${count} article(s). Comment l'intégrer à la bibliothèque Cloud ?`,
+      [
+        { key: 'merge', label: 'Fusionner', description: 'Ajoute les nouveaux articles et met à jour ceux de même référence. Conserve le reste de la bibliothèque.' },
+        { key: 'replace', label: 'Remplacer toute la bibliothèque', description: 'Vide la bibliothèque Cloud puis charge uniquement ce fichier. Action irréversible.', danger: true },
+      ],
+      { title: 'Import JSON vers le Cloud' }
+    );
+    if (!mode) return;
+
+    if (mode === 'replace') {
+      const ok = await confirm(
+        'Confirmer le remplacement TOTAL de la bibliothèque Cloud par ce fichier ? Les articles actuels seront définitivement supprimés.',
+        { title: 'Remplacer la bibliothèque', danger: true, confirmLabel: 'Remplacer' }
+      );
+      if (!ok) return;
+    }
+
+    await handleImportDatabase(data, mode);
   };
 
   // --- Pipeline commun : vérifie unités inconnues, ouvre modale ou télécharge ---
@@ -334,7 +383,7 @@ const SettingsView = ({
                 </div>
                 <div>
                   <h3 className="font-black uppercase text-sm tracking-widest text-slate-700">Importation & Conversion</h3>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Gérer la bibliothèque (.xlsx)</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Gérer la bibliothèque (.xlsx / .json)</p>
                 </div>
               </div>
               
@@ -362,18 +411,31 @@ const SettingsView = ({
               <input type="file" accept=".xlsx, .xls" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
               <input type="file" accept=".xlsx, .xls" ref={jsonInputRef} onChange={handleConvertXlsxToJson} className="hidden" />
               <input type="file" accept="application/pdf,.pdf" ref={pdfInputRef} onChange={handleConvertPdfToJson} className="hidden" />
+              <input type="file" accept="application/json,.json" ref={jsonImportRef} onChange={handleImportJsonToCloud} className="hidden" />
 
               <div className="flex flex-col md:flex-row gap-4 w-full justify-center">
                 {/* BOUTON IMPORT PRINCIPAL */}
                 <div className="flex flex-col items-center gap-2">
                     <button
                     onClick={() => fileInputRef.current.click()}
-                    title="Charge le fichier Excel directement dans la base de données actuelle (navigateur)"
+                    title="Charge le fichier Excel directement dans la bibliothèque Cloud"
                     className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-lg shadow-lg text-[11px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3 active:scale-95"
                     >
-                    <Upload size={18} /> Import vers Bibliothèque
+                    <Upload size={18} /> Import Excel → Biblio
                     </button>
-                    <span className="text-[9px] text-emerald-700 font-bold bg-emerald-100 px-2 py-0.5 rounded">Usage Direct</span>
+                    <span className="text-[9px] text-emerald-700 font-bold bg-emerald-100 px-2 py-0.5 rounded">Cloud · Usage Direct</span>
+                </div>
+
+                {/* BOUTON IMPORT JSON → CLOUD */}
+                <div className="flex flex-col items-center gap-2">
+                    <button
+                    onClick={() => jsonImportRef.current.click()}
+                    title="Importe un fichier JSON (bibliothèque exportée ou convertie) directement dans la bibliothèque Cloud. Choix fusion ou remplacement à l'import."
+                    className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-3 rounded-lg shadow-lg text-[11px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3 active:scale-95"
+                    >
+                    <FileJson size={18} /> Import JSON → Biblio
+                    </button>
+                    <span className="text-[9px] text-teal-700 font-bold bg-teal-100 px-2 py-0.5 rounded">Cloud · Fusion / Remplace</span>
                 </div>
 
                 {/* BOUTON CONVERSION JSON (Excel) */}
