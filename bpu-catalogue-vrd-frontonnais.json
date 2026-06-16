@@ -1,0 +1,2106 @@
+{
+  "meta": {
+    "source": "MBC 2023 VO 001 DQE BPU Ent.xls",
+    "libelle": "Bordereau de Prix Unitaires VRD — CC du Frontonnais",
+    "maitreOuvrage": "Communauté de communes du Frontonnais",
+    "consultation": "MBC-2023-VO-001",
+    "devise": "EUR",
+    "prixHT": true,
+    "nbChapitres": 3,
+    "nbArticles": 259,
+    "genere": "2026-06-09",
+    "notes": "Prix non renseignés (prix=null). Structure DQE (3 lots), descriptions feuille BPU. Codes 4 chiffres réutilisés entre lots dédoublonnés (1ʳᵉ occurrence conservée)."
+  },
+  "chapitres": [
+    {
+      "code": "1",
+      "titre": "TRAVAUX DE VOIRIE",
+      "articles": [
+        {
+          "code": "0101",
+          "designation": "Signalisation temporaire de chantier",
+          "description": "Ce prix rémunère à la journée l’amenée, la mise en place, la fixation, l’exploitation, la surveillance, le remplacement s’il y a lieu, de jour comme de nuit y compris samedi, dimanche et jours fériés et repliement en fin de travaux des dispositifs de signalisation temporaires des chantiers conformes aux règlements en vigueur.",
+          "unite": "j",
+          "prix": null,
+          "quantite": 500.0
+        },
+        {
+          "code": "0102",
+          "designation": "Installation et signalisation de chantier",
+          "description": "Ce prix rémunère au forfait les frais fixes :\r\n     - d’installation de chantier tel que définie au CCTP\r\n     - d’aménagement d’un accès routier au chantier\r\n     - de signalisation de chantier \r\n     - de repliement des installations de chantier\r\n     - de remise en état des lieux après travaux\r\net toutes sujétions liées à l’installation de chantier.\r\nLe forfait est réglé en deux fractions:\r\n- 70 % à l'achèvement des installations, de la pose de la signalisation et de l'amenée à pied d'oeuvre des matériaux et matériels,\r\n- 30 % après le repliement et la complète remise en état des lieux",
+          "unite": "forfait",
+          "prix": null,
+          "quantite": 80.0
+        },
+        {
+          "code": "0103",
+          "designation": "Mise en place de feux de chantier",
+          "description": "Ce prix rémunère à la journée, la fourniture et la mise en service de feux tricolores de chantier à la demande du maître d’œuvre.",
+          "unite": "j",
+          "prix": null,
+          "quantite": 240.0
+        },
+        {
+          "code": "0104",
+          "designation": "Dépose de panneaux de signalisation",
+          "description": "Ce prix rémunère à l’unité la dépose de panneaux de signalisation de police ou de direction.\nIl comprend la dépose à la main avec soin et la mise en dépôt dans un lieu désigné par la maîtrise d’œuvre au moment des travaux.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 240.0
+        },
+        {
+          "code": "0107",
+          "designation": "Réservation en phi 100 mm pour pose de panneaux",
+          "description": "Ce prix rémunère à l’unité la fourniture et la pose sur îlots ou trottoirs de réservation en PVC de diamètre 100 mm pour la pose de mâts ou de panneaux de signalisation.\nIl comprend la fourniture, le transport et la mise en œuvre de tous les matériaux nécessaires ainsi que tous les travaux préparatoires y compris les terrassements avec évacuation des déblais.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 200.0
+        },
+        {
+          "code": "0112",
+          "designation": "Constat d'huissier",
+          "description": "Ce prix rémunère au forfait la prestation d'un constat d'huissier avant travaux. Ce constat est réalisé à l'initiative de l'entreprise avec un huissier soumis à l'agréement du maître d'œuvre. Un exemplaire papier et un exemplaire informatique seront remis à la maîtrise d'ouvrage.",
+          "unite": "forfait",
+          "prix": null,
+          "quantite": 30.0
+        },
+        {
+          "code": "0201",
+          "designation": "Débroussaillage",
+          "description": "Ce prix rémunère au mètre carré les travaux de débroussaillage. Il comprend :\n- l’arrachage des taillis, haies, broussailles et arbres dont la circonférence mesurée à 1 m du sol est inférieure ou égale à 0,60 m\n- l’extraction d’anciennes souches dont la circonférence mesurée au collet est inférieure ou égale à 1 m\n- l’évacuation de ces produits après brûlage éventuel dans un dépôt agréé par le maître d’oeuvre",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 3000.0
+        },
+        {
+          "code": "0202",
+          "designation": "Arrachage de haie",
+          "description": "Ce prix rémunère au mètre linéaire l’arrachage d’une haie végétale quelle qu’en soit la nature y compris le dessouchage et l’évacuation des produits, après brûlage éventuel, dans un dépôt agréé par le maître d’oeuvre",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 200.0
+        },
+        {
+          "code": "0203",
+          "designation": "Arrachage ou abattage et dessouchage d'arbres",
+          "description": "Ce prix rémunère à l’unité l’arrachage ou abattage et dessouchage d’arbres dont la circonférence mesurée à 1 m du sol est supérieure à 0,60 m. Il comprend également l’évacuation des produits, après débitage et brûlage éventuel, dans un dépôt agréé par le maître d’œuvre.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "0205",
+          "designation": "Démolition d'accès existant non bétonné",
+          "description": "Ce prix rémunère à l’unité la démolition d’accès riverains. Il comprend les terrassements en pleine masse après sciage éventuel y compris l’utilisation du marteau piqueur, le chargement, le transport et l’évacuation des déblais vers une décharge agréée par le maître d’œuvre et toutes sujétions d’exécution notamment le maintien du libre accès des riverains à leur parcelle.\nCe prix s’entend pour un accès d’une longueur maximale de 7 m quel que soit le diamètre des buses et pour une surface maximale de 35 m2 non bétonné.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "0206",
+          "designation": "Démolition de béton armé",
+          "description": "Ce prix rémunère au mètre cube la démolition des ouvrages en béton armé. Il comprend :\n     - le sciage éventuel, \n     - l’utilisation si besoin du marteau piqueur ou du brise roche\n     - le découpage des armatures\n     -le chargement, le transport et l’évacuation des produits vers un lieu de réemploi éventuel ou vers une décharge agréée par le maître d’œuvre.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "0207",
+          "designation": "Démolition de bordures et/ou caniveaux",
+          "description": "Ce prix rémunère au mètre linéaire les travaux de démolition aux engins mécaniques de bordures ou caniveaux de tous types y compris le chargement, le transport et l’évacuation des déblais vers une décharge agréée par le maître d’œuvre.\nDans le cas de démolition de trottoir, ce prix s’entend pour l’ensemble bordures/caniveaux.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 700.0
+        },
+        {
+          "code": "0208",
+          "designation": "Démolition de busage existant - Diamètre < à 1 000 mm",
+          "description": "Ce prix rémunère au mètre linéaire la démolition de buses en béton de diamètre inférieur à 1000 mm y compris le chargement, le transport et l’évacuation des déblais vers une décharge agréée par le maître d’œuvre.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 160.0
+        },
+        {
+          "code": "0209",
+          "designation": "Démolition de chaussée en enduit superficiel",
+          "description": "Ce prix rémunère au mètre carré la démolition sur 20 cm de chaussée en enduit superficiel y compris le chargement, le transport et l’évacuation des déblais vers une décharge agréée par le maître d’œuvre.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 20000.0
+        },
+        {
+          "code": "0210",
+          "designation": "Démolition de chaussée en enrobé",
+          "description": "Ce prix rémunère au mètre carré la démolition sur 20 cm de chaussée en enrobé y compris le sciage à la scie hydraulique, le chargement, le transport et l’évacuation des déblais vers une décharge agréée par le maître d’œuvre.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 6000.0
+        },
+        {
+          "code": "0211",
+          "designation": "Démolition de trottoir en béton",
+          "description": "Ce prix rémunère au mètre carré la démolition aux engins mécaniques sur une épaisseur de 20 cm de trottoir en béton y compris la découpe éventuelle à la scie hydraulique en pied de façade, le chargement, le transport et l’évacuation des déblais vers une décharge agréée par le maître d’œuvre.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 1200.0
+        },
+        {
+          "code": "0212",
+          "designation": "Démolition de trottoir en enrobé",
+          "description": "Ce prix rémunère au mètre carré la démolition aux engins mécaniques sur une épaisseur de 20 cm de trottoir en béton bitumineux y compris la découpe éventuelle à la scie hydraulique en pied de façade, le chargement, le transport et l’évacuation des déblais vers une décharge agréée par le maître d’œuvre.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 1500.0
+        },
+        {
+          "code": "0213",
+          "designation": "Démolition de clôture sans murette",
+          "description": "Ce prix rémunère au mètre linéaire les travaux de démolition aux engins mécaniques de clôture grillagée, sans murette, y compris le chargement, le transport et l’évacuation des déblais vers une décharge agréée par le maître d’œuvre.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 200.0
+        },
+        {
+          "code": "0214",
+          "designation": "Démolition de clôture avec murette",
+          "description": "Ce prix rémunère au mètre linéaire les travaux de démolition aux engins mécaniques de clôture grillagée, avec murette, y compris le chargement, le transport et l’évacuation des déblais vers une décharge agréée par le maître d’œuvre.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 200.0
+        },
+        {
+          "code": "0215",
+          "designation": "Démolition de maçonnerie en béton ordinaire",
+          "description": "Ce prix rémunère au mètre cube la démolition de maçonnerie de toute nature et béton ordinaire y compris le chargement, le transport et l’évacuation des déblais vers une décharge agréée par le maître d’œuvre.\nCe prix s'applique notamment pour la démolition de marches et de jardinières situées sur le domaine public.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 60.0
+        },
+        {
+          "code": "0216",
+          "designation": "Démolition de mur de tête existant",
+          "description": "Ce prix rémunère à l’unité la démolition de mur de tête existant quel qu’en soit le type y compris l’utilisation éventuelle du marteau piqueur, le chargement, le transport et l’évacuation des déblais vers une décharge agréée par le maître d’œuvre.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 34.0
+        },
+        {
+          "code": "0217",
+          "designation": "Démolition de regard de tout type",
+          "description": "Ce prix rémunère à l’unité la démolition aux engins mécaniques de regards d’assainissement de tout type et tout diamètre (regards avaloirs, de visite, de jonction .....) y compris le chargement, le transport et l’évacuation des déblais vers une décharge agréée par le maître d’œuvre.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 34.0
+        },
+        {
+          "code": "0223",
+          "designation": "Démolition d'accès existant en béton",
+          "description": "Ce prix rémunère à l’unité la démolition d’accès riverains. Il comprend les terrassements en pleine masse après sciage éventuel y compris l’utilisation du marteau piqueur, le chargement, le transport et l’évacuation des déblais vers une décharge agréée par le maître d’œuvre et toutes sujétions d’exécution notamment le maintien du libre accès des riverains à leur parcelle.\nCe prix s’entend pour un accès d’une longueur maximale de 7 m quel que soit le diamètre des buses et pour une surface maximale de 35 m2 en béton, pavés ou autres.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 20.0
+        },
+        {
+          "code": "0228",
+          "designation": "Démolition de busage existant - Diamètre > ou = à 1 000 mm",
+          "description": "Ce prix rémunère au mètre linéaire la démolition de buses en béton de diamètre égal ou supérieur à 1000 mm y compris le chargement, le transport et l’évacuation des déblais vers une décharge agréée par le maître d’œuvre.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 24.0
+        },
+        {
+          "code": "0238",
+          "designation": "Dépose de mur de tête de sécurité",
+          "description": "Ce prix rémunère à l&#146;unité la dépose soignée de mur de tête de sécurité quel qu&#146;en soit le type y compris le chargement, le transport et l&#146;évacuation vers un dépôt agréé par le maître d&#146;&#156;uvre.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 24.0
+        },
+        {
+          "code": "0301",
+          "designation": "Décapage de terre végétale",
+          "description": "Ce prix rémunère au mètre carré le décapage de terre végétale. Il comprend :\n     - l’enlèvement de la terre végétale sur 20 cm\n     - l’élimination des produits étrangers (grosses racines, pierres, déchets divers,……)\n     - le chargement, le transport, le déchargement et la mise en dépôt soit sur le chantier pour son éventuel réemploi, soit dans un lieu agréé par le maître d’œuvre.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 3000.0
+        },
+        {
+          "code": "0302",
+          "designation": "Découpe de chaussée à la scie hydraulique",
+          "description": "Ce prix rémunère au mètre linéaire la découpe de chaussée à la scie hydraulique sur une profondeur moyenne de 10 cm quelle que soit sa dureté et son revêtement.\nCompris toutes sujétions de traçage, transfert de matériel, chargement, location et signalisation.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 1600.0
+        },
+        {
+          "code": "0303",
+          "designation": "Découpe à la scie de trottoir ou dalle béton",
+          "description": "Ce prix rémunère au mètre linéaire la découpe de trottoir ou de dalle en béton à la scie hydraulique sur une profondeur moyenne de 10 cm quelle que soit sa dureté.\nCompris toutes sujétions de traçage, transfert de matériel, chargement, location et signalisation.\nCe prix s'entend quelles que soient les difficultés liées à l'encombrement des réseaux de concessionnaires",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 340.0
+        },
+        {
+          "code": "0305",
+          "designation": "Déblais de toute nature à évacuer",
+          "description": "Ce prix rémunère au mètre cube, mesuré en place, les travaux de déblais en terrain de toute nature réalisés aux engins mécaniques.\nIl comprend le chargement des déblais et leur transport dans un lieu agréé par le maître d’œuvre.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 600.0
+        },
+        {
+          "code": "0306",
+          "designation": "Terrassement pour chaussée et/ou trottoirs",
+          "description": "Ce prix rémunère au mètre cube, mesuré en place, les travaux de déblais en terrain de toute nature exécutés aux engins mécaniques pour la réalisation de trottoirs ou chaussées.\nIl comprend le chargement des déblais et leur transport dans un lieu agréé par le maître d’œuvre.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 800.0
+        },
+        {
+          "code": "0307",
+          "designation": "Terrassement manuel",
+          "description": "Ce prix rémunère au mètre cube, mesuré en place, les travaux de déblais en terrain de toute nature exécutés à la main si impossibilité mécanique constaté par le maître d’œuvre.\nIl comprend le chargement des déblais et leur transport dans un lieu agréé par le maître d’œuvre.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 100.0
+        },
+        {
+          "code": "0308",
+          "designation": "Déblais de toute nature mis en remblais sur site",
+          "description": "Ce prix rémunère au mètre cube, mesuré en place, les travaux de déblais en terrain de toute nature exécutés aux engins mécaniques destinés à être réutilisés en remblais sur le site.\nIl comprend le chargement des déblais et leur mise en dépôt sur site ou à proximité (distance inférieure à 1 km).",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 800.0
+        },
+        {
+          "code": "0309",
+          "designation": "Evacuation des déblais en excédent",
+          "description": "Ce prix rémunère au mètre cube foisonné, l’évacuation des déblais excédentaires après remblaiement.\nIl comprend le chargement, le transport et le déchargement des produits dans un lieu agréé par le maître d’œuvre.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 200.0
+        },
+        {
+          "code": "0310",
+          "designation": "Terrassements réutilisés en remblais",
+          "description": "Ce prix rémunère le mètre cube en place de déblais à régaler sur place ou à réutiliser en remblais pour la construction de la plateforme ou pour le remblaiement des tranchées.\nIl comprend le réglage, le compactage du fond de forme et des remblais et toutes sujétions de mise hors d’eau pendant les travaux.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 340.0
+        },
+        {
+          "code": "0311",
+          "designation": "Terrassements en tranchée pour pose de canalisations",
+          "description": "Ce prix rémunère au mètre cube en place la réalisation de terrassements en tranchées pour la pose de collecteurs d’assainissement exécutés en terrains ordinaires imprégnés d’eau ou non. Ils comprennent notamment :\n     - le piquetage\n     - la fouille dans l’embarras des étais et des canalisations de toute sorte\n     - le chargement, le transport et l’évacuation des déblais excédentaires vers une décharge agréée par le maître d’oeuvre\nCe prix s’entend pour une profondeur inférieure ou égale à 5 m.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 240.0
+        },
+        {
+          "code": "0315",
+          "designation": "Terrassements pour poutres de rive",
+          "description": "Ce prix rémunère au mètre cube en place la réalisation de terrassements pour poutres de rive exécutés en terrains ordinaires. Ils comprennent notamment :\n     - le piquetage\n     - la découpe de chaussée à la scie hydraulique\n     - le chargement, le transport et l’évacuation des déblais excédentaires vers une décharge agréée par le maître d’oeuvre\nCe prix s’entend pour une profondeur inférieure ou égale à 1 m.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 240.0
+        },
+        {
+          "code": "0401",
+          "designation": "Construction de fossé",
+          "description": "Ce prix rémunère au mètre linéaire la réalisation de fossés en bordure de route ou en plein champs. Il comprend :\r\n     - les fouilles et l&#146;évacuation des déblais vers un dépôt agréé par le maître d&#146;&#156;uvre\r\n     - le dressement des talus ou des formes en berceau\r\n     - toutes sujétions de réalisation notamment le creusement de dérivations provisoires ou définitives\r\nIl s&#146;applique pour toutes les dimensions de fossé.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 2000.0
+        },
+        {
+          "code": "0402",
+          "designation": "Curage de fossé à évacuer",
+          "description": "Ce prix rémunère au mètre linéaire le curage de fossés existants pour rétablissement de fil d&#146;eau et d&#146;évacuation. Il comprend :\r\n     - l&#146;évacuation des produits de curage vers un dépôt agréé par le maître d&#146;&#156;uvre\r\n     - le réglage des talus \r\n     - toutes sujétions de réalisation notamment le creusement de dérivations provisoires ou définitives\r\n     - les épuisements si nécessaires\r\nIl s&#146;applique pour toutes les dimensions de fossé.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 2000.0
+        },
+        {
+          "code": "0403",
+          "designation": "Curage de fossé à régaler sur les abords",
+          "description": "Ce prix rémunère au mètre linéaire le curage de fossés existants pour rétablissement de fil d’eau et d’évacuation. Il comprend :\n     - le réglage des produits de curage sur les abords et l’évacuation si nécessaire de l’excédent vers un dépôt agréé par le maître d’œuvre\n     - le réglage des talus \n     - toutes sujétions de réalisation notamment le creusement de dérivations provisoires ou définitives\n     - les épuisements si nécessaires\nIl s’applique pour toutes les dimensions de fossé.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 4000.0
+        },
+        {
+          "code": "0404",
+          "designation": "Ouvrage de raccordement au fossé",
+          "description": "Ce prix rémunère au forfait la réalisation d’un ouvrage en béton armé pour le raccordement au fossé d’une canalisation d’eau pluviale quel qu’en soit le diamètre.\nIl comprend les terrassements évacués, l’exécution d’un radier en béton armé de 20 cm d’épaisseur sur 2 mètres de long avec bêche amont de 30 cm, la protection en béton armé sur 20 cm d’épaisseur des berges du fossé, coté buse et coté opposé, sur un mètre de part et d’autre de la canalisation et toutes sujétions de raccordement avec la canalisation.",
+          "unite": "forfait",
+          "prix": null,
+          "quantite": 34.0
+        },
+        {
+          "code": "0501",
+          "designation": "Rabotage de chaussée",
+          "description": "Ce prix rémunère au mètre carré de surface effective le rabotage de chaussée. Il comprend :\n     - le transfert du matériel\n     - le rabotage du revêtement existant sur une épaisseur de 5 cm,\n     - l’extraction des matériaux, leur évacuation à la décharge ou la mise en dépôt provisoire\n     - le balayage de la chaussée.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 5800.0
+        },
+        {
+          "code": "0503",
+          "designation": "Décroutage de chausssée",
+          "description": "Ce prix rémunère au mètre carré de surface effective le décroutage aux engins mécaniques de chaussée sur une épaisseur moyenne de 8 cm. Il comprend le grattage, l’extraction des matériaux et leur évacuation vers une décharge agréée.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 16600.0
+        },
+        {
+          "code": "0504",
+          "designation": "Saignées d'ancrage transversales",
+          "description": "Ce prix rémunère au mètre linéaire la confection de saignées d’ancrage transversales sur une épaisseur maximale de 5 cm et une largeur de 30 cm réalisées au marteau pneumatique y compris évacuation des déblais et nettoyage.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 600.0
+        },
+        {
+          "code": "0505",
+          "designation": "Ancrage de rives à la niveleuse",
+          "description": "Ce prix rémunère au mètre linéaire la confection d’un ancrage de rives à la niveleuse sur une largeur de 50 cm et une épaisseur de 20 cm réalisé en une ou deux passes et mise en cordon des produits sur les accotements afin de procéder à un épaulement du renforcement de la chaussée.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 2500.0
+        },
+        {
+          "code": "0508",
+          "designation": "Préparation de compactage",
+          "description": "Ce prix rémunère au mètre carré de surface effective le réglage et le compactage du terrain sous les remblais et du fond de forme, conformément aux dispositions prévues dans le CCTP.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 1500.0
+        },
+        {
+          "code": "0510",
+          "designation": "Réglage et compactage de la couche de base",
+          "description": "Ce prix rémunère au mètre carré de surface effective l’exécution du et du compactage de la couche de base en place.\nIl comprend le grattage des zones polluées, l’extraction des matériaux et leur évacuation vers une décharge agréée par le maître d’œuvre, l’apport éventuel de matériaux, le compactage et le réglage de l’assise.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 1500.0
+        },
+        {
+          "code": "0601",
+          "designation": "Réglage d'accotements",
+          "description": "Ce prix rémunère au mètre carré le réglage et le compactage d’accotements après apport éventuel de Tout Venant 0/80 pour épaulement de la chaussée.\nLe devers sera réglé à 4% vers le fossé.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 1200.0
+        },
+        {
+          "code": "0602",
+          "designation": "Dérasement d'accotements",
+          "description": "Ce prix rémunère au mètre carré le dérasement d’accotements.\nIl comprend le dérasement mécanique, l’évacuation des déblais vers une décharge agréée par le maître d’œuvre et le nettoyage de la chaussée.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 4600.0
+        },
+        {
+          "code": "0603",
+          "designation": "Accotements en terre",
+          "description": "Ce prix rémunère au mètre carré la construction d’accotements en terre le long du renforcement sur une largeur de 1,00 m et une épaisseur de 20 cm.\nIl comprend la fourniture, le chargement, le transport, le déchargement au lieu d’emploi, la mise en œuvre, l’arrosage, le réglage et le compactage ainsi que toutes sujétions de parfaite réalisation.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 4600.0
+        },
+        {
+          "code": "0604",
+          "designation": "Reprise d'accotements en graves 0/20",
+          "description": "Ce prix rémunère au mètre carré la reprise d’accotements en graves concassées sur une épaisseur de 20 cm.\nIl comprend la fourniture, le chargement, le transport, le déchargement au lieu d’emploi, la mise en œuvre, l’arrosage, le réglage et le compactage ainsi que toutes sujétions de parfaite réalisation.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 9200.0
+        },
+        {
+          "code": "0703",
+          "designation": "Fourniture et pose de canalisation béton A135 - Diamètre 300 mm",
+          "description": "Ce prix rémunère au mètre linéaire la réalisation de réseau pluvial en buses de béton 135 A de diamètre 300 mm. Il comprend :\n     - le terrassement avec évacuation des déblais\n     - les étaiements nécessaires et le pompage éventuel\n     - le réglage du fond de fouille et la confection de niches pour joints\n     - la fourniture et la mise en œuvre d’un lit de sable ou de grave 0/6 sur une épaisseur de 10 cm \n     - la fourniture et la pose des buses y compris façon des joints mécaniques en caoutchouc ou d’un type agréé jusqu’à étanchéité complète\n     - le calage des tuyaux et le raccordement aux regards\n     - la fourniture et la mise en œuvre de tout venant 0/80 pour remblaiement de la tranchée après la pose de la canalisation y compris le compactage et l’arrosage.\nIl s’entend pour toutes fournitures, main d’œuvre et toutes sujétions de mise en œuvre conformément aux prescriptions du fascicule 70 du CPC .\nLes volumes de terrassement et de remblais compris dans ce prix sont précisés dans les schémas joint au présent bordereau",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 120.0
+        },
+        {
+          "code": "0705",
+          "designation": "Fourniture et pose de canalisation béton A135 - Diamètre 400 mm",
+          "description": "Ce prix rémunère au mètre linéaire la réalisation de réseau pluvial en buses de béton 135 A de diamètre 400 mm. Il comprend :\n     - le terrassement avec évacuation des déblais\n     - les étaiements nécessaires et le pompage éventuel\n     - le réglage du fond de fouille et la confection de niches pour joints\n     - la fourniture et la mise en œuvre d’un lit de sable ou de grave 0/6 sur une épaisseur de 10 cm \n     - la fourniture et la pose des buses y compris façon des joints mécaniques en caoutchouc ou d’un type agréé jusqu’à étanchéité complète\n     - le calage des tuyaux et le raccordement aux regards\n     - la fourniture et la mise en œuvre de tout venant 0/80 pour remblaiement de la tranchée après la pose de la canalisation y compris le compactage et l’arrosage.\nIl s’entend pour toutes fournitures, main d’œuvre et toutes sujétions de mise en œuvre conformément aux prescriptions du fascicule 70 du CPC .\nLes volumes de terrassement et de remblais compris dans ce prix sont précisés dans les schémas joint au présent bordereau",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 120.0
+        },
+        {
+          "code": "0707",
+          "designation": "Fourniture et pose de canalisation béton A135 - Diamètre 500 mm",
+          "description": "Ce prix rémunère au mètre linéaire la réalisation de réseau pluvial en buses de béton 135 A de diamètre 500 mm. Il comprend :\n     - le terrassement avec évacuation des déblais\n     - les étaiements nécessaires et le pompage éventuel\n     - le réglage du fond de fouille et la confection de niches pour joints\n     - la fourniture et la mise en œuvre d’un lit de sable ou de grave 0/6 sur une épaisseur de 10 cm \n     - la fourniture et la pose des buses y compris façon des joints mécaniques en caoutchouc ou d’un type agréé jusqu’à étanchéité complète\n     - le calage des tuyaux et le raccordement aux regards\n     - la fourniture et la mise en œuvre de tout venant 0/80 pour remblaiement de la tranchée après la pose de la canalisation y compris le compactage et l’arrosage.\nIl s’entend pour toutes fournitures, main d’œuvre et toutes sujétions de mise en œuvre conformément aux prescriptions du fascicule 70 du CPC .\nLes volumes de terrassement et de remblais compris dans ce prix sont précisés dans les schémas joint au présent bordereau",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 240.0
+        },
+        {
+          "code": "0709",
+          "designation": "Fourniture et pose de canalisation béton A135 - Diamètre 600 mm",
+          "description": "Ce prix rémunère au mètre linéaire la réalisation de réseau pluvial en buses de béton 135 A de diamètre 600 mm. Il comprend :\n     - le terrassement avec évacuation des déblais\n     - les étaiements nécessaires et le pompage éventuel\n     - le réglage du fond de fouille et la confection de niches pour joints\n     - la fourniture et la mise en œuvre d’un lit de sable ou de grave 0/6 sur une épaisseur de 10 cm \n     - la fourniture et la pose des buses y compris façon des joints mécaniques en caoutchouc ou d’un type agréé jusqu’à étanchéité complète\n     - le calage des tuyaux et le raccordement aux regards\n     - la fourniture et la mise en œuvre de tout venant 0/80 pour remblaiement de la tranchée après la pose de la canalisation y compris le compactage et l’arrosage.\nIl s’entend pour toutes fournitures, main d’œuvre et toutes sujétions de mise en œuvre conformément aux prescriptions du fascicule 70 du CPC .\nLes volumes de terrassement et de remblais compris dans ce prix sont précisés dans les schémas joint au présent bordereau",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 240.0
+        },
+        {
+          "code": "0711",
+          "designation": "Fourniture et pose de canalisation béton A135 - Diamètre 800 mm",
+          "description": "Ce prix rémunère au mètre linéaire la réalisation de réseau pluvial en buses de béton 135 A de diamètre 800 mm. Il comprend :\n     - le terrassement avec évacuation des déblais\n     - les étaiements nécessaires et le pompage éventuel\n     - le réglage du fond de fouille et la confection de niches pour joints\n     - la fourniture et la mise en œuvre d’un lit de sable ou de grave 0/6 sur une épaisseur de 10 cm \n     - la fourniture et la pose des buses y compris façon des joints mécaniques en caoutchouc ou d’un type agréé jusqu’à étanchéité complète\n     - le calage des tuyaux et le raccordement aux regards\n     - la fourniture et la mise en œuvre de tout venant 0/80 pour remblaiement de la tranchée après la pose de la canalisation y compris le compactage et l’arrosage.\nIl s’entend pour toutes fournitures, main d’œuvre et toutes sujétions de mise en œuvre conformément aux prescriptions du fascicule 70 du CPC .\nLes volumes de terrassement et de remblais compris dans ce prix sont précisés dans les schémas joint au présent bordereau",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 240.0
+        },
+        {
+          "code": "0712",
+          "designation": "Fourniture et pose de canalisation béton A135 - Diamètre 1000 mm",
+          "description": "Ce prix rémunère au mètre linéaire la réalisation de réseau pluvial en buses de béton 135 A de diamètre 1000 mm. Il comprend :\n     - le terrassement avec évacuation des déblais\n     - les étaiements nécessaires et le pompage éventuel\n     - le réglage du fond de fouille et la confection de niches pour joints\n     - la fourniture et la mise en œuvre d’un lit de sable ou de grave 0/6 sur une épaisseur de 10 cm \n     - la fourniture et la pose des buses y compris façon des joints mécaniques en caoutchouc ou d’un type agréé jusqu’à étanchéité complète\n     - le calage des tuyaux et le raccordement aux regards\n     - la fourniture et la mise en œuvre de tout venant 0/80 pour remblaiement de la tranchée après la pose de la canalisation y compris le compactage et l’arrosage.\nIl s’entend pour toutes fournitures, main d’œuvre et toutes sujétions de mise en œuvre conformément aux prescriptions du fascicule 70 du CPC .\nLes volumes de terrassement et de remblais compris dans ce prix sont précisés dans les schémas joint au présent bordereau",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 240.0
+        },
+        {
+          "code": "0713",
+          "designation": "Fourniture et pose de canalisation béton A135 - Diamètre 1200 mm",
+          "description": "Ce prix rémunère au mètre linéaire la réalisation de réseau pluvial en buses de béton 135 A de diamètre 1200 mm. Il comprend :\n     - le terrassement avec évacuation des déblais\n     - les étaiements nécessaires et le pompage éventuel\n     - le réglage du fond de fouille et la confection de niches pour joints\n     - la fourniture et la mise en œuvre d’un lit de sable ou de grave 0/6 sur une épaisseur de 10 cm \n     - la fourniture et la pose des buses y compris façon des joints mécaniques en caoutchouc ou d’un type agréé jusqu’à étanchéité complète\n     - le calage des tuyaux et le raccordement aux regards\n     - la fourniture et la mise en œuvre de tout venant 0/80 pour remblaiement de la tranchée après la pose de la canalisation y compris le compactage et l’arrosage.\nIl s’entend pour toutes fournitures, main d’œuvre et toutes sujétions de mise en œuvre conformément aux prescriptions du fascicule 70 du CPC jusqu’à une profondeur de 2,50 m mesuré au fil d’eau.\nLes volumes de terrassement et de remblais compris dans ce prix sont précisés dans les schémas joint au présent bordereau",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 240.0
+        },
+        {
+          "code": "0714",
+          "designation": "Canalisation en béton A135, diamètre 300 mm, en traversée de chaussée",
+          "description": "Ce prix rémunère au mètre linéaire la fourniture et la pose de buses de béton 135 A de diamètre 300 mm en traversée de chaussée. Il comprend :\n     - la découpe de la chaussée à la scie hydraulique\n     - le terrassement avec évacuation des déblais\n     - les étaiements nécessaires et le pompage éventuel\n     - le réglage du fond de fouille et la confection de niches pour joints\n     - la fourniture et la mise en œuvre d’un lit de sable ou de grave 0/6 sur une épaisseur de 10 cm\n     - la fourniture et la pose des buses y compris façon des joints mécaniques en caoutchouc ou d’un type agréé jusqu’à étanchéité complète\n     -  le calage des tuyaux et le raccordement aux regards\n     - la fourniture et la mise en œuvre de béton ou de grave ciment pour remblaiement de la tranchée après la pose de la canalisation y compris le compactage \nIl s’entend pour toutes fournitures, main d’œuvre et toutes sujétions de mise en œuvre conformément aux prescriptions du fascicule 70 du CPC .\nLes volumes de terrassement et de remblais compris dans ce prix sont précisés dans les schémas joint au présent bordereau",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 240.0
+        },
+        {
+          "code": "0715",
+          "designation": "Canalisation en béton A135, diamètre 400 mm, en traversée de chaussée",
+          "description": "Ce prix rémunère au mètre linéaire la fourniture et la pose de buses de béton 135 A de diamètre 400 mm en traversée de chaussée. Il comprend :\n     - la découpe de la chaussée à la scie hydraulique\n     - le terrassement avec évacuation des déblais\n     - les étaiements nécessaires et le pompage éventuel\n     - le réglage du fond de fouille et la confection de niches pour joints\n     - la fourniture et la mise en œuvre d’un lit de sable ou de grave 0/6 sur une épaisseur de 10 cm\n     - la fourniture et la pose des buses y compris façon des joints mécaniques en caoutchouc ou d’un type agréé jusqu’à étanchéité complète\n     -  le calage des tuyaux et le raccordement aux regards\n     - la fourniture et la mise en œuvre de béton ou de grave ciment pour remblaiement de la tranchée après la pose de la canalisation y compris le compactage \nIl s’entend pour toutes fournitures, main d’œuvre et toutes sujétions de mise en œuvre conformément aux prescriptions du fascicule 70 du CPC .\nLes volumes de terrassement et de remblais compris dans ce prix sont précisés dans les schémas joint au présent bordereau",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 240.0
+        },
+        {
+          "code": "0720",
+          "designation": "Fourniture et pose de canalisation PVC de diamètre 100 mm",
+          "description": "Ce prix rémunère au mètre linéaire, sur fond bien dressé d’après la pente du profil en long, la fourniture et la pose de tuyaux en polychlorure de vinyle à emboîtements et joints automatiques ou soudés, de diamètre 100 mm, de série I, y compris façon des joints mécaniques en élastomère ou d’un type agréé jusqu’à étanchéité complète. Il comprend :\n     - le calage des tuyaux\n     - l’épuisement de la nappe s’il y a lieu\n     - la fourniture et la mise en œuvre du lit de sable sur 10 cm\n     - le raccordement des tuyaux aux regards quel qu’en soit le type\n     - la fourniture et la mise en œuvre de graves concassées 0/20 pour remblaiement de la tranchée après la pose de la canalisation y compris le compactage et l’arrosage\nIl s’entend pour toutes fournitures, main d’œuvre et toutes sujétions de mise en œuvre conformément aux prescriptions du fascicule 70 du CPC jusqu’à une profondeur de 1,00 m mesuré au fil d’eau",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 240.0
+        },
+        {
+          "code": "0722",
+          "designation": "Fourniture et pose de canalisation PVC de diamètre 160 mm",
+          "description": "Ce prix rémunère au mètre linéaire, sur fond bien dressé d’après la pente du profil en long, la fourniture et la pose de tuyaux en polychlorure de vinyle à emboîtements et joints automatiques ou soudés, de diamètre 160 mm, de série I, y compris façon des joints mécaniques en élastomère ou d’un type agréé jusqu’à étanchéité complète. Il comprend :\n     - le calage des tuyaux\n     - l’épuisement de la nappe s’il y a lieu\n     - la fourniture et la mise en œuvre du lit de sable sur 10 cm\n     - le raccordement des tuyaux aux regards quel qu’en soit le type\n     - la fourniture et la mise en œuvre de graves concassées 0/20 pour remblaiement de la tranchée après la pose de la canalisation y compris le compactage et l’arrosage\nIl s’entend pour toutes fournitures, main d’œuvre et toutes sujétions de mise en œuvre conformément aux prescriptions du fascicule 70 du CPC jusqu’à une profondeur de 1,00 m mesuré au fil d’eau",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 240.0
+        },
+        {
+          "code": "0723",
+          "designation": "Fourniture et pose de canalisation PVC de diamètre 200 mm",
+          "description": "Ce prix rémunère au mètre linéaire, sur fond bien dressé d’après la pente du profil en long, la fourniture et la pose de tuyaux en polychlorure de vinyle à emboîtements et joints automatiques ou soudés, de diamètre 200 mm, de série I, y compris façon des joints mécaniques en élastomère ou d’un type agréé jusqu’à étanchéité complète. Il comprend :\n     - le calage des tuyaux\n     - l’épuisement de la nappe s’il y a lieu\n     - la fourniture et la mise en œuvre du lit de sable sur 10 cm\n     - le raccordement des tuyaux aux regards quel qu’en soit le type\n     - la fourniture et la mise en œuvre de graves concassées 0/20 pour remblaiement de la tranchée après la pose de la canalisation y compris le compactage et l’arrosage\nIl s’entend pour toutes fournitures, main d’œuvre et toutes sujétions de mise en œuvre conformément aux prescriptions du fascicule 70 du CPC jusqu’à une profondeur de 1,00 m mesuré au fil d’eau",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 240.0
+        },
+        {
+          "code": "0724",
+          "designation": "Fourniture et pose de canalisation PVC de diamètre 300 mm",
+          "description": "Ce prix rémunère au mètre linéaire, sur fond bien dressé d’après la pente du profil en long, la fourniture et la pose de tuyaux en polychlorure de vinyle à emboîtements et joints automatiques ou soudés, de diamètre 300 mm, de série I, y compris façon des joints mécaniques en élastomère ou d’un type agréé jusqu’à étanchéité complète. Il comprend :\n     - le calage des tuyaux\n     - l’épuisement de la nappe s’il y a lieu\n     - la fourniture et la mise en œuvre du lit de sable sur 10 cm\n     - le raccordement des tuyaux aux regards quel qu’en soit le type\n     - la fourniture et la mise en œuvre de graves concassées 0/20 pour remblaiement de la tranchée après la pose de la canalisation y compris le compactage et l’arrosage\nIl s’entend pour toutes fournitures, main d’œuvre et toutes sujétions de mise en œuvre conformément aux prescriptions du fascicule 70 du CPC jusqu’à une profondeur de 1,30 m mesuré au fil d’eau",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 240.0
+        },
+        {
+          "code": "0725",
+          "designation": "Mur de tête simple sur canalisation de diamètre < ou = à 600 mm",
+          "description": "Ce prix rémunère à l’unité la confection de mur tête simple de 20 cm d’épaisseur en béton banché dosé à 350 kg par mètre cube de CPA 45. Il comprend :\n     - le terrassement avec évacuation des déblais\n     - la fondation en béton armé dosé à 250 kg\n     - la fourniture et la mise en œuvre des matériaux, coffrages, ferraillages\n     - les enduits et crépis avec arrondis des angles",
+          "unite": "u",
+          "prix": null,
+          "quantite": 240.0
+        },
+        {
+          "code": "0726",
+          "designation": "Mur de tête simple sur canalisation de diamètre > à 600 mm",
+          "description": "Ce prix rémunère à l’unité la confection de mur tête simple de 20 cm d’épaisseur en béton banché dosé à 350 kg par mètre cube de CPA 45. Il comprend :\n     - le terrassement avec évacuation des déblais\n     - la fondation en béton armé dosé à 250 kg\n     - la fourniture et la mise en œuvre des matériaux, coffrages, ferraillages\n     - les enduits et crépis avec arrondis des angles",
+          "unite": "u",
+          "prix": null,
+          "quantite": 18.0
+        },
+        {
+          "code": "0727",
+          "designation": "Mur de tête en L",
+          "description": "Ce prix rémunère à l’unité la confection de mur tête en L de 20 cm d’épaisseur en béton banché dosé à 350 kg par mètre cube de CPA 45. Il comprend :\n     - le terrassement avec évacuation des déblais\n     - la fondation en béton armé dosé à 250 kg\n     - la fourniture et la mise en œuvre des matériaux, coffrages, ferraillages\n     - les enduits et crépis avec arrondis des angles",
+          "unite": "u",
+          "prix": null,
+          "quantite": 24.0
+        },
+        {
+          "code": "0728",
+          "designation": "Mur de tête en U",
+          "description": "Ce prix rémunère à l’unité la confection de mur tête en U de 20 cm d’épaisseur en béton banché dosé à 350 kg par mètre cube de CPA 45. Il comprend :\n     - le terrassement avec évacuation des déblais\n     - la fondation en béton armé dosé à 250 kg\n     - la fourniture et la mise en œuvre des matériaux, coffrages, ferraillages\n     - les enduits et crépis avec arrondis des angles",
+          "unite": "u",
+          "prix": null,
+          "quantite": 24.0
+        },
+        {
+          "code": "0729",
+          "designation": "Mur de tête de sécurité sur canalisation de diamètre < ou = à 600 mm",
+          "description": "Ce prix rémunère à l’unité la fourniture et la pose de mur tête de sécurité préfabriqué pour buse de diamètre < ou = à 600 mm ou sa confection en béton banché dosé à 350 kg par mètre cube de CPA 45 de 20 cm d’épaisseur. Il comprend :\n     - le terrassement avec évacuation des déblais\n     - la fondation en béton armé dosé à 250 kg\n     - la fourniture et la mise en œuvre des matériaux, coffrages, ferraillages\n     - les enduits et crépis avec arrondis des angles",
+          "unite": "u",
+          "prix": null,
+          "quantite": 24.0
+        },
+        {
+          "code": "0730",
+          "designation": "Mur de tête de sécurité sur canalisation de diamètre > à 600 mm",
+          "description": "Ce prix rémunère à l’unité la fourniture et la pose de mur tête de sécurité préfabriqué pour buse de diamètre > à 600 mm ou sa confection en béton banché dosé à 350 kg par mètre cube de CPA 45 de 20 cm d’épaisseur. Il comprend :\n     - le terrassement avec évacuation des déblais\n     - la fondation en béton armé dosé à 250 kg\n     - la fourniture et la mise en œuvre des matériaux, coffrages, ferraillages\n     - les enduits et crépis avec arrondis des angles",
+          "unite": "u",
+          "prix": null,
+          "quantite": 8.0
+        },
+        {
+          "code": "0734",
+          "designation": "Fourniture et pose de buses de type ECOPAL - Diamètre 300 mm",
+          "description": "Ce prix rémunère au mètre linéaire la réalisation de réseau pluvial en buses de type ECOPAL ou similaire de diamètre 300 mm. Il comprend :\n     - le terrassement avec évacuation des déblais\n     - les étaiements nécessaires et le pompage éventuel\n     - le réglage du fond de fouille et la confection de niches pour joints\n     - la fourniture et la mise en œuvre d’un lit de sable ou de grave 0/6 sur une épaisseur de 10 cm \n     - la fourniture et la pose des buses y compris façon des joints mécaniques en caoutchouc ou d’un type agréé jusqu’à étanchéité complète\n     - le calage des tuyaux et le raccordement aux regards\n     - la fourniture et la mise en œuvre de tout venant 0/80 pour remblaiement de la tranchée après la pose de la canalisation y compris le compactage et l’arrosage.\nIl s’entend pour toutes fournitures, main d’œuvre et toutes sujétions de mise en œuvre conformément aux prescriptions du fascicule 70 du CPC .\nLes volumes de terrassement et de remblais compris dans ce prix sont précisés dans les schémas joint au présent bordereau",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 80.0
+        },
+        {
+          "code": "0735",
+          "designation": "Fourniture et pose de buses de type ECOPAL - Diamètre 400 mm",
+          "description": "Ce prix rémunère au mètre linéaire la réalisation de réseau pluvial en buses de type ECOPAL ou similaire de diamètre 400 mm. Il comprend :\n     - le terrassement avec évacuation des déblais\n     - les étaiements nécessaires et le pompage éventuel\n     - le réglage du fond de fouille et la confection de niches pour joints\n     - la fourniture et la mise en œuvre d’un lit de sable ou de grave 0/6 sur une épaisseur de 10 cm \n     - la fourniture et la pose des buses y compris façon des joints mécaniques en caoutchouc ou d’un type agréé jusqu’à étanchéité complète\n     - le calage des tuyaux et le raccordement aux regards\n     - la fourniture et la mise en œuvre de tout venant 0/80 pour remblaiement de la tranchée après la pose de la canalisation y compris le compactage et l’arrosage.\nIl s’entend pour toutes fournitures, main d’œuvre et toutes sujétions de mise en œuvre conformément aux prescriptions du fascicule 70 du CPC .\nLes volumes de terrassement et de remblais compris dans ce prix sont précisés dans les schémas joint au présent bordereau",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 80.0
+        },
+        {
+          "code": "0736",
+          "designation": "Fourniture et pose de buses de type ECOPAL - Diamètre 500 mm",
+          "description": "Ce prix rémunère au mètre linéaire la réalisation de réseau pluvial en buses de type ECOPAL ou similaire de diamètre 500 mm. Il comprend :\n     - le terrassement avec évacuation des déblais\n     - les étaiements nécessaires et le pompage éventuel\n     - le réglage du fond de fouille et la confection de niches pour joints\n     - la fourniture et la mise en œuvre d’un lit de sable ou de grave 0/6 sur une épaisseur de 10 cm \n     - la fourniture et la pose des buses y compris façon des joints mécaniques en caoutchouc ou d’un type agréé jusqu’à étanchéité complète\n     - le calage des tuyaux et le raccordement aux regards\n     - la fourniture et la mise en œuvre de tout venant 0/80 pour remblaiement de la tranchée après la pose de la canalisation y compris le compactage et l’arrosage.\nIl s’entend pour toutes fournitures, main d’œuvre et toutes sujétions de mise en œuvre conformément aux prescriptions du fascicule 70 du CPC .\nLes volumes de terrassement et de remblais compris dans ce prix sont précisés dans les schémas joint au présent bordereau",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 120.0
+        },
+        {
+          "code": "0737",
+          "designation": "Fourniture et pose de buses de type ECOPAL - Diamètre 600 mm",
+          "description": "Ce prix rémunère au mètre linéaire la réalisation de réseau pluvial en buses de type ECOPAL ou similaire de diamètre 600 mm. Il comprend :\n     - le terrassement avec évacuation des déblais\n     - les étaiements nécessaires et le pompage éventuel\n     - le réglage du fond de fouille et la confection de niches pour joints\n     - la fourniture et la mise en œuvre d’un lit de sable ou de grave 0/6 sur une épaisseur de 10 cm \n     - la fourniture et la pose des buses y compris façon des joints mécaniques en caoutchouc ou d’un type agréé jusqu’à étanchéité complète\n     - le calage des tuyaux et le raccordement aux regards\n     - la fourniture et la mise en œuvre de tout venant 0/80 pour remblaiement de la tranchée après la pose de la canalisation y compris le compactage et l’arrosage.\nIl s’entend pour toutes fournitures, main d’œuvre et toutes sujétions de mise en œuvre conformément aux prescriptions du fascicule 70 du CPC\nLes volumes de terrassement et de remblais compris dans ce prix sont précisés dans les schémas joint au présent bordereau",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 80.0
+        },
+        {
+          "code": "0738",
+          "designation": "Fourniture et pose de buses de type ECOPAL - Diamètre 800 mm",
+          "description": "Ce prix rémunère au mètre linéaire la réalisation de réseau pluvial en buses de type ECOPAL ou similaire de diamètre 800 mm. Il comprend :\n     - le terrassement avec évacuation des déblais\n     - les étaiements nécessaires et le pompage éventuel\n     - le réglage du fond de fouille et la confection de niches pour joints\n     - la fourniture et la mise en œuvre d’un lit de sable ou de grave 0/6 sur une épaisseur de 10 cm \n     - la fourniture et la pose des buses y compris façon des joints mécaniques en caoutchouc ou d’un type agréé jusqu’à étanchéité complète\n     - le calage des tuyaux et le raccordement aux regards\n     - la fourniture et la mise en œuvre de tout venant 0/80 pour remblaiement de la tranchée après la pose de la canalisation y compris le compactage et l’arrosage.\nIl s’entend pour toutes fournitures, main d’œuvre et toutes sujétions de mise en œuvre conformément aux prescriptions du fascicule 70 du CPC .\nLes volumes de terrassement et de remblais compris dans ce prix sont précisés dans les schémas joint au présent bordereau",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "0741",
+          "designation": "Canalisation en béton A135, diamètre 500 mm, en traversée de chaussée",
+          "description": "Ce prix rémunère au mètre linéaire la fourniture et la pose de buses de béton 135 A de diamètre 500 mm en traversée de chaussée. Il comprend :\n     - la découpe de la chaussée à la scie hydraulique\n     - le terrassement avec évacuation des déblais\n     - les étaiements nécessaires et le pompage éventuel\n     - le réglage du fond de fouille et la confection de niches pour joints\n     - la fourniture et la mise en œuvre d’un lit de sable ou de grave 0/6 sur une épaisseur de 10 cm\n     - la fourniture et la pose des buses y compris façon des joints mécaniques en caoutchouc ou d’un type agréé jusqu’à étanchéité complète\n     -  le calage des tuyaux et le raccordement aux regards\n     - la fourniture et la mise en œuvre de béton ou de grave ciment pour remblaiement de la tranchée après la pose de la canalisation y compris le compactage \nIl s’entend pour toutes fournitures, main d’œuvre et toutes sujétions de mise en œuvre conformément aux prescriptions du fascicule 70 du CPC .\nLes volumes de terrassement et de remblais compris dans ce prix sont précisés dans les schémas joint au présent bordereau",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "0747",
+          "designation": "Fourniture et pose de canalisation PVC de diamètre 250 mm",
+          "description": "Ce prix rémunère au mètre linéaire, sur fond bien dressé d’après la pente du profil en long, la fourniture et la pose de tuyaux en polychlorure de vinyle à emboîtements et joints automatiques ou soudés, de diamètre 250 mm, de série I, y compris façon des joints mécaniques en élastomère ou d’un type agréé jusqu’à étanchéité complète. Il comprend :\n     - le calage des tuyaux\n     - l’épuisement de la nappe s’il y a lieu\n     - la fourniture et la mise en œuvre du lit de sable sur 10 cm\n     - le raccordement des tuyaux aux regards quel qu’en soit le type\n     - la fourniture et la mise en œuvre de graves concassées 0/20 pour remblaiement de la tranchée après la pose de la canalisation y compris le compactage et l’arrosage\nIl s’entend pour toutes fournitures, main d’œuvre et toutes sujétions de mise en œuvre conformément aux prescriptions du fascicule 70 du CPC jusqu’à une profondeur de 1,30 m mesuré au fil d’eau",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "0748",
+          "designation": "Pose de mur de tête",
+          "description": "Ce prix rémunère à l’unité la pose de mur de tête préalablement déposé ou fourni par le maître d'ouvrage quel qu’en soit le type y compris le chargement, le transport et toutes suggestions de raccordement et de parfaite exécution.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 24.0
+        },
+        {
+          "code": "0801",
+          "designation": "Regard de visite de diamètre 800 mm",
+          "description": "Ce prix rémunère à l’unité la construction de regard de visite circulaire en béton de diamètre 800 mm terminé par un tronc de cône et une couronne. Il comprend notamment :\n     - les terrassements nécessaires et leur évacuation\n     - le cadre et le tampon série lourde, plein ou à grille de diamètre 600 mm\n     - le scellement du cadre\n     - les manchons de raccordement pour tuyaux et branchements particuliers et toutes sujétions de parfaite réalisation y compris façons et fournitures pour l’étanchéité de l’ouvrage.\nCe prix s’entend jusqu’à une profondeur de 1,50 m au fil d’eau.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 34.0
+        },
+        {
+          "code": "0803",
+          "designation": "Réalisation de puits filtrant de diamètre 1000 mm, de profondeur = 6 m",
+          "description": "Ce prix rémunère à l’unité la réalisation de puits filtrant de profondeur inférieure ou égale à 6,00 m, de diamètre 1000 mm tel que défini sur le plan de détail joint. Il comprend notamment :\n     - les terrassements nécessaires et leur évacuation\n     - la fourniture et la pose des éléments de puits perforés (à barbacanes)\n     - le remplissage en galets 40/80\n     - la fourniture et le scellement d'une grille intermédiaire 600 x 600 mm ou d'un panier\n     - le cadre et le tampon série lourde, plein ou à grille de diamètre 600 mm\n     - le scellement du cadre\n     - le raccordement aux buses convergentes\net toutes sujétions de parfaite réalisation.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 10.0
+        },
+        {
+          "code": "0804",
+          "designation": "Bouche d'égout avaloir à grille",
+          "description": "Ce prix rémunère à l’unité la construction de bouche d’égout avaloir à grille de 60 x 60 préfabriqué ou coulé en place. Il comprend notamment :\n     - les terrassements nécessaires et leur évacuation \n     - le boisage ou étaiement éventuellement nécessaire\n     - l’exécution du béton de propreté, du radier et de la cheminée\n    - la fourniture et la mise en œuvre du cadre et de la grille concave en fonte ductile ainsi que leur calage\n     - les sujétions de fil d’eau, de perçage et de raccordement aux collecteurs et autres ouvrages\n     - la fourniture et la mise en œuvre des matériaux de remblaiement et la remise en état des abords\net toutes sujétions de parfaite réalisation.\nCe prix s’entend jusqu’à une profondeur de 1,50 m au fil d’eau.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 34.0
+        },
+        {
+          "code": "0805",
+          "designation": "Regard avaloir sous trottoir",
+          "description": "Ce prix rémunère à l’unité la construction de regard avaloir sous trottoir tel que défini au plan joint. Il comprend notamment :\n     - les terrassements nécessaires et leur évacuation \n     - le boisage ou étaiement éventuellement nécessaire\n     - l’exécution du béton de propreté, du radier et de la cheminée\n    - la fourniture et la mise en œuvre du cadre et de la grille concave en fonte ductile ainsi que leur calage\n     - les sujétions de fil d’eau, de perçage et de raccordement aux collecteurs et autres ouvrages\n     - la fourniture et la mise en œuvre des matériaux de remblaiement et la remise en état des abords\net toutes sujétions de parfaite réalisation.\nCe prix s’entend jusqu’à une profondeur de 1,50 m au fil d’eau.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 34.0
+        },
+        {
+          "code": "0806",
+          "designation": "Regard à grille 40 x 40",
+          "description": "Ce prix rémunère à l’unité la construction de regard à grille 40 x 40 préfabriqué ou coulé en place. Il comprend notamment :\n     - les terrassements nécessaires et leur évacuation \n     - le boisage ou étaiement éventuellement nécessaire\n     - l’exécution du béton de propreté, du radier et de la cheminée\n    - la fourniture et la mise en œuvre du cadre et de la grille concave en fonte ductile ainsi que leur calage\n     - les sujétions de fil d’eau, de perçage et de raccordement aux collecteurs et autres ouvrages\n     - la fourniture et la mise en œuvre des matériaux de remblaiement et la remise en état des abords\net toutes sujétions de parfaite réalisation.\nCe prix s’entend jusqu’à une profondeur de 1,50 m au fil d’eau.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 34.0
+        },
+        {
+          "code": "0807",
+          "designation": "Regard à grille 50 x 50",
+          "description": "Ce prix rémunère à l’unité la construction de regard à grille 50 x 50 préfabriqué ou coulé en place. Il comprend notamment :\n     - les terrassements nécessaires et leur évacuation \n     - le boisage ou étaiement éventuellement nécessaire\n     - l’exécution du béton de propreté, du radier et de la cheminée\n    - la fourniture et la mise en œuvre du cadre et de la grille concave en fonte ductile ainsi que leur calage\n     - les sujétions de fil d’eau, de perçage et de raccordement aux collecteurs et autres ouvrages\n     - la fourniture et la mise en œuvre des matériaux de remblaiement et la remise en état des abords\net toutes sujétions de parfaite réalisation.\nCe prix s’entend jusqu’à une profondeur de 1,50 m au fil d’eau.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 34.0
+        },
+        {
+          "code": "0808",
+          "designation": "Regard à grille 60 x 60",
+          "description": "Ce prix rémunère à l’unité la construction de regard à grille 60 x 60 préfabriqué ou coulé en place. Il comprend notamment :\n     - les terrassements nécessaires et leur évacuation \n     - le boisage ou étaiement éventuellement nécessaire\n     - l’exécution du béton de propreté, du radier et de la cheminée\n    - la fourniture et la mise en œuvre du cadre et de la grille concave en fonte ductile ainsi que leur calage\n     - les sujétions de fil d’eau, de perçage et de raccordement aux collecteurs et autres ouvrages\n     - la fourniture et la mise en œuvre des matériaux de remblaiement et la remise en état des abords\net toutes sujétions de parfaite réalisation.\nCe prix s’entend jusqu’à une profondeur de 1,50 m au fil d’eau.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 34.0
+        },
+        {
+          "code": "0809",
+          "designation": "Regard de branchement 30 x 30 x 70",
+          "description": "Ce prix rémunère à l’unité la construction de branchement particulier 30 x 30 x 70 préfabriqué ou coulé en place.\nIl comprend notamment les terrassements nécessaires et leur évacuation, la fourniture et la mise en œuvre des différents matériaux, la fourniture et la pose du cadre et du tampon en fonte ductile à fermeture hydraulique, les sujétions de fil d’eau, de perçage et de raccordement au collecteur, le manchon en attente coté riverain y compris bouchon de fermeture et toutes sujétions de parfaite réalisation.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 16.0
+        },
+        {
+          "code": "0810",
+          "designation": "Regard de branchement 40 x 40 x 70",
+          "description": "Ce prix rémunère à l’unité la construction de branchement particulier 40 x 40 x 70 préfabriqué ou coulé en place.\nIl comprend notamment les terrassements nécessaires et leur évacuation, la fourniture et la mise en œuvre des différents matériaux, la fourniture et la pose du cadre et du tampon en fonte ductile à fermeture hydraulique, les sujétions de fil d’eau, de perçage et de raccordement au collecteur, le manchon en attente coté riverain y compris bouchon de fermeture et toutes sujétions de parfaite réalisation.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 16.0
+        },
+        {
+          "code": "0811",
+          "designation": "Regard de branchement 50 x 50 x 70",
+          "description": "Ce prix rémunère à l’unité la construction de branchement particulier 50 x 50 x 70 préfabriqué ou coulé en place.\nIl comprend notamment les terrassements nécessaires et leur évacuation, la fourniture et la mise en œuvre des différents matériaux, la fourniture et la pose du cadre et du tampon en fonte ductile à fermeture hydraulique, les sujétions de fil d’eau, de perçage et de raccordement au collecteur, le manchon en attente coté riverain y compris bouchon de fermeture et toutes sujétions de parfaite réalisation.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 16.0
+        },
+        {
+          "code": "0818",
+          "designation": "Plus ou moins value pour variation de regard de diamètre 1000 mm",
+          "description": "Ce prix rémunère la plus ou moins value au décimètre de profondeur au prix de regards de visite, de regards avaloir, de regards à grille ou de puits filtrants.",
+          "unite": "dm/m",
+          "prix": null,
+          "quantite": 20.0
+        },
+        {
+          "code": "0819",
+          "designation": "Travaux de modification de regard",
+          "description": "Ce prix rémunère à l’unité les travaux de modification de regards de visite, de regards avaloirs ou de regards à grille existants pour mise à niveau ou mise à l’alignement y compris tous travaux de démolition avec évacuation des déblais, de reconstruction, sans fourniture de cadre et tampon.\nIl comprend toutes sujétions de parfaite réalisation notamment la fourniture et la mise en œuvre des différents matériaux et la remise en état des abords.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 14.0
+        },
+        {
+          "code": "0820",
+          "designation": "Piquage sur regard existant",
+          "description": "Ce prix rémunère à l’unité l’exécution de branchement de quelque diamètre que ce soit de canalisation en béton ou en PVC sur regard existant y compris toutes sujétions de parfaite réalisation notamment les terrassements et l’évacuation des déblais, la fourniture et la mise en œuvre des différents matériaux et la remise en état des abords.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 16.0
+        },
+        {
+          "code": "0821",
+          "designation": "Piquage sur canalisation",
+          "description": "Ce prix rémunère à l’unité l’exécution de piquage de quelque diamètre que ce soit de canalisation en béton ou en PVC sur collecteur existant y compris toutes sujétions de parfaite réalisation notamment les terrassements et l’évacuation des déblais, la fourniture et la mise en œuvre des différents matériaux et la remise en état des abords.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 16.0
+        },
+        {
+          "code": "0823",
+          "designation": "Caniveau Acodrain de type LV 200 mm - Classe D",
+          "description": "Ce prix rémunère au mètre linéaire la fourniture, le transport et la pose de caniveau Acodrain de type LV 200 de classe D avec grille en fonte y compris les terrassements avec évacuation des déblais, la fourniture et la mise en œuvre d’un lit de pose en béton dosé à 250 Kg sur une épaisseur de 15 cm et remblaiement en graves concassées 0/20.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 250.0
+        },
+        {
+          "code": "0824",
+          "designation": "Construction de caniveau à grille",
+          "description": "Ce prix rémunère au mètre linéaire la construction de caniveau à grille en béton coffré de dimensions intérieures 0,25 x 0,30 avec grille à chainage mécanique verrouillable en fonte ductile de classe C 250 (dimensions 750 x 300) y compris les terrassements avec évacuation des déblais, la fourniture et la mise en œuvre des différents matériaux et la remise en état des abords.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 25.0
+        },
+        {
+          "code": "0827",
+          "designation": "Recherche de canalisation",
+          "description": "Ce prix rémunère au forfait les travaux de recherche de canalisation pluviale ou eaux usées quel que soit le diamètre et la profondeur, en terrain de toute nature avec remise en état des lieux après travaux.",
+          "unite": "forfait",
+          "prix": null,
+          "quantite": 25.0
+        },
+        {
+          "code": "0833",
+          "designation": "Descentes d'eau maçonnées",
+          "description": "Ce prix rémunère au mètre linéaire la réalisation de descentes d’eau maçonnées en béton coulé sur place y compris les terrassements et l’évacuation des déblais et toutes  sujétions de parfaite réalisation.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 16.0
+        },
+        {
+          "code": "0834",
+          "designation": "Descentes d'eau préfabriquées",
+          "description": "Ce prix rémunère au mètre linéaire la fourniture et la pose d’éléments préfabriqués de tout type pour la constitution de descentes d’eau maçonnées y compris les terrassements et l’évacuation des déblais, la fourniture et la réalisation d’un béton de propreté, la façon des joints et toutes  sujétions de parfaite réalisation.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 16.0
+        },
+        {
+          "code": "0849",
+          "designation": "Regard avaloir à grille articulée - Profil T",
+          "description": "Ce prix rémunère à l’unité la construction de regard avaloir sous trottoir tel que défini sur les plans de détails et dont le positionnement est précisé sur le plan général. Il comprend notamment :\n     - les terrassements nécessaires et leur évacuation \n     - le boisage ou étaiement éventuellement nécessaire\n     - l’exécution du béton de propreté, du radier et de la cheminée\n     - la fourniture et la mise en œuvre du cadre et de la grille concave en fonte ductile ainsi que leur calage\n     - les sujétions de fil d’eau, de perçage et de raccordement aux collecteurs et autres ouvrages\n     - la fourniture et la mise en œuvre des matériaux de remblaiement et la remise en état des abords\net toutes sujétions de parfaite réalisation.\nCe prix s’entend jusqu’à une profondeur de 1,50 m au fil d’eau.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 50.0
+        },
+        {
+          "code": "0850",
+          "designation": "Regard avaloir à grille articulée - Profil A",
+          "description": "Ce prix rémunère à l’unité la construction de regard avaloir sous trottoir tel que défini sur les plans de détails et dont le positionnement est précisé sur le plan général. Il comprend notamment :\n     - les terrassements nécessaires et leur évacuation \n     - le boisage ou étaiement éventuellement nécessaire\n     - l’exécution du béton de propreté, du radier et de la cheminée\n     - la fourniture et la mise en œuvre du cadre et de la grille concave en fonte ductile ainsi que leur calage\n     - les sujétions de fil d’eau, de perçage et de raccordement aux collecteurs et autres ouvrages\n     - la fourniture et la mise en œuvre des matériaux de remblaiement et la remise en état des abords\net toutes sujétions de parfaite réalisation.\nCe prix s’entend jusqu’à une profondeur de 1,50 m au fil d’eau.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 12.0
+        },
+        {
+          "code": "0902",
+          "designation": "Couche de fondation en graves naturelles 0/80",
+          "description": "Ce prix rémunère au mètre cube mesuré en place la fourniture et la mise en œuvre de graves naturelles 0/80 en couche de fondation de chaussée.\nIl comprend la fourniture des matériaux, leur chargement, leur transport, la mise en œuvre, le réglage, le compactage, les essais de l’atelier de compactage, la fourniture et le transport de l’eau d’arrosage et l’arrosage.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 8000.0
+        },
+        {
+          "code": "0903",
+          "designation": "Couche de base en graves concassées 0/20",
+          "description": "Ce prix rémunère au mètre cube mesuré en place la fourniture et la mise en œuvre de graves concassées 0/20 en couche de base de chaussée.\nIl comprend la fourniture des matériaux, leur chargement, leur transport, la mise en œuvre, le réglage, le compactage, les essais de l’atelier de compactage, la fourniture et le transport de l’eau d’arrosage et l’arrosage.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 6000.0
+        },
+        {
+          "code": "0905",
+          "designation": "Graves naturelles 0/80 pour remblaiement de tranchées",
+          "description": "Ce prix rémunère au mètre cube le remblaiement de tranchées en graves naturelles 0/80.\nIl comprend la fourniture, le transport et la mise en œuvre des matériaux, leur réglage, l’arrosage éventuel et le compactage ainsi que toutes sujétions de parfaite mise en œuvre.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 240.0
+        },
+        {
+          "code": "0906",
+          "designation": "Graves concassées 0/20 pour remblaiement de tranchées",
+          "description": "Ce prix rémunère au mètre cube le remblaiement de tranchées en graves concassées 0/20.\nIl comprend la fourniture, le transport et la mise en œuvre des matériaux, leur réglage, l’arrosage éventuel et le compactage ainsi que toutes sujétions de parfaite mise en œuvre.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 400.0
+        },
+        {
+          "code": "0908",
+          "designation": "Couche de base en grave ciment au m3",
+          "description": "Ce prix rémunère au mètre cube mesuré en place la fourniture et la mise en œuvre de grave ciment dosé à 4% en couche de base de chaussée dans les zones destinées à recevoir un revêtement constitué de pavés de béton ou de pavé de granit.\nIl comprend la fourniture, le transport, la mise en œuvre, le réglage, le compactage et les essais de l’atelier de compactage.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 360.0
+        },
+        {
+          "code": "0910",
+          "designation": "Grave ciment pour remblaiement de tranchées",
+          "description": "Ce prix rémunère au mètre cube mesuré en place la fourniture et la mise en œuvre de grave ciment dosé à 4% en remblaiement de tranchées.\nIl comprend la fourniture, le transport, la mise en œuvre et le compactage.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 120.0
+        },
+        {
+          "code": "0914",
+          "designation": "Remblais drainant 20/80",
+          "description": "Ce prix rémunère au mètre cube le remblaiement  en matériaux drainants 20/80 de fouilles ou d’arrières de murs de souténement.\nIl comprend la fourniture, le transport et la mise en œuvre des matériaux drainants, leur réglage, l’arrosage éventuel et le compactage ainsi que toutes sujétions de parfaite mise en œuvre.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "0915",
+          "designation": "Remblais avec matériaux issus des déblais",
+          "description": "Ce prix rémunère le mètre cube en place les remblais issus des déblais utiliser pour la construction de la plateforme ou pour le remblaiement des tranchées.\nIl comprend la reprise sur site aux engins mécaniques, le réglage, le compactage du fond de forme et des remblais et toutes sujétions de mise hors d’eau pendant les travaux.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "0916",
+          "designation": "Remblais d'apport en tout venant",
+          "description": "Ce prix rémunère au mètre cube mesuré en place la fourniture et la mise en œuvre de remblais d’apport en tout venant 0/100 en couche de fondation de chaussée ou en remblaiement de tranchées.\nIl comprend la fourniture des matériaux, leur chargement, leur transport, la mise en œuvre, le réglage, le compactage, les essais de l’atelier de compactage, la fourniture et le transport de l’eau d’arrosage et l’arrosage.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "0917",
+          "designation": "Revêtement en graves concassées 0/10 de couleur",
+          "description": "Ce prix rémunère au mètre carré mesuré en place la fourniture et la mise en œuvre de graves concassées 0/10 de couleur ocre ou rosé (à définir par le Maître d'Oeuvre) pour réalisation de surface piétonne ou d'aires de jeux.\nIl comprend la fourniture des matériaux, leur chargement, leur transport, la mise en œuvre, le réglage, le compactage, les essais de l’atelier de compactage, la fourniture et le transport de l’eau d’arrosage et l’arrosage.\nCe prix s'entend pour une épaisseur, après compactage de 10 cm.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 360.0
+        },
+        {
+          "code": "0928",
+          "designation": "Couche de base en grave ciment pour poutre de rive",
+          "description": "Ce prix rémunère au mètre cube mesuré en place la fourniture et la mise en œuvre de grave ciment dosé à 4% en couche de base de chaussée pour réalisation de poutre de rive.\nIl comprend la fourniture, le transport, la mise en œuvre, le réglage, le compactage et les essais de l’atelier de compactage.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 120.0
+        },
+        {
+          "code": "1001",
+          "designation": "Déflachage de chaussée en graves concassées 0/20",
+          "description": "Ce prix rémunère au mètre carré mesuré sur place la fourniture et la mise en œuvre de graves concassées 0/20 pour déflachage de chaussée y compris le transport, la mise en œuvre à la niveleuse ou manuellement ainsi que le compactage et l'ancrage des rives.\nCe prix s’entend pour le déflachage de chaussée dégradée pour une épaisseur de 0 à 8 cm y compris l’application d’un revêtement superficiel de type tricouche.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 4000.0
+        },
+        {
+          "code": "1002",
+          "designation": "Déflachage de chaussée en grave émulsion 0/14",
+          "description": "Ce prix rémunère au mètre carré mesuré sur place la fourniture et la mise en œuvre de grave émulsion 0/14 dosée à 4,5% de bitume résiduel pour déflachage de chaussée y compris le transport, la mise en œuvre à la niveleuse et le compactage.\nCe prix s’entend pour le déflachage de chaussée dégradée pour une épaisseur de 0 à 8 cm y compris l’application d’une couche d’accrochage à raison de 200 à 300 g d’émulsion de bitume par m2.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 1000.0
+        },
+        {
+          "code": "1003",
+          "designation": "Enduit de cure sur grave ciment",
+          "description": "Ce prix rémunère au mètre carré mesuré sur place la réalisation d’un enduit de  cure sur grave-ciment.\nIl comprend la fourniture, le transport et la mise en œuvre de l’émulsion cationnique de bitume, du sable et des gravillons tels que définis au CCTP.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 400.0
+        },
+        {
+          "code": "1004",
+          "designation": "Enduit de scellement",
+          "description": "Ce prix rémunère au mètre carré mesuré sur place la réalisation d’un enduit de  scellement avant réalisation d’un enduit.\nIl comprend la fourniture, le transport et la mise en œuvre de l’émulsion de bitume et des gravillons tels que définis au CCTP.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 400.0
+        },
+        {
+          "code": "1005",
+          "designation": "Couche d'accrochage",
+          "description": "Ce prix rémunère au mètre carré mesuré sur place la réalisation d’une couche d’accrochage avant réalisation du revêtement.\nIl comprend la fourniture, le transport et la mise en œuvre de l’émulsion de bitume et des gravillons tels que définis au CCTP.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 5800.0
+        },
+        {
+          "code": "1006",
+          "designation": "Couche de roulement en enduit superficiel de type GLG",
+          "description": "Ce prix rémunère au mètre carré mesuré sur place la réalisation d’un enduit superficiel de type sandwich pour la couche de roulement de la chaussée.\nIl comprend la fourniture, le transport, le stockage et la mise en œuvre de l’émulsion de bitume et des gravillons tels que définis au CCTP ainsi que le compactage.\nCe prix comprend également la signalisation spécifique de chantier jusqu’au balayage définitif. Cette signalisation devra être en place au moins 15 jours après le revêtement et sera réalisée au moyen de panneaux de type AK 22 espacés au maximun de 250 m.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 10000.0
+        },
+        {
+          "code": "1007",
+          "designation": "Couche de roulement en enduit superficiel de type Bicouche",
+          "description": "Ce prix rémunère au mètre carré mesuré sur place la réalisation d&#146;un enduit superficiel de type bicouche pour la couche de roulement de la chaussée.\r\nIl comprend la fourniture, le transport, le stockage et la mise en &#156;uvre de l&#146;émulsion de bitume et des gravillons tels que définis au CCTP ainsi que le compactage.\r\nCe prix comprend également la signalisation spécifique de chantier jusqu&#146;au balayage définitif. Cette signalisation devra être en place au moins 15 jours après le revêtement et sera réalisée au moyen de panneaux de type AK 22 espacés au maximun de 250 m.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 12000.0
+        },
+        {
+          "code": "1008",
+          "designation": "Couche de roulement en enduit superficiel de type Tricouche",
+          "description": "Ce prix rémunère au mètre carré mesuré sur place la réalisation d’un enduit superficiel de type tricouche pour la couche de roulement de la chaussée.\nIl comprend la fourniture, le transport, le stockage et la mise en œuvre de l’émulsion de bitume et des gravillons tels que définis au CCTP ainsi que le compactage.\nCe prix comprend également la signalisation spécifique de chantier jusqu’au balayage définitif. Cette signalisation devra être en place au moins 15 jours après le revêtement et sera réalisée au moyen de panneaux de type AK 22 espacés au maximun de 250 m.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 19000.0
+        },
+        {
+          "code": "1009",
+          "designation": "Revêtement en béton bitumineux 0/10 mis en œuvre manuelle",
+          "description": "Ce prix rémunère à la tonne constatée par bons de pesée la réalisation d’une couche de roulement de chaussée en béton bitumineux 0/10 mis en œuvre manuellement dans les conditions définies au CCTP.\nIl comprend la fourniture, le transport, la mise en œuvre, le réglage, le compactage, les essais de l’atelier de compactage ainsi que la réalisation si nécessaire du raccordement à la chaussée existante.",
+          "unite": "t",
+          "prix": null,
+          "quantite": 120.0
+        },
+        {
+          "code": "1010",
+          "designation": "Revêtement en béton bitumineux 0/10",
+          "description": "Ce prix rémunère à la tonne constatée par bons de pesée la réalisation d’une couche de roulement de chaussée en béton bitumineux 0/10 mis en œuvre mécaniquement dans les conditions définies au CCTP.\nIl comprend la fourniture, le transport, la mise en œuvre, le réglage, le compactage, les essais de l’atelier de compactage ainsi que la réalisation si nécessaire du raccordement à la chaussée existante.\nLa tonne :\nRevêtement en béton bitumineux 0/10 drainant\nCe prix rémunère à la tonne constatée par bons de pesée la réalisation d&#146;une couche de roulement de chaussée en béton bitumineux 0/10 drainant mis en &#156;uvre mécaniquement dans les conditions définies au CCTP.\r\nIl comprend la fourniture, le transport, la mise en &#156;uvre, le réglage, le compactage, les essais de l&#146;atelier de compactage ainsi que la réalisation si nécessaire du raccordement à la chaussée existante.",
+          "unite": "t",
+          "prix": null,
+          "quantite": 2000.0
+        },
+        {
+          "code": "1012",
+          "designation": "Revêtement en béton bitumineux 0/6 mis en œuvre manuelle",
+          "description": "Ce prix rémunère à la tonne constatée par bons de pesée la réalisation d’une couche de roulement de chaussée en béton bitumineux 0/6 mis en œuvre manuellement dans les conditions définies au CCTP.\nIl comprend la fourniture, le transport, la mise en œuvre, le réglage, le compactage, les essais de l’atelier de compactage ainsi que la réalisation si nécessaire du raccordement à la chaussée existante.",
+          "unite": "t",
+          "prix": null,
+          "quantite": 240.0
+        },
+        {
+          "code": "1013",
+          "designation": "Revêtement en béton bitumineux 0/6",
+          "description": "Ce prix rémunère à la tonne constatée par bons de pesée la réalisation d’une couche de roulement de chaussée en béton bitumineux 0/6 mis en œuvre mécaniquement dans les conditions définies au CCTP.\nIl comprend la fourniture, le transport, la mise en œuvre, le réglage, le compactage, les essais de l’atelier de compactage ainsi que la réalisation si nécessaire du raccordement à la chaussée existante.",
+          "unite": "t",
+          "prix": null,
+          "quantite": 800.0
+        },
+        {
+          "code": "1015",
+          "designation": "Couche de base en grave bitume",
+          "description": "Ce prix rémunère à la tonne constatée par bons de pesée la réalisation d’une couche de base en grave bitume mis en œuvre mécaniquement dans les conditions définies au CCTP.\nIl comprend la fourniture, le transport, la mise en œuvre, le réglage, le compactage et les essais de l’atelier de compactage.",
+          "unite": "t",
+          "prix": null,
+          "quantite": 1000.0
+        },
+        {
+          "code": "1016",
+          "designation": "Couche de base en grave bitume enrichie",
+          "description": "Ce prix rémunère à la tonne constatée par bons de pesée la réalisation d’une couche de base en grave bitume enrichie mis en œuvre mécaniquement dans les conditions définies au CCTP.\nIl comprend la fourniture, le transport, la mise en œuvre, le réglage, le compactage et les essais de l’atelier de compactage.",
+          "unite": "t",
+          "prix": null,
+          "quantite": 1000.0
+        },
+        {
+          "code": "1017",
+          "designation": "Couche de base en grave émulsion",
+          "description": "Ce prix rémunère à la tonne constatée par bons de pesée la réalisation d’une couche de base en grave émulsion mis en œuvre mécaniquement dans les conditions définies au CCTP.\nIl comprend la fourniture, le transport, la mise en œuvre, le réglage, le compactage et les essais de l’atelier de compactage.",
+          "unite": "t",
+          "prix": null,
+          "quantite": 3500.0
+        },
+        {
+          "code": "1018",
+          "designation": "Balayage de chaussée après revêtement",
+          "description": "Ce prix rémunère au mètre carré la réalisation du balayage mécanique ou manuel des granulats non fixés après réalisation du revêtement.\nIl comprend le balayage, le chargement et l’évacuation des granulats vers une décharge agréée.\nCe balayage sera effectué entre 8 et 15 jours de circulation sur chaussée.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 25000.0
+        },
+        {
+          "code": "1019",
+          "designation": "Balayage de chaussée avant revêtement",
+          "description": "Ce prix rémunère au mètre carré la réalisation du balayage mécanique ou manuel de la chaussée avant l’exécution d’un nouveau revêtement.\nIl comprend le balayage, le chargement et l’évacuation des granulats vers une décharge agréée.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 25000.0
+        },
+        {
+          "code": "1021",
+          "designation": "Couche de roulement en enrobés spéciaux BBME de classe 2",
+          "description": "Ce prix rémunère à la tonne constatée par bons de pesée la réalisation d’une couche de roulement de chaussée en béton bitumineux à module élevé 0/10 ou 0/14 de la classe 2 mis en œuvre mécaniquement dans les conditions définies au CCTP et selon la norme P98-141.\nIl comprend la fourniture, le transport, la mise en œuvre, le réglage, le compactage, les essais de l’atelier de compactage ainsi que la réalisation si nécessaire du raccordement à la chaussée existante.",
+          "unite": "t",
+          "prix": null,
+          "quantite": 900.0
+        },
+        {
+          "code": "1024",
+          "designation": "Couche de roulement en grave émulsion calcaire",
+          "description": "Ce prix rémunère au mètre cube mis en oeuvre, constaté par bons de pesée, la réalisation d’une couche de roulement de piste cyclable ou de chaussée en grave émulsion calcaire 0/14 mis en œuvre mécaniquement .\nIl comprend la fourniture, le transport, la mise en œuvre, le réglage, le compactage, les essais de l’atelier de compactage ainsi que la réalisation si nécessaire du raccordement à la voirie existante.\nLe mètre cube :\nCouche de roulement en grave émulsion calcaire 100 % recyclé\nCe prix rémunère à la tonne constatée par bons de pesée, la réalisation d&#146;une couche de roulement de piste cyclable ou de chaussée en grave émulsion calcaire 0/10  100% recyclés mis en &#156;uvre mécaniquement .\r\nIl comprend la fourniture, le transport, la mise en &#156;uvre, le réglage, le compactage, les essais de l&#146;atelier de compactage ainsi que la réalisation si nécessaire du raccordement à la voirie existante.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 800.0
+        },
+        {
+          "code": "1029",
+          "designation": "Enduits monocouches minces type E.C.F.",
+          "description": "Ce prix rémunère au mètre carré mesuré sur place la réalisation d’un revêtement coulé à froid monocouche,\r\nIl comprend la fourniture, le transport, le stockage et la mise en œuvre des matériaux ainsi que le compactage.\r\nCe prix comprend également :\r\n- la protection des divers avaloirs, regards et bouche à clé de même que leur nettoyage après exécution\r\n- la signalisation spécifique de chantier jusqu’au balayage définitif. .\nLe mètre carré :\nEnduits bicouches minces type E.C.F.\nCe prix rémunère au mètre carré mesuré sur place la réalisation d’un revêtement coulé à froid bicouche,\nIl comprend la fourniture, le transport, le stockage et la mise en œuvre des matériaux tels que définis au CCTP ainsi que le compactage.\nCe prix comprend également :\n- la protection des divers avaloirs, regards et bouche à clé de même que leur nettoyage après exécution\n- la signalisation spécifique de chantier jusqu’au balayage définitif. .",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 18000.0
+        },
+        {
+          "code": "1031",
+          "designation": "Revêtement en béton bitumineux 0/6 coloré sur 5 cm",
+          "description": "Ce prix rémunère au mètre carré mesuré sur place la réalisation d'une couche de roulement en béton bitumineux coloré (couleur précisée sur plan des travaux) sur une épaisseur de 5 cm. Il comprend :\n     - le compactage de la couche de base\n     - le répandage d’une couche d’imprégnation à raison de 500 g par m2 d’émulsion dosée à 65%\n     - la mise en œuvre d’un tapis d’enrobé dense à chaud 0/6 de couleur \n     - le cylindrage mécanique\net toutes sujétions de parfaite réalisation.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 160.0
+        },
+        {
+          "code": "1102",
+          "designation": "Bordures de trottoir de type T2",
+          "description": "Ce prix rémunère au mètre linéaire la fourniture et la pose de bordures de trottoir de type T2 de classe B. Il comprend :\n     - la fourniture et la mise en place des bordures préfabriquées posées sur une assise en béton dosé à 250 kgs/m3 de 15 cm d’épaisseur\n     - le béton de calage à l’arrière de la bordure,\n     - les terrassements quel que soit la nature du terrain y compris chaussées,\n     - le béton de pose sur une fondation de 15 cm en graves concassées 0/20,\n     - la façon des joints au mortier de ciment\n     - le nivellement et toutes sujétions de pose.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 640.0
+        },
+        {
+          "code": "1104",
+          "designation": "Bordures caniveaux de type CS2",
+          "description": "Ce prix rémunère au mètre linéaire la fourniture et la pose de bordures de caniveaux de type CS2 de classe B. Il comprend :\n     - la fourniture et la mise en place des bordures préfabriquées posées sur une assise en béton dosé à 250 kgs/m3 de 15 cm d’épaisseur\n     - le béton de calage à l’arrière de la bordure,\n     - les terrassements quel que soit la nature du terrain y compris chaussées,\n     - le béton de pose sur une fondation de 15 cm en graves concassées 0/20,\n     - la façon des joints au mortier de ciment\n     - le nivellement et toutes sujétions de pose.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 320.0
+        },
+        {
+          "code": "1105",
+          "designation": "Bordures de trottoir de type P1",
+          "description": "Ce prix rémunère au mètre linéaire la fourniture et la pose de bordures de trottoir de type P1 de classe B. Il comprend :\n     - la fourniture et la mise en place des bordures préfabriquées posées sur une assise en béton dosé à 250 kgs/m3 de 15 cm d’épaisseur\n     - le béton de calage à l’arrière de la bordure,\n     - les terrassements quel que soit la nature du terrain y compris chaussées,\n     - le béton de pose sur une fondation de 15 cm en graves concassées 0/20,\n     - la façon des joints au mortier de ciment\n     - le nivellement et toutes sujétions de pose.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 320.0
+        },
+        {
+          "code": "1108",
+          "designation": "Bordures d'accotement de type A2",
+          "description": "Ce prix rémunère au mètre linéaire la fourniture et la pose de bordures d’accotements de type A2 de classe B.  Il comprend :\n     - la fourniture et la mise en place des bordures préfabriquées posées sur une assise en béton dosé à 250 kgs/m3 de 15 cm d’épaisseur\n     - le béton de calage à l’arrière de la bordure,\n     - les terrassements quel que soit la nature du terrain y compris chaussées,\n     - le béton de pose sur une fondation de 15 cm en graves concassées 0/20,\n     - la façon des joints au mortier de ciment\n     - le nivellement et toutes sujétions de pose.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 120.0
+        },
+        {
+          "code": "1109",
+          "designation": "Bordures caniveaux de type CC1",
+          "description": "Ce prix rémunère au mètre linéaire la fourniture et la pose de bordures caniveaux de type CC1 de classe B.  Il comprend :\n     - la fourniture et la mise en place des bordures préfabriquées posées sur une assise en béton dosé à 250 kgs/m3 de 15 cm d’épaisseur\n     - le béton de calage à l’arrière de la bordure,\n     - les terrassements quel que soit la nature du terrain y compris chaussées,\n     - le béton de pose sur une fondation de 15 cm en graves concassées 0/20,\n     - la façon des joints au mortier de ciment\n     - le nivellement et toutes sujétions de pose.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "1111",
+          "designation": "Bordures caniveaux de type AC1",
+          "description": "Ce prix rémunère au mètre linéaire la fourniture et la pose de bordures de caniveaux de type AC1 de classe B. Il comprend :\n     - la fourniture et la mise en place des bordures préfabriquées posées sur une assise en béton dosé à 250 kgs/m3 de 15 cm d’épaisseur\n     - le béton de calage à l’arrière de la bordure,\n     - les terrassements quel que soit la nature du terrain y compris chaussées,\n     - le béton de pose sur une fondation de 15 cm en graves concassées 0/20,\n     - la façon des joints au mortier de ciment\n     - le nivellement et toutes sujétions de pose.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "1112",
+          "designation": "Bordures d'ilôts de type I1",
+          "description": "Ce prix rémunère au mètre linéaire la fourniture et la pose de bordures d’îlots de type I1 de classe B. Il comprend :\n     - la fourniture et la mise en place des bordures préfabriquées posées sur une assise en béton dosé à 250 kgs/m3 de 15 cm d’épaisseur\n     - le béton de calage à l’arrière de la bordure,\n     - les terrassements quel que soit la nature du terrain y compris chaussées,\n     - le béton de pose sur une fondation de 15 cm en graves concassées 0/20,\n     - la façon des joints au mortier de ciment\n     - le nivellement et toutes sujétions de pose.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "1113",
+          "designation": "Bordures d'ilôts de type I2",
+          "description": "Ce prix rémunère au mètre linéaire la fourniture et la pose de bordures d’îlots de type I2 de classe B. Il comprend :\n     - la fourniture et la mise en place des bordures préfabriquées posées sur une assise en béton dosé à 250 kgs/m3 de 15 cm d’épaisseur\n     - le béton de calage à l’arrière de la bordure,\n     - les terrassements quel que soit la nature du terrain y compris chaussées,\n     - le béton de pose sur une fondation de 15 cm en graves concassées 0/20,\n     - la façon des joints au mortier de ciment\n     - le nivellement et toutes sujétions de pose.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "1114",
+          "designation": "Dépose et repose de bordures de tout type",
+          "description": "Ce prix rémunère au mètre linéaire la dépose soignée et la repose de bordures de tous types. Il comprend :\n     - la dépose soignée des bordures avec mise en dépôt éventuelle\n     - le remplacement de bordures défectueuses\n     - la mise en place des bordures posées sur une assise en béton dosé à 250 kgs/m3 de 15 cm d’épaisseur\n     - le béton de calage à l’arrière de la bordure,\n     - les terrassements quel que soit la nature du terrain y compris chaussées,\n     - le béton de pose sur une fondation de 15 cm en graves concassées 0/20,\n     - la façon des joints au mortier de ciment\n    - le nivellement et toutes sujétions de pose.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "1115",
+          "designation": "Bordures de trottoir de type BJ5",
+          "description": "Ce prix rémunère au mètre linéaire la fourniture et la pose de bordures de trottoir de type BJ5 de classe B. Il comprend :\n     - la fourniture et la mise en place des bordures préfabriquées posées sur une assise en béton dosé à 250 kgs/m3 de 15 cm d’épaisseur\n     - le béton de calage à l’arrière de la bordure,\n     - les terrassements quel que soit la nature du terrain y compris chaussées,\n     - le béton de pose sur une fondation de 15 cm en graves concassées 0/20,\n     - la façon des joints au mortier de ciment\n     - le nivellement et toutes sujétions de pose.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 320.0
+        },
+        {
+          "code": "1125",
+          "designation": "Reprise de bordures épaufrées",
+          "description": "Ce prix rémunère à l'unité la reprise de bordures épaufrées au mortier de ciment ou au ciment colle. Il comprend :\n     - le nettoyage de la bordure\n     - la fourniture et l'application d'un fixateur\n     - la reprise des bordures désignées par le maître d'oeuvre\n     - la finition soignéee \n et toutes sujétions de pose.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 80.0
+        },
+        {
+          "code": "1201",
+          "designation": "Trottoirs en graves concassées 0/20",
+          "description": "Ce prix rémunère au mètre carré mesuré sur place la réalisation de la couche de base de trottoirs en graves concassées 0/20 sur une épaisseur de 20 cm.\nIl comprend la fourniture, le chargement, le transport, le déchargement au lieu d’emploi, la mise en œuvre, l’arrosage, le réglage et le compactage.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 320.0
+        },
+        {
+          "code": "1203",
+          "designation": "Trottoir en béton balayé sur 10 cm",
+          "description": "Ce prix rémunère au mètre carré mesuré sur place la confection de trottoirs ou allées de circulation pour piétons en béton balayé sur une épaisseur de 10 cm. Il comprend :\n     - le compactage de la couche de base\n     - la fourniture et la mise en place d’un joint de dilatation en PVC à raison d’un tous les 3,00 m ou d’un par 5 m2\n     - la fourniture et la mise en œuvre du béton dosé à 350 kg/m3 y compris finition au balai de bruyère\n     - la fourniture et la mise en œuvre d’un treillis soudé à mailles rectangulaires au droit des accès\net toutes sujétions de parfaite réalisation.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 1000.0
+        },
+        {
+          "code": "1204",
+          "designation": "Trottoir en béton bitumineux 0/6 noir sur 4 cm",
+          "description": "Ce prix rémunère au mètre carré mesuré sur place la confection de trottoirs ou allées de circulation piétonnes en béton bitumineux sur une épaisseur de 4 cm. Il comprend :\n     - le compactage de la couche de base\n     - le répandage d’une couche d’imprégnation à raison de 500 g par m2 d’émulsion dosée à 65%\n     - la mise en œuvre d’un tapis d’enrobé dense à chaud 0/6 \n     - le cylindrage mécanique\net toutes sujétions de parfaite réalisation.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 1200.0
+        },
+        {
+          "code": "1205",
+          "designation": "Trottoir en béton bitumineux 0/6 rouge sur  4 cm",
+          "description": "Ce prix rémunère au mètre carré mesuré sur place la confection de trottoirs ou allées de circulation piétonnes en béton bitumineux de couleur rouge sur une épaisseur de 4 cm. Il comprend :\n     - le compactage de la couche de base\n     - le répandage d’une couche d’imprégnation à raison de 500 g par m2 d’émulsion dosée à 65%\n     - la mise en œuvre d’un tapis d’enrobé dense à chaud 0/6 \n     - le cylindrage mécanique\net toutes sujétions de parfaite réalisation.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 160.0
+        },
+        {
+          "code": "1206",
+          "designation": "Trottoir en pavés autobloquants",
+          "description": "Ce prix rémunère au mètre carré mesuré la fourniture et la pose de pavés béton de type autobloquant de 6 cm d’épaisseur pour la confection de trottoirs ou allées de circulation pour piétons. Il comprend :\n     - le compactage de la couche de base\n     - la fourniture et la mise en oeuvre d’un lit de sable de 4 cm\n     - la fourniture et la mise en œuvre de pavés autobloquants y compris les coupes et raccordements nécessaires\n     - la façon des joints à la silice\net toutes sujétions de parfaite réalisation.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 160.0
+        },
+        {
+          "code": "1208",
+          "designation": "Trottoir en béton désactivé avec granulats de Garonne",
+          "description": "Ce prix rémunère au mètre carré mesuré sur place la confection de trottoirs ou allées de circulation pour piétons en béton désactivé réalisé avec des granulats de Garonne sur une épaisseur de 10 cm. Il comprend :\n     - le compactage de la couche de base\n     - la fourniture et la mise en place d’un joint de dilatation en PVC à raison d’un tous les 3,00 m ou d’un par 5 m2\n     - la fourniture et la mise en œuvre du béton dosé à 350 kg/m3 confectionné avec des granulats de couleur\n     - la fourniture et la mise en œuvre d’un treillis soudé à mailles rectangulaires au droit des accès\n     - la fourniture et la mise en œuvre du désactivant\net toutes sujétions de parfaite réalisation.\nRef : granulats de couleur et de granulométrie identiques à ceux mis en oeuvre sur le Parvis de la Salle des Fêtes",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 160.0
+        },
+        {
+          "code": "1209",
+          "designation": "Trottoir en béton désactivé avec granulats de couleur",
+          "description": "Ce prix rémunère au mètre carré mesuré sur place la confection de trottoirs ou allées de circulation pour piétons en béton désactivé sur une épaisseur de 10 cm réalisé avec des granulats de couleur à l'identique de ceux existants sur la commune. Il comprend :\n     - le compactage de la couche de base\n     - la fourniture et la mise en place d’un joint de dilatation en PVC à raison d’un tous les 3,00 m ou d’un par 5 m2\n     - la fourniture et la mise en œuvre du béton dosé à 350 kg/m3 confectionné avec des granulats de couleur\n     - la fourniture et la mise en œuvre d’un treillis soudé à mailles rectangulaires au droit des accès\n     - la fourniture et la mise en œuvre du désactivant\net toutes sujétions de parfaite réalisation.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 160.0
+        },
+        {
+          "code": "1214",
+          "designation": "Trottoir en béton bitumineux 0/6 mis en &#156;uvre à la main",
+          "description": "Ce prix rémunère au mètre carré mesuré sur place la confection de trottoirs ou allées de circulation piétonnes en béton bitumineux sur une épaisseur de 4 cm mise en œuvre manuellement. Il comprend :\n     - le compactage de la couche de base\n     - le répandage d’une couche d’imprégnation à raison de 500 g par m2 d’émulsion dosée à 65%\n     - la mise en œuvre à la main d’un tapis d’enrobé dense à chaud 0/6 \n     - le cylindrage mécanique\net toutes sujétions de parfaite réalisation.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 160.0
+        },
+        {
+          "code": "1217",
+          "designation": "Ilôt en béton teinté",
+          "description": "Ce prix rémunère au mètre carré mesuré sur place le remplissage d’îlots en béton balayé teinté, selon les indications du maître d’œuvre, sur une épaisseur de 10 cm. Il comprend :\n     - la fourniture, le transport et la mise en œuvre de graves concassées 0/20 en couche de base sur une épaisseur de 15 cm\n     - le compactage de la couche de base\n     - la fourniture et la mise en œuvre du béton teinté dosé à 350 kg/m3 y compris finition au balai de bruyère\net toutes sujétions de parfaite réalisation.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 60.0
+        },
+        {
+          "code": "1219",
+          "designation": "Confection de surface en galets maçonnés",
+          "description": "Ce prix rémunère au mètre carré mesuré sur place la confection de surfaces en galets maçonnés destinées à être circulées par des véhicules. Il comprend :\n     - la préparation du support\n     - la fourniture et la mise en œuvre de béton  dosé à 350 kg/m3 en couche de base\n     - la fourniture et la mise en œuvre de galets de dimensions 80/220 noyés au ¾ dans le béton\n     - la façon des joints et le brossage des galets\net toutes sujétions de parfaite réalisation.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 60.0
+        },
+        {
+          "code": "1141",
+          "designation": "Reprise de joint de bordure",
+          "description": "Ce prix rémunère à l'unité la reprise de joint de bordure au mortier de ciment ou au ciment colle. Il comprend :\n     - le creusement du joint existant, son nettoyage\n     - la fourniture et l'application d'un fixateur\n     - la finition soignéee \n et toutes sujétions de pose.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 60.0
+        },
+        {
+          "code": "1303",
+          "designation": "Point à temps à la tonne",
+          "description": "Ce prix rémunère à la tonne, constatée par bons de pesée, l’exécution ponctuelles de reprises de chaussée à l’émulsion de bitume dosée à 65% y compris nettoyage du support, fourniture, transport et mise en œuvre de granulats et liants ainsi que toutes sujétions de parfaite réalisation.",
+          "unite": "t",
+          "prix": null,
+          "quantite": 20.0
+        },
+        {
+          "code": "1302",
+          "designation": "Reprise de chaussée en limite de caniveau en grave bitume",
+          "description": "Ce prix rémunère au mètre carré la reprise de rive de chaussée, en grave bitume, le long des trottoirs après la pose de bordures et/ou caniveaux. Il comprend :\n    - la fourniture et la mise en œuvre de grave bitume sur une épaisseur de 15cm\n     - le compactage\n     - la réalisation d’un revêtement à l’identique de l’existant\net toutes sujétions de parfaite réalisation.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 200.0
+        },
+        {
+          "code": "1306",
+          "designation": "Retraitement au liant hydraulique",
+          "description": "Ce prix rémunère au mètre cube le retraitement de remblais d'apport au liant hydraulique . Il comprend :\n     - la fourniture, le transport et la mise en œuvre du liant hydraulique\n     - le transport et la mise en oeuvre remblais ainsi traité\n     - l’humidification nécessaire\n     - le réglage et le compactage\net toutes sujétions de parfaite réalisation",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 2400.0
+        },
+        {
+          "code": "1307",
+          "designation": "Reprofilage en grave bitume",
+          "description": "Ce prix rémunère au mètre carré mesuré en place, la fourniture, le transport et la mise en œuvre de grave bitume pour le reprofilage. Il comprend notamment la mise en œuvre à la niveleuse, le compactage et la réalisation d’une couche d’accrochage à raison de 200 à 300 g d’émulsion de bitume par m2.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 400.0
+        },
+        {
+          "code": "1308",
+          "designation": "Reprofilage en grave émulsion au m2",
+          "description": "Ce prix rémunère au mètre carré mesuré en place, le reprofilage de chaussée existante en grave émulsion 0/14 dosée à 4,5% de bitume résiduel y compris la fourniture, le transport et mise en œuvre à la niveleuse ou manuellement, le compactage ainsi que toutes sujétions de parfaite réalisation.\nCe prix s’entend pour le reprofilage d’une chaussée dégradée d’épaisseur variable de 0 à 10 cm y compris répandage d’une couche d’accrochage à raison de 200 à 300 g d’émulsion de bitume par m2.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 1000.0
+        },
+        {
+          "code": "1035",
+          "designation": "Béton Bitumineux à Emulsion (BBE)",
+          "description": "Ce prix rémunère à la tonne constatée par bons de pesée la réalisation d’une couche de roulement de chaussée en béton bitumineux à froid, à base d'émulsion mis en œuvre mécaniquement dans les conditions définies au CCTP et selon la norme P98-141.\nIl comprend notamment l'étude de formulation, la fourniture, le transport, la mise en œuvre, le réglage, le compactage, les essais de l’atelier de compactage ainsi que la réalisation si nécessaire du raccordement à la chaussée existante.",
+          "unite": "t",
+          "prix": null,
+          "quantite": 120.0
+        },
+        {
+          "code": "1310",
+          "designation": "Reprise de chaussée en limite de caniveau en graves concassées 0/20 + revêtement",
+          "description": "Ce prix rémunère au mètre carré la reprise de rive de chaussée, en graves concassées 0/20, le long des trottoirs après la pose de bordures et/ou caniveaux. Il comprend :\n     - la fourniture et la mise en œuvre de graves concassées 0/20, sur une épaisseur de 20 cm\n     - la réalisation d’un revêtement à l’identique de l’existant\net toutes sujétions de parfaite réalisation.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 20.0
+        },
+        {
+          "code": "1318",
+          "designation": "Pontage des fisssures sur enrobé",
+          "description": "",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 1000.0
+        },
+        {
+          "code": "1401",
+          "designation": "Réfection d'accès en bicouche",
+          "description": "Ce prix rémunère au mètre carré mesuré en place, la réfection ou la reprise d’accès de riverains pour raccordement au nouveau revêtement de chaussée. Il comprend :\n     - le grattage ou la mise en propreté de l’accès existant\n     - le compactage de la couche de forme\n     - la fourniture et la mise en œuvre de graves concassées 0/20 sur une épaisseur de 20 cm\n     - la réalisation d’un revêtement superficiel bicouche à l’émulsion de bitume\ncompris toutes sujétions de réalisation.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 160.0
+        },
+        {
+          "code": "1402",
+          "designation": "Réfection d'accès en béton bitumineux",
+          "description": "Ce prix rémunère au mètre carré mesuré en place, la réfection ou la reprise d’accès de riverains en béton bitumineux pour raccordement au nouveau revêtement de chaussée. Il comprend :\n     - le grattage ou la mise en propreté de l’accès existant\n     - le compactage de la couche de forme\n     - la fourniture et la mise en œuvre de graves concassées 0/20 sur une épaisseur de 20 cm\n     - la réalisation d’un revêtement en béton bitumineux sur une épaisseur de 5 cm\ncompris toutes sujétions de réalisation.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 160.0
+        },
+        {
+          "code": "1501",
+          "designation": "Mise à niveau de bouche à clé",
+          "description": "Ce prix rémunère à l’unité la mise à niveau de bouche à clé après revêtement de chaussée.\nIl comprend la recherche de bouche à clé si nécessaire, les terrassements, l’évacuation des déblais, la mise à niveau proprement dite et la réfection de la chaussée ou du trottoir à l’identique y compris toutes fournitures et mise en œuvre.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "1502",
+          "designation": "Mise à la côte de chambre PTT de petit format",
+          "description": "Ce prix rémunère à l’unité la mise à la côte définitive de chambre PTT de petit format (60 x 60 maxi) avant ou après revêtement de chaussée.\nIl comprend la recherche de la chambre si nécessaire, le découpage de la chaussée, les terrassements, l’évacuation des déblais, la mise à niveau proprement dite et la réfection de la chaussée ou du trottoir à l’identique y compris toutes fournitures et mise en œuvre.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 20.0
+        },
+        {
+          "code": "1503",
+          "designation": "Mise à la côte de chambre PTT de grand format",
+          "description": "Ce prix rémunère à l’unité la mise à la côte définitive de chambre PTT de grand (supérieur à 60 x 60) avant ou après revêtement de chaussée.\nIl comprend la recherche de la chambre si nécessaire, le découpage de la chaussée, les terrassements, l’évacuation des déblais, la mise à niveau proprement dite et la réfection de la chaussée ou du trottoir à l’identique y compris toutes fournitures et mise en œuvre.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 20.0
+        },
+        {
+          "code": "1504",
+          "designation": "Mise à niveau de regard EU ou EP sur chaussée",
+          "description": "Ce prix rémunère à l’unité la mise à la côte définitive de regard d’assainissement eaux usées ou eaux pluviales de tout type et toutes dimensions avant ou après revêtement de chaussée.\nIl comprend la recherche du regard si nécessaire, le découpage de la chaussée, les terrassements, l’évacuation des déblais, la dépose des éléments, la mise à niveau proprement dite avec scellement du cadre et la réfection de la chaussée à l’identique y compris toutes fournitures et mise en œuvre.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 24.0
+        },
+        {
+          "code": "1505",
+          "designation": "Mise à niveau de regard EU ou EP sur trottoir",
+          "description": "Ce prix rémunère à l’unité la mise à la côte définitive de regard d’assainissement eaux usées ou eaux pluviales de tout type et toutes dimensions avant réalisation du trottoir.\nIl comprend les terrassements nécessaires, l’évacuation des déblais, la dépose des éléments, la mise à niveau proprement dite avec scellement du cadre y compris toutes fournitures et mise en œuvre.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 24.0
+        },
+        {
+          "code": "1506",
+          "designation": "Mise à niveau de regard divers sur trottoir",
+          "description": "Ce prix rémunère à l’unité la mise à la côte définitive de regard de tout type et toutes dimensions avant réalisation du trottoir (regard pied de chute, compteur d’eau, …….°.\nIl comprend les terrassements nécessaires, l’évacuation des déblais, la mise à niveau proprement dite avec scellement du cadre y compris toutes fournitures et mise en œuvre.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 24.0
+        },
+        {
+          "code": "1602",
+          "designation": "Clôture grillagée avec mur bahut",
+          "description": "Ce prix rémunère au mètre linéaire, la construction d’une clôture grillagée avec mur bahut de hauteur totale égale à 2,00 m. Il comprend :\r\n     - les terrassements en terrain de toute nature avec évacuation des déblais vers une décharge agréée de dimensions 0,50 x 0,40 \r\n     - le béton de fondation de type C300 y compris le ferraillage\r\n     - la réalisation de joints de dilatation tous les 15 m ou à chaque redent\r\n     - le mur bahut en blocs agglomérés de béton creux de 0,20 x 0,20 x 0,50 sur trois rangs\r\n     - les enduits colorés sur les deux faces avec arase et façon des angles\r\n     - la fourniture et la pose de poteaux en fer à T  à raison d’un tous les 2,00 m y compris façon des trous de scellement, jambes de force aux angles et tous les 20 m en alignements droits\r\n     - la fourniture et la pose de grillage en fil de fer galvanisé simple torsion de 1,40 m de hauteur y compris fils tendeurs, fils d’attache et tendeurs\r\net  toutes sujétions de parfaite réalisation.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "1603",
+          "designation": "Clôture grillagée sans mur bahut",
+          "description": "Ce prix rémunère au mètre linéaire, la construction d’une clôture grillagée sans mur bahut de hauteur totale égale à 2,00 m. Il comprend :\r\n     - la fourniture et la pose de poteaux en fer à T ou en béton de 2,50 m de hauteur à raison d’un tous les 2,00 m y compris terrassements, évacuation des déblais, scellement au béton, jambes de force aux angles et tous les 20 m en alignements droits\r\n     - la fourniture et la pose de grillage en fil de fer galvanisé double torsion de 2,00 m de hauteur y compris fils tendeurs, fils d’attache et tendeurs\r\net  toutes sujétions de parfaite réalisation.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 80.0
+        },
+        {
+          "code": "1604",
+          "designation": "Confection de murette sur trois rangées de moellons",
+          "description": "Ce prix rémunère au mètre linéaire, la confection de murette sur une hauteur hors sol de 0,60 m. Il comprend :\r\n     - les terrassements en terrain de toute nature avec évacuation des déblais vers une décharge agréée de dimensions 0,50 x 0,40 \r\n     - le béton de fondation de type C300 y compris le ferraillage\r\n     - la réalisation de joints de dilatation tous les 15 m ou à chaque redent\r\n     - la murette en blocs agglomérés de béton creux de 0,20 x 0,50 x 0,50 sur trois rangs\r\n     - les enduits colorés sur une face avec arase et façon des angles\r\net  toutes sujétions de parfaite réalisation.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "1605",
+          "designation": "Plus value au prix n° 1604 par rangée supplémentaire",
+          "description": "Ce prix rémunère au mètre linéaire la plus value au prix n° 1604 par rang supplémentaire de blocs agglomérés enduits",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "1606",
+          "designation": "Enduit au mortier de ciment de couleur",
+          "description": "Ce prix rémunère au mètre carré la réalisation d’enduit au mortier de couleur identique à l’existant ou selon les indications du maître d’œuvre.\nIl s’entend toutes fournitures et contraintes de mise en œuvre notamment piquage ou nettoyage du support avant réalisation.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 80.0
+        },
+        {
+          "code": "1607",
+          "designation": "Béton de propreté B16",
+          "description": "(Articles 24 et 36 du fascicule 65 du C.C.T.G.)\nCe prix rémunère au mètre cube le béton de propreté B16 sous fondation. Il comprend la fourniture, le transport et la mise en œuvre si besoin avec l’aide du camion pompe et toutes sujétions de mise en œuvre.\nLe volume à prendre en compte sera le produit de la surface de la fondation par 10 cm d’épaisseur.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 20.0
+        },
+        {
+          "code": "1608",
+          "designation": "Béton B20 pour parties d'ouvrage non armées",
+          "description": "(Articles 24 et 36 du fascicule 65 du C.C.T.G.)\nCe prix rémunère au mètre cube le béton non armé tel que défini à l’article 41.5.1 du fascicule 65 du CCTG mesuré conformément aux indications de l’article 42.1 de ce même fascicule.\nIl comprend la fourniture, le transport et la mise en œuvre si besoin avec l’aide du camion pompe et toutes sujétions de mise en œuvre.\nBéton de valeur caractéristique à la compression à 28 jours au moins égale à 35 Mpa dosé à 300 kg de ciment de classe CPJ par m3.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 20.0
+        },
+        {
+          "code": "1609",
+          "designation": "Béton B25 pour parties d'ouvrage armées",
+          "description": "(Articles 24 et 36 du fascicule 65 du C.C.T.G.)\nCe prix rémunère au mètre cube le béton B25 non armé tel que défini à l’article 41.5.1 du fascicule 65 du CCTG mesuré conformément aux indications de l’article 42.1 de ce même fascicule.\nIl comprend la fourniture, le transport et la mise en œuvre si besoin avec l’aide du camion pompe et toutes sujétions de mise en œuvre.\nBéton de valeur caractéristique à la compression à 28 jours au moins égale à 35 Mpa dosé à 300 kg de ciment de classe CPJ 45 par m3.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 20.0
+        },
+        {
+          "code": "1611",
+          "designation": "Béton dosé à 250 kg pour enrobage de tuyaux",
+          "description": "Ce prix rémunère au mètre cube le béton dosé à 250 kg de ciment de classe CPJ 45 par m3 pour enrobage de tuyaux.\nIl comprend la fourniture, le transport et la mise en œuvre si besoin avec l’aide du camion pompe et toutes sujétions de mise en œuvre.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 20.0
+        },
+        {
+          "code": "1622",
+          "designation": "Réalisation d'une dalle béton d'épaisseur 20 cm",
+          "description": "Ce prix rémunère au mètre carré la réalisation d'une dalle béton sur une épaisseur de 0,20 m. Il comprend :\n     - les terrassements en terrain de toute nature avec évacuation des déblais vers une décharge agréée\n     - le béton de propreté\n     - la confection des coffrages avec les découpes nécessaires \n     - la fourniture et la mise en œuvre de béton de type C300 y compris le ferraillage\n     - l'arrondi des angles\net toutes sujétions de parfaite réalisation.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "1631",
+          "designation": "Béton B20 pour couche de base de trottoir",
+          "description": "(Articles 24 et 36 du fascicule 65 du C.C.T.G.)\nCe prix rémunère au mètre cube le béton non armé tel que défini à l’article 41.5.1 du fascicule 65 du CCTG mesuré conformément aux indications de l’article 42.1 de ce même fascicule.\nIl comprend la fourniture, le transport et la mise en œuvre si besoin avec l’aide du camion pompe et toutes sujétions de mise en œuvre.\nBéton de valeur caractéristique à la compression à 28 jours au moins égale à 35 Mpa dosé à 300 kg de ciment de classe CPJ par m3.\nDestination : couche de base de trottoir ou d'allées piétonnes ou cyclables.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "1719",
+          "designation": "Revêtement de type Pépite ou équivalent",
+          "description": "Ce prix rémunère au mètre carré la réalisation de travaux de revêtement de type Pépite ou équivalent sur chaussée ou sur trottoir quel qu'en soit le support. Les revêtements seront constitués de granulats de roche naturelle fixés au sol au moyen de résine de synthèse à haute performance. Les granulats seront de dimensions 1,5 à 2,5 mm sur trottoirs et de 2,5 à 5 mm sur chaussées. La teinte sera soumise au choix du Maître d'Oeuvre avant réalisation. Les granulats devront être sélectionnés pour leurs caractéristiques visuelles et mécaniques. Le revêtement devra être résistant au gel et stable à la chaleur.\r\nIl comprend la signalisation de chantier, la préparation du support, le prémarquage, la fourniture et la mise en &#156;uvre des résines et granulats, la protection, le nettoyage et l'évacuation des excédents et rejets et toutes sujétions de parfaite réalisation.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "1728",
+          "designation": "Réalisation de plateau ralentisseur en enrobé",
+          "description": "Ce prix rémunère au mètre carré la réalisation de plateau ralentisseur en béton bitumineux 0/10, de dimensions précisées sur les plans et selon les instructions de la maîtrise d'oeuvre.\nIl comprend :\n- le sciage de la chaussée existante et tous les travaux nécessaires au bon ancrage du plateau\n- la fourniture, le transport et la mise en œuvre des enrobés y compris façon des rampes aux normes prescrites par la réglementation\n- le compactage\n\nLa signalisation verticale et horizontale ne sont pas comprises dans ce prix.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 160.0
+        },
+        {
+          "code": "1801",
+          "designation": "Reprise de terre végétale sur dépôt",
+          "description": "Ce prix rémunère au mètre cube, la reprise de terre végétale sur dépôt.\nIl comprend le chargement des matériaux depuis le lieu de dépôt, le transport, le déchargement, la mise en œuvre, le réglage, la fourniture et le transport de l’eau d’arrosage et l’arrosage.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 400.0
+        },
+        {
+          "code": "1802",
+          "designation": "Fourniture et mise en oeuvre de terre végétale",
+          "description": "Ce prix rémunère au mètre cube, la fourniture et la mise en œuvre de terre végétale.\r\nIl comprend le chargement des matériaux depuis le lieu de dépôt, le transport, le déchargement, la mise en œuvre, le réglage, la fourniture et le transport de l’eau d’arrosage et l’arrosage.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "1803",
+          "designation": "Modelage en terre végétale pour engazonnement",
+          "description": "Ce prix rémunère au mètre carré le remodelage de surface avant engazonnement y compris la forme de noue lorsque celle ci est précisée sur les plans.\nIl comprend le travail de réglage et la préparation aux engins mécaniques ou à la main sur une épaisseur moyenne de 30 cm non compris engazonnement ou plantations.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 160.0
+        },
+        {
+          "code": "2002",
+          "designation": "Gaine PVC de diamètre 80 mm",
+          "description": "Ce prix rémunère au mètre linéaire la fourniture et la mise en œuvre de fourreau en PVC  de diamètre 80 mm.  Il comprend :\n     - l’ouverture de la tranchée avec évacuation des déblais vers un décharge agréée\n     - la fourniture et la mise en œuvre d’un lit de sable de 10 cm\n     - la pose du fourreau\n     - la fourniture et la pose du grillage avertisseur\n     - la fourniture et la mise en œuvre du remblaiement en graves concassées 0/20 y compris le compactage\net toutes sujétions de mise en œuvre y compris la présence éventuelle d’eau dans la tranchée et l’encombrement des réseaux.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 160.0
+        },
+        {
+          "code": "2003",
+          "designation": "Gaine PVC de diamètre 100 mm",
+          "description": "Ce prix rémunère au mètre linéaire la fourniture et la mise en œuvre de fourreau en PVC  de diamètre 100 mm.   Il comprend :\n     - l’ouverture de la tranchée avec évacuation des déblais vers un décharge agréée\n     - la fourniture et la mise en œuvre d’un lit de sable de 10 cm\n     - la pose du fourreau\n     - la fourniture et la pose du grillage avertisseur\n     - la fourniture et la mise en œuvre du remblaiement en graves concassées 0/20 y compris le compactage\net toutes sujétions de mise en œuvre y compris la présence éventuelle d’eau dans la tranchée et l’encombrement des réseaux.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 160.0
+        },
+        {
+          "code": "2004",
+          "designation": "Fourniture et mise en oeuvre de géotextile",
+          "description": "Ce prix rémunère au mètre carré la fourniture et la mise en œuvre de géotextile.\r\nIl comprend la fourniture, le transport et la mise en œuvre du géotextile.\r\nIl s’applique au mètre carré de surface couverte sans tenir compte des recouvrements.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 2400.0
+        },
+        {
+          "code": "2019",
+          "designation": "Drain routier de diamètre 200 mm enrobé de géotextile",
+          "description": "Ce prix rémunère au mètre linéaire la fourniture et la pose d'un drain PVC, annelé, perforé, recouvert de géotextile, mis en place en fond de tranchée pour assurer le drainage et la collecte des eaux. Il comprend :\r\n- la fourniture et la mise en oeuvre du drain routier\r\n- la fourniture et la mise des manchons et toutes pièces nécessaires au raccordement aux regards.\r\net toutes sujétions de parfaite exécution",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 160.0
+        },
+        {
+          "code": "2020",
+          "designation": "Drain routier de diamètre 150 mm",
+          "description": "Ce prix rémunère au mètre linéaire la fourniture et la pose d'un drain PVC, annelé, perforé, mis en place en fond de tranchée pour assurer le drainage et la collecte des eaux. Il comprend :\r\n- la fourniture et la mise en oeuvre du drain routier\r\n- la fourniture et la mise des manchons et toutes pièces nécessaires au raccordement aux regards.\r\net toutes sujétions de parfaite exécution",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 160.0
+        },
+        {
+          "code": "1232",
+          "designation": "Ilôt en béton balayé",
+          "description": "Ce prix rémunère au mètre carré mesuré sur place le remplissage d’îlots en béton balayé, sur une épaisseur de 10 cm. Il comprend :\n     - la fourniture, le transport et la mise en œuvre de graves concassées 0/20 en couche de base sur une épaisseur de 15 cm\n     - le compactage de la couche de base\n     - la fourniture et la mise en œuvre du béton dosé à 350 kg/m3 y compris finition au balai de bruyère\net toutes sujétions de parfaite réalisation.\nLe mètre carré :\nRéalisation d'un enrochement non bétonné\nCe prix comprend au m3 : \n- la fourniture de bloc d'enrochement répondant à la norme NF EN 13-383 et seront constitués de calcaire massif. Les matériaux utilisés seront en roche saine, monolithe, sans fissuration et non gélive (norme NF EN 12-371). Les blocs seront propres sans inclusion de terre.\nLes enrochement seront de blocométrie 1500/2000 kg (90 % mnimum de bloc).\n- la mise en oeuvre pour confortement de talus. Pour la mise en oeuvre, un ancrage des blocs sur une profondeur minimale de 50 cm à 100 cm sera effectué. Les blocs seront agencés minutieusement afin d'avoir le plan moyen de la paroi visible des enrochements le plus rectiligne possible et satisfasse le visuel.\n- et toute sujétion de parfaite réalisation.\nLe mètre cube :\nRéfection de couche de roulement en BBSG 0/10 classe 3\nCe prix rémunère au mètre carré :\n-\tLe rabotage de la chaussée sur 6 cm d’épaisseur ;\n-\tLe sciage d’ancrage transversal ;\n-\tLe détourage des émergences (regards, chambres et bouches à clés) ;\n-\tLa réalisation d’un enduit de scellement ;\n-\tLa fourniture, le transport et l’application d’un béton bitumineux 0/10 classe 3, sur une épaisseur de 6 cm ;\n-\tLe balayage pour nettoyage de la section concernée.\nLe mètre carré :\nConfection d’un coussin ralentisseur en béton bitumineux\nCe prix rémunère à l’unité :\r\n-\tLe sciage et le décroutage de chaussée pour ancrage du coussin ;\r\n-\tLe réalisation du coussin ralentisseur en BB 0/6 réglementaire (répondant aux spécifications techniques du Certu) ;\r\n-\tLe marquage réglementaire des dents de requin sur le coussin.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 160.0
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "titre": "TRAVAUX DE SIGNALISATION",
+      "articles": [
+        {
+          "code": "0108",
+          "designation": "Création de massif pour signalisation",
+          "description": "Ce prix rémunère à l’unité la réalisation de massif en béton de dimensions 20 x 20 et de 40 cm de profondeur y compris réservation en PVC de diamètre 100 mm",
+          "unite": "u",
+          "prix": null,
+          "quantite": 120.0
+        },
+        {
+          "code": "1739",
+          "designation": "Balise de type J 11",
+          "description": "Ce prix rémunère à l&#146;unité la fourniture et la pose de balises de signalisation d'obstacle de type J11, de gamme normale, de classe 2 rétro-réfléchissant haute intensité.\r\nIl comprend outre la fourniture et la pose du panneau proprement dit,  la réalisation du massif en béton et toute autre sujétion d'exécution.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 20.0
+        },
+        {
+          "code": "1709",
+          "designation": "Balise de type J 13",
+          "description": "Ce prix rémunère à l’unité la fourniture et la pose de balises de signalisation d'obstacle de type J13, de gamme normale, de classe 2 rétro-réfléchissant haute intensité.\r\nIl comprend outre la fourniture et la pose du panneau proprement dit,  la réalisation du massif en béton et toute autre sujétion d'exécution.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 20.0
+        },
+        {
+          "code": "1706",
+          "designation": "Signalisation verticale de tout type, de gamme normale",
+          "description": "Ce prix rémunère à l&#146;unité la fourniture et la pose de panneau de signalisation de police de tout type, de gamme normale, de classe 2 rétro-réfléchissant haute intensité.\r\nIl comprend :\r\n     - la réalisation du massif en béton,\r\n     - la fourniture et la pose du panneau de police en aluminium,\r\n     - la fourniture et la pose d'un mat en acier galvanisé ou en aluminium de section adaptée au panneau de dimension (80x40 ou 80x80) type fermé de 3,50 m de long\r\n     - les brides de fixation et la boulonnerie.\nL'unité :\nSignalisation verticale de tout type, de petite gamme\nCe prix rémunère à l’unité la fourniture et la pose de panneau de signalisation de police de tout type, de petite gamme, de classe 2 rétro-réfléchissant haute intensité.\r\nIl comprend outre la fourniture et la pose du panneau proprement dit :\r\n     - la réalisation du massif en béton\r\n     - la fourniture et la pose d’un support de type fermé de 3,50 m de long\nL'unité :\nPeinture pour ligne continue ou discontinue - L 10 cm\nCe prix rémunère au mètre linéaire (vide exclu) l'application de peinture routière pour la réalisation de marquage au sol de ligne continue ou discontinue de largeur 10 cm,\r\nIl comprend :\r\n- la signalisation de chantier, \r\n- le balayage préalable,\r\n- la protection du marquage le temps du sèchage, \r\n- le prémarquage éventuel.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 60.0
+        },
+        {
+          "code": "1704",
+          "designation": "Travaux spéciaux de peinture",
+          "description": "Ce prix rémunère au mètre carré la réalisation de travaux spéciaux sur chaussée en enduit thermo plastique de couleur blanche tel que : passage piéton, zébras, bandes de stop ou de cédez le passage.\nIl comprend la signalisation de chantier, la préparation du support, le prémarquage, la fourniture et la mise en œuvre de l’enduit, la protection des peintures et toutes sujétions de parfaite réalisation.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 20.0
+        },
+        {
+          "code": "1705",
+          "designation": "Travaux spéciaux de peinture - Marquage places PMR",
+          "description": "Ce prix rémunère à l'unité le marquage d'une place de stationnement pour personne à mobilité réduite, en enduit thermo plastique de couleur blanche. \r\nIl comprend : \r\n- la signalisation de chantier, \r\n- le balayage préalable,\r\n- la protection du marquage le temps du sèchage, \r\n- le prémarquage éventuel.\nL'unité :\nPannonceau de type M, gamme normale\nCe prix remunère, à l'unité la fourniture et pose d'un pannonceau de type M en aluminium avec film rétroréfléchissant de classe II.\r\nIl comprend :\r\n- la fourniture du ponnonceau,\r\n- les brides de fixation et la boulonnerie.\nL'unité :\nPannonceau de type M de petite gamme\nCe prix remunère, à l'unité la fourniture et pose d'un pannonceau de type M en aluminium avec film rétroréfléchissant de classe II.\r\nIl comprend :\r\n- la fourniture du ponnonceau,\r\n- les brides de fixation et la boulonnerie.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 4.0
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "titre": "TRAVAUX DE GENIE CIVIL",
+      "articles": [
+        {
+          "code": "2248",
+          "designation": "Amenée et repli du matériel",
+          "description": "Ce prix rémunère au forfait l'amenée et le repli du matériel nécessaire à la réalisation des travaux quel qu'en soit la nature et les contraintes liées aux difficultés du chantier",
+          "unite": "forfait",
+          "prix": null,
+          "quantite": 20.0
+        },
+        {
+          "code": "2206",
+          "designation": "Terrassement pour dégagement des murs en aile",
+          "description": "Ce prix rémunère au mètre cube la réalisation de fouilles pour découvrir les maçonneries des murs d'ouvrage ou le bon sol à la demande du Maître d'Œuvre. Il comprend :\n- le réglage et le compactage du fond de fouille\n- le chargement, le transport et le déchargement des produits vers une décharge agréée\net toute autre sujétion d'exécution.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "2205",
+          "designation": "Débroussaillage",
+          "description": "Ce prix rémunère au forfait, l'ensemble des opérations nécessaires à l'enlèvement de toute sorte de végétation sur les parements de l'ouvrage, y compris la suppression des racines ainsi que le débroussaillage de la ravine et du fil d'eau 5 m de part et d'autre de l'ouvrage. Il comprend :\n- l'enlèvement manuel de la végétation\n- la fourniture et l'utilisation du matériel approprié pour l'arrachage et l'élimination des arbustes et souches d'arbres enracinés dans la maçonnerie\n- la fourniture et l'application de produits chimiques autorisés pour la dévitalisation des souches, racines ou autres\n- la pose et la dépose d'échafaudage éventuel\net toute autre sujétion d'exécution.",
+          "unite": "forfait",
+          "prix": null,
+          "quantite": 20.0
+        },
+        {
+          "code": "2209",
+          "designation": "Hydrodécapage ou sablage des maçonneries",
+          "description": "Ce prix rémunère au mètre carré le nettoyage au jet d'eau à haute pression (supérieure à 200 bars) de toutes parties d'ouvrage(parapets, tympans, bandeaux, voûte, contreforts, buse métallique ...). Il comprend :\n- la mise en oeuvre du matériel et son utilisation\n- le pompage éventuel de tout excés d'eau accumulé en partie basse de part et d'autre de l'ouvrage\net toute autre sujétion d'exécution",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 120.0
+        },
+        {
+          "code": "2225",
+          "designation": "Sablage des maçonneries après rejointoiement",
+          "description": "Ce prix rémunère au mètre carré le sablage des parements rejointoyés pour enlever toute trace de laitance de ciment sur les briques et pour donner une patine similaire à l'existant. Il comprend :\n- la mise en œuvre du matériel et son utilisation\n- la protection du ruisseau et la mise en oeuvre de toutes dispositions pour la récupération intégrale de l'abrasif\n- le ramassage et l'évacuation en décharge agréée de l'abrasif et des résidus de sablage\net toute autre sujétion d'exécution.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "2215",
+          "designation": "Piquage et rejointoiement de maçonnerie",
+          "description": "Ce prix rémunère au mètre carré de maçonnerie traitée le rejointoiement de toute ou partie d'ouvrage. Il comprend :\n- le relevé contradictoire avec le Maître d'Œuvre des parties à traiter\n- le piquage, le dégarnissage des joints et le calage si nécessaire\n- l'humidification\n- le badigeonnage au lit de chaux immédiatement avant garnissage\n- la fourniture, le transport et la mise en oeuvre d'un mortier de rejointoiement coloré dans la masse, couleur rosée, après approbation par le Maître d'Oeuvre\n- la réalisation d'une épreuve de convenance et la fourniture d'une planche témoin\net toute autre sujétion d'exécution notamment le matériel et la main d'oeuvre nécessaire à la préparation, à la confection et à la finition des joints.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "2208",
+          "designation": "Echafaudage",
+          "description": "Ce prix rémunère au forfait, l'amenée, le montage, le démontage et la mise à disposition des échafaudages pour accéder aux niveaux de travail, conformément au titre IV du fascicule 65A du CCTG. Il comprend :\n- l'amenée et le repliement de tous les matériels\n- le montage des éléments d'échafaudage\n- la réception par un organisme agréé \net toute autre sujétion d'exécution",
+          "unite": "forfait",
+          "prix": null,
+          "quantite": 80.0
+        },
+        {
+          "code": "3002",
+          "designation": "Platelages",
+          "description": "Ce prix rémunère:\r\nAu mètre carré de surface effective, la confection d'un platelage. \r\nCe prix comprend notamment :  \r\n- la fourniture et la mise en oeuvre de tous les moyens et pièces constitutives nécessaires ainsi que la main d'œuvre,  \r\n- toutes sujétions pour le montage et le démontage notamment la réalisation des appuis et des fixations nécessaires,  \r\n- le maintien d'une section d'écoulement raisonnable, permettant une montée des eaux en cas de platelage sur un cours d'eau,  \r\n- la mise en place d'un bâchage de récupération en cas de travaux non protégés par un batardeau,  \r\n- le ramassage des déchets et l'évacuation en décharge agréée,  \r\n- le nettoyage et la remise en état des lieux.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "3003",
+          "designation": "Bâche de récupération",
+          "description": "Ce prix rémunère:\r\nAu mètre carré de protection effective, la pose d'un bâchage de récupération efficace pour les échafaudages ou les platelages.\r\nCe prix comprend:  \r\n- la fourniture et la mise en oeuvre de bâches et des fixations,  \r\n- la réalisation de dispositifs complémentaires de maintien si nécessaire,  \r\n- toutes sujétions pour le montage et le démontage,  \r\n- le ramassage et l'évacuation des résidus en  décharge agréée,  \r\n- le nettoyage et la remise en état des lieux.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 60.0
+        },
+        {
+          "code": "3004",
+          "designation": "Déblais de deuxième catégorie",
+          "description": "Ce prix rémunère :  \r\nAu mètre cube en place, les déblais nécessitant l'emploi d'explosifs ou de brise roche.\r\nIl rémunère notamment :  \r\n- les piquetages, général et spécial, s'ils n'ont pas été réalisés par le maître d'œuvre,  \r\n- les piquetages complémentaires,  \r\n- l'extraction et le chargement,  \r\n- le transport du lieu d'extraction au lieu de dépôt provisoire pour réemploi, ou de mise en dépôt définitifs,  \r\n- le déchargement des matériaux aux lieux d'utilisation ou de dépôt,  \r\n- le fractionnement des blocs de dimension supérieure à 500mm,  \r\n- les frais d'occupation éventuels relatifs aux dépôts provisoires,  \r\n- le réglage de la plate-forme d'assise,  \r\n- la protection de la plate-forme et des talus contre les eaux de ruissellement,  \r\n- les sujétions de sécurité et de tenue du talus de déblai,  \r\n- les précautions pour ne pas endommager les ouvrages, les constructions et équipements de toute nature présents sur la zone du chantier ou en périphérie.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 20.0
+        },
+        {
+          "code": "3005",
+          "designation": "Déblais en terrain ordinaire exécutés à la main",
+          "description": "Ce prix rémunère :\r\nAu mètre cube en place , les déblais en terrain ordinaire (terrains de toutes natures ne nécessitant pas l'emploi du compresseur) exécutés manuellement.\r\nCe prix comprend notamment :  \r\n- l'extraction, le chargement, le transport et le déchargement des produits à l'extérieur de l'emprise de la fouille,  \r\n- le dressement du fond et des parois des fouilles,  \r\n- la protection contre les eaux de toutes natures y compris l'exécution des ouvrages provisoires correspondants,  \r\n- le compactage du fond des fouilles,  \r\n- la reprise éventuelle, le transport et le déchargement des produits au lieu de réemploi éventuel ou de stockage définitif.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 4.0
+        },
+        {
+          "code": "2204",
+          "designation": "Curage de l'ouvrage",
+          "description": "Ce prix rémunère au mètre cube, par un moyen approprié, mécanique ou manuel, proposé par l'entreprise et agréé par le Maître d'Œuvre, l'enlèvement des atterrissements accumulés sous l'ouvrage et aux abords sur 2,50 m de part et d'autre. Il comprend :\n- l'amenée et le repliement de tous les matériels\n- les purges éventuelles jusqu'au bon sol des matériaux impropres et leur remplacement par des matériaux sains\n- le chargement, le transport et le déchargement des produits vers une décharge agréée\net toute autre sujétion d'exécution.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 4.0
+        },
+        {
+          "code": "3006",
+          "designation": "Etaiement de talus",
+          "description": "Ce prix rémunère au mètre carré de talus étayé, la fourniture et la mise en œuvre d'un système de protection contre les risques d'éboulement des talus de déblais.\r\nIl rémunère notamment:\r\n- la fourniture a pied d'œuvre de l'ensemble des constituants;\r\n- la mise en oeuvre de l'étaiement à l'avancement des terrassements;\r\n- les sujétions de maintien durant les travaux;\r\n- la dépose et l'évacuation du dispositif en fin de chantier.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 280.0
+        },
+        {
+          "code": "3007",
+          "designation": "Fouilles en rigole",
+          "description": "Ce prix rémunère :\r\nAu mètre cube en place , les fouilles dans les terrains de toutes natures ne nécessitant pas l'emploi du compresseur.\r\nCe prix comprend notamment :  \r\n- l'extraction, le chargement, le transport et le déchargement des produits au lieu de réemploi éventuel ou de stockage définitif,  \r\n- le dressement du fond et des parois des fouilles,  \r\n- la protection contre les eaux de toutes natures y compris l'exécution des ouvrages provisoires correspondants,  \r\n- le compactage du fond des fouilles.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "3008",
+          "designation": "Fouilles en rigole nécessitant l'emploi d'un compresseur",
+          "description": "Ce prix rémunère :\r\nAu mètre cube en place, les fouilles dans les terrains nécessitant l'emploi du compresseur ou du brise roche.\r\nCe prix comprend notamment :  \r\n- l'extraction, le chargement, le transport et le déchargement des produits au lieu de réemploi éventuel ou de stockage définitif,  \r\n- le dressement du fond et des parois des fouilles,  \r\n- la protection contre les eaux de toutes natures y compris l'exécution des ouvrages provisoires correspondants,  \r\n- le compactage du fond des fouilles,  \r\n- les précautions pour ne pas endommager les ouvrages, constructions et équipements de toute nature présents sur la zone du chantier ou en périphérie.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 20.0
+        },
+        {
+          "code": "3009",
+          "designation": "Coffrages à parois ordinaires",
+          "description": "Ce prix rémunère : \r\nAu mètre carré, les prestations définies à l'article 1.4.4 de l'annexe D au texte du fascicule 65 du C.C.T.G.mesurées conformément aux indications de l'article 2.2.1 de cette annexe.\r\nCe prix s'applique aux coffrages pour surface coffrée non vue, aussi bien aux coffrages plans qu'aux coffrages courbes, quels que soient les rayons.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 20.0
+        },
+        {
+          "code": "3010",
+          "designation": "Coffrages a parois soignées pour parements simples",
+          "description": "Ce prix rémunère : \r\nAu mètre carré les prestations définies à l'article 1.4.4 de l'annexe D au texte du fascicule 65 du C.C.T.G.mesurées conformément aux indications de l'article 2.2.1 de cette annexe.\r\nCe prix s'applique aux coffrages pour parements simples, aussi bien aux coffrages plans qu'aux coffrages courbes, quels que soient les rayons.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 20.0
+        },
+        {
+          "code": "3011",
+          "designation": "Coffrages a parois soignées pour parements fins",
+          "description": "Ce prix rémunère : \r\nAu mètre carré les prestations définies à l'article 1.4.4 de l'annexe D au texte du fascicule 65 du C.C.T.G.mesurées conformément aux indications de l'article 2.2.1 de cette annexe.\r\nCe prix s'applique aux coffrages pour parements fins, conformes au chapitre 6 du fascicule 65, aussi bien aux coffrages plans qu'aux coffrages courbes, quels que soient les rayons.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 200.0
+        },
+        {
+          "code": "3012",
+          "designation": "Béton C20/25",
+          "description": "Ce prix rémunère : \r\nAu mètre cube en place, les prestations définies à l'article 1.5.1 de l'annexe D au texte du fascicule 65 du CCTG mesuré conformément à l'article 2.1 de cette annexe.\r\nPar dérogation à l'art. 1.5.1 susmentionné, ce prix rémunère également les sujétions de bétonnage par temps froid, béton C20/25 BPS NF EN 206-1 destiné aux parties d'ouvrages désignées dans le dossier fourni par le maître d'œuvre.\r\nCe prix tient compte des sujétions suivantes :   \r\n- mise en œuvre,  \r\n- traitement de surface : dressage, talochage ou autre traitement ordinaire en fonction de sa destination.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "3013",
+          "designation": "Béton C25/30",
+          "description": "Ce prix rémunère : \r\nAu mètre cube en place, les prestations définies à l'article 1.5.1 de l'annexe D au texte du fascicule 65 du CCTG mesuré conformément à l'article 2.1 de cette annexe.\r\nPar dérogation à l'art. 1.5.1 susmentionné, ce prix rémunère également les sujétions de bétonnage par temps froid, béton C25/30 BPS NF EN 206-1 destiné aux parties d'ouvrages désignées dans le dossier fourni par le maître d'œuvre.\r\nCe prix tient compte des sujétions suivantes :   \r\n- mise en œuvre,   \r\n- traitement de surface : dressage, talochage ou autre traitement ordinaire en fonction de sa destination",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 20.0
+        },
+        {
+          "code": "3014",
+          "designation": "Béton C30/37",
+          "description": "Ce prix rémunère : \r\nAu mètre cube en place, les prestations définies à l'article 1.5.1 de l'annexe D au texte du fascicule 65 du CCTG mesuré conformément à l'article 2.1 de cette annexe.\r\nPar dérogation à l'art. 1.5.1 susmentionné, ce prix rémunère également les sujétions de bétonnage par temps froid, béton C30/37, XF2, BPS NF EN 206-1 destiné aux parties d'ouvrages désignées dans le dossier fourni par le maître d'œuvre. \r\nCe prix tient compte des sujétions suivantes :   \r\n- mise en œuvre,   \r\n- traitement de surface : dressage, talochage ou autre traitement ordinaire en fonction de sa destination.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 80.0
+        },
+        {
+          "code": "3015",
+          "designation": "Trottoir en béton B.P.S. de classe C30/37",
+          "description": "Ce prix rémunère :\r\nAu mètre carré, la réalisation de trottoirs en béton de classe C30/37, XF2.L'épaisseur minimale du béton du trottoir sera de 20cm.\r\nCe prix comprend notamment :  \r\n- la préparation du support,  \r\n- les coffrages,  \r\n- la fourniture et la mise en œuvre du béton,  \r\n- la cure du béton,  \r\n- le traitement de surface : dressage, talochage ou autre en fonction de sa destination,  - la confection des joints de dilatation,  \r\n- toutes sujétions de mise en œuvre selon les règles de l'art.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 20.0
+        },
+        {
+          "code": "3016",
+          "designation": "Béton  immergé",
+          "description": "Ce prix rémunère : \r\nAu mètre cube en place, la fourniture et la mise en œuvre de béton C30/37 coulé par technique immergée dans des coffrages à parois étanches.\r\nCe prix comprend notamment :  \r\n- la fourniture et la mise en œuvre du béton de classe C30/37 par technique immergée, béton BPS NF EN 206-1 destiné aux parties d'ouvrages désignées dans le dossier fourni par le maître d'œuvre,  \r\n- le matériel adapté à cette technique : pompes à béton pour coulage en immergé, etc.,\r\n- toutes les sujétions d'exécution propres à cette technique.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 80.0
+        },
+        {
+          "code": "3017",
+          "designation": "Ancrage passif dans rocher",
+          "description": "Ce prix rémunère :\r\nA l'unité, la réalisation d'ancrages passifs dans le rocher compact.\r\nIl rémunère notamment :    \r\n- l'amenée et le repliement des matériels nécessaires,  \r\n- l'exécution des forages de diamètre 50mm au minimum et de profondeur qui sera fonction de la nature et de la qualité du substratum rencontré,  \r\n- la fourniture et la mise en place des aciers HA 20 de longueur 1m minimum et leur scellement à la résine ou au coulis de ciment,  \r\n- tous les frais de main d'œuvre et de façon.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 20.0
+        },
+        {
+          "code": "3018",
+          "designation": "Nettoyage de barbacanes",
+          "description": "Ce prix rémunère :\r\nA l'unité, le nettoyage de barbacanes existantes selon tout procédé efficace à restaurer leur bon fonctionnement, y compris toutes sujétions de petits terrassements, évacuation des résidus, et remise en état des lieux.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 8.0
+        },
+        {
+          "code": "3019",
+          "designation": "Rejointoiement des maçonneries anciennes",
+          "description": "Ce prix rémunère :\r\nAu mètre carré, le rejointoiement des maçonneries anciennes en moellons de pierres sur les parties définies au dossier remis par le maître d'œuvre.\r\nIl comprend notamment :    \r\n- la fourniture des matériaux, matériels et main d'œuvre nécessaires,  \r\n- le piquage et le dégraissage des joints existants,  \r\n- le parfait remplissage des joints au mortier bâtard,  \r\n- la finition des joints en léger creux,  \r\n- le nettoyage des parements après rejointoiement (brossage des pierres),  \r\n- l'évacuation des gravats et résidus.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 800.0
+        },
+        {
+          "code": "3020",
+          "designation": "Gunitage des maçonneries anciennes",
+          "description": "Ce prix rémunère : \r\nAu mètre carré, le gunitage par voie sèche ou humide des maçonneries anciennes selon  la largeur et  la profondeur des joints à remplir.\r\nLe remplissage des joints sera profond et complet.\r\nCe prix comprend notamment :  \r\n- le soufflage et l'aspersion des joints,  \r\n- le gunitage à la buse sous pression,  \r\n- le traitement des joints en parement, la finition en léger creux,  \r\n- le nettoyage des pierres après gunitage et l'évacuation des déchets.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "1628",
+          "designation": "Couronnement en briques foraines posées sur chant",
+          "description": "Ce prix rémunère au mètre linéaire la réalisation d'un couronnement de mur de soutènement en briques foraines traditionnelles rustiques de couleur rouge, de dimensions 40 x 20 x 5, posées sur chant et hourdies à la chaux hydraulique naturelle coloré par adjonction de sable calcaire y compris toutes sujétions de parfaite réalisation notamment les coupes.\nUn échantillon de la brique foraine sera soumis à l'approbation du maître d'oeuvre avant la pose",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 20.0
+        },
+        {
+          "code": "3021",
+          "designation": "Fourniture et pose de briques foraines à plat",
+          "description": "Ce prix rémunère:\r\nAu mètre linéaire, la fourniture et la pose de briques foraines à plat en 0.40 m de largeur.\r\nCe prix comprend notamment :  \r\n- la fourniture et la pose des briques à plat, le jointoiement ainsi que le rejointoiement au mortier bâtard de teinte définie par le maître d'œuvre,  \r\n- le brossage et le nettoyage des briques après réalisation des joints,  \r\n- la récupération des déchets et leur évacuation vers une décharge agréée,  \r\n- toutes sujétions d'exécution.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "3022",
+          "designation": "Remplacement de brique foraine",
+          "description": "Ce prix rémunère:\r\nA l'unité, le remplacement total ou partiel d'une brique foraine de parement de mur, tympan, bandeau, plinthe, intrados de voûte, etc.\r\nCe prix comprend notamment :  \r\n- la fourniture des matériaux, matériels et main d'œuvre nécessaires,  \r\n- le refouillement des briques cassées ou altérées jusqu'au support sain,  \r\n- les épinglages si besoin (zone importante à restaurer),  \r\n- le nettoyage de la cavité, le soufflage, l'aspersion,  \r\n- le mortier pour lit de pose,  \r\n- la préparation de la brique de remplacement (le découpage par sciage, le chanfreinage pour briques de plinthes, etc.),  \r\n- la pose de la brique, le jointoiement et le rejointoiement au mortier bâtard de teinte définie par le maître d'œuvre,  \r\n- le brossage et le nettoyage du parement et l'évacuation des déchets.\r\n\r\nCe prix ne comprend pas l'échafaudage sur pied.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 100.0
+        },
+        {
+          "code": "3023",
+          "designation": "Treillis soudés (au kg)",
+          "description": "Ce prix rémunère :\r\nAu kilogramme,  la fourniture et la mise en place de treillis soudés pour armature de béton, en acier HA de nuance fe E 500.\r\nCe prix comprend notamment :\r\n  - les découpages, chutes et recouvrements,\r\n  - tous les travaux et fournitures nécessaires à la fixation,\r\n  - la fourniture, le façonnage, le découpage, la mise en place avec recouvrements,\r\n  - les épinglages, les fixations, les calages,\r\n  - toutes sujétions d'exécution.",
+          "unite": "kg",
+          "prix": null,
+          "quantite": 20.0
+        },
+        {
+          "code": "3024",
+          "designation": "Aciers HA20 de liaison",
+          "description": "Ce prix rémunère :\r\nA l'unité, la pose d'aciers HA 20 de liaison, aciers HA de la nuance fe E500 dont la longueur nominale est égale à 1,20m pour liaison du béton de fondation avec les maçonneries.\r\nCe prix comprend notamment :  \r\n- les fournitures,  \r\n- le scellement.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 20.0
+        },
+        {
+          "code": "3025",
+          "designation": "Acier Ha et Adx",
+          "description": "Ce prix rémunère : \r\nAu kilogramme, les prestations définies à l'article 1.6 du l'annexe D au texte du fascicule 65 mesurées conformément aux indications de l'article 2.3.1 de cette même annexe.\r\nIl concerne les aciers haute adhérence de la nuance fe E 500 et les aciers ronds lisses de la nuance fe E 240.\r\nCes aciers rentrent dans la composition des bétons.",
+          "unite": "kg",
+          "prix": null,
+          "quantite": 680.0
+        },
+        {
+          "code": "2244",
+          "designation": "Barbacanes",
+          "description": "Ce prix rémunère à l'unité la fourniture et la mise en œuvre de barbacanes en partie basse du mur. Il comprend :\n- la mise en place dans les forages de tubes crépinés de diamètre 80 mm pénétrant de 50 cm dans le remblais avec chaussette en géotextile\n- le scellement au mortier de ciment\net toute autre sujétion d'exécution.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 400.0
+        },
+        {
+          "code": "3026",
+          "designation": "Fût de parapet en maçonnerie (galets ou petites pierres)",
+          "description": "Ce prix rémunère :\r\nAu mètre cube, la construction de fût de parapet en maçonnerie de galets ou petites pierres sur 2 parements vus hourdée au mortier bâtard.\r\nCe prix comprend notamment :  \r\n- la fourniture sur le chantier des constituants,  \r\n- les frais de matériels, de main d'œuvre et de façon,  \r\n- le rejointoiement en léger creux des parements vus,  \r\n- la réalisation d'exutoires,  \r\n- la réalisation des extrémités abaissées,  \r\n- toutes sujétions d'exécution.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 20.0
+        },
+        {
+          "code": "3027",
+          "designation": "Parapet en maconnerie de moellons",
+          "description": "Ce prix rémunère : \r\nAu mètre cube, la réalisation de parapet en maçonnerie de moellons de pierres hourdées au mortier de ciment.\r\nIl rémunère notamment :  \r\n- la fourniture des matériaux,  \r\n- les frais de main-d'œuvre de façon pour appareillage des pierres en \"Opus Incertum\",\r\n- le rejointoiement en creux au mortier bâtard des parements vus,  \r\n- les exutoires et les abouts inclinés,  \r\n- le nettoyage des pierres après rejointoiement et l'évacuation des gravats.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 120.0
+        },
+        {
+          "code": "3028",
+          "designation": "Maçonnerie de moellons de pierres",
+          "description": "Ce prix rémunère : \r\nAu mètre cube, le corps des murs en élévation réalisé totalement en maçonnerie de moellons de pierres hourdées au mortier de ciment.\r\nIl rémunère notamment :  \r\n- la fourniture des matériaux,  \r\n- les frais de main-d'œuvre de façon pour appareillage des pierres en \"opus incertum\",  \r\n- les fournitures et mise en oeuvre des barbacanes en PVC,  \r\n- toutes sujétions de réalisation.\r\n\r\nCe prix ne comprend pas le rejointoiement.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 280.0
+        },
+        {
+          "code": "3029",
+          "designation": "Maçonnerie de moellons avec pierres récupérées",
+          "description": "Ce prix rémunère : \r\nAu mètre cube, le corps des murs en élévation réalisé totalement en maçonnerie de moellons de pierres hourdées au mortier de ciment, avec les pierres récupérées sur place provenant de la démolition du mur existant.\r\nIl rémunère notamment :  \r\n- la récupération, le nettoyage et le réemploi des moellons,  \r\n- la fourniture du mortier,  \r\n- les frais de main-d'œuvre de façon pour appareillage des pierres en \"opus incertum\",  \r\n- les fournitures et mise en oeuvre des barbacanes en PVC,  \r\n- toutes sujétions dues à sa mise en oeuvre.\r\n\r\nCe prix ne comprend pas la démolition de maçonneries et la mise en dépôt des pierres",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 200.0
+        },
+        {
+          "code": "3030",
+          "designation": "Traitement parement vu",
+          "description": "Ce prix rémunère : \r\nAu mètre carré, le traitement de parement vu des murs en maçonnerie de moellons de pierre façon \"opus incertum\".\r\nIl rémunère notamment :  \r\n- la fourniture des constituants entrant dans la composition du mortier,  \r\n- la fabrication du mortier,  \r\n- le rejointoiement en léger creux au mortier bâtard,  \r\n- les frais de main d'œuvre et de façon,  \r\n- le nettoyage des pierres après rejointoiement et l'évacuation des déchets.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 1000.0
+        },
+        {
+          "code": "3031",
+          "designation": "Rejointoiement de maçonneries anciennes en briques foraines",
+          "description": "Ce prix rémunère :\r\nAu mètre carré, le rejointoiement des maçonneries anciennes en briques foraines.\r\nIl comprend :\r\n  - les matétiaux, matériels et main d'oeuvre nécessaires,\r\n  - le piquage, le dégarnissage des joints,\r\n  - le nettoyage et l'humidification avant leur garnissage,\r\n  - la confection des nouveau joints légèrement en creux au mortier bâtard,\r\n  - le brossage et le nettoyage du parement et l'évacuation des déchets.\r\n\r\nCe prix ne comprend pas l'échafaudage.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 20.0
+        },
+        {
+          "code": "3032",
+          "designation": "Comblement de cavités isolées de faible volume",
+          "description": "Ce prix rémunère :\r\nAu mètre cube, le comblement de cavités sur un ouvrage (pierres cassées ou manquantes isolées et de faible volume). \r\nCe prix comprend notamment :  \r\n- la purge des matières impropres et instables,  \r\n- la réalisation d'un épinglage en acier HA (fourniture des épingles, forage et scellement),  \r\n- le comblement des cavités par béton projeté par voie sèche en plusieurs couches si nécessaire,   \r\n- le surfaçage en harmonie avec le parement contigu (talochage et dessins des pierres pour un ouvrage en maçonnerie),   \r\n- le nettoyage et toutes les sujétions d'exécution.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 3400.0
+        },
+        {
+          "code": "3033",
+          "designation": "Comblement de cavités",
+          "description": "Ce prix rémunère :\r\nAu mètre cube, le comblement de grandes cavités sur un ouvrage (nombreuses pierres cassées ou manquantes en général). \r\nCe prix comprend notamment :  \r\n- la purge des matières impropres et instables,  \r\n- la réalisation d'un épinglage en acier HA (fourniture des épingles, forage et scellement),   \r\n- le comblement des cavités par béton projeté par voie sèche en plusieurs couches si nécessaire ou par de la maçonnerie de pierres,   \r\n- le surfaçage taloché intégrant le dessin des joints des pierres,   \r\n- le nettoyage et toutes les sujétions d'exécution.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 4.0
+        },
+        {
+          "code": "3034",
+          "designation": "Enduit au mortier bâtard",
+          "description": "Ce prix rémunère : \r\nAu mètre carré, l'enduit au mortier bâtard réalisé en trois couches.\r\nCe prix comprend notamment :  \r\n- les matériaux, matériels et main d'œuvre nécessaires,  \r\n- la réalisation en trois couches (gobetage, dressage et couche de finition),  \r\n- le traitement de surface de la couche de finition : talochage ou jeté à la truelle,  \r\n- les sujétions de mise en œuvre.Ce prix ne comprend pas l'échafaudage ni la préparation du support (piquage vieux crépis ou autre).",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "3035",
+          "designation": "Passivation d'armature",
+          "description": "Ce prix rémunère :\r\nAu mètre linéaire, la fourniture et l'application du produit passivant sur les armatures, quel que soit le diamètre.\r\nLe produit passivant doit être appliqué sur toute la périphérie de l'armature.\r\nIl comprend l'élimination de l'oxydation des armatures par sablage avant passivation",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 200.0
+        },
+        {
+          "code": "3036",
+          "designation": "Ragréage de surface sur paroi béton armé",
+          "description": "Ce prix rémunère:\r\nAu mètre carré, toutes les fournitures et mises en œuvre nécessaires à la réalisation de ragréage des parties en béton armé.\r\nLes produits devront être titulaires de la marque NF.\r\nCe prix rémunère notamment :  \r\n- tous les matériels et sujétions d'accès aux zones à traiter,  \r\n- le relevé contradictoire des surfaces à ragréer,  \r\n- l'épreuve de convenance,  \r\n- l'élimination des bétons dégradés jusqu'à obtention d'un support sain permettant le dégagement d'armatures présentant de la corrosion,  \r\n- la préparation des surfaces réceptrices, le nettoyage,  \r\n- le chargement et l'évacuation en décharge des produits de démolition,  \r\n- la fourniture des différents composants du produit de ragréage,  \r\n- la préparation de ce produit avant mise en oeuvre,  \r\n- la mise en œuvre du produit y compris toutes sujétions,  \r\n- l'enlèvement des déchets et le nettoyage après exécution,  \r\n- les contrôles internes et externes de l'entreprise.\nLes surfaces à prendre en compte seront définies contradictoirement avant le commencement des travaux.\r\n\r\nCe prix ne comprend pas la passivation des armatures.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 8.0
+        },
+        {
+          "code": "3037",
+          "designation": "Amenée et repliement de l'atelier d'injection",
+          "description": "Ce prix rémunère :\r\nAu forfait, l'amenée et le repliement de l'atelier complet pour forage et injection de coulis de ciment ou de mortier ou pour projection de béton.\r\nCe prix comprend toutes sujétions pour cette prestation.",
+          "unite": "forfait",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "3038",
+          "designation": "Injection de décollement",
+          "description": "Ce prix rémunère : \r\nAu mètre linéaire, le remplissage au mortier ou coulis de ciment des disjointoiement, fractures ou décollements entre voûtes.\r\nCe prix comprend notamment :  \r\n- le piquage des joints existants au droit des parties disjointes, fracturées ou décollées pour retirer les matières impropres ou instables,  \r\n- le soufflage, l'humidification,  \r\n- le parfait remplissage au mortier de ciment exécuté manuellement, ou mécaniquement en une ou plusieurs passes selon l'importance du joint,  \r\n- la finition en harmonie avec les parties contigues,  \r\n- l'injection au mortier ou coulis de ciment des parties de maçonneries profondes non remplies ou non accessibles y compris toutes sujétions de pose de canules d'injection, d'évents, etc.  \r\n- le nettoyage des parements,  \r\n- l'évacuation des gravats et résidus.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 280.0
+        },
+        {
+          "code": "3039",
+          "designation": "Mise en place des canules d'injection et évents",
+          "description": "Ce prix rémunère: \r\nA l'unité, la fourniture et la mise en place des canules d'injection et des évents nécessaires au comblement des vides par injection de coulis de ciment dans les maçonneries.\r\nCe prix comprend :\r\n - les essais de convenance,\r\n - l'implantation des canules et des évents après validation du maillage suite aux essais de convenance,\r\n - les forages,\r\n - les fournitures, la mise en place et le scellement des canules et évents,\r\n - l'enlèvement ou le recépage des canules après durcissement du coulis d'injection,\r\n - le ragréage si nécessaire,\r\n - toutes sujétions d'exécution.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "3040",
+          "designation": "Injection de coulis",
+          "description": "Ce prix rémunère : \r\nAu mètre cube de coulis de ciment injecté, la réalisation du colmatage des vides dans les maçonneries.\r\nCe prix comprend :\r\n  - les essais de convenance,\r\n  - la main d'oeuvre spécialisée, les fournitures en matériaux et matériels spécifiques,\r\n  - l'installation du matériel,\r\n  - la mise en place des protections,\r\n  - l'injection maîtrisée de coulis de ciment y compris obturation des fuites de coulis au ciment à prise rapide,\r\n  - le nettoyage des parements de pierre si nécessaire,\r\n  - le nettoyage des matériels, du site et l'évacuation des déchets,\r\n  - toutes sujétions d'exécution.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 8.0
+        },
+        {
+          "code": "3041",
+          "designation": "Tirants d'enserrement passifs",
+          "description": "Au mètre, la fourniture et la mise en place des tirants d'enserrement passifs droits dans les bandeaux, tympans et murs en retour.\r\nIl comprend :\r\n  - l'implantation des tirants après accord du maître d'oeuvre,\r\n  - le forage quelles que soient la nature des matériaux rencontrés,\r\n  - la fourniture et la mise en place du tirant HA diamètre 32mm pré-protége (gainés et graissés), y compris gaines d'injection,\r\n  - la fourniture, fabrication du coulis et l'injection.\r\nLa longueur à prendre en compte est celle de la longueur totale du tirant (y compris la longueur hors maçonnerie nécessaire pour la fixation des croix).",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 450.0
+        },
+        {
+          "code": "2219",
+          "designation": "Tête de tirants croix Saint-André",
+          "description": "A l'unité, la fourniture et la mise en place des têtes de tirants d'enserrement passifs droits par  croix.\r\nIl comprend notamment :  \r\n- la réalisation d'une semelle d'appui au mortier,  \r\n- la fourniture et la pose de la tête de tirant en croix de 0.70m x 0.70m de longueur avec profilés UPN de 140mm plaqués y compris une plaque de renfort centrale de 10mm soudée en fond de croix,  \r\n- la fourniture et la pose des écrous et contre écrous,   \r\n- le serrage des écrous à la clé dynamométrique,  \r\n- la protection anti-corrosion par peinture de toutes les pièces de métal hors maçonnerie.",
+          "unite": "u",
+          "prix": null,
+          "quantite": 120.0
+        },
+        {
+          "code": "3042",
+          "designation": "Béton projeté",
+          "description": "Ce prix rémunère : \r\nAu mètre cube, le béton projeté (C30/37) par voie séche destiné à la réalisation de contre voûtes, de comblement d'affouillement ...etc.\r\n Ce prix rémunère notamment: \r\n- la fourniture, le transport et la mise en oeuvre par voie sèche du béton  projeté par passes successives de 10cm d'épaisseur maximum,   \r\n- l'évacuation des retombées,\r\n- la reprise éventuelle des parements.\r\n\r\nCe prix ne comprend pas les ferraillages rémunérés par les prix spécifiques du bordereau",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 80.0
+        },
+        {
+          "code": "3043",
+          "designation": "Fourniture et pose de garde-corps de type S7",
+          "description": "Ce prix rémunère :\r\nAu mètre, la fourniture et la pose de garde-corps de type S7, fixé par platine sur longrines BA, conformément  au dossier garde-corps du SETRA d'avril 1997 et au plan du dossier fourni par le maître d'œuvre.\r\nIl rémunère notamment :  \r\n- les études, le calepinage et la fixation,  \r\n- la fabrication du garde-corps type S7 et la galvanisation,   \r\n- le transport,  \r\n- les mise en place des dispositifs de fixation par platines,  \r\n- les manutentions, la pose, les réglages,  \r\n- les dispositifs de dilatation longitudinale,  \r\n- toutes sujétions d'exécution.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 250.0
+        },
+        {
+          "code": "2242",
+          "designation": "Fourniture et pose d'un garde corps de type S8",
+          "description": "Ce prix rémunère au mètre linéaire la fourniture et la mise en place de garde corps de type S8 en acier galvanisé en conformité avec le chapitre VIII du fascicule 65A et avec les dispositions du dossier pilote GC 77 du SETRA. Il comprend ::\r\n- l'établissement du calepinage\r\n- le carottage éventuel du support pour réalisation des scellements\r\n- la protection anti corrosion par galvanisation à chaud\r\n- la fourniture, la pose, le calage et le scellement du garde corps\r\net toute autre sujétion d'exécution.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 12.0
+        },
+        {
+          "code": "3044",
+          "designation": "Fourniture et pose de garde-corps de type S7 scellés",
+          "description": "Ce prix rémunère :\r\nau mètre, la fourniture et la pose de garde-corps de type S7, scellé dans les corniches ou longrines BA, conformément au dossier garde-corps du SETRA d'avril 1997 et au plan du dossier fourni par le maître d'œuvre.\r\nIl rémunère notamment :  \r\n- les études, le calepinage et la fixation,  \r\n- la fabrication du garde-corps type S7 et la galvanisation,   \r\n- le transport,  \r\n- les mise en place des dispositifs de fixation scellés dans les corniches préfabriquées ou longrines (la fourniture et la pose des frettes et le scellement),  \r\n- les manutentions, la pose, les réglages,  \r\n- les dispositifs de dilatation longitudinale,  \r\n- toutes sujétions d'exécution.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 250.0
+        },
+        {
+          "code": "3045",
+          "designation": "Fourniture et pose de garde-corps de type S8 scellés",
+          "description": "Ce prix rémunère :\r\nau mètre linéaire, la fourniture et la pose de garde-corps de type S8, scellé dans les corniches ou longrines BA, conformément au dossier garde-corps du SETRA d'avril 1997 et au plan du dossier fourni par le maître d'œuvre.\r\nIl rémunère notamment :  \r\n- les études, le calepinage et la fixation,  \r\n- la fabrication du garde-corps type S8 et la galvanisation,   \r\n- le transport,  \r\n- les mise en place des dispositifs de fixation scellés dans les corniches préfabriquées ou longrines (la fourniture et la pose des frettes et le scellement),  \r\n- les manutentions, la pose, les réglages,  \r\n- les dispositifs de dilatation longitudinale,  \r\n- toutes sujétions d'exécution.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 12.0
+        },
+        {
+          "code": "3046",
+          "designation": "Plus-value pour mise en peinture de garde-corps",
+          "description": "Ce prix rémunère:\r\nau métre linéaire, une plus-value aux prix n°363 et 364 pour la mise en peinture du garde-corps de type S8 par thermolaquage en usine.\r\nCe prix rémunère notamment:\r\n- la préparation du garde-corps galvanisé,\r\n- la mise en peinture suivant le RAAL définit par le Maître d'Oeuvre par thermolaquage,\r\n- les reprises des dégradations éventuelles des peintures lors des transports et la pose.",
+          "unite": "ml",
+          "prix": null,
+          "quantite": 12.0
+        },
+        {
+          "code": "3047",
+          "designation": "Batardeau-Matériaux d'apport en vrac",
+          "description": "Ce prix rémunère : \r\nAu mètre cube, la fourniture et la mise en place de matériaux d'apport en vrac nécessaires à la confection d'un batardeau.\r\nCe prix comprend notamment : \r\n  - la fourniture de matériaux d'apport adapté au site (argile, gravier, terres, etc.),\r\n  - la mise en place pour confectionner le batardeau,\r\n  - le démontage et l'évacuation,\r\n  - toutes sujétions d'exécution.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 20.0
+        },
+        {
+          "code": "3048",
+          "designation": "Batardeau-Matériaux d'apport en sacs",
+          "description": "Ce prix rémunère :\r\nAu mètre cube, la fourniture et la mise en place de matériaux d'apport en sacs nécessaires à la confection d'un batardeau.\r\nCe prix comprend notamment :\r\n  - la fourniture de matériaux d'apport en sacs,\r\n  - la mise en place pour confectionner le batardeau,\r\n  - le démontage et l'évacuation,\r\n  - toutes sujétions d'exécution.",
+          "unite": "m3",
+          "prix": null,
+          "quantite": 40.0
+        },
+        {
+          "code": "3049",
+          "designation": "Batardeau-Membrane étanche",
+          "description": "Ce prix rémunère :\r\nAu mètre carré, la fourniture et la mise en place d'une membrane étanche nécessaires à l'étanchéité d'un batardeau.\r\nCe prix comprend notamment :\r\n  - la fourniture de la membrane,\r\n  - sa mise en place pour créer l'étanchéité du batardeau,\r\n  - le démontage et l'évacuation,\r\n  - toutes sujétions d'exécution.",
+          "unite": "m2",
+          "prix": null,
+          "quantite": 36.0
+        },
+        {
+          "code": "3050",
+          "designation": "Batardeau-Pompage (pompe avec débit inférieur ou égal à 60m3/h)",
+          "description": "Ce prix rémunère : \r\nA la journée, la fourniture et la mise en place d'une pompe dont le débit est inférieur ou égal à 60m3/heure.\r\nCe prix comprend notamment :\r\n  - la fourniture et la mise en place de la pompe,\r\n  - la fourniture de l'énergie (groupe électrogène, branchement sur réseau ERDF, etc.),\r\n  - le démontage et le repliement de tous les matériels,\r\n  - toutes sujétions.",
+          "unite": "j",
+          "prix": null,
+          "quantite": 4.0
+        },
+        {
+          "code": "3051",
+          "designation": "Batardeau-Pompage (pompe avec débit compris entre 60 et 120 m3/heure)",
+          "description": "Ce prix rémunère :\r\nA la journée, la fourniture et la mise en place d'une pompe dont le débit est compris entre 60 et 120 m3/heure.\r\nCe prix comprend notamment :\r\n  - la fourniture et la mise en place de la pompe,\r\n  - la fourniture de l'énergie (groupe électrogène, branchement sur réseau ERDF, etc.),\r\n  - le démontage et le repliement de tous les matériels,\r\n  - toutes sujétions.",
+          "unite": "j",
+          "prix": null,
+          "quantite": 4.0
+        },
+        {
+          "code": "2203",
+          "designation": "Mise en place d'un batardeau pour déviation du ruisseau",
+          "description": "Ce prix rémunère au forfait, l'ensemble des opérations nécessaires à la déviation du cours d'eau au droit de l'ouvrage. Il comprend :\n- la demande d'autorisation de travaux en rivière auprès de la MISE\n- les batardeaux, la déviation de l'eau et les pompages éventuels, selon les instructions de la DDAF et du Conseil Supérieur de la Pêche\n- le repliement et la remise en état des lieux en fin de travaux\net toute sujétion d'exécution.",
+          "unite": "forfait",
+          "prix": null,
+          "quantite": 40.0
+        }
+      ]
+    }
+  ]
+}
