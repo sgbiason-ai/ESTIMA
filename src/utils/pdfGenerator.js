@@ -336,14 +336,22 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
           totals[idx] += chapData.total;
         });
       });
+      // TOTAL GÉNÉRAL HT (Hors PSE) : juste APRÈS la base, AVANT les PSE.
+      // Les PSE n'entrent jamais dans ce total.
+      body.push([
+        { content: totalHtLabel, styles: { fillColor: THEME.secondary, textColor: 0, fontStyle: 'bold', halign: 'left', fontSize: 8 } },
+        ...totals.map(t => ({
+          content: isDQE ? '' : cleanFormat(t) + " €",
+          styles: { fillColor: THEME.secondary, textColor: 0, fontStyle: 'bold', halign: 'right', fontSize: 8 }
+        }))
+      ]);
+      // Les PSE sont listées APRÈS le total général (hors total).
       const pseRows = buildSummaryRows(project.chapters, 0, 'option');
       if (pseRows.length > 0) {
         body.push([{ content: 'OPTIONS / PRESTATIONS SUPPLÉMENTAIRES', colSpan: summaryExports.length + 1, styles: { fillColor: THEME.pseBg, textColor: THEME.pse, fontStyle: 'bold', halign: 'center' } }]);
         body.push(...pseRows);
       }
     }
-
-    const foot = [[totalHtLabel, ...totals.map(t => ({ content: isDQE ? '' : cleanFormat(t) + " €", styles: { halign: 'right' } }))]];
 
     // Largeurs de colonnes proportionnelles : désignation + N colonnes de prix
     const pageContentWidth = doc.internal.pageSize.width - 20; // 10mm margins each side
@@ -356,9 +364,8 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
     }
 
     autoTable(doc, {
-      theme: 'grid', startY: 58, head, body, foot,
+      theme: 'grid', startY: 58, head, body,
       headStyles: { fillColor: THEME.tableHeader, textColor: 255, fontStyle: 'bold', halign: 'center', fontSize: 7 },
-      footStyles: { fillColor: THEME.secondary, textColor: 0, fontStyle: 'bold' },
       styles: { font: 'Helvetica', fontSize: 8, halign: 'right', cellPadding: { left: 2, right: 2, top: 2, bottom: 2 } },
       columnStyles: summaryColumnStyles,
       alternateRowStyles: { fillColor: THEME.tableAlt },

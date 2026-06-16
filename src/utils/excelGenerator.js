@@ -434,8 +434,22 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
       for (let i = 2; i <= rowData.length; i++) row.getCell(i).numFmt = '#,##0.00 €';
     });
 
+    // ── TOTAL GÉNÉRAL HT (Hors PSE) : juste APRÈS la base, AVANT les PSE. ──
+    //    Pointe sur la ligne « TOTAL GÉNÉRAL HT » de chaque tranche (base seule).
+    summarySheet.addRow([]);
+    const footData = [totalHtLabel];
+    selectedExports.forEach((expId) => {
+      const tr = summaryRefs[expId];
+      footData.push(tr ? { formula: `${quote(tr.sheetName)}!F${tr.totalRow}` } : '');
+    });
+    const footRow = summarySheet.addRow(footData);
+    footRow.getCell(1).font = fonts.total;
+    for (let i = 2; i <= footData.length; i++) {
+      const cell = footRow.getCell(i); cell.numFmt = '#,##0.00 €'; cell.font = fonts.total; cell.fill = fills.total;
+    }
+
     // ── Section PSE : chaque PSE par son numéro (net = montant ou plus/moins-value),
-    //    via formule inter-feuilles. Pas de total général PSE (PSE indépendantes). ──
+    //    via formule inter-feuilles. APRÈS le total général, hors total (PSE indépendantes). ──
     const pseNumbers = buildPseNumbers(project.chapters);
     const pseRoots = collectPseRoots(project.chapters)
       .filter(root => selectedExports.some(expId => summaryRefs[expId]?.pse?.[root.id]));
@@ -454,18 +468,6 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
         row.getCell(1).font = fonts.totalPse;
         for (let i = 2; i <= rowData.length; i++) row.getCell(i).numFmt = '#,##0.00 €';
       });
-    }
-
-    summarySheet.addRow([]);
-    const footData = [totalHtLabel];
-    selectedExports.forEach((expId) => {
-      const tr = summaryRefs[expId];
-      footData.push(tr ? { formula: `${quote(tr.sheetName)}!F${tr.totalRow}` } : '');
-    });
-    const footRow = summarySheet.addRow(footData);
-    footRow.getCell(1).font = fonts.total;
-    for (let i = 2; i <= footData.length; i++) {
-      const cell = footRow.getCell(i); cell.numFmt = '#,##0.00 €'; cell.font = fonts.total; cell.fill = fills.total;
     }
   }
 
