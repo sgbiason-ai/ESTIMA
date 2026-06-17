@@ -6,11 +6,12 @@
 import React, { useState, useRef, useCallback } from 'react';
 import {
   X, Plus, Trash2, Check, Edit2, Edit3, ChevronDown, ChevronRight,
-  Users, BookUser, Upload, Download, Info, UserPlus, GripVertical, Copy,
+  Users, BookUser, Upload, Download, Info, UserPlus, GripVertical, Copy, AlertTriangle,
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import * as XLSX from 'xlsx';
 import { toast } from '../../utils/globalUI';
+import { nameEmailMismatch } from '../../utils/crrTextQa';
 import GroupBadge from './GroupBadge';
 import { confirm } from '../../utils/globalUI';
 
@@ -190,7 +191,12 @@ const GroupTree = ({
                             ) : (
                               <>
                                 <span className="font-medium text-slate-700 truncate min-w-[80px]">{contact.name || '—'}</span>
-                                <span className="text-slate-400 truncate flex-1">{contact.email || ''}</span>
+                                <span className={`truncate flex-1 ${nameEmailMismatch(contact.name, contact.email) ? 'text-red-500 font-medium' : 'text-slate-400'}`}>{contact.email || ''}</span>
+                                {nameEmailMismatch(contact.name, contact.email) && (
+                                  <span className="shrink-0 text-red-500" title="L'e-mail semble incohérent avec le nom — à vérifier">
+                                    <AlertTriangle size={11} />
+                                  </span>
+                                )}
                                 {contact.phone && <span className="text-[10px] text-slate-300 shrink-0">{contact.phone}</span>}
                                 <div className="flex items-center gap-0.5 opacity-0 group-hover/row:opacity-100 transition-all shrink-0">
                                   <button onClick={() => startEditContact(contact)} className="p-0.5 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded"><Edit2 size={10} /></button>

@@ -8,8 +8,10 @@ import Icon from './Icon';
 import { uploadCrrImage, deleteCrrImage } from '../../utils/crrImageStorage';
 import { useOrientation } from '../../hooks/useOrientation';
 import { sanitizeHtml } from '../../utils/helpers';
+import { stripHtml } from '../../utils/formatObsText';
 import { toast } from '../../utils/globalUI';
 import { getGroupColor, obsValidation } from '../../data/crrData';
+import { detectTextIssues } from '../../utils/crrTextQa';
 
 // ─── STATUS CONFIG ─────────────────────────────────────────────────────────
 const STATUSES = [
@@ -107,6 +109,8 @@ export default function ObservationEditSheet({
 
   // Champs requis manquants (obs Ouverte/En cours) → signalement rouge.
   const { missingResponsable, missingEcheance } = obsValidation(obs);
+  // Anomalies de saisie (fautes connues + heuristiques) — suggestion de relecture.
+  const textIssues = detectTextIssues(stripHtml(obs.text));
 
   return (
     <>
@@ -186,6 +190,11 @@ export default function ObservationEditSheet({
                 {missingResponsable && missingEcheance
                   ? 'Responsable et échéance requis (observation ouverte / en cours)'
                   : missingResponsable ? 'Responsable requis' : 'Échéance requise'}
+              </p>
+            )}
+            {textIssues.length > 0 && (
+              <p className="text-[11px] text-slate-500 -mt-1">
+                Relecture : {textIssues.slice(0, 2).map((i) => i.message).join('  ·  ')}{textIssues.length > 2 ? `  ·  +${textIssues.length - 2}` : ''}
               </p>
             )}
 

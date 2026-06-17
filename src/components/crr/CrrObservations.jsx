@@ -5,12 +5,13 @@ import {
   Plus, Trash2, ChevronDown, ChevronRight,
   MinusCircle, Circle, Loader, CheckCircle2,
   ImagePlus, Camera, X, Bold, Underline, Highlighter, List, GripVertical,
-  ArrowUp, ArrowDown, ArrowUpDown, TextSelect, AlertTriangle,
+  ArrowUp, ArrowDown, ArrowUpDown, TextSelect, AlertTriangle, SpellCheck,
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { OBSERVATION_STATUSES, getGroupColor, obsDisplayNumber, obsAge, obsValidation } from '../../data/crrData';
 import { confirm, toast } from '../../utils/globalUI';
-import { normalizeObsText } from '../../utils/formatObsText.jsx';
+import { normalizeObsText, stripHtml } from '../../utils/formatObsText.jsx';
+import { detectTextIssues } from '../../utils/crrTextQa';
 import { uploadCrrImage, deleteCrrImage } from '../../utils/crrImageStorage';
 import GroupBadge from './GroupBadge';
 
@@ -339,6 +340,8 @@ const ObservationRow = memo(({ obs, obsNumber, meetingNumber, onUpdate, onDelete
   const age = obsAge(obs, meetingNumber);
   // Champs requis manquants (obs Ouverte/En cours sans Responsable/Echeance).
   const { missingResponsable, missingEcheance, hasIssue } = obsValidation(obs);
+  // Anomalies de saisie (fautes connues + heuristiques) — suggestion, non bloquant.
+  const textIssues = detectTextIssues(stripHtml(obs.text));
   const images = obs.images || [];
 
   const handleAddImages = async (e) => {
@@ -575,6 +578,13 @@ const ObservationRow = memo(({ obs, obsNumber, meetingNumber, onUpdate, onDelete
             {missingResponsable && missingEcheance
               ? 'Responsable et échéance requis'
               : missingResponsable ? 'Responsable requis' : 'Échéance requise'}
+          </div>
+        )}
+
+        {textIssues.length > 0 && (
+          <div className="mt-1 text-[10px] text-slate-500 flex items-start gap-1" style={{ marginLeft: 'calc(24px + 56px + 120px + 1rem)' }} title="Suggestions de relecture (non bloquant)">
+            <SpellCheck size={10} className="mt-px shrink-0" />
+            <span>{textIssues.slice(0, 2).map((i) => i.message).join('  ·  ')}{textIssues.length > 2 ? `  ·  +${textIssues.length - 2}` : ''}</span>
           </div>
         )}
       </div>
