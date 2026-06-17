@@ -20,6 +20,7 @@ export const CHANGELOG = [
       'Compte Rendu de chantier : chaque observation porte désormais un numéro stable et durable (ex. « CHANTIER.04 ») — un préfixe propre à chaque catégorie (modifiable dans « Gestion des catégories ») suivi d\'un compteur qui n\'est jamais réutilisé. Le numéro est attribué à la création, conservé d\'un compte rendu au suivant (y compris lors des reports) et affiché à l\'écran, dans l\'aperçu et dans les exports PDF / Word',
       'Compte Rendu de chantier : le compteur d\'en-tête est corrigé. Le total affiché correspond désormais exactement à la somme « ouvertes + en cours + faites » (les observations encore non classées ne sont plus comptées), ce qui supprime les incohérences du type « 18 pour 17 »',
       'Compte Rendu de chantier : report plus propre des observations. Seules les observations non clôturées (ouvertes / en cours) sont reportées sur le compte rendu suivant — celles marquées « fait » restent sur le CR où elles ont été soldées et ne réapparaissent plus. Chaque observation reportée affiche désormais son ancienneté (« depuis CR n°3 ») à l\'écran, dans l\'aperçu, en mobile et dans le PDF, en conservant sa date d\'émission d\'origine',
+      'Compte Rendu de chantier (PDF) : le texte mis en forme (gras, souligné, surligné, listes à puces) ne peut plus apparaître en double. Le rendu enrichi est désormais dessiné une seule fois, ce qui élimine les cas de texte fantôme/dupliqué lorsqu\'une observation débordait de sa cellule ou tombait sur un saut de page',
     ],
   },
   {

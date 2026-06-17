@@ -725,13 +725,24 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
       const obsNum = obsDisplayNumber(obs, crrConfig.categoryCodes);
       // Report CR nXX uniquement dans l'aperçu, pas dans le PDF
       const plainText = stripHtml(rawText);
+      // Texte mis en forme (gras/puces/souligne/fluo) → rendu par le calque
+      // (didDrawCell). Dans ce cas on NE donne PAS le texte brut a autoTable :
+      // sinon autoTable l'imprime ET le calque le redessine = double rendu.
+      // La hauteur reste garantie par minCellHeight (didParseCell). hasFormatting
+      // est calcule UNE fois ici et partage via meta → zero divergence brut/calque.
+      let hasFormatting = false;
+      try {
+        const segs = parseObsHtml(rawText);
+        hasFormatting = segs.some(s => s.bold || s.underline || s.highlight || s.indent || s.bullet);
+      } catch { hasFormatting = false; }
+      const cellText = hasFormatting ? '' : plainText;
       const imgs = (obs.images || []).map(e => typeof e === 'string' ? e : e.src).filter(u => imageCache.has(u));
 
       const obsBody = [];
       const obsRowMeta = [];
 
-      obsBody.push(['', formatDateFr(obs.date), plainText, '', '', formatDateFr(obs.actionDeadline)]);
-      obsRowMeta.push({ obs, type: 'text', rawText, emitter: obs.emitter || '', actionBy: obs.actionBy || '' });
+      obsBody.push(['', formatDateFr(obs.date), cellText, '', '', formatDateFr(obs.actionDeadline)]);
+      obsRowMeta.push({ obs, type: 'text', rawText, hasFormatting, emitter: obs.emitter || '', actionBy: obs.actionBy || '' });
 
       if (imgs.length > 0) {
         obsBody.push(['', '', '', '', '', '']);
@@ -832,11 +843,10 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
         }
 
         // Hauteur minimale pour texte formate (gras/puces = plus de lignes)
-        if (meta.type === 'text' && data.column.index === 2 && meta.rawText) {
+        if (meta.type === 'text' && data.column.index === 2 && meta.hasFormatting) {
           try {
             const segments = parseObsHtml(meta.rawText);
-            const hasFormatting = segments.some(s => s.bold || s.underline || s.highlight || s.indent || s.bullet);
-            if (hasFormatting) {
+            {
               const colW = data.cell.width || OBS_COL_W;
               const pad = data.cell.styles.cellPadding;
               const padL = (typeof pad === 'object' ? pad.left : pad) || 2;
@@ -1014,17 +1024,13 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
         }
 
         // Texte formate (gras, souligne, fluo) dans colonne observation (col 2)
-        if (meta.type === 'text' && data.column.index === 2 && meta.rawText) {
+        if (meta.type === 'text' && data.column.index === 2 && meta.hasFormatting) {
           try {
             const segments = parseObsHtml(meta.rawText);
-            const hasFormatting = segments.some(s => s.bold || s.underline || s.highlight || s.indent || s.bullet);
-            if (hasFormatting) {
-              // Effacer le texte brut dessine par autoTable
+            {
+              // autoTable n'a rien imprime dans cette cellule (cellText='') : le
+              // calque dessine le texte une seule fois, sans effacement prealable.
               const c = data.cell;
-              const fill = Array.isArray(c.styles.fillColor) ? c.styles.fillColor : [255, 255, 255];
-              doc.setFillColor(...fill);
-              doc.rect(c.x + 0.1, c.y + 0.1, c.width - 0.2, c.height - 0.2, 'F');
-
               const pad = c.styles.cellPadding;
               const padL = (typeof pad === 'object' ? pad.left : pad) || 2;
               const padT = (typeof pad === 'object' ? pad.top : pad) || 2;
