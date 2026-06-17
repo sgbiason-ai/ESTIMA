@@ -24,6 +24,7 @@ export const CHANGELOG = [
       'Compte Rendu de chantier : les observations ouvertes ou en cours signalent désormais en rouge un responsable ou une échéance manquants — directement sur la ligne (champ surligné + mention « Responsable / Échéance requis »), à l\'écran comme sur mobile. C\'est un simple rappel visuel : la publication n\'est jamais bloquée',
       'Compte Rendu de chantier : aide à la relecture des observations. Une suggestion discrète signale les fautes récurrentes (ex. « diffuera » → « diffusera », « tramsettra » → « transmettra »), les mots collés (« MARCOULYindique »), la ponctuation répétée (« !! ») et les espaces en trop — sans rien corriger automatiquement ni bloquer la saisie',
       'Compte Rendu de chantier : cohérence nom / e-mail des participants. Dans la gestion des participants, un e-mail qui semble incohérent avec le nom du contact (ex. « FAUGIE » associé à « augie@… ») est signalé en rouge avec une infobulle, pour repérer d\'un coup d\'œil les coquilles d\'adresse avant diffusion',
+      'Compte Rendu de chantier : code couleur clarifié. Le rouge est désormais réservé aux alertes (échéance dépassée, absence) : les catégories et rôles qui pouvaient s\'afficher en rouge (ex. SPS) passent en gris-bleu sobre. Le statut « Excusé » n\'est plus en jaune (gris-bleu), le statut « Ouvert » gagne en lisibilité (ambre plus foncé), et un libellé d\'aide rappelle de saisir un objet court puis le détail en puces — à l\'écran, sur mobile, dans l\'aperçu et le PDF',
     ],
   },
   {

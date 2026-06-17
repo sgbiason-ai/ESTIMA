@@ -466,7 +466,8 @@ const ObservationRow = memo(({ obs, obsNumber, meetingNumber, onUpdate, onDelete
               }}
               spellCheck
               lang="fr"
-              data-placeholder="Observation..."
+              data-placeholder="Objet bref, puis détails en puces…"
+              title="Conseil : commencez par un objet court (en gras), puis détaillez en puces"
               className="w-full text-xs [@media(pointer:coarse)]:text-[15px] [@media(pointer:coarse)]:leading-relaxed px-2 py-1 [@media(pointer:coarse)]:px-3 [@media(pointer:coarse)]:py-2.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 min-h-[28px] [@media(pointer:coarse)]:min-h-[44px] text-slate-800 whitespace-pre-wrap select-text empty:before:content-[attr(data-placeholder)] empty:before:text-slate-300"
               style={{
                 outline: 'none',

@@ -16,7 +16,7 @@ import { detectTextIssues } from '../../utils/crrTextQa';
 // ─── STATUS CONFIG ─────────────────────────────────────────────────────────
 const STATUSES = [
   { value: 'empty',       label: 'Vide',     bg: 'bg-gray-500/20',   activeBg: 'bg-gray-500',   text: 'text-gray-600' },
-  { value: 'open',        label: 'Ouvert',   bg: 'bg-orange-500/20',  activeBg: 'bg-orange-500',  text: 'text-orange-300' },
+  { value: 'open',        label: 'Ouvert',   bg: 'bg-orange-500/20',  activeBg: 'bg-orange-500',  text: 'text-orange-500' },
   { value: 'in_progress', label: 'En cours', bg: 'bg-blue-500/20',    activeBg: 'bg-blue-500',    text: 'text-blue-300' },
   { value: 'done',        label: 'FAIT',     bg: 'bg-emerald-500/20', activeBg: 'bg-emerald-500', text: 'text-emerald-300' },
 ];

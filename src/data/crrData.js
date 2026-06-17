@@ -23,7 +23,7 @@ export const PRESENCE_OPTIONS = [
 
 export const OBSERVATION_STATUSES = [
   { value: 'empty',       label: 'Vide',     color: 'text-slate-400',   bg: 'bg-slate-50',   icon: 'minus' },
-  { value: 'open',        label: 'Ouvert',   color: 'text-orange-500',  bg: 'bg-orange-50',  icon: 'circle' },
+  { value: 'open',        label: 'Ouvert',   color: 'text-orange-600',  bg: 'bg-orange-50',  icon: 'circle' },
   { value: 'in_progress', label: 'En cours', color: 'text-blue-500',    bg: 'bg-blue-50',    icon: 'loader' },
   { value: 'done',        label: 'FAIT',     color: 'text-emerald-500', bg: 'bg-emerald-50', icon: 'check' },
 ];
@@ -36,7 +36,7 @@ export const GROUP_COLORS = [
   { bg: 'bg-blue-100',    text: 'text-blue-700',    border: 'border-blue-300',    dot: 'bg-blue-500',    rgb: [59,130,246],  rgbBg: [219,234,254] },
   { bg: 'bg-amber-100',   text: 'text-amber-700',   border: 'border-amber-300',   dot: 'bg-amber-500',   rgb: [245,158,11],  rgbBg: [254,243,199] },
   { bg: 'bg-purple-100',  text: 'text-purple-700',  border: 'border-purple-300',  dot: 'bg-purple-500',  rgb: [168,85,247],  rgbBg: [243,232,255] },
-  { bg: 'bg-rose-100',    text: 'text-rose-700',    border: 'border-rose-300',    dot: 'bg-rose-500',    rgb: [244,63,94],   rgbBg: [255,228,230] },
+  { bg: 'bg-slate-100',   text: 'text-slate-700',   border: 'border-slate-300',   dot: 'bg-slate-500',   rgb: [100,116,139], rgbBg: [241,245,249] },
   { bg: 'bg-cyan-100',    text: 'text-cyan-700',    border: 'border-cyan-300',    dot: 'bg-cyan-500',    rgb: [6,182,212],   rgbBg: [207,250,254] },
   { bg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-300', dot: 'bg-emerald-500', rgb: [16,185,129],  rgbBg: [209,250,229] },
   { bg: 'bg-orange-100',  text: 'text-orange-700',  border: 'border-orange-300',  dot: 'bg-orange-500',  rgb: [249,115,22],  rgbBg: [255,237,213] },

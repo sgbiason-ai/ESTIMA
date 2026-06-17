@@ -21,15 +21,15 @@ const CRR_OVERRIDES = {
   borders:     [210, 218, 226],
   presentBg:   [232, 250, 240],
   presentTxt:  [22, 130, 76],
-  excusedBg:   [255, 247, 230],
-  excusedTxt:  [180, 120, 20],
+  excusedBg:   [241, 245, 249],
+  excusedTxt:  [71, 85, 105],
   absentTxt:   [180, 180, 190],
   doneBg:      [232, 250, 240],
   doneTxt:     [22, 120, 70],
   progressBg:  [230, 242, 255],
   progressTxt: [30, 90, 170],
   openBg:      [255, 247, 230],
-  openTxt:     [190, 110, 20],
+  openTxt:     [146, 64, 14],
 };
 
 const buildTheme = (branding) => _buildTheme(branding, CRR_OVERRIDES);
@@ -40,7 +40,7 @@ const CAT_COLORS = [
   [37, 99, 175],   // blue
   [124, 58, 170],  // purple
   [210, 120, 20],  // orange
-  [190, 50, 50],   // red
+  [71, 85, 105],   // slate (ex-rouge : reserve aux alertes, pas aux categories)
   [170, 140, 20],  // amber
 ];
 
@@ -1135,7 +1135,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
           } else if (obs.status === 'in_progress') {
             drawBadge(doc, data.cell, 'En cours', [185, 215, 250], [20, 70, 150], fontH);
           } else if (obs.status !== 'empty') {
-            drawBadge(doc, data.cell, 'Ouvert', [240, 215, 185], [170, 90, 10], fontH);
+            drawBadge(doc, data.cell, 'Ouvert', [240, 215, 185], [146, 64, 14], fontH);
           }
         }
       },

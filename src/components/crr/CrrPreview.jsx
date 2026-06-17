@@ -13,7 +13,7 @@ const CAT_COLORS = [
   { r: 37, g: 99, b: 175 },   // blue
   { r: 124, g: 58, b: 170 },  // purple
   { r: 210, g: 120, b: 20 },  // orange
-  { r: 190, g: 50, b: 50 },   // red
+  { r: 71, g: 85, b: 105 },   // slate (ex-rouge : reserve aux alertes)
   { r: 170, g: 140, b: 20 },  // amber
 ];
 
@@ -229,7 +229,7 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
                         {att === 'absent' ? (
                           <span className="inline-block px-1.5 py-0.5 rounded text-[8px] font-bold" style={{ backgroundColor: 'rgb(239,68,68)', color: 'white' }}>A</span>
                         ) : (
-                          <span style={{ color: att === 'present' ? 'rgb(22,130,76)' : att === 'excused' ? 'rgb(180,120,20)' : 'rgb(168,85,247)' }}>
+                          <span style={{ color: att === 'present' ? 'rgb(22,130,76)' : att === 'excused' ? 'rgb(71,85,105)' : 'rgb(168,85,247)' }}>
                             {att === 'present' ? 'P' : att === 'excused' ? 'E' : 'NC'}
                           </span>
                         )}
@@ -400,7 +400,7 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
                               <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold" style={{ backgroundColor: 'rgb(210,230,255)', color: 'rgb(30,90,170)' }}>En cours</span>
                             )}
                             {!isDone && !isProgress && !isEmpty && (
-                              <span className="inline-block px-2 py-0.5 rounded text-[9px] font-bold" style={{ backgroundColor: 'rgb(245,227,210)', color: 'rgb(190,110,20)' }}>Ouvert</span>
+                              <span className="inline-block px-2 py-0.5 rounded text-[9px] font-bold" style={{ backgroundColor: 'rgb(245,227,210)', color: 'rgb(146,64,14)' }}>Ouvert</span>
                             )}
                           </td>
                           <td className="px-1 py-1.5 border border-slate-200 w-[13%] align-top">

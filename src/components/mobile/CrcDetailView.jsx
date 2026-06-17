@@ -31,7 +31,7 @@ const presenceShort = (value) => {
 
 const presenceColor = (value) => {
   if (value === 'present') return 'text-blue-600 bg-blue-50';
-  if (value === 'excused') return 'text-amber-400 bg-amber-500/15';
+  if (value === 'excused') return 'text-slate-600 bg-slate-500/15';
   if (value === 'absent') return 'text-white bg-red-500';
   return 'text-gray-700 bg-gray-500/10';
 };
@@ -42,7 +42,7 @@ const meetingTypeLabel = (value) =>
 const statusColorMobile = (value) => {
   if (value === 'done') return 'text-blue-600 bg-blue-50 border-blue-200';
   if (value === 'in_progress') return 'text-blue-400 bg-blue-500/15 border-blue-500/20';
-  if (value === 'open') return 'text-amber-400 bg-amber-500/15 border-amber-500/20';
+  if (value === 'open') return 'text-amber-700 bg-amber-50 border-amber-200';
   return 'text-gray-700 bg-gray-500/10 border-gray-500/10';
 };
 
@@ -355,7 +355,7 @@ export default function CrcDetailView({ chantier, branding, onToast, manager, is
         <div className={`mx-4 bg-white rounded-xl border border-gray-200 ${isLandscape ? 'mt-0.5 mb-1 p-2' : 'mt-1 mb-2 p-3'}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-[13px] font-semibold text-amber-400">
+              <span className="text-[13px] font-semibold text-gray-900">
                 {meetingTypeLabel(meeting.type)} n°{meeting.number}
               </span>
               {canEdit && <SaveStatusDot status={manager.saveStatus} />}
