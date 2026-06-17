@@ -4,7 +4,7 @@ import {
   DEFAULT_CATEGORIES, MEETING_TYPES, PRESENCE_OPTIONS, OBSERVATION_STATUSES,
   LEGAL_TEXT, GROUP_COLORS, getGroupColor, abbreviateGroup,
   DEFAULT_PARTICIPANT_GROUPS, generateCrrId, createEmptyMeeting, createEmptyObservation,
-  generateObsKey, defaultCategoryCode, formatObsNumber, computeObsStats, obsDisplayNumber,
+  generateObsKey, defaultCategoryCode, formatObsNumber, computeObsStats, obsDisplayNumber, obsAge,
 } from '../data/crrData';
 
 // ─── Constantes ─────────────────────────────────────────────────────────────
@@ -250,5 +250,21 @@ describe('obsDisplayNumber', () => {
   it('retourne vide sans seq ou sans obs', () => {
     expect(obsDisplayNumber({ category: 'Travaux', seq: null }, {})).toBe('');
     expect(obsDisplayNumber(null, {})).toBe('');
+  });
+});
+
+describe('obsAge', () => {
+  it('0 si emise au CR courant', () => {
+    expect(obsAge({ originMeetingNumber: 5 }, 5)).toBe(0);
+  });
+
+  it('compte les reunions ecoulees depuis l\'emission', () => {
+    expect(obsAge({ originMeetingNumber: 2 }, 5)).toBe(3);
+  });
+
+  it('0 si donnees manquantes, jamais negatif', () => {
+    expect(obsAge({ originMeetingNumber: null }, 5)).toBe(0);
+    expect(obsAge({ originMeetingNumber: 7 }, 5)).toBe(0);
+    expect(obsAge(null, 5)).toBe(0);
   });
 });

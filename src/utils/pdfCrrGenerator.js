@@ -10,7 +10,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { DEFAULT_BRANDING } from '../data/branding';
-import { MEETING_TYPES, GROUP_COLORS, abbreviateGroup, computeObsStats, obsDisplayNumber } from '../data/crrData';
+import { MEETING_TYPES, GROUP_COLORS, abbreviateGroup, computeObsStats, obsDisplayNumber, obsAge } from '../data/crrData';
 import { parseObsHtml, stripHtml } from './formatObsText.jsx';
 import { lightenRgb, darkenRgb, loadImage, formatDateFr, formatDateLong, sanitizeFilename, loadLogos } from './pdf/pdfSharedHelpers';
 import { buildTheme as _buildTheme } from './pdf/buildTheme';
@@ -1102,6 +1102,14 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
           doc.setFontSize(6);
           doc.setTextColor(...catColor);
           doc.text(obsNum, data.cell.x + 2, data.cell.y + 3);
+          // Age (depuis CR n°X) a droite de la bande haute — discret, factuel.
+          const age = obsAge(obs, meeting.number);
+          if (age >= 1) {
+            doc.setFont(fontB, 'italic');
+            doc.setFontSize(5);
+            doc.setTextColor(...THEME.lightText);
+            doc.text(`depuis CR n°${obs.originMeetingNumber}`, data.cell.x + data.cell.width - 2, data.cell.y + 3, { align: 'right' });
+          }
           doc.setTextColor(...THEME.text);
         }
 

@@ -147,6 +147,16 @@ export const formatObsNumber = (code, seq) => {
   return `${code || 'OBS'}.${String(seq).padStart(2, '0')}`;
 };
 
+// Age d'une observation = nombre de reunions ecoulees depuis son emission.
+//   0  → emise au CR courant (pas un report)
+//   >=1 → reportee depuis un CR anterieur (origin < courant)
+// Jamais negatif ; 0 si donnees manquantes.
+export const obsAge = (obs, currentMeetingNumber) => {
+  const origin = obs?.originMeetingNumber;
+  if (origin == null || currentMeetingNumber == null) return 0;
+  return Math.max(0, currentMeetingNumber - origin);
+};
+
 // Numero affiche d'une observation, en resolvant le code de sa categorie
 // (code custom si defini, sinon defaut derive du nom). Vide si pas de seq.
 export const obsDisplayNumber = (obs, categoryCodes = {}) => {

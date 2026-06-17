@@ -3,7 +3,7 @@
 // Apercu du compte rendu fidele au rendu PDF moderne.
 
 import React from 'react';
-import { MEETING_TYPES, OBSERVATION_STATUSES, GROUP_COLORS, abbreviateGroup, computeObsStats, obsDisplayNumber } from '../../data/crrData';
+import { MEETING_TYPES, OBSERVATION_STATUSES, GROUP_COLORS, abbreviateGroup, computeObsStats, obsDisplayNumber, obsAge } from '../../data/crrData';
 import { renderFormattedText } from '../../utils/formatObsText.jsx';
 import { formatDateFr, formatDateLong } from '../../utils/dateHelpers';
 import { lightenHex } from '../../utils/colorHelpers';
@@ -364,8 +364,8 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
                               <span className="font-bold mr-1.5" style={{ color: rgb(catColor) }}>{obsNum}</span>
                             )}
                             {renderFormattedText(obs.text)}
-                            {obs.originMeetingNumber && (
-                              <span className="text-slate-400 ml-1">(Report CR n{obs.originMeetingNumber})</span>
+                            {obsAge(obs, meeting.number) >= 1 && (
+                              <span className="text-slate-400 ml-1.5 text-[9px] italic">depuis CR n°{obs.originMeetingNumber}</span>
                             )}
                             {/* Images */}
                             {images.length > 0 && (

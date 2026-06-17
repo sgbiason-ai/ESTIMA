@@ -8,7 +8,7 @@ import {
   ArrowUp, ArrowDown, ArrowUpDown, TextSelect,
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { OBSERVATION_STATUSES, getGroupColor, obsDisplayNumber } from '../../data/crrData';
+import { OBSERVATION_STATUSES, getGroupColor, obsDisplayNumber, obsAge } from '../../data/crrData';
 import { confirm, toast } from '../../utils/globalUI';
 import { normalizeObsText } from '../../utils/formatObsText.jsx';
 import { uploadCrrImage, deleteCrrImage } from '../../utils/crrImageStorage';
@@ -229,7 +229,7 @@ const InlineToolbar = ({ onExecFormat, onHighlight, onSelectAll, fileRef, camera
   );
 };
 
-const ObservationRow = memo(({ obs, obsNumber, onUpdate, onDelete, participantGroups, dragHandleProps, companyId, crrId, isEditing, onEditorFocus, onEditorBlur }) => {
+const ObservationRow = memo(({ obs, obsNumber, meetingNumber, onUpdate, onDelete, participantGroups, dragHandleProps, companyId, crrId, isEditing, onEditorFocus, onEditorBlur }) => {
   const fileRef = useRef(null);
   const cameraRef = useRef(null);
   const editorRef = useRef(null);
@@ -333,7 +333,8 @@ const ObservationRow = memo(({ obs, obsNumber, onUpdate, onDelete, participantGr
     }
   }, [execFormat, handleHighlight]);
 
-  const isCarried = obs.originMeetingNumber && obs.originMeetingNumber !== undefined;
+  // Age = nombre de reunions depuis l'emission ; >=1 → observation reportee.
+  const age = obsAge(obs, meetingNumber);
   const images = obs.images || [];
 
   const handleAddImages = async (e) => {
@@ -553,9 +554,9 @@ const ObservationRow = memo(({ obs, obsNumber, onUpdate, onDelete, participantGr
           </button>
         </div>
 
-        {isCarried && (
+        {age >= 1 && (
           <div className="mt-1 text-[10px] text-slate-400 italic" style={{ marginLeft: 'calc(24px + 56px + 120px + 1rem)' }}>
-            Report du CR n°{obs.originMeetingNumber}
+            depuis CR n°{obs.originMeetingNumber}
           </div>
         )}
       </div>
@@ -564,6 +565,7 @@ const ObservationRow = memo(({ obs, obsNumber, onUpdate, onDelete, participantGr
 }, (prev, next) => {
   return prev.obs === next.obs
     && prev.obsNumber === next.obsNumber
+    && prev.meetingNumber === next.meetingNumber
     && prev.meetingDate === next.meetingDate
     && prev.participantGroups === next.participantGroups
     && prev.dragHandleProps === next.dragHandleProps
@@ -755,6 +757,7 @@ const CrrObservations = ({
                             <ObservationRow
                               obs={ob}
                               obsNumber={obsDisplayNumber(ob, categoryCodes)}
+                              meetingNumber={meeting.number}
                               onUpdate={updateObservation}
                               onDelete={deleteObservation}
                               meetingDate={meeting.date}

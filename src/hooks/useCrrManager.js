@@ -227,7 +227,11 @@ export const useCrrManager = ({
     // Reporter les observations non soldees de la derniere reunion
     if (meetings.length > 0) {
       const lastMeeting = meetings[meetings.length - 1];
-      const carriedObs = (lastMeeting.observations || [])
+      // Report : uniquement les observations NON cloturees (Ouvert / En cours /
+      // non classees). Les obs FAIT restent sur le CR ou elles ont ete soldees
+      // et ne sont plus reportees (pas d'historique redondant). obsKey / seq /
+      // date d'emission preserves par le spread → numero & age stables.
+      newMeeting.observations = (lastMeeting.observations || [])
         .filter((obs) => obs.status !== 'done')
         .map((obs) => ({
           ...obs,
@@ -235,18 +239,6 @@ export const useCrrManager = ({
           originMeetingNumber: obs.originMeetingNumber || lastMeeting.number,
           originObsId: obs.id,
         }));
-
-      // Reporter aussi les observations FAIT pour l'historique complet
-      const doneObs = (lastMeeting.observations || [])
-        .filter((obs) => obs.status === 'done')
-        .map((obs) => ({
-          ...obs,
-          id: `obs_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-          originMeetingNumber: obs.originMeetingNumber || lastMeeting.number,
-          originObsId: obs.id,
-        }));
-
-      newMeeting.observations = [...carriedObs, ...doneObs];
 
       // Copier le type de reunion et attendance structure (sans presences)
       newMeeting.type = lastMeeting.type === 'preparation' && nextNumber >= 5

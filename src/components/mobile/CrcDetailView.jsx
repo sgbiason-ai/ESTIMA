@@ -8,7 +8,7 @@ import React, { useState, useMemo, useCallback, Suspense } from 'react';
 import lazyWithReload from '../../utils/lazyWithReload';
 import Icon from './Icon';
 import { dateFr } from './formatters';
-import { OBSERVATION_STATUSES, PRESENCE_OPTIONS, MEETING_TYPES, GROUP_COLORS, getGroupColor, abbreviateGroup, obsDisplayNumber } from '../../data/crrData';
+import { OBSERVATION_STATUSES, PRESENCE_OPTIONS, MEETING_TYPES, GROUP_COLORS, getGroupColor, abbreviateGroup, obsDisplayNumber, obsAge } from '../../data/crrData';
 import { normalizeObsText, stripHtml } from '../../utils/formatObsText';
 import { sanitizeHtml } from '../../utils/helpers';
 // fileSaver non utilisé — export PDF direct par téléchargement
@@ -437,6 +437,7 @@ export default function CrcDetailView({ chantier, branding, onToast, manager, is
             allContacts={allContacts}
             groupColorMap={groupColorMap}
             categoryCodes={categoryCodes}
+            meetingNumber={meeting?.number}
             canEdit={canEdit}
             isLandscape={isLandscape}
             onEditObs={setEditingObs}
@@ -486,6 +487,7 @@ export default function CrcDetailView({ chantier, branding, onToast, manager, is
           allContacts={allContacts}
           groupColorMap={groupColorMap}
           categoryCodes={categoryCodes}
+          meetingNumber={meeting?.number}
           onViewImage={setViewingImage}
         />
       )}
@@ -607,7 +609,7 @@ function GroupBadgeMobile({ name, colorIndex }) {
 
 // ─── SECTION OBSERVATIONS ───────────────────────────────────────────────────
 
-function ObservationsSection({ obsByCategory, allContacts, groupColorMap, categoryCodes = {}, canEdit, isLandscape, onEditObs, onTapObs, onAddObs, onViewImage }) {
+function ObservationsSection({ obsByCategory, allContacts, groupColorMap, categoryCodes = {}, meetingNumber, canEdit, isLandscape, onEditObs, onTapObs, onAddObs, onViewImage }) {
   const [expandedCats, setExpandedCats] = useState(() => new Set(Object.keys(obsByCategory)));
 
   const toggleCat = (cat) => {
@@ -666,6 +668,7 @@ function ObservationsSection({ obsByCategory, allContacts, groupColorMap, catego
                 contactName={contactName}
                 groupColorMap={groupColorMap}
                 categoryCodes={categoryCodes}
+                meetingNumber={meetingNumber}
                 canEdit={canEdit}
                 onEdit={() => onEditObs?.(o)}
                 onTap={() => onTapObs?.(o)}
@@ -690,11 +693,12 @@ function ObservationsSection({ obsByCategory, allContacts, groupColorMap, catego
   );
 }
 
-function ObservationCard({ obs, groupColorMap, categoryCodes = {}, canEdit, onTap, onViewImage }) {
+function ObservationCard({ obs, groupColorMap, categoryCodes = {}, meetingNumber, canEdit, onTap, onViewImage }) {
   const st = statusMeta(obs.status);
   const text = stripHtml(obs.text);
   const images = obs.images || [];
   const num = obsDisplayNumber(obs, categoryCodes);
+  const age = obsAge(obs, meetingNumber);
 
   return (
     <div
@@ -712,8 +716,8 @@ function ObservationCard({ obs, groupColorMap, categoryCodes = {}, canEdit, onTa
         {obs.emitter && (
           <GroupBadgeMobile name={obs.emitter} colorIndex={groupColorMap[obs.emitter]} />
         )}
-        {obs.originMeetingNumber && (
-          <span className="text-[10px] text-gray-600 ml-auto shrink-0">CR{obs.originMeetingNumber}</span>
+        {age >= 1 && (
+          <span className="text-[10px] text-gray-600 ml-auto shrink-0" title="Nombre de réunions depuis l'émission">depuis CR n°{obs.originMeetingNumber}</span>
         )}
         {canEdit && (
           <Icon name="edit" size={12} color="#475569" />
@@ -772,12 +776,13 @@ function ObservationCard({ obs, groupColorMap, categoryCodes = {}, canEdit, onTa
 
 // ─── OBSERVATION SWIPER (carrousel plein écran) ────────────────────────────
 
-function SwiperSlide({ obs, groupColorMap, categoryCodes = {}, onViewImage }) {
+function SwiperSlide({ obs, groupColorMap, categoryCodes = {}, meetingNumber, onViewImage }) {
   if (!obs) return <div className="w-full shrink-0" />;
   const st = statusMeta(obs.status);
   const text = obs.text || '';
   const images = obs.images || [];
   const num = obsDisplayNumber(obs, categoryCodes);
+  const age = obsAge(obs, meetingNumber);
 
   return (
     <div className="px-5 py-4" style={{ scrollbarWidth: 'none', height: '100%', overflowY: 'auto' }}>
@@ -832,14 +837,14 @@ function SwiperSlide({ obs, groupColorMap, categoryCodes = {}, onViewImage }) {
         </div>
       )}
 
-      {obs.originMeetingNumber && (
-        <div className="text-[11px] text-gray-400 italic">Report du CR n°{obs.originMeetingNumber}</div>
+      {age >= 1 && (
+        <div className="text-[11px] text-gray-400 italic">depuis CR n°{obs.originMeetingNumber}</div>
       )}
     </div>
   );
 }
 
-function ObservationSwiper({ observations, currentIdx, onChangeIdx, onClose, onEdit, allContacts, groupColorMap, categoryCodes = {}, onViewImage }) {
+function ObservationSwiper({ observations, currentIdx, onChangeIdx, onClose, onEdit, allContacts, groupColorMap, categoryCodes = {}, meetingNumber, onViewImage }) {
   const [touchStartX, setTouchStartX] = useState(null);
   const [offsetX, setOffsetX] = useState(0); // en pixels, drag en cours
   const [settling, setSettling] = useState(false); // transition retour en cours
@@ -952,13 +957,13 @@ function ObservationSwiper({ observations, currentIdx, onChangeIdx, onClose, onE
             }}
           >
             <div style={{ width: slideW, flexShrink: 0, height: '100%', overflowY: 'auto' }}>
-              {canPrev && <SwiperSlide obs={observations[currentIdx - 1]} allContacts={allContacts} groupColorMap={groupColorMap} categoryCodes={categoryCodes} onViewImage={onViewImage} />}
+              {canPrev && <SwiperSlide obs={observations[currentIdx - 1]} allContacts={allContacts} groupColorMap={groupColorMap} categoryCodes={categoryCodes} meetingNumber={meetingNumber} onViewImage={onViewImage} />}
             </div>
             <div style={{ width: slideW, flexShrink: 0, height: '100%', overflowY: 'auto' }}>
-              <SwiperSlide obs={observations[currentIdx]} allContacts={allContacts} groupColorMap={groupColorMap} categoryCodes={categoryCodes} onViewImage={onViewImage} />
+              <SwiperSlide obs={observations[currentIdx]} allContacts={allContacts} groupColorMap={groupColorMap} categoryCodes={categoryCodes} meetingNumber={meetingNumber} onViewImage={onViewImage} />
             </div>
             <div style={{ width: slideW, flexShrink: 0, height: '100%', overflowY: 'auto' }}>
-              {canNext && <SwiperSlide obs={observations[currentIdx + 1]} allContacts={allContacts} groupColorMap={groupColorMap} categoryCodes={categoryCodes} onViewImage={onViewImage} />}
+              {canNext && <SwiperSlide obs={observations[currentIdx + 1]} allContacts={allContacts} groupColorMap={groupColorMap} categoryCodes={categoryCodes} meetingNumber={meetingNumber} onViewImage={onViewImage} />}
             </div>
           </div>
         </div>
