@@ -3,7 +3,7 @@
 // Export Word (.doc) d'un Compte Rendu de Reunion.
 // Genere un document HTML avec styles inline que Word ouvre nativement.
 
-import { MEETING_TYPES } from '../data/crrData';
+import { MEETING_TYPES, computeObsStats } from '../data/crrData';
 import { obsTextToHtml } from './formatObsText.jsx';
 
 const formatDate = (dateStr) => {
@@ -155,11 +155,8 @@ export const generateWordCrr = (meeting, crrConfig, projectName = '', branding =
     html += `<div class="legal">${crrConfig.legalText}</div>`;
   }
 
-  // Observations
-  const totalObs = observations.length;
-  const openObs = observations.filter(o => o.status === 'open').length;
-  const progObs = observations.filter(o => o.status === 'in_progress').length;
-  const doneObs = observations.filter(o => o.status === 'done').length;
+  // Observations — total = ouvertes + en cours + faites (obs 'empty' exclues). Source unique.
+  const { total: totalObs, open: openObs, inProgress: progObs, done: doneObs } = computeObsStats(observations);
 
   html += `<div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
     <span>OBSERVATIONS</span>

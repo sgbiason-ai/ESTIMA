@@ -4,7 +4,7 @@ import {
   DEFAULT_CATEGORIES, MEETING_TYPES, PRESENCE_OPTIONS, OBSERVATION_STATUSES,
   LEGAL_TEXT, GROUP_COLORS, getGroupColor, abbreviateGroup,
   DEFAULT_PARTICIPANT_GROUPS, generateCrrId, createEmptyMeeting, createEmptyObservation,
-  generateObsKey, defaultCategoryCode, formatObsNumber,
+  generateObsKey, defaultCategoryCode, formatObsNumber, computeObsStats,
 } from '../data/crrData';
 
 // ─── Constantes ─────────────────────────────────────────────────────────────
@@ -215,5 +215,25 @@ describe('formatObsNumber', () => {
   it('retourne vide si pas de seq, fallback OBS', () => {
     expect(formatObsNumber('CHANTIER', null)).toBe('');
     expect(formatObsNumber('', 3)).toBe('OBS.03');
+  });
+});
+
+describe('computeObsStats', () => {
+  it('total = ouvertes + en cours + faites (empty exclues)', () => {
+    const obs = [
+      { status: 'open' }, { status: 'open' },
+      { status: 'in_progress' },
+      { status: 'done' }, { status: 'done' }, { status: 'done' },
+      { status: 'empty' }, // non classee → exclue du total
+    ];
+    const s = computeObsStats(obs);
+    expect(s).toEqual({ open: 2, inProgress: 1, done: 3, total: 6 });
+    // L'invariant clé : plus de "18 pour 17"
+    expect(s.total).toBe(s.open + s.inProgress + s.done);
+  });
+
+  it('gere la liste vide / absente', () => {
+    expect(computeObsStats([])).toEqual({ open: 0, inProgress: 0, done: 0, total: 0 });
+    expect(computeObsStats()).toEqual({ open: 0, inProgress: 0, done: 0, total: 0 });
   });
 });

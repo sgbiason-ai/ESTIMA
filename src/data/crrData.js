@@ -147,6 +147,16 @@ export const formatObsNumber = (code, seq) => {
   return `${code || 'OBS'}.${String(seq).padStart(2, '0')}`;
 };
 
+// Compteurs d'observations pour l'en-tete (PDF / preview / Word).
+// total = ouvertes + en cours + faites — les obs 'empty' (non classees) sont
+// volontairement exclues pour garantir total == somme des etats affiches.
+export const computeObsStats = (observations = []) => {
+  const open = observations.filter((o) => o.status === 'open').length;
+  const inProgress = observations.filter((o) => o.status === 'in_progress').length;
+  const done = observations.filter((o) => o.status === 'done').length;
+  return { open, inProgress, done, total: open + inProgress + done };
+};
+
 // Cree une reunion vide
 export const createEmptyMeeting = (number) => ({
   id: generateCrrId(),

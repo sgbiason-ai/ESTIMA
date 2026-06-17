@@ -3,7 +3,7 @@
 // Apercu du compte rendu fidele au rendu PDF moderne.
 
 import React from 'react';
-import { MEETING_TYPES, OBSERVATION_STATUSES, GROUP_COLORS, abbreviateGroup } from '../../data/crrData';
+import { MEETING_TYPES, OBSERVATION_STATUSES, GROUP_COLORS, abbreviateGroup, computeObsStats } from '../../data/crrData';
 import { renderFormattedText } from '../../utils/formatObsText.jsx';
 import { formatDateFr, formatDateLong } from '../../utils/dateHelpers';
 import { lightenHex } from '../../utils/colorHelpers';
@@ -71,11 +71,8 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
   const observations = meeting.observations || [];
   const pdfProjectName = (projectName || 'NOM DU PROJET').toUpperCase();
 
-  // Stats
-  const totalObs = observations.length;
-  const openObs = observations.filter(o => o.status === 'open').length;
-  const progObs = observations.filter(o => o.status === 'in_progress').length;
-  const doneObs = observations.filter(o => o.status === 'done').length;
+  // Stats — total = ouvertes + en cours + faites (obs 'empty' exclues). Source unique.
+  const { total: totalObs, open: openObs, inProgress: progObs, done: doneObs } = computeObsStats(observations);
 
   return (
     <div className="bg-white shadow-lg max-w-[800px] mx-auto my-4 text-[11px] leading-snug relative overflow-hidden" style={{ color: '#282828' }}>

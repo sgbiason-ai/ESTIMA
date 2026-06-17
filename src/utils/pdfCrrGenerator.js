@@ -10,7 +10,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { DEFAULT_BRANDING } from '../data/branding';
-import { MEETING_TYPES, GROUP_COLORS, abbreviateGroup } from '../data/crrData';
+import { MEETING_TYPES, GROUP_COLORS, abbreviateGroup, computeObsStats } from '../data/crrData';
 import { parseObsHtml, stripHtml } from './formatObsText.jsx';
 import { lightenRgb, darkenRgb, loadImage, formatDateFr, formatDateLong, sanitizeFilename, loadLogos } from './pdf/pdfSharedHelpers';
 import { buildTheme as _buildTheme } from './pdf/buildTheme';
@@ -535,10 +535,9 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
   const observations = meeting.observations || [];
 
   // Statistiques
-  const totalObs = observations.length;
-  const openObs  = observations.filter(o => o.status === 'open').length;
-  const progObs  = observations.filter(o => o.status === 'in_progress').length;
-  const doneObs  = observations.filter(o => o.status === 'done').length;
+  // Compteur d'en-tete : total = ouvertes + en cours + faites (obs 'empty'
+  // exclues → corrige l'incoherence "18 pour 17 classees"). Source unique.
+  const { total: totalObs, open: openObs, inProgress: progObs, done: doneObs } = computeObsStats(observations);
   const statsText = `${totalObs} obs.  |  ${openObs} ouvertes  |  ${progObs} en cours  |  ${doneObs} faites`;
 
   // Largeurs colonnes observations (partagees : header manuel ET corps autoTable)
