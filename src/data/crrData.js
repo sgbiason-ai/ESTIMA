@@ -157,6 +157,19 @@ export const obsAge = (obs, currentMeetingNumber) => {
   return Math.max(0, currentMeetingNumber - origin);
 };
 
+// Statuts "actionnables" : une obs ouverte ou en cours DOIT designer un
+// responsable (actionBy) et une echeance (actionDeadline).
+export const ACTIONABLE_STATUSES = ['open', 'in_progress'];
+
+// Validation de saisie d'une observation (signalement ecran, sans blocage).
+// Retourne les champs requis manquants pour une obs Ouverte / En cours.
+export const obsValidation = (obs) => {
+  const actionable = !!obs && ACTIONABLE_STATUSES.includes(obs.status);
+  const missingResponsable = actionable && !(obs.actionBy && String(obs.actionBy).trim());
+  const missingEcheance = actionable && !(obs.actionDeadline && String(obs.actionDeadline).trim());
+  return { actionable, missingResponsable, missingEcheance, hasIssue: missingResponsable || missingEcheance };
+};
+
 // Numero affiche d'une observation, en resolvant le code de sa categorie
 // (code custom si defini, sinon defaut derive du nom). Vide si pas de seq.
 export const obsDisplayNumber = (obs, categoryCodes = {}) => {

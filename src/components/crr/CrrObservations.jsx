@@ -5,10 +5,10 @@ import {
   Plus, Trash2, ChevronDown, ChevronRight,
   MinusCircle, Circle, Loader, CheckCircle2,
   ImagePlus, Camera, X, Bold, Underline, Highlighter, List, GripVertical,
-  ArrowUp, ArrowDown, ArrowUpDown, TextSelect,
+  ArrowUp, ArrowDown, ArrowUpDown, TextSelect, AlertTriangle,
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { OBSERVATION_STATUSES, getGroupColor, obsDisplayNumber, obsAge } from '../../data/crrData';
+import { OBSERVATION_STATUSES, getGroupColor, obsDisplayNumber, obsAge, obsValidation } from '../../data/crrData';
 import { confirm, toast } from '../../utils/globalUI';
 import { normalizeObsText } from '../../utils/formatObsText.jsx';
 import { uploadCrrImage, deleteCrrImage } from '../../utils/crrImageStorage';
@@ -16,7 +16,7 @@ import GroupBadge from './GroupBadge';
 
 // ── Selecteur multi-groupes avec pastilles (Emetteur / PAR) ─────────────────
 
-const GroupPicker = ({ value, onChange, groups, placeholder, className = '' }) => {
+const GroupPicker = ({ value, onChange, groups, placeholder, className = '', invalid = false }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const btnRef = useRef(null);
@@ -84,8 +84,10 @@ const GroupPicker = ({ value, onChange, groups, placeholder, className = '' }) =
         ref={btnRef}
         type="button"
         onClick={openDropdown}
-        className={`w-full min-h-[28px] flex flex-wrap items-center justify-center gap-1 px-1.5 py-0.5 border border-slate-200 rounded bg-slate-50 transition-all
-          ${open ? 'ring-1 ring-emerald-400 border-emerald-400' : 'hover:border-slate-300'}`}
+        className={`w-full min-h-[28px] flex flex-wrap items-center justify-center gap-1 px-1.5 py-0.5 border rounded transition-all
+          ${open ? 'ring-1 ring-emerald-400 border-emerald-400 bg-slate-50'
+            : invalid ? 'border-red-300 bg-red-50 hover:border-red-400'
+            : 'border-slate-200 bg-slate-50 hover:border-slate-300'}`}
       >
         {selected.size > 0 ? (
           [...selected].map((name) => {
@@ -335,6 +337,8 @@ const ObservationRow = memo(({ obs, obsNumber, meetingNumber, onUpdate, onDelete
 
   // Age = nombre de reunions depuis l'emission ; >=1 → observation reportee.
   const age = obsAge(obs, meetingNumber);
+  // Champs requis manquants (obs Ouverte/En cours sans Responsable/Echeance).
+  const { missingResponsable, missingEcheance, hasIssue } = obsValidation(obs);
   const images = obs.images || [];
 
   const handleAddImages = async (e) => {
@@ -381,6 +385,8 @@ const ObservationRow = memo(({ obs, obsNumber, meetingNumber, onUpdate, onDelete
       className={`border rounded-lg transition-all overflow-hidden ${
         isEditing
           ? 'ring-2 ring-blue-200 border-blue-300 bg-blue-50/20'
+          : hasIssue
+          ? 'border-red-300 bg-red-50/40 ring-1 ring-red-200'
           : obs.status === 'done'
           ? 'border-emerald-200 bg-emerald-50/30 opacity-75'
           : obs.status === 'in_progress'
@@ -517,6 +523,7 @@ const ObservationRow = memo(({ obs, obsNumber, meetingNumber, onUpdate, onDelete
             onChange={(name) => onUpdate(obs.id, { actionBy: name })}
             groups={participantGroups}
             placeholder="PAR"
+            invalid={missingResponsable}
           />
 
           {/* Col 7 — Date action */}
@@ -528,11 +535,13 @@ const ObservationRow = memo(({ obs, obsNumber, meetingNumber, onUpdate, onDelete
               className={`w-full text-[11px] px-1 xl:px-2 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 ${
                 isOverdue
                   ? 'text-red-700 bg-red-50 border-red-300 font-semibold'
+                  : missingEcheance
+                  ? 'text-red-500 bg-red-50 border-red-300'
                   : obs.actionDeadline
                   ? 'text-slate-800 border-slate-200'
                   : 'text-slate-300 border-slate-200'
               }`}
-              title={isOverdue ? `En retard de ${daysLate} jour${daysLate > 1 ? 's' : ''}` : 'Pour le'}
+              title={isOverdue ? `En retard de ${daysLate} jour${daysLate > 1 ? 's' : ''}` : missingEcheance ? 'Échéance requise (observation ouverte / en cours)' : 'Pour le'}
             />
             {obs.actionDeadline && (
               <button onClick={() => onUpdate(obs.id, { actionDeadline: '' })} className="p-0.5 text-slate-300 hover:text-red-400 transition-colors" title="Effacer la date">
@@ -557,6 +566,15 @@ const ObservationRow = memo(({ obs, obsNumber, meetingNumber, onUpdate, onDelete
         {age >= 1 && (
           <div className="mt-1 text-[10px] text-slate-400 italic" style={{ marginLeft: 'calc(24px + 56px + 120px + 1rem)' }}>
             depuis CR n°{obs.originMeetingNumber}
+          </div>
+        )}
+
+        {hasIssue && (
+          <div className="mt-1 text-[10px] text-red-500 font-medium flex items-center gap-1" style={{ marginLeft: 'calc(24px + 56px + 120px + 1rem)' }}>
+            <AlertTriangle size={10} />
+            {missingResponsable && missingEcheance
+              ? 'Responsable et échéance requis'
+              : missingResponsable ? 'Responsable requis' : 'Échéance requise'}
           </div>
         )}
       </div>

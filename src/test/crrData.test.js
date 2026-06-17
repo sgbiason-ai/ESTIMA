@@ -4,7 +4,7 @@ import {
   DEFAULT_CATEGORIES, MEETING_TYPES, PRESENCE_OPTIONS, OBSERVATION_STATUSES,
   LEGAL_TEXT, GROUP_COLORS, getGroupColor, abbreviateGroup,
   DEFAULT_PARTICIPANT_GROUPS, generateCrrId, createEmptyMeeting, createEmptyObservation,
-  generateObsKey, defaultCategoryCode, formatObsNumber, computeObsStats, obsDisplayNumber, obsAge,
+  generateObsKey, defaultCategoryCode, formatObsNumber, computeObsStats, obsDisplayNumber, obsAge, obsValidation,
 } from '../data/crrData';
 
 // ─── Constantes ─────────────────────────────────────────────────────────────
@@ -266,5 +266,28 @@ describe('obsAge', () => {
     expect(obsAge({ originMeetingNumber: null }, 5)).toBe(0);
     expect(obsAge({ originMeetingNumber: 7 }, 5)).toBe(0);
     expect(obsAge(null, 5)).toBe(0);
+  });
+});
+
+describe('obsValidation', () => {
+  it('signale responsable + echeance manquants sur une obs ouverte', () => {
+    const v = obsValidation({ status: 'open', actionBy: '', actionDeadline: '' });
+    expect(v).toMatchObject({ missingResponsable: true, missingEcheance: true, hasIssue: true });
+  });
+
+  it('aucun signalement si responsable et echeance renseignes', () => {
+    const v = obsValidation({ status: 'in_progress', actionBy: 'MOE', actionDeadline: '2026-06-24' });
+    expect(v.hasIssue).toBe(false);
+  });
+
+  it('signale uniquement le champ manquant', () => {
+    expect(obsValidation({ status: 'open', actionBy: 'MOE', actionDeadline: '' }))
+      .toMatchObject({ missingResponsable: false, missingEcheance: true, hasIssue: true });
+  });
+
+  it('aucun signalement pour les obs faites, vides ou nulles', () => {
+    expect(obsValidation({ status: 'done', actionBy: '', actionDeadline: '' }).hasIssue).toBe(false);
+    expect(obsValidation({ status: 'empty', actionBy: '', actionDeadline: '' }).hasIssue).toBe(false);
+    expect(obsValidation(null).hasIssue).toBe(false);
   });
 });

@@ -8,7 +8,7 @@ import React, { useState, useMemo, useCallback, Suspense } from 'react';
 import lazyWithReload from '../../utils/lazyWithReload';
 import Icon from './Icon';
 import { dateFr } from './formatters';
-import { OBSERVATION_STATUSES, PRESENCE_OPTIONS, MEETING_TYPES, GROUP_COLORS, getGroupColor, abbreviateGroup, obsDisplayNumber, obsAge } from '../../data/crrData';
+import { OBSERVATION_STATUSES, PRESENCE_OPTIONS, MEETING_TYPES, GROUP_COLORS, getGroupColor, abbreviateGroup, obsDisplayNumber, obsAge, obsValidation } from '../../data/crrData';
 import { normalizeObsText, stripHtml } from '../../utils/formatObsText';
 import { sanitizeHtml } from '../../utils/helpers';
 // fileSaver non utilisé — export PDF direct par téléchargement
@@ -699,10 +699,11 @@ function ObservationCard({ obs, groupColorMap, categoryCodes = {}, meetingNumber
   const images = obs.images || [];
   const num = obsDisplayNumber(obs, categoryCodes);
   const age = obsAge(obs, meetingNumber);
+  const { missingResponsable, missingEcheance, hasIssue } = obsValidation(obs);
 
   return (
     <div
-      className="px-3 py-2.5 border-t border-gray-100 bg-white active:bg-gray-50 cursor-pointer"
+      className={`px-3 py-2.5 border-t bg-white active:bg-gray-50 cursor-pointer ${hasIssue ? 'border-l-2 border-l-red-400 border-t-gray-100' : 'border-gray-100'}`}
       onClick={() => onTap?.()}
     >
       {/* Status + emitter */}
@@ -745,6 +746,15 @@ function ObservationCard({ obs, groupColorMap, categoryCodes = {}, meetingNumber
               <span className="font-semibold">Échéance :</span> {dateFr(obs.actionDeadline)}
             </span>
           )}
+        </div>
+      )}
+
+      {/* Signalement champs requis manquants (obs ouverte / en cours) */}
+      {hasIssue && (
+        <div className="mt-1.5 text-[11px] font-semibold text-red-600">
+          {missingResponsable && missingEcheance
+            ? 'Responsable et échéance requis'
+            : missingResponsable ? 'Responsable requis' : 'Échéance requise'}
         </div>
       )}
 

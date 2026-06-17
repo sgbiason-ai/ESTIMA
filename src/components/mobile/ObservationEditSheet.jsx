@@ -9,7 +9,7 @@ import { uploadCrrImage, deleteCrrImage } from '../../utils/crrImageStorage';
 import { useOrientation } from '../../hooks/useOrientation';
 import { sanitizeHtml } from '../../utils/helpers';
 import { toast } from '../../utils/globalUI';
-import { getGroupColor } from '../../data/crrData';
+import { getGroupColor, obsValidation } from '../../data/crrData';
 
 // ─── STATUS CONFIG ─────────────────────────────────────────────────────────
 const STATUSES = [
@@ -105,6 +105,9 @@ export default function ObservationEditSheet({
 
   if (!obs) return null;
 
+  // Champs requis manquants (obs Ouverte/En cours) → signalement rouge.
+  const { missingResponsable, missingEcheance } = obsValidation(obs);
+
   return (
     <>
       {/* Plein écran */}
@@ -175,9 +178,16 @@ export default function ObservationEditSheet({
           <div className="shrink-0 space-y-3 pt-3">
             {/* Action par + Échéance */}
             <div className="grid grid-cols-2 gap-2">
-              <ColoredSelect value={obs.actionBy || ''} onChange={(v) => update({ actionBy: v })} placeholder="Action par…" options={groupNames} groupColorMap={groupColorMap} />
-              <input type="date" value={obs.actionDeadline || ''} onChange={(e) => update({ actionDeadline: e.target.value })} className={`${inputClass} text-xs py-2`} placeholder="Échéance" />
+              <ColoredSelect value={obs.actionBy || ''} onChange={(v) => update({ actionBy: v })} placeholder="Action par…" options={groupNames} groupColorMap={groupColorMap} invalid={missingResponsable} />
+              <input type="date" value={obs.actionDeadline || ''} onChange={(e) => update({ actionDeadline: e.target.value })} className={`${inputClass} text-xs py-2 ${missingEcheance ? 'border-red-300 bg-red-50 text-red-600' : ''}`} placeholder="Échéance" />
             </div>
+            {(missingResponsable || missingEcheance) && (
+              <p className="text-[11px] text-red-600 font-semibold -mt-1.5">
+                {missingResponsable && missingEcheance
+                  ? 'Responsable et échéance requis (observation ouverte / en cours)'
+                  : missingResponsable ? 'Responsable requis' : 'Échéance requise'}
+              </p>
+            )}
 
             {/* Photos — compact row */}
             <div className="flex items-center gap-2">
@@ -248,7 +258,7 @@ export default function ObservationEditSheet({
 
 // ─── TOOLBAR FORMATAGE ────────────────────────────────────────────────────
 
-function ColoredSelect({ value, onChange, placeholder, options, groupColorMap }) {
+function ColoredSelect({ value, onChange, placeholder, options, groupColorMap, invalid = false }) {
   const colorIdx = groupColorMap[value];
   const c = colorIdx != null ? getGroupColor(colorIdx) : null;
   return (
@@ -259,7 +269,7 @@ function ColoredSelect({ value, onChange, placeholder, options, groupColorMap })
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`${selectClass} text-xs py-2 ${c ? `pl-7 ${c.border} ${c.bg}` : ''}`}
+        className={`${selectClass} text-xs py-2 ${c ? `pl-7 ${c.border} ${c.bg}` : ''} ${invalid ? 'border-red-300 bg-red-50' : ''}`}
       >
         <option value="">{placeholder}</option>
         {options.map((g) => (<option key={g} value={g}>{g}</option>))}
