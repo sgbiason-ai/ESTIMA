@@ -8,7 +8,7 @@ import React, { useState, useMemo, useCallback, Suspense } from 'react';
 import lazyWithReload from '../../utils/lazyWithReload';
 import Icon from './Icon';
 import { dateFr } from './formatters';
-import { OBSERVATION_STATUSES, PRESENCE_OPTIONS, MEETING_TYPES, GROUP_COLORS, getGroupColor, abbreviateGroup } from '../../data/crrData';
+import { OBSERVATION_STATUSES, PRESENCE_OPTIONS, MEETING_TYPES, GROUP_COLORS, getGroupColor, abbreviateGroup, obsDisplayNumber } from '../../data/crrData';
 import { normalizeObsText, stripHtml } from '../../utils/formatObsText';
 import { sanitizeHtml } from '../../utils/helpers';
 // fileSaver non utilisé — export PDF direct par téléchargement
@@ -50,6 +50,9 @@ const statusColorMobile = (value) => {
 
 export default function CrcDetailView({ chantier, branding, onToast, manager, isLandscape, companyId }) {
   const config = chantier.crrConfig || {};
+  // Codes de numerotation (prefixe "CHANTIER.04") : config live du manager en
+  // edition, sinon snapshot du chantier en lecture seule.
+  const categoryCodes = (manager?.crrConfig || config).categoryCodes || {};
   const meetings = chantier.crrMeetings || [];
   const groups = config.participantGroups || [];
   const canEdit = !!manager;
@@ -433,6 +436,7 @@ export default function CrcDetailView({ chantier, branding, onToast, manager, is
             obsByCategory={obsByCategory}
             allContacts={allContacts}
             groupColorMap={groupColorMap}
+            categoryCodes={categoryCodes}
             canEdit={canEdit}
             isLandscape={isLandscape}
             onEditObs={setEditingObs}
@@ -481,6 +485,7 @@ export default function CrcDetailView({ chantier, branding, onToast, manager, is
           onEdit={canEdit ? (obs) => { setSwiperObsIdx(null); setEditingObs(obs); } : null}
           allContacts={allContacts}
           groupColorMap={groupColorMap}
+          categoryCodes={categoryCodes}
           onViewImage={setViewingImage}
         />
       )}
@@ -602,7 +607,7 @@ function GroupBadgeMobile({ name, colorIndex }) {
 
 // ─── SECTION OBSERVATIONS ───────────────────────────────────────────────────
 
-function ObservationsSection({ obsByCategory, allContacts, groupColorMap, canEdit, isLandscape, onEditObs, onTapObs, onAddObs, onViewImage }) {
+function ObservationsSection({ obsByCategory, allContacts, groupColorMap, categoryCodes = {}, canEdit, isLandscape, onEditObs, onTapObs, onAddObs, onViewImage }) {
   const [expandedCats, setExpandedCats] = useState(() => new Set(Object.keys(obsByCategory)));
 
   const toggleCat = (cat) => {
@@ -660,6 +665,7 @@ function ObservationsSection({ obsByCategory, allContacts, groupColorMap, canEdi
                 obs={o}
                 contactName={contactName}
                 groupColorMap={groupColorMap}
+                categoryCodes={categoryCodes}
                 canEdit={canEdit}
                 onEdit={() => onEditObs?.(o)}
                 onTap={() => onTapObs?.(o)}
@@ -684,10 +690,11 @@ function ObservationsSection({ obsByCategory, allContacts, groupColorMap, canEdi
   );
 }
 
-function ObservationCard({ obs, groupColorMap, canEdit, onTap, onViewImage }) {
+function ObservationCard({ obs, groupColorMap, categoryCodes = {}, canEdit, onTap, onViewImage }) {
   const st = statusMeta(obs.status);
   const text = stripHtml(obs.text);
   const images = obs.images || [];
+  const num = obsDisplayNumber(obs, categoryCodes);
 
   return (
     <div
@@ -696,6 +703,9 @@ function ObservationCard({ obs, groupColorMap, canEdit, onTap, onViewImage }) {
     >
       {/* Status + emitter */}
       <div className="flex items-center gap-2 mb-1">
+        {num && (
+          <span className="text-[10px] font-bold text-slate-500 tabular-nums shrink-0" title="Numéro stable de l'observation">{num}</span>
+        )}
         <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase border ${statusColorMobile(obs.status)}`}>
           {st.label}
         </span>
@@ -762,11 +772,12 @@ function ObservationCard({ obs, groupColorMap, canEdit, onTap, onViewImage }) {
 
 // ─── OBSERVATION SWIPER (carrousel plein écran) ────────────────────────────
 
-function SwiperSlide({ obs, groupColorMap, onViewImage }) {
+function SwiperSlide({ obs, groupColorMap, categoryCodes = {}, onViewImage }) {
   if (!obs) return <div className="w-full shrink-0" />;
   const st = statusMeta(obs.status);
   const text = obs.text || '';
   const images = obs.images || [];
+  const num = obsDisplayNumber(obs, categoryCodes);
 
   return (
     <div className="px-5 py-4" style={{ scrollbarWidth: 'none', height: '100%', overflowY: 'auto' }}>
@@ -778,6 +789,7 @@ function SwiperSlide({ obs, groupColorMap, onViewImage }) {
       )}
 
       <div className="flex items-center gap-2 mb-3">
+        {num && <span className="text-[12px] font-bold text-slate-500 tabular-nums shrink-0" title="Numéro stable de l'observation">{num}</span>}
         <span className={`px-2.5 py-1 rounded-lg text-[12px] font-bold uppercase border ${statusColorMobile(obs.status)}`}>
           {st.label}
         </span>
@@ -827,7 +839,7 @@ function SwiperSlide({ obs, groupColorMap, onViewImage }) {
   );
 }
 
-function ObservationSwiper({ observations, currentIdx, onChangeIdx, onClose, onEdit, allContacts, groupColorMap, onViewImage }) {
+function ObservationSwiper({ observations, currentIdx, onChangeIdx, onClose, onEdit, allContacts, groupColorMap, categoryCodes = {}, onViewImage }) {
   const [touchStartX, setTouchStartX] = useState(null);
   const [offsetX, setOffsetX] = useState(0); // en pixels, drag en cours
   const [settling, setSettling] = useState(false); // transition retour en cours
@@ -940,13 +952,13 @@ function ObservationSwiper({ observations, currentIdx, onChangeIdx, onClose, onE
             }}
           >
             <div style={{ width: slideW, flexShrink: 0, height: '100%', overflowY: 'auto' }}>
-              {canPrev && <SwiperSlide obs={observations[currentIdx - 1]} allContacts={allContacts} groupColorMap={groupColorMap} onViewImage={onViewImage} />}
+              {canPrev && <SwiperSlide obs={observations[currentIdx - 1]} allContacts={allContacts} groupColorMap={groupColorMap} categoryCodes={categoryCodes} onViewImage={onViewImage} />}
             </div>
             <div style={{ width: slideW, flexShrink: 0, height: '100%', overflowY: 'auto' }}>
-              <SwiperSlide obs={observations[currentIdx]} allContacts={allContacts} groupColorMap={groupColorMap} onViewImage={onViewImage} />
+              <SwiperSlide obs={observations[currentIdx]} allContacts={allContacts} groupColorMap={groupColorMap} categoryCodes={categoryCodes} onViewImage={onViewImage} />
             </div>
             <div style={{ width: slideW, flexShrink: 0, height: '100%', overflowY: 'auto' }}>
-              {canNext && <SwiperSlide obs={observations[currentIdx + 1]} allContacts={allContacts} groupColorMap={groupColorMap} onViewImage={onViewImage} />}
+              {canNext && <SwiperSlide obs={observations[currentIdx + 1]} allContacts={allContacts} groupColorMap={groupColorMap} categoryCodes={categoryCodes} onViewImage={onViewImage} />}
             </div>
           </div>
         </div>

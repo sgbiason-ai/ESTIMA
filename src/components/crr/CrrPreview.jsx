@@ -3,7 +3,7 @@
 // Apercu du compte rendu fidele au rendu PDF moderne.
 
 import React from 'react';
-import { MEETING_TYPES, OBSERVATION_STATUSES, GROUP_COLORS, abbreviateGroup, computeObsStats } from '../../data/crrData';
+import { MEETING_TYPES, OBSERVATION_STATUSES, GROUP_COLORS, abbreviateGroup, computeObsStats, obsDisplayNumber } from '../../data/crrData';
 import { renderFormattedText } from '../../utils/formatObsText.jsx';
 import { formatDateFr, formatDateLong } from '../../utils/dateHelpers';
 import { lightenHex } from '../../utils/colorHelpers';
@@ -340,6 +340,7 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
                       const isProgress = obs.status === 'in_progress';
                       const isEmpty = obs.status === 'empty';
                       const images = obs.images || [];
+                      const obsNum = obsDisplayNumber(obs, crrConfig.categoryCodes);
 
                       const rowBg = isDone
                         ? 'rgb(232,250,240)'
@@ -359,6 +360,9 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
                             color: isDone ? 'rgb(22,120,70)' : isProgress ? 'rgb(30,90,170)' : '#282828',
                             wordBreak: 'break-word',
                           }}>
+                            {obsNum && (
+                              <span className="font-bold mr-1.5" style={{ color: rgb(catColor) }}>{obsNum}</span>
+                            )}
                             {renderFormattedText(obs.text)}
                             {obs.originMeetingNumber && (
                               <span className="text-slate-400 ml-1">(Report CR n{obs.originMeetingNumber})</span>

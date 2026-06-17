@@ -8,7 +8,7 @@ import {
   ArrowUp, ArrowDown, ArrowUpDown, TextSelect,
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { OBSERVATION_STATUSES, getGroupColor } from '../../data/crrData';
+import { OBSERVATION_STATUSES, getGroupColor, obsDisplayNumber } from '../../data/crrData';
 import { confirm, toast } from '../../utils/globalUI';
 import { normalizeObsText } from '../../utils/formatObsText.jsx';
 import { uploadCrrImage, deleteCrrImage } from '../../utils/crrImageStorage';
@@ -229,7 +229,7 @@ const InlineToolbar = ({ onExecFormat, onHighlight, onSelectAll, fileRef, camera
   );
 };
 
-const ObservationRow = memo(({ obs, onUpdate, onDelete, participantGroups, dragHandleProps, companyId, crrId, isEditing, onEditorFocus, onEditorBlur }) => {
+const ObservationRow = memo(({ obs, obsNumber, onUpdate, onDelete, participantGroups, dragHandleProps, companyId, crrId, isEditing, onEditorFocus, onEditorBlur }) => {
   const fileRef = useRef(null);
   const cameraRef = useRef(null);
   const editorRef = useRef(null);
@@ -430,6 +430,11 @@ const ObservationRow = memo(({ obs, onUpdate, onDelete, participantGroups, dragH
 
           {/* Col 4 — Texte observation */}
           <div className="flex flex-col gap-1 min-w-0">
+            {obsNumber && (
+              <span className="self-start text-[10px] font-bold text-slate-400 tracking-wide tabular-nums" title="Numéro stable de l'observation">
+                {obsNumber}
+              </span>
+            )}
             <div
               ref={(el) => {
                 editorRef.current = el;
@@ -558,6 +563,7 @@ const ObservationRow = memo(({ obs, onUpdate, onDelete, participantGroups, dragH
   );
 }, (prev, next) => {
   return prev.obs === next.obs
+    && prev.obsNumber === next.obsNumber
     && prev.meetingDate === next.meetingDate
     && prev.participantGroups === next.participantGroups
     && prev.dragHandleProps === next.dragHandleProps
@@ -569,6 +575,7 @@ const ObservationRow = memo(({ obs, onUpdate, onDelete, participantGroups, dragH
 const CrrObservations = ({
   meeting,
   categories,
+  categoryCodes = {},
   observationsByCategory,
   addObservation,
   updateObservation,
@@ -747,6 +754,7 @@ const CrrObservations = ({
                           >
                             <ObservationRow
                               obs={ob}
+                              obsNumber={obsDisplayNumber(ob, categoryCodes)}
                               onUpdate={updateObservation}
                               onDelete={deleteObservation}
                               meetingDate={meeting.date}

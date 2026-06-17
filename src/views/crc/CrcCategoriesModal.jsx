@@ -4,8 +4,9 @@ import React, { useState } from 'react';
 import { Plus, Trash2, X, Check, Edit3, GripVertical } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { confirm } from '../../utils/globalUI';
+import { defaultCategoryCode } from '../../data/crrData';
 
-export default function CrcCategoriesModal({ isOpen, onClose, categories, addCategory, renameCategory, deleteCategory, reorderCategories }) {
+export default function CrcCategoriesModal({ isOpen, onClose, categories, addCategory, renameCategory, deleteCategory, reorderCategories, categoryCodes = {}, setCategoryCode }) {
   const [newCat, setNewCat] = useState('');
   const [editingCat, setEditingCat] = useState(null);
   const [editValue, setEditValue] = useState('');
@@ -65,7 +66,15 @@ export default function CrcCategoriesModal({ isOpen, onClose, categories, addCat
                             <div {...prov.dragHandleProps} className="p-1 text-slate-300 hover:text-slate-500 cursor-grab active:cursor-grabbing">
                               <GripVertical size={14} />
                             </div>
-                            <span className="flex-1 text-sm text-slate-700 px-3 py-2 bg-slate-50 rounded-lg">{cat}</span>
+                            <span className="flex-1 text-sm text-slate-700 px-3 py-2 bg-slate-50 rounded-lg truncate" title={cat}>{cat}</span>
+                            <input
+                              type="text"
+                              value={categoryCodes[cat] || ''}
+                              onChange={(e) => setCategoryCode?.(cat, e.target.value)}
+                              placeholder={defaultCategoryCode(cat)}
+                              title={`Code de numérotation — préfixe du numéro (ex. ${defaultCategoryCode(cat)}.04)`}
+                              className="w-24 text-[11px] font-bold uppercase tracking-wide px-2 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 text-slate-700 placeholder:font-normal placeholder:normal-case placeholder:text-slate-300"
+                            />
                             <button onClick={() => startEdit(cat)} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"><Edit3 size={12} /></button>
                             <button onClick={() => handleDelete(cat)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={12} /></button>
                           </>
@@ -89,7 +98,7 @@ export default function CrcCategoriesModal({ isOpen, onClose, categories, addCat
           </button>
         </div>
         <div className="px-5 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between rounded-b-2xl">
-          <p className="text-[10px] text-slate-400 italic">Glissez-deposez pour reordonner</p>
+          <p className="text-[10px] text-slate-400 italic">Glissez-deposez pour reordonner · le code sert de prefixe au numero (ex. CHANTIER.04)</p>
           <button onClick={onClose}
             className="px-5 py-2 bg-emerald-500 text-white text-sm font-medium rounded-xl hover:bg-emerald-600 transition-all shadow-sm">
             Fermer

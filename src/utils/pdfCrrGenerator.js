@@ -10,7 +10,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { DEFAULT_BRANDING } from '../data/branding';
-import { MEETING_TYPES, GROUP_COLORS, abbreviateGroup, computeObsStats } from '../data/crrData';
+import { MEETING_TYPES, GROUP_COLORS, abbreviateGroup, computeObsStats, obsDisplayNumber } from '../data/crrData';
 import { parseObsHtml, stripHtml } from './formatObsText.jsx';
 import { lightenRgb, darkenRgb, loadImage, formatDateFr, formatDateLong, sanitizeFilename, loadLogos } from './pdf/pdfSharedHelpers';
 import { buildTheme as _buildTheme } from './pdf/buildTheme';
@@ -51,6 +51,9 @@ const PH = 297;
 const PW = 210;
 const CW = PW - M.left - M.right;
 const STRIPE_W = 1.5;
+// Hauteur reservee (mm) en haut de la cellule observation pour la ligne de
+// numero "CHANTIER.04" (dessine en gras, au-dessus du texte).
+const NUM_BAND = 3.0;
 
 // ─── PAGES ──────────────────────────────────────────────────────────────────
 
@@ -719,6 +722,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
 
     catObs.forEach((obs) => {
       let rawText = obs.text || '';
+      const obsNum = obsDisplayNumber(obs, crrConfig.categoryCodes);
       // Report CR nXX uniquement dans l'aperçu, pas dans le PDF
       const plainText = stripHtml(rawText);
       const imgs = (obs.images || []).map(e => typeof e === 'string' ? e : e.src).filter(u => imageCache.has(u));
@@ -741,8 +745,8 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
       const splitLines = doc.splitTextToSize(plainText, obsColUsable);
       // Hauteur de ligne jsPDF : fontSize(pt) / 72 * 25.4 * lineHeightFactor(1.15) ≈ 2.63mm
       const lineH = (6.5 / 72) * 25.4 * 1.15;
-      // cellPadding top:2 + bottom:2 = 4mm + marge securite
-      const textH = Math.max(12, splitLines.length * lineH + 6);
+      // cellPadding top:2 + bottom:2 = 4mm + marge securite (+ bande numero)
+      const textH = Math.max(12, splitLines.length * lineH + 6) + (obsNum ? NUM_BAND : 0);
       let imgH = 0;
       if (imgs.length === 1) {
         const cached = imageCache.get(imgs[0]);
@@ -805,6 +809,16 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
         const meta = obsRowMeta[data.row.index];
         if (!meta) return;
         const obs = meta.obs;
+
+        // Reserve une bande haute dans la cellule observation pour le numero.
+        // Fait AVANT la mesure de hauteur du texte formate (qui relit padTop).
+        if (meta.type === 'text' && data.column.index === 2 && obsNum) {
+          const pad = data.cell.styles.cellPadding;
+          const base = (pad && typeof pad === 'object')
+            ? pad
+            : { top: pad ?? 2, right: pad ?? 1.5, bottom: pad ?? 2, left: pad ?? 2 };
+          data.cell.styles.cellPadding = { ...base, top: (base.top ?? 2) + NUM_BAND };
+        }
 
         // Hauteur minimale pour les pastilles emetteur/actionBy
         if (meta.type === 'text') {
@@ -1079,6 +1093,16 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
               }
             }
           } catch { /* fallback: autoTable texte brut deja dessine */ }
+        }
+
+        // Numero stable de l'observation (CHANTIER.04), en gras dans la bande
+        // haute reservee — dessine APRES le texte formate (jamais efface).
+        if (meta.type === 'text' && data.column.index === 2 && obsNum) {
+          doc.setFont(fontH, 'bold');
+          doc.setFontSize(6);
+          doc.setTextColor(...catColor);
+          doc.text(obsNum, data.cell.x + 2, data.cell.y + 3);
+          doc.setTextColor(...THEME.text);
         }
 
         // Pastilles groupes emetteur (col 0) et actionBy (col 4)

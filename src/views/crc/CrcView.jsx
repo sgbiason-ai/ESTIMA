@@ -837,6 +837,7 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
                     deleteParticipantGroup={manager.deleteParticipantGroup} showManagement={true}
                     reorderParticipantGroups={manager.reorderParticipantGroups} />
                   <CrrObservations meeting={manager.activeMeeting} categories={manager.crrConfig.categories}
+                    categoryCodes={manager.crrConfig.categoryCodes}
                     observationsByCategory={manager.observationsByCategory} addObservation={manager.addObservation}
                     updateObservation={manager.updateObservation} deleteObservation={manager.deleteObservation}
                     reorderObservations={manager.reorderObservations}
@@ -866,7 +867,8 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
       <CrcCategoriesModal isOpen={showCategoriesModal} onClose={() => setShowCategoriesModal(false)}
         categories={manager.crrConfig.categories} addCategory={manager.addCategory}
         renameCategory={manager.renameCategory} deleteCategory={manager.deleteCategory}
-        reorderCategories={manager.reorderCategories} />
+        reorderCategories={manager.reorderCategories}
+        categoryCodes={manager.crrConfig.categoryCodes} setCategoryCode={manager.setCategoryCode} />
 
       <UnifiedParticipantsModal
         isOpen={showParticipantsModal}

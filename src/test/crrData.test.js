@@ -4,7 +4,7 @@ import {
   DEFAULT_CATEGORIES, MEETING_TYPES, PRESENCE_OPTIONS, OBSERVATION_STATUSES,
   LEGAL_TEXT, GROUP_COLORS, getGroupColor, abbreviateGroup,
   DEFAULT_PARTICIPANT_GROUPS, generateCrrId, createEmptyMeeting, createEmptyObservation,
-  generateObsKey, defaultCategoryCode, formatObsNumber, computeObsStats,
+  generateObsKey, defaultCategoryCode, formatObsNumber, computeObsStats, obsDisplayNumber,
 } from '../data/crrData';
 
 // ─── Constantes ─────────────────────────────────────────────────────────────
@@ -235,5 +235,20 @@ describe('computeObsStats', () => {
   it('gere la liste vide / absente', () => {
     expect(computeObsStats([])).toEqual({ open: 0, inProgress: 0, done: 0, total: 0 });
     expect(computeObsStats()).toEqual({ open: 0, inProgress: 0, done: 0, total: 0 });
+  });
+});
+
+describe('obsDisplayNumber', () => {
+  it('utilise le code custom de la categorie si defini', () => {
+    expect(obsDisplayNumber({ category: 'Travaux', seq: 4 }, { Travaux: 'CHANTIER' })).toBe('CHANTIER.04');
+  });
+
+  it('retombe sur le code par defaut sinon', () => {
+    expect(obsDisplayNumber({ category: 'Travaux', seq: 4 }, {})).toBe('TRAVAUX.04');
+  });
+
+  it('retourne vide sans seq ou sans obs', () => {
+    expect(obsDisplayNumber({ category: 'Travaux', seq: null }, {})).toBe('');
+    expect(obsDisplayNumber(null, {})).toBe('');
   });
 });

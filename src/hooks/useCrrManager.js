@@ -678,6 +678,16 @@ export const useCrrManager = ({
     [crrConfig, updateConfig]
   );
 
+  // Code court de numerotation d'une categorie (prefixe "CHANTIER.04").
+  const setCategoryCode = useCallback(
+    (category, code) => {
+      const cleaned = (code || '').toUpperCase().replace(/[^A-Z0-9]+/g, '').slice(0, 10);
+      const codes = { ...(crrConfig.categoryCodes || {}), [category]: cleaned };
+      updateConfig({ ...crrConfig, categoryCodes: codes });
+    },
+    [crrConfig, updateConfig]
+  );
+
   // ── ACTIONS INFO CHANTIER ─────────────────────────────────────────────
 
   const updateChantierInfo = useCallback(
@@ -1045,6 +1055,7 @@ export const useCrrManager = ({
     renameCategory,
     deleteCategory,
     reorderCategories,
+    setCategoryCode,
 
     // Observations
     observationsByCategory,

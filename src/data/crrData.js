@@ -147,6 +147,14 @@ export const formatObsNumber = (code, seq) => {
   return `${code || 'OBS'}.${String(seq).padStart(2, '0')}`;
 };
 
+// Numero affiche d'une observation, en resolvant le code de sa categorie
+// (code custom si defini, sinon defaut derive du nom). Vide si pas de seq.
+export const obsDisplayNumber = (obs, categoryCodes = {}) => {
+  if (!obs || obs.seq == null) return '';
+  const code = categoryCodes[obs.category] || defaultCategoryCode(obs.category);
+  return formatObsNumber(code, obs.seq);
+};
+
 // Compteurs d'observations pour l'en-tete (PDF / preview / Word).
 // total = ouvertes + en cours + faites — les obs 'empty' (non classees) sont
 // volontairement exclues pour garantir total == somme des etats affiches.
