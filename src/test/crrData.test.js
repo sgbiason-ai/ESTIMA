@@ -4,6 +4,7 @@ import {
   DEFAULT_CATEGORIES, MEETING_TYPES, PRESENCE_OPTIONS, OBSERVATION_STATUSES,
   LEGAL_TEXT, GROUP_COLORS, getGroupColor, abbreviateGroup,
   DEFAULT_PARTICIPANT_GROUPS, generateCrrId, createEmptyMeeting, createEmptyObservation,
+  generateObsKey, defaultCategoryCode, formatObsNumber,
 } from '../data/crrData';
 
 // ─── Constantes ─────────────────────────────────────────────────────────────
@@ -172,5 +173,47 @@ describe('createEmptyObservation', () => {
   it('a une date ISO valide', () => {
     const obs = createEmptyObservation('Test');
     expect(obs.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it('porte une identite stable obsKey et un seq null (attribue plus tard)', () => {
+    const obs = createEmptyObservation('Travaux');
+    expect(obs.obsKey).toMatch(/^k_/);
+    expect(obs.seq).toBeNull();
+  });
+});
+
+// ─── Numerotation stable (helpers) ──────────────────────────────────────────
+
+describe('generateObsKey', () => {
+  it('commence par k_ et est unique', () => {
+    expect(generateObsKey()).toMatch(/^k_/);
+    const keys = new Set(Array.from({ length: 50 }, () => generateObsKey()));
+    expect(keys.size).toBe(50);
+  });
+});
+
+describe('defaultCategoryCode', () => {
+  it('majuscule le premier mot, sans accents ni ponctuation', () => {
+    expect(defaultCategoryCode('Travaux')).toBe('TRAVAUX');
+    expect(defaultCategoryCode('Planning - DESC')).toBe('PLANNING');
+    expect(defaultCategoryCode('Réseaux')).toBe('RESEAUX');
+  });
+
+  it('tronque a 10 caracteres et gere le vide', () => {
+    expect(defaultCategoryCode('Administratif')).toBe('ADMINISTRA');
+    expect(defaultCategoryCode('')).toBe('OBS');
+    expect(defaultCategoryCode(null)).toBe('OBS');
+  });
+});
+
+describe('formatObsNumber', () => {
+  it('formate code + seq avec padding', () => {
+    expect(formatObsNumber('CHANTIER', 4)).toBe('CHANTIER.04');
+    expect(formatObsNumber('TRAVAUX', 12)).toBe('TRAVAUX.12');
+  });
+
+  it('retourne vide si pas de seq, fallback OBS', () => {
+    expect(formatObsNumber('CHANTIER', null)).toBe('');
+    expect(formatObsNumber('', 3)).toBe('OBS.03');
   });
 });

@@ -114,6 +114,39 @@ export const DEFAULT_PARTICIPANT_GROUPS = [
 export const generateCrrId = () =>
   `crr_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
 
+// ── NUMEROTATION STABLE DES OBSERVATIONS ────────────────────────────────────
+// Une observation possede :
+//  - id      : identifiant de l'INSTANCE (change a chaque report/duplication)
+//  - obsKey  : identite STABLE de cycle de vie (survit aux reports)
+//  - seq     : compteur fige DANS la categorie → "CHANTIER.04", jamais reutilise
+// Le numero affiche = `${code(categorie)}.${seq}` (cf. formatObsNumber).
+
+let _obsKeyCounter = 0;
+
+// Cle de cycle de vie stable, garantie unique meme en cas d'appels rapproches.
+export const generateObsKey = () =>
+  `k_${Date.now().toString(36)}_${(_obsKeyCounter++).toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+
+// Code court par defaut pour une categorie (prefixe de numerotation).
+// Sert de valeur initiale, editable ensuite par l'utilisateur.
+// Ex: "Travaux" → "TRAVAUX", "Planning - DESC" → "PLANNING".
+export const defaultCategoryCode = (name) => {
+  if (!name) return 'OBS';
+  const firstWord = name.trim().split(/[\s\-/]+/)[0] || name;
+  // NFD décompose les accents (É → E + diacritique) ; le filtre [^A-Z0-9]
+  // retire ensuite les diacritiques ET la ponctuation en une passe.
+  const cleaned = firstWord
+    .normalize('NFD')
+    .toUpperCase().replace(/[^A-Z0-9]+/g, '');
+  return cleaned.slice(0, 10) || 'OBS';
+};
+
+// Formate le numero affiche : (code, seq) → "CHANTIER.04". Vide si pas de seq.
+export const formatObsNumber = (code, seq) => {
+  if (seq == null) return '';
+  return `${code || 'OBS'}.${String(seq).padStart(2, '0')}`;
+};
+
 // Cree une reunion vide
 export const createEmptyMeeting = (number) => ({
   id: generateCrrId(),
@@ -131,8 +164,13 @@ export const createEmptyMeeting = (number) => ({
 });
 
 // Cree une observation vide
+// obsKey = identite stable de cycle de vie (jamais regeneree au report).
+// seq    = numero stable dans la categorie, attribue par useCrrManager.addObservation
+//          (lit/incremente project.crrObsCounters) — null tant que non attribue.
 export const createEmptyObservation = (category) => ({
   id: `obs_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+  obsKey: generateObsKey(),
+  seq: null,
   category,
   emitter: '',
   date: new Date().toISOString().split('T')[0],

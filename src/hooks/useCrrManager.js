@@ -11,7 +11,9 @@ import {
   createEmptyMeeting,
   createEmptyObservation,
   generateCrrId,
+  defaultCategoryCode,
 } from '../data/crrData';
+import { migrateCrrData } from '../utils/crrMigration';
 import { useRobustSave } from './useRobustSave';
 import { useStableHash } from './useStableHash';
 import { reoptimizeDataUrl } from '../utils/imageCompressor';
@@ -32,6 +34,7 @@ export const useCrrManager = ({
     return {
       participantGroups: cfg.participantGroups || DEFAULT_PARTICIPANT_GROUPS,
       categories: cfg.categories || [...DEFAULT_CATEGORIES],
+      categoryCodes: cfg.categoryCodes || {},
       legalText: cfg.legalText !== undefined ? cfg.legalText : LEGAL_TEXT,
       chantierInfo: {
         nom: '',
@@ -175,6 +178,31 @@ export const useCrrManager = ({
   // Ref toujours a jour pour le handler visibilitychange (pas de closure stale)
   const projectRef = useRef(project);
   projectRef.current = project;
+
+  // ── MIGRATION SCHEMA (numerotation stable) ────────────────────────────────
+  // Backfill idempotent au chargement : obsKey / seq / originMeetingNumber +
+  // crrObsCounters + categoryCodes. Une seule passe par projet ; ne boucle pas
+  // (apres migration les obs portent deja leur obsKey → migrateCrrData renvoie
+  // changed:false, et le guard par id court-circuite les rendus suivants).
+  const migratedRef = useRef(null);
+  useEffect(() => {
+    const pid = project?.id;
+    if (!pid || migratedRef.current === pid) return;
+    migratedRef.current = pid;
+    const result = migrateCrrData(project);
+    if (!result.changed) return;
+    onUpdateProject?.((prev) => {
+      if (!prev) return prev;
+      const next = {
+        ...prev,
+        crrMeetings: result.crrMeetings,
+        crrConfig: result.crrConfig,
+        crrObsCounters: result.crrObsCounters,
+      };
+      syncDraft(next);
+      return next;
+    });
+  }, [project, onUpdateProject]);
 
   useEffect(() => {
     const flush = () => { forceSave(); };
@@ -580,37 +608,65 @@ export const useCrrManager = ({
 
   const addCategory = useCallback(
     (name) => {
-      if (!name?.trim()) return;
-      const cats = [...crrConfig.categories, name.trim()];
-      updateConfig({ ...crrConfig, categories: cats });
+      const trimmed = name?.trim();
+      if (!trimmed) return;
+      const cats = [...crrConfig.categories, trimmed];
+      const codes = { ...(crrConfig.categoryCodes || {}) };
+      if (!codes[trimmed]) codes[trimmed] = defaultCategoryCode(trimmed);
+      updateConfig({ ...crrConfig, categories: cats, categoryCodes: codes });
     },
     [crrConfig, updateConfig]
   );
 
   const renameCategory = useCallback(
     (oldName, newName) => {
-      if (!newName?.trim()) return;
-      const cats = crrConfig.categories.map((c) =>
-        c === oldName ? newName.trim() : c
-      );
-      updateConfig({ ...crrConfig, categories: cats });
+      const trimmed = newName?.trim();
+      if (!trimmed || trimmed === oldName) return;
+      // Patch atomique : categories + codes + compteurs + observations, en un
+      // seul update projet (evite les ecritures partielles incoherentes).
+      onUpdateProject?.((prev) => {
+        if (!prev) return prev;
+        const cfg = prev.crrConfig || {};
+        const cats = (cfg.categories || []).map((c) => (c === oldName ? trimmed : c));
 
-      // Renommer aussi dans toutes les observations existantes
-      const newMeetings = meetings.map((m) => ({
-        ...m,
-        observations: (m.observations || []).map((obs) =>
-          obs.category === oldName ? { ...obs, category: newName.trim() } : obs
-        ),
-      }));
-      updateMeetings(newMeetings);
+        const codes = { ...(cfg.categoryCodes || {}) };
+        if (oldName in codes) { codes[trimmed] = codes[oldName]; delete codes[oldName]; }
+
+        // Conserve la continuite du compteur de numerotation (seq jamais reutilise)
+        const counters = { ...(prev.crrObsCounters || {}) };
+        if (oldName in counters) {
+          counters[trimmed] = Math.max(counters[trimmed] || 0, counters[oldName]);
+          delete counters[oldName];
+        }
+
+        const newMeetings = (prev.crrMeetings || []).map((m) => ({
+          ...m,
+          observations: (m.observations || []).map((obs) =>
+            obs.category === oldName ? { ...obs, category: trimmed } : obs
+          ),
+        }));
+
+        const next = {
+          ...prev,
+          crrConfig: { ...cfg, categories: cats, categoryCodes: codes },
+          crrMeetings: newMeetings,
+          crrObsCounters: counters,
+        };
+        syncDraft(next);
+        return next;
+      });
     },
-    [crrConfig, meetings, updateConfig, updateMeetings]
+    [onUpdateProject]
   );
 
   const deleteCategory = useCallback(
     (name) => {
       const cats = crrConfig.categories.filter((c) => c !== name);
-      updateConfig({ ...crrConfig, categories: cats });
+      const codes = { ...(crrConfig.categoryCodes || {}) };
+      delete codes[name];
+      // Le compteur crrObsCounters[name] est volontairement conserve : si la
+      // categorie est recreee, la numerotation reprend sans reutiliser un seq.
+      updateConfig({ ...crrConfig, categories: cats, categoryCodes: codes });
     },
     [crrConfig, updateConfig]
   );
@@ -638,18 +694,36 @@ export const useCrrManager = ({
 
   const addObservation = useCallback(
     (category) => {
-      // Generer l'obs une seule fois (id stable) ; date relue dans l'updater pour
-      // refleter une eventuelle modif de meeting.date entre temps.
+      // Generer l'obs une seule fois (id + obsKey stables).
       const newObs = createEmptyObservation(category);
-      updateActiveMeeting((meeting) => ({
-        observations: [
-          ...(meeting.observations || []),
-          { ...newObs, date: meeting.date },
-        ],
-      }));
-      return newObs.id;
+      const createdId = newObs.id;
+      // Update projet fonctionnel : attribue un seq stable depuis le compteur
+      // projet (jamais reutilise) ET ajoute l'obs au meeting actif, en un seul
+      // patch atomique (date + originMeetingNumber relus sur l'etat courant).
+      onUpdateProject?.((prev) => {
+        if (!prev) return prev;
+        const id = activeMeetingIdRef.current;
+        if (!id) return prev;
+        const counters = { ...(prev.crrObsCounters || {}) };
+        const seq = (counters[category] || 0) + 1;
+        counters[category] = seq;
+        const meetings = (prev.crrMeetings || []).map((m) => {
+          if (m.id !== id) return m;
+          return {
+            ...m,
+            observations: [
+              ...(m.observations || []),
+              { ...newObs, seq, date: m.date, originMeetingNumber: m.number },
+            ],
+          };
+        });
+        const next = { ...prev, crrMeetings: meetings, crrObsCounters: counters };
+        syncDraft(next);
+        return next;
+      });
+      return createdId;
     },
-    [updateActiveMeeting]
+    [onUpdateProject]
   );
 
   const updateObservation = useCallback(
