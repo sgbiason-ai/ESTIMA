@@ -71,6 +71,7 @@ const CctpGeneratorView = ({
         onEditProject={handleEditProject}
         addChapter={manager.addChapter}
         handleFileUpload={manager.handleFileUpload}
+        handlePdfUpload={manager.handlePdfUpload}
         handleExportMaster={manager.handleExportMaster}
         handleExportPdf={handleExportPdf}
         saveToCloud={manager.saveToCloud}

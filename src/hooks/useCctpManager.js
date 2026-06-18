@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { SMART_MAPPING } from '../data/cctpData';
 import { parseDocxToTree } from '../utils/wordImporter';
+import { parsePdfToTree } from '../utils/parsePdfCctp';
 import { toast, confirm } from '../utils/globalUI';
 import { useRobustSave } from './useRobustSave';
 import { useStableHash } from './useStableHash';
@@ -452,6 +453,31 @@ export const useCctpManager = ({
     e.target.value = null;
   };
 
+  const handlePdfUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const ok = await confirm("L'importation PDF va REMPLACER toute la structure CCTP actuelle.\nLe sommaire et le texte du PDF seront reconstruits par chapitre.\nVoulez-vous continuer ?", { title: 'Importation PDF', danger: true });
+    if (ok) {
+      toast.info("Analyse du PDF en cours…");
+      try {
+        const newStructure = await parsePdfToTree(file);
+        if (newStructure && newStructure.length > 0) {
+          setCctpData(newStructure);
+          setTimeout(() => setSelectedIds(new Set()), 500);
+          const count = (function countNodes(nodes) {
+            return nodes.reduce((acc, n) => acc + 1 + (n.children ? countNodes(n.children) : 0), 0);
+          })(newStructure);
+          toast.success(`Structure CCTP importée : ${count} chapitres`);
+        } else {
+          toast.error("Erreur import : aucune structure détectée.");
+        }
+      } catch (err) {
+        toast.error(err?.message || "Erreur lors de l'importation du PDF.");
+      }
+    }
+    e.target.value = null;
+  };
+
   const scrollToPreview = (id) => {
     isAutoScrolling.current = true; 
     setTimeout(() => {
@@ -579,7 +605,7 @@ export const useCctpManager = ({
     activeNodeId, searchQuery, setSearchQuery, modalOpen, setModalOpen,
     nodeToEdit, variables, saveStatus, filteredCctpData,
     autoSelectChapters, toggleExpand, expandAll, collapseAll,
-    handleExportMaster, handleFileUpload, handlePreviewScroll,
+    handleExportMaster, handleFileUpload, handlePdfUpload, handlePreviewScroll,
     openEditor, handleSaveNode, addChapter, deleteNode, toggleSelection, saveToCloud
   };
 };

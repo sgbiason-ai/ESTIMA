@@ -69,6 +69,7 @@ const RcGeneratorView = ({
         onEditProject={handleEditProject}
         addChapter={manager.addChapter}
         handleFileUpload={manager.handleFileUpload}
+        handlePdfUpload={manager.handlePdfUpload}
         handleExportMaster={manager.handleExportMaster}
         loadTemplate={manager.loadTemplate}
         handleExportPdf={handleExportPdf}
