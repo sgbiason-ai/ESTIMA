@@ -1,6 +1,6 @@
 // src/components/ccap/CcapPreview.jsx
 import React from 'react';
-import { Eye, Palette, Download, Edit3, FileText, FileSignature, Cloud, RefreshCw, CheckSquare } from 'lucide-react';
+import { Eye, Download, Edit3, FileText, FileSignature, Cloud, RefreshCw, CheckSquare } from 'lucide-react';
 import { generateWordCCAP } from '../../utils/ccapExport';
 import { renderForPreview } from '../../utils/docContent';
 import { sanitizeHtml } from '../../utils/helpers';
@@ -11,7 +11,6 @@ const CcapPreview = ({
   selectedIds,
   variables,
   branding,
-  setBrandingModalOpen,
   handlePreviewScroll,
   openEditor,
   handleExportPdf,
@@ -111,7 +110,6 @@ const CcapPreview = ({
         </RibbonGroup>
 
         <RibbonGroup label="Document">
-          <RibbonBtnLarge icon={Palette} label="Style" onClick={() => setBrandingModalOpen(true)} title="Modifier la charte graphique (couleurs, polices, logo)" accent="text-indigo-600" />
           <RibbonBtnLarge icon={FileSignature} label="Champs" onClick={onEditVariables} title="Saisir les champs du document (communs, RC, CCAP) — accès à la fiche projet complète depuis la fenêtre" accent="text-blue-600" />
         </RibbonGroup>
 
