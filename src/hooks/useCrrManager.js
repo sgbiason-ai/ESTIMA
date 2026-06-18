@@ -94,12 +94,12 @@ export const useCrrManager = ({
   // le composant n'a pas encore re-rendu et que triggerSave n'a pas ete appele,
   // le brouillon est a jour quand visibilitychange/pagehide se declenchent.
 
-  const draftKeyRef = useRef(project?.id ? `draft_crr_${project.id}` : null);
-  draftKeyRef.current = project?.id ? `draft_crr_${project.id}` : null;
-
+  // Cle de brouillon TOUJOURS derivee de l'id de la donnee ecrite (jamais d'une
+  // ref qui peut decaler pendant un changement d'affaire) → zero contamination
+  // inter-affaire des brouillons localStorage.
   const syncDraft = (data) => {
-    const key = draftKeyRef.current;
-    if (!key || !data) return;
+    const key = data?.id ? `draft_crr_${data.id}` : null;
+    if (!key) return;
     try { localStorage.setItem(key, JSON.stringify({ ...data, _draftAt: Date.now() })); } catch { /* ignore */ }
   };
 
@@ -163,7 +163,9 @@ export const useCrrManager = ({
 
   const { saveStatus, triggerSave, forceSave } = useRobustSave({
     saveFn: onSaveProject,
-    draftKey: project?.id ? `draft_crr_${project.id}` : null,
+    // Cle derivee de la donnee (jamais d'une cle figee) → brouillon toujours
+    // ecrit sous l'id de l'affaire reellement sauvegardee, pas une autre.
+    draftKey: (data) => (data?.id ? `draft_crr_${data.id}` : null),
     debounceMs: 1500,
   });
 

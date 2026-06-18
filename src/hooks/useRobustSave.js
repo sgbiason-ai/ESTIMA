@@ -55,9 +55,17 @@ export function useRobustSave({ saveFn, draftKey, debounceMs = 1500, maxRetries 
   useEffect(() => { draftKeyRef.current = draftKey; }, [draftKey]);
   useEffect(() => { statusRef.current = saveStatus; }, [saveStatus]);
 
+  // Resout la cle de brouillon. Si draftKey est une FONCTION, on la derive de la
+  // donnee elle-meme → impossible d'ecrire le brouillon d'une entite sous la cle
+  // d'une autre lors d'un changement rapide (fuite inter-entite).
+  const resolveDraftKey = (data) => {
+    const dk = draftKeyRef.current;
+    return typeof dk === 'function' ? dk(data) : dk;
+  };
+
   // ── Helper : écriture brouillon localStorage avec timestamp ───────────────
   const writeDraft = (data) => {
-    const key = draftKeyRef.current;
+    const key = resolveDraftKey(data);
     if (!key || !data) return;
     try {
       safeStorage.set(key, JSON.stringify({ ...data, _draftAt: Date.now() }));
@@ -78,7 +86,8 @@ export function useRobustSave({ saveFn, draftKey, debounceMs = 1500, maxRetries 
       retryCountRef.current = 0;
       if (pendingDataRef.current === data) pendingDataRef.current = null;
       lastSavedJsonRef.current = JSON.stringify(data);
-      if (draftKeyRef.current) safeStorage.remove(draftKeyRef.current);
+      const doneKey = resolveDraftKey(data);
+      if (doneKey) safeStorage.remove(doneKey);
     } catch (err) {
       console.error('[RobustSave] Erreur sauvegarde:', err);
       retryCountRef.current++;

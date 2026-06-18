@@ -119,7 +119,10 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
           const draft = loadDraft(draftKey);
           const draftAt = draft?._draftAt || 0;
           const firestoreAt = target.lastSaved ? new Date(target.lastSaved).getTime() : 0;
-          if (draft && draftAt > firestoreAt) {
+          // Ne restaurer que si le brouillon appartient bien a CETTE affaire
+          // (garde-fou anti-fuite : un brouillon ecrit sous une mauvaise cle lors
+          // d'un changement d'affaire ne doit jamais s'appliquer a une autre).
+          if (draft && draftAt > firestoreAt && draft.id === target.id) {
             const { _draftAt, ...cleanDraft } = draft;
             setCrrDoc(cleanDraft);
             toast.warning('Brouillon local restauré (dernière sauvegarde non envoyée).', { duration: 6000 });
