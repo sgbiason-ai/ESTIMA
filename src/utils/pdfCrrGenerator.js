@@ -185,6 +185,9 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
   const logoCommune = crrConfig.chantierInfo?.communeLogo
     ? await loadImage(crrConfig.chantierInfo.communeLogo).catch(() => null)
     : null;
+  const logoCotraitant = crrConfig.chantierInfo?.cotraitantLogo
+    ? await loadImage(crrConfig.chantierInfo.cotraitantLogo).catch(() => null)
+    : null;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // 1. EN-TETE
@@ -213,12 +216,24 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
   }
 
   // Logo MOE en haut a droite, centre verticalement dans la bande (28mm)
+  let moeWidth = 0;
   if (logoMoe) {
     const mxW = 30, mxH = 18, r = logoMoe.width / logoMoe.height;
     let w = mxW, h = w / r;
     if (h > mxH) { h = mxH; w = h * r; }
+    moeWidth = w;
     const my = cursor.y + (28 - h) / 2;
     doc.addImage(logoMoe, 'JPEG', PW - M.right - w - 4, my, w, h);
+  }
+
+  // Logo Cotraitant en haut a droite, a cote du logo MOE
+  if (logoCotraitant) {
+    const mxW = 30, mxH = 18, r = logoCotraitant.width / logoCotraitant.height;
+    let w = mxW, h = w / r;
+    if (h > mxH) { h = mxH; w = h * r; }
+    const my = cursor.y + (28 - h) / 2;
+    const offset = moeWidth > 0 ? moeWidth + 8 : 4;
+    doc.addImage(logoCotraitant, 'JPEG', PW - M.right - w - offset, my, w, h);
   }
 
   // Type de reunion + numero

@@ -75,7 +75,7 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
   const { total: totalObs, open: openObs, inProgress: progObs, done: doneObs } = computeObsStats(observations);
 
   return (
-    <div className="bg-white shadow-lg max-w-[800px] mx-auto my-4 text-[11px] leading-snug relative overflow-hidden" style={{ color: '#282828' }}>
+    <div className="bg-white shadow-[0_2px_4px_rgba(0,0,0,0.02),0_4px_12px_rgba(0,0,0,0.04),0_12px_24px_rgba(0,0,0,0.06),0_24px_48px_rgba(0,0,0,0.06)] rounded-sm max-w-[800px] mx-auto my-6 text-[11px] leading-snug relative overflow-hidden transition-all duration-500 ease-out" style={{ color: '#282828' }}>
 
       {/* Bande laterale gauche decorative */}
       <div className="absolute left-0 top-0 w-[5px] h-[60%] rounded-r-sm" style={{ backgroundColor: primary }} />
@@ -111,14 +111,25 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
             />
           )}
 
-          {/* Logo MOE — droite */}
-          {branding?.logo && (
-            <img
-              src={branding.logo}
-              alt="Logo MOE"
-              className="h-12 object-contain"
-            />
-          )}
+          <div className="flex items-center gap-4">
+            {/* Logo Cotraitant — a cote de MOE */}
+            {crrConfig.chantierInfo?.cotraitantLogo && (
+              <img
+                src={crrConfig.chantierInfo.cotraitantLogo}
+                alt="Logo cotraitant"
+                className="h-12 object-contain"
+              />
+            )}
+
+            {/* Logo MOE — droite */}
+            {branding?.logo && (
+              <img
+                src={branding.logo}
+                alt="Logo MOE"
+                className="h-12 object-contain"
+              />
+            )}
+          </div>
         </div>
       </div>
 

@@ -24,6 +24,7 @@ const mapProjectToChantierInfo = (proj) => ({
   dureePreparation: proj.prepPeriod || '',
   dureeChantier: proj.duration || '',
   communeLogo: proj.clientLogo || null,
+  cotraitantLogo: proj.cotraitantLogo || (Array.isArray(proj.coTraitantLogos) && proj.coTraitantLogos.length > 0 ? proj.coTraitantLogos[0] : null),
 });
 
 import { useCrrManager } from '../../hooks/useCrrManager';
@@ -657,10 +658,10 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
       {/* ═══════════════════════════════════════════════════════════════════════
           RUBAN ESTIMASTYLE
           ═══════════════════════════════════════════════════════════════════════ */}
-      <div className="shrink-0 bg-white/80 backdrop-blur-xl border-b border-gray-200/60 min-w-0 w-full">
+      <div className="shrink-0 bg-white/70 backdrop-blur-xl border-b border-slate-200/60 shadow-sm min-w-0 w-full z-40 relative">
 
         {/* Ligne superieure : titre + retour */}
-        <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-200/60">
+        <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-200/50 bg-white/40">
           <button
             onClick={onBackToHub}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all text-xs font-medium"

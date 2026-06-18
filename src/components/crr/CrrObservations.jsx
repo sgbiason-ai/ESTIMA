@@ -169,7 +169,7 @@ const StatusBadge = memo(({ status, onChange }) => {
   return (
     <button
       onClick={cycle}
-      className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold transition-all hover:scale-105 ${st.bg} ${st.color} border border-current/20`}
+      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-extrabold transition-all duration-300 hover:scale-105 shadow-sm hover:shadow ${st.bg} ${st.color} border border-current/30 backdrop-blur-sm`}
       title={`Statut: ${st.label} — Cliquez pour changer`}
     >
       {icons[st.icon]}
@@ -385,15 +385,15 @@ const ObservationRow = memo(({ obs, obsNumber, meetingNumber, onUpdate, onDelete
 
   return (
     <div
-      className={`border rounded-lg transition-all overflow-hidden ${
+      className={`border rounded-xl transition-all duration-300 overflow-hidden shadow-sm hover:shadow-md hover:-translate-y-0.5 ${
         isEditing
-          ? 'ring-2 ring-blue-200 border-blue-300 bg-blue-50/20'
+          ? 'ring-2 ring-indigo-300 border-indigo-400 bg-indigo-50/40 shadow-md z-10 relative'
           : hasIssue
           ? 'border-red-300 bg-red-50/40 ring-1 ring-red-200'
           : obs.status === 'done'
-          ? 'border-emerald-200 bg-emerald-50/30 opacity-75'
+          ? 'border-emerald-200 bg-emerald-50/40 opacity-80'
           : obs.status === 'in_progress'
-          ? 'border-blue-200 bg-blue-50/30'
+          ? 'border-blue-200 bg-blue-50/40'
           : 'border-slate-200 bg-white'
       }`}
     >
@@ -709,7 +709,7 @@ const CrrObservations = ({
         return (
           <div key={cat} className="space-y-1.5">
             <div
-              className="flex items-center justify-between bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/60 rounded-xl px-4 py-2.5 cursor-pointer hover:from-blue-100/80 hover:to-indigo-100/80 transition-all"
+              className="flex items-center justify-between bg-gradient-to-r from-slate-50 to-white border border-slate-200/80 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] rounded-xl px-4 py-3 cursor-pointer hover:shadow-md hover:border-indigo-300/60 hover:-translate-y-px transition-all duration-300 group"
               onClick={() => toggleCat(cat)}
             >
               <div className="flex items-center gap-2">

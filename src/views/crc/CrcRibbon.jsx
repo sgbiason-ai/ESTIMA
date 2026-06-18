@@ -2,12 +2,12 @@
 import React from 'react';
 
 export const RibbonButton = ({ icon: Icon, label, onClick, disabled, variant = 'default', active, title }) => {
-  const base = 'flex flex-col items-center gap-0.5 px-2 xl:px-3 py-1 xl:py-1.5 rounded-lg xl:rounded-xl transition-all text-center min-w-[46px] xl:min-w-[56px]';
+  const base = 'flex flex-col items-center gap-0.5 px-2 xl:px-3 py-1 xl:py-1.5 rounded-lg xl:rounded-xl transition-all duration-200 text-center min-w-[46px] xl:min-w-[56px]';
   const variants = {
-    default: `${base} ${disabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-gray-100 text-gray-500 hover:text-gray-700'}`,
-    primary: `${base} ${disabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-blue-50 text-blue-600 hover:text-blue-700'}`,
-    accent: `${base} ${disabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-violet-50 text-violet-600 hover:text-violet-700'}`,
-    active: `${base} bg-blue-50 text-blue-700 border border-blue-200/60`,
+    default: `${base} ${disabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-100/80 text-slate-500 hover:text-slate-800 hover:shadow-sm active:scale-95'}`,
+    primary: `${base} ${disabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-indigo-50 hover:bg-gradient-to-b hover:from-indigo-50/50 hover:to-indigo-100/50 text-indigo-600 hover:text-indigo-800 hover:shadow-sm hover:shadow-indigo-500/10 active:scale-95'}`,
+    accent: `${base} ${disabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-violet-50 hover:bg-gradient-to-b hover:from-violet-50/50 hover:to-violet-100/50 text-violet-600 hover:text-violet-800 hover:shadow-sm hover:shadow-violet-500/10 active:scale-95'}`,
+    active: `${base} bg-indigo-50/80 text-indigo-700 border border-indigo-200/60 shadow-inner`,
   };
 
   return (
