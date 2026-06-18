@@ -102,13 +102,24 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
             </div>
           </div>
 
-          {/* Logo commune — centré */}
-          {crrConfig.chantierInfo?.communeLogo && (
-            <img
-              src={crrConfig.chantierInfo.communeLogo}
-              alt="Logo commune"
-              className="h-14 object-contain"
-            />
+          {/* Logos MOA (commune + 2e MOA) — centrés, côte à côte */}
+          {(crrConfig.chantierInfo?.communeLogo || crrConfig.chantierInfo?.communeLogo2) && (
+            <div className="flex items-center gap-3">
+              {crrConfig.chantierInfo?.communeLogo && (
+                <img
+                  src={crrConfig.chantierInfo.communeLogo}
+                  alt="Logo commune"
+                  className="h-14 object-contain"
+                />
+              )}
+              {crrConfig.chantierInfo?.communeLogo2 && (
+                <img
+                  src={crrConfig.chantierInfo.communeLogo2}
+                  alt="Logo MOA 2"
+                  className="h-14 object-contain"
+                />
+              )}
+            </div>
           )}
 
           <div className="flex items-center gap-4">

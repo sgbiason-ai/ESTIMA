@@ -122,6 +122,62 @@ export default function CrcInfoChantierModal({ isOpen, onClose, chantierInfo, up
             <div>
               <label className="flex items-center gap-1.5 text-[11px] text-gray-500 font-medium mb-1.5">
                 <ImagePlus size={11} />
+                Logo MOA n°2
+              </label>
+              {chantierInfo.communeLogo2 ? (
+                <div className="flex items-center gap-3 p-3 border border-gray-200/60 rounded-xl bg-gray-50">
+                  <img
+                    src={chantierInfo.communeLogo2}
+                    alt="Logo MOA 2"
+                    className="max-h-12 max-w-[100px] object-contain rounded"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-500">Logo chargé</p>
+                    <button
+                      onClick={() => updateChantierInfo({ communeLogo2: null })}
+                      className="text-xs text-red-400 hover:text-red-600 mt-0.5 transition-colors"
+                    >
+                      Supprimer
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  onClick={() => document.getElementById('communeLogo2Input')?.click()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const file = e.dataTransfer.files?.[0];
+                    if (!file || !file.type.startsWith('image/')) return;
+                    const reader = new FileReader();
+                    reader.onload = (ev) => updateChantierInfo({ communeLogo2: ev.target.result });
+                    reader.readAsDataURL(file);
+                  }}
+                  onDragOver={(e) => e.preventDefault()}
+                  className="w-full flex flex-col items-center justify-center gap-1.5 px-3 py-5 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 hover:border-blue-300 hover:text-blue-500 hover:bg-blue-50/50 transition-all cursor-pointer"
+                >
+                  <ImagePlus size={20} />
+                  <span className="text-xs font-medium text-center">Glisser-déposer ou cliquer</span>
+                  <span className="text-[10px] text-gray-300">PNG, JPG, SVG</span>
+                </div>
+              )}
+              <input
+                id="communeLogo2Input"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file || !file.type.startsWith('image/')) return;
+                  const reader = new FileReader();
+                  reader.onload = (ev) => updateChantierInfo({ communeLogo2: ev.target.result });
+                  reader.readAsDataURL(file);
+                }}
+              />
+            </div>
+
+            <div>
+              <label className="flex items-center gap-1.5 text-[11px] text-gray-500 font-medium mb-1.5">
+                <ImagePlus size={11} />
                 Logo du co-traitant
               </label>
               {chantierInfo.cotraitantLogo ? (
@@ -198,23 +254,25 @@ export default function CrcInfoChantierModal({ isOpen, onClose, chantierInfo, up
                 <HardDrive size={11} />
                 Dossier d'export
               </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
+              <div className="flex gap-2 items-start">
+                <textarea
                   value={chantierInfo.exportPath || ''}
                   onChange={(e) => updateChantierInfo({ exportPath: e.target.value })}
-                  placeholder="Aucun dossier selectionne"
-                  readOnly
-                  className="flex-1 px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 text-slate-600 cursor-default"
+                  placeholder="Aucun dossier sélectionné — collez/complétez le chemin complet ici si besoin"
+                  rows={2}
+                  className="flex-1 px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 text-slate-700 resize-y min-h-[44px] whitespace-pre-wrap break-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400"
                 />
                 <button
                   onClick={handlePickFolder}
-                  className="px-3 py-2 bg-emerald-50 text-emerald-600 text-xs font-medium rounded-xl hover:bg-emerald-100 transition-all border border-emerald-200 flex items-center gap-1.5 whitespace-nowrap"
+                  className="px-3 py-2 bg-emerald-50 text-emerald-600 text-xs font-medium rounded-xl hover:bg-emerald-100 transition-all border border-emerald-200 flex items-center gap-1.5 whitespace-nowrap shrink-0"
                 >
                   <FolderOpen size={13} />
                   Parcourir
                 </button>
               </div>
+              <p className="text-[10px] text-slate-400 mt-1">
+                Le navigateur ne fournit que le nom du dossier choisi (sécurité). Vous pouvez compléter le chemin complet ici pour mémoire — l'export va toujours dans le dossier sélectionné via « Parcourir ».
+              </p>
             </div>
 
             {/* Pattern nom de fichier */}

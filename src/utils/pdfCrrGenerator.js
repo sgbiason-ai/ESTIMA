@@ -185,6 +185,9 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
   const logoCommune = crrConfig.chantierInfo?.communeLogo
     ? await loadImage(crrConfig.chantierInfo.communeLogo).catch(() => null)
     : null;
+  const logoCommune2 = crrConfig.chantierInfo?.communeLogo2
+    ? await loadImage(crrConfig.chantierInfo.communeLogo2).catch(() => null)
+    : null;
   const logoCotraitant = crrConfig.chantierInfo?.cotraitantLogo
     ? await loadImage(crrConfig.chantierInfo.cotraitantLogo).catch(() => null)
     : null;
@@ -205,14 +208,23 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
   doc.setFillColor(...THEME.primary);
   roundedRect(doc, M.left, cursor.y, 1.5, 28, 0.75, 'F');
 
-  // Logo commune centre dans la bande header
-  if (logoCommune) {
-    const mxW = 22, mxH = 18, r = logoCommune.width / logoCommune.height;
-    let w = mxW, h = w / r;
-    if (h > mxH) { h = mxH; w = h * r; }
-    const cx = PW / 2 - w / 2;
-    const cy = cursor.y + (28 - h) / 2;
-    doc.addImage(logoCommune, 'JPEG', cx, cy, w, h);
+  // Logos MOA (commune + 2e MOA) centres cote a cote dans la bande header.
+  // Taille reduite a 18mm chacun si deux logos (evite le chevauchement a droite).
+  if (logoCommune || logoCommune2) {
+    const both = !!(logoCommune && logoCommune2);
+    const fit = (img) => {
+      const mxW = both ? 18 : 22, mxH = 18, r = img.width / img.height;
+      let w = mxW, h = w / r;
+      if (h > mxH) { h = mxH; w = h * r; }
+      return { w, h };
+    };
+    const l1 = logoCommune ? fit(logoCommune) : null;
+    const l2 = logoCommune2 ? fit(logoCommune2) : null;
+    const gap = both ? 4 : 0;
+    const totalW = (l1 ? l1.w : 0) + gap + (l2 ? l2.w : 0);
+    let lx = PW / 2 - totalW / 2;
+    if (l1) { doc.addImage(logoCommune, 'JPEG', lx, cursor.y + (28 - l1.h) / 2, l1.w, l1.h); lx += l1.w + gap; }
+    if (l2) { doc.addImage(logoCommune2, 'JPEG', lx, cursor.y + (28 - l2.h) / 2, l2.w, l2.h); }
   }
 
   // Logo MOE en haut a droite, centre verticalement dans la bande (28mm)
