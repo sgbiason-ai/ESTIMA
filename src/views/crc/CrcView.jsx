@@ -718,7 +718,8 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
               label={crrDoc?.crrConfig?.chantierInfo?.nom || 'Choisir affaire'}
               onClick={() => setShowChantierPicker(true)}
               variant="primary"
-              title="Choisir une affaire parmi la liste"
+              title={crrDoc?.crrConfig?.chantierInfo?.nom || 'Choisir une affaire parmi la liste'}
+              wrap
             />
           </RibbonGroup>
 

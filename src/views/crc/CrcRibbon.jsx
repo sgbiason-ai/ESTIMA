@@ -1,7 +1,7 @@
 // src/views/crc/CrcRibbon.jsx — EstimaStyle responsive
 import React from 'react';
 
-export const RibbonButton = ({ icon: Icon, label, onClick, disabled, variant = 'default', active, title }) => {
+export const RibbonButton = ({ icon: Icon, label, onClick, disabled, variant = 'default', active, title, wrap = false }) => {
   const base = 'flex flex-col items-center gap-0.5 px-2 xl:px-3 py-1 xl:py-1.5 rounded-lg xl:rounded-xl transition-all duration-200 text-center min-w-[46px] xl:min-w-[56px]';
   const variants = {
     default: `${base} ${disabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-100/80 text-slate-500 hover:text-slate-800 hover:shadow-sm active:scale-95'}`,
@@ -14,7 +14,7 @@ export const RibbonButton = ({ icon: Icon, label, onClick, disabled, variant = '
     <button onClick={onClick} disabled={disabled} title={title || label} className={active ? variants.active : variants[variant]}>
       <Icon size={16} className="xl:hidden" />
       <Icon size={18} className="hidden xl:block" />
-      <span className="text-[8px] xl:text-[9px] font-semibold leading-tight whitespace-nowrap">{label}</span>
+      <span className={`text-[8px] xl:text-[9px] font-semibold leading-tight ${wrap ? 'whitespace-normal break-words line-clamp-2 max-w-[88px] xl:max-w-[120px]' : 'whitespace-nowrap'}`}>{label}</span>
     </button>
   );
 };
