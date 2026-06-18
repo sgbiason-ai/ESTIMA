@@ -699,7 +699,7 @@ function ObservationCard({ obs, groupColorMap, categoryCodes = {}, meetingNumber
   const images = obs.images || [];
   const num = obsDisplayNumber(obs, categoryCodes);
   const age = obsAge(obs, meetingNumber);
-  const { missingResponsable, missingEcheance, hasIssue } = obsValidation(obs);
+  const { hasIssue } = obsValidation(obs);
 
   return (
     <div
@@ -749,12 +749,10 @@ function ObservationCard({ obs, groupColorMap, categoryCodes = {}, meetingNumber
         </div>
       )}
 
-      {/* Signalement champs requis manquants (obs ouverte / en cours) */}
+      {/* Signalement responsable manquant (obs ouverte / en cours) */}
       {hasIssue && (
         <div className="mt-1.5 text-[11px] font-semibold text-red-600">
-          {missingResponsable && missingEcheance
-            ? 'Responsable et échéance requis'
-            : missingResponsable ? 'Responsable requis' : 'Échéance requise'}
+          Responsable requis
         </div>
       )}
 

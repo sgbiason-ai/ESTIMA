@@ -338,8 +338,8 @@ const ObservationRow = memo(({ obs, obsNumber, meetingNumber, onUpdate, onDelete
 
   // Age = nombre de reunions depuis l'emission ; >=1 → observation reportee.
   const age = obsAge(obs, meetingNumber);
-  // Champs requis manquants (obs Ouverte/En cours sans Responsable/Echeance).
-  const { missingResponsable, missingEcheance, hasIssue } = obsValidation(obs);
+  // Responsable manquant (obs Ouverte/En cours). L'échéance reste facultative.
+  const { missingResponsable, hasIssue } = obsValidation(obs);
   // Anomalies de saisie (fautes connues + heuristiques) — suggestion, non bloquant.
   const textIssues = detectTextIssues(stripHtml(obs.text));
   const images = obs.images || [];
@@ -539,13 +539,11 @@ const ObservationRow = memo(({ obs, obsNumber, meetingNumber, onUpdate, onDelete
               className={`w-full text-[11px] px-1 xl:px-2 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 ${
                 isOverdue
                   ? 'text-red-700 bg-red-50 border-red-300 font-semibold'
-                  : missingEcheance
-                  ? 'text-red-500 bg-red-50 border-red-300'
                   : obs.actionDeadline
                   ? 'text-slate-800 border-slate-200'
                   : 'text-slate-300 border-slate-200'
               }`}
-              title={isOverdue ? `En retard de ${daysLate} jour${daysLate > 1 ? 's' : ''}` : missingEcheance ? 'Échéance requise (observation ouverte / en cours)' : 'Pour le'}
+              title={isOverdue ? `En retard de ${daysLate} jour${daysLate > 1 ? 's' : ''}` : 'Pour le'}
             />
             {obs.actionDeadline && (
               <button onClick={() => onUpdate(obs.id, { actionDeadline: '' })} className="p-0.5 text-slate-300 hover:text-red-400 transition-colors" title="Effacer la date">
@@ -576,9 +574,7 @@ const ObservationRow = memo(({ obs, obsNumber, meetingNumber, onUpdate, onDelete
         {hasIssue && (
           <div className="mt-1 text-[10px] text-red-500 font-medium flex items-center gap-1" style={{ marginLeft: 'calc(24px + 56px + 120px + 1rem)' }}>
             <AlertTriangle size={10} />
-            {missingResponsable && missingEcheance
-              ? 'Responsable et échéance requis'
-              : missingResponsable ? 'Responsable requis' : 'Échéance requise'}
+            Responsable requis
           </div>
         )}
 

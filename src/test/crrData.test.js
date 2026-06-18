@@ -270,19 +270,19 @@ describe('obsAge', () => {
 });
 
 describe('obsValidation', () => {
-  it('signale responsable + echeance manquants sur une obs ouverte', () => {
+  it('signale le responsable manquant sur une obs ouverte', () => {
     const v = obsValidation({ status: 'open', actionBy: '', actionDeadline: '' });
-    expect(v).toMatchObject({ missingResponsable: true, missingEcheance: true, hasIssue: true });
+    expect(v).toMatchObject({ missingResponsable: true, hasIssue: true });
   });
 
-  it('aucun signalement si responsable et echeance renseignes', () => {
-    const v = obsValidation({ status: 'in_progress', actionBy: 'MOE', actionDeadline: '2026-06-24' });
+  it('echeance facultative : aucun signalement si responsable present sans echeance', () => {
+    const v = obsValidation({ status: 'open', actionBy: 'MOE', actionDeadline: '' });
+    expect(v.missingResponsable).toBe(false);
     expect(v.hasIssue).toBe(false);
   });
 
-  it('signale uniquement le champ manquant', () => {
-    expect(obsValidation({ status: 'open', actionBy: 'MOE', actionDeadline: '' }))
-      .toMatchObject({ missingResponsable: false, missingEcheance: true, hasIssue: true });
+  it('aucun signalement si responsable renseigne', () => {
+    expect(obsValidation({ status: 'in_progress', actionBy: 'MOE', actionDeadline: '2026-06-24' }).hasIssue).toBe(false);
   });
 
   it('aucun signalement pour les obs faites, vides ou nulles', () => {

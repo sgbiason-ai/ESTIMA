@@ -107,8 +107,8 @@ export default function ObservationEditSheet({
 
   if (!obs) return null;
 
-  // Champs requis manquants (obs Ouverte/En cours) → signalement rouge.
-  const { missingResponsable, missingEcheance } = obsValidation(obs);
+  // Responsable manquant (obs Ouverte/En cours) → signalement rouge. Échéance facultative.
+  const { missingResponsable } = obsValidation(obs);
   // Anomalies de saisie (fautes connues + heuristiques) — suggestion de relecture.
   const textIssues = detectTextIssues(stripHtml(obs.text));
 
@@ -183,13 +183,11 @@ export default function ObservationEditSheet({
             {/* Action par + Échéance */}
             <div className="grid grid-cols-2 gap-2">
               <ColoredSelect value={obs.actionBy || ''} onChange={(v) => update({ actionBy: v })} placeholder="Action par…" options={groupNames} groupColorMap={groupColorMap} invalid={missingResponsable} />
-              <input type="date" value={obs.actionDeadline || ''} onChange={(e) => update({ actionDeadline: e.target.value })} className={`${inputClass} text-xs py-2 ${missingEcheance ? 'border-red-300 bg-red-50 text-red-600' : ''}`} placeholder="Échéance" />
+              <input type="date" value={obs.actionDeadline || ''} onChange={(e) => update({ actionDeadline: e.target.value })} className={`${inputClass} text-xs py-2`} placeholder="Échéance" />
             </div>
-            {(missingResponsable || missingEcheance) && (
+            {missingResponsable && (
               <p className="text-[11px] text-red-600 font-semibold -mt-1.5">
-                {missingResponsable && missingEcheance
-                  ? 'Responsable et échéance requis (observation ouverte / en cours)'
-                  : missingResponsable ? 'Responsable requis' : 'Échéance requise'}
+                Responsable requis (observation ouverte / en cours)
               </p>
             )}
             {textIssues.length > 0 && (
