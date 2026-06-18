@@ -13,6 +13,7 @@ import { confirm, toast } from '../../utils/globalUI';
 import { normalizeObsText } from '../../utils/formatObsText.jsx';
 import { uploadCrrImage, deleteCrrImage } from '../../utils/crrImageStorage';
 import GroupBadge from './GroupBadge';
+import ImageLightbox from '../../views/siteVisits/ImageLightbox';
 
 // ── Selecteur multi-groupes avec pastilles (Emetteur / PAR) ─────────────────
 
@@ -240,6 +241,7 @@ const ObservationRow = memo(({ obs, obsNumber, meetingNumber, onUpdate, onDelete
   const cameraRef = useRef(null);
   const editorRef = useRef(null);
   const lastHtmlRef = useRef('');
+  const [lightboxIndex, setLightboxIndex] = useState(null); // index de la photo agrandie (null = fermé)
 
   useEffect(() => {
     const el = editorRef.current;
@@ -489,7 +491,14 @@ const ObservationRow = memo(({ obs, obsNumber, meetingNumber, onUpdate, onDelete
                   return (
                     <div key={idx} className="relative group flex flex-col items-center">
                       <div className="w-16 h-16 rounded border border-gray-200 overflow-hidden bg-gray-100">
-                        <img src={imgSrc} alt="" className="w-full h-full object-cover" loading="lazy" />
+                        <img
+                          src={imgSrc}
+                          alt=""
+                          className="w-full h-full object-cover cursor-zoom-in"
+                          loading="lazy"
+                          title="Cliquer pour agrandir"
+                          onClick={() => { document.activeElement?.blur?.(); setLightboxIndex(idx); }}
+                        />
                         <button
                           onClick={() => removeImage(idx)}
                           className="absolute top-0 right-0 p-0.5 bg-red-500 text-white rounded-bl opacity-0 group-hover:opacity-100 transition-opacity"
@@ -514,6 +523,11 @@ const ObservationRow = memo(({ obs, obsNumber, meetingNumber, onUpdate, onDelete
 
             <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleAddImages} />
             <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleAddImages} />
+
+            {lightboxIndex !== null && ReactDOM.createPortal(
+              <ImageLightbox images={images} index={lightboxIndex} onClose={() => setLightboxIndex(null)} />,
+              document.body
+            )}
           </div>
 
           {/* Col 5 — Statut */}
