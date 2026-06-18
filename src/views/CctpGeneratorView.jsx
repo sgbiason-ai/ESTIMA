@@ -3,6 +3,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import CctpSidebar from '../components/cctp/CctpSidebar';
 import CctpPreview from '../components/cctp/CctpPreview';
 import CctpEditorModal from '../components/modals/CctpEditorModal';
+import DocumentVariablesModal from '../components/modals/DocumentVariablesModal';
 import FavoritesPanel from '../components/common/FavoritesPanel';
 import { useCctpManager } from '../hooks/useCctpManager';
 import { useFavorites } from '../hooks/useFavorites';
@@ -18,6 +19,7 @@ const CctpGeneratorView = ({
   
   const [isFavoritesPanelOpen, setIsFavoritesPanelOpen] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [varsModalOpen, setVarsModalOpen] = useState(false);
 
   const manager = useCctpManager({
     project, masterCctp, onSaveMasterCctp, masterBranding, onUpdateProject, onSaveProject
@@ -125,10 +127,19 @@ const CctpGeneratorView = ({
         handleExportPdf={handleExportPdf}
         saveToCloud={manager.saveToCloud}
         saveStatus={manager.saveStatus}
-        onEditProject={handleEditProject}
+        onEditVariables={() => setVarsModalOpen(true)}
       />
 
-      <CctpEditorModal 
+      <DocumentVariablesModal
+        isOpen={varsModalOpen}
+        onClose={() => setVarsModalOpen(false)}
+        project={project}
+        activeModule="cctp"
+        onSave={(p) => onUpdateProject?.(p)}
+        onOpenFullSheet={handleEditProject}
+      />
+
+      <CctpEditorModal
         isOpen={manager.modalOpen} 
         onClose={() => manager.setModalOpen(false)} 
         node={manager.nodeToEdit} 

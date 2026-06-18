@@ -3,6 +3,7 @@ import React, { useState, useCallback } from 'react';
 import RcSidebar from '../components/rc/RcSidebar';
 import RcPreview from '../components/rc/RcPreview';
 import RcEditorModal from '../components/modals/RcEditorModal';
+import DocumentVariablesModal from '../components/modals/DocumentVariablesModal';
 import FavoritesPanel from '../components/common/FavoritesPanel';
 import { useRcManager } from '../hooks/useRcManager';
 import { useFavorites } from '../hooks/useFavorites';
@@ -18,6 +19,7 @@ const RcGeneratorView = ({
 
   const [isFavoritesPanelOpen, setIsFavoritesPanelOpen] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [varsModalOpen, setVarsModalOpen] = useState(false);
 
   const manager = useRcManager({
     project, masterRc, onSaveMasterRc, masterBranding, onUpdateProject, onSaveProject, companyId
@@ -98,10 +100,19 @@ const RcGeneratorView = ({
         handleExportPdf={handleExportPdf}
         saveToCloud={manager.saveToCloud}
         saveStatus={manager.saveStatus}
-        onEditProject={handleEditProject}
+        onEditVariables={() => setVarsModalOpen(true)}
       />
 
-      <RcEditorModal 
+      <DocumentVariablesModal
+        isOpen={varsModalOpen}
+        onClose={() => setVarsModalOpen(false)}
+        project={project}
+        activeModule="rc"
+        onSave={(p) => onUpdateProject?.(p)}
+        onOpenFullSheet={handleEditProject}
+      />
+
+      <RcEditorModal
         isOpen={manager.modalOpen} 
         onClose={() => manager.setModalOpen(false)} 
         node={manager.nodeToEdit} 

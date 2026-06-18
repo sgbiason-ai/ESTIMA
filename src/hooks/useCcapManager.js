@@ -5,6 +5,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { parseDocxToTree } from '../utils/wordImporter';
 import { parsePdfToTree } from '../utils/parsePdfCctp';
+import { computeDerogations } from '../utils/docContent';
 import { toast, confirm } from '../utils/globalUI';
 import { useRobustSave } from './useRobustSave';
 import { useStableHash } from './useStableHash';
@@ -138,7 +139,9 @@ export const useCcapManager = ({
     return date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   };
 
-  const variables = useMemo(() => {
+  // Les champs propres au CCAP (project.ccapVars) sont saisis via la modale
+  // unifiée DocumentVariablesModal et injectés ci-dessous dans `variables`.
+  const baseVariables = useMemo(() => {
     const hasPSE = (project?.chapters || []).some(c => c.isOption === true)
       ? 'comporte' : 'ne comporte pas';
 
@@ -173,8 +176,39 @@ export const useCcapManager = ({
       startDate:          project?.startDate          || '',
       validityDays:       project?.validityDays != null ? String(project.validityDays) : '120',
       platformUrl:        project?.platformUrl        || '',
+
+      // ── Alias CCAP : placeholders du template dérivés de la fiche projet ──────
+      objet_operation:     project?.projectDescription || '',
+      pouvoir_adjudicateur: project?.client            || '',
+      maitre_oeuvre:       project?.moe                || '',
+      date_limite_offres:  formatDateFR(project?.dateRemise),
+      lieu_execution:      project?.location           || '',
+      categorie_sps:       project?.spsLevel           || 'II',
+
+      // ── Champs PROPRES au CCAP (modale dédiée → project.ccapVars) ────────────
+      coordonnateur_sps:                project?.ccapVars?.coordonnateur_sps                || '',
+      duree_globale_mois:               project?.ccapVars?.duree_globale_mois               || '',
+      duree_preparation_mois:           project?.ccapVars?.duree_preparation_mois           || '',
+      duree_travaux_mois:               project?.ccapVars?.duree_travaux_mois               || '',
+      index_revision:                   project?.ccapVars?.index_revision                   || '',
+      seuil_debut_remboursement_avance: project?.ccapVars?.seuil_debut_remboursement_avance || '',
+      voie_concernee:                   project?.ccapVars?.voie_concernee                   || '',
+      station_meteo:                    project?.ccapVars?.station_meteo                    || '',
+      jours_intemperies_previsibles:    project?.ccapVars?.jours_intemperies_previsibles    || '',
     };
   }, [project]);
+
+  // {{derogations}} : liste de l'article 12 dérivée AUTOMATIQUEMENT du corps
+  // (scan des « Par dérogation à l'article X du CCAG » dans les chapitres cochés).
+  const derogations = useMemo(
+    () => computeDerogations(ccapData, selectedIds),
+    [ccapData, selectedIds]
+  );
+
+  const variables = useMemo(
+    () => ({ ...baseVariables, derogations }),
+    [baseVariables, derogations]
+  );
 
   // --- RECHERCHE INTELLIGENTE (SANS ACCENTS) ---
   const removeAccents = (str) => {

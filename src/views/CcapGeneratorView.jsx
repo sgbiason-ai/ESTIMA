@@ -3,6 +3,7 @@ import React, { useState, useCallback } from 'react';
 import CcapSidebar from '../components/ccap/CcapSidebar';
 import CcapPreview from '../components/ccap/CcapPreview';
 import CcapEditorModal from '../components/modals/CcapEditorModal';
+import DocumentVariablesModal from '../components/modals/DocumentVariablesModal';
 import FavoritesPanel from '../components/common/FavoritesPanel';
 import { useCcapManager } from '../hooks/useCcapManager';
 import { useFavorites } from '../hooks/useFavorites';
@@ -17,6 +18,7 @@ const CcapGeneratorView = ({
 }) => {
 
   const [isFavoritesPanelOpen, setIsFavoritesPanelOpen] = useState(false);
+  const [varsModalOpen, setVarsModalOpen] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
 
   const manager = useCcapManager({
@@ -96,7 +98,16 @@ const CcapGeneratorView = ({
         handleExportPdf={handleExportPdf}
         saveToCloud={manager.saveToCloud}
         saveStatus={manager.saveStatus}
-        onEditProject={handleEditProject}
+        onEditVariables={() => setVarsModalOpen(true)}
+      />
+
+      <DocumentVariablesModal
+        isOpen={varsModalOpen}
+        onClose={() => setVarsModalOpen(false)}
+        project={project}
+        activeModule="ccap"
+        onSave={(p) => onUpdateProject?.(p)}
+        onOpenFullSheet={handleEditProject}
       />
 
       <CcapEditorModal
