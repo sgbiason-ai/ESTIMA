@@ -163,4 +163,28 @@ describe('apprentissage (learnedLinks)', () => {
     });
     expect(res.selectedIds.has(terrId)).toBe(false);
   });
+
+  it('un retrait appris est SCOPÉ à son article (n’efface pas un chapitre déduit par un autre)', () => {
+    const tree = makeTree('imported');
+    const terrId = idByTitle(tree, 'Terrassements généraux');
+    const artA = { id: 'A', type: 'item', designation: 'Terrassement en déblai' };
+    const artB = { id: 'B', type: 'item', designation: 'Décaissement et terrassement de plateforme' };
+    const res = computeAutoSelection({
+      cctpData: tree, project: { chapters: [artA, artB] }, taxonomy: TAXO,
+      learnedLinks: [{ sig: articleSignature(artA), add: [], remove: [terrId] }],
+    });
+    // artB déclenche aussi « terrassement » par concept → le chapitre reste coché
+    expect(res.selectedIds.has(terrId)).toBe(true);
+  });
+
+  it('un retrait appris n’efface pas un chapitre obligatoire', () => {
+    const tree = makeTree('imported');
+    const objetId = idByTitle(tree, "Objet de l'accord-cadre");
+    const artA = { id: 'A', type: 'item', designation: 'Objet du marché et terrassement' };
+    const res = computeAutoSelection({
+      cctpData: tree, project: { chapters: [artA] }, taxonomy: TAXO,
+      learnedLinks: [{ sig: articleSignature(artA), add: [], remove: [objetId] }],
+    });
+    expect(res.selectedIds.has(objetId)).toBe(true); // 'obligatoire' protégé
+  });
 });

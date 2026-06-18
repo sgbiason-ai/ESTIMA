@@ -108,7 +108,7 @@ const STOP_WORDS = new Set([
 /**
  * @returns {{ selectedIds:Set, expandedIds:Set, provenance:Map<id,{sources:string[],confidence:'sure'|'devine'}> }}
  */
-export const computeAutoSelection = ({ cctpData, project, taxonomy = [], learnedLinks = [] }) => {
+export const computeAutoSelection = ({ cctpData, project, taxonomy = [], learnedLinks = [], articleOnly = false }) => {
   const { byKey, flat } = buildIndex(cctpData || []);
   const selection = new Set();
   const expanded = new Set();
@@ -148,23 +148,28 @@ export const computeAutoSelection = ({ cctpData, project, taxonomy = [], learned
     scored.filter((x) => x.s >= floor).forEach((x) => selectNode(x.e.node.id, source));
   };
 
-  // ── 1. Chapitres obligatoires (par titre, niveau 1+) ──
-  [
-    ['objet'],
-    ['generalites', 'generalite', 'dispositions generales', 'prescriptions generales'],
-    ['consistance des travaux', 'description des travaux', 'consistance'],
-  ].forEach((terms) => selectByTitle(terms, 'obligatoire', { minLevel: 1, minScore: 1 }));
+  // Les passes globales (obligatoires, contexte, sismique) sont sautées en mode
+  // articleOnly (utilisé par le « focus article » : on ne veut que ce que CET
+  // article déclenche).
+  if (!articleOnly) {
+    // ── 1. Chapitres obligatoires (par titre, niveau 1+) ──
+    [
+      ['objet'],
+      ['generalites', 'generalite', 'dispositions generales', 'prescriptions generales'],
+      ['consistance des travaux', 'description des travaux', 'consistance'],
+    ].forEach((terms) => selectByTitle(terms, 'obligatoire', { minLevel: 1, minScore: 1 }));
 
-  // ── 2. Contexte projet (mots du nom/description, hors stop-words) ──
-  const ctxText = normalizeText(`${project?.projectDescription || ''} ${project?.name || ''}`);
-  const ctxTerms = [...new Set(tokenize(ctxText).filter((w) => w.length > 5 && !STOP_WORDS.has(w)))];
-  if (ctxTerms.length) selectByTitle(ctxTerms, 'contexte', { minLevel: 2, minScore: 2 });
+    // ── 2. Contexte projet (mots du nom/description, hors stop-words) ──
+    const ctxText = normalizeText(`${project?.projectDescription || ''} ${project?.name || ''}`);
+    const ctxTerms = [...new Set(tokenize(ctxText).filter((w) => w.length > 5 && !STOP_WORDS.has(w)))];
+    if (ctxTerms.length) selectByTitle(ctxTerms, 'contexte', { minLevel: 2, minScore: 2 });
 
-  // ── 3. Règle métier sismique par département ──
-  const dpt = parseInt(project?.department, 10);
-  const ZONES_SISMIQUES = [4, 5, 6, 9, 11, 13, 38, 64, 65, 66, 73, 74, 83, 971, 972, 973, 974];
-  if (ZONES_SISMIQUES.includes(dpt)) {
-    selectByTitle(['sismique', 'parasismique', 'eurocode 8'], 'sismique', { minLevel: 2 });
+    // ── 3. Règle métier sismique par département ──
+    const dpt = parseInt(project?.department, 10);
+    const ZONES_SISMIQUES = [4, 5, 6, 9, 11, 13, 38, 64, 65, 66, 73, 74, 83, 971, 972, 973, 974];
+    if (ZONES_SISMIQUES.includes(dpt)) {
+      selectByTitle(['sismique', 'parasismique', 'eurocode 8'], 'sismique', { minLevel: 2 });
+    }
   }
 
   // ── 4. Par article du devis ──
@@ -181,22 +186,23 @@ export const computeAutoSelection = ({ cctpData, project, taxonomy = [], learned
     if (!l || !l.sig) return;
     learnedBySig.set(l.sig, l);
   });
-  const removals = new Set(); // nodeIds explicitement retirés par l'utilisateur
+  // Un retrait appris ne doit annuler QUE les chapitres ajoutés par l'article qui
+  // l'a appris — jamais ceux déjà présents (autre article, passe obligatoire…) ni
+  // une source forte. D'où le snapshot `before` par article + le scoping ci-dessous.
+  const STRONG = new Set(['explicite', 'obligatoire', 'appris']);
 
   items.forEach((item) => {
+    const before = new Set(selection); // état avant cet article (appartient à d'autres)
     const text = normalizeText(`${item.designation || ''} ${item.description || ''}`);
     const words = new Set(tokenize(text));
+    const learned = learnedBySig.get(articleSignature(item));
 
     // 4.a Liens explicites cctpRefs (id littéral OU numéro positionnel)
     const refs = item.cctpRefs || (item.cctpRef ? [item.cctpRef] : []);
     refs.forEach((ref) => selectNode(ref, 'explicite'));
 
-    // 4.b Apprentissage : corrections mémorisées pour cet article
-    const learned = learnedBySig.get(articleSignature(item));
-    if (learned) {
-      (learned.add || []).forEach((id) => selectNode(id, 'appris'));
-      (learned.remove || []).forEach((id) => removals.add(id));
-    }
+    // 4.b Apprentissage : ajouts mémorisés pour cet article
+    if (learned) (learned.add || []).forEach((id) => selectNode(id, 'appris'));
 
     // 4.c Concepts VRD (par mots du devis → résolus par mots des titres)
     let conceptHit = false;
@@ -216,14 +222,23 @@ export const computeAutoSelection = ({ cctpData, project, taxonomy = [], learned
         .filter((w) => w.length > 4 && !STOP_WORDS.has(w)))];
       if (dterms.length) selectByTitle(dterms, 'titre', { minLevel: 2, minScore: 2 });
     }
-  });
 
-  // ── 5. Retraits appris (l'utilisateur a décoché → on respecte) ──
-  removals.forEach((id) => {
-    const entry = byKey.get(String(id));
-    if (!entry) { selection.delete(id); provSources.delete(id); return; }
-    const down = (node) => { selection.delete(node.id); provSources.delete(node.id); node.children?.forEach(down); };
-    down(entry.node);
+    // 4.e Retraits appris — uniquement les nœuds que CET article vient d'ajouter
+    if (learned && learned.remove && learned.remove.length) {
+      const removeIfOwn = (nid) => {
+        if (before.has(nid)) return;                              // appartient à un autre article / passe
+        const s = provSources.get(nid);
+        if (s && [...s].some((x) => STRONG.has(x))) return;       // jamais une source forte (ex. cctpRef du même article)
+        selection.delete(nid);
+        provSources.delete(nid);
+      };
+      learned.remove.forEach((id) => {
+        const entry = byKey.get(String(id));
+        if (!entry) { removeIfOwn(id); return; }
+        const down = (node) => { removeIfOwn(node.id); node.children?.forEach(down); };
+        down(entry.node);
+      });
+    }
   });
 
   // ── Provenance finale + confiance ──

@@ -1,5 +1,5 @@
 // src/views/CctpGeneratorView.jsx
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import CctpSidebar from '../components/cctp/CctpSidebar';
 import CctpPreview from '../components/cctp/CctpPreview';
 import CctpEditorModal from '../components/modals/CctpEditorModal';
@@ -54,6 +54,24 @@ const CctpGeneratorView = ({
     onEditProject?.();
   };
 
+  // ── Mode « focus article » : apprentissage des correspondances devis ↔ CCTP ──
+  const [focusArticleId, setFocusArticleId] = useState(null);
+  const focusArticle = useMemo(
+    () => manager.devisItems.find((i) => i.id === focusArticleId) || null,
+    [manager.devisItems, focusArticleId]
+  );
+  const focusTargets = useMemo(
+    () => (focusArticle ? manager.getArticleTargets(focusArticle) : null),
+    [focusArticle, manager.cctpData, manager.learnedLinks] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  // Coche/décoche un chapitre en mode focus ET mémorise la correction pour cet article.
+  const handleLearnToggle = useCallback((nodeId) => {
+    if (!focusArticle) return;
+    const willSelect = !manager.selectedIds.has(nodeId);
+    manager.toggleSelection(nodeId);
+    manager.learnLink(focusArticle, nodeId, willSelect ? 'add' : 'remove');
+  }, [focusArticle, manager]);
+
   return (
     <div className="flex h-full w-full bg-[#f8fafc] overflow-hidden">
 
@@ -64,6 +82,8 @@ const CctpGeneratorView = ({
         setSearchQuery={manager.setSearchQuery}
         collapseAll={manager.collapseAll}
         expandAll={manager.expandAll}
+        selectAll={manager.selectAll}
+        deselectAll={manager.deselectAll}
         autoSelectChapters={manager.autoSelectChapters}
         saveStatus={manager.saveStatus}
         filteredCctpData={manager.filteredCctpData}
@@ -86,6 +106,12 @@ const CctpGeneratorView = ({
         toggleFavorite={(node) => toggleFavorite(node, 'cctp')}
         favoritesCount={favorites.filter(f => f.type === 'cctp').length}
         onOpenFavorites={() => setIsFavoritesPanelOpen(true)}
+        provenance={manager.provenance}
+        devisItems={manager.devisItems}
+        focusArticleId={focusArticleId}
+        setFocusArticleId={setFocusArticleId}
+        focusTargets={focusTargets}
+        onLearnToggle={handleLearnToggle}
       />
 
       <CctpPreview
@@ -141,13 +167,17 @@ const CctpGeneratorView = ({
       />
 
       <style>{`
-        .cctp-content table { width: 100%; border-collapse: collapse; margin: 1em 0; border: 1px solid #e2e8f0; }
-        .cctp-content th, .cctp-content td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; }
-        .cctp-content th { background-color: #f1f5f9; font-weight: bold; }
-        .cctp-content ul { list-style-type: disc !important; padding-left: 1.5em !important; margin: 0.5em 0; }
-        .cctp-content ol { list-style-type: decimal !important; padding-left: 1.5em !important; margin: 0.5em 0; }
-        .cctp-content li { margin-bottom: 0.25em; }
-        .cctp-content p { margin-bottom: 0.8em; text-align: justify; }
+        .cctp-content { font-size: 15px; line-height: 1.7; }
+        .cctp-content table { width: 100%; border-collapse: collapse; margin: 1em 0; table-layout: fixed; }
+        .cctp-content td, .cctp-content th { border: 1px solid #cbd5e1; padding: 6px 10px; min-width: 30px; vertical-align: top; position: relative; font-size: 14px; text-align: left; }
+        .cctp-content th { background-color: #f1f5f9; font-weight: bold; color: #334155; }
+        .cctp-content ul { list-style-type: disc !important; padding-left: 1.5em !important; margin: 0.6em 0; }
+        .cctp-content ol { list-style-type: decimal !important; padding-left: 1.5em !important; margin: 0.6em 0; }
+        .cctp-content li { margin-bottom: 0.2em; }
+        .cctp-content p { margin: 0 0 0.7em; }
+        .cctp-content a { color: #2563eb; text-decoration: underline; }
+        .cctp-content [align="justify"] { text-align: justify; }
+        .cctp-content img { max-width: 100%; height: auto; border-radius: 6px; margin: 0.4em 0; }
       `}</style>
 
     </div>

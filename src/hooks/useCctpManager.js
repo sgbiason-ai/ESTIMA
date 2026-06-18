@@ -43,6 +43,8 @@ export const useCctpManager = ({
     return saved ? new Set(JSON.parse(saved)) : new Set();
   });
 
+  const [learnedLinks, setLearnedLinks] = useState(() => project?.cctpLearnedLinks || []);
+
   useEffect(() => {
     if (project?.id) {
         if (project.cctpSelectedIds) {
@@ -58,6 +60,7 @@ export const useCctpManager = ({
             const saved = localStorage.getItem(`cctp_expanded_${project.id}`);
             setExpandedIds(saved ? new Set(JSON.parse(saved)) : new Set());
         }
+        setLearnedLinks(project?.cctpLearnedLinks || []);
     }
   }, [project?.id]);
 
@@ -73,14 +76,16 @@ export const useCctpManager = ({
     const expArray = Array.from(expandedIds);
     const currentSel = project?.cctpSelectedIds || [];
     const currentExp = project?.cctpExpandedIds || [];
+    const currentLearned = project?.cctpLearnedLinks || [];
     
     if (JSON.stringify(selArray) !== JSON.stringify(currentSel) || 
-        JSON.stringify(expArray) !== JSON.stringify(currentExp)) {
+        JSON.stringify(expArray) !== JSON.stringify(currentExp) ||
+        JSON.stringify(learnedLinks) !== JSON.stringify(currentLearned)) {
         if (onUpdateProject) {
-            onUpdateProject({ ...project, cctpSelectedIds: selArray, cctpExpandedIds: expArray });
+            onUpdateProject({ ...project, cctpSelectedIds: selArray, cctpExpandedIds: expArray, cctpLearnedLinks: learnedLinks });
         }
     }
-  }, [selectedIds, expandedIds]);
+  }, [selectedIds, expandedIds, learnedLinks]);
 
   // --- AUTOSAVE (robuste : debounce + retry + brouillon localStorage) ---
   const robustSave = useRobustSave({
@@ -226,7 +231,7 @@ export const useCctpManager = ({
       cctpData,
       project,
       taxonomy: VRD_CONCEPTS,
-      learnedLinks: project?.cctpLearnedLinks || [],
+      learnedLinks,
     });
     setSelectedIds(sel);
     setExpandedIds(exp);
@@ -257,6 +262,16 @@ export const useCctpManager = ({
   };
 
   const collapseAll = () => setExpandedIds(new Set());
+
+  // Coche TOUS les chapitres / décoche tout (cases à cocher de l'arbre).
+  const selectAll = () => {
+    const allIds = new Set();
+    const traverse = (nodes) => { nodes.forEach(node => { allIds.add(node.id); if (node.children) traverse(node.children); }); };
+    traverse(cctpData);
+    setSelectedIds(allIds);
+  };
+
+  const deselectAll = () => setSelectedIds(new Set());
 
   const handleExportMaster = () => {
     const blob = new Blob([JSON.stringify(cctpData, null, 2)], { type: "application/json" });
@@ -413,9 +428,9 @@ export const useCctpManager = ({
   // Mémorise une correction manuelle (coche/décoche) d'un chapitre pour un article,
   // afin que l'AUTO la rejoue ensuite (apprentissage par signature d'article).
   const learnLink = (article, nodeId, mode = 'add') => {
-    if (!article || !nodeId || !onUpdateProject) return;
+    if (!article || !nodeId) return;
     const sig = articleSignature(article);
-    const links = (project?.cctpLearnedLinks || []).map(l => ({ ...l, add: [...(l.add || [])], remove: [...(l.remove || [])] }));
+    const links = learnedLinks.map(l => ({ ...l, add: [...(l.add || [])], remove: [...(l.remove || [])] }));
     let entry = links.find(l => l.sig === sig);
     if (!entry) { entry = { sig, add: [], remove: [] }; links.push(entry); }
     const addSet = new Set(entry.add);
@@ -424,7 +439,31 @@ export const useCctpManager = ({
     else { remSet.add(nodeId); addSet.delete(nodeId); }
     entry.add = [...addSet];
     entry.remove = [...remSet];
-    onUpdateProject({ ...project, cctpLearnedLinks: links });
+    setLearnedLinks(links);
+  };
+
+  // Liste à plat des articles du devis (pour le sélecteur « focus article »).
+  const devisItems = useMemo(() => {
+    const items = [];
+    const extract = (nodes) => nodes?.forEach((n) => {
+      if (n.type === 'item' || n.price !== undefined) items.push(n);
+      if (n.children) extract(n.children);
+    });
+    extract(project?.chapters || []);
+    return items;
+  }, [project?.chapters]);
+
+  // Chapitres déclenchés par UN SEUL article (surlignage en mode focus).
+  const getArticleTargets = (article) => {
+    if (!article) return new Set();
+    const { selectedIds } = computeAutoSelection({
+      cctpData,
+      project: { ...project, chapters: [article] },
+      taxonomy: VRD_CONCEPTS,
+      learnedLinks,
+      articleOnly: true,
+    });
+    return selectedIds;
   };
 
   const saveToCloud = async () => {
@@ -451,9 +490,9 @@ export const useCctpManager = ({
     cctpData, setCctpData, branding, selectedIds, expandedIds,
     activeNodeId, searchQuery, setSearchQuery, modalOpen, setModalOpen,
     nodeToEdit, variables, saveStatus, filteredCctpData,
-    autoSelectChapters, toggleExpand, expandAll, collapseAll,
+    autoSelectChapters, toggleExpand, expandAll, collapseAll, selectAll, deselectAll,
     handleExportMaster, handleFileUpload, handlePdfUpload, handlePreviewScroll,
     openEditor, handleSaveNode, addChapter, deleteNode, toggleSelection, saveToCloud,
-    provenance, learnLink
+    provenance, learnLink, devisItems, getArticleTargets, learnedLinks
   };
 };

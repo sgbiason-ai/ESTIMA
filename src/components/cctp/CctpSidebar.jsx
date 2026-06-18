@@ -1,18 +1,19 @@
 import React from 'react';
 import {
   Search, X, Minimize2, Maximize2, RefreshCw, CheckSquare,
-  Plus, UploadCloud, Download, FileText,
+  Plus, UploadCloud, Download, FileText, Crosshair,
   ChevronRight, ChevronDown, Square, Edit3, Trash2, Star
 } from 'lucide-react';
 
 const CctpSidebar = ({
   searchQuery, setSearchQuery,
-  collapseAll, expandAll, autoSelectChapters,
+  collapseAll, expandAll, selectAll, deselectAll, autoSelectChapters,
   filteredCctpData, cctpDataLength,
   addChapter, handleFileUpload, handlePdfUpload, handleExportMaster,
   expandedIds, selectedIds, activeNodeId,
   toggleExpand, toggleSelection, openEditor, deleteNode,
   isFavorite, toggleFavorite, favoritesCount = 0, onOpenFavorites,
+  provenance, devisItems = [], focusArticleId, setFocusArticleId, focusTargets, onLearnToggle,
 }) => {
 
   // ─── File input refs pour les boutons Word / PDF ─────
@@ -27,12 +28,16 @@ const CctpSidebar = ({
         const isExpanded = expandedIds.has(node.id);
         const isSelected = selectedIds.has(node.id);
         const isActive = node.id === activeNodeId;
+        const prov = provenance?.get?.(node.id);
+        const isFocusTarget = focusTargets?.has?.(node.id);
+        const inFocus = !!focusArticleId;
 
         return (
           <div key={node.id} id={`tree-node-${node.id}`} className="my-1">
             <div className={`
               flex items-center gap-2 p-1.5 rounded-lg transition-all group relative duration-200
               ${isActive ? 'bg-blue-100 border-l-4 border-blue-600 shadow-sm' : 'hover:bg-slate-50 border-l-4 border-transparent'}
+              ${isFocusTarget ? 'ring-2 ring-amber-300 ring-inset' : ''}
             `}>
               <div
                 className={`p-0.5 rounded hover:bg-slate-200 text-slate-400 cursor-pointer transition-colors ${hasChildren ? '' : 'invisible'}`}
@@ -44,11 +49,13 @@ const CctpSidebar = ({
 
               <div
                 className="cursor-pointer p-0.5"
-                onClick={(e) => { e.stopPropagation(); toggleSelection(node.id); }}
-                title={isSelected ? 'Désélectionner ce chapitre (et ses enfants)' : 'Sélectionner ce chapitre (et ses enfants)'}
+                onClick={(e) => { e.stopPropagation(); inFocus ? onLearnToggle?.(node.id) : toggleSelection(node.id); }}
+                title={inFocus
+                  ? (isSelected ? 'Dissocier de l’article focalisé (mémorisé)' : 'Associer à l’article focalisé (mémorisé)')
+                  : (isSelected ? 'Désélectionner ce chapitre (et ses enfants)' : 'Sélectionner ce chapitre (et ses enfants)')}
               >
                 {isSelected
-                  ? <CheckSquare size={16} className="text-indigo-600 shrink-0" />
+                  ? <CheckSquare size={16} className={`shrink-0 ${inFocus ? 'text-amber-600' : 'text-indigo-600'}`} />
                   : <Square size={16} className="text-slate-300 hover:text-slate-400 shrink-0" />
                 }
               </div>
@@ -58,6 +65,12 @@ const CctpSidebar = ({
                 onClick={() => openEditor(node)}
                 title="Éditer le contenu de ce chapitre"
               >
+                {isSelected && prov && (
+                  <span
+                    className={`w-2 h-2 rounded-full shrink-0 ${prov.confidence === 'sure' ? 'bg-blue-500' : 'bg-violet-400'}`}
+                    title={`Coché automatiquement — ${prov.confidence === 'sure' ? 'certain' : 'déduit'} (${prov.sources.join(', ')})`}
+                  />
+                )}
                 <span className={`font-mono text-[9px] font-bold opacity-70 px-1 py-0.5 rounded ${isActive ? 'bg-blue-200 text-blue-900' : 'bg-slate-100 text-slate-500'}`}>
                   {currentNumber}
                 </span>
@@ -181,6 +194,13 @@ const CctpSidebar = ({
             <button onClick={expandAll} className="p-1.5 bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 rounded shadow-sm" title="Tout développer">
               <Maximize2 size={14} />
             </button>
+            <div className="w-px h-6 bg-slate-200 mx-1 self-center"></div>
+            <button onClick={selectAll} className="p-1.5 bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 rounded shadow-sm" title="Tout sélectionner (cocher tous les chapitres)">
+              <CheckSquare size={14} />
+            </button>
+            <button onClick={deselectAll} className="p-1.5 bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 rounded shadow-sm" title="Tout désélectionner (décocher tous les chapitres)">
+              <Square size={14} />
+            </button>
             <button
               onClick={autoSelectChapters}
               className="px-2 py-1.5 bg-indigo-50 border border-indigo-100 text-indigo-600 hover:bg-indigo-100 rounded shadow-sm text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ml-2"
@@ -194,6 +214,41 @@ const CctpSidebar = ({
           </div>
         </div>
       </div>
+
+      {/* ═══ FOCUS ARTICLE (apprentissage) ═══ */}
+      {devisItems.length > 0 && (
+        <div className="px-3 py-2 border-b border-slate-200 bg-amber-50/40 shrink-0">
+          <div className="flex items-center gap-2">
+            <Crosshair size={13} className={`shrink-0 ${focusArticleId ? 'text-amber-600' : 'text-slate-400'}`} />
+            <select
+              value={focusArticleId || ''}
+              onChange={(e) => setFocusArticleId?.(e.target.value || null)}
+              className="flex-1 min-w-0 text-[11px] bg-white border border-amber-200/80 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-100"
+              title="Focaliser un article du devis pour voir/ajuster les chapitres qu'il déclenche"
+            >
+              <option value="">Focus article… (apprentissage)</option>
+              {devisItems.map((it) => (
+                <option key={it.id} value={it.id}>{(it.designation || 'Article sans nom').slice(0, 70)}</option>
+              ))}
+            </select>
+            {focusArticleId && (
+              <button onClick={() => setFocusArticleId?.(null)} className="p-1 rounded hover:bg-amber-100 text-amber-600 shrink-0" title="Quitter le focus">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          {focusArticleId ? (
+            <p className="text-[10px] text-amber-700 mt-1 leading-tight">
+              Chapitres surlignés = déclenchés par cet article. Cochez/décochez : la correspondance est mémorisée et rejouée à chaque AUTO.
+            </p>
+          ) : (
+            <div className="flex items-center gap-3 mt-1 text-[9px] text-slate-400">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" /> certain</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-violet-400" /> déduit</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ═══ ARBRE ═══ */}
       <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-white">
