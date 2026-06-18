@@ -8,7 +8,7 @@ import { getItemRefMap, normalizeUnitSymbol } from './helpers';
 import { saveFileWithPicker, FILE_TYPES, PICKER_IDS } from './fileSaver';
 import { sanitizeFilename, loadLogos, drawCoverPage as _drawCoverPage } from './pdf/pdfSharedHelpers';
 import { buildTheme } from './pdf/buildTheme';
-import { computePseDeltas, buildPseNumbers, collectPseRoots, collectSubstitutions } from './projectCalculations';
+import { computePseDeltas, buildPseNumbers, collectPseRoots, collectSubstitutions, buildChapterNumberMap } from './projectCalculations';
 import { getCurrentPhaseCode } from './phaseModel';
 import { computeVatBreakdown } from './financeFormat';
 import { htmlToPlainText, htmlToRichBlocks } from './richText';
@@ -100,7 +100,7 @@ const drawPseDescriptionBox = (doc, blocks, THEME, startY) => {
 
 // ─── COLLECTE DES DONNÉES ─────────────────────────────────────────────────────
 
-const collectData = (nodes, isParentOption, level, mode, projectRefMap, currentQtyMap, bpuConfig, includePM = true) => {
+const collectData = (nodes, isParentOption, level, mode, projectRefMap, currentQtyMap, bpuConfig, includePM = true, chapterNumMap = null) => {
   let rows = [];
   let total = 0;
   nodes.forEach(node => {
@@ -133,13 +133,16 @@ const collectData = (nodes, isParentOption, level, mode, projectRefMap, currentQ
       });
       total += lineTotal;
     } else if (node.children) {
-      const childData = collectData(node.children, isEffectiveOption, level + 1, mode, projectRefMap, currentQtyMap, bpuConfig, includePM);
+      const childData = collectData(node.children, isEffectiveOption, level + 1, mode, projectRefMap, currentQtyMap, bpuConfig, includePM, chapterNumMap);
       if (childData.rows.length > 0) {
         const titleStr = node.title ? node.title.toUpperCase() : (node.designation || '').toUpperCase();
-        const displayTitle = level > 0 ? `  ${titleStr}` : titleStr;
+        // Numéro de (sous-)chapitre identique à l'écran (base uniquement ; PSE garde « PSE n°X »).
+        const chapNum = mode === 'base' && chapterNumMap ? chapterNumMap.get(node.id) : null;
+        const numberedTitle = chapNum ? `${chapNum}. ${titleStr}` : titleStr;
+        const displayTitle = level > 0 ? `  ${numberedTitle}` : numberedTitle;
         rows.push({ type: 'HEADER', designation: displayTitle, level });
         rows = rows.concat(childData.rows);
-        rows.push({ type: 'SUBTOTAL', designation: `SOUS-TOTAL ${titleStr}`, total: childData.total, level });
+        rows.push({ type: 'SUBTOTAL', designation: `SOUS-TOTAL ${numberedTitle.trim()}`, total: childData.total, level });
         total += childData.total;
       }
     }
@@ -234,6 +237,8 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
 
   let projectRefMap = new Map();
   try { if (project?.chapters) projectRefMap = getItemRefMap(project); } catch { /* ignore */ }
+  // Numéro de chaque (sous-)chapitre, comme à l'écran — numérote les sous-chapitres des exports.
+  const chapterNumMap = buildChapterNumberMap(project?.chapters || [], bpuConfig);
 
   // Label du total général : on ne précise « (Hors PSE) » que s'il existe des PSE.
   const hasPse = collectPseRoots(project?.chapters || []).length > 0;
@@ -345,7 +350,7 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
 
       const buildSummaryRows = (nodes, level, mode, parentIsOption = false) => {
         let rows = [];
-        nodes.forEach((node, nodeIdx) => {
+        nodes.forEach((node) => {
           if (node.children) {
             const effOption = parentIsOption || !!node.isOption;
             // En mode PSE : un conteneur de base (non-option) ne s'affiche pas en tant
@@ -360,7 +365,9 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
             const substDelta = subst ? (pseDeltasByExport[summaryExports[0]]?.get(node.id)?.delta ?? 0) : 0;
             const substSuffix = subst ? (substDelta >= 0 ? ' (PLUS-VALUE)' : ' (MOINS-VALUE)') : '';
             const rawTitle = (node.title || node.designation || '') + substSuffix;
-            const chapPrefix = (level === 0 && mode === 'base') ? `${nodeIdx + 1}. ` : '';
+            // Numéro de (sous-)chapitre (base uniquement) — récap numéroté à tous les niveaux.
+            const chapNum = mode === 'base' ? chapterNumMap.get(node.id) : null;
+            const chapPrefix = chapNum ? `${chapNum}. ` : '';
             const title = isPseRoot
               ? `PSE n°${pseNumbersSummary.get(node.id)} - ${rawTitle}`.toUpperCase()
               : `${chapPrefix}${rawTitle}`.toUpperCase();
@@ -483,15 +490,10 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
       // Tous les chapitres dans UN SEUL tableau : l'en-tête de colonnes (N° · DÉSIGNATION…)
       // n'est alors réimprimé qu'en haut de chaque page (autoTable), et non à chaque chapitre.
       const allDetailRows = [];
-      project.chapters.forEach((chap, chapIndex) => {
-        const chapData = collectData([chap], false, 0, 'base', projectRefMap, currentMap, bpuConfig, includePM);
+      project.chapters.forEach((chap) => {
+        // chapterNumMap numérote désormais le HEADER racine ET ses sous-chapitres (+ leurs sous-totaux).
+        const chapData = collectData([chap], false, 0, 'base', projectRefMap, currentMap, bpuConfig, includePM, chapterNumMap);
         if (chapData.rows.length === 0 || (!isDQE && chapData.total === 0 && !includePM)) return;
-
-        // ── Préfixe numéro de chapitre sur le HEADER racine et son SUBTOTAL ──
-        const firstHeader = chapData.rows.find(r => r.type === 'HEADER' && r.level === 0);
-        if (firstHeader) firstHeader.designation = `${chapIndex + 1}. ${firstHeader.designation.trim()}`;
-        const rootSubtotal = chapData.rows.findLast(r => r.type === 'SUBTOTAL' && r.level === 0);
-        if (rootSubtotal) rootSubtotal.designation = `SOUS-TOTAL ${chapIndex + 1}. ${(chap.title || '').toUpperCase()}`;
 
         allDetailRows.push(...chapData.rows.filter(row => !(row.type === 'SUBTOTAL' && row.total === 0)));
         globalTotal += chapData.total;

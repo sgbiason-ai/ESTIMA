@@ -3,7 +3,7 @@ import ExcelJS from 'exceljs';
 import { getItemRefMap, cleanText, normalizeUnitSymbol } from './helpers';
 import { roundEuro } from './financeFormat';
 import { saveFileWithPicker, FILE_TYPES, PICKER_IDS } from './fileSaver';
-import { computePseDeltas, buildPseNumbers, collectPseRoots, collectSubstitutions } from './projectCalculations';
+import { computePseDeltas, buildPseNumbers, collectPseRoots, collectSubstitutions, buildChapterNumberMap } from './projectCalculations';
 import { htmlToPlainText, htmlToRichBlocks } from './richText';
 
 // Description PSE (HTML riche) → richText ExcelJS (gras/souligné préservés, puces,
@@ -74,6 +74,8 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
 
   let projectRefMap = new Map();
   try { if (project?.chapters) projectRefMap = getItemRefMap(project); } catch { /* ignore */ }
+  // Numéro de chaque (sous-)chapitre, comme à l'écran — numérote les sous-chapitres des exports.
+  const chapterNumMap = buildChapterNumberMap(project?.chapters || [], bpuConfig);
 
   // Label du total général : on ne précise « (Hors PSE) » que s'il existe des PSE.
   const hasPse = collectPseRoots(project?.chapters || []).length > 0;
@@ -180,7 +182,10 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
           return false;
         };
         if (!hasContent(node, parentIsOption)) return;
-        const chapNum = level === 0 ? (index + 1).toString() : '';
+        // Numéro identique à l'écran en mode base (sous-chapitres numérotés en colonne A) ;
+        // PSE/option → repli sur l'index racine (comportement inchangé).
+        const mappedNum = mode === 'base' ? chapterNumMap.get(node.id) : null;
+        const chapNum = mappedNum || (level === 0 ? (index + 1).toString() : '');
         const titleStr = (node.title || node.designation || '').toUpperCase();
         const rowHeader = ws.addRow([chapNum, titleStr, '', '', '', '']);
         // Appliquer la couleur cellule par cellule (A→F) pour ne pas déborder hors du tableau
@@ -190,8 +195,8 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
           const cell = rowHeader.getCell(c);
           cell.font = headerFont; cell.fill = headerFill; cell.border = borders.thin;
         }
-        if (level === 0) rowHeader.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
-        else rowHeader.getCell(2).alignment = { horizontal: 'left', indent: 2 };
+        rowHeader.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+        if (level > 0) rowHeader.getCell(2).alignment = { horizontal: 'left', indent: 2 };
         const startChildRow = ws.lastRow.number + 1;
         processNodes(node.children, ws, qtyMap, level + 1, mode, isEffectiveOption, null, _includePM, cellRefMap);
         const endChildRow = ws.lastRow.number;
@@ -211,7 +216,8 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
           // quand même les lignes de sous-total (formules SUBTOTAL live, calculées
           // dès que le candidat saisit les prix). On les force donc pour le DQE.
           if (childTotal !== 0 || type === 'DQE') {
-            const rowTotal = ws.addRow(['', `SOUS-TOTAL ${titleStr}`, '', '', '', { formula }]);
+            const subtotalLabel = mappedNum ? `SOUS-TOTAL ${mappedNum}. ${titleStr}` : `SOUS-TOTAL ${titleStr}`;
+            const rowTotal = ws.addRow(['', subtotalLabel, '', '', '', { formula }]);
             // On mémorise l'index du chapitre (= index niveau 0) pour pouvoir
             // référencer ce sous-total depuis le récapitulatif (formule inter-feuilles).
             if (level === 0 && subTotalCollector) subTotalCollector.push({ ref: `F${rowTotal.number}`, chapterIndex: index });
@@ -447,7 +453,8 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
   if (summarySheet && project.chapters) {
     const quote = (sheet) => `'${String(sheet).replace(/'/g, "''")}'`;
     project.chapters.forEach((chap, chapIdx) => {
-      const rowData = [(chap.title || chap.designation || '').toUpperCase()];
+      const chapNo = chapterNumMap.get(chap.id);
+      const rowData = [`${chapNo ? `${chapNo}. ` : ''}${(chap.title || chap.designation || '').toUpperCase()}`];
       let hasAny = false;
       selectedExports.forEach((expId) => {
         const ref = summaryRefs[expId]?.chapters?.[chapIdx];

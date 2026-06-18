@@ -417,6 +417,38 @@ export function buildRefMap(chapters, bpuConfig = {}) {
   return map;
 }
 
+/**
+ * Numéro hiérarchique de CHAQUE chapitre / sous-chapitre (id → « 1 », « 1.2 », « 1.2.3 »…),
+ * reproduisant la numérotation affichée à l'écran (ItemList) — sert aux exports PDF/Excel
+ * pour numéroter les sous-chapitres, pas seulement les chapitres racine.
+ *   - Mode hiérarchique : réutilise buildRefMap (séquence partagée avec les articles), donc le
+ *     sous-chapitre « 1.3 » contient bien l'article « 1.3.1 ».
+ *   - Autres modes : seuls les (sous-)chapitres consomment un rang (« 1 », « 1.1 », « 1.2 »…),
+ *     les articles gardent leur référence P.x.
+ * Pure : aucune dépendance React.
+ */
+export function buildChapterNumberMap(chapters, bpuConfig = {}) {
+  // Mode hiérarchique : buildRefMap renseigne déjà l'id de chaque (sous-)chapitre.
+  if (bpuConfig?.numberingMode === 'hierarchical') {
+    return buildRefMap(chapters, bpuConfig);
+  }
+  // Autres modes : compteur de (sous-)chapitres uniquement (les articles ne consomment pas de rang).
+  const map = new Map();
+  const walk = (nodes, prefix) => {
+    if (!Array.isArray(nodes)) return;
+    let rank = 0;
+    nodes.forEach((node) => {
+      if (!node || node.type === 'item') return;
+      rank += 1;
+      const num = prefix ? `${prefix}.${rank}` : String(rank);
+      map.set(node.id, num);
+      if (node.children) walk(node.children, num);
+    });
+  };
+  walk(chapters || [], '');
+  return map;
+}
+
 // ─── NUMÉROTATION DES PSE ──────────────────────────────────────────────────────
 
 /**

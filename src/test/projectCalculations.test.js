@@ -11,6 +11,7 @@ import {
   computePriceScore,
   detectAtypicalPrice,
   buildRefMap,
+  buildChapterNumberMap,
   buildDuplicateIndex,
   computePseDeltas,
   buildPseNumbers,
@@ -724,5 +725,40 @@ describe('checkPriceConsistency', () => {
     ]), { numberingMode: 'manual' });
     expect(r.numberConflicts).toHaveLength(1);
     expect(r.numberConflicts[0].ref).toBe('201');
+  });
+});
+
+// ── buildChapterNumberMap ──────────────────────────────────────────────────
+describe('buildChapterNumberMap', () => {
+  it('numérote (sous-)chapitres en séquentiel et ignore les articles', () => {
+    const chapters = [
+      { id: 'a', children: [
+        { type: 'item', id: 'a-i1' },             // article : ne consomme pas de rang
+        { id: 'a1', children: [{ id: 'a1x' }] },  // sous-chapitre 1.1 puis 1.1.1
+        { id: 'a2' },                             // sous-chapitre 1.2
+      ] },
+      { id: 'b' },                                // chapitre 2
+    ];
+    const map = buildChapterNumberMap(chapters, { numberingMode: 'sequential' });
+    expect(map.get('a')).toBe('1');
+    expect(map.get('a1')).toBe('1.1');
+    expect(map.get('a1x')).toBe('1.1.1');
+    expect(map.get('a2')).toBe('1.2');
+    expect(map.get('b')).toBe('2');
+    expect(map.has('a-i1')).toBe(false); // article non numéroté
+  });
+
+  it('mode hiérarchique : délègue à buildRefMap', () => {
+    const chapters = [{ id: 'a', children: [{ id: 'a1' }] }];
+    const cfg = { numberingMode: 'hierarchical' };
+    const viaMap = buildChapterNumberMap(chapters, cfg);
+    const viaRef = buildRefMap(chapters, cfg);
+    expect(viaMap.get('a')).toBe(viaRef.get('a'));
+    expect(viaMap.get('a1')).toBe(viaRef.get('a1'));
+  });
+
+  it('gère les entrées vides ou non-tableau', () => {
+    expect(buildChapterNumberMap(null).size).toBe(0);
+    expect(buildChapterNumberMap([]).size).toBe(0);
   });
 });
