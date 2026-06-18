@@ -12,6 +12,8 @@ import ExpenseNotesMonthView from './ExpenseNotesMonthView';
 import VehiclesPanel from './VehiclesPanel';
 import LocationsPanel from './LocationsPanel';
 import DistanceMarginsModal from './DistanceMarginsModal';
+import HelpPanel from '../../components/help/HelpPanel';
+import HelpButton from '../../components/help/HelpButton';
 
 const MONTH_LABELS = [
   'Janvier', 'Fevrier', 'Mars', 'Avril', 'Mai', 'Juin',
@@ -33,6 +35,7 @@ const ExpenseNotesView = ({ user, companyId, onBackToHub, masterBranding }) => {
   const [showVehicles, setShowVehicles] = useState(false);
   const [showLocations, setShowLocations] = useState(false);
   const [showMargins, setShowMargins] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   // Migration des anciennes donnees partagees (chemins pre-V2.5.x) vers per-user.
   // Le bandeau s'affiche tant que l'utilisateur n'a aucune note ni adresse,
@@ -235,6 +238,7 @@ const ExpenseNotesView = ({ user, companyId, onBackToHub, masterBranding }) => {
           <Settings size={14} />
           Vehicules
         </button>
+        <HelpButton onClick={() => setShowHelp(true)} />
       </header>
 
       <div className="flex-1 overflow-y-auto p-6">
@@ -553,6 +557,8 @@ const ExpenseNotesView = ({ user, companyId, onBackToHub, masterBranding }) => {
           onClose={() => setShowMargins(false)}
         />
       )}
+
+      <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="expenseNotes" />
 
     </div>
   );

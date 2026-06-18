@@ -1847,4 +1847,275 @@ REGLES
       },
     ],
   },
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // NOTES DE FRAIS KILOMÉTRIQUES
+  // ──────────────────────────────────────────────────────────────────────────
+  expenseNotes: {
+    title: 'Guide — Notes de Frais',
+    subtitle: 'Frais kilométriques au barème fiscal',
+    tabs: [
+      {
+        id: 'apercu', label: "Vue d'ensemble", icon: 'BookOpen',
+        sections: [
+          { type: 'intro', text: "Ce module calcule vos indemnités kilométriques selon le barème fiscal officiel. Vous saisissez vos trajets, l'application en déduit la distance et le montant déductible. Vos données (trajets, véhicules, adresses) sont privées : chaque utilisateur ne voit que les siennes." },
+          {
+            type: 'steps',
+            items: [
+              { color: 'blue', title: 'Deux écrans', description: "La vue annuelle présente une grille des 12 mois ; un clic sur un mois ouvre le détail de ses trajets." },
+              { color: 'emerald', title: 'Navigation par année', description: "Les flèches autour de l'année changent d'exercice ; impossible d'aller dans le futur." },
+              { color: 'violet', title: 'Trois indicateurs annuels', description: "Total annuel (km), Montant déductible (€) et Tranche active — recalculés en direct à chaque trajet." },
+            ],
+          },
+          {
+            type: 'card', icon: 'BarChart3', color: 'violet', title: 'Suivi de la tranche fiscale',
+            description: "Un graphe d'évolution mensuelle et une barre de progression situent votre cumul annuel par rapport aux seuils de 5 000 et 20 000 km (les trois tranches du barème).",
+          },
+          { type: 'tip', text: "Le mois en cours est entouré d'ambre et porte le badge « En cours ». Les mois sans trajet affichent « Aucun trajet »." },
+        ],
+      },
+      {
+        id: 'trajet', label: 'Saisir un trajet', icon: 'MapPin',
+        sections: [
+          { type: 'intro', text: "Dans la vue d'un mois, le bouton « Trajet » (ou la touche N) ouvre le formulaire de saisie. La distance se calcule automatiquement dès que le départ et l'arrivée sont reconnus." },
+          {
+            type: 'steps',
+            items: [
+              { color: 'blue', title: 'Date & motif', description: "Choisissez la date (un avertissement signale week-end et jour férié). Le motif est libre, avec suggestions (Chantier, Réunion sur site, Visite de site…)." },
+              { color: 'emerald', title: 'Départ & arrivée', description: "Saisissez les adresses : l'autocomplétion propose d'abord vos favoris, puis des adresses réelles. Le domicile sert de départ par défaut." },
+              { color: 'amber', title: 'Étapes', description: "« Ajouter une étape » insère un point intermédiaire ; la distance passe alors par chaque étape." },
+              { color: 'indigo', title: 'Distance', description: "Calculée automatiquement par l'itinéraire routier. Vous pouvez la saisir à la main (priorité à votre valeur) ; « Recalculer auto » rétablit le calcul." },
+              { color: 'rose', title: 'Aller-retour', description: "La case « A/R » double le trajet (ou ajoute le retour direct lorsqu'il y a des étapes)." },
+            ],
+          },
+          {
+            type: 'card', icon: 'Copy', color: 'teal', title: 'Trajets récurrents',
+            description: "À la création, « Répéter ce trajet » génère automatiquement une série : quotidien, jours ouvrés, hebdomadaire, toutes les 2 semaines ou mensuel, jusqu'à une date de fin.",
+          },
+          { type: 'tip', text: "Dans le tableau du mois, la colonne KM est cliquable pour corriger une distance à la main ; un double-clic sur la ligne la modifie. Les actions Dupliquer / Supprimer apparaissent au survol." },
+        ],
+      },
+      {
+        id: 'vehicules', label: 'Véhicules & adresses', icon: 'Settings',
+        sections: [
+          { type: 'intro', text: "Deux réglages conditionnent vos calculs et votre confort de saisie : le véhicule (sa puissance fiscale) et vos adresses favorites." },
+          {
+            type: 'card', icon: 'Settings', color: 'blue', title: 'Véhicules', badge: 'Bouton « Véhicules »',
+            description: "Déclarez un ou plusieurs véhicules. L'étoile désigne le véhicule par défaut utilisé pour les calculs.",
+            steps: [
+              "Libellé (ex. « Renault Clio ») et puissance fiscale (de « 3 CV et moins » à « 7 CV et plus »)",
+              "Immatriculation facultative (reprise sur le PDF)",
+              "Véhicule électrique : bonus fiscal de +20 % appliqué au montant",
+            ],
+          },
+          {
+            type: 'card', icon: 'MapPin', color: 'emerald', title: 'Adresses favorites', badge: 'Bouton « Adresses »',
+            description: "Mémorisez vos lieux fréquents (domicile, bureau, chantiers) pour les réutiliser en un clic dans le formulaire de trajet.",
+            steps: [
+              "L'adresse marquée « Domicile » (icône maison) devient le départ par défaut",
+              "Les favoris remontent en tête de l'autocomplétion (départ, étapes, arrivée)",
+              "Renommez (crayon) ou supprimez (corbeille) chaque adresse",
+            ],
+          },
+          { type: 'warning', text: "Un véhicule au moins est requis : impossible de supprimer le dernier. Le bonus électrique se règle via l'icône éclair sur chaque véhicule." },
+        ],
+      },
+      {
+        id: 'bareme', label: 'Barème & majoration', icon: 'Calculator',
+        sections: [
+          { type: 'intro', text: "Le montant déductible suit le barème kilométrique fiscal 2025. Il dépend de la puissance du véhicule et de votre cumul annuel de kilomètres." },
+          {
+            type: 'table', title: 'Trois tranches selon le cumul annuel',
+            rows: [
+              { label: "Tranche 1 — jusqu'à 5 000 km", desc: "Taux plein par kilomètre" },
+              { label: "Tranche 2 — de 5 001 à 20 000 km", desc: "Taux réduit + forfait fixe" },
+              { label: "Tranche 3 — au-delà de 20 000 km", desc: "Taux dégressif" },
+            ],
+          },
+          {
+            type: 'steps',
+            items: [
+              { color: 'violet', title: 'Tranche automatique', description: "Par défaut, l'app applique le calcul marginal exact : chaque mois est valorisé selon la progression réelle du cumul annuel (forfait et passage de tranche inclus)." },
+              { color: 'amber', title: 'Tranche forcée', description: "Le sélecteur « Tranche active » permet d'imposer une tranche : un taux fixe est alors appliqué à tous les kilomètres (badge « forcée »)." },
+              { color: 'emerald', title: 'Bonus électrique', description: "Un véhicule électrique majore le montant de +20 %, signalé partout par le badge éclair." },
+            ],
+          },
+          {
+            type: 'card', icon: 'Calculator', color: 'indigo', title: 'Majoration des distances', badge: 'Bouton « Majoration km »',
+            description: "La distance routière théorique est souvent inférieure au réel (détours, parking). Vous pouvez la majorer automatiquement selon la distance.",
+            steps: [
+              "Règles par défaut : ≤ 10 km +15 %, ≤ 30 km +10 %, ≤ 100 km +5 %, au-delà 0 %",
+              "Ajoutez ou supprimez vos propres seuils, ou « Réinitialiser défaut »",
+              "Une distance saisie manuellement n'est jamais majorée (elle prime)",
+            ],
+            tip: "La majoration est partagée au niveau de l'entreprise ; trajets, véhicules et adresses restent personnels.",
+          },
+        ],
+      },
+      {
+        id: 'export', label: 'Exporter & envoyer', icon: 'FileDown',
+        sections: [
+          { type: 'intro', text: "Depuis la vue d'un mois, deux boutons permettent de sortir la note de frais." },
+          {
+            type: 'card', icon: 'FileDown', color: 'red', title: 'Export PDF', badge: 'Bouton « PDF »',
+            description: "Génère la note du mois en PDF : véhicule, liste des trajets, total km, montant déductible, tranche et taux. Le document reprend votre identité visuelle (branding).",
+          },
+          {
+            type: 'card', icon: 'Send', color: 'emerald', title: 'Envoi par email', badge: 'Bouton « Email »',
+            description: "Envoie la note du mois directement depuis l'application, avec le PDF en pièce jointe.",
+            steps: [
+              "Nécessite un serveur d'envoi configuré (Hub → Mon Compte → Email)",
+              "Destinataires, sujet et message sont pré-remplis et modifiables",
+              "Un aperçu du message est disponible avant l'envoi",
+            ],
+          },
+          { type: 'warning', text: "Les boutons PDF et Email sont désactivés tant que le mois ne contient aucun trajet." },
+        ],
+      },
+    ],
+  },
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // ESTIMATION RAPIDE
+  // ──────────────────────────────────────────────────────────────────────────
+  estimRapide: {
+    title: 'Guide — Estimation Rapide',
+    subtitle: "Chiffrage d'enveloppe par grands lots",
+    tabs: [
+      {
+        id: 'apercu', label: "Vue d'ensemble", icon: 'BookOpen',
+        sections: [
+          { type: 'intro', text: "Estimation Rapide sert à chiffrer une enveloppe budgétaire par grands lots VRD (terrassement, voirie, réseaux…), en phase avant-projet. C'est volontairement plus léger que le module ESTIMA : pas de BPU détaillé ni de tranches, juste des postes sommaires." },
+          {
+            type: 'steps',
+            items: [
+              { color: 'emerald', title: 'Liste des estimations', description: "L'écran d'accueil affiche vos estimations en cartes (nom, client, lieu, nombre de lots, total HT). Un champ de recherche filtre par nom, client ou lieu." },
+              { color: 'blue', title: 'Créer / ouvrir', description: "« Nouvelle » part d'un modèle ; un clic sur une carte ouvre l'éditeur. Les actions Dupliquer et Supprimer apparaissent au survol." },
+              { color: 'amber', title: 'Enregistrement automatique', description: "Tout est sauvegardé seul, 3 secondes après votre dernière saisie. L'indicateur du ruban affiche Non enregistré / Enregistrement… / Enregistré." },
+            ],
+          },
+          { type: 'tip', text: "Quitter l'éditeur (Liste / Hub) force d'abord une sauvegarde. Si vous fermez l'onglet avec des modifications en attente, le navigateur vous prévient." },
+        ],
+      },
+      {
+        id: 'modeles', label: 'Modèles', icon: 'Layers',
+        sections: [
+          { type: 'intro', text: "Chaque estimation démarre d'un modèle, pour ne pas repartir d'une page blanche." },
+          {
+            type: 'card', icon: 'Layers', color: 'blue', title: 'Modèle de départ',
+            description: "À la création, choisissez un modèle système (pré-rempli de lots VRD types) ou l'un de vos modèles personnels. Donnez un nom, puis « Créer ».",
+          },
+          {
+            type: 'card', icon: 'Star', color: 'violet', title: 'Vos propres modèles', badge: 'Bouton « Enreg. modèle »',
+            description: "Depuis l'éditeur, enregistrez la structure de lots de l'estimation courante comme modèle réutilisable (seuls les lots sont mémorisés, pas le client ni le nom).",
+          },
+          { type: 'tip', text: "Vos modèles personnels apparaissent dans la fenêtre de création, sous les modèles système, et se suppriment d'un clic (corbeille au survol)." },
+        ],
+      },
+      {
+        id: 'editeur', label: 'Éditeur', icon: 'ListTree',
+        sections: [
+          { type: 'intro', text: "L'estimation s'organise en grands lots, chacun contenant des postes. Le total se recalcule en continu." },
+          {
+            type: 'steps',
+            items: [
+              { color: 'blue', title: 'En-tête', description: "Renseignez le nom de l'estimation, le client / maître d'ouvrage et le lieu / commune." },
+              { color: 'emerald', title: 'Grands lots', description: "« Ajouter un grand lot » propose les lots VRD du catalogue non encore présents, ou un lot personnalisé. Chaque lot se plie/déplie et affiche son sous-total." },
+              { color: 'amber', title: 'Postes', description: "« Ajouter un poste » crée une ligne : désignation, unité, quantité, prix unitaire. Le montant (Qté × P.U.) se calcule seul ; il affiche « PM » (pour mémoire) s'il vaut 0." },
+              { color: 'slate', title: 'Lots vides', description: "Le bouton « Masquer les lots vides » épure l'affichage en cachant les lots sans valeur." },
+            ],
+          },
+          { type: 'tip', text: "Chaque poste porte une référence automatique (P1, P2, P3…) affichée dans la colonne N° — elle sert aux formules." },
+        ],
+      },
+      {
+        id: 'total', label: 'Formules & total', icon: 'FunctionSquare',
+        sections: [
+          { type: 'intro', text: "Comme dans ESTIMA, une quantité peut être une formule qui référence d'autres postes ; le bas de page calcule le total complet." },
+          {
+            type: 'card', icon: 'FunctionSquare', color: 'emerald', title: 'Quantités calculées',
+            description: "Saisissez une quantité commençant par = pour en faire une formule (ex. =[Surface voirie]*0.05). Une barre de formule s'ouvre ; cliquez un autre poste pour insérer sa référence. Entrée valide, Échap annule.",
+          },
+          {
+            type: 'table', title: 'Carte « Total »',
+            rows: [
+              { label: "Total HT (base)", desc: "Somme des sous-totaux de tous les lots" },
+              { label: "Aléas", desc: "Pourcentage optionnel (10 % par défaut) ajouté à la base" },
+              { label: "Total HT", desc: "Base + aléas" },
+              { label: "TVA 20 % puis Total TTC", desc: "TVA à taux fixe 20 %, puis TTC = HT × 1,2" },
+            ],
+          },
+          { type: 'warning', text: "Le taux de TVA est figé à 20 % et il n'y a pas de réorganisation des lots par glisser-déposer : l'ordre suit l'ajout." },
+        ],
+      },
+      {
+        id: 'convertir', label: 'Convertir en ESTIMA', icon: 'ArrowRight',
+        sections: [
+          { type: 'intro', text: "Quand le chiffrage rapide est validé, transformez-le en projet ESTIMA détaillé pour l'affiner." },
+          {
+            type: 'card', icon: 'ArrowRight', color: 'emerald', title: 'Passerelle vers ESTIMA', badge: 'Bouton « Convertir en ESTIMA »',
+            description: "Crée un nouveau projet ESTIMA à partir de l'estimation : les lots deviennent des chapitres, les postes des articles, et les formules sont conservées.",
+            steps: [
+              "L'estimation rapide d'origine n'est pas supprimée (le projet est créé à côté)",
+              "L'application bascule automatiquement vers le module ESTIMA sur le nouveau projet",
+              "Vous pouvez ensuite l'enrichir avec le BPU, les tranches et les exports détaillés",
+            ],
+          },
+          { type: 'tip', text: "Idéal en phase APS : on pose vite une enveloppe, puis on bascule en ESTIMA dès que le projet se précise." },
+        ],
+      },
+    ],
+  },
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // MON COMPTE & DONNÉES PERSONNELLES (RGPD)
+  // ──────────────────────────────────────────────────────────────────────────
+  rgpd: {
+    title: 'Guide — Mon Compte & Données',
+    subtitle: "RGPD : portabilité et droit à l'effacement",
+    tabs: [
+      {
+        id: 'apercu', label: "Vue d'ensemble", icon: 'Shield',
+        sections: [
+          { type: 'intro', text: "Cet écran regroupe la gestion de votre compte et de vos données personnelles, conformément au RGPD. Il contient deux volets : la configuration de votre email d'envoi, et vos droits sur vos données." },
+          {
+            type: 'card', icon: 'Send', color: 'blue', title: 'Configuration Email (SMTP)',
+            description: "Le premier volet configure le serveur qui enverra vos documents (comptes rendus, notes de frais) directement depuis l'application. Il dispose de sa propre aide détaillée (bouton « Aide » de la section Email).",
+          },
+          { type: 'tip', text: "Vos données personnelles n'appartiennent qu'à vous : ce module vous laisse les récupérer ou supprimer votre compte à tout moment." },
+        ],
+      },
+      {
+        id: 'export', label: 'Exporter mes données', icon: 'Download',
+        sections: [
+          { type: 'intro', text: "Le droit à la portabilité (RGPD art. 20) vous permet de récupérer vos données dans un format réutilisable." },
+          {
+            type: 'card', icon: 'Download', color: 'blue', title: 'Exporter mes données', badge: 'RGPD art. 20',
+            description: "Télécharge un fichier JSON contenant votre profil et l'intégralité de vos projets (y compris leur historique).",
+            steps: [
+              "Cliquez « Exporter mes données »",
+              "Un fichier estimavrd-donnees-AAAA-MM-JJ.json est téléchargé",
+              "Conservez-le ou ré-importez-le ailleurs : il est lisible et structuré",
+            ],
+          },
+        ],
+      },
+      {
+        id: 'suppression', label: 'Supprimer mon compte', icon: 'Trash2',
+        sections: [
+          { type: 'intro', text: "Le droit à l'effacement (RGPD art. 17) vous permet de supprimer définitivement votre compte." },
+          {
+            type: 'card', icon: 'Trash2', color: 'red', title: 'Supprimer mon compte', badge: 'RGPD art. 17',
+            description: "Supprime définitivement votre profil et votre compte de connexion. L'opération est sécurisée par une double confirmation puis la saisie de votre mot de passe.",
+            steps: [
+              "Deux confirmations successives préviennent toute suppression accidentelle",
+              "Une ré-authentification (mot de passe) est demandée",
+              "Vous êtes déconnecté automatiquement une fois le compte supprimé",
+            ],
+          },
+          { type: 'warning', text: "Action irréversible. À noter : les données de l'entreprise (projets, BPU, bibliothèque) sont conservées — seul votre compte personnel est effacé." },
+        ],
+      },
+    ],
+  },
 };

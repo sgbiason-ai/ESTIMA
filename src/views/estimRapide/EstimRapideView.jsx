@@ -2,13 +2,14 @@
 // Module Estimation Rapide — orchestrateur (liste ↔ éditeur, auto-save).
 // Look ESTIMA : ribbon Office, fond clair, accent émeraude.
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { ArrowLeft, Plus, Save, Loader2, CheckCircle2, Copy, Trash2, FileOutput, BookmarkPlus } from 'lucide-react';
+import { ArrowLeft, Plus, Save, Loader2, CheckCircle2, Copy, Trash2, FileOutput, BookmarkPlus, HelpCircle } from 'lucide-react';
 import { useEstimRapide } from '../../hooks/useEstimRapide';
 import { confirm, prompt } from '../../utils/globalUI';
 import { RibbonHeader, RibbonContainer, RibbonGroup, RibbonBtnLarge } from '../../components/common/RibbonParts';
 import EstimRapideList from './EstimRapideList';
 import EstimRapideEditor from './EstimRapideEditor';
 import TemplatePickerModal from './TemplatePickerModal';
+import HelpPanel from '../../components/help/HelpPanel';
 
 export default function EstimRapideView({ user, companyId, onBackToHub, onNavigateModule }) {
   const {
@@ -21,6 +22,7 @@ export default function EstimRapideView({ user, companyId, onBackToHub, onNaviga
   const [draft, setDraft] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [showTemplate, setShowTemplate] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   const savingRef = useRef(false);
   const autoSaveTimerRef = useRef(null);
@@ -178,6 +180,10 @@ export default function EstimRapideView({ user, companyId, onBackToHub, onNaviga
               <RibbonBtnLarge icon={FileOutput} label="Convertir en ESTIMA" onClick={handleConvert} accent="text-emerald-500" />
             </RibbonGroup>
           )}
+
+          <RibbonGroup label="Aide">
+            <RibbonBtnLarge icon={HelpCircle} label="Aide" onClick={() => setShowHelp(true)} />
+          </RibbonGroup>
         </RibbonContainer>
       </header>
 
@@ -203,6 +209,8 @@ export default function EstimRapideView({ user, companyId, onBackToHub, onNaviga
           onClose={() => setShowTemplate(false)}
         />
       )}
+
+      <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="estimRapide" />
     </div>
   );
 }
