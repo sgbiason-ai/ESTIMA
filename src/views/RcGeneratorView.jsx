@@ -140,13 +140,17 @@ const RcGeneratorView = ({
       />
 
       <style>{`
-        .rc-content table { width: 100%; border-collapse: collapse; margin: 1em 0; border: 1px solid #e2e8f0; }
-        .rc-content th, .rc-content td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; }
-        .rc-content th { background-color: #f1f5f9; font-weight: bold; }
-        .rc-content ul { list-style-type: disc !important; padding-left: 1.5em !important; margin: 0.5em 0; }
-        .rc-content ol { list-style-type: decimal !important; padding-left: 1.5em !important; margin: 0.5em 0; }
-        .rc-content li { margin-bottom: 0.25em; }
-        .rc-content p { margin-bottom: 0.8em; text-align: justify; }
+        .rc-content { font-size: 15px; line-height: 1.7; }
+        .rc-content table { width: 100%; border-collapse: collapse; margin: 1em 0; table-layout: fixed; }
+        .rc-content td, .rc-content th { border: 1px solid #cbd5e1; padding: 6px 10px; min-width: 30px; vertical-align: top; position: relative; font-size: 14px; text-align: left; }
+        .rc-content th { background-color: #f1f5f9; font-weight: bold; color: #334155; }
+        .rc-content ul { list-style-type: disc !important; padding-left: 1.5em !important; margin: 0.6em 0; }
+        .rc-content ol { list-style-type: decimal !important; padding-left: 1.5em !important; margin: 0.6em 0; }
+        .rc-content li { margin-bottom: 0.2em; }
+        .rc-content p { margin: 0 0 0.7em; }
+        .rc-content a { color: #2563eb; text-decoration: underline; }
+        .rc-content [align="justify"] { text-align: justify; }
+        .rc-content img { max-width: 100%; height: auto; border-radius: 6px; margin: 0.4em 0; }
       `}</style>
 
     </div>

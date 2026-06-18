@@ -70,7 +70,7 @@ const RcPreview = ({
             <h3 style={titleStyle}>{node.title}</h3>
           </div>
           <div 
-            className="text-sm leading-relaxed text-justify rc-content" 
+            className="rc-content" 
             style={{ fontFamily: branding?.fonts?.main || 'Arial', color: branding?.colors?.text || '#374151' }} 
             dangerouslySetInnerHTML={{__html: sanitizeHtml(text)}} 
           />
