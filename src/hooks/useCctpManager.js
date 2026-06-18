@@ -1,6 +1,7 @@
 // src/hooks/useCctpManager.js
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { SMART_MAPPING } from '../data/cctpData';
+import { VRD_CONCEPTS } from '../data/cctpData';
+import { computeAutoSelection, articleSignature } from '../utils/cctpAutoSelect';
 import { parseDocxToTree } from '../utils/wordImporter';
 import { parsePdfToTree } from '../utils/parsePdfCctp';
 import { toast, confirm } from '../utils/globalUI';
@@ -102,6 +103,7 @@ export const useCctpManager = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [nodeToEdit, setNodeToEdit] = useState(null);
+  const [provenance, setProvenance] = useState(new Map());
   const isAutoScrolling = useRef(false);
 
   // ── VARIABLES : dérivées directement du projet (fiche projet) ───────────────
@@ -216,191 +218,19 @@ export const useCctpManager = ({
     return null;
   };
 
-  // ─── UTILITAIRES TEXTE ───────────────────────────────────────────────────────
-
-  const normalizeText = (str) =>
-    (str || '').toLowerCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/[-_]/g, ' ')
-      .replace(/\s+/g, ' ').trim();
-
-  // Optimisation de la regex avec \b au lieu de lookbehinds
-  const matchesWord = (text, keyword) => {
-    if (keyword.length <= 3) {
-      const re = new RegExp(`\\b${keyword}\\b`, 'i');
-      return re.test(text);
-    }
-    return text.includes(keyword);
-  };
-
-  const scoreMatch = (text, keywords) =>
-    keywords.filter(k => matchesWord(text, normalizeText(k))).length;
-
-  // ─── INDEX CCTP (construit une seule fois par cctpData) ───────────────────
-  const buildCctpIndex = (nodes, path = []) => {
-    const index = new Map();
-    const traverse = (nodes, currentPath) => {
-      nodes.forEach((node) => {
-        const nodePath = [...currentPath, node.id];
-        index.set(String(node.id), { node, path: nodePath });
-        if (node.children) traverse(node.children, nodePath);
-      });
-    };
-    traverse(nodes, path);
-    return index;
-  };
-
-  // Recherche dans les titres, avec minLevel pour cibler les chapitres principaux (niveau 1) ou non
-  const findIdsByTitleKeywords = (nodes, keywords, minLevel = 2) => {
-      const matches = [];
-      nodes.forEach(node => {
-          const title = normalizeText(node.title || '');
-          const score = scoreMatch(title, keywords);
-          if (node.level >= minLevel && score > 0) matches.push({ id: node.id, score });
-          if (node.children) matches.push(...findIdsByTitleKeywords(node.children, keywords, minLevel));
-      });
-      return matches;
-  };
-
-  // ─── AUTO-SÉLECTION CCTP ─────────────────────────────────────────────────
+  // ─── AUTO-SÉLECTION CCTP (déléguée au moteur pur cctpAutoSelect.js) ───────────
+  // Fonctionne sur le CCTP maître ET sur un CCTP importé (résolution par titres +
+  // index positionnel + concepts VRD), avec apprentissage des corrections.
   const autoSelectChapters = () => {
-    const newSelection = new Set(); 
-    const newExpanded = new Set();
-
-    const cctpIndex = buildCctpIndex(cctpData);
-
-    const selectNode = (id) => {
-      const entry = cctpIndex.get(String(id));
-      if (!entry) return;
-      entry.path.forEach(pid => { newSelection.add(pid); newExpanded.add(pid); });
-      const selectDown = (node) => {
-        newSelection.add(node.id);
-        node.children?.forEach(selectDown);
-      };
-      selectDown(entry.node);
-    };
-
-    // ── -1. CHAPITRES OBLIGATOIRES DE BASE ──
-    const mandatoryKeywordsGroups = [
-      ['objet'], // Plus besoin de "marche" à côté
-      ['generalite'],
-      ['generalites'],
-      ['presentation']
-    ];
-
-    mandatoryKeywordsGroups.forEach(keywords => {
-      // minLevel = 1 pour forcer la recherche dans les grands titres
-      const matches = findIdsByTitleKeywords(cctpData, keywords, 1);
-      matches
-        .filter(c => c.score >= keywords.length)
-        .forEach(c => selectNode(c.id));
+    const { selectedIds: sel, expandedIds: exp, provenance: prov } = computeAutoSelection({
+      cctpData,
+      project,
+      taxonomy: VRD_CONCEPTS,
+      learnedLinks: project?.cctpLearnedLinks || [],
     });
-
-    // ── 0. CONTEXTE GLOBAL DU PROJET ──
-    const projectContextText = normalizeText(`
-      ${project?.projectDescription || ''} 
-      ${project?.marketType || ''}
-      ${project?.name || ''}
-    `);
-    
-    const projectKeywords = projectContextText.split(' ').filter(w => w.length > 4);
-    
-    if (projectKeywords.length > 0) {
-      const contextMatches = findIdsByTitleKeywords(cctpData, projectKeywords);
-      contextMatches
-        .filter(c => c.score >= 2)
-        .forEach(c => selectNode(c.id));
-    }
-
-    // ── 0.bis RÈGLES MÉTIERS STRICTES (Exemple: Sismique selon département) ──
-    if (project?.department) {
-      const dpt = parseInt(project.department, 10);
-      const zonesSismiques = [5, 9, 38, 73, 74, 65, 66, 971, 972, 973, 974]; 
-      if (zonesSismiques.includes(dpt)) {
-        const sismMatches = findIdsByTitleKeywords(cctpData, ['sismique', 'eurocode', 'parasismique']);
-        sismMatches.forEach(c => selectNode(c.id));
-      }
-    }
-
-    // ── 1. EXTRACTION DES ARTICLES DU DEVIS ──
-    const allDevisItems = [];
-    const extractItems = (nodes) => {
-      nodes.forEach(n => {
-        if (n.type === 'item' || n.price !== undefined) allDevisItems.push(n);
-        if (n.children) extractItems(n.children);
-      });
-    };
-    if (project?.chapters) extractItems(project.chapters);
-
-    allDevisItems.forEach(item => {
-      // ── 1. Liens CCTP explicites (cctpRefs)
-      const refs = item.cctpRefs || (item.cctpRef ? [item.cctpRef] : []);
-      refs.forEach(refId => selectNode(refId));
-
-      // ── 2. SMART_MAPPING avec texte normalisé + scoring
-      const rawText = `${item.designation} ${item.description || ''}`;
-      const text = normalizeText(rawText);
-
-      if (SMART_MAPPING) {
-        const sortedRules = [...SMART_MAPPING].sort(
-          (a, b) => b.keywords.length - a.keywords.length
-        );
-
-        sortedRules.forEach(rule => {
-          const blocked = (rule.mustNotContain || []).some(bad =>
-            matchesWord(text, normalizeText(bad))
-          );
-          if (blocked) return;
-
-          const score = scoreMatch(text, rule.keywords);
-          if (score === 0) return;
-
-          const threshold = rule.keywords.length >= 4 ? 2 : 1;
-          if (score < threshold) return;
-
-          let foundAtLeastOne = false;
-          (rule.targetIds || []).forEach(targetId => {
-            if (cctpIndex.has(String(targetId))) {
-              selectNode(targetId);
-              foundAtLeastOne = true;
-            }
-          });
-
-          if (!foundAtLeastOne) {
-            const candidates = findIdsByTitleKeywords(cctpData, rule.keywords);
-            const maxScore = Math.max(...candidates.map(c => c.score), 0);
-            candidates
-              .filter(c => c.score >= maxScore)
-              .forEach(c => selectNode(c.id));
-          }
-        });
-      }
-
-      // ── 3. Correspondance directe titre CCTP ↔ désignation article
-      if (refs.length === 0) {
-        const words = text.split(' ').filter(w => w.length > 4);
-        if (words.length > 0) {
-          const direct = findIdsByTitleKeywords(cctpData, words);
-          direct
-            .filter(c => c.score >= 2)
-            .forEach(c => selectNode(c.id));
-        }
-      }
-    });
-
-    // ── 4. Sélectionne les chapitres level=1 UNIQUEMENT si des enfants ont été sélectionnés
-    cctpData.forEach(node => {
-      if (node.level === 1) {
-        const hasSelectedChild = node.children?.some(child => newSelection.has(child.id));
-        if (hasSelectedChild) {
-          newSelection.add(node.id);
-          newExpanded.add(node.id);
-        }
-      }
-    });
-
-    setSelectedIds(newSelection);
-    setExpandedIds(newExpanded);
+    setSelectedIds(sel);
+    setExpandedIds(exp);
+    setProvenance(prov);
   };
 
   useEffect(() => {
@@ -580,6 +410,23 @@ export const useCctpManager = ({
     setSelectedIds(newSet);
   };
 
+  // Mémorise une correction manuelle (coche/décoche) d'un chapitre pour un article,
+  // afin que l'AUTO la rejoue ensuite (apprentissage par signature d'article).
+  const learnLink = (article, nodeId, mode = 'add') => {
+    if (!article || !nodeId || !onUpdateProject) return;
+    const sig = articleSignature(article);
+    const links = (project?.cctpLearnedLinks || []).map(l => ({ ...l, add: [...(l.add || [])], remove: [...(l.remove || [])] }));
+    let entry = links.find(l => l.sig === sig);
+    if (!entry) { entry = { sig, add: [], remove: [] }; links.push(entry); }
+    const addSet = new Set(entry.add);
+    const remSet = new Set(entry.remove);
+    if (mode === 'add') { addSet.add(nodeId); remSet.delete(nodeId); }
+    else { remSet.add(nodeId); addSet.delete(nodeId); }
+    entry.add = [...addSet];
+    entry.remove = [...remSet];
+    onUpdateProject({ ...project, cctpLearnedLinks: links });
+  };
+
   const saveToCloud = async () => {
     const sanitizeData = (nodes) => {
         const seenIds = new Set();
@@ -606,6 +453,7 @@ export const useCctpManager = ({
     nodeToEdit, variables, saveStatus, filteredCctpData,
     autoSelectChapters, toggleExpand, expandAll, collapseAll,
     handleExportMaster, handleFileUpload, handlePdfUpload, handlePreviewScroll,
-    openEditor, handleSaveNode, addChapter, deleteNode, toggleSelection, saveToCloud
+    openEditor, handleSaveNode, addChapter, deleteNode, toggleSelection, saveToCloud,
+    provenance, learnLink
   };
 };
