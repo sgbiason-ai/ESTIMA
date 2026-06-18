@@ -8,6 +8,7 @@ import autoTable from 'jspdf-autotable';
 import { DEFAULT_BRANDING } from '../data/branding';
 import { sanitizeFilename, loadLogos } from './pdf/pdfSharedHelpers';
 import { buildTheme as _buildTheme } from './pdf/buildTheme';
+import { renderForExport } from './docContent';
 
 // ─── COULEURS ────────────────────────────────────────────────────────────────
 // CCTP/RC utilise des defaults bleu et chapterBg à facteur 0.88 (= tableBg central).
@@ -366,7 +367,10 @@ const renderTable = (doc, ctx, cursor, head, body) => {
 
 const renderContent = (doc, ctx, cursor, html, vars) => {
   const { THEME, fontB } = ctx;
-  const blocks = parseHtmlBlocks(html, vars);
+  // Pipeline partagé : retrait notes éditeur + sections conditionnelles +
+  // substitution. parseHtmlBlocks ne re-substitue donc rien (vars vides).
+  const rendered = renderForExport(html, vars);
+  const blocks = parseHtmlBlocks(rendered, {});
   if (!blocks.length) return;
   cursor.y += 1;
 

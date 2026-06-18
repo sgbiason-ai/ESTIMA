@@ -10,6 +10,33 @@
 
 import { buildCoverPageCanvas } from "./coverPageCanvas";
 
+const cleanColor = (hex) => (hex ? String(hex).replace(/^#/, "").toUpperCase() : "1E3A5F");
+
+// Page de garde native (texte) — fallback si le rendu canvas échoue.
+// Garantit un document jamais blanc en première page.
+const buildNativeCover = async (docLabel, variables = {}, branding = {}) => {
+  const { Paragraph, TextRun, AlignmentType } = await import("docx");
+  const primary = cleanColor(branding?.colors?.primary);
+  const fontH = branding?.fonts?.headings || "Arial";
+  const fontB = branding?.fonts?.main || "Arial";
+  const line = (text, opts = {}) =>
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: opts.before ?? 120, after: opts.after ?? 120 },
+      children: [new TextRun({ text: text || "", font: opts.font || fontB, size: opts.size || 24, bold: opts.bold, color: opts.color })],
+    });
+  return [
+    new Paragraph({ spacing: { before: 2400 }, children: [] }),
+    line(docLabel, { font: fontH, size: 28, bold: true, color: "808080" }),
+    line((variables.name || "PROJET").toUpperCase(), { font: fontH, size: 52, bold: true, color: primary, before: 400, after: 400 }),
+    line(variables.client || "", { size: 26, bold: true }),
+    line([variables.clientZip, variables.clientCity].filter(Boolean).join(" "), { size: 22, color: "666666" }),
+    line(variables.location ? `Lieu : ${variables.location}` : "", { size: 22, color: "666666", before: 240 }),
+    line(variables.code ? `Référence : ${variables.code}` : "", { size: 22, color: "666666" }),
+    line(`Phase : ${variables.phase || "DCE"}`, { size: 22, color: "666666" }),
+  ];
+};
+
 const base64DataURLToUint8Array = (dataURL) => {
   if (!dataURL) return null;
   const base64Regex = /^data:image\/(png|jpg|jpeg);base64,/i;
@@ -44,13 +71,19 @@ export const buildCoverPageElements = async (docType, variables, branding) => {
         ? "CAHIER DES CLAUSES ADMINISTRATIVES PARTICULIÈRES"
         : "RÈGLEMENT DE LA CONSULTATION";
 
-  // Rendu canvas → PNG data URL
-  const dataUrl = await buildCoverPageCanvas(variables, docLabel, branding);
-  const bytes   = base64DataURLToUint8Array(dataUrl);
+  // Rendu canvas → PNG data URL. Peut échouer (canvas « tainté » par un logo
+  // chargé en cross-origin, police absente…) : on ne renvoie alors JAMAIS une
+  // page blanche, mais une page de garde native (texte) lisible et embarquée.
+  let bytes = null;
+  try {
+    const dataUrl = await buildCoverPageCanvas(variables, docLabel, branding);
+    bytes = base64DataURLToUint8Array(dataUrl);
+  } catch {
+    bytes = null;
+  }
 
   if (!bytes) {
-    // Fallback : paragraphe vide si le rendu a échoué
-    return [new Paragraph({ children: [] })];
+    return buildNativeCover(docLabel, variables, branding);
   }
 
   // A4 affiché pleine page :

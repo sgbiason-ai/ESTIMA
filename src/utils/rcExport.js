@@ -1,6 +1,7 @@
 import { saveAs } from "file-saver";
 import { DEFAULT_BRANDING } from "../data/branding";
 import { buildCoverPageElements } from "./wordCoverPage";
+import { renderForExport } from "./docContent";
 
 let Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
     Header, Footer, PageNumber, TableOfContents, PageBreak, ImageRun,
@@ -283,11 +284,9 @@ export const generateWordRC = async (selectedNodes, variables, masterData, brand
       );
 
       if (node.content) {
-        let text = String(node.content || "");
-        Object.keys(variables).forEach((key) => {
-          const regex = new RegExp(`{{${key}}}`, "g");
-          text = text.replace(regex, String(variables[key] || ""));
-        });
+        // Pipeline partagé : retrait notes éditeur (mode final) + sections
+        // conditionnelles {{#var}} + substitution des variables.
+        const text = renderForExport(node.content, variables);
         docChildren.push(...parseHtmlToDocx(text, branding));
       }
 
@@ -309,6 +308,8 @@ export const generateWordRC = async (selectedNodes, variables, masterData, brand
   const footerTable = new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: { top: { style: BorderStyle.SINGLE, size: 6, color: "E0E0E0" }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideVertical: { style: BorderStyle.NONE } }, rows: [ new TableRow({ children: [ new TableCell({ width: { size: 33, type: WidthType.PERCENTAGE }, borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } }, children: [new Paragraph({ children: [new TextRun({ text: sanitizeText(variables.code || "Ref"), size: 16, color: "888888" })] })] }), new TableCell({ width: { size: 33, type: WidthType.PERCENTAGE }, borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } }, children: [ new Paragraph({ alignment: AlignmentType.CENTER, children: [ new TextRun({ text: "Page ", size: 16, color: "888888" }), new TextRun({ children: [PageNumber.CURRENT], size: 16, color: "888888" }), new TextRun({ text: " / ", size: 16, color: "888888" }), new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 16, color: "888888" }) ] }) ] }), new TableCell({ width: { size: 33, type: WidthType.PERCENTAGE }, borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } }, children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: new Date().toLocaleDateString("fr-FR"), size: 16, color: "888888" })] })] }), ] }) ] });
 
   const doc = new Document({
+    // Force Word à recalculer les champs (dont le SOMMAIRE/TOC) à l'ouverture.
+    features: { updateFields: true },
     styles: createDocStyles(branding),
     sections: [
       // ── Section 1 : page de garde pleine page, sans header/footer ──────────
