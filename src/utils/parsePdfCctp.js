@@ -70,9 +70,13 @@ async function resolveDest(pdf, dest) {
 async function extractPages(pdf) {
   const pages = [];
   const lineFreq = new Map();
+  const tocPages = new Set(); // pages "SOMMAIRE" (beaucoup de lignes finissant par un n° de page)
+  const topFreq = new Map();  // textes récurrents en haut de page (en-têtes courants)
+  const botFreq = new Map();  // textes récurrents en bas de page (pieds de page)
 
   for (let p = 1; p <= pdf.numPages; p++) {
     const page = await pdf.getPage(p);
+    const viewportWidth = page.getViewport({ scale: 1 }).width || 595;
     const content = await page.getTextContent();
 
     const byY = new Map();
@@ -91,35 +95,63 @@ async function extractPages(pdf) {
     const lines = [...byY.keys()]
       .sort((a, b) => b - a) // haut → bas (Y décroissant)
       .map((y) => {
-        const text = byY.get(y)
-          .sort((a, b) => a.x - b.x)
-          .map((i) => i.str)
-          .join(' ')
-          .replace(/\s+/g, ' ')
-          .trim();
-        return { y, text };
+        const items = byY.get(y).sort((a, b) => a.x - b.x);
+        const text = items.map((i) => i.str).join(' ').replace(/\s+/g, ' ').trim();
+        // Entrée de sommaire = se termine par un n° de page (1-3 chiffres) aligné à droite.
+        const last = items[items.length - 1];
+        const isTocEntry =
+          items.length >= 2 &&
+          text.length > 6 &&
+          /^\d{1,3}$/.test(last.str.trim()) &&
+          last.x > viewportWidth * 0.72;
+        return { y, text, isTocEntry };
       })
       .filter((l) => l.text);
 
     for (const l of lines) lineFreq.set(l.text, (lineFreq.get(l.text) || 0) + 1);
+    if (lines.filter((l) => l.isTocEntry).length >= 4) tocPages.add(p - 1);
+    // En-tête/pied courants : 2 premières et 2 dernières lignes, clé débarrassée du
+    // n° de page final (« … Travaux 9 » / « … Travaux 10 » → même en-tête récurrent).
+    [lines[0], lines[1]].forEach((l) => l && tallyRunning(topFreq, l.text));
+    [lines[lines.length - 1], lines[lines.length - 2]].forEach((l) => l && tallyRunning(botFreq, l.text));
     pages[p - 1] = lines;
   }
 
-  return { pages, lineFreq };
+  // Une ligne récurrente en haut ou en bas de ≥3 pages = en-tête/pied courant → bruit.
+  const minRepeat = Math.min(3, pdf.numPages);
+  const runningLines = new Set();
+  for (const [t, n] of topFreq) if (n >= minRepeat) runningLines.add(t);
+  for (const [t, n] of botFreq) if (n >= minRepeat) runningLines.add(t);
+
+  return { pages, lineFreq, tocPages, runningLines };
 }
 
 // ─── Filtre du bruit (en-têtes/pieds de page répétés, pagination) ────────────
-function makeNoiseFilter(lineFreq, numPages) {
+function makeNoiseFilter(lineFreq, numPages, runningLines = new Set()) {
   const threshold = Math.max(3, Math.floor(numPages * 0.25));
   return (text) => {
+    if (runningLines.has(text) || runningLines.has(stripTrailingPageNum(text))) return true; // en-tête/pied courant
     if (/^\d{1,3}\s*\/\s*\d{1,3}$/.test(text)) return true;           // "12/129"
     if (/^\d{1,4}$/.test(text)) return true;                           // numéro de page seul
+    if (/^\d{1,4}\s+sur\s+\d{1,4}$/i.test(text)) return true;          // "3 sur 44" (pied de page)
     if (/Page\s+\d+\s+sur\s+\d+/i.test(text)) return true;             // "… Page X sur Y"
     if (/^Consultation\s+n[°o]\s*:/i.test(text)) return true;          // bandeau de consultation
     if ((lineFreq.get(text) || 0) >= threshold && text.length < 80) return true;
     return false;
   };
 }
+
+// Ligne de sommaire = points de suite + (éventuel) numéro de page : "TITRE …… 27".
+// On les écarte pour ne pas dupliquer la structure (les vrais titres sont dans le corps).
+const isTocLine = (text) => /\.{4,}\s*\d{0,4}\s*$/.test(text);
+
+// Retire un éventuel n° de page final ("… Travaux 9" → "… Travaux") pour reconnaître
+// un en-tête courant dont seul le numéro de page change d'une page à l'autre.
+const stripTrailingPageNum = (s) => s.replace(/\s+\d{1,3}$/, '').trim();
+const tallyRunning = (map, text) => {
+  const k = stripTrailingPageNum(text);
+  if (k.length >= 8) map.set(k, (map.get(k) || 0) + 1);
+};
 
 // ─── Lignes [{p,y,text}] → HTML (paragraphes par écart vertical + puces) ─────
 function linesToHtml(lines) {
@@ -242,44 +274,79 @@ async function buildFromOutline(pdf, outline, pages, numPages, isNoise) {
 }
 
 // ─── Fallback : détection des titres par numérotation (pas de sommaire) ──────
-function buildFromHeadings(pages, isNoise) {
-  // Niveau d'un titre numéroté : "1" → 1, "1.2" → 2, "1.2.3" → 3 …
-  const headingLevel = (text) => {
-    const t = text.trim();
-    if (/^chapitre\s+\d+/i.test(t)) return 1;
-    const m = t.match(/^(\d+(?:\.\d+)*)\.?\s+\S/);
-    if (m) return Math.min(m[1].split('.').length, MAX_LEVEL);
-    return 0;
+//
+// Gère les conventions rencontrées sur les marchés publics :
+//  - numéro seul sur sa ligne, titre sur la ligne suivante  ("1." ⏎ "TITRE")
+//  - numéro + titre sur la même ligne                         ("1.2 TITRE", "10.1. TITRE")
+//  - "Chapitre N" / "Titre N"
+// Les pages SOMMAIRE entières (tocPages), les lignes à points de suite et le bruit
+// sont écartés pour ne pas dupliquer la structure.
+function buildFromHeadings(pages, isNoise, tocPages = new Set()) {
+  const numSegments = (s) => Math.min(s.split('.').filter(Boolean).length, MAX_LEVEL);
+
+  const CHAP_RE = /^(chapitre|titre)\s+([0-9]+|[ivxlcdm]+)\b/i;
+  const NUM_ONLY_RE = /^(\d{1,3}(?:\.\d{1,3})*)\.?$/;          // "1.", "1.1", "10.2."
+  const NUM_INLINE_RE = /^(\d{1,3}(?:\.\d{1,3})*)\.?\s+(.+)$/; // "1.2 TITRE", "0. OBJET"
+
+  // Un vrai titre CCTP commence par une majuscule (les phrases "3 (trois)…",
+  // "2 faces cintrées…" sont ainsi écartées).
+  const headingLike = (title) => {
+    const t = title.trim();
+    if (t.length < 2 || t[0] === '(') return false;
+    return /^[A-ZÀ-Ÿ]/.test(t);
   };
 
   const root = [];
-  const stack = []; // stack[k] = dernier nœud du niveau k+1
-  let buffer = [];  // lignes de contenu en attente pour le nœud courant
+  const stack = [];        // stack[k] = { node, level }
+  let buffer = [];         // lignes de contenu du nœud courant
+  let pendingNum = null;   // numéro en attente de son titre (numéro sur ligne séparée)
 
-  const flush = () => {
+  const flushBuffer = () => {
     const node = stack[stack.length - 1]?.node;
-    if (node && buffer.length) node.content = linesToHtml(buffer);
+    if (node && buffer.length) node.content += linesToHtml(buffer);
     buffer = [];
   };
 
+  const addHeading = (level, rawTitle) => {
+    flushBuffer();
+    const node = { id: generateId(), title: cleanTitle(rawTitle) || 'Section', level, content: '', children: [] };
+    while (stack.length >= level) stack.pop();
+    if (stack.length === 0) root.push(node);
+    else stack[stack.length - 1].node.children.push(node);
+    stack.push({ node, level });
+  };
+
   for (let p = 0; p < pages.length; p++) {
+    if (tocPages.has(p)) continue; // page SOMMAIRE entière → ignorée
     for (const l of pages[p] || []) {
-      if (isNoise(l.text)) continue;
-      const lvl = headingLevel(l.text);
-      if (lvl > 0) {
-        flush();
-        const node = { id: generateId(), title: cleanTitle(l.text) || 'Section', level: lvl, content: '', children: [] };
-        // Dépile jusqu'au parent (niveau lvl-1).
-        while (stack.length >= lvl) stack.pop();
-        if (stack.length === 0) root.push(node);
-        else stack[stack.length - 1].node.children.push(node);
-        stack.push({ node, level: lvl });
-      } else if (stack.length) {
-        buffer.push({ p, y: l.y, text: l.text });
+      const text = l.text;
+      if (isNoise(text) || isTocLine(text)) continue;
+
+      if (CHAP_RE.test(text)) { addHeading(1, text); pendingNum = null; continue; }
+
+      const mOnly = text.match(NUM_ONLY_RE);
+      if (mOnly) {
+        if (pendingNum) addHeading(numSegments(pendingNum), 'Section'); // n° précédent resté sans titre (rare)
+        pendingNum = mOnly[1];
+        continue;
       }
+
+      if (pendingNum) {                         // cette ligne est le titre du numéro précédent
+        addHeading(numSegments(pendingNum), text);
+        pendingNum = null;
+        continue;
+      }
+
+      const mInline = text.match(NUM_INLINE_RE);
+      if (mInline && headingLike(mInline[2])) {
+        addHeading(numSegments(mInline[1]), text);
+        continue;
+      }
+
+      if (stack.length) buffer.push({ p, y: l.y, text });
     }
   }
-  flush();
+  flushBuffer();
   return root;
 }
 
@@ -299,15 +366,15 @@ export const parsePdfToTree = async (file) => {
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
-  const { pages, lineFreq } = await extractPages(pdf);
-  const isNoise = makeNoiseFilter(lineFreq, pdf.numPages);
+  const { pages, lineFreq, tocPages, runningLines } = await extractPages(pdf);
+  const isNoise = makeNoiseFilter(lineFreq, pdf.numPages, runningLines);
 
   let outline = null;
   try { outline = await pdf.getOutline(); } catch { outline = null; }
 
   const tree = outline && outline.length
     ? await buildFromOutline(pdf, outline, pages, pdf.numPages, isNoise)
-    : buildFromHeadings(pages, isNoise);
+    : buildFromHeadings(pages, isNoise, tocPages);
 
   if (!tree || tree.length === 0) {
     throw new Error("Aucune structure détectée dans le PDF (ni sommaire, ni titres numérotés).");
