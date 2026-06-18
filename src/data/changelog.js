@@ -2,13 +2,13 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '3.3.1';
+export const APP_VERSION = '3.4.0';
 
 export const CHANGELOG = [
   {
-    version: '3.3.1',
-    date: '2026-06-16',
-    title: 'Estimation : récap exports (TOTAL hors PSE) & Calculateur de Marge persistant',
+    version: '3.4.0',
+    date: '2026-06-18',
+    title: 'Documents : module CCAP, fenêtre « Champs » unifiée & fiabilisation des exports',
     highlights: [
       'Nouveau module CCAP (Cahier des Clauses Administratives Particulières), sur le même principe que le CCTP et le Règlement de Consultation : import Word/PDF, arborescence de chapitres, éditeur de texte enrichi, sélection des articles, export Word et PDF',
       'CCTP · RC · CCAP — nouveau bouton « Champs » (ruban) commun aux trois modules : une seule fenêtre à onglets (Commun · RC · CCAP · CCTP) pour renseigner toutes les variables des documents. L\'onglet « Commun » regroupe maître d\'ouvrage, maîtrise d\'œuvre, objet, lieu, dates et délais ; l\'onglet « RC » l\'intitulé du lot, la coordination SPS, le démarrage, la validité des offres et la plateforme ; l\'onglet « CCAP » les champs propres au CCAP (coordonnateur SPS, délais d\'exécution en mois, index de révision des prix, seuil de remboursement de l\'avance, voie concernée, station météo, jours d\'intempéries). Tout est synchronisé entre les modules et avec la fiche projet — aucune double saisie. La fiche projet complète (logos, page de garde, tranches) reste accessible d\'un clic depuis cette fenêtre',
@@ -17,6 +17,15 @@ export const CHANGELOG = [
       'CCTP · RC · CCAP — notes de rédaction : les encadrés « ⚑ Note éditeur » restent visibles à l\'écran (aide à la rédaction) mais sont automatiquement retirés des exports Word et PDF. Les documents livrés ne contiennent plus de commentaire interne',
       'CCAP — contrôle de cohérence des délais : si la durée globale ne correspond pas à préparation + travaux, la fenêtre « Champs » le signale et propose de corriger en un clic',
       'CCTP · RC · CCAP (export Word) — le sommaire se met désormais à jour automatiquement à l\'ouverture du document (champ recalculé), et la page de garde ne peut plus partir blanche : si le visuel ne peut être généré, une page de garde texte de secours est produite à la place',
+      'CCTP · RC · CCAP — le bouton « Style » a été retiré du ruban des trois modules ; la charte graphique se règle depuis Paramètres › Identité & Charte graphique',
+      'RC & CCAP — boutons « tout cocher / tout décocher » ajoutés à la liste des chapitres (déjà présents sur le CCTP) pour (dé)sélectionner d\'un clic tous les chapitres à inclure dans le document',
+    ],
+  },
+  {
+    version: '3.3.1',
+    date: '2026-06-16',
+    title: 'Estimation : récap exports (TOTAL hors PSE) & Calculateur de Marge persistant',
+    highlights: [
       'CCTP & RC — l\'éditeur de chapitre devient un vrai petit traitement de texte. Présentation en page (feuille blanche centrée), barre d\'outils regroupée (Annuler · Format · Paragraphe · Insertion), annuler/rétablir, tableaux (insertion + lignes/colonnes), liens hypertexte, retrait, surligneur en couleur, et compteur de mots / caractères. Les images se collent ou se glissent-déposent directement (compressées automatiquement), le collage de texte (Word / Google Docs) est nettoyé, et le correcteur orthographique français est actif. Les différentes tailles de texte ont été retirées pour un rendu homogène',
       'CCTP — refonte de la sélection automatique des chapitres (bouton « Auto »). Elle fonctionne désormais sur n\'importe quel CCTP, y compris ceux importés en PDF ou Word (auparavant elle n\'était vraiment efficace que sur le CCTP maître, et ne cochait quasiment que les généralités sur un CCTP importé). Le moteur s\'appuie sur une bibliothèque d\'une cinquantaine de concepts métier VRD qui relient le vocabulaire des lignes de devis (« bordure T2 », « BBSG 0/10 », « tuyau PVC DN200 »…) aux titres des chapitres du CCTP. Chaque chapitre coché automatiquement affiche une petite pastille de provenance — bleue (certain : lien explicite, obligatoire) ou violette (déduit du devis) — avec le détail au survol. Nouveau mode « Focus article » (sélecteur en haut de la liste des chapitres) : choisissez une ligne du devis, les chapitres qu\'elle déclenche se surlignent en ambre, et vos corrections (cocher/décocher) sont mémorisées pour cet article et rejouées automatiquement aux prochaines sélections — y compris sur vos futurs projets',
       'CCTP & RC : import direct d\'un fichier PDF. À côté du bouton « Word », un nouveau bouton « PDF » permet d\'importer un CCTP (ou un Règlement de Consultation) au format PDF. L\'application reconstruit automatiquement toute l\'arborescence des chapitres (jusqu\'à 5 niveaux) à partir du sommaire du document, et range le texte de chaque section dans le chapitre correspondant (paragraphes et listes à puces, en-têtes/pieds de page et numéros de page écartés). Comme pour l\'import Word, l\'opération remplace la structure en cours après confirmation, et tout reste ensuite modifiable dans l\'éditeur. L\'import fonctionne aussi bien sur les PDF avec sommaire intégré (signets) que sur ceux qui n\'en ont pas : la structure est alors reconstruite à partir de la numérotation des titres (« Chapitre 1 », « 1. », « 1.2.3 »…, y compris quand le numéro est sur une ligne séparée du titre). Les pages de sommaire, les en-têtes et pieds de page récurrents et la pagination sont automatiquement écartés pour ne pas polluer le contenu',
