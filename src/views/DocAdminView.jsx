@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- fichier mêlant volontairement composants et helpers/constantes (règle DX Fast-Refresh, sans impact fonctionnel) */
 // src/views/DocAdminView.jsx
 // Module Document Administratif — Gestion des Fiches Marché + Documents EXE
 import React, { useState, useMemo, useCallback } from 'react';

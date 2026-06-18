@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- fichier mêlant volontairement composants et helpers/constantes (règle DX Fast-Refresh, sans impact fonctionnel) */
 // src/views/devisMoe/devisMoeHelpers.jsx
 // Helpers de calcul, styles et composants partagés pour le module Devis MOE
 import React from 'react';

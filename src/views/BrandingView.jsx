@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- fichier mêlant volontairement composants et helpers/constantes (règle DX Fast-Refresh, sans impact fonctionnel) */
 // src/views/BrandingView.jsx
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { confirm } from '../utils/globalUI';

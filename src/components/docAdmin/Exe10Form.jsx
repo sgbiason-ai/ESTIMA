@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- fichier mêlant volontairement composants et helpers/constantes (règle DX Fast-Refresh, sans impact fonctionnel) */
 // src/components/docAdmin/Exe10Form.jsx
 // Formulaire EXE10 — Avenant au marché public
 // Mode clair, largeur A4, reproduisant la mise en page du formulaire officiel DAJ

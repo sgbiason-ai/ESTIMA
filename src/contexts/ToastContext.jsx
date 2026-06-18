@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- fichier mêlant volontairement composants et helpers/constantes (règle DX Fast-Refresh, sans impact fonctionnel) */
 // src/contexts/ToastContext.jsx
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
 import { CheckCircle2, XCircle, AlertTriangle, Info, X } from 'lucide-react';

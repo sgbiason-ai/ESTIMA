@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- fichier mêlant volontairement composants et helpers/constantes (règle DX Fast-Refresh, sans impact fonctionnel) */
 // src/components/docAdmin/ExeReceptionForm.jsx
 // Formulaire unifié EXE4 / EXE5 / EXE6 — Réception des travaux
 // Mode clair, largeur A4, reproduisant la mise en page du formulaire officiel DAJ

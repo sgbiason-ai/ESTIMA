@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- fichier mêlant volontairement composants et helpers/constantes (règle DX Fast-Refresh, sans impact fonctionnel) */
 // src/components/help/HelpSections.jsx
 // Renderer generique pour les sections de contenu d'aide.
 

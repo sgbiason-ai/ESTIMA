@@ -21,7 +21,7 @@ function cleanRuntimeCachesIfMajorBump(previous, current) {
 export default function UpdatePrompt() {
   const registrationRef = useRef(null);
   const {
-    offlineReady: [offlineReady, setOfflineReady],
+    offlineReady: [, setOfflineReady],
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
   } = useRegisterSW({

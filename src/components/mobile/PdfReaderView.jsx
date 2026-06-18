@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- fichier mêlant volontairement composants et helpers/constantes (règle DX Fast-Refresh, sans impact fonctionnel) */
 // src/components/mobile/PdfReaderView.jsx
 // Lecteur PDF mobile — URL ou fichier local, affichage iframe
 

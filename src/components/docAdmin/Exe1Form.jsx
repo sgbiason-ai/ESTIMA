@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- fichier mêlant volontairement composants et helpers/constantes (règle DX Fast-Refresh, sans impact fonctionnel) */
 // src/components/docAdmin/Exe1Form.jsx
 // Formulaire spécifique pour l'EXE1-T (Ordre de Service)
 // Les sections A/B/C/D viennent de la Fiche Marché, ce formulaire gère E/F/G
