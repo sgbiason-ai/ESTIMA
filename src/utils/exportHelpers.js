@@ -88,6 +88,22 @@ export const loadDirHandle = async (key) => {
 };
 
 /**
+ * Verifie/demande la permission readwrite sur un dossier memorise.
+ * A appeler TOT (pendant l'activation utilisateur du clic), avant toute
+ * generation asynchrone — sinon requestPermission echoue (geste perdu).
+ * @param {FileSystemDirectoryHandle|null} dirHandle
+ * @returns {Promise<'granted'|'denied'|'no-handle'>}
+ */
+export const ensureDirPermission = async (dirHandle) => {
+  if (!dirHandle) return 'no-handle';
+  try {
+    let perm = await dirHandle.queryPermission({ mode: 'readwrite' });
+    if (perm !== 'granted') perm = await dirHandle.requestPermission({ mode: 'readwrite' });
+    return perm === 'granted' ? 'granted' : 'denied';
+  } catch { return 'denied'; }
+};
+
+/**
  * Ecrire un blob dans le dossier via File System Access.
  * @param {FileSystemDirectoryHandle} dirHandle
  * @param {string} filename

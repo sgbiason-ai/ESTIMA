@@ -384,7 +384,7 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
   }, [manager]);
 
   const handleExportPdf = useCallback(async () => {
-    const { buildExportFilename, loadDirHandle } = await import('../../utils/exportHelpers');
+    const { buildExportFilename, loadDirHandle, saveToDirectory, ensureDirPermission } = await import('../../utils/exportHelpers');
     const info = manager.crrConfig.chantierInfo || {};
     const meeting = manager.activeMeeting;
 
@@ -392,50 +392,61 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
       number: meeting.number, projectName: chantierName, date: meeting.date, ext: 'pdf',
     });
 
-    // Boite Save As Windows native, defaut dossier projet (modale info chantier)
+    // Dossier memorise (modale info chantier). Permission demandee TOT (avant la
+    // generation) pour conserver l'activation utilisateur du clic.
     const dirKey = `${companyId}_${crrDoc?.id || 'default'}`;
     const dirHandle = await loadDirHandle(dirKey);
-    let saveHandle;
-    try {
-      saveHandle = await window.showSaveFilePicker({
-        suggestedName: filename,
-        startIn: dirHandle || 'documents',
-        types: [{ description: 'Document PDF', accept: { 'application/pdf': ['.pdf'] } }],
-      });
-    } catch (err) {
-      if (err.name === 'AbortError') { toast.info('Annule.'); return; }
-      toast.error(`Erreur : ${err.message}`);
-      return;
+    const dirPerm = await ensureDirPermission(dirHandle);
+
+    // Pas d'ecriture directe possible → boite "Enregistrer sous" (avant generation)
+    let saveHandle = null;
+    if (dirPerm !== 'granted') {
+      try {
+        saveHandle = await window.showSaveFilePicker({
+          suggestedName: filename,
+          startIn: dirHandle || 'documents',
+          types: [{ description: 'Document PDF', accept: { 'application/pdf': ['.pdf'] } }],
+        });
+      } catch (err) {
+        if (err.name === 'AbortError') { toast.info('Annule.'); return; }
+        toast.error(`Erreur : ${err.message}`);
+        return;
+      }
     }
 
-    // Generer PDF puis ecrire dans le handle choisi
+    // Generer le PDF (une seule fois)
     const { generatePdfCrr } = await import('../../utils/pdfCrrGenerator');
     const result = await generatePdfCrr(meeting, manager.crrConfig, chantierName, branding, { returnBlob: true, sortDate, sortCat });
     if (!result?.blob) { toast.error('Echec generation PDF.'); return; }
 
+    const openAction = {
+      label: 'Ouvrir le PDF',
+      onClick: () => {
+        const blobUrl = URL.createObjectURL(result.blob);
+        window.open(blobUrl, '_blank');
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+      },
+    };
+
     try {
-      const writable = await saveHandle.createWritable();
-      await writable.write(result.blob);
-      await writable.close();
-      toast.success(`Sauvegarde : ${saveHandle.name}`, {
-        title: 'PDF enregistre',
-        duration: 8000,
-        action: {
-          label: 'Ouvrir le PDF',
-          onClick: () => {
-            const blobUrl = URL.createObjectURL(result.blob);
-            window.open(blobUrl, '_blank');
-            setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
-          },
-        },
-      });
+      if (dirPerm === 'granted') {
+        // Ecriture directe dans le dossier memorise (sans boite de dialogue)
+        const ok = await saveToDirectory(dirHandle, filename, result.blob);
+        if (!ok) throw new Error('ecriture dans le dossier refusee');
+        toast.success(`Enregistre dans « ${dirHandle.name} » : ${filename}`, { title: 'PDF enregistre', duration: 8000, action: openAction });
+      } else {
+        const writable = await saveHandle.createWritable();
+        await writable.write(result.blob);
+        await writable.close();
+        toast.success(`Sauvegarde : ${saveHandle.name}`, { title: 'PDF enregistre', duration: 8000, action: openAction });
+      }
     } catch (err) {
       toast.error(`Echec ecriture : ${err.message}`);
     }
   }, [manager, chantierName, branding, companyId, crrDoc]);
 
   const handleExportWord = useCallback(async () => {
-    const { buildExportFilename, loadDirHandle } = await import('../../utils/exportHelpers');
+    const { buildExportFilename, loadDirHandle, saveToDirectory, ensureDirPermission } = await import('../../utils/exportHelpers');
     const info = manager.crrConfig.chantierInfo || {};
     const meeting = manager.activeMeeting;
 
@@ -443,19 +454,24 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
       number: meeting.number, projectName: chantierName, date: meeting.date, ext: 'doc',
     });
 
+    // Dossier memorise → permission demandee TOT (avant generation).
     const dirKey = `${companyId}_${crrDoc?.id || 'default'}`;
     const dirHandle = await loadDirHandle(dirKey);
-    let saveHandle;
-    try {
-      saveHandle = await window.showSaveFilePicker({
-        suggestedName: filename,
-        startIn: dirHandle || 'documents',
-        types: [{ description: 'Document Word', accept: { 'application/msword': ['.doc'] } }],
-      });
-    } catch (err) {
-      if (err.name === 'AbortError') { toast.info('Annule.'); return; }
-      toast.error(`Erreur : ${err.message}`);
-      return;
+    const dirPerm = await ensureDirPermission(dirHandle);
+
+    let saveHandle = null;
+    if (dirPerm !== 'granted') {
+      try {
+        saveHandle = await window.showSaveFilePicker({
+          suggestedName: filename,
+          startIn: dirHandle || 'documents',
+          types: [{ description: 'Document Word', accept: { 'application/msword': ['.doc'] } }],
+        });
+      } catch (err) {
+        if (err.name === 'AbortError') { toast.info('Annule.'); return; }
+        toast.error(`Erreur : ${err.message}`);
+        return;
+      }
     }
 
     const { generateWordCrr } = await import('../../utils/crrWordExporter');
@@ -463,10 +479,16 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
     if (!result?.blob) { toast.error('Echec generation Word.'); return; }
 
     try {
-      const writable = await saveHandle.createWritable();
-      await writable.write(result.blob);
-      await writable.close();
-      toast.success(`Sauvegarde : ${saveHandle.name}`);
+      if (dirPerm === 'granted') {
+        const ok = await saveToDirectory(dirHandle, filename, result.blob);
+        if (!ok) throw new Error('ecriture dans le dossier refusee');
+        toast.success(`Enregistre dans « ${dirHandle.name} » : ${filename}`);
+      } else {
+        const writable = await saveHandle.createWritable();
+        await writable.write(result.blob);
+        await writable.close();
+        toast.success(`Sauvegarde : ${saveHandle.name}`);
+      }
     } catch (err) {
       toast.error(`Echec ecriture : ${err.message}`);
     }
