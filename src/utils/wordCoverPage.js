@@ -40,7 +40,9 @@ export const buildCoverPageElements = async (docType, variables, branding) => {
   const docLabel =
     docType === "CCTP"
       ? "CAHIER DES CLAUSES TECHNIQUES PARTICULIÈRES"
-      : "RÈGLEMENT DE LA CONSULTATION";
+      : docType === "CCAP"
+        ? "CAHIER DES CLAUSES ADMINISTRATIVES PARTICULIÈRES"
+        : "RÈGLEMENT DE LA CONSULTATION";
 
   // Rendu canvas → PNG data URL
   const dataUrl = await buildCoverPageCanvas(variables, docLabel, branding);

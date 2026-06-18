@@ -230,10 +230,16 @@ const createDocStyles = (branding) => ({
 });
 
 // --- EXPORT PRINCIPAL RC ---
-export const generateWordRC = async (selectedNodes, variables, masterData, branding = DEFAULT_BRANDING) => {
+export const generateWordRC = async (selectedNodes, variables, masterData, branding = DEFAULT_BRANDING, docType = 'RC') => {
   await ensureDocx();
+  const HEADER_LABELS = {
+    RC:   "RÈGLEMENT DE LA CONSULTATION",
+    CCTP: "CAHIER DES CLAUSES TECHNIQUES PARTICULIÈRES",
+    CCAP: "CAHIER DES CLAUSES ADMINISTRATIVES PARTICULIÈRES",
+  };
+  const headerLabel = HEADER_LABELS[docType] || HEADER_LABELS.RC;
   // ── Section 1 : page de garde PNG (rendu canvas identique au PDF) ──────────
-  const coverElements = await buildCoverPageElements("RC", variables, branding);
+  const coverElements = await buildCoverPageElements(docType, variables, branding);
 
   // ── Section 2 : contenu principal ─────────────────────────────────────────
   const docChildren = [];
@@ -293,7 +299,7 @@ export const generateWordRC = async (selectedNodes, variables, masterData, brand
 
   // --- EN-TÊTE ---
   const headerLeftCell = new TableCell({ width: { size: 35, type: WidthType.PERCENTAGE }, borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.SINGLE, size: 6, color: "E0E0E0" }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } }, children: [ new Paragraph({ children: [ new TextRun({ text: sanitizeText(variables.name ? variables.name.toUpperCase() : "PROJET"), bold: true, color: cleanColor(branding.colors.primary), font: branding.fonts.main, size: 18 }) ], spacing: { after: 0 } }), new Paragraph({ children: [ new TextRun({ text: sanitizeText(variables.client || "Maître d'Ouvrage"), color: "666666", font: branding.fonts.main, size: 14 }) ], spacing: { after: 100 } }) ], });
-  const headerCenterCell = new TableCell({ width: { size: 30, type: WidthType.PERCENTAGE }, verticalAlign: VerticalAlign.CENTER, borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.SINGLE, size: 6, color: "E0E0E0" }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } }, children: [ new Paragraph({ alignment: AlignmentType.CENTER, children: [ new TextRun({ text: "RÈGLEMENT DE LA CONSULTATION", bold: true, color: cleanColor(branding.colors.subtle), font: branding.fonts.main, size: 20 }) ], spacing: { after: 100 } }) ], });
+  const headerCenterCell = new TableCell({ width: { size: 30, type: WidthType.PERCENTAGE }, verticalAlign: VerticalAlign.CENTER, borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.SINGLE, size: 6, color: "E0E0E0" }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } }, children: [ new Paragraph({ alignment: AlignmentType.CENTER, children: [ new TextRun({ text: headerLabel, bold: true, color: cleanColor(branding.colors.subtle), font: branding.fonts.main, size: 20 }) ], spacing: { after: 100 } }) ], });
   const headerRightChildren = [];
   if (branding.logo) { const logoBytes = base64DataURLToUint8Array(branding.logo); if (logoBytes) { const logoType = detectImageType(logoBytes) || "png"; headerRightChildren.push(new Paragraph({ alignment: AlignmentType.RIGHT, children: [new ImageRun({ type: logoType, data: logoBytes, transformation: { width: 80, height: 50 } })], spacing: { after: 100 } })); } else { headerRightChildren.push(new Paragraph({ children: [new TextRun(" ")] })); } } else { headerRightChildren.push(new Paragraph({ children: [new TextRun(" ")] })); }
   const headerRightCell = new TableCell({ width: { size: 35, type: WidthType.PERCENTAGE }, verticalAlign: VerticalAlign.CENTER, borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.SINGLE, size: 6, color: "E0E0E0" }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } }, children: headerRightChildren, });
@@ -324,5 +330,5 @@ export const generateWordRC = async (selectedNodes, variables, masterData, brand
 
   const blob = await Packer.toBlob(doc);
   const dateStr = new Date().toISOString().slice(0, 10);
-  saveAs(blob, `RC_${sanitizeText(variables.code || "Projet")}_${dateStr}.docx`);
+  saveAs(blob, `${docType}_${sanitizeText(variables.code || "Projet")}_${dateStr}.docx`);
 };

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   LayoutDashboard, Database, Settings, FileText, Calculator, Folder,
   LineChart, LogOut, User, PanelLeftClose, PanelLeftOpen, BookOpen,
-  FileCheck, ArrowLeft, Cloud, CheckCircle2, AlertCircle, Loader, Layers, FileStack
+  FileCheck, ArrowLeft, Cloud, CheckCircle2, AlertCircle, Loader, Layers, FileStack, Scale
 } from 'lucide-react';
 
 const Sidebar = ({ activeTab, setActiveTab, onLogout, userEmail, onOpenCalculator, onToggle, saveStatus, projectName, onBackToHub, onBackToWorkspace }) => {
@@ -23,6 +23,7 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout, userEmail, onOpenCalculato
       { id: 'bpu_export', label: 'Bordereau de prix', icon: FileText },
       { id: 'cctp', label: 'CCTP', icon: BookOpen },
       { id: 'rc', label: 'Règlement Consul.', icon: FileCheck },
+      { id: 'ccap', label: 'CCAP', icon: Scale },
     ]},
     { id: 'analyse_section', items: [{ id: 'price_analysis', label: 'Analyse des Prix', icon: LineChart }] },
   ];

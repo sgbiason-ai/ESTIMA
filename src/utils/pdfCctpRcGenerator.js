@@ -498,6 +498,7 @@ export const generatePdfCctpRc = async (
   const LABELS = {
     CCTP: 'Cahier des Clauses Techniques Particulières',
     RC:   'Règlement de la Consultation',
+    CCAP: 'Cahier des Clauses Administratives Particulières',
   };
   const docLabel = LABELS[docType] || docType;
   const THEME    = buildTheme(branding);

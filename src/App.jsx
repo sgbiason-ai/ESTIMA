@@ -46,6 +46,7 @@ const DatabaseView       = lazyWithReload(() => import('./views/DatabaseView'));
 const PriceAnalysisView  = lazyWithReload(() => import('./views/PriceAnalysisView'));
 const CctpGeneratorView  = lazyWithReload(() => import('./views/CctpGeneratorView'));
 const RcGeneratorView    = lazyWithReload(() => import('./views/RcGeneratorView'));
+const CcapGeneratorView  = lazyWithReload(() => import('./views/CcapGeneratorView'));
 const BpuExportView      = lazyWithReload(() => import('./views/bpu/BpuExportView'));
 const SettingsView       = lazyWithReload(() => import('./views/SettingsView'));
 const BrandingView       = lazyWithReload(() => import('./views/BrandingView'));
@@ -820,6 +821,20 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNav
                 companyId={companyId}
                 masterRc={resources.masterRc || []}
                 onSaveMasterRc={resources.handleSaveMasterRc || (() => {})}
+                masterBranding={resources.masterBranding}
+                onSaveMasterBranding={resources.handleSaveMasterBranding}
+                onEditProject={modals.openProjectModal}
+                onUpdateProject={setProject}
+                onSaveProject={handleSaveProject}
+                onEditBranding={() => setActiveTab('settings')}
+              />
+            )}
+
+            {activeTab === 'ccap' && (
+              <CcapGeneratorView
+                project={project}
+                masterCcap={resources.masterCcap || []}
+                onSaveMasterCcap={resources.handleSaveMasterCcap || (() => {})}
                 masterBranding={resources.masterBranding}
                 onSaveMasterBranding={resources.handleSaveMasterBranding}
                 onEditProject={modals.openProjectModal}

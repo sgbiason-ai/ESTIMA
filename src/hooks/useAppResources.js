@@ -17,6 +17,7 @@ export const useAppResources = (user, companyId) => {
 
   const [masterCctp,     setMasterCctp]     = useState([]);
   const [masterRc,       setMasterRc]       = useState([]);
+  const [masterCcap,     setMasterCcap]     = useState([]);
   const [masterBranding, setMasterBranding] = useState(DEFAULT_BRANDING);
   const [resourcesLoading, setResourcesLoading] = useState(false);
 
@@ -29,15 +30,17 @@ export const useAppResources = (user, companyId) => {
     const fetchResources = async () => {
       setResourcesLoading(true);
       try {
-        const [cctpSnap, brandSnap, rcSnap] = await Promise.all([
+        const [cctpSnap, brandSnap, rcSnap, ccapSnap] = await Promise.all([
           getDoc(resDoc('master_cctp')),
           getDoc(resDoc('branding')),
           getDoc(resDoc('master_rc')),
+          getDoc(resDoc('master_ccap')),
         ]);
 
         if (cctpSnap.exists())  setMasterCctp(cctpSnap.data().content);
         if (brandSnap.exists()) setMasterBranding(brandSnap.data().config);
         if (rcSnap.exists())    setMasterRc(rcSnap.data().content);
+        if (ccapSnap.exists())  setMasterCcap(ccapSnap.data().content);
 
       } catch (e) {
         console.error('Erreur chargement ressources:', e);
@@ -78,6 +81,20 @@ export const useAppResources = (user, companyId) => {
     }
   };
 
+  const handleSaveMasterCcap = async (data) => {
+    setMasterCcap(data);
+    try {
+      await setDoc(resDoc('master_ccap'), {
+        content:   data,
+        updatedAt: new Date().toISOString(),
+      });
+      toast.success('CCAP sauvegardé sur le Cloud.', { title: 'Sauvegarde réussie' });
+    } catch (e) {
+      console.error('Erreur sauvegarde CCAP:', e);
+      toast.error('Impossible de sauvegarder le CCAP.', { title: 'Erreur' });
+    }
+  };
+
   const handleSaveMasterBranding = async (data) => {
     setMasterBranding(data);
     try {
@@ -95,10 +112,12 @@ export const useAppResources = (user, companyId) => {
   return {
     masterCctp,     setMasterCctp,
     masterRc,       setMasterRc,
+    masterCcap,     setMasterCcap,
     masterBranding, setMasterBranding,
     resourcesLoading,
     handleSaveMasterCctp,
     handleSaveMasterRc,
+    handleSaveMasterCcap,
     handleSaveMasterBranding,
   };
 };
