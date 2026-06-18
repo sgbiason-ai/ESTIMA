@@ -37,6 +37,14 @@ describe('detectTextIssues — heuristiques structurelles', () => {
     expect(detectTextIssues('mot  colle').some((i) => i.type === 'spacing')).toBe(true);
   });
 
+  it('signale un passage tout en majuscules (≥3 mots)', () => {
+    expect(detectTextIssues('IL FAUT TERMINER AVANT VENDREDI').some((i) => i.type === 'caps')).toBe(true);
+  });
+
+  it('ignore un acronyme ou un nom propre isolé', () => {
+    expect(detectTextIssues('Voir avec la MOE et M. DUPONT.').some((i) => i.type === 'caps')).toBe(false);
+  });
+
   it('texte propre ou vide → aucune anomalie', () => {
     expect(detectTextIssues('Les entreprises signalent toute absence 48 h avant la réunion.')).toEqual([]);
     expect(detectTextIssues('')).toEqual([]);

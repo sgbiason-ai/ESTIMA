@@ -70,6 +70,11 @@ export const detectTextIssues = (text) => {
   if (/[!?]{2,}/.test(text)) {
     issues.push({ type: 'punct', message: 'ponctuation répétée (ex. « !! ») — préférer une formulation factuelle' });
   }
+  // Passage en MAJUSCULES : 3 mots majuscules consécutifs ou plus = ton « criard »
+  // à neutraliser. Un mot isolé (acronyme MOE/SPS, nom propre DUPONT) est ignoré.
+  if (/[A-ZÀ-ÖØ-Þ]{2,}(?:[^A-Za-zÀ-ÖØ-öø-ÿ]+[A-ZÀ-ÖØ-Þ]{2,}){2,}/.test(text)) {
+    issues.push({ type: 'caps', message: 'passage tout en majuscules — préférer une casse normale' });
+  }
   // Espaces multiples consécutifs
   if (/ {2,}/.test(text)) {
     issues.push({ type: 'spacing', message: 'espaces multiples' });
