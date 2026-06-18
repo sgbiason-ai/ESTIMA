@@ -298,6 +298,10 @@ export const useRcManager = ({
 
   const collapseAll = () => setExpandedIds(new Set());
 
+  // Coche TOUS les chapitres / décoche tout (cases à cocher de l'arbre).
+  const selectAll = () => setSelectedIds(getAllIds(rcData));
+  const deselectAll = () => setSelectedIds(new Set());
+
   // Charge le modèle type de RC (remplace la structure courante après confirmation).
   const loadTemplate = async () => {
     const ok = await confirm(
@@ -487,7 +491,7 @@ export const useRcManager = ({
     rcData, setRcData, branding, selectedIds, expandedIds,
     activeNodeId, searchQuery, setSearchQuery, modalOpen, setModalOpen,
     nodeToEdit, variables, saveStatus, filteredRcData,
-    toggleExpand, expandAll, collapseAll,
+    toggleExpand, expandAll, collapseAll, selectAll, deselectAll,
     handleExportMaster, handleFileUpload, handlePdfUpload, handlePreviewScroll,
     openEditor, handleSaveNode, addChapter, deleteNode, toggleSelection, saveToCloud,
     loadTemplate,

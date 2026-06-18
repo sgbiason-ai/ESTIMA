@@ -291,6 +291,10 @@ export const useCcapManager = ({
 
   const collapseAll = () => setExpandedIds(new Set());
 
+  // Coche TOUS les chapitres / décoche tout (cases à cocher de l'arbre).
+  const selectAll = () => setSelectedIds(getAllIds(ccapData));
+  const deselectAll = () => setSelectedIds(new Set());
+
   const handleExportMaster = () => {
     const blob = new Blob([JSON.stringify(ccapData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -467,7 +471,7 @@ export const useCcapManager = ({
     ccapData, setCcapData, branding, selectedIds, expandedIds,
     activeNodeId, searchQuery, setSearchQuery, modalOpen, setModalOpen,
     nodeToEdit, variables, saveStatus, filteredCcapData,
-    toggleExpand, expandAll, collapseAll,
+    toggleExpand, expandAll, collapseAll, selectAll, deselectAll,
     handleExportMaster, handleFileUpload, handlePdfUpload, handlePreviewScroll,
     openEditor, handleSaveNode, addChapter, deleteNode, toggleSelection, saveToCloud,
   };
