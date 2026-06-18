@@ -748,7 +748,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
       let hasFormatting = false;
       try {
         const segs = parseObsHtml(rawText);
-        hasFormatting = segs.some(s => s.bold || s.underline || s.highlight || s.indent || s.bullet);
+        hasFormatting = segs.some(s => s.bold || s.underline || s.strike || s.highlight || s.indent || s.bullet);
       } catch { hasFormatting = false; }
       const cellText = hasFormatting ? '' : plainText;
       const imgs = (obs.images || []).map(e => typeof e === 'string' ? e : e.src).filter(u => imageCache.has(u));
@@ -1105,6 +1105,11 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
                       doc.setDrawColor(...txtColor);
                       doc.setLineWidth(0.15);
                       doc.line(curX, curY + 0.5, curX + ww, curY + 0.5);
+                    }
+                    if (seg.strike) {
+                      doc.setDrawColor(...txtColor);
+                      doc.setLineWidth(0.15);
+                      doc.line(curX, curY - 0.7, curX + ww, curY - 0.7);
                     }
                     curX += ww;
                   }

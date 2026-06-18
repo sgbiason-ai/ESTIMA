@@ -8,10 +8,8 @@ import Icon from './Icon';
 import { uploadCrrImage, deleteCrrImage } from '../../utils/crrImageStorage';
 import { useOrientation } from '../../hooks/useOrientation';
 import { sanitizeHtml } from '../../utils/helpers';
-import { stripHtml } from '../../utils/formatObsText';
 import { toast } from '../../utils/globalUI';
 import { getGroupColor, obsValidation } from '../../data/crrData';
-import { detectTextIssues } from '../../utils/crrTextQa';
 
 // ─── STATUS CONFIG ─────────────────────────────────────────────────────────
 const STATUSES = [
@@ -109,8 +107,6 @@ export default function ObservationEditSheet({
 
   // Responsable manquant (obs Ouverte/En cours) → signalement rouge. Échéance facultative.
   const { missingResponsable } = obsValidation(obs);
-  // Anomalies de saisie (fautes connues + heuristiques) — suggestion de relecture.
-  const textIssues = detectTextIssues(stripHtml(obs.text));
 
   return (
     <>
@@ -161,6 +157,8 @@ export default function ObservationEditSheet({
             ref={textRef}
             contentEditable
             suppressContentEditableWarning
+            spellCheck
+            lang="fr"
             onBlur={handleTextBlur}
             onKeyDown={(e) => {
               if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
@@ -188,11 +186,6 @@ export default function ObservationEditSheet({
             {missingResponsable && (
               <p className="text-[11px] text-red-600 font-semibold -mt-1.5">
                 Responsable requis (observation ouverte / en cours)
-              </p>
-            )}
-            {textIssues.length > 0 && (
-              <p className="text-[11px] text-slate-500 -mt-1">
-                Relecture : {textIssues.slice(0, 2).map((i) => i.message).join('  ·  ')}{textIssues.length > 2 ? `  ·  +${textIssues.length - 2}` : ''}
               </p>
             )}
 
@@ -341,6 +334,9 @@ function FormatToolbar({ textRef, onInput }) {
       </button>
       <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => exec('underline')} className={btnClass} title="Souligné">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3v7a6 6 0 006 6 6 6 0 006-6V3"/><line x1="4" y1="21" x2="20" y2="21"/></svg>
+      </button>
+      <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => exec('strikeThrough')} className={btnClass} title="Barré">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4H9a3 3 0 00-2.83 4"/><path d="M14 12a4 4 0 010 8H6"/><line x1="4" y1="12" x2="20" y2="12"/></svg>
       </button>
       <button type="button" onMouseDown={e => e.preventDefault()} onClick={handleHighlight} className={btnClass} title="Surligner">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>

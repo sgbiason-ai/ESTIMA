@@ -378,19 +378,21 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
                             {obsAge(obs, meeting.number) >= 1 && (
                               <span className="text-slate-400 ml-1.5 text-[9px] italic">depuis CR n°{obs.originMeetingNumber}</span>
                             )}
-                            {/* Images */}
+                            {/* Images — rendu fidèle au PDF : ratio préservé (pas de
+                                recadrage), 1 photo pleine largeur centrée, sinon 2 par
+                                ligne. Hauteurs max calquées sur le PDF (70 mm / 50 mm). */}
                             {images.length > 0 && (
-                              <div className={`flex flex-wrap gap-1.5 mt-2`} style={{ maxWidth: images.length === 1 ? '100%' : '50%' }}>
+                              <div className={`mt-2 grid gap-1.5 ${images.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
                                 {images.map((img, idx) => {
                                   const imgSrc = typeof img === 'string' ? img : img.src;
                                   const lat = typeof img === 'object' ? img.lat : null;
                                   const lng = typeof img === 'object' ? img.lng : null;
                                   const hasGps = lat != null && lng != null;
                                   return (
-                                    <div key={idx} className="flex flex-col">
+                                    <div key={idx} className="flex flex-col items-center">
                                       <img src={imgSrc} alt="" loading="lazy"
-                                        className="rounded border border-gray-200 object-cover"
-                                        style={images.length === 1 ? { width: '100%', height: 'auto' } : { width: 'calc(50% - 3px)', minWidth: 60, maxHeight: '80px' }} />
+                                        className="rounded border border-gray-200"
+                                        style={{ maxWidth: '100%', maxHeight: images.length === 1 ? '280px' : '200px', width: 'auto', height: 'auto', objectFit: 'contain' }} />
                                       {hasGps && (
                                         <a href={`https://www.google.com/maps?q=${lat},${lng}`} target="_blank" rel="noreferrer"
                                           className="text-[8px] italic text-blue-600 hover:underline mt-0.5 block text-center">

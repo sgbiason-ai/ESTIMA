@@ -32,7 +32,7 @@ const hasHtml = (text) => /<\/?[a-z][\s\S]*>/i.test(text);
 export const parseObsHtml = (html) => {
   if (!html) return [];
   const normalized = normalizeObsText(html);
-  if (!hasHtml(normalized)) return [{ text: normalized, bold: false, underline: false, highlight: false, indent: 0 }];
+  if (!hasHtml(normalized)) return [{ text: normalized, bold: false, underline: false, strike: false, highlight: false, indent: 0 }];
 
   const div = document.createElement('div');
   div.innerHTML = normalized;
@@ -79,6 +79,8 @@ export const parseObsHtml = (html) => {
     if (tag === 'li') newStyles.indent = (styles.indent || 0) + 1;
     if (tag === 'b' || tag === 'strong') newStyles.bold = true;
     if (tag === 'u') newStyles.underline = true;
+    if (tag === 's' || tag === 'strike' || tag === 'del'
+      || (tag === 'span' && /line-through/.test(node.style.textDecoration || node.style.textDecorationLine || ''))) newStyles.strike = true;
     if (tag === 'mark' || (tag === 'span' && node.style.backgroundColor)) newStyles.highlight = true;
 
     for (const child of node.childNodes) {
@@ -86,13 +88,13 @@ export const parseObsHtml = (html) => {
     }
   };
 
-  walk(div, { bold: false, underline: false, highlight: false, indent: 0 });
+  walk(div, { bold: false, underline: false, strike: false, highlight: false, indent: 0 });
   return segments;
 };
 
 // ── Rendu React securise (pour CrrPreview) ───────────────────────────────────
 
-const ALLOWED_TAGS = ['b', 'strong', 'u', 'mark', 'span', 'br', 'div', 'ul', 'ol', 'li'];
+const ALLOWED_TAGS = ['b', 'strong', 'u', 's', 'strike', 'del', 'mark', 'span', 'br', 'div', 'ul', 'ol', 'li'];
 
 const sanitizeHtml = (html) => {
   if (!html) return '';

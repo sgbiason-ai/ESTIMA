@@ -4,14 +4,13 @@ import ReactDOM from 'react-dom';
 import {
   Plus, Trash2, ChevronDown, ChevronRight,
   MinusCircle, Circle, Loader, CheckCircle2,
-  ImagePlus, Camera, X, Bold, Underline, Highlighter, List, GripVertical,
-  ArrowUp, ArrowDown, ArrowUpDown, TextSelect, AlertTriangle, SpellCheck,
+  ImagePlus, Camera, X, Bold, Underline, Strikethrough, Highlighter, List, GripVertical,
+  ArrowUp, ArrowDown, ArrowUpDown, TextSelect, AlertTriangle,
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { OBSERVATION_STATUSES, getGroupColor, obsDisplayNumber, obsAge, obsValidation } from '../../data/crrData';
 import { confirm, toast } from '../../utils/globalUI';
-import { normalizeObsText, stripHtml } from '../../utils/formatObsText.jsx';
-import { detectTextIssues } from '../../utils/crrTextQa';
+import { normalizeObsText } from '../../utils/formatObsText.jsx';
 import { uploadCrrImage, deleteCrrImage } from '../../utils/crrImageStorage';
 import GroupBadge from './GroupBadge';
 
@@ -200,6 +199,10 @@ const InlineToolbar = ({ onExecFormat, onHighlight, onSelectAll, fileRef, camera
           className="p-1.5 [@media(pointer:coarse)]:p-2.5 rounded-md hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-all">
           <Underline size={14} strokeWidth={2.5} />
         </button>
+        <button type="button" onClick={() => onExecFormat('strikeThrough')} title="Barré"
+          className="p-1.5 [@media(pointer:coarse)]:p-2.5 rounded-md hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-all">
+          <Strikethrough size={14} strokeWidth={2.5} />
+        </button>
         <button type="button" onClick={onHighlight} title="Fluo (Ctrl+H)"
           className="p-1.5 [@media(pointer:coarse)]:p-2.5 rounded-md hover:bg-amber-50 text-gray-500 hover:text-amber-600 transition-all">
           <Highlighter size={14} strokeWidth={2.5} />
@@ -340,8 +343,6 @@ const ObservationRow = memo(({ obs, obsNumber, meetingNumber, onUpdate, onDelete
   const age = obsAge(obs, meetingNumber);
   // Responsable manquant (obs Ouverte/En cours). L'échéance reste facultative.
   const { missingResponsable, hasIssue } = obsValidation(obs);
-  // Anomalies de saisie (fautes connues + heuristiques) — suggestion, non bloquant.
-  const textIssues = detectTextIssues(stripHtml(obs.text));
   const images = obs.images || [];
 
   const handleAddImages = async (e) => {
@@ -575,13 +576,6 @@ const ObservationRow = memo(({ obs, obsNumber, meetingNumber, onUpdate, onDelete
           <div className="mt-1 text-[10px] text-red-500 font-medium flex items-center gap-1" style={{ marginLeft: 'calc(24px + 56px + 120px + 1rem)' }}>
             <AlertTriangle size={10} />
             Responsable requis
-          </div>
-        )}
-
-        {textIssues.length > 0 && (
-          <div className="mt-1 text-[10px] text-slate-500 flex items-start gap-1" style={{ marginLeft: 'calc(24px + 56px + 120px + 1rem)' }} title="Suggestions de relecture (non bloquant)">
-            <SpellCheck size={10} className="mt-px shrink-0" />
-            <span>{textIssues.slice(0, 2).map((i) => i.message).join('  ·  ')}{textIssues.length > 2 ? `  ·  +${textIssues.length - 2}` : ''}</span>
           </div>
         )}
       </div>

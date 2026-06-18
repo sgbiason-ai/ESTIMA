@@ -1,87 +1,14 @@
 // src/utils/crrTextQa.js
 //
-// Contrôles qualité de saisie pour le module CRC (signalement écran, jamais
+// Contrôle qualité de saisie pour le module CRC (signalement écran, jamais
 // bloquant) :
-//   - detectTextIssues(plainText) : fautes connues (dictionnaire maison) +
-//     heuristiques structurelles (espace manquant, ponctuation répétée…)
 //   - nameEmailMismatch(name, email) : cohérence nom / adresse e-mail
 //
-// Module PUR (aucune dépendance DOM) → testable directement. Le texte passé à
-// detectTextIssues doit déjà être en clair (cf. stripHtml côté appelant).
-
-// ── Dictionnaire de fautes récurrentes (extensible) ─────────────────────────
-// Clé = forme fautive normalisée (minuscules, sans accents) → correction.
-export const KNOWN_TYPOS = {
-  diffuera: 'diffusera',
-  diffueront: 'diffuseront',
-  diffuer: 'diffuser',
-  tramsettra: 'transmettra',
-  tramsmettra: 'transmettra',
-  tramsmettre: 'transmettre',
-  tramsmet: 'transmet',
-  raport: 'rapport',
-  reunnion: 'réunion',
-  echeancier: 'échéancier',
-};
+// L'orthographe des observations est laissée au correcteur natif du navigateur
+// (contentEditable spellCheck lang="fr"). Module PUR → testable directement.
 
 const norm = (s) =>
   (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-
-/**
- * Analyse un texte (déjà en clair) et retourne la liste des anomalies de saisie.
- * @param {string} text
- * @returns {Array<{type:'spelling'|'spacing'|'punct', message:string, word?:string, suggestion?:string}>}
- */
-export const detectTextIssues = (text) => {
-  const issues = [];
-  if (!text || !text.trim()) return issues;
-
-  // 1. Fautes connues (mot entier, insensible casse/accents, dédupliqué)
-  const seen = new Set();
-  const wordRe = /[A-Za-zÀ-ÿ]+/g;
-  let m;
-  while ((m = wordRe.exec(text)) !== null) {
-    const key = norm(m[0]);
-    if (KNOWN_TYPOS[key] && !seen.has(key)) {
-      seen.add(key);
-      issues.push({
-        type: 'spelling',
-        word: m[0],
-        suggestion: KNOWN_TYPOS[key],
-        message: `« ${m[0]} » → « ${KNOWN_TYPOS[key]} »`,
-      });
-    }
-  }
-
-  // 2. Heuristiques structurelles (que le correcteur natif ne voit pas)
-  // Espace manquant : mots collés (minuscule→MAJUSCULE, ou MAJUSCULES collées
-  // à une minuscule comme « MARCOULYindique »).
-  // Classes distinguant vraiment MAJUSCULE accentuée (À-Ö, Ø-Þ) de minuscule
-  // accentuée (à-ö, ø-ÿ) — la plage naïve « À-Ÿ » inclut à tort les minuscules.
-  const glued = text.match(/[A-Za-zÀ-ÖØ-öø-ÿ]*(?:[a-zà-öø-ÿ][A-ZÀ-ÖØ-Þ]|[A-ZÀ-ÖØ-Þ]{2,}[a-zà-öø-ÿ])[A-Za-zÀ-ÖØ-öø-ÿ]*/);
-  if (glued) {
-    issues.push({ type: 'spacing', message: `espace manquant : « ${glued[0]} »` });
-  }
-  // Espace manquant après une virgule / un point suivi d'une lettre
-  if (/[,.][A-Za-zÀ-ÿ]/.test(text)) {
-    issues.push({ type: 'spacing', message: 'espace manquant après une virgule ou un point' });
-  }
-  // Ponctuation répétée (« !! », « ?? », « !? »…) → ton à neutraliser
-  if (/[!?]{2,}/.test(text)) {
-    issues.push({ type: 'punct', message: 'ponctuation répétée (ex. « !! ») — préférer une formulation factuelle' });
-  }
-  // Passage en MAJUSCULES : 3 mots majuscules consécutifs ou plus = ton « criard »
-  // à neutraliser. Un mot isolé (acronyme MOE/SPS, nom propre DUPONT) est ignoré.
-  if (/[A-ZÀ-ÖØ-Þ]{2,}(?:[^A-Za-zÀ-ÖØ-öø-ÿ]+[A-ZÀ-ÖØ-Þ]{2,}){2,}/.test(text)) {
-    issues.push({ type: 'caps', message: 'passage tout en majuscules — préférer une casse normale' });
-  }
-  // Espaces multiples consécutifs
-  if (/ {2,}/.test(text)) {
-    issues.push({ type: 'spacing', message: 'espaces multiples' });
-  }
-
-  return issues;
-};
 
 // ── Cohérence nom / e-mail ──────────────────────────────────────────────────
 
