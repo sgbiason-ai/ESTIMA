@@ -2,9 +2,19 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '3.4.0';
+export const APP_VERSION = '3.5.0';
 
 export const CHANGELOG = [
+  {
+    version: '3.5.0',
+    date: '2026-06-19',
+    title: 'Documents : sauvegarde par projet (CCTP/RC/CCAP), sommaire & page de garde',
+    highlights: [
+      'CCTP · RC · CCAP — le contenu du document est désormais sauvegardé PAR PROJET (et plus seulement comme gabarit partagé) : chaque édition de chapitre ou import est enregistrée automatiquement dans le projet, sans rien écraser pour les autres affaires. À l\'ouverture d\'un projet, on retrouve son propre contenu ; un nouveau projet démarre du gabarit maître. Le bouton « Sauver » devient « Gabarit » : il sert à enregistrer le contenu courant comme modèle maître pour les futurs projets (action volontaire), distinct de la sauvegarde automatique du projet',
+      'Page de garde — les cases « Tampon / Signature » sont désormais masquées par défaut. Elles restent activables au cas par cas dans la fiche projet (section « Cases Tampon / Signature — Page de garde »)',
+      'CCTP · RC · CCAP (export Word) — le sommaire se remplit enfin : les titres portent désormais un niveau de plan, donc lorsque Word propose de « mettre à jour les champs » à l\'ouverture (cliquer « Oui »), la table des matières s\'affiche avec sa pagination (auparavant elle restait vide)',
+    ],
+  },
   {
     version: '3.4.0',
     date: '2026-06-18',
@@ -16,7 +26,7 @@ export const CHANGELOG = [
       'CCTP · RC · CCAP — clauses optionnelles : on peut entourer un passage de {{#variable}}…{{/variable}}. Si la variable est vide, tout le passage disparaît proprement (fini les phrases tronquées du type « à la fermeture de , »). Sinon le passage est conservé et la variable substituée',
       'CCTP · RC · CCAP — notes de rédaction : les encadrés « ⚑ Note éditeur » restent visibles à l\'écran (aide à la rédaction) mais sont automatiquement retirés des exports Word et PDF. Les documents livrés ne contiennent plus de commentaire interne',
       'CCAP — contrôle de cohérence des délais : si la durée globale ne correspond pas à préparation + travaux, la fenêtre « Champs » le signale et propose de corriger en un clic',
-      'CCTP · RC · CCAP (export Word) — le sommaire se met désormais à jour automatiquement à l\'ouverture du document (champ recalculé), et la page de garde ne peut plus partir blanche : si le visuel ne peut être généré, une page de garde texte de secours est produite à la place',
+      'CCTP · RC · CCAP (export Word) — la page de garde ne peut plus partir blanche : si le visuel ne peut être généré, une page de garde texte de secours est produite à la place',
       'CCTP · RC · CCAP — le bouton « Style » a été retiré du ruban des trois modules ; la charte graphique se règle depuis Paramètres › Identité & Charte graphique',
       'RC & CCAP — boutons « tout cocher / tout décocher » ajoutés à la liste des chapitres (déjà présents sur le CCTP) pour (dé)sélectionner d\'un clic tous les chapitres à inclure dans le document',
     ],
