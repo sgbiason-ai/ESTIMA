@@ -160,7 +160,7 @@ const drawCoverPageRao = (doc, project, consultation, logoMoe, logoClient, today
     clientCityZip: [project?.clientZip, project?.clientCity].filter(Boolean).join(' ').trim(),
     locationRaw: consultation?.lieu || project?.location || 'Non renseignée',
     codeAffaire: consultation?.code || project?.code || 'Non défini',
-    showSignatures: project?.showSignatures !== false,
+    showSignatures: project?.showSignatures === true,
     signatories: project?.signatories || ['', '', '', ''],
     branding,
     today,

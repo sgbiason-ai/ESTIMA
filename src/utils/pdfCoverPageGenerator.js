@@ -25,7 +25,7 @@ export const generateCoverPagePDF = async (project, branding = null) => {
     clientCityZip: [project?.clientZip, project?.clientCity].filter(Boolean).join(' ').trim(),
     locationRaw: project?.location || 'Non renseignée',
     codeAffaire: project?.code || 'Non défini',
-    showSignatures: project?.showSignatures !== false,
+    showSignatures: project?.showSignatures === true,
     signatories: project?.signatories || ['', '', '', ''],
     branding,
     today,

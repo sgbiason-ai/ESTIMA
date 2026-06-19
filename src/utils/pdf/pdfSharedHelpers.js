@@ -278,7 +278,7 @@ export const drawCoverPage = (doc, config, theme, logos) => {
     docType, title: rawTitle, subtitle1 = '', subtitle2 = '',
     phaseLabel, clientName, clientStreet = '', clientCityZip = '',
     locationRaw, codeAffaire,
-    showSignatures = true, signatories = [],
+    showSignatures = false, signatories = [],
     branding, today,
     extraBlocks = [],
   } = config;

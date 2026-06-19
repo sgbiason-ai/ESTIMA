@@ -92,7 +92,7 @@ export const buildCoverPageCanvas = async (project, docLabel, branding = null, t
   const codeAffaire  = project.code      || 'Non défini';
   const subtitle1    = (project.subtitle1 || '').trim();
   const subtitle2    = (project.subtitle2 || '').trim();
-  const showSignatures = project.showSignatures !== false;
+  const showSignatures = project.showSignatures === true;
   const signatories  = project.signatories || ['', '', '', ''];
   const today        = new Date().toLocaleDateString('fr-FR');
 
