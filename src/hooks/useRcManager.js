@@ -10,6 +10,7 @@ import { useStableHash } from './useStableHash';
 import { DEFAULT_CRITERIA } from './useRao';
 import { buildCriteriaTableHtml } from '../utils/rcCriteriaTable';
 import { RC_TEMPLATE } from '../data/rcTemplate';
+import { useProjectDocStore } from './useProjectDocStore';
 
 export const useRcManager = ({
   project,
@@ -35,18 +36,15 @@ export const useRcManager = ({
   };
 
   // --- ETAT GLOBAL ---
-  const [rcData, setRcData] = useState([]);
+  // Contenu sauvegardé PAR PROJET (sous-collection projects/{id}/rc/data).
+  // Amorçage : gabarit maître s'il existe, sinon le modèle de référence RC.
+  const { data: rcData, setData: setRcData, docSaveStatus } = useProjectDocStore({
+    companyId,
+    projectId: project?.id,
+    moduleKey: 'rc',
+    master: (masterRc && masterRc.length > 0) ? masterRc : RC_TEMPLATE,
+  });
   const branding = masterBranding;
-
-  useEffect(() => {
-    if (masterRc && masterRc.length > 0) {
-        setRcData(JSON.parse(JSON.stringify(masterRc)));
-    } else {
-        // RC maître vide (jamais sauvegardé en Cloud) → amorçage local avec le
-        // modèle de référence, sans écriture Cloud (l'utilisateur valide via "Sauver").
-        setRcData(prev => prev.length > 0 ? prev : JSON.parse(JSON.stringify(RC_TEMPLATE)));
-    }
-  }, [masterRc]);
 
   // --- CRITERES RAO (pour la variable {{criteresTable}}) ---
   // Chargés depuis la sous-collection dédiée projects/{id}/rao/data
@@ -140,7 +138,11 @@ export const useRcManager = ({
     debounceMs: 2000,
   });
 
-  const saveStatus = robustSave.saveStatus;
+  const saveStatus =
+    (robustSave.saveStatus === 'saving' || docSaveStatus === 'saving') ? 'saving'
+    : (robustSave.saveStatus === 'error' || docSaveStatus === 'error') ? 'error'
+    : (robustSave.saveStatus === 'saved' || docSaveStatus === 'saved') ? 'saved'
+    : 'idle';
 
   const projectHash = useStableHash(project);
   const lastSavedHashRef = useRef(projectHash);
@@ -479,7 +481,7 @@ export const useRcManager = ({
         });
         return cleanRecursive(nodes);
     };
-    const ok = await confirm("Mise à jour Cloud ?", { title: 'Mise à jour', danger: true });
+    const ok = await confirm("Enregistrer ce contenu comme GABARIT maître partagé ?\nIl deviendra le modèle des futurs projets. Le contenu de CE projet n'est pas affecté (il est déjà sauvegardé automatiquement).", { title: 'Enregistrer comme gabarit', danger: true });
     if (ok) {
         const cleanRc = sanitizeData(rcData);
         setRcData(cleanRc);

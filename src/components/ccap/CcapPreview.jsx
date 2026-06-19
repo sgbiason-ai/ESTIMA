@@ -122,17 +122,17 @@ const CcapPreview = ({
 
         <RibbonSpacer />
 
-        <RibbonGroup label="Cloud" noBorder>
+        <RibbonGroup label="Gabarit" noBorder>
           <div className="flex flex-col items-center gap-1">
-            <RibbonBtnLarge icon={Cloud} label="Sauver" onClick={saveToCloud} title="Sauvegarder en Cloud" />
+            <RibbonBtnLarge icon={Cloud} label="Gabarit" onClick={saveToCloud} title="Enregistrer le contenu actuel comme GABARIT maître partagé (modèle des futurs projets). Le contenu de CE projet est sauvegardé automatiquement." />
             {saveStatus === 'saving' && (
               <span className="text-[9px] font-bold text-amber-500 uppercase flex items-center gap-1">
-                <RefreshCw size={10} className="animate-spin" /> Sync...
+                <RefreshCw size={10} className="animate-spin" /> Projet : sync…
               </span>
             )}
             {saveStatus === 'saved' && (
               <span className="text-[9px] font-bold text-emerald-500 uppercase flex items-center gap-1">
-                <CheckSquare size={10} /> À jour
+                <CheckSquare size={10} /> Projet à jour
               </span>
             )}
           </div>

@@ -6,12 +6,14 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { parseDocxToTree } from '../utils/wordImporter';
 import { parsePdfToTree } from '../utils/parsePdfCctp';
 import { computeDerogations } from '../utils/docContent';
+import { useProjectDocStore } from './useProjectDocStore';
 import { toast, confirm } from '../utils/globalUI';
 import { useRobustSave } from './useRobustSave';
 import { useStableHash } from './useStableHash';
 
 export const useCcapManager = ({
   project,
+  companyId,
   masterCcap,
   onSaveMasterCcap,
   masterBranding,
@@ -33,16 +35,15 @@ export const useCcapManager = ({
   };
 
   // --- ETAT GLOBAL ---
-  const [ccapData, setCcapData] = useState([]);
+  // Contenu sauvegardé PAR PROJET (sous-collection projects/{id}/ccap/data),
+  // avec amorçage sur le gabarit maître si le projet n'a pas encore de contenu.
+  const { data: ccapData, setData: setCcapData, docSaveStatus } = useProjectDocStore({
+    companyId,
+    projectId: project?.id,
+    moduleKey: 'ccap',
+    master: masterCcap,
+  });
   const branding = masterBranding;
-
-  useEffect(() => {
-    if (masterCcap && masterCcap.length > 0) {
-        setCcapData(JSON.parse(JSON.stringify(masterCcap)));
-    }
-    // Pas de modèle type : si masterCcap est vide, le module reste vide
-    // (l'utilisateur importe ou rédige son CCAP).
-  }, [masterCcap]);
 
   // --- SAUVEGARDE LIEE AU PROJET ---
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -114,7 +115,13 @@ export const useCcapManager = ({
     debounceMs: 2000,
   });
 
-  const saveStatus = robustSave.saveStatus;
+  // Statut affiché = fusion de la sauvegarde projet (cases cochées / champs) et
+  // de l'autosave du CONTENU (sous-collection ccap/data).
+  const saveStatus =
+    (robustSave.saveStatus === 'saving' || docSaveStatus === 'saving') ? 'saving'
+    : (robustSave.saveStatus === 'error' || docSaveStatus === 'error') ? 'error'
+    : (robustSave.saveStatus === 'saved' || docSaveStatus === 'saved') ? 'saved'
+    : 'idle';
 
   const projectHash = useStableHash(project);
   const lastSavedHashRef = useRef(projectHash);
@@ -459,7 +466,7 @@ export const useCcapManager = ({
         });
         return cleanRecursive(nodes);
     };
-    const ok = await confirm("Mise à jour Cloud ?", { title: 'Mise à jour', danger: true });
+    const ok = await confirm("Enregistrer ce contenu comme GABARIT maître partagé ?\nIl deviendra le modèle des futurs projets. Le contenu de CE projet n'est pas affecté (il est déjà sauvegardé automatiquement).", { title: 'Enregistrer comme gabarit', danger: true });
     if (ok) {
         const cleanCcap = sanitizeData(ccapData);
         setCcapData(cleanCcap);

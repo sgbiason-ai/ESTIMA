@@ -7,9 +7,11 @@ import { parsePdfToTree } from '../utils/parsePdfCctp';
 import { toast, confirm } from '../utils/globalUI';
 import { useRobustSave } from './useRobustSave';
 import { useStableHash } from './useStableHash';
+import { useProjectDocStore } from './useProjectDocStore';
 
 export const useCctpManager = ({
   project,
+  companyId,
   masterCctp,
   onSaveMasterCctp,
   masterBranding,
@@ -17,18 +19,17 @@ export const useCctpManager = ({
   onSaveProject
 }) => {
   // --- ETAT GLOBAL ---
-  const [cctpData, setCctpData] = useState(
-      masterCctp ? JSON.parse(JSON.stringify(masterCctp)) : []
-  );
+  // Contenu sauvegardé PAR PROJET (sous-collection projects/{id}/cctp/data),
+  // avec amorçage sur le gabarit maître si le projet n'a pas encore de contenu.
+  const { data: cctpData, setData: setCctpData, docSaveStatus } = useProjectDocStore({
+    companyId,
+    projectId: project?.id,
+    moduleKey: 'cctp',
+    master: masterCctp,
+  });
 
   // branding est directement masterBranding — plus de state local
   const branding = masterBranding;
-
-  useEffect(() => {
-    if (masterCctp && masterCctp.length > 0) {
-        setCctpData(JSON.parse(JSON.stringify(masterCctp)));
-    }
-  }, [masterCctp]);
 
   // --- SAUVEGARDE LIEE AU PROJET ---
   const [selectedIds, setSelectedIds] = useState(() => {
@@ -94,7 +95,11 @@ export const useCctpManager = ({
     debounceMs: 2000,
   });
 
-  const saveStatus = robustSave.saveStatus;
+  const saveStatus =
+    (robustSave.saveStatus === 'saving' || docSaveStatus === 'saving') ? 'saving'
+    : (robustSave.saveStatus === 'error' || docSaveStatus === 'error') ? 'error'
+    : (robustSave.saveStatus === 'saved' || docSaveStatus === 'saved') ? 'saved'
+    : 'idle';
 
   const projectHash = useStableHash(project);
   const lastSavedHashRef = useRef(projectHash);
@@ -478,7 +483,7 @@ export const useCctpManager = ({
         });
         return cleanRecursive(nodes);
     };
-    const ok = await confirm("Mise à jour Cloud ?", { title: 'Mise à jour', danger: true });
+    const ok = await confirm("Enregistrer ce contenu comme GABARIT maître partagé ?\nIl deviendra le modèle des futurs projets. Le contenu de CE projet n'est pas affecté (il est déjà sauvegardé automatiquement).", { title: 'Enregistrer comme gabarit', danger: true });
     if (ok) {
         const cleanCctp = sanitizeData(cctpData);
         setCctpData(cleanCctp);

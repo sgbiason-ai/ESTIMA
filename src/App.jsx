@@ -804,6 +804,7 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNav
             {activeTab === 'cctp' && (
               <CctpGeneratorView
                 project={project}
+                companyId={companyId}
                 masterCctp={resources.masterCctp}
                 onSaveMasterCctp={resources.handleSaveMasterCctp}
                 masterBranding={resources.masterBranding}
@@ -833,6 +834,7 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNav
             {activeTab === 'ccap' && (
               <CcapGeneratorView
                 project={project}
+                companyId={companyId}
                 masterCcap={resources.masterCcap || []}
                 onSaveMasterCcap={resources.handleSaveMasterCcap || (() => {})}
                 masterBranding={resources.masterBranding}

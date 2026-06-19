@@ -12,7 +12,7 @@ import HelpPanel from '../components/help/HelpPanel';
 import HelpButton from '../components/help/HelpButton';
 
 const CctpGeneratorView = ({ 
-  project, masterCctp, onSaveMasterCctp, masterBranding,
+  project, companyId, masterCctp, onSaveMasterCctp, masterBranding,
   onEditProject, onUpdateProject, onSaveProject,
   onEditBranding,
 }) => {
@@ -22,7 +22,7 @@ const CctpGeneratorView = ({
   const [varsModalOpen, setVarsModalOpen] = useState(false);
 
   const manager = useCctpManager({
-    project, masterCctp, onSaveMasterCctp, masterBranding, onUpdateProject, onSaveProject
+    project, companyId, masterCctp, onSaveMasterCctp, masterBranding, onUpdateProject, onSaveProject
   });
 
   const { favorites, toggleFavorite, isFavorite, removeFavorite } = useFavorites();

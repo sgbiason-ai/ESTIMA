@@ -140,6 +140,17 @@ service cloud.firestore {
         match /rao/{docId} {
           allow read, write: if isCompanyMember(companyId);
         }
+
+        // Contenu des documents par projet (CCTP / RC / CCAP) — document dédié
+        match /cctp/{docId} {
+          allow read, write: if isCompanyMember(companyId);
+        }
+        match /rc/{docId} {
+          allow read, write: if isCompanyMember(companyId);
+        }
+        match /ccap/{docId} {
+          allow read, write: if isCompanyMember(companyId);
+        }
       }
 
       match /bpu/{itemId} {

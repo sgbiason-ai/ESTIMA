@@ -12,7 +12,7 @@ import HelpPanel from '../components/help/HelpPanel';
 import HelpButton from '../components/help/HelpButton';
 
 const CcapGeneratorView = ({
-  project, masterCcap, onSaveMasterCcap, masterBranding,
+  project, companyId, masterCcap, onSaveMasterCcap, masterBranding,
   onEditProject, onUpdateProject, onSaveProject,
   onEditBranding,
 }) => {
@@ -22,7 +22,7 @@ const CcapGeneratorView = ({
   const [showHelp, setShowHelp] = useState(false);
 
   const manager = useCcapManager({
-    project, masterCcap, onSaveMasterCcap, masterBranding, onUpdateProject, onSaveProject
+    project, companyId, masterCcap, onSaveMasterCcap, masterBranding, onUpdateProject, onSaveProject
   });
 
   const { favorites, toggleFavorite, isFavorite, removeFavorite } = useFavorites();
