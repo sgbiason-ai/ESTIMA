@@ -226,7 +226,7 @@ const createDocStyles = (branding) => ({
       next: "Normal",
       quickFormat: true,
       run: { font: branding.fonts.headings, size: branding.sizes.title1, bold: true, color: cleanColor(branding.colors.heading1 || branding.colors.primary), allCaps: true },
-      paragraph: { spacing: { before: 480, after: 240 }, keepNext: true, tabStops: [{ type: "left", position: 900 }] },
+      paragraph: { spacing: { before: 480, after: 240 }, keepNext: true, outlineLevel: 0, tabStops: [{ type: "left", position: 900 }] },
     },
     {
       id: "Heading2",
@@ -235,7 +235,7 @@ const createDocStyles = (branding) => ({
       next: "Normal",
       quickFormat: true,
       run: { font: branding.fonts.headings, size: branding.sizes.title2, bold: true, color: cleanColor(branding.colors.heading2 || branding.colors.secondary) },
-      paragraph: { spacing: { before: 240, after: 120 }, keepNext: true, tabStops: [{ type: "left", position: 900 }] },
+      paragraph: { spacing: { before: 240, after: 120 }, keepNext: true, outlineLevel: 1, tabStops: [{ type: "left", position: 900 }] },
     },
     {
       id: "Heading3",
@@ -244,7 +244,7 @@ const createDocStyles = (branding) => ({
       next: "Normal",
       quickFormat: true,
       run: { font: branding.fonts.headings, size: branding.sizes.title3, bold: true, color: cleanColor(branding.colors.heading3 || '#444444'), italics: true },
-      paragraph: { spacing: { before: 200, after: 100 }, keepNext: true, tabStops: [{ type: "left", position: 900 }] },
+      paragraph: { spacing: { before: 200, after: 100 }, keepNext: true, outlineLevel: 2, tabStops: [{ type: "left", position: 900 }] },
     },
     {
       id: "Heading4",
@@ -253,7 +253,7 @@ const createDocStyles = (branding) => ({
       next: "Normal",
       quickFormat: true,
       run: { font: branding.fonts.headings, size: branding.sizes.title4, bold: true, color: "000000" },
-      paragraph: { spacing: { before: 180, after: 80 }, keepNext: true, tabStops: [{ type: "left", position: 900 }] },
+      paragraph: { spacing: { before: 180, after: 80 }, keepNext: true, outlineLevel: 3, tabStops: [{ type: "left", position: 900 }] },
     },
     {
       id: "Heading5",
@@ -262,7 +262,7 @@ const createDocStyles = (branding) => ({
       next: "Normal",
       quickFormat: true,
       run: { font: branding.fonts.headings, size: branding.sizes.title5, bold: false, underline: { type: "single" }, color: "000000" },
-      paragraph: { spacing: { before: 160, after: 60 }, keepNext: true, tabStops: [{ type: "left", position: 900 }] },
+      paragraph: { spacing: { before: 160, after: 60 }, keepNext: true, outlineLevel: 4, tabStops: [{ type: "left", position: 900 }] },
     },
     {
       id: "Normal",
@@ -497,7 +497,11 @@ export const generateWordCCTP = async (selectedNodes, variables, masterData, bra
   });
 
   const doc = new Document({
-    // ON SUPPRIME la ligne "features: { updateFields: true }," qui faisait planter Word !
+    // Word propose de mettre à jour les champs à l'ouverture ; « Oui » remplit
+    // le SOMMAIRE (TOC) avec pagination (effectif grâce à l'outlineLevel des
+    // styles de titres). Ce n'est pas un plantage : juste la boîte de dialogue
+    // « mettre à jour les champs ».
+    features: { updateFields: true },
     styles: createDocStyles(branding),
     sections: [
       // ── Section 1 : page de garde pleine page, sans header/footer ──────────
