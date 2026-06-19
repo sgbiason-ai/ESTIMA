@@ -4,7 +4,7 @@ import { Eye, Download, Edit3, FileText, FileSignature, Cloud, RefreshCw, CheckS
 import { generateWordCCTP } from '../../utils/cctpExport';
 import { renderForPreview } from '../../utils/docContent';
 import { sanitizeHtml } from '../../utils/helpers';
-import { RibbonGroup, RibbonBtnLarge, RibbonBtnSmall, RibbonContainer, RibbonSpacer } from '../common/RibbonParts';
+import { RibbonGroup, RibbonBtnLarge, RibbonContainer, RibbonSpacer } from '../common/RibbonParts';
 
 const CctpPreview = ({
   cctpData,
@@ -13,7 +13,6 @@ const CctpPreview = ({
   branding,
   handlePreviewScroll,
   openEditor,
-  handleExportPdf,
   saveToCloud,
   saveStatus,
   onEditVariables,
@@ -117,9 +116,6 @@ const CctpPreview = ({
 
         <RibbonGroup label="Exporter">
           <RibbonBtnLarge icon={Download} label={<>Word<br/><span className="text-[8px] opacity-60">.docx</span></>} onClick={() => generateWordCCTP(selectedIds, variables, cctpData, branding)} title="Générer et télécharger le document Word (.docx)" accent="text-indigo-600" />
-          <div className="flex flex-col gap-0.5">
-            <RibbonBtnSmall icon={FileText} label="Export PDF" onClick={handleExportPdf} title="Exporter le CCTP en PDF" accent="text-red-600" />
-          </div>
         </RibbonGroup>
 
         <RibbonSpacer />

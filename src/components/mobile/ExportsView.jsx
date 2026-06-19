@@ -10,13 +10,6 @@ const EXPORT_SECTIONS = [
     ],
   },
   {
-    title: 'Marché',
-    items: [
-      { key: 'CCTP', label: 'CCTP', format: 'PDF', desc: 'Cahier des Clauses Techniques' },
-      { key: 'RC',   label: 'RC',   format: 'PDF', desc: 'Règlement de Consultation' },
-    ],
-  },
-  {
     title: 'Estimation',
     items: [
       { key: 'Estim', label: 'Estim. (DQE)', format: 'PDF',   desc: 'Devis PDF (DQE)' },

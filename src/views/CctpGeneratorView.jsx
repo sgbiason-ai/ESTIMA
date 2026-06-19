@@ -39,18 +39,6 @@ const CctpGeneratorView = ({
     setIsFavoritesPanelOpen(false);
   }, [manager]);
 
-  const handleExportPdf = useCallback(async () => {
-    const { generatePdfCctpRc } = await import('../utils/pdfCctpRcGenerator');
-    await generatePdfCctpRc(
-      'CCTP',
-      manager.selectedIds,
-      manager.cctpData,
-      manager.variables,
-      project,
-      manager.branding
-    );
-  }, [manager, project]);
-
   // Utilise le modal global de App.jsx via onEditProject (= modals.openProjectModal)
   const handleEditProject = () => {
     onEditProject?.();
@@ -95,7 +83,6 @@ const CctpGeneratorView = ({
         handleFileUpload={manager.handleFileUpload}
         handlePdfUpload={manager.handlePdfUpload}
         handleExportMaster={manager.handleExportMaster}
-        handleExportPdf={handleExportPdf}
         saveToCloud={manager.saveToCloud}
         expandedIds={manager.expandedIds}
         selectedIds={manager.selectedIds}
@@ -124,7 +111,6 @@ const CctpGeneratorView = ({
         setBrandingModalOpen={() => onEditBranding?.()}
         handlePreviewScroll={manager.handlePreviewScroll}
         openEditor={manager.openEditor}
-        handleExportPdf={handleExportPdf}
         saveToCloud={manager.saveToCloud}
         saveStatus={manager.saveStatus}
         onEditVariables={() => setVarsModalOpen(true)}

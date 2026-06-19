@@ -3,7 +3,7 @@
 // Construit le tableau HTML des critères d'attribution du RC à partir des
 // critères du module RAO (project.rao.criteria / DEFAULT_CRITERIA).
 // Le HTML produit est consommé par la variable {{criteresTable}} du RC,
-// rendue en aperçu (RcPreview), en Word (rcExport) et en PDF (pdfCctpRcGenerator).
+// rendue en aperçu (RcPreview) et en Word (rcExport).
 
 const escapeHtml = (str) =>
   String(str ?? '')

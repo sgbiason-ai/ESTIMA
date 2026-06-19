@@ -38,18 +38,6 @@ const RcGeneratorView = ({
     setIsFavoritesPanelOpen(false);
   }, [manager]);
 
-  const handleExportPdf = useCallback(async () => {
-    const { generatePdfCctpRc } = await import('../utils/pdfCctpRcGenerator');
-    await generatePdfCctpRc(
-      'RC',
-      manager.selectedIds,
-      manager.rcData,
-      manager.variables,
-      project,
-      manager.branding
-    );
-  }, [manager, project]);
-
   // Utilise le modal global de App.jsx via onEditProject (= modals.openProjectModal)
   const handleEditProject = () => {
     onEditProject?.();
@@ -76,7 +64,6 @@ const RcGeneratorView = ({
         handlePdfUpload={manager.handlePdfUpload}
         handleExportMaster={manager.handleExportMaster}
         loadTemplate={manager.loadTemplate}
-        handleExportPdf={handleExportPdf}
         saveToCloud={manager.saveToCloud}
         expandedIds={manager.expandedIds}
         selectedIds={manager.selectedIds}
@@ -99,7 +86,6 @@ const RcGeneratorView = ({
         setBrandingModalOpen={() => onEditBranding?.()}
         handlePreviewScroll={manager.handlePreviewScroll}
         openEditor={manager.openEditor}
-        handleExportPdf={handleExportPdf}
         saveToCloud={manager.saveToCloud}
         saveStatus={manager.saveStatus}
         onEditVariables={() => setVarsModalOpen(true)}

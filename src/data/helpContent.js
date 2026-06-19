@@ -912,11 +912,11 @@ REGLES
       {
         id: 'export', label: 'Export', icon: 'FileDown',
         sections: [
-          { type: 'intro', text: "Exportez votre CCTP en document PDF professionnel avec page de garde, sommaire et mise en page automatique." },
+          { type: 'intro', text: "Exportez votre CCTP en document Word (.docx) professionnel avec page de garde, sommaire et mise en page automatique." },
           {
             type: 'steps',
             items: [
-              { color: 'blue', title: 'Generer le PDF', description: "Cliquez sur \"Exporter PDF\" dans la toolbar. Seules les clauses cochees sont incluses." },
+              { color: 'blue', title: 'Generer le document', description: "Cliquez sur \"Word\" dans le ruban Exporter. Seules les clauses cochees sont incluses." },
               { color: 'emerald', title: 'Page de garde', description: "La page de garde utilise votre branding (logo, couleurs, coordonnees) automatiquement." },
               { color: 'amber', title: 'Options', description: "Choisissez d'inclure ou non le sommaire, la numerotation, et les annexes." },
             ],
@@ -978,7 +978,7 @@ REGLES
           {
             type: 'steps',
             items: [
-              { color: 'blue', title: 'Generer le PDF', description: "Cliquez sur \"Exporter PDF\" pour generer le document RC avec page de garde et votre branding." },
+              { color: 'blue', title: 'Generer le document', description: "Cliquez sur \"Word\" pour generer le document RC avec page de garde et votre branding." },
               { color: 'emerald', title: 'Options d\'export', description: "Choisissez d'inclure le sommaire et la numerotation automatique." },
             ],
           },

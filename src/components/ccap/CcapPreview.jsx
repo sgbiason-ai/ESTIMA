@@ -4,7 +4,7 @@ import { Eye, Download, Edit3, FileText, FileSignature, Cloud, RefreshCw, CheckS
 import { generateWordCCAP } from '../../utils/ccapExport';
 import { renderForPreview } from '../../utils/docContent';
 import { sanitizeHtml } from '../../utils/helpers';
-import { RibbonGroup, RibbonBtnLarge, RibbonBtnSmall, RibbonContainer, RibbonSpacer } from '../common/RibbonParts';
+import { RibbonGroup, RibbonBtnLarge, RibbonContainer, RibbonSpacer } from '../common/RibbonParts';
 
 const CcapPreview = ({
   ccapData,
@@ -13,7 +13,6 @@ const CcapPreview = ({
   branding,
   handlePreviewScroll,
   openEditor,
-  handleExportPdf,
   saveToCloud,
   saveStatus,
   onEditVariables,
@@ -115,9 +114,6 @@ const CcapPreview = ({
 
         <RibbonGroup label="Exporter">
           <RibbonBtnLarge icon={Download} label={<>Word<br/><span className="text-[8px] opacity-60">.docx</span></>} onClick={() => generateWordCCAP(selectedIds, variables, ccapData, branding)} title="Générer et télécharger le document Word (.docx)" accent="text-indigo-600" />
-          <div className="flex flex-col gap-0.5">
-            <RibbonBtnSmall icon={FileText} label="Export PDF" onClick={handleExportPdf} title="Exporter le CCAP en PDF" accent="text-red-600" />
-          </div>
         </RibbonGroup>
 
         <RibbonSpacer />

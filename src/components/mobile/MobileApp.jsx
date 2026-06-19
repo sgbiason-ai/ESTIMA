@@ -14,7 +14,6 @@ import { useProjectTranches }     from '../../hooks/useProjectTranches';
 // ─── GENERATORS (chargés dynamiquement pour ne pas alourdir le bundle mobile) ─
 const loadExcelGenerator    = () => import('../../utils/excelGenerator');
 const loadPdfGenerator      = () => import('../../utils/pdfGenerator');
-const loadPdfCctpRc         = () => import('../../utils/pdfCctpRcGenerator');
 const loadAnalysisPdf       = () => import('../../utils/pdfAnalysisGenerator');
 const loadAnalysisExcel     = () => import('../../utils/excelAnalysisGenerator');
 const loadRaoPdf            = () => import('../../utils/pdfRaoGenerator');
@@ -363,24 +362,6 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
             includeSummary: tranchesHook.hasTranches,
             tranches: tranchesList,
           }, branding);
-          break;
-        }
-        case 'CCTP': {
-          const { generatePdfCctpRc } = await loadPdfCctpRc();
-          const tree = resources.masterCctp || [];
-          const allIds = [];
-          const collectIds = (nodes) => nodes.forEach(n => { allIds.push(n.id); if (n.children) collectIds(n.children); });
-          collectIds(tree);
-          await generatePdfCctpRc('CCTP', allIds, tree, {}, fullProject, branding);
-          break;
-        }
-        case 'RC': {
-          const { generatePdfCctpRc } = await loadPdfCctpRc();
-          const tree = resources.masterRc || [];
-          const allIds = [];
-          const collectIds = (nodes) => nodes.forEach(n => { allIds.push(n.id); if (n.children) collectIds(n.children); });
-          collectIds(tree);
-          await generatePdfCctpRc('RC', allIds, tree, {}, fullProject, branding);
           break;
         }
         case 'Analyse': {

@@ -38,18 +38,6 @@ const CcapGeneratorView = ({
     setIsFavoritesPanelOpen(false);
   }, [manager]);
 
-  const handleExportPdf = useCallback(async () => {
-    const { generatePdfCctpRc } = await import('../utils/pdfCctpRcGenerator');
-    await generatePdfCctpRc(
-      'CCAP',
-      manager.selectedIds,
-      manager.ccapData,
-      manager.variables,
-      project,
-      manager.branding
-    );
-  }, [manager, project]);
-
   const handleEditProject = () => {
     onEditProject?.();
   };
@@ -74,7 +62,6 @@ const CcapGeneratorView = ({
         handleFileUpload={manager.handleFileUpload}
         handlePdfUpload={manager.handlePdfUpload}
         handleExportMaster={manager.handleExportMaster}
-        handleExportPdf={handleExportPdf}
         saveToCloud={manager.saveToCloud}
         expandedIds={manager.expandedIds}
         selectedIds={manager.selectedIds}
@@ -97,7 +84,6 @@ const CcapGeneratorView = ({
         setBrandingModalOpen={() => onEditBranding?.()}
         handlePreviewScroll={manager.handlePreviewScroll}
         openEditor={manager.openEditor}
-        handleExportPdf={handleExportPdf}
         saveToCloud={manager.saveToCloud}
         saveStatus={manager.saveStatus}
         onEditVariables={() => setVarsModalOpen(true)}

@@ -10,6 +10,7 @@ export const CHANGELOG = [
     date: '2026-06-19',
     title: 'Documents : sauvegarde par projet (CCTP/RC/CCAP), sommaire & page de garde',
     highlights: [
+      'CCTP · RC · CCAP — l\'export PDF a été retiré : ces documents s\'exportent désormais uniquement en Word (.docx), entièrement modifiable. Sur mobile, le CCTP et le RC ne figurent plus dans l\'écran « Exports »',
       'CCTP · RC · CCAP — le contenu du document est désormais sauvegardé PAR PROJET (et plus seulement comme gabarit partagé) : chaque édition de chapitre ou import est enregistrée automatiquement dans le projet, sans rien écraser pour les autres affaires. À l\'ouverture d\'un projet, on retrouve son propre contenu ; un nouveau projet démarre du gabarit maître. Le bouton « Sauver » devient « Gabarit » : il sert à enregistrer le contenu courant comme modèle maître pour les futurs projets (action volontaire), distinct de la sauvegarde automatique du projet',
       'Page de garde — les cases « Tampon / Signature » sont désormais masquées par défaut. Elles restent activables au cas par cas dans la fiche projet (section « Cases Tampon / Signature — Page de garde »)',
       'CCTP · RC · CCAP (export Word) — le sommaire se remplit enfin : les titres portent désormais un niveau de plan, donc lorsque Word propose de « mettre à jour les champs » à l\'ouverture (cliquer « Oui »), la table des matières s\'affiche avec sa pagination (auparavant elle restait vide)',
