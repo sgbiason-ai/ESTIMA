@@ -38,6 +38,21 @@ export const helpContent = {
           },
         ],
       },
+      {
+        id: 'detail', label: 'Sous-détail', icon: 'Calculator',
+        sections: [
+          {
+            type: 'cards',
+            cards: [
+              { color: 'orange', title: 'Déboursé sec', description: "Pour chaque article : 5 postes — Matériel (amort./entretien/conso/location), Main d'œuvre, Fournitures, Sous-traitance, Transport." },
+              { color: 'blue', title: 'Rendement & durée', description: "Saisissez le rendement (ex. 1390 m²/j). La durée se déduit (quantité ÷ rendement) ou se force au cadenas. Elle pilote les coûts MO et matériel." },
+              { color: 'emerald', title: 'Fournitures', description: "Quantité auto = quantité d'ouvrage × épaisseur × densité, sinon quantité directe. PU barème ou PU forcé." },
+              { color: 'violet', title: 'Prix de vente', description: "Coefficients par poste (onglet Marges, défaut 1,15) → PU vente. Possibilité de forcer le PU retenu. Le PU alimente le bordereau." },
+            ],
+          },
+          { type: 'tip', title: 'Récap', text: "L'onglet « Récap » affiche le DQE chiffré : déboursé, PU vente et total par article, marge globale et répartition par poste." },
+        ],
+      },
     ],
   },
 

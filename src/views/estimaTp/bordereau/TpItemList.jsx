@@ -79,15 +79,25 @@ const ItemRow = memo(function ItemRow({ el, index, level }) {
           </div>
           <div className="w-24 px-2 shrink-0"><TpFormulaCell el={el} /></div>
           <div className="w-28 px-2 shrink-0">
-            <div className="relative flex items-center">
-              <InlineInput
-                value={el.price === 0 ? '' : el.price}
-                onCommit={(val) => onUpdateNode(el.id, { price: Number(String(val).replace(',', '.')) || 0 })}
-                placeholder="0"
-                className="w-full bg-slate-50 border border-slate-200 focus:border-orange-500 focus:bg-white rounded py-0.5 px-1 pr-4 text-right text-xs font-mono font-bold text-slate-800 outline-none"
-              />
-              <span className="absolute right-1.5 text-[10px] text-slate-300 font-black pointer-events-none">€</span>
-            </div>
+            {el.detail ? (
+              <div className="relative flex items-center" title="PU piloté par le sous-détail de prix">
+                <span className="w-full text-right text-xs font-mono font-bold text-orange-700 pr-4 truncate">
+                  {Number(el.price || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+                <span className="absolute -left-1 top-1/2 -translate-y-1/2 text-[7px] font-black text-orange-400" title="Sous-détail">SD</span>
+                <span className="absolute right-1.5 text-[10px] text-orange-300 font-black pointer-events-none">€</span>
+              </div>
+            ) : (
+              <div className="relative flex items-center">
+                <InlineInput
+                  value={el.price === 0 ? '' : el.price}
+                  onCommit={(val) => onUpdateNode(el.id, { price: Number(String(val).replace(',', '.')) || 0 })}
+                  placeholder="0"
+                  className="w-full bg-slate-50 border border-slate-200 focus:border-orange-500 focus:bg-white rounded py-0.5 px-1 pr-4 text-right text-xs font-mono font-bold text-slate-800 outline-none"
+                />
+                <span className="absolute right-1.5 text-[10px] text-slate-300 font-black pointer-events-none">€</span>
+              </div>
+            )}
           </div>
           <div className="w-28 text-right px-3 shrink-0">
             <span className={`text-[11px] font-mono font-black ${isPM ? 'italic text-slate-400 font-medium' : 'text-slate-900'}`}>
