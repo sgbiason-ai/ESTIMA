@@ -16,6 +16,7 @@ export const ASSIGNABLE_MODULES = [
   { id: 'estima',           label: 'ESTIMA VRD',                  group: 'Projet & Estimation' },
   { id: 'estim_rapide',     label: 'Estimation Rapide',           group: 'Projet & Estimation' },
   { id: 'rao_analysis',     label: 'RAO & Analyse',               group: 'Projet & Estimation' },
+  { id: 'tp_etude_prix',    label: 'Étude de Prix (TP)',          group: 'ESTIMA TP' },
   { id: 'devis_moe',        label: 'Devis MOE',                   group: 'Outils & Administration' },
   { id: 'expense_notes',    label: 'Notes de Frais',              group: 'Outils & Administration' },
   { id: 'crc',              label: 'Compte Rendu Chantier',       group: 'Outils & Administration' },

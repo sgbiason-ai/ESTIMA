@@ -36,6 +36,7 @@ export const MODULE_LABELS = {
   projects_manager: 'Gestion de Projets',
   estima:           'Estima VRD',
   rao_analysis:     'RAO & Analyse',
+  tp_etude_prix:    'Étude de Prix (TP)',
   crc:              'Compte Rendu Chantier',
   doc_admin:        'Documents Administratifs',
   devis_moe:        'Devis MOE',

@@ -52,6 +52,7 @@ const SettingsView       = lazyWithReload(() => import('./views/SettingsView'));
 const BrandingView       = lazyWithReload(() => import('./views/BrandingView'));
 const AdminView          = lazyWithReload(() => import('./views/AdminView'));
 const RaoAnalysisView    = lazyWithReload(() => import('./views/RaoAnalysisView'));
+const EstimaTpView       = lazyWithReload(() => import('./views/estimaTp/EstimaTpView'));
 const CrcView            = lazyWithReload(() => import('./views/crc/CrcView'));
 const DocAdminView       = lazyWithReload(() => import('./views/DocAdminView'));
 const SiteVisitsView     = lazyWithReload(() => import('./views/SiteVisitsView'));
@@ -293,6 +294,15 @@ export default function App() {
     return (
       <Lazy>
         <RaoAnalysisView user={user} companyId={companyId} onBackToHub={handleBackToHub} />
+      </Lazy>
+    );
+  }
+
+  // Module : ESTIMA TP — Étude de Prix (chiffrage entreprise)
+  if (activeModule === 'tp_etude_prix') {
+    return (
+      <Lazy>
+        <EstimaTpView user={user} companyId={companyId} onBackToHub={handleBackToHub} />
       </Lazy>
     );
   }

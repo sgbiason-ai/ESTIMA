@@ -4,7 +4,8 @@ import {
   Calculator, BarChart3, ClipboardList, FileStack, ShieldCheck,
   Folder, LogOut, Lock, Briefcase, Wrench, Receipt, Car,
   Layers, Settings, Palette, Shield, Smartphone, RefreshCw,
-  Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudDrizzle, CloudFog, MapPin, ChevronRight, Sparkles
+  Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudDrizzle, CloudFog, MapPin, ChevronRight, Sparkles,
+  HardHat, Coins
 } from 'lucide-react';
 import { APP_VERSION } from '../data/changelog';
 import ChangelogModal from '../components/ChangelogModal';
@@ -66,6 +67,8 @@ const MODULES = [
   { id: 'crc', label: 'Compte Rendu Chantier', description: 'Suivi de chantier et comptes rendus de réunion', icon: ClipboardList, access: 'admin_or_unlocked', tag: 'Terrain', row: 2 },
   { id: 'doc_admin', label: 'Documents Administratifs', description: 'Génération des documents administratifs de marché', icon: FileStack, access: 'admin_or_unlocked', tag: 'Admin', row: 2 },
   { id: 'site_visits', label: 'Visites de Site', description: 'Documentation terrain avec photos et GPS', icon: MapPin, access: 'all', tag: 'Terrain', row: 2 },
+  // Row 4 — ESTIMA TP (orange chantier, light) — modules entreprise de travaux publics
+  { id: 'tp_etude_prix', label: 'Étude de Prix', description: "Sous-détail de prix entreprise : déboursé sec, frais et prix de vente", icon: Coins, access: 'all', tag: 'TP', row: 4 },
   // Row 3 — Paramètres & Compte (amethyst glass)
   { id: 'branding', label: 'Identité & Charte Graphique', description: 'Logo, couleurs, typographie et informations de contact', icon: Palette, access: 'all', tag: 'Branding', row: 3 },
   { id: 'rgpd', label: 'Mon Compte & Données', description: 'RGPD — Portabilité des données et droit à l\'effacement', icon: Shield, access: 'all', tag: 'RGPD', row: 3 },
@@ -110,6 +113,18 @@ const ROW_THEMES = {
     badge: 'bg-violet-800/40 text-violet-300/80 border border-violet-600/30',
     status: 'text-violet-400/50',
     statusLabel: 'Prêt à l\'emploi',
+  },
+  4: {
+    // Orange chantier — light (volontairement clair, distinct du cuivre sombre de la row 2)
+    card: 'bg-gradient-to-br from-orange-50 to-white border-orange-200/70',
+    cardHover: 'hover:shadow-lg hover:shadow-orange-200/50 hover:-translate-y-0.5',
+    iconBg: 'bg-orange-100/80',
+    iconColor: 'text-orange-600',
+    title: 'text-gray-900',
+    desc: 'text-gray-500',
+    badge: 'bg-orange-100 text-orange-700 border border-orange-200/60',
+    status: 'text-orange-400',
+    statusLabel: 'Nouveau',
   },
 };
 
@@ -187,6 +202,7 @@ const ROW_LABELS = {
   1: { label: 'Projet & Estimation', icon: Briefcase },
   2: { label: 'Outils & Administration', icon: Wrench },
   3: { label: 'Paramètres & Compte', icon: Settings },
+  4: { label: 'ESTIMA TP', icon: HardHat },
 };
 
 // ─── COMPOSANT PRINCIPAL ────────────────────────────────────────────────────
@@ -243,7 +259,8 @@ export default function ModuleHubView({ isAdmin, userEmail, userModules, onSelec
   const greeting = hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
 
   const visibleModules = MODULES.filter(isVisible);
-  const rows = [1, 2, 3];
+  // Ordre des colonnes : ESTIMA TP (4) en 2e position, juste après « Projet & Estimation ».
+  const rows = [1, 4, 2, 3];
 
   return (
     <div className="flex flex-col h-screen w-full bg-[#f5f5f7] text-gray-900 overflow-hidden selection:bg-blue-200"
@@ -321,7 +338,7 @@ export default function ModuleHubView({ isAdmin, userEmail, userModules, onSelec
           {/* Bento Grid — desktop : 3 colonnes (rows horizontales)
               Tablette/mobile : 1 colonne externe (sections empilées),
                 chaque section a ses cartes en grille 2 cols (md) ou 1 col (mobile) */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-[clamp(0.5rem,0.8vh,1.25rem)] lg:flex-1 lg:min-h-0">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-[clamp(0.5rem,0.8vh,1.25rem)] lg:flex-1 lg:min-h-0">
             {rows.map((rowNum) => {
               const colModules = visibleModules.filter(m => m.row === rowNum);
               if (colModules.length === 0) return null;
@@ -332,8 +349,8 @@ export default function ModuleHubView({ isAdmin, userEmail, userModules, onSelec
                   {/* Column label */}
                   <div className={`flex items-center gap-2 mb-[clamp(0.25rem,0.4vh,0.75rem)] mt-3 lg:mt-0 shrink-0 transition-all duration-700 ease-out ${mounted ? 'opacity-100' : 'opacity-0'}`}
                     style={{ transitionDelay: `${100 + rowNum * 80}ms` }}>
-                    <ColIcon size={14} className={rowNum === 1 ? 'text-gray-400' : rowNum === 2 ? 'text-amber-500/70' : 'text-violet-500/70'} strokeWidth={1.5} />
-                    <span className={`text-xs font-medium uppercase tracking-widest ${rowNum === 1 ? 'text-gray-400' : rowNum === 2 ? 'text-amber-600/50' : 'text-violet-600/50'}`}>
+                    <ColIcon size={14} className={rowNum === 1 ? 'text-gray-400' : rowNum === 2 ? 'text-amber-500/70' : rowNum === 4 ? 'text-orange-500/80' : 'text-violet-500/70'} strokeWidth={1.5} />
+                    <span className={`text-xs font-medium uppercase tracking-widest ${rowNum === 1 ? 'text-gray-400' : rowNum === 2 ? 'text-amber-600/50' : rowNum === 4 ? 'text-orange-600/70' : 'text-violet-600/50'}`}>
                       {ROW_LABELS[rowNum].label}
                     </span>
                   </div>

@@ -219,6 +219,12 @@ service cloud.firestore {
         allow read, write: if isCompanyMember(companyId);
       }
 
+      // ESTIMA TP — études de prix (chiffrage entreprise)
+      // L'accès UI est contrôlé par les permissions par module dans /users/{uid}
+      match /tpStudies/{studyId} {
+        allow read, write: if isCompanyMember(companyId);
+      }
+
       // Présence en temps réel
       match /presence/{presenceId} {
         allow read: if isCompanyMember(companyId);

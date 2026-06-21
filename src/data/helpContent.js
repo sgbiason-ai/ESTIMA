@@ -5,6 +5,43 @@
 export const helpContent = {
 
   // ──────────────────────────────────────────────────────────────────────────
+  // ESTIMA TP — Étude de Prix (chiffrage entreprise de travaux publics)
+  // ──────────────────────────────────────────────────────────────────────────
+  estimaTp: {
+    title: 'Guide — Étude de Prix',
+    subtitle: 'Chiffrage entreprise : du bordereau au prix de vente',
+    tabs: [
+      {
+        id: 'principe', label: 'Principe', icon: 'Calculator',
+        sections: [
+          {
+            type: 'cards',
+            cards: [
+              { color: 'amber', title: 'Côté entreprise', description: "ESTIMA TP est l'inverse d'ESTIMA VRD : ici vous chiffrez une réponse à appel d'offres en construisant votre prix de vente." },
+              { color: 'blue', title: 'Étude autonome', description: "Chaque étude est indépendante des projets MOE. Créez-la, nommez-la, puis saisissez le bordereau." },
+            ],
+          },
+          { type: 'tip', title: 'Feuille de route', text: "Phase 1 : saisie du cadre (chapitres + articles + quantités). Phases suivantes : bibliothèque de ressources, sous-détail (déboursé sec), marges (coefficient) et récapitulatif chiffré, puis import DPGF Excel et exports." },
+        ],
+      },
+      {
+        id: 'cadre', label: 'Cadre', icon: 'Package',
+        sections: [
+          {
+            type: 'cards',
+            cards: [
+              { color: 'blue', title: 'Forme du devis ESTIMA', description: "Le bordereau reprend la structure d'ESTIMA : chapitres, sous-chapitres imbriqués et articles, avec glisser-déposer pour réorganiser." },
+              { color: 'emerald', title: 'Article', description: "Renseignez désignation, unité, quantité et PU HT. La numérotation (1.1.2…) est automatique." },
+              { color: 'violet', title: 'Formules ƒ(x)', description: "Une quantité peut être une formule : =2*3.5, ou =[1.2]*1.1 en cliquant une autre ligne pour la référencer." },
+              { color: 'amber', title: 'Sauvegarde auto', description: "Tout est enregistré automatiquement (indicateur « Enregistré » en haut à droite)." },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+
+  // ──────────────────────────────────────────────────────────────────────────
   // ESTIMATION (module principal — ProjectView)
   // ──────────────────────────────────────────────────────────────────────────
   estimation: {
