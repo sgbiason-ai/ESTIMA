@@ -1,13 +1,13 @@
 // src/views/estimaTp/sousDetail/TpSousDetailEditor.jsx
 // ESTIMA TP — éditeur de sous-détail d'un article (rendement/durée + 5 postes + PV).
 import React from 'react';
-import { Gauge, Lock, Unlock } from 'lucide-react';
+import { Gauge, Lock, Unlock, BookOpen } from 'lucide-react';
 import { NumCell } from './sdShared';
 import { fmt, fmt2 } from './sdFormat';
 import { RessourceTable, FournitureTable, SousTraitanceTable, TransportTable } from './TpDetailTables';
 import { emptyDetail, computeDetail, effectiveDuree, POSTES, POSTE_LABELS } from '../../../utils/tp/tpPriceCompute';
 
-export default function TpSousDetailEditor({ item, coef, onChange }) {
+export default function TpSousDetailEditor({ item, coef, onChange, libraryOpen, onToggleLibrary }) {
   const detail = item.detail || emptyDetail();
   const qte = Number(item.qty || 0);
   const r = computeDetail(detail, qte, coef);
@@ -22,7 +22,16 @@ export default function TpSousDetailEditor({ item, coef, onChange }) {
       <div className="bg-white border border-slate-200 rounded-2xl p-4">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-widest text-orange-500">Article</p>
+            <div className="flex items-center gap-2">
+              <p className="text-[10px] font-black uppercase tracking-widest text-orange-500">Article</p>
+              {onToggleLibrary && (
+                <button onClick={onToggleLibrary}
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all ${libraryOpen ? 'bg-orange-600 text-white' : 'bg-orange-50 text-orange-600 hover:bg-orange-100'}`}
+                  title="Insérer des ressources depuis la bibliothèque">
+                  <BookOpen size={11} /> Bibliothèque
+                </button>
+              )}
+            </div>
             <h3 className="text-sm font-bold text-slate-900 truncate">{item.designation || 'Article sans nom'}</h3>
             <p className="text-xs text-slate-400">Quantité d'ouvrage : <span className="font-semibold text-slate-700">{qte.toLocaleString('fr-FR')} {item.unit}</span></p>
           </div>

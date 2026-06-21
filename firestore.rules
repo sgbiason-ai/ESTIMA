@@ -225,6 +225,11 @@ service cloud.firestore {
         allow read, write: if isCompanyMember(companyId);
       }
 
+      // ESTIMA TP — bibliothèque de ressources réutilisable (MO/matériel/fournitures…)
+      match /tpResources/{resId} {
+        allow read, write: if isCompanyMember(companyId);
+      }
+
       // Présence en temps réel
       match /presence/{presenceId} {
         allow read: if isCompanyMember(companyId);

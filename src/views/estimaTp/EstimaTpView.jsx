@@ -11,16 +11,16 @@ import TpCadreTab from './TpCadreTab';
 import TpSousDetailTab from './sousDetail/TpSousDetailTab';
 import MargesTab from './MargesTab';
 import RecapTab from './RecapTab';
+import TpResourcesTab from './ressources/TpResourcesTab';
 import HelpButton from '../../components/help/HelpButton';
 import HelpPanel from '../../components/help/HelpPanel';
 
-// phase ≤ 2 = disponible ; phase 3 = à venir (verrouillé)
 const TABS = [
   { id: 'cadre',      label: 'Cadre',       phase: 1 },
   { id: 'detail',     label: 'Sous-détail', phase: 2 },
   { id: 'marges',     label: 'Marges',      phase: 2 },
   { id: 'recap',      label: 'Récap',       phase: 2 },
-  { id: 'ressources', label: 'Ressources',  phase: 3 },
+  { id: 'ressources', label: 'Ressources',  phase: 2 },
 ];
 
 export default function EstimaTpView({ companyId, onBackToHub }) {
@@ -147,11 +147,13 @@ export default function EstimaTpView({ companyId, onBackToHub }) {
         ) : activeTab === 'cadre' ? (
           <TpCadreTab study={study} setStudy={setStudy} />
         ) : activeTab === 'detail' ? (
-          <TpSousDetailTab study={study} setStudy={setStudy} />
+          <TpSousDetailTab study={study} setStudy={setStudy} companyId={companyId} />
         ) : activeTab === 'marges' ? (
           <MargesTab study={study} setStudy={setStudy} />
         ) : activeTab === 'recap' ? (
           <RecapTab study={study} />
+        ) : activeTab === 'ressources' ? (
+          <TpResourcesTab companyId={companyId} />
         ) : null}
       </div>
     </div>
