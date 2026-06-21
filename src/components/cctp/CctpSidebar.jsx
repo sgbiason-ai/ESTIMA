@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   Search, X, Minimize2, Maximize2, RefreshCw, CheckSquare,
-  Plus, UploadCloud, Download, FileText, Crosshair,
+  Plus, Crosshair,
   ChevronRight, ChevronDown, Square, Edit3, Trash2, Star
 } from 'lucide-react';
 
@@ -9,16 +9,12 @@ const CctpSidebar = ({
   searchQuery, setSearchQuery,
   collapseAll, expandAll, selectAll, deselectAll, autoSelectChapters,
   filteredCctpData, cctpDataLength,
-  addChapter, handleFileUpload, handlePdfUpload, handleExportMaster,
+  addChapter,
   expandedIds, selectedIds, activeNodeId,
   toggleExpand, toggleSelection, openEditor, deleteNode,
   isFavorite, toggleFavorite, favoritesCount = 0, onOpenFavorites,
   provenance, devisItems = [], focusArticleId, setFocusArticleId, focusTargets, onLearnToggle,
 }) => {
-
-  // ─── File input refs pour les boutons Word / PDF ─────
-  const fileInputRef = React.useRef(null);
-  const pdfInputRef = React.useRef(null);
 
   const renderTree = (nodes, parentPrefix = "") => (
     <div className="pl-4 ml-1">
@@ -131,22 +127,6 @@ const CctpSidebar = ({
           <button onClick={() => addChapter()} className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-transparent hover:bg-[#dce6f0] hover:border-[#c4d5e8] transition-all" title="Ajouter un nouveau chapitre">
             <Plus size={16} strokeWidth={1.6} className="text-emerald-600" />
             <span className="text-[11px] text-slate-600">Chapitre</span>
-          </button>
-          <label className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-transparent hover:bg-[#dce6f0] hover:border-[#c4d5e8] transition-all cursor-pointer" title="Importer un fichier Word (.docx)">
-            <UploadCloud size={16} strokeWidth={1.6} className="text-slate-500" />
-            <span className="text-[11px] text-slate-600">Word</span>
-            <input ref={fileInputRef} type="file" accept=".docx" className="hidden" onChange={handleFileUpload} />
-          </label>
-          {handlePdfUpload && (
-            <label className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-transparent hover:bg-[#fbe9e9] hover:border-[#f0c4c4] transition-all cursor-pointer" title="Importer un CCTP au format PDF (structure + texte reconstruits par chapitre)">
-              <FileText size={16} strokeWidth={1.6} className="text-red-500" />
-              <span className="text-[11px] text-slate-600">PDF</span>
-              <input ref={pdfInputRef} type="file" accept=".pdf,application/pdf" className="hidden" onChange={handlePdfUpload} />
-            </label>
-          )}
-          <button onClick={handleExportMaster} className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-transparent hover:bg-[#dce6f0] hover:border-[#c4d5e8] transition-all" title="Télécharger une sauvegarde JSON">
-            <Download size={16} strokeWidth={1.6} className="text-amber-600" />
-            <span className="text-[11px] text-slate-600">Backup</span>
           </button>
         </div>
         <button

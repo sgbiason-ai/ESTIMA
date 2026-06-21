@@ -454,7 +454,9 @@ export const useCcapManager = ({
     setSelectedIds(newSet);
   };
 
-  const saveToCloud = async () => {
+  // L'écrasement du gabarit est protégé en amont par la modale « tapez GABARIT »
+  // (DocRibbon) ; ici on applique directement.
+  const saveToCloud = () => {
     const sanitizeData = (nodes) => {
         const seenIds = new Set();
         const cleanRecursive = (items) => items.map(item => {
@@ -466,12 +468,10 @@ export const useCcapManager = ({
         });
         return cleanRecursive(nodes);
     };
-    const ok = await confirm("Enregistrer ce contenu comme GABARIT maître partagé ?\nIl deviendra le modèle des futurs projets. Le contenu de CE projet n'est pas affecté (il est déjà sauvegardé automatiquement).", { title: 'Enregistrer comme gabarit', danger: true });
-    if (ok) {
-        const cleanCcap = sanitizeData(ccapData);
-        setCcapData(cleanCcap);
-        onSaveMasterCcap(cleanCcap);
-    }
+    const cleanCcap = sanitizeData(ccapData);
+    setCcapData(cleanCcap);
+    onSaveMasterCcap(cleanCcap);
+    toast.success("Gabarit maître mis à jour.");
   };
 
   return {

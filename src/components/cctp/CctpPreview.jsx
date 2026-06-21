@@ -1,10 +1,10 @@
 // src/components/cctp/CctpPreview.jsx
 import React from 'react';
-import { Eye, Download, Edit3, FileText, FileSignature, Cloud, RefreshCw, CheckSquare } from 'lucide-react';
+import { Edit3, FileText } from 'lucide-react';
 import { generateWordCCTP } from '../../utils/cctpExport';
 import { renderForPreview } from '../../utils/docContent';
 import { sanitizeHtml } from '../../utils/helpers';
-import { RibbonGroup, RibbonBtnLarge, RibbonContainer, RibbonSpacer } from '../common/RibbonParts';
+import DocRibbon from '../common/DocRibbon';
 
 const CctpPreview = ({
   cctpData,
@@ -16,6 +16,9 @@ const CctpPreview = ({
   saveToCloud,
   saveStatus,
   onEditVariables,
+  handleFileUpload,
+  handlePdfUpload,
+  handleExportMaster,
 }) => {
   
   const previewContent = [];
@@ -95,47 +98,18 @@ const CctpPreview = ({
     <div className="w-2/3 flex flex-col bg-slate-100/50 relative">
 
       {/* ═══ RIBBON OFFICE ═══ */}
-      <RibbonContainer>
-        <RibbonGroup label="Aperçu">
-          <div className="flex flex-col items-center gap-0.5 px-1">
-            <Eye size={20} className="text-slate-400" />
-            <span className="text-[10px] font-bold text-slate-500">
-              {selectedIds.size} chap.
-            </span>
-            {missingVars > 0 && (
-              <span className="text-[9px] text-red-400 font-bold" title={`${missingVars} variable(s) non renseignée(s)`}>
-                {missingVars} var. ⚠
-              </span>
-            )}
-          </div>
-        </RibbonGroup>
-
-        <RibbonGroup label="Document">
-          <RibbonBtnLarge icon={FileSignature} label="Champs" onClick={onEditVariables} title="Saisir les champs du document (communs, RC, CCAP) — accès à la fiche projet complète depuis la fenêtre" accent="text-blue-600" />
-        </RibbonGroup>
-
-        <RibbonGroup label="Exporter">
-          <RibbonBtnLarge icon={Download} label={<>Word<br/><span className="text-[8px] opacity-60">.docx</span></>} onClick={() => generateWordCCTP(selectedIds, variables, cctpData, branding)} title="Générer et télécharger le document Word (.docx)" accent="text-indigo-600" />
-        </RibbonGroup>
-
-        <RibbonSpacer />
-
-        <RibbonGroup label="Gabarit" noBorder>
-          <div className="flex flex-col items-center gap-1">
-            <RibbonBtnLarge icon={Cloud} label="Gabarit" onClick={saveToCloud} title="Enregistrer le contenu actuel comme GABARIT maître partagé (modèle des futurs projets). Le contenu de CE projet est sauvegardé automatiquement." />
-            {saveStatus === 'saving' && (
-              <span className="text-[9px] font-bold text-amber-500 uppercase flex items-center gap-1">
-                <RefreshCw size={10} className="animate-spin" /> Projet : sync…
-              </span>
-            )}
-            {saveStatus === 'saved' && (
-              <span className="text-[9px] font-bold text-emerald-500 uppercase flex items-center gap-1">
-                <CheckSquare size={10} /> Projet à jour
-              </span>
-            )}
-          </div>
-        </RibbonGroup>
-      </RibbonContainer>
+      <DocRibbon
+        docType="CCTP"
+        selectedCount={selectedIds.size}
+        missingVars={missingVars}
+        onEditVariables={onEditVariables}
+        onImportWord={handleFileUpload}
+        onImportPdf={handlePdfUpload}
+        onExportWord={() => generateWordCCTP(selectedIds, variables, cctpData, branding)}
+        onExportMaster={handleExportMaster}
+        saveStatus={saveStatus}
+        onSaveTemplate={saveToCloud}
+      />
       
       {/* Aperçu A4 */}
       <div 

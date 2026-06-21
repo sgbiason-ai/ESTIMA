@@ -2,7 +2,7 @@
 import React from 'react';
 import {
   Search, X, Minimize2, Maximize2, CheckSquare,
-  Plus, UploadCloud, Download, FileText,
+  Plus,
   ChevronRight, ChevronDown, Square, Edit3, Trash2, Star
 } from 'lucide-react';
 
@@ -10,14 +10,11 @@ const RcSidebar = ({
   searchQuery, setSearchQuery,
   collapseAll, expandAll, selectAll, deselectAll,
   filteredRcData, rcDataLength,
-  addChapter, handleFileUpload, handlePdfUpload, handleExportMaster, loadTemplate,
+  addChapter,
   expandedIds, selectedIds, activeNodeId,
   toggleExpand, toggleSelection, openEditor, deleteNode,
   isFavorite, toggleFavorite, favoritesCount = 0, onOpenFavorites,
 }) => {
-
-  const fileInputRef = React.useRef(null);
-  const pdfInputRef = React.useRef(null);
 
   const renderTree = (nodes, parentPrefix = "") => (
     <div className="pl-4 ml-1">
@@ -119,28 +116,6 @@ const RcSidebar = ({
             <Plus size={16} strokeWidth={1.6} className="text-emerald-600" />
             <span className="text-[11px] text-slate-600">Chapitre</span>
           </button>
-          <label className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-transparent hover:bg-[#dce6f0] hover:border-[#c4d5e8] transition-all cursor-pointer" title="Importer un fichier Word (.docx)">
-            <UploadCloud size={16} strokeWidth={1.6} className="text-slate-500" />
-            <span className="text-[11px] text-slate-600">Word</span>
-            <input ref={fileInputRef} type="file" accept=".docx" className="hidden" onChange={handleFileUpload} />
-          </label>
-          {handlePdfUpload && (
-            <label className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-transparent hover:bg-[#fbe9e9] hover:border-[#f0c4c4] transition-all cursor-pointer" title="Importer un RC au format PDF (structure + texte reconstruits par chapitre)">
-              <FileText size={16} strokeWidth={1.6} className="text-red-500" />
-              <span className="text-[11px] text-slate-600">PDF</span>
-              <input ref={pdfInputRef} type="file" accept=".pdf,application/pdf" className="hidden" onChange={handlePdfUpload} />
-            </label>
-          )}
-          <button onClick={handleExportMaster} className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-transparent hover:bg-[#dce6f0] hover:border-[#c4d5e8] transition-all" title="Télécharger une sauvegarde JSON">
-            <Download size={16} strokeWidth={1.6} className="text-amber-600" />
-            <span className="text-[11px] text-slate-600">Backup</span>
-          </button>
-          {loadTemplate && (
-            <button onClick={loadTemplate} className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-transparent hover:bg-[#dce6f0] hover:border-[#c4d5e8] transition-all" title="Charger le modèle type de RC (remplace la structure actuelle)">
-              <FileText size={16} strokeWidth={1.6} className="text-cyan-600" />
-              <span className="text-[11px] text-slate-600">Modèle</span>
-            </button>
-          )}
         </div>
         <button
           onClick={onOpenFavorites}

@@ -60,10 +60,6 @@ const RcGeneratorView = ({
         rcDataLength={manager.rcData.length}
         onEditProject={handleEditProject}
         addChapter={manager.addChapter}
-        handleFileUpload={manager.handleFileUpload}
-        handlePdfUpload={manager.handlePdfUpload}
-        handleExportMaster={manager.handleExportMaster}
-        loadTemplate={manager.loadTemplate}
         saveToCloud={manager.saveToCloud}
         expandedIds={manager.expandedIds}
         selectedIds={manager.selectedIds}
@@ -89,6 +85,10 @@ const RcGeneratorView = ({
         saveToCloud={manager.saveToCloud}
         saveStatus={manager.saveStatus}
         onEditVariables={() => setVarsModalOpen(true)}
+        handleFileUpload={manager.handleFileUpload}
+        handlePdfUpload={manager.handlePdfUpload}
+        handleExportMaster={manager.handleExportMaster}
+        loadTemplate={manager.loadTemplate}
       />
 
       <DocumentVariablesModal

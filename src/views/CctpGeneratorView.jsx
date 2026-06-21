@@ -80,9 +80,6 @@ const CctpGeneratorView = ({
         cctpDataLength={manager.cctpData.length}
         onEditProject={handleEditProject}
         addChapter={manager.addChapter}
-        handleFileUpload={manager.handleFileUpload}
-        handlePdfUpload={manager.handlePdfUpload}
-        handleExportMaster={manager.handleExportMaster}
         saveToCloud={manager.saveToCloud}
         expandedIds={manager.expandedIds}
         selectedIds={manager.selectedIds}
@@ -114,6 +111,9 @@ const CctpGeneratorView = ({
         saveToCloud={manager.saveToCloud}
         saveStatus={manager.saveStatus}
         onEditVariables={() => setVarsModalOpen(true)}
+        handleFileUpload={manager.handleFileUpload}
+        handlePdfUpload={manager.handlePdfUpload}
+        handleExportMaster={manager.handleExportMaster}
       />
 
       <DocumentVariablesModal
