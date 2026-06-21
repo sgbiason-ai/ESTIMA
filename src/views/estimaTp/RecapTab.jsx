@@ -1,12 +1,35 @@
 // src/views/estimaTp/RecapTab.jsx
 // ESTIMA TP — onglet « Récap » : DQE chiffré (lecture seule) + totaux par poste.
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
+import { FileSpreadsheet, FileText, Loader2 } from 'lucide-react';
 import { refMapOf } from './bordereau/tpBordereauModel';
 import { computeDetail, defaultCoefficients, POSTES, POSTE_LABELS } from '../../utils/tp/tpPriceCompute';
 import { fmt, fmt2 } from './sousDetail/sdFormat';
+import { useToast } from '../../contexts/ToastContext';
 
 export default function RecapTab({ study }) {
+  const toast = useToast();
+  const [exporting, setExporting] = useState(null); // 'excel' | 'pdf' | null
   const chapters = useMemo(() => study?.cadre?.chapters || [], [study?.cadre?.chapters]);
+
+  const handleExport = async (kind) => {
+    if (exporting) return;
+    setExporting(kind);
+    try {
+      if (kind === 'excel') {
+        const { generateTpExcel } = await import('../../utils/tp/tpExcelExport');
+        await generateTpExcel(study);
+      } else {
+        const { generateTpPdf } = await import('../../utils/tp/tpPdfExport');
+        await generateTpPdf(study);
+      }
+    } catch (e) {
+      console.error('[ESTIMA TP] Export échoué:', e);
+      toast.error('Export impossible. Réessayez.');
+    } finally {
+      setExporting(null);
+    }
+  };
   const coef = study?.coefficients || defaultCoefficients();
 
   const { rows, totals } = useMemo(() => {
@@ -42,6 +65,21 @@ export default function RecapTab({ study }) {
   return (
     <div className="flex-1 overflow-y-auto px-6 py-6 bg-[#f5f5f7]">
       <div className="max-w-6xl mx-auto space-y-5">
+
+        {/* Exports */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h3 className="text-sm font-bold text-slate-900">Récapitulatif chiffré</h3>
+          <div className="flex items-center gap-2">
+            <button onClick={() => handleExport('excel')} disabled={!!exporting}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition-all shadow-sm disabled:opacity-50">
+              {exporting === 'excel' ? <Loader2 size={15} className="animate-spin" /> : <FileSpreadsheet size={15} />} Excel
+            </button>
+            <button onClick={() => handleExport('pdf')} disabled={!!exporting}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-all shadow-sm disabled:opacity-50">
+              {exporting === 'pdf' ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />} PDF
+            </button>
+          </div>
+        </div>
 
         {/* Synthèse */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
