@@ -66,11 +66,16 @@ export const emptyDetail = () => ({
 // ignoré → les lignes suivent la durée calculée par défaut.)
 export const lineDuree = (line, fallback) => (line?.dureeForced ? num(line?.duree) : num(fallback));
 
-// Coût d'une ressource (matériel ou MO) = nombre × durée × somme des composants
-// (Personnel + A + E + I + Location). Tout est imputé au poste de la ligne.
+// Coût journalier unitaire d'une ressource = somme des composants
+// (Personnel + A + E + I + Location). C'est le « PU/J » affiché.
+export const ressourceDailyCost = (line) =>
+  r2(num(line?.puJour) + num(line?.amort) + num(line?.entret) + num(line?.cons) + num(line?.loc));
+
+// Coût d'une ressource (matériel ou MO) = nombre × durée × coût journalier.
+// Tout est imputé au poste de la ligne.
 export function ressourceCosts(line, fallbackDuree) {
   const base = num(line.nombre) * lineDuree(line, fallbackDuree);
-  return r2(base * (num(line.puJour) + num(line.amort) + num(line.entret) + num(line.cons) + num(line.loc)));
+  return r2(base * ressourceDailyCost(line));
 }
 
 /** Quantité d'une fourniture : épaisseur × densité × quantité d'ouvrage, sinon qté directe. */

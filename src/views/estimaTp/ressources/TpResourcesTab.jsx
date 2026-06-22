@@ -4,12 +4,13 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { Plus, Trash2, Loader2, Search, Package, FileSpreadsheet } from 'lucide-react';
 import { useTpResources, emptyResource } from '../../../hooks/useTpResources';
-import { POSTES, POSTE_LABELS } from '../../../utils/tp/tpPriceCompute';
+import { POSTES, POSTE_LABELS, ressourceDailyCost } from '../../../utils/tp/tpPriceCompute';
 import { NumCell, TxtCell } from '../sousDetail/sdShared';
 import { useToast } from '../../../contexts/ToastContext';
 import { useDialog } from '../../../contexts/DialogContext';
 
 const removeAccents = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const RENDER_CAP = 200; // évite de monter des milliers de lignes éditables d'un coup
 
 const CAT_BADGE = {
   materiel: 'bg-orange-100 text-orange-700', mo: 'bg-blue-100 text-blue-700',
@@ -104,11 +105,18 @@ export default function TpResourcesTab({ companyId }) {
             <p className="text-xs text-gray-400 mt-1">Cliquez « Ajouter » pour créer une ressource (choisissez sa catégorie).</p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {list.map(r => (
-              <ResourceRow key={r.id} r={r} upd={(p) => upd(r, p)} del={() => deleteResource(r.id)} badge={CAT_BADGE[r.category]} />
-            ))}
-          </div>
+          <>
+            <div className="space-y-2">
+              {list.slice(0, RENDER_CAP).map(r => (
+                <ResourceRow key={r.id} r={r} upd={(p) => upd(r, p)} del={() => deleteResource(r.id)} badge={CAT_BADGE[r.category]} />
+              ))}
+            </div>
+            {list.length > RENDER_CAP && (
+              <p className="text-center text-xs text-gray-400 py-3">
+                {list.length.toLocaleString('fr-FR')} ressources — affichage des {RENDER_CAP} premières. Filtrez par catégorie ou recherchez pour affiner.
+              </p>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -134,11 +142,16 @@ function ResourceRow({ r, upd, del, badge }) {
       <Labeled label="U"><div className="w-12"><TxtCell value={r.unit} upper onCommit={(v) => upd({ unit: v })} className="text-center" /></div></Labeled>
       {/* Coûts selon catégorie */}
       {isRes && <>
-        <Labeled label="PU/J"><Num v={r.puJour} on={(v) => upd({ puJour: v })} /></Labeled>
+        <Labeled label="Perso."><Num v={r.puJour} on={(v) => upd({ puJour: v })} /></Labeled>
         <Labeled label="Amort."><Num v={r.amort} on={(v) => upd({ amort: v })} /></Labeled>
         <Labeled label="Entret."><Num v={r.entret} on={(v) => upd({ entret: v })} /></Labeled>
         <Labeled label="Cons."><Num v={r.cons} on={(v) => upd({ cons: v })} /></Labeled>
         <Labeled label="Loc."><Num v={r.loc} on={(v) => upd({ loc: v })} /></Labeled>
+        <Labeled label="PU/J">
+          <div className="w-[72px] text-right text-sm font-mono font-black text-orange-700 px-1 py-0.5" title="Coût journalier = Perso. + Amort. + Entret. + Cons. + Loc.">
+            {ressourceDailyCost(r).toLocaleString('fr-FR')}
+          </div>
+        </Labeled>
       </>}
       {isPrix && <Labeled label="PU barème"><Num v={r.puBareme} on={(v) => upd({ puBareme: v })} /></Labeled>}
       {isTransport && <>

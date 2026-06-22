@@ -80,7 +80,7 @@ export async function generateTpPdf(study) {
       if (!lines.length) return;
       autoTable(doc, {
         startY: y,
-        head: [[label, 'Nb', 'Durée', 'PU/J', 'Amort.', 'Entret.', 'Cons.', 'Loc.', 'Total']],
+        head: [[label, 'Nb', 'Durée', 'Perso.', 'Amort.', 'Entret.', 'Cons.', 'Loc.', 'Total']],
         body: lines.map(l => [l.designation || '', l.nombre, lineDuree(l, duree), e2(l.puJour), e2(l.amort), e2(l.entret), e2(l.cons), e2(l.loc), e2(ressourceCosts(l, duree))]),
         headStyles: { ...HEAD, fillColor: ORANGE }, bodyStyles: { fontSize: 7 },
         columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' }, 8: { halign: 'right' } },

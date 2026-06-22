@@ -64,7 +64,7 @@ export function RessourceTable({ title, accent, addLabel, lines, onChange, duree
       <div className="min-w-[740px]">
         <div className={`${RES_COLS} px-2 py-1.5 border-b border-slate-100`}>
           <Th>Désignation</Th><Th className="text-center">Nb</Th><Th className="text-center">Durée</Th>
-          <Th className="text-right">PU/J</Th><Th className="text-right">Amort.</Th><Th className="text-right">Entret.</Th>
+          <Th className="text-right">Perso.</Th><Th className="text-right">Amort.</Th><Th className="text-right">Entret.</Th>
           <Th className="text-right">Cons.</Th><Th className="text-right">Loc.</Th><Th className="text-right">Total</Th><Th />
         </div>
         {(lines || []).map(l => (

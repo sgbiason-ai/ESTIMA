@@ -97,7 +97,7 @@ export async function generateTpExcel(study) {
       const lines = d[key] || [];
       if (lines.length === 0) return;
       sub(label);
-      colHead(['Désignation', 'Nb', 'Durée', 'PU/J', 'Amort.', 'Entret.', 'Cons.', 'Loc.', 'Total']);
+      colHead(['Désignation', 'Nb', 'Durée', 'Perso.', 'Amort.', 'Entret.', 'Cons.', 'Loc.', 'Total']);
       lines.forEach(l => {
         const row = ws.addRow([l.designation || '', Number(l.nombre || 0), lineDuree(l, duree), Number(l.puJour || 0),
           Number(l.amort || 0), Number(l.entret || 0), Number(l.cons || 0), Number(l.loc || 0), ressourceCosts(l, duree)]);
