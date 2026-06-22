@@ -44,10 +44,11 @@ export const newSousTraitanceLine = (over = {}) => ({
   qte: 0, puBareme: 0, puForce: 0, ...over,
 });
 
+// Transport : contenance par voyage + voyages/jour + coût journalier du camion.
+// La quantité à transporter peut être convertie via épaisseur × densité.
 export const newTransportLine = (over = {}) => ({
-  id: `tpt_${generateId()}`, code: '', designation: '', unit: 'J',
-  nombre: 1, toursJour: 0, unitesJour: 0,
-  puJour: 0, amort: 0, entret: 0, cons: 0, loc: 0, ...over,
+  id: `tpt_${generateId()}`, designation: '', unit: 'T',
+  epaisseur: 0, densite: 0, contenance: 0, voyagesParJour: 0, coutJour: 0, ...over,
 });
 
 export const emptyDetail = () => ({
@@ -65,15 +66,11 @@ export const emptyDetail = () => ({
 // ignoré → les lignes suivent la durée calculée par défaut.)
 export const lineDuree = (line, fallback) => (line?.dureeForced ? num(line?.duree) : num(fallback));
 
-// Une ressource (matériel ou MO) contribue à DEUX postes :
-//   - part personnel (chauffeur / ouvrier)  → poste « mo »
-//   - part matériel (machine / véhicule)    → poste « materiel »
-// Coût = nombre × durée (ligne ou totale) × tarif/jour.
+// Coût d'une ressource (matériel ou MO) = nombre × durée × somme des composants
+// (Personnel + A + E + I + Location). Tout est imputé au poste de la ligne.
 export function ressourceCosts(line, fallbackDuree) {
   const base = num(line.nombre) * lineDuree(line, fallbackDuree);
-  const perso = base * num(line.puJour);
-  const mat = base * (num(line.amort) + num(line.entret) + num(line.cons) + num(line.loc));
-  return { perso: r2(perso), mat: r2(mat) };
+  return r2(base * (num(line.puJour) + num(line.amort) + num(line.entret) + num(line.cons) + num(line.loc)));
 }
 
 /** Quantité d'une fourniture : épaisseur × densité × quantité d'ouvrage, sinon qté directe. */
@@ -102,10 +99,27 @@ export const sousTraitanceCost = (line, qteOuvrage, articleUnit) => {
   return r2(sousTraitanceQty(line, qteOuvrage, articleUnit) * pu);
 };
 
-export const transportCost = (line, fallbackDuree) => {
-  const base = num(line.nombre) * lineDuree(line, fallbackDuree);
-  return r2(base * (num(line.puJour) + num(line.amort) + num(line.entret) + num(line.cons) + num(line.loc)));
+/** Quantité à transporter : quantité d'ouvrage × épaisseur × densité, sinon quantité d'ouvrage. */
+export function transportQty(line, qteOuvrage) {
+  const ep = num(line?.epaisseur), de = num(line?.densite);
+  if (ep > 0 && de > 0) return r2(num(qteOuvrage) * ep * de);
+  return num(qteOuvrage);
+}
+
+// Camions-jours nécessaires = quantité à transporter / (contenance × voyages par jour).
+const camionsJours = (line, qteOuvrage) => {
+  const perDay = num(line?.contenance) * num(line?.voyagesParJour);
+  return perDay > 0 ? num(transportQty(line, qteOuvrage)) / perDay : 0;
 };
+
+/** Nombre de camions nécessaires en parallèle (camions-jours / durée). */
+export const transportCamions = (line, qteOuvrage, duree) => {
+  const cj = camionsJours(line, qteOuvrage);
+  return r2(num(duree) > 0 ? cj / num(duree) : cj);
+};
+
+/** Coût transport = camions-jours × coût journalier du camion. */
+export const transportCost = (line, qteOuvrage) => r2(camionsJours(line, qteOuvrage) * num(line?.coutJour));
 
 // ─── Calcul complet d'un sous-détail ──────────────────────────────────────────
 /**
@@ -120,11 +134,11 @@ export function computeDetail(detail, qteOuvrage, coef = defaultCoefficients(), 
   const duree = effectiveDuree(d, qte); // durée totale = quantité / rendement (ou forcée)
   const sec = { materiel: 0, mo: 0, fourniture: 0, soustraitance: 0, transport: 0 };
 
-  (d.materiel || []).forEach(l => { const c = ressourceCosts(l, duree); sec.mo += c.perso; sec.materiel += c.mat; });
-  (d.mo || []).forEach(l => { const c = ressourceCosts(l, duree); sec.mo += c.perso; sec.materiel += c.mat; });
+  (d.materiel || []).forEach(l => { sec.materiel += ressourceCosts(l, duree); });
+  (d.mo || []).forEach(l => { sec.mo += ressourceCosts(l, duree); });
   (d.fourniture || []).forEach(l => { sec.fourniture += fournitureCost(l, qte); });
   (d.soustraitance || []).forEach(l => { sec.soustraitance += sousTraitanceCost(l, qte, articleUnit); });
-  (d.transport || []).forEach(l => { sec.transport += transportCost(l, duree); });
+  (d.transport || []).forEach(l => { sec.transport += transportCost(l, qte); });
 
   POSTES.forEach(p => { sec[p] = r2(sec[p]); });
 

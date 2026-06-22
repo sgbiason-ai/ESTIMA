@@ -121,7 +121,7 @@ export default function TpSousDetailEditor({ item, coef, onChange, onQtyChange, 
         <SousTraitanceTable lines={detail.soustraitance} onChange={setBlock('soustraitance')} qteOuvrage={qte} articleUnit={item.unit} />
       </div>
       <div {...blockProps('transport')}>
-        <TransportTable lines={detail.transport} onChange={setBlock('transport')} duree={duree} />
+        <TransportTable lines={detail.transport} onChange={setBlock('transport')} qteOuvrage={qte} duree={duree} />
       </div>
       </div>
     </div>

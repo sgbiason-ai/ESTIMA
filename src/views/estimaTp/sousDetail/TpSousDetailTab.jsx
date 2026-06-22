@@ -22,9 +22,9 @@ function lineFromResource(res) {
     case 'mo':
       return [res.category, newRessourceLine({ ...c, unit: res.unit || 'J', puJour: res.puJour, amort: res.amort, entret: res.entret, cons: res.cons, loc: res.loc })];
     case 'transport':
-      return ['transport', newTransportLine({ ...c, unit: res.unit || 'J', puJour: res.puJour, amort: res.amort, entret: res.entret, cons: res.cons, loc: res.loc })];
+      return ['transport', newTransportLine({ ...c, unit: res.unit || 'T', contenance: res.contenance, coutJour: res.coutJour })];
     case 'fourniture':
-      return ['fourniture', newFournitureLine({ ...c, unit: res.unit || 'T', epaisseur: res.epaisseur, densite: res.densite, puBareme: res.puBareme })];
+      return ['fourniture', newFournitureLine({ ...c, unit: res.unit || 'T', puBareme: res.puBareme })];
     case 'soustraitance':
       return ['soustraitance', newSousTraitanceLine({ ...c, unit: res.unit || 'U', puBareme: res.puBareme })];
     default:

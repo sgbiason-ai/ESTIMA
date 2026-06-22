@@ -7,6 +7,7 @@ import { saveFileWithPicker, FILE_TYPES, PICKER_IDS } from '../fileSaver';
 import {
   computeDetail, defaultCoefficients, POSTES, POSTE_LABELS, effectiveDuree,
   ressourceCosts, fournitureQty, fournitureCost, sousTraitanceCost, sousTraitanceQty, lineDuree,
+  transportCost, transportCamions,
 } from './tpPriceCompute';
 
 const EUR = '# ##0.00 "€"';
@@ -92,15 +93,14 @@ export async function generateTpExcel(study) {
     const colHead = (arr) => { const row = ws.addRow(arr); row.font = { bold: true, color: { argb: 'FF6B7280' } }; };
 
     // Matériel + MO + Transport (mêmes colonnes)
-    [['materiel', 'MATÉRIEL'], ['mo', "MAIN D'ŒUVRE"], ['transport', 'TRANSPORT']].forEach(([key, label]) => {
+    [['materiel', 'MATÉRIEL'], ['mo', "MAIN D'ŒUVRE"]].forEach(([key, label]) => {
       const lines = d[key] || [];
       if (lines.length === 0) return;
       sub(label);
       colHead(['Désignation', 'Nb', 'Durée', 'PU/J', 'Amort.', 'Entret.', 'Cons.', 'Loc.', 'Total']);
       lines.forEach(l => {
-        const c = ressourceCosts(l, duree);
         const row = ws.addRow([l.designation || '', Number(l.nombre || 0), lineDuree(l, duree), Number(l.puJour || 0),
-          Number(l.amort || 0), Number(l.entret || 0), Number(l.cons || 0), Number(l.loc || 0), c.perso + c.mat]);
+          Number(l.amort || 0), Number(l.entret || 0), Number(l.cons || 0), Number(l.loc || 0), ressourceCosts(l, duree)]);
         [4, 5, 6, 7, 8, 9].forEach(i => { row.getCell(i).numFmt = EUR; });
       });
       ws.addRow([]);
@@ -125,6 +125,19 @@ export async function generateTpExcel(study) {
       d.soustraitance.forEach(l => {
         const row = ws.addRow([l.designation || '', l.unit || '', sousTraitanceQty(l, qte, node.unit), Number(l.puBareme || 0), Number(l.puForce || 0), sousTraitanceCost(l, qte, node.unit)]);
         [4, 5, 6].forEach(i => { row.getCell(i).numFmt = EUR; });
+      });
+      ws.addRow([]);
+    }
+
+    // Transport
+    if ((d.transport || []).length) {
+      sub('TRANSPORT');
+      colHead(['Désignation', 'U', 'Épaiss.', 'Densité', 'Contenance', 'Voy./j', 'Coût/j', 'Camions', 'Total']);
+      d.transport.forEach(l => {
+        const row = ws.addRow([l.designation || '', l.unit || '', Number(l.epaisseur || 0), Number(l.densite || 0),
+          Number(l.contenance || 0), Number(l.voyagesParJour || 0), Number(l.coutJour || 0),
+          transportCamions(l, qte, duree), transportCost(l, qte)]);
+        [7, 9].forEach(i => { row.getCell(i).numFmt = EUR; });
       });
       ws.addRow([]);
     }

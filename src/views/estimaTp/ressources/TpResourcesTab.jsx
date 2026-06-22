@@ -45,10 +45,11 @@ export default function TpResourcesTab({ companyId }) {
       }
       const n = await importResources(list, { replace: true });
       const parts = [];
-      if (counts.FOU) parts.push(`${counts.FOU} fournitures`);
-      if (counts.ST) parts.push(`${counts.ST} sous-traitance`);
-      if ((counts.MA || 0) + (counts.LOC || 0)) parts.push(`${(counts.MA || 0) + (counts.LOC || 0)} matériel`);
-      if (counts.MO) parts.push(`${counts.MO} MO`);
+      if (counts.fourniture) parts.push(`${counts.fourniture} fournitures`);
+      if (counts.soustraitance) parts.push(`${counts.soustraitance} sous-traitance`);
+      if (counts.materiel) parts.push(`${counts.materiel} matériel`);
+      if (counts.mo) parts.push(`${counts.mo} MO`);
+      if (counts.transport) parts.push(`${counts.transport} transport`);
       toast.success(`${n} ressources importées${parts.length ? ` (${parts.join(', ')})` : ''}${skipped ? ` — ${skipped} ignorée(s)` : ''}.`);
     } catch (err) {
       console.error('[ESTIMA TP] Import barème échoué:', err);
@@ -115,9 +116,9 @@ export default function TpResourcesTab({ companyId }) {
 }
 
 function ResourceRow({ r, upd, del, badge }) {
-  const isFourn = r.category === 'fourniture';
-  const isST = r.category === 'soustraitance';
-  const isRes = !isFourn && !isST;
+  const isRes = r.category === 'materiel' || r.category === 'mo';
+  const isPrix = r.category === 'fourniture' || r.category === 'soustraitance';
+  const isTransport = r.category === 'transport';
   return (
     <div className="group bg-white border border-slate-200 rounded-xl px-3 py-2 flex items-center gap-2 flex-wrap">
       {/* Catégorie */}
@@ -139,12 +140,11 @@ function ResourceRow({ r, upd, del, badge }) {
         <Labeled label="Cons."><Num v={r.cons} on={(v) => upd({ cons: v })} /></Labeled>
         <Labeled label="Loc."><Num v={r.loc} on={(v) => upd({ loc: v })} /></Labeled>
       </>}
-      {isFourn && <>
-        <Labeled label="Épaiss."><Num v={r.epaisseur} on={(v) => upd({ epaisseur: v })} ph="—" /></Labeled>
-        <Labeled label="Densité"><Num v={r.densite} on={(v) => upd({ densite: v })} ph="—" /></Labeled>
-        <Labeled label="PU barème"><Num v={r.puBareme} on={(v) => upd({ puBareme: v })} /></Labeled>
+      {isPrix && <Labeled label="PU barème"><Num v={r.puBareme} on={(v) => upd({ puBareme: v })} /></Labeled>}
+      {isTransport && <>
+        <Labeled label="Contenance"><Num v={r.contenance} on={(v) => upd({ contenance: v })} /></Labeled>
+        <Labeled label="Coût/j"><Num v={r.coutJour} on={(v) => upd({ coutJour: v })} /></Labeled>
       </>}
-      {isST && <Labeled label="PU barème"><Num v={r.puBareme} on={(v) => upd({ puBareme: v })} /></Labeled>}
       <button onClick={del} className="shrink-0 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={14} /></button>
     </div>
   );

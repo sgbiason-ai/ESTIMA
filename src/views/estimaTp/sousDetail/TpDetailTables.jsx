@@ -7,7 +7,8 @@ import { NumCell, TxtCell, DureeCell } from './sdShared';
 import { fmt2 } from './sdFormat';
 import {
   newRessourceLine, newFournitureLine, newSousTraitanceLine, newTransportLine,
-  ressourceCosts, fournitureQty, fournitureCost, sousTraitanceCost, sousTraitanceQty, transportCost,
+  ressourceCosts, fournitureQty, fournitureCost, sousTraitanceCost, sousTraitanceQty,
+  transportCost, transportCamions,
 } from '../../../utils/tp/tpPriceCompute';
 
 const sameUnitUI = (a, b) => !!a && !!b && String(a).trim().toUpperCase() === String(b).trim().toUpperCase();
@@ -66,9 +67,7 @@ export function RessourceTable({ title, accent, addLabel, lines, onChange, duree
           <Th className="text-right">PU/J</Th><Th className="text-right">Amort.</Th><Th className="text-right">Entret.</Th>
           <Th className="text-right">Cons.</Th><Th className="text-right">Loc.</Th><Th className="text-right">Total</Th><Th />
         </div>
-        {(lines || []).map(l => {
-          const c = ressourceCosts(l, duree);
-          return (
+        {(lines || []).map(l => (
             <div key={l.id} className={`group ${RES_COLS} px-2 py-1 border-b border-slate-50 hover:bg-slate-50/60`}>
               <TxtCell value={l.designation} onCommit={(v) => upd(l.id, { designation: v })} placeholder="Désignation" className="font-semibold text-slate-700" />
               <NumCell value={l.nombre} onCommit={(v) => upd(l.id, { nombre: v })} align="center" />
@@ -78,11 +77,10 @@ export function RessourceTable({ title, accent, addLabel, lines, onChange, duree
               <NumCell value={l.entret} onCommit={(v) => upd(l.id, { entret: v })} />
               <NumCell value={l.cons} onCommit={(v) => upd(l.id, { cons: v })} />
               <NumCell value={l.loc} onCommit={(v) => upd(l.id, { loc: v })} />
-              <div className="text-right text-[11px] font-mono font-bold text-slate-900 px-1">{fmt2(c.perso + c.mat)}</div>
+              <div className="text-right text-[11px] font-mono font-bold text-slate-900 px-1">{fmt2(ressourceCosts(l, duree))}</div>
               <DelBtn onClick={() => del(l.id)} />
             </div>
-          );
-        })}
+        ))}
         {(!lines || lines.length === 0) && <div className="px-3 py-2 text-[10px] italic text-slate-400">Aucune ligne</div>}
       </div>
     </Block>
@@ -161,27 +159,30 @@ export function SousTraitanceTable({ lines, onChange, qteOuvrage = 0, articleUni
 }
 
 // ─── Transport ────────────────────────────────────────────────────────────────
-export function TransportTable({ lines, onChange, duree = 0 }) {
+// Contenance/voyage + voyages/jour → nombre de camions selon la quantité à transporter.
+const TRANS_COLS = 'grid grid-cols-[1fr_44px_60px_60px_74px_56px_84px_60px_92px_28px] gap-1 items-center';
+
+export function TransportTable({ lines, onChange, qteOuvrage = 0, duree = 0 }) {
   const { add, upd, del } = useOps(lines, onChange);
   return (
     <Block title="Transport" accent="sky" addLabel="Transport" onAdd={() => add(newTransportLine())}>
-      <div className="min-w-[740px]">
-        <div className={`${RES_COLS} px-2 py-1.5 border-b border-slate-100`}>
-          <Th>Désignation</Th><Th className="text-center">Nb</Th><Th className="text-center">Durée</Th>
-          <Th className="text-right">PU/J</Th><Th className="text-right">Amort.</Th><Th className="text-right">Entret.</Th>
-          <Th className="text-right">Cons.</Th><Th className="text-right">Loc.</Th><Th className="text-right">Total</Th><Th />
+      <div className="min-w-[800px]">
+        <div className={`${TRANS_COLS} px-2 py-1.5 border-b border-slate-100`}>
+          <Th>Désignation</Th><Th className="text-center">U</Th><Th className="text-right">Épaiss.</Th><Th className="text-right">Densité</Th>
+          <Th className="text-right">Contenance</Th><Th className="text-right">Voy./j</Th><Th className="text-right">Coût/j</Th>
+          <Th className="text-right">Camions</Th><Th className="text-right">Total</Th><Th />
         </div>
         {(lines || []).map(l => (
-          <div key={l.id} className={`group ${RES_COLS} px-2 py-1 border-b border-slate-50 hover:bg-slate-50/60`}>
+          <div key={l.id} className={`group ${TRANS_COLS} px-2 py-1 border-b border-slate-50 hover:bg-slate-50/60`}>
             <TxtCell value={l.designation} onCommit={(v) => upd(l.id, { designation: v })} placeholder="Désignation" className="font-semibold text-slate-700" />
-            <NumCell value={l.nombre} onCommit={(v) => upd(l.id, { nombre: v })} align="center" />
-            <DureeCell forced={l.dureeForced} duree={l.duree} auto={duree} onCommit={(patch) => upd(l.id, patch)} />
-            <NumCell value={l.puJour} onCommit={(v) => upd(l.id, { puJour: v })} />
-            <NumCell value={l.amort} onCommit={(v) => upd(l.id, { amort: v })} />
-            <NumCell value={l.entret} onCommit={(v) => upd(l.id, { entret: v })} />
-            <NumCell value={l.cons} onCommit={(v) => upd(l.id, { cons: v })} />
-            <NumCell value={l.loc} onCommit={(v) => upd(l.id, { loc: v })} />
-            <div className="text-right text-[11px] font-mono font-bold text-slate-900 px-1">{fmt2(transportCost(l, duree))}</div>
+            <TxtCell value={l.unit} upper onCommit={(v) => upd(l.id, { unit: v })} className="text-center" />
+            <NumCell value={l.epaisseur} onCommit={(v) => upd(l.id, { epaisseur: v })} placeholder="—" />
+            <NumCell value={l.densite} onCommit={(v) => upd(l.id, { densite: v })} placeholder="—" />
+            <NumCell value={l.contenance} onCommit={(v) => upd(l.id, { contenance: v })} />
+            <NumCell value={l.voyagesParJour} onCommit={(v) => upd(l.id, { voyagesParJour: v })} />
+            <NumCell value={l.coutJour} onCommit={(v) => upd(l.id, { coutJour: v })} />
+            <div className="text-right text-[11px] font-mono text-slate-500 px-1" title="Camions nécessaires en parallèle (camions-jours / durée)">{transportCamions(l, qteOuvrage, duree).toLocaleString('fr-FR')}</div>
+            <div className="text-right text-[11px] font-mono font-bold text-slate-900 px-1">{fmt2(transportCost(l, qteOuvrage))}</div>
             <DelBtn onClick={() => del(l.id)} />
           </div>
         ))}

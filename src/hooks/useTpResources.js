@@ -8,9 +8,12 @@ import { db } from '../firebase';
 import { generateId } from '../utils/helpers';
 
 export const emptyResource = (category = 'materiel') => ({
-  category, designation: '', unit: category === 'fourniture' ? 'T' : (category === 'soustraitance' ? 'U' : 'J'),
-  puJour: 0, amort: 0, entret: 0, cons: 0, loc: 0,        // matériel / MO / transport
-  epaisseur: 0, densite: 0, puBareme: 0,                   // fourniture / sous-traitance
+  category,
+  designation: '',
+  unit: category === 'fourniture' ? 'T' : (category === 'soustraitance' ? 'U' : (category === 'transport' ? 'T' : 'J')),
+  puJour: 0, amort: 0, entret: 0, cons: 0, loc: 0,        // matériel / MO (A/E/I + Personnel + Location)
+  puBareme: 0,                                            // fourniture / sous-traitance (juste un prix)
+  contenance: 0, coutJour: 0,                             // transport (contenance/voyage + coût journalier)
 });
 
 export function useTpResources(companyId) {

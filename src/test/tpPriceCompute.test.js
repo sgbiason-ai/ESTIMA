@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   computeDetail, ressourceCosts, fournitureQty, fournitureCost,
-  sousTraitanceQty, sousTraitanceCost,
+  sousTraitanceQty, sousTraitanceCost, transportQty, transportCost, transportCamions,
   emptyDetail, defaultCoefficients, effectiveDuree, rendementFromDuree, DEFAULT_COEF,
 } from '../utils/tp/tpPriceCompute';
 
@@ -28,20 +28,15 @@ function articleEnrobes() {
 }
 
 describe('tpPriceCompute — coûts par ligne', () => {
-  it('décompose part personnel / part matériel (sur la durée totale)', () => {
-    expect(ressourceCosts({ nombre: 1, puJour: 520, amort: 950 }, 1))
-      .toEqual({ perso: 520, mat: 950 });
-    expect(ressourceCosts({ nombre: 3, loc: 200 }, 1))
-      .toEqual({ perso: 0, mat: 600 });
+  it('coût ressource = nombre × durée × somme (Personnel + A + E + I + Location)', () => {
+    expect(ressourceCosts({ nombre: 1, puJour: 520, amort: 950 }, 1)).toBe(1470);
+    expect(ressourceCosts({ nombre: 3, loc: 200 }, 1)).toBe(600);
     // durée totale (fallback) 2 jours → coût doublé
-    expect(ressourceCosts({ nombre: 1, puJour: 520, amort: 950 }, 2))
-      .toEqual({ perso: 1040, mat: 1900 });
+    expect(ressourceCosts({ nombre: 1, puJour: 520, amort: 950 }, 2)).toBe(2940);
     // durée FORCÉE sur la ligne (flag dureeForced) → prioritaire sur la durée totale
-    expect(ressourceCosts({ nombre: 1, duree: 1, dureeForced: true, puJour: 520, amort: 950 }, 5))
-      .toEqual({ perso: 520, mat: 950 });
+    expect(ressourceCosts({ nombre: 1, duree: 1, dureeForced: true, puJour: 520, amort: 950 }, 5)).toBe(1470);
     // un `duree` résiduel SANS flag est ignoré → durée totale (fallback) utilisée
-    expect(ressourceCosts({ nombre: 1, duree: 1, puJour: 520, amort: 950 }, 2))
-      .toEqual({ perso: 1040, mat: 1900 });
+    expect(ressourceCosts({ nombre: 1, duree: 1, puJour: 520, amort: 950 }, 2)).toBe(2940);
   });
 
   it('quantité fourniture = quantité × épaisseur × densité', () => {
@@ -59,9 +54,9 @@ describe('tpPriceCompute — coûts par ligne', () => {
 describe('tpPriceCompute — sous-détail complet (Enrobés sur 0.05)', () => {
   const res = computeDetail(articleEnrobes(), 1390, defaultCoefficients());
 
-  it('totaux secs par poste conformes au fichier', () => {
-    expect(res.sec.mo).toBeCloseTo(1880, 2);          // 760 (matériel) + 1120 (MO)
-    expect(res.sec.materiel).toBeCloseTo(2205, 2);     // 2155 + 50 (véhicule chef)
+  it('totaux secs par poste (somme complète, sans séparation chauffeur)', () => {
+    expect(res.sec.materiel).toBeCloseTo(2915, 2);     // 1470 + 500 + 345 + 600
+    expect(res.sec.mo).toBeCloseTo(1170, 2);           // 450 (chef+véhicule) + 720 (OS)
     expect(res.sec.fourniture).toBeCloseTo(14861.88, 2);
     expect(res.sec.soustraitance).toBe(0);
     expect(res.sec.transport).toBe(0);
@@ -93,8 +88,8 @@ describe('tpPriceCompute — déboursé = coût sur la durée totale / quantité
     const r2x = computeDetail(articleEnrobes(), 2780, defaultCoefficients());
     expect(r2x.duree).toBe(2);
     // Matériel/MO doublent (2 jours), fournitures doublent (quantité ×2)…
-    expect(r2x.sec.mo).toBeCloseTo(3760, 2);
-    expect(r2x.sec.materiel).toBeCloseTo(4410, 2);
+    expect(r2x.sec.materiel).toBeCloseTo(5830, 2);
+    expect(r2x.sec.mo).toBeCloseTo(2340, 2);
     expect(r2x.sec.fourniture).toBeCloseTo(29723.76, 2);
     expect(r2x.deboursecSec).toBeCloseTo(37893.76, 2);
     // …donc le PU sec reste identique (invariant à la quantité, rendement fixe).
@@ -119,6 +114,26 @@ describe('tpPriceCompute — sous-traitance', () => {
   it('quantité saisie si unité différente', () => {
     expect(sousTraitanceQty({ unit: 'U', qte: 5 }, 250, 'M2')).toBe(5);
     expect(sousTraitanceCost({ unit: 'U', qte: 5, puForce: 8 }, 250, 'M2')).toBe(40);
+  });
+});
+
+describe('tpPriceCompute — transport (contenance / voyages / camions)', () => {
+  // Camion 13 T, 5 voyages/j, coût 500 €/j ; à transporter : 300 T (article en T).
+  const camion = { unit: 'T', contenance: 13, voyagesParJour: 5, coutJour: 500 };
+  it('quantité transportée = quantité d\'ouvrage (ou × épaisseur × densité)', () => {
+    expect(transportQty(camion, 300)).toBe(300);
+    expect(transportQty({ epaisseur: 0.09, densite: 2.4 }, 1390)).toBeCloseTo(300.24, 2);
+  });
+  it('coût = camions-jours × coût journalier', () => {
+    // camions-jours = 300 / (13 × 5) = 4.615… ; coût = ×500 ≈ 2307,69 €
+    expect(transportCost(camion, 300)).toBeCloseTo((300 / 65) * 500, 2);
+  });
+  it('nombre de camions en parallèle = camions-jours / durée', () => {
+    // camions-jours ≈ 4.615 ; sur 2 jours → ≈ 2.31 camions
+    expect(transportCamions(camion, 300, 2)).toBeCloseTo((300 / 65) / 2, 2);
+  });
+  it('contenance ou voyages nuls → coût 0', () => {
+    expect(transportCost({ contenance: 0, voyagesParJour: 5, coutJour: 500 }, 300)).toBe(0);
   });
 });
 

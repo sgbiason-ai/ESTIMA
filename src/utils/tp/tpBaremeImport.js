@@ -20,7 +20,7 @@ const getNum = (cell) => { const n = Number(getCellValue(cell)); return Number.i
 
 const baseResource = (designation, unit) => ({
   designation, unit: unit || 'U',
-  puJour: 0, amort: 0, entret: 0, cons: 0, loc: 0, epaisseur: 0, densite: 0, puBareme: 0,
+  puJour: 0, amort: 0, entret: 0, cons: 0, loc: 0, puBareme: 0, contenance: 0, coutJour: 0,
 });
 
 export async function parseBaremeExcel(file) {
@@ -42,22 +42,37 @@ export async function parseBaremeExcel(file) {
     const unit = String(getCellValue(row.getCell(4))).trim();
     const base = baseResource(designation, unit);
 
+    // Composants A/E/I/Personnel/Location (matériel & MO)
+    const comps = () => ({
+      amort: getNum(row.getCell(5)), entret: getNum(row.getCell(6)), cons: getNum(row.getCell(7)),
+      puJour: getNum(row.getCell(8)), loc: getNum(row.getCell(9)),
+    });
+
     let r;
     switch (type) {
       case 'FOU':
         r = { ...base, category: 'fourniture', puBareme: getNum(row.getCell(11)) }; break;
       case 'ST':
         r = { ...base, category: 'soustraitance', puBareme: getNum(row.getCell(12)) }; break;
-      case 'MA':
-      case 'LOC':
-        r = { ...base, category: 'materiel', amort: getNum(row.getCell(5)), entret: getNum(row.getCell(6)), cons: getNum(row.getCell(7)), puJour: getNum(row.getCell(8)), loc: getNum(row.getCell(9)) }; break;
       case 'MO':
-        r = { ...base, category: 'mo', amort: getNum(row.getCell(5)), entret: getNum(row.getCell(6)), cons: getNum(row.getCell(7)), puJour: getNum(row.getCell(8)), loc: getNum(row.getCell(9)) }; break;
+        r = { ...base, category: 'mo', ...comps() }; break;
+      case 'MA':
+      case 'LOC': {
+        const contenance = getNum(row.getCell(13)); // « Qté transportée » = contenance/voyage
+        if (type === 'LOC' && contenance > 0) {
+          const c = comps();
+          const coutJour = Math.round((c.amort + c.entret + c.cons + c.puJour + c.loc) * 100) / 100;
+          r = { ...base, category: 'transport', contenance, coutJour };
+        } else {
+          r = { ...base, category: 'materiel', ...comps() };
+        }
+        break;
+      }
       default:
         skipped++; return;
     }
     resources.push(r);
-    counts[type] = (counts[type] || 0) + 1;
+    counts[r.category] = (counts[r.category] || 0) + 1;
   });
 
   return { resources, counts, skipped };

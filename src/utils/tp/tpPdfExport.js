@@ -7,6 +7,7 @@ import { saveFileWithPicker, FILE_TYPES, PICKER_IDS } from '../fileSaver';
 import {
   computeDetail, defaultCoefficients, POSTES, POSTE_LABELS, effectiveDuree,
   ressourceCosts, fournitureQty, fournitureCost, sousTraitanceCost, sousTraitanceQty, lineDuree,
+  transportCost, transportCamions,
 } from './tpPriceCompute';
 
 const e2 = (n) => `${(Number(n || 0)).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
@@ -80,14 +81,14 @@ export async function generateTpPdf(study) {
       autoTable(doc, {
         startY: y,
         head: [[label, 'Nb', 'Durée', 'PU/J', 'Amort.', 'Entret.', 'Cons.', 'Loc.', 'Total']],
-        body: lines.map(l => { const c = ressourceCosts(l, duree); return [l.designation || '', l.nombre, lineDuree(l, duree), e2(l.puJour), e2(l.amort), e2(l.entret), e2(l.cons), e2(l.loc), e2(c.perso + c.mat)]; }),
+        body: lines.map(l => [l.designation || '', l.nombre, lineDuree(l, duree), e2(l.puJour), e2(l.amort), e2(l.entret), e2(l.cons), e2(l.loc), e2(ressourceCosts(l, duree))]),
         headStyles: { ...HEAD, fillColor: ORANGE }, bodyStyles: { fontSize: 7 },
         columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' }, 8: { halign: 'right' } },
         margin: { left: 14, right: 14 },
       });
       y = doc.lastAutoTable.finalY + 3;
     };
-    res('materiel', 'Matériel'); res('mo', "Main d'œuvre"); res('transport', 'Transport');
+    res('materiel', 'Matériel'); res('mo', "Main d'œuvre");
 
     if ((d.fourniture || []).length) {
       autoTable(doc, {
@@ -107,6 +108,17 @@ export async function generateTpPdf(study) {
         body: d.soustraitance.map(l => [l.designation || '', l.unit || '', sousTraitanceQty(l, qte, node.unit).toLocaleString('fr-FR'), e2(l.puBareme), l.puForce ? e2(l.puForce) : '—', e2(sousTraitanceCost(l, qte, node.unit))]),
         headStyles: { ...HEAD, fillColor: [124, 58, 237] }, bodyStyles: { fontSize: 7 },
         columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } },
+        margin: { left: 14, right: 14 },
+      });
+      y = doc.lastAutoTable.finalY + 3;
+    }
+    if ((d.transport || []).length) {
+      autoTable(doc, {
+        startY: y,
+        head: [['Transport', 'U', 'Épaiss.', 'Densité', 'Contenance', 'Voy./j', 'Coût/j', 'Camions', 'Total']],
+        body: d.transport.map(l => [l.designation || '', l.unit || '', l.epaisseur || '', l.densite || '', l.contenance || '', l.voyagesParJour || '', e2(l.coutJour), transportCamions(l, qte, duree).toLocaleString('fr-FR'), e2(transportCost(l, qte))]),
+        headStyles: { ...HEAD, fillColor: [14, 165, 233] }, bodyStyles: { fontSize: 7 },
+        columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' }, 8: { halign: 'right' } },
         margin: { left: 14, right: 14 },
       });
       y = doc.lastAutoTable.finalY + 3;
