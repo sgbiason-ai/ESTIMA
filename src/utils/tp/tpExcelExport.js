@@ -6,7 +6,7 @@ import { buildRefMap } from '../projectCalculations';
 import { saveFileWithPicker, FILE_TYPES, PICKER_IDS } from '../fileSaver';
 import {
   computeDetail, defaultCoefficients, POSTES, POSTE_LABELS, effectiveDuree,
-  ressourceCosts, fournitureQty, fournitureCost, sousTraitanceCost, lineDuree,
+  ressourceCosts, fournitureQty, fournitureCost, sousTraitanceCost, sousTraitanceQty, lineDuree,
 } from './tpPriceCompute';
 
 const EUR = '# ##0.00 "€"';
@@ -55,7 +55,7 @@ export async function generateTpExcel(study) {
   const tot = { deb: 0, vente: 0, sec: { materiel: 0, mo: 0, fourniture: 0, soustraitance: 0, transport: 0 } };
   arts.forEach(({ node, num }) => {
     const qte = Number(node.qty || 0);
-    const r = computeDetail(node.detail, qte, coef);
+    const r = computeDetail(node.detail, qte, coef, node.unit);
     const row = recap.addRow([
       num, node.designation || '', qte, node.unit || '', r.puSec, r.deboursecSec, r.puRetenu, r.totalVente,
       r.sec.materiel, r.sec.mo, r.sec.fourniture, r.sec.soustraitance, r.sec.transport,
@@ -78,7 +78,7 @@ export async function generateTpExcel(study) {
     if (!node.detail) return;
     const qte = Number(node.qty || 0);
     const d = node.detail;
-    const r = computeDetail(d, qte, coef);
+    const r = computeDetail(d, qte, coef, node.unit);
     const duree = r.duree;
     const ws = wb.addWorksheet(safeSheet(num ? `${num}` : node.designation, used));
 
@@ -123,7 +123,7 @@ export async function generateTpExcel(study) {
       sub('SOUS-TRAITANCE');
       colHead(['Désignation', 'U', 'Qté', 'PU barème', 'PU forcé', 'Total']);
       d.soustraitance.forEach(l => {
-        const row = ws.addRow([l.designation || '', l.unit || '', Number(l.qte || 0), Number(l.puBareme || 0), Number(l.puForce || 0), sousTraitanceCost(l)]);
+        const row = ws.addRow([l.designation || '', l.unit || '', sousTraitanceQty(l, qte, node.unit), Number(l.puBareme || 0), Number(l.puForce || 0), sousTraitanceCost(l, qte, node.unit)]);
         [4, 5, 6].forEach(i => { row.getCell(i).numFmt = EUR; });
       });
       ws.addRow([]);

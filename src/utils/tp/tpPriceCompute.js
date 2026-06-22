@@ -88,9 +88,18 @@ export const fournitureCost = (line, qteOuvrage) => {
   return r2(fournitureQty(line, qteOuvrage) * pu);
 };
 
-export const sousTraitanceCost = (line) => {
+const sameUnit = (a, b) => !!a && !!b && String(a).trim().toUpperCase() === String(b).trim().toUpperCase();
+
+/** Quantité d'une sous-traitance : quantité de la tâche si l'unité est la même
+ *  que l'ouvrage, sinon quantité saisie. */
+export function sousTraitanceQty(line, qteOuvrage, articleUnit) {
+  if (sameUnit(line?.unit, articleUnit)) return num(qteOuvrage);
+  return num(line?.qte);
+}
+
+export const sousTraitanceCost = (line, qteOuvrage, articleUnit) => {
   const pu = num(line.puForce) > 0 ? num(line.puForce) : num(line.puBareme);
-  return r2(num(line.qte) * pu);
+  return r2(sousTraitanceQty(line, qteOuvrage, articleUnit) * pu);
 };
 
 export const transportCost = (line, fallbackDuree) => {
@@ -105,7 +114,7 @@ export const transportCost = (line, fallbackDuree) => {
  * @param {object} coef  coefficients de vente par poste
  * @returns totaux secs par poste, déboursé, PU sec, PV par poste, PV unitaire, PU retenu
  */
-export function computeDetail(detail, qteOuvrage, coef = defaultCoefficients()) {
+export function computeDetail(detail, qteOuvrage, coef = defaultCoefficients(), articleUnit = '') {
   const d = detail || emptyDetail();
   const qte = num(qteOuvrage);
   const duree = effectiveDuree(d, qte); // durée totale = quantité / rendement (ou forcée)
@@ -114,7 +123,7 @@ export function computeDetail(detail, qteOuvrage, coef = defaultCoefficients()) 
   (d.materiel || []).forEach(l => { const c = ressourceCosts(l, duree); sec.mo += c.perso; sec.materiel += c.mat; });
   (d.mo || []).forEach(l => { const c = ressourceCosts(l, duree); sec.mo += c.perso; sec.materiel += c.mat; });
   (d.fourniture || []).forEach(l => { sec.fourniture += fournitureCost(l, qte); });
-  (d.soustraitance || []).forEach(l => { sec.soustraitance += sousTraitanceCost(l); });
+  (d.soustraitance || []).forEach(l => { sec.soustraitance += sousTraitanceCost(l, qte, articleUnit); });
   (d.transport || []).forEach(l => { sec.transport += transportCost(l, duree); });
 
   POSTES.forEach(p => { sec[p] = r2(sec[p]); });

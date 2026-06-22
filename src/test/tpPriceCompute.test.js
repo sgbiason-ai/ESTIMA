@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   computeDetail, ressourceCosts, fournitureQty, fournitureCost,
+  sousTraitanceQty, sousTraitanceCost,
   emptyDetail, defaultCoefficients, effectiveDuree, rendementFromDuree, DEFAULT_COEF,
 } from '../utils/tp/tpPriceCompute';
 
@@ -107,6 +108,17 @@ describe('tpPriceCompute — déboursé = coût sur la durée totale / quantité
     expect(r.sec.materiel).toBe(0);
     // les fournitures (basées sur la quantité) restent comptées
     expect(r.sec.fourniture).toBeCloseTo(14861.88, 2);
+  });
+});
+
+describe('tpPriceCompute — sous-traitance', () => {
+  it('quantité = quantité de la tâche si même unité (insensible à la casse)', () => {
+    expect(sousTraitanceQty({ unit: 'm2', qte: 5 }, 250, 'M2')).toBe(250);
+    expect(sousTraitanceCost({ unit: 'm2', puBareme: 10 }, 250, 'M2')).toBe(2500);
+  });
+  it('quantité saisie si unité différente', () => {
+    expect(sousTraitanceQty({ unit: 'U', qte: 5 }, 250, 'M2')).toBe(5);
+    expect(sousTraitanceCost({ unit: 'U', qte: 5, puForce: 8 }, 250, 'M2')).toBe(40);
   });
 });
 

@@ -10,7 +10,7 @@ import { emptyDetail, computeDetail, effectiveDuree, rendementFromDuree, POSTES,
 export default function TpSousDetailEditor({ item, coef, onChange, onQtyChange, libraryOpen, onToggleLibrary, onActivePoste }) {
   const detail = item.detail || emptyDetail();
   const qte = Number(item.qty || 0);
-  const r = computeDetail(detail, qte, coef);
+  const r = computeDetail(detail, qte, coef, item.unit);
   const duree = effectiveDuree(detail, qte);
 
   const patch = (p) => onChange({ ...detail, ...p });
@@ -98,7 +98,7 @@ export default function TpSousDetailEditor({ item, coef, onChange, onQtyChange, 
         <FournitureTable lines={detail.fourniture} onChange={setBlock('fourniture')} qteOuvrage={qte} />
       </div>
       <div {...blockProps('soustraitance')}>
-        <SousTraitanceTable lines={detail.soustraitance} onChange={setBlock('soustraitance')} />
+        <SousTraitanceTable lines={detail.soustraitance} onChange={setBlock('soustraitance')} qteOuvrage={qte} articleUnit={item.unit} />
       </div>
       <div {...blockProps('transport')}>
         <TransportTable lines={detail.transport} onChange={setBlock('transport')} duree={duree} />
