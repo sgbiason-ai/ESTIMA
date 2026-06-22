@@ -22,58 +22,56 @@ export default function TpSousDetailEditor({ item, coef, onChange, onQtyChange, 
   });
 
   return (
-    <div className="space-y-4">
-      {/* En-tête article — bloc prioritaire (désignation + quantité / rendement / durée) */}
-      <div className="relative bg-gradient-to-br from-orange-50 to-white border border-orange-200 rounded-2xl p-5 pl-6 shadow-sm overflow-hidden">
-        <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-orange-500" />
+    <div className="flex flex-col">
+      {/* Bloc résumé FIGÉ (sticky) : en-tête article + récap + répartition par poste */}
+      <div className="sticky top-0 z-20 bg-[#f5f5f7] pt-4 pb-3 space-y-3 border-b border-slate-200/70">
+      {/* En-tête article — compact : désignation + quantité / rendement / durée sur une ligne */}
+      <div className="relative bg-gradient-to-br from-orange-50 to-white border border-orange-200 rounded-xl p-2.5 pl-3.5 shadow-sm overflow-hidden flex items-center gap-3 flex-wrap">
+        <div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-500" />
 
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-orange-600 text-white text-[10px] font-black uppercase tracking-widest shadow-sm">
-            <Hammer size={12} /> Article à chiffrer
-          </span>
-          {onToggleLibrary && (
-            <button onClick={onToggleLibrary}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide transition-all ${libraryOpen ? 'bg-orange-600 text-white shadow-sm' : 'bg-white border border-orange-200 text-orange-600 hover:bg-orange-100'}`}
-              title="Insérer des ressources depuis la bibliothèque">
-              <BookOpen size={13} /> Bibliothèque
-            </button>
-          )}
+        {/* Désignation + badge */}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-orange-600 text-white text-[9px] font-black uppercase tracking-widest shrink-0">
+              <Hammer size={10} /> Article
+            </span>
+            {onToggleLibrary && (
+              <button onClick={onToggleLibrary}
+                className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide transition-all shrink-0 ${libraryOpen ? 'bg-orange-600 text-white' : 'bg-white border border-orange-200 text-orange-600 hover:bg-orange-100'}`}
+                title="Insérer des ressources depuis la bibliothèque">
+                <BookOpen size={11} /> Biblio
+              </button>
+            )}
+          </div>
+          <h3 className="text-base font-black text-slate-900 leading-tight tracking-tight truncate mt-1">
+            {item.designation || 'Article sans nom'}
+          </h3>
         </div>
 
-        <h3 className="text-xl font-black text-slate-900 leading-tight tracking-tight mb-4 line-clamp-2">
-          {item.designation || 'Article sans nom'}
-        </h3>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {/* Quantité d'ouvrage */}
-          <HeaderTile icon={Ruler} label="Quantité d'ouvrage" unit={item.unit}>
+        {/* 3 mini-tuiles alignées à droite */}
+        <div className="flex items-stretch gap-2 shrink-0">
+          <MiniTile icon={Ruler} label="Quantité" unit={item.unit}>
             <NumCell value={qte} onCommit={(v) => onQtyChange?.(v)} align="left"
-              className="!border-0 !bg-transparent !px-0 !py-0 !text-2xl !font-black !text-slate-900" />
-          </HeaderTile>
-
-          {/* Rendement / jour */}
-          <HeaderTile icon={Gauge} label="Rendement / jour" unit={`${item.unit}/j`}>
+              className="!border-0 !bg-transparent !px-0 !py-0 !text-base !font-black !text-slate-900" />
+          </MiniTile>
+          <MiniTile icon={Gauge} label="Rendt/j" unit={`${item.unit}/j`}>
             <NumCell value={detail.rendement} onCommit={(v) => patch({ rendement: v })} placeholder="0" align="left"
-              className="!border-0 !bg-transparent !px-0 !py-0 !text-2xl !font-black !text-orange-700" />
-          </HeaderTile>
-
-          {/* Durée */}
-          <HeaderTile
-            icon={Clock}
-            label="Durée (jours)"
-            unit={detail.dureeForced ? 'forcée' : 'auto'}
+              className="!border-0 !bg-transparent !px-0 !py-0 !text-base !font-black !text-orange-700" />
+          </MiniTile>
+          <MiniTile
+            icon={Clock} label="Durée (j)" unit={detail.dureeForced ? 'forcée' : 'auto'}
             action={
               <button onClick={() => patch({ dureeForced: !detail.dureeForced, duree: detail.dureeForced ? detail.duree : duree })}
                 className={`p-0.5 rounded ${detail.dureeForced ? 'text-orange-600' : 'text-slate-400 hover:text-orange-500'}`}
-                title={detail.dureeForced ? 'Durée forcée (cliquer pour repasser en calcul auto)' : 'Durée calculée = quantité / rendement (cliquer pour forcer)'}>
-                {detail.dureeForced ? <Lock size={13} /> : <Unlock size={13} />}
+                title={detail.dureeForced ? 'Durée forcée (cliquer pour calcul auto)' : 'Durée calculée = quantité / rendement (cliquer pour forcer)'}>
+                {detail.dureeForced ? <Lock size={11} /> : <Unlock size={11} />}
               </button>
             }>
             {detail.dureeForced
               ? <NumCell value={detail.duree} onCommit={(v) => patch({ duree: v })} align="left"
-                  className="!border-0 !bg-transparent !px-0 !py-0 !text-2xl !font-black !text-orange-700" />
-              : <span className="text-2xl font-black font-mono text-slate-900 leading-none">{duree.toLocaleString('fr-FR')}</span>}
-          </HeaderTile>
+                  className="!border-0 !bg-transparent !px-0 !py-0 !text-base !font-black !text-orange-700" />
+              : <span className="text-base font-black font-mono text-slate-900 leading-none">{duree.toLocaleString('fr-FR')}</span>}
+          </MiniTile>
         </div>
       </div>
 
@@ -94,8 +92,10 @@ export default function TpSousDetailEditor({ item, coef, onChange, onQtyChange, 
           </span>
         ))}
       </div>
+      </div>
 
-      {/* Les 5 postes — chaque bloc signale le poste actif au clic/focus */}
+      {/* Les 5 postes (scrollent sous le bloc figé) — chaque bloc signale le poste actif */}
+      <div className="space-y-4 pt-3">
       <div {...blockProps('materiel')}>
         <RessourceTable title="Matériel (+ chauffeur)" accent="orange" addLabel="Matériel" lines={detail.materiel} onChange={setBlock('materiel')} duree={duree} />
       </div>
@@ -111,23 +111,24 @@ export default function TpSousDetailEditor({ item, coef, onChange, onQtyChange, 
       <div {...blockProps('transport')}>
         <TransportTable lines={detail.transport} onChange={setBlock('transport')} duree={duree} />
       </div>
+      </div>
     </div>
   );
 }
 
-// Tuile de saisie du header (label + icône + valeur en grand + unité + action)
-function HeaderTile({ icon: Icon, label, unit, action, children }) {
+// Mini-tuile de saisie du header compact (label + icône + valeur + unité + action)
+function MiniTile({ icon: Icon, label, unit, action, children }) {
   return (
-    <div className="bg-white border border-orange-200/70 rounded-xl p-3 transition-shadow focus-within:ring-2 focus-within:ring-orange-200">
-      <div className="flex items-center justify-between gap-1 mb-1.5">
-        <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-          {Icon && <Icon size={12} className="text-orange-500" />}{label}
+    <div className="bg-white border border-orange-200/70 rounded-lg px-2.5 py-1 min-w-[94px] transition-shadow focus-within:ring-2 focus-within:ring-orange-200">
+      <div className="flex items-center justify-between gap-1">
+        <span className="flex items-center gap-1 text-[8px] font-bold uppercase tracking-wide text-slate-500">
+          {Icon && <Icon size={10} className="text-orange-500" />}{label}
         </span>
         {action}
       </div>
-      <div className="flex items-baseline gap-1.5">
+      <div className="flex items-baseline gap-1">
         <div className="flex-1 min-w-0">{children}</div>
-        {unit && <span className="shrink-0 text-[11px] font-semibold text-slate-400 lowercase">{unit}</span>}
+        {unit && <span className="shrink-0 text-[9px] font-semibold text-slate-400 lowercase">{unit}</span>}
       </div>
     </div>
   );

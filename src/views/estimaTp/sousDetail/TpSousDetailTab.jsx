@@ -106,7 +106,7 @@ export default function TpSousDetailTab({ study, setStudy, companyId }) {
         </div>
 
         {/* Éditeur */}
-        <div className="flex-1 overflow-y-auto px-5 py-5">
+        <div className="flex-1 overflow-y-auto px-5 pb-5">
           {selectedItem
             ? <TpSousDetailEditor
                 item={{ ...selectedItem, detail: selectedItem.detail || emptyDetail() }}
