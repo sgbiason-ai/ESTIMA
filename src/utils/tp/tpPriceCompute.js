@@ -57,13 +57,20 @@ export const emptyDetail = () => ({
 });
 
 // ─── Coûts par ligne ──────────────────────────────────────────────────────────
-// Le coût d'une ressource (matériel ou MO) court sur la DURÉE TOTALE du chantier
-// (= quantité / rendement), pas une durée par ligne : nombre × duréeTotale × tarif/j.
-// Une ligne contribue à DEUX postes :
+// Durée effective d'une ligne : sa durée propre si renseignée, sinon la durée
+// TOTALE du chantier (= quantité / rendement). La durée est donc affichée et
+// modifiable par ligne mais pré-remplie avec la valeur calculée.
+export const lineDuree = (line, fallback) => {
+  const v = line?.duree;
+  return (v === null || v === undefined || v === '') ? num(fallback) : num(v);
+};
+
+// Une ressource (matériel ou MO) contribue à DEUX postes :
 //   - part personnel (chauffeur / ouvrier)  → poste « mo »
 //   - part matériel (machine / véhicule)    → poste « materiel »
-export function ressourceCosts(line, duree) {
-  const base = num(line.nombre) * num(duree);
+// Coût = nombre × durée (ligne ou totale) × tarif/jour.
+export function ressourceCosts(line, fallbackDuree) {
+  const base = num(line.nombre) * lineDuree(line, fallbackDuree);
   const perso = base * num(line.puJour);
   const mat = base * (num(line.amort) + num(line.entret) + num(line.cons) + num(line.loc));
   return { perso: r2(perso), mat: r2(mat) };
@@ -86,8 +93,8 @@ export const sousTraitanceCost = (line) => {
   return r2(num(line.qte) * pu);
 };
 
-export const transportCost = (line, duree) => {
-  const base = num(line.nombre) * num(duree);
+export const transportCost = (line, fallbackDuree) => {
+  const base = num(line.nombre) * lineDuree(line, fallbackDuree);
   return r2(base * (num(line.puJour) + num(line.amort) + num(line.entret) + num(line.cons) + num(line.loc)));
 };
 

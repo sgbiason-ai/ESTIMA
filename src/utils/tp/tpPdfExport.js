@@ -6,7 +6,7 @@ import { buildRefMap } from '../projectCalculations';
 import { saveFileWithPicker, FILE_TYPES, PICKER_IDS } from '../fileSaver';
 import {
   computeDetail, defaultCoefficients, POSTES, POSTE_LABELS, effectiveDuree,
-  ressourceCosts, fournitureQty, fournitureCost, sousTraitanceCost,
+  ressourceCosts, fournitureQty, fournitureCost, sousTraitanceCost, lineDuree,
 } from './tpPriceCompute';
 
 const e2 = (n) => `${(Number(n || 0)).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
@@ -80,7 +80,7 @@ export async function generateTpPdf(study) {
       autoTable(doc, {
         startY: y,
         head: [[label, 'Nb', 'Durée', 'PU/J', 'Amort.', 'Entret.', 'Cons.', 'Loc.', 'Total']],
-        body: lines.map(l => { const c = ressourceCosts(l, duree); return [l.designation || '', l.nombre, duree, e2(l.puJour), e2(l.amort), e2(l.entret), e2(l.cons), e2(l.loc), e2(c.perso + c.mat)]; }),
+        body: lines.map(l => { const c = ressourceCosts(l, duree); return [l.designation || '', l.nombre, lineDuree(l, duree), e2(l.puJour), e2(l.amort), e2(l.entret), e2(l.cons), e2(l.loc), e2(c.perso + c.mat)]; }),
         headStyles: { ...HEAD, fillColor: ORANGE }, bodyStyles: { fontSize: 7 },
         columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' }, 8: { halign: 'right' } },
         margin: { left: 14, right: 14 },

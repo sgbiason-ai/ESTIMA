@@ -9,15 +9,16 @@ import {
 function articleEnrobes() {
   const d = emptyDetail();
   d.rendement = 1390; d.duree = 1;
+  // Durée par ligne laissée vide → durée totale calculée (= quantité / rendement).
   d.materiel = [
-    { nombre: 1, duree: 1, puJour: 520, amort: 950, entret: 0, cons: 0, loc: 0 }, // Finisseur
-    { nombre: 1, duree: 1, puJour: 0,   amort: 0,   entret: 0, cons: 0, loc: 500 }, // Double bille
-    { nombre: 1, duree: 1, puJour: 240, amort: 105, entret: 0, cons: 0, loc: 0 }, // Cylindre
-    { nombre: 3, duree: 1, puJour: 0,   amort: 0,   entret: 0, cons: 0, loc: 200 }, // Transfert
+    { nombre: 1, puJour: 520, amort: 950, entret: 0, cons: 0, loc: 0 }, // Finisseur
+    { nombre: 1, puJour: 0,   amort: 0,   entret: 0, cons: 0, loc: 500 }, // Double bille
+    { nombre: 1, puJour: 240, amort: 105, entret: 0, cons: 0, loc: 0 }, // Cylindre
+    { nombre: 3, puJour: 0,   amort: 0,   entret: 0, cons: 0, loc: 200 }, // Transfert
   ];
   d.mo = [
-    { nombre: 1, duree: 1, puJour: 400, amort: 50, entret: 0, cons: 0, loc: 0 }, // Chef + véhicule
-    { nombre: 3, duree: 1, puJour: 240, amort: 0,  entret: 0, cons: 0, loc: 0 }, // OS
+    { nombre: 1, puJour: 400, amort: 50, entret: 0, cons: 0, loc: 0 }, // Chef + véhicule
+    { nombre: 3, puJour: 240, amort: 0,  entret: 0, cons: 0, loc: 0 }, // OS
   ];
   d.fourniture = [
     { epaisseur: 0.09, densite: 2.4, puBareme: 49.66, puForce: 49.5 }, // Grave Bitume
@@ -31,9 +32,12 @@ describe('tpPriceCompute — coûts par ligne', () => {
       .toEqual({ perso: 520, mat: 950 });
     expect(ressourceCosts({ nombre: 3, loc: 200 }, 1))
       .toEqual({ perso: 0, mat: 600 });
-    // durée 2 jours → coût doublé
+    // durée totale (fallback) 2 jours → coût doublé
     expect(ressourceCosts({ nombre: 1, puJour: 520, amort: 950 }, 2))
       .toEqual({ perso: 1040, mat: 1900 });
+    // durée FORCÉE sur la ligne → prioritaire sur la durée totale
+    expect(ressourceCosts({ nombre: 1, duree: 1, puJour: 520, amort: 950 }, 5))
+      .toEqual({ perso: 520, mat: 950 });
   });
 
   it('quantité fourniture = quantité × épaisseur × densité', () => {
