@@ -1,11 +1,13 @@
 // src/views/estimaTp/ressources/TpResourcesTab.jsx
 // ESTIMA TP — bibliothèque commune de ressources : une seule liste, chaque ligne
 // porte sa catégorie (poste). Réutilisable dans les sous-détails (volet latéral).
-import React, { useMemo, useState } from 'react';
-import { Plus, Trash2, Loader2, Search, Package } from 'lucide-react';
+import React, { useMemo, useRef, useState } from 'react';
+import { Plus, Trash2, Loader2, Search, Package, FileSpreadsheet } from 'lucide-react';
 import { useTpResources, emptyResource } from '../../../hooks/useTpResources';
 import { POSTES, POSTE_LABELS } from '../../../utils/tp/tpPriceCompute';
 import { NumCell, TxtCell } from '../sousDetail/sdShared';
+import { useToast } from '../../../contexts/ToastContext';
+import { useDialog } from '../../../contexts/DialogContext';
 
 const removeAccents = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
@@ -16,9 +18,45 @@ const CAT_BADGE = {
 };
 
 export default function TpResourcesTab({ companyId }) {
-  const { resources, loading, saveResource, deleteResource } = useTpResources(companyId);
+  const { resources, loading, saveResource, deleteResource, importResources } = useTpResources(companyId);
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [importing, setImporting] = useState(false);
+  const fileRef = useRef(null);
+  const toast = useToast();
+  const { confirm } = useDialog();
+
+  const handleImport = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = null;
+    if (!file) return;
+    const ok = await confirm(
+      `Importer ce barème REMPLACERA toute la bibliothèque actuelle (${resources.length} ressource(s)).\n\nContinuer ?`,
+      { title: 'Importer un barème Excel', danger: true, confirmLabel: 'Remplacer et importer' }
+    );
+    if (!ok) return;
+    setImporting(true);
+    try {
+      const { parseBaremeExcel } = await import('../../../utils/tp/tpBaremeImport');
+      const { resources: list, counts, skipped } = await parseBaremeExcel(file);
+      if (list.length === 0) {
+        toast.error('Aucune ressource reconnue. Vérifiez les colonnes (Type, Libellé, U…).');
+        return;
+      }
+      const n = await importResources(list, { replace: true });
+      const parts = [];
+      if (counts.FOU) parts.push(`${counts.FOU} fournitures`);
+      if (counts.ST) parts.push(`${counts.ST} sous-traitance`);
+      if ((counts.MA || 0) + (counts.LOC || 0)) parts.push(`${(counts.MA || 0) + (counts.LOC || 0)} matériel`);
+      if (counts.MO) parts.push(`${counts.MO} MO`);
+      toast.success(`${n} ressources importées${parts.length ? ` (${parts.join(', ')})` : ''}${skipped ? ` — ${skipped} ignorée(s)` : ''}.`);
+    } catch (err) {
+      console.error('[ESTIMA TP] Import barème échoué:', err);
+      toast.error('Impossible de lire le fichier. Vérifiez le format Excel.');
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const list = useMemo(() => {
     let l = filter === 'all' ? resources : resources.filter(r => r.category === filter);
@@ -44,10 +82,16 @@ export default function TpResourcesTab({ companyId }) {
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher…"
               className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200/60 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-orange-400" />
           </div>
+          <button onClick={() => fileRef.current?.click()} disabled={importing}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-all shadow-sm disabled:opacity-50">
+            {importing ? <Loader2 size={16} className="animate-spin" /> : <FileSpreadsheet size={16} />}
+            {importing ? 'Import…' : 'Importer un barème'}
+          </button>
           <button onClick={() => saveResource(emptyResource(filter === 'all' ? 'materiel' : filter))}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700 transition-all shadow-sm">
             <Plus size={16} /> Ajouter
           </button>
+          <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleImport} className="hidden" />
         </div>
 
         {loading ? (
