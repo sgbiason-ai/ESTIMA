@@ -79,6 +79,7 @@ export async function generateTpExcel(study) {
     const qte = Number(node.qty || 0);
     const d = node.detail;
     const r = computeDetail(d, qte, coef);
+    const duree = r.duree;
     const ws = wb.addWorksheet(safeSheet(num ? `${num}` : node.designation, used));
 
     ws.mergeCells('A1:H1');
@@ -97,8 +98,8 @@ export async function generateTpExcel(study) {
       sub(label);
       colHead(['Désignation', 'Nb', 'Durée', 'PU/J', 'Amort.', 'Entret.', 'Cons.', 'Loc.', 'Total']);
       lines.forEach(l => {
-        const c = ressourceCosts(l);
-        const row = ws.addRow([l.designation || '', Number(l.nombre || 0), Number(l.duree || 0), Number(l.puJour || 0),
+        const c = ressourceCosts(l, duree);
+        const row = ws.addRow([l.designation || '', Number(l.nombre || 0), duree, Number(l.puJour || 0),
           Number(l.amort || 0), Number(l.entret || 0), Number(l.cons || 0), Number(l.loc || 0), c.perso + c.mat]);
         [4, 5, 6, 7, 8, 9].forEach(i => { row.getCell(i).numFmt = EUR; });
       });

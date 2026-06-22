@@ -50,25 +50,25 @@ const DelBtn = ({ onClick }) => (
 );
 
 // ─── Matériel / Main d'œuvre (même structure) ─────────────────────────────────
-const RES_COLS = 'grid grid-cols-[1fr_52px_52px_70px_66px_66px_66px_66px_92px_28px] gap-1 items-center';
+// La durée n'est plus par ligne : le coût court sur la durée totale (passée en prop).
+const RES_COLS = 'grid grid-cols-[1fr_52px_70px_66px_66px_66px_66px_92px_28px] gap-1 items-center';
 
-export function RessourceTable({ title, accent, addLabel, lines, onChange }) {
+export function RessourceTable({ title, accent, addLabel, lines, onChange, duree = 0 }) {
   const { add, upd, del } = useOps(lines, onChange);
   return (
     <Block title={title} accent={accent} addLabel={addLabel} onAdd={() => add(newRessourceLine())}>
-      <div className="min-w-[760px]">
+      <div className="min-w-[700px]">
         <div className={`${RES_COLS} px-2 py-1.5 border-b border-slate-100`}>
-          <Th>Désignation</Th><Th className="text-center">Nb</Th><Th className="text-center">Durée</Th>
+          <Th>Désignation</Th><Th className="text-center">Nb</Th>
           <Th className="text-right">PU/J</Th><Th className="text-right">Amort.</Th><Th className="text-right">Entret.</Th>
           <Th className="text-right">Cons.</Th><Th className="text-right">Loc.</Th><Th className="text-right">Total</Th><Th />
         </div>
         {(lines || []).map(l => {
-          const c = ressourceCosts(l);
+          const c = ressourceCosts(l, duree);
           return (
             <div key={l.id} className={`group ${RES_COLS} px-2 py-1 border-b border-slate-50 hover:bg-slate-50/60`}>
               <TxtCell value={l.designation} onCommit={(v) => upd(l.id, { designation: v })} placeholder="Désignation" className="font-semibold text-slate-700" />
               <NumCell value={l.nombre} onCommit={(v) => upd(l.id, { nombre: v })} align="center" />
-              <NumCell value={l.duree} onCommit={(v) => upd(l.id, { duree: v })} align="center" />
               <NumCell value={l.puJour} onCommit={(v) => upd(l.id, { puJour: v })} />
               <NumCell value={l.amort} onCommit={(v) => upd(l.id, { amort: v })} />
               <NumCell value={l.entret} onCommit={(v) => upd(l.id, { entret: v })} />
@@ -152,13 +152,13 @@ export function SousTraitanceTable({ lines, onChange }) {
 }
 
 // ─── Transport ────────────────────────────────────────────────────────────────
-export function TransportTable({ lines, onChange }) {
+export function TransportTable({ lines, onChange, duree = 0 }) {
   const { add, upd, del } = useOps(lines, onChange);
   return (
     <Block title="Transport" accent="sky" addLabel="Transport" onAdd={() => add(newTransportLine())}>
-      <div className="min-w-[760px]">
+      <div className="min-w-[700px]">
         <div className={`${RES_COLS} px-2 py-1.5 border-b border-slate-100`}>
-          <Th>Désignation</Th><Th className="text-center">Nb</Th><Th className="text-center">Durée</Th>
+          <Th>Désignation</Th><Th className="text-center">Nb</Th>
           <Th className="text-right">PU/J</Th><Th className="text-right">Amort.</Th><Th className="text-right">Entret.</Th>
           <Th className="text-right">Cons.</Th><Th className="text-right">Loc.</Th><Th className="text-right">Total</Th><Th />
         </div>
@@ -166,13 +166,12 @@ export function TransportTable({ lines, onChange }) {
           <div key={l.id} className={`group ${RES_COLS} px-2 py-1 border-b border-slate-50 hover:bg-slate-50/60`}>
             <TxtCell value={l.designation} onCommit={(v) => upd(l.id, { designation: v })} placeholder="Désignation" className="font-semibold text-slate-700" />
             <NumCell value={l.nombre} onCommit={(v) => upd(l.id, { nombre: v })} align="center" />
-            <NumCell value={l.duree} onCommit={(v) => upd(l.id, { duree: v })} align="center" />
             <NumCell value={l.puJour} onCommit={(v) => upd(l.id, { puJour: v })} />
             <NumCell value={l.amort} onCommit={(v) => upd(l.id, { amort: v })} />
             <NumCell value={l.entret} onCommit={(v) => upd(l.id, { entret: v })} />
             <NumCell value={l.cons} onCommit={(v) => upd(l.id, { cons: v })} />
             <NumCell value={l.loc} onCommit={(v) => upd(l.id, { loc: v })} />
-            <div className="text-right text-[11px] font-mono font-bold text-slate-900 px-1">{fmt2(transportCost(l))}</div>
+            <div className="text-right text-[11px] font-mono font-bold text-slate-900 px-1">{fmt2(transportCost(l, duree))}</div>
             <DelBtn onClick={() => del(l.id)} />
           </div>
         ))}

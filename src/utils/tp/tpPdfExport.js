@@ -66,6 +66,7 @@ export async function generateTpPdf(study) {
     const qte = Number(node.qty || 0);
     const d = node.detail;
     const r = computeDetail(d, qte, coef);
+    const duree = r.duree;
     doc.addPage();
     doc.setFontSize(12); doc.setFont(undefined, 'bold'); doc.setTextColor(17, 24, 39);
     doc.text(`${num ? num + ' — ' : ''}${node.designation || ''}`, 14, 16);
@@ -79,7 +80,7 @@ export async function generateTpPdf(study) {
       autoTable(doc, {
         startY: y,
         head: [[label, 'Nb', 'Durée', 'PU/J', 'Amort.', 'Entret.', 'Cons.', 'Loc.', 'Total']],
-        body: lines.map(l => { const c = ressourceCosts(l); return [l.designation || '', l.nombre, l.duree, e2(l.puJour), e2(l.amort), e2(l.entret), e2(l.cons), e2(l.loc), e2(c.perso + c.mat)]; }),
+        body: lines.map(l => { const c = ressourceCosts(l, duree); return [l.designation || '', l.nombre, duree, e2(l.puJour), e2(l.amort), e2(l.entret), e2(l.cons), e2(l.loc), e2(c.perso + c.mat)]; }),
         headStyles: { ...HEAD, fillColor: ORANGE }, bodyStyles: { fontSize: 7 },
         columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' }, 8: { halign: 'right' } },
         margin: { left: 14, right: 14 },

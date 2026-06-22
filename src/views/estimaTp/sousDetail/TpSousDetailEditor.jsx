@@ -85,10 +85,10 @@ export default function TpSousDetailEditor({ item, coef, onChange, libraryOpen, 
 
       {/* Les 5 postes — chaque bloc signale le poste actif au clic/focus */}
       <div {...blockProps('materiel')}>
-        <RessourceTable title="Matériel (+ chauffeur)" accent="orange" addLabel="Matériel" lines={detail.materiel} onChange={setBlock('materiel')} />
+        <RessourceTable title="Matériel (+ chauffeur)" accent="orange" addLabel="Matériel" lines={detail.materiel} onChange={setBlock('materiel')} duree={duree} />
       </div>
       <div {...blockProps('mo')}>
-        <RessourceTable title="Main d'œuvre (+ véhicule)" accent="sky" addLabel="Personnel" lines={detail.mo} onChange={setBlock('mo')} />
+        <RessourceTable title="Main d'œuvre (+ véhicule)" accent="sky" addLabel="Personnel" lines={detail.mo} onChange={setBlock('mo')} duree={duree} />
       </div>
       <div {...blockProps('fourniture')}>
         <FournitureTable lines={detail.fourniture} onChange={setBlock('fourniture')} qteOuvrage={qte} />
@@ -97,7 +97,7 @@ export default function TpSousDetailEditor({ item, coef, onChange, libraryOpen, 
         <SousTraitanceTable lines={detail.soustraitance} onChange={setBlock('soustraitance')} />
       </div>
       <div {...blockProps('transport')}>
-        <TransportTable lines={detail.transport} onChange={setBlock('transport')} />
+        <TransportTable lines={detail.transport} onChange={setBlock('transport')} duree={duree} />
       </div>
     </div>
   );

@@ -30,7 +30,7 @@ const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 // décomposée en amortissement / entretien / consommable / location).
 export const newRessourceLine = (over = {}) => ({
   id: `tpr_${generateId()}`, code: '', nombre: 1, designation: '', unit: 'J',
-  duree: 1, puJour: 0, amort: 0, entret: 0, cons: 0, loc: 0, ...over,
+  puJour: 0, amort: 0, entret: 0, cons: 0, loc: 0, ...over,
 });
 
 // Fourniture : quantité pilotée par épaisseur × densité (ou directe), PU barème/forcé.
@@ -46,7 +46,7 @@ export const newSousTraitanceLine = (over = {}) => ({
 
 export const newTransportLine = (over = {}) => ({
   id: `tpt_${generateId()}`, code: '', designation: '', unit: 'J',
-  nombre: 1, duree: 1, toursJour: 0, unitesJour: 0,
+  nombre: 1, toursJour: 0, unitesJour: 0,
   puJour: 0, amort: 0, entret: 0, cons: 0, loc: 0, ...over,
 });
 
@@ -56,12 +56,14 @@ export const emptyDetail = () => ({
   pvForce: null,
 });
 
-// ─── Coûts unitaires par ligne ────────────────────────────────────────────────
-// Une ligne ressource (matériel ou MO) contribue à DEUX postes :
+// ─── Coûts par ligne ──────────────────────────────────────────────────────────
+// Le coût d'une ressource (matériel ou MO) court sur la DURÉE TOTALE du chantier
+// (= quantité / rendement), pas une durée par ligne : nombre × duréeTotale × tarif/j.
+// Une ligne contribue à DEUX postes :
 //   - part personnel (chauffeur / ouvrier)  → poste « mo »
 //   - part matériel (machine / véhicule)    → poste « materiel »
-export function ressourceCosts(line) {
-  const base = num(line.nombre) * num(line.duree);
+export function ressourceCosts(line, duree) {
+  const base = num(line.nombre) * num(duree);
   const perso = base * num(line.puJour);
   const mat = base * (num(line.amort) + num(line.entret) + num(line.cons) + num(line.loc));
   return { perso: r2(perso), mat: r2(mat) };
@@ -84,8 +86,8 @@ export const sousTraitanceCost = (line) => {
   return r2(num(line.qte) * pu);
 };
 
-export const transportCost = (line) => {
-  const base = num(line.nombre) * num(line.duree);
+export const transportCost = (line, duree) => {
+  const base = num(line.nombre) * num(duree);
   return r2(base * (num(line.puJour) + num(line.amort) + num(line.entret) + num(line.cons) + num(line.loc)));
 };
 
@@ -99,13 +101,14 @@ export const transportCost = (line) => {
 export function computeDetail(detail, qteOuvrage, coef = defaultCoefficients()) {
   const d = detail || emptyDetail();
   const qte = num(qteOuvrage);
+  const duree = effectiveDuree(d, qte); // durée totale = quantité / rendement (ou forcée)
   const sec = { materiel: 0, mo: 0, fourniture: 0, soustraitance: 0, transport: 0 };
 
-  (d.materiel || []).forEach(l => { const c = ressourceCosts(l); sec.mo += c.perso; sec.materiel += c.mat; });
-  (d.mo || []).forEach(l => { const c = ressourceCosts(l); sec.mo += c.perso; sec.materiel += c.mat; });
+  (d.materiel || []).forEach(l => { const c = ressourceCosts(l, duree); sec.mo += c.perso; sec.materiel += c.mat; });
+  (d.mo || []).forEach(l => { const c = ressourceCosts(l, duree); sec.mo += c.perso; sec.materiel += c.mat; });
   (d.fourniture || []).forEach(l => { sec.fourniture += fournitureCost(l, qte); });
   (d.soustraitance || []).forEach(l => { sec.soustraitance += sousTraitanceCost(l); });
-  (d.transport || []).forEach(l => { sec.transport += transportCost(l); });
+  (d.transport || []).forEach(l => { sec.transport += transportCost(l, duree); });
 
   POSTES.forEach(p => { sec[p] = r2(sec[p]); });
 
@@ -124,7 +127,7 @@ export function computeDetail(detail, qteOuvrage, coef = defaultCoefficients()) 
   const ratios = {};
   POSTES.forEach(p => { ratios[p] = deboursecSec > 0 ? r2(sec[p] / deboursecSec) : 0; });
 
-  return { sec, deboursecSec, puSec, pvParPoste, pvTotalTache, puVente, puRetenu, totalVente, ratios, qte };
+  return { sec, deboursecSec, puSec, pvParPoste, pvTotalTache, puVente, puRetenu, totalVente, ratios, qte, duree };
 }
 
 /** Durée effective : forcée si dureeForced, sinon quantité / rendement. */

@@ -26,11 +26,14 @@ function articleEnrobes() {
 }
 
 describe('tpPriceCompute — coûts par ligne', () => {
-  it('décompose part personnel / part matériel', () => {
-    expect(ressourceCosts({ nombre: 1, duree: 1, puJour: 520, amort: 950 }))
+  it('décompose part personnel / part matériel (sur la durée totale)', () => {
+    expect(ressourceCosts({ nombre: 1, puJour: 520, amort: 950 }, 1))
       .toEqual({ perso: 520, mat: 950 });
-    expect(ressourceCosts({ nombre: 3, duree: 1, loc: 200 }))
+    expect(ressourceCosts({ nombre: 3, loc: 200 }, 1))
       .toEqual({ perso: 0, mat: 600 });
+    // durée 2 jours → coût doublé
+    expect(ressourceCosts({ nombre: 1, puJour: 520, amort: 950 }, 2))
+      .toEqual({ perso: 1040, mat: 1900 });
   });
 
   it('quantité fourniture = quantité × épaisseur × densité', () => {
@@ -73,6 +76,30 @@ describe('tpPriceCompute — sous-détail complet (Enrobés sur 0.05)', () => {
     const r = computeDetail(d, 1390);
     expect(r.puRetenu).toBe(15.67);
     expect(r.totalVente).toBeCloseTo(15.67 * 1390, 2);
+  });
+});
+
+describe('tpPriceCompute — déboursé = coût sur la durée totale / quantité', () => {
+  it('le coût équipe court sur la durée totale (quantité / rendement)', () => {
+    // Même article, quantité doublée (2780 m²), rendement inchangé (1390) → durée 2 j.
+    const r2x = computeDetail(articleEnrobes(), 2780, defaultCoefficients());
+    expect(r2x.duree).toBe(2);
+    // Matériel/MO doublent (2 jours), fournitures doublent (quantité ×2)…
+    expect(r2x.sec.mo).toBeCloseTo(3760, 2);
+    expect(r2x.sec.materiel).toBeCloseTo(4410, 2);
+    expect(r2x.sec.fourniture).toBeCloseTo(29723.76, 2);
+    expect(r2x.deboursecSec).toBeCloseTo(37893.76, 2);
+    // …donc le PU sec reste identique (invariant à la quantité, rendement fixe).
+    expect(r2x.puSec).toBeCloseTo(13.63, 2);
+  });
+
+  it('rendement nul → durée 0 → coût équipe nul', () => {
+    const d = articleEnrobes(); d.rendement = 0; d.dureeForced = false;
+    const r = computeDetail(d, 1390);
+    expect(r.sec.mo).toBe(0);
+    expect(r.sec.materiel).toBe(0);
+    // les fournitures (basées sur la quantité) restent comptées
+    expect(r.sec.fourniture).toBeCloseTo(14861.88, 2);
   });
 });
 
