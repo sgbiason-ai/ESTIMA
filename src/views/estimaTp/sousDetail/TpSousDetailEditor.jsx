@@ -5,7 +5,7 @@ import { Gauge, Lock, Unlock, BookOpen, Hammer, Ruler, Clock } from 'lucide-reac
 import { NumCell } from './sdShared';
 import { fmt, fmt2 } from './sdFormat';
 import { RessourceTable, FournitureTable, SousTraitanceTable, TransportTable } from './TpDetailTables';
-import { emptyDetail, computeDetail, effectiveDuree, POSTES, POSTE_LABELS } from '../../../utils/tp/tpPriceCompute';
+import { emptyDetail, computeDetail, effectiveDuree, rendementFromDuree, POSTES, POSTE_LABELS } from '../../../utils/tp/tpPriceCompute';
 
 export default function TpSousDetailEditor({ item, coef, onChange, onQtyChange, libraryOpen, onToggleLibrary, onActivePoste }) {
   const detail = item.detail || emptyDetail();
@@ -15,6 +15,8 @@ export default function TpSousDetailEditor({ item, coef, onChange, onQtyChange, 
 
   const patch = (p) => onChange({ ...detail, ...p });
   const setBlock = (key) => (lines) => onChange({ ...detail, [key]: lines });
+  // Durée ↔ rendement liés par la quantité : saisir la durée recalcule le rendement.
+  const setDuree = (val) => patch({ rendement: rendementFromDuree(qte, val) });
   // Tout clic/focus dans un bloc signale le poste actif → le volet bibliothèque s'y filtre.
   const blockProps = (poste) => ({
     onMouseDownCapture: () => onActivePoste?.(poste),
@@ -58,19 +60,9 @@ export default function TpSousDetailEditor({ item, coef, onChange, onQtyChange, 
             <NumCell value={detail.rendement} onCommit={(v) => patch({ rendement: v })} placeholder="0" align="left"
               className="!border-0 !bg-transparent !px-0 !py-0 !text-base !font-black !text-orange-700" />
           </MiniTile>
-          <MiniTile
-            icon={Clock} label="Durée (j)" unit={detail.dureeForced ? 'forcée' : 'auto'}
-            action={
-              <button onClick={() => patch({ dureeForced: !detail.dureeForced, duree: detail.dureeForced ? detail.duree : duree })}
-                className={`p-0.5 rounded ${detail.dureeForced ? 'text-orange-600' : 'text-slate-400 hover:text-orange-500'}`}
-                title={detail.dureeForced ? 'Durée forcée (cliquer pour calcul auto)' : 'Durée calculée = quantité / rendement (cliquer pour forcer)'}>
-                {detail.dureeForced ? <Lock size={11} /> : <Unlock size={11} />}
-              </button>
-            }>
-            {detail.dureeForced
-              ? <NumCell value={detail.duree} onCommit={(v) => patch({ duree: v })} align="left"
-                  className="!border-0 !bg-transparent !px-0 !py-0 !text-base !font-black !text-orange-700" />
-              : <span className="text-base font-black font-mono text-slate-900 leading-none">{duree.toLocaleString('fr-FR')}</span>}
+          <MiniTile icon={Clock} label="Durée" unit="j">
+            <NumCell value={duree} onCommit={setDuree} placeholder="0" align="left"
+              className="!border-0 !bg-transparent !px-0 !py-0 !text-base !font-black !text-slate-900" />
           </MiniTile>
         </div>
       </div>

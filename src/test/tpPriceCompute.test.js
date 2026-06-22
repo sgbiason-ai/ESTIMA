@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   computeDetail, ressourceCosts, fournitureQty, fournitureCost,
-  emptyDetail, defaultCoefficients, effectiveDuree, DEFAULT_COEF,
+  emptyDetail, defaultCoefficients, effectiveDuree, rendementFromDuree, DEFAULT_COEF,
 } from '../utils/tp/tpPriceCompute';
 
 // Reproduit l'article 1 du fichier « Sous-détail » : « Enrobés sur 0.05 », 1390 m².
@@ -110,15 +110,21 @@ describe('tpPriceCompute — déboursé = coût sur la durée totale / quantité
   });
 });
 
-describe('tpPriceCompute — durée effective', () => {
-  it('durée = quantité / rendement quand non forcée', () => {
-    expect(effectiveDuree({ rendement: 1390, dureeForced: false }, 1390)).toBe(1);
-    expect(effectiveDuree({ rendement: 695, dureeForced: false }, 1390)).toBe(2);
+describe('tpPriceCompute — durée ↔ rendement (liés par la quantité)', () => {
+  it('durée = quantité / rendement', () => {
+    expect(effectiveDuree({ rendement: 1390 }, 1390)).toBe(1);
+    expect(effectiveDuree({ rendement: 695 }, 1390)).toBe(2);
   });
-  it('durée forcée prioritaire', () => {
-    expect(effectiveDuree({ rendement: 1390, duree: 3, dureeForced: true }, 1390)).toBe(3);
+  it('rendement = quantité / durée (sens inverse)', () => {
+    expect(rendementFromDuree(1390, 1)).toBe(1390);
+    expect(rendementFromDuree(1390, 2)).toBe(695);
   });
-  it('rendement nul → durée 0', () => {
-    expect(effectiveDuree({ rendement: 0, dureeForced: false }, 1390)).toBe(0);
+  it('aller-retour durée → rendement → durée cohérent', () => {
+    const rdt = rendementFromDuree(250, 2); // 125
+    expect(effectiveDuree({ rendement: rdt }, 250)).toBe(2);
+  });
+  it('valeurs nulles → 0', () => {
+    expect(effectiveDuree({ rendement: 0 }, 1390)).toBe(0);
+    expect(rendementFromDuree(1390, 0)).toBe(0);
   });
 });
