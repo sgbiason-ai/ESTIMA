@@ -38,6 +38,7 @@ export default function TpSousDetailTab({ study, setStudy, companyId }) {
   const articles = useMemo(() => flattenArticles(chapters), [chapters]);
   const [selectedId, setSelectedId] = useState(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [activePoste, setActivePoste] = useState(null);
   const { resources } = useTpResources(companyId);
 
   const currentId = selectedId && articles.some(a => a.id === selectedId) ? selectedId : (articles[0]?.id || null);
@@ -71,9 +72,9 @@ export default function TpSousDetailTab({ study, setStudy, companyId }) {
 
   return (
     <div className="flex-1 flex min-h-0 bg-[#f5f5f7]">
-      {/* Volet bibliothèque (gauche, façon ESTIMA) */}
+      {/* Volet bibliothèque (gauche, façon ESTIMA) — filtre suit le bloc actif */}
       {libraryOpen && (
-        <TpLibraryPanel resources={resources} onInsert={insertFromLibrary} onClose={() => setLibraryOpen(false)} />
+        <TpLibraryPanel resources={resources} onInsert={insertFromLibrary} onClose={() => setLibraryOpen(false)} activeCategory={activePoste} />
       )}
 
       <div className="flex-1 flex flex-col min-h-0">
@@ -99,7 +100,8 @@ export default function TpSousDetailTab({ study, setStudy, companyId }) {
             ? <TpSousDetailEditor
                 item={{ ...selectedItem, detail: selectedItem.detail || emptyDetail() }}
                 coef={coef} onChange={applyDetail}
-                libraryOpen={libraryOpen} onToggleLibrary={() => setLibraryOpen(o => !o)} />
+                libraryOpen={libraryOpen} onToggleLibrary={() => setLibraryOpen(o => !o)}
+                onActivePoste={setActivePoste} />
             : <div className="flex items-center justify-center h-full text-slate-400"><Coins size={20} className="mr-2" /> Sélectionnez un article</div>}
         </div>
       </div>

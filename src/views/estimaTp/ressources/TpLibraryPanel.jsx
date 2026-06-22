@@ -1,7 +1,7 @@
 // src/views/estimaTp/ressources/TpLibraryPanel.jsx
 // ESTIMA TP — barre latérale « Bibliothèque » du sous-détail, façon BPU ESTIMA :
 // volet gauche, recherche + filtre par catégorie, cartes cliquables → insertion.
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Package, PanelLeftClose, Search, Filter, Plus } from 'lucide-react';
 import { POSTES, POSTE_LABELS } from '../../../utils/tp/tpPriceCompute';
 
@@ -19,9 +19,11 @@ const previewPU = (r) => {
   return t ? `${t} €/j` : '';
 };
 
-export default function TpLibraryPanel({ resources, onInsert, onClose }) {
+export default function TpLibraryPanel({ resources, onInsert, onClose, activeCategory = null }) {
   const [cat, setCat] = useState('all');
   const [search, setSearch] = useState('');
+  // Le filtre suit le bloc cliqué dans le sous-détail (poste actif).
+  useEffect(() => { if (activeCategory) setCat(activeCategory); }, [activeCategory]);
 
   const items = useMemo(() => {
     let l = cat === 'all' ? resources : resources.filter(r => r.category === cat);
@@ -51,6 +53,9 @@ export default function TpLibraryPanel({ resources, onInsert, onClose }) {
             {POSTES.map(p => <option key={p} value={p}>{POSTE_LABELS[p]}</option>)}
           </select>
         </div>
+        {activeCategory && cat === activeCategory && (
+          <p className="mt-1 text-[9px] font-semibold text-orange-600">↳ suit le bloc actif ({POSTE_LABELS[activeCategory]})</p>
+        )}
       </header>
 
       <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1.5 bg-slate-50/50">

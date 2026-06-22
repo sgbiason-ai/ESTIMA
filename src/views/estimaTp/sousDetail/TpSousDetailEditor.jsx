@@ -7,7 +7,7 @@ import { fmt, fmt2 } from './sdFormat';
 import { RessourceTable, FournitureTable, SousTraitanceTable, TransportTable } from './TpDetailTables';
 import { emptyDetail, computeDetail, effectiveDuree, POSTES, POSTE_LABELS } from '../../../utils/tp/tpPriceCompute';
 
-export default function TpSousDetailEditor({ item, coef, onChange, libraryOpen, onToggleLibrary }) {
+export default function TpSousDetailEditor({ item, coef, onChange, libraryOpen, onToggleLibrary, onActivePoste }) {
   const detail = item.detail || emptyDetail();
   const qte = Number(item.qty || 0);
   const r = computeDetail(detail, qte, coef);
@@ -15,6 +15,11 @@ export default function TpSousDetailEditor({ item, coef, onChange, libraryOpen, 
 
   const patch = (p) => onChange({ ...detail, ...p });
   const setBlock = (key) => (lines) => onChange({ ...detail, [key]: lines });
+  // Tout clic/focus dans un bloc signale le poste actif → le volet bibliothèque s'y filtre.
+  const blockProps = (poste) => ({
+    onMouseDownCapture: () => onActivePoste?.(poste),
+    onFocusCapture: () => onActivePoste?.(poste),
+  });
 
   return (
     <div className="space-y-4">
@@ -78,12 +83,22 @@ export default function TpSousDetailEditor({ item, coef, onChange, libraryOpen, 
         ))}
       </div>
 
-      {/* Les 5 postes */}
-      <RessourceTable title="Matériel (+ chauffeur)" accent="orange" addLabel="Matériel" lines={detail.materiel} onChange={setBlock('materiel')} />
-      <RessourceTable title="Main d'œuvre (+ véhicule)" accent="sky" addLabel="Personnel" lines={detail.mo} onChange={setBlock('mo')} />
-      <FournitureTable lines={detail.fourniture} onChange={setBlock('fourniture')} qteOuvrage={qte} />
-      <SousTraitanceTable lines={detail.soustraitance} onChange={setBlock('soustraitance')} />
-      <TransportTable lines={detail.transport} onChange={setBlock('transport')} />
+      {/* Les 5 postes — chaque bloc signale le poste actif au clic/focus */}
+      <div {...blockProps('materiel')}>
+        <RessourceTable title="Matériel (+ chauffeur)" accent="orange" addLabel="Matériel" lines={detail.materiel} onChange={setBlock('materiel')} />
+      </div>
+      <div {...blockProps('mo')}>
+        <RessourceTable title="Main d'œuvre (+ véhicule)" accent="sky" addLabel="Personnel" lines={detail.mo} onChange={setBlock('mo')} />
+      </div>
+      <div {...blockProps('fourniture')}>
+        <FournitureTable lines={detail.fourniture} onChange={setBlock('fourniture')} qteOuvrage={qte} />
+      </div>
+      <div {...blockProps('soustraitance')}>
+        <SousTraitanceTable lines={detail.soustraitance} onChange={setBlock('soustraitance')} />
+      </div>
+      <div {...blockProps('transport')}>
+        <TransportTable lines={detail.transport} onChange={setBlock('transport')} />
+      </div>
     </div>
   );
 }
