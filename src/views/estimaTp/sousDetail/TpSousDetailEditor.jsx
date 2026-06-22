@@ -7,6 +7,15 @@ import { fmt, fmt2 } from './sdFormat';
 import { RessourceTable, FournitureTable, SousTraitanceTable, TransportTable } from './TpDetailTables';
 import { emptyDetail, computeDetail, effectiveDuree, rendementFromDuree, POSTES, POSTE_LABELS } from '../../../utils/tp/tpPriceCompute';
 
+// Couleurs par poste (classes littérales — requis par le JIT Tailwind)
+const POSTE_COLORS = {
+  materiel: 'bg-orange-500',
+  mo: 'bg-blue-500',
+  fourniture: 'bg-emerald-500',
+  soustraitance: 'bg-violet-500',
+  transport: 'bg-amber-500',
+};
+
 export default function TpSousDetailEditor({ item, coef, onChange, onQtyChange, libraryOpen, onToggleLibrary, onActivePoste }) {
   const detail = item.detail || emptyDetail();
   const qte = Number(item.qty || 0);
@@ -76,14 +85,24 @@ export default function TpSousDetailEditor({ item, coef, onChange, onQtyChange, 
         <ForcedTile detail={detail} unit={item.unit} onChange={patch} />
       </div>
 
-      {/* Répartition par poste (sec) */}
-      <div className="flex flex-wrap gap-2">
-        {POSTES.map(p => (
-          <span key={p} className="px-2.5 py-1 rounded-lg bg-slate-100 text-[11px] font-medium text-slate-600">
-            {POSTE_LABELS[p]} : <span className="font-bold text-slate-900">{fmt(r.sec[p])}</span>
-            {r.deboursecSec > 0 && <span className="text-slate-400"> · {(r.ratios[p] * 100).toFixed(0)}%</span>}
-          </span>
-        ))}
+      {/* Répartition du déboursé sec par poste — barre empilée pleine largeur */}
+      <div className="bg-white border border-slate-200 rounded-xl p-2.5">
+        <div className="flex h-3 w-full rounded-full overflow-hidden bg-slate-100">
+          {POSTES.map(p => (r.ratios[p] > 0 ? (
+            <div key={p} className={POSTE_COLORS[p]} style={{ width: `${r.ratios[p] * 100}%` }}
+              title={`${POSTE_LABELS[p]} : ${fmt(r.sec[p])} · ${(r.ratios[p] * 100).toFixed(0)}%`} />
+          ) : null))}
+        </div>
+        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+          {POSTES.map(p => (
+            <span key={p} className="flex items-center gap-1.5 text-[11px]">
+              <span className={`w-2.5 h-2.5 rounded-sm shrink-0 ${POSTE_COLORS[p]}`} />
+              <span className="text-slate-600">{POSTE_LABELS[p]}</span>
+              <span className="font-bold text-slate-900">{fmt(r.sec[p])}</span>
+              <span className="text-slate-400">{(r.deboursecSec > 0 ? (r.ratios[p] * 100) : 0).toFixed(0)}%</span>
+            </span>
+          ))}
+        </div>
       </div>
       </div>
 
