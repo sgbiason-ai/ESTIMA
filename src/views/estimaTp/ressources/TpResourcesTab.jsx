@@ -1,129 +1,124 @@
 // src/views/estimaTp/ressources/TpResourcesTab.jsx
-// ESTIMA TP — bibliothèque de ressources réutilisable : les 5 catégories (postes)
-// sont affichées comme 5 bibliothèques distinctes, chacune avec son tableau.
+// ESTIMA TP — bibliothèque commune de ressources : une seule liste, chaque ligne
+// porte sa catégorie (poste). Réutilisable dans les sous-détails (volet latéral).
 import React, { useMemo, useState } from 'react';
-import { Plus, Trash2, Loader2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, Loader2, Search, Package } from 'lucide-react';
 import { useTpResources, emptyResource } from '../../../hooks/useTpResources';
 import { POSTES, POSTE_LABELS } from '../../../utils/tp/tpPriceCompute';
 import { NumCell, TxtCell } from '../sousDetail/sdShared';
 
+const removeAccents = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+const CAT_BADGE = {
+  materiel: 'bg-orange-100 text-orange-700', mo: 'bg-blue-100 text-blue-700',
+  fourniture: 'bg-emerald-100 text-emerald-700', soustraitance: 'bg-violet-100 text-violet-700',
+  transport: 'bg-sky-100 text-sky-700',
+};
+
 export default function TpResourcesTab({ companyId }) {
   const { resources, loading, saveResource, deleteResource } = useTpResources(companyId);
-  const [collapsed, setCollapsed] = useState(() => new Set());
-  const byCat = useMemo(() => {
-    const m = {}; POSTES.forEach(p => { m[p] = []; });
-    resources.forEach(r => { if (m[r.category]) m[r.category].push(r); });
-    return m;
-  }, [resources]);
+  const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
 
-  const toggle = (cat) => setCollapsed(prev => { const n = new Set(prev); n.has(cat) ? n.delete(cat) : n.add(cat); return n; });
+  const list = useMemo(() => {
+    let l = filter === 'all' ? resources : resources.filter(r => r.category === filter);
+    if (search.trim()) { const q = removeAccents(search); l = l.filter(r => removeAccents(r.designation).includes(q)); }
+    return [...l].sort((a, b) => POSTES.indexOf(a.category) - POSTES.indexOf(b.category) || (a.designation || '').localeCompare(b.designation || '', 'fr'));
+  }, [resources, filter, search]);
 
-  if (loading) {
-    return <div className="flex-1 flex items-center justify-center bg-[#f5f5f7]"><Loader2 size={26} className="animate-spin text-orange-500" /></div>;
-  }
+  const upd = (r, patch) => saveResource({ ...r, ...patch });
 
   return (
     <div className="flex-1 overflow-y-auto px-6 py-6 bg-[#f5f5f7]">
-      <div className="max-w-5xl mx-auto space-y-4">
-        <p className="text-xs text-gray-400">
-          Vos ressources types, réutilisables dans les sous-détails (volet « Bibliothèque »). Une bibliothèque par catégorie.
-        </p>
-        {POSTES.map(cat => (
-          <LibrarySection
-            key={cat}
-            cat={cat}
-            list={byCat[cat]}
-            collapsed={collapsed.has(cat)}
-            onToggle={() => toggle(cat)}
-            onAdd={() => saveResource(emptyResource(cat))}
-            onUpd={(r, patch) => saveResource({ ...r, ...patch })}
-            onDel={(id) => deleteResource(id)}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
+      <div className="max-w-4xl mx-auto space-y-4">
+        <p className="text-xs text-gray-400">Bibliothèque commune de ressources, réutilisable dans les sous-détails (volet « Bibliothèque » à gauche). Chaque ressource a une catégorie.</p>
 
-function LibrarySection({ cat, list, collapsed, onToggle, onAdd, onUpd, onDel }) {
-  const isFourn = cat === 'fourniture';
-  const isST = cat === 'soustraitance';
-  const isRes = !isFourn && !isST;
-
-  return (
-    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-      {/* En-tête de la bibliothèque */}
-      <div className="flex items-center gap-2 px-4 py-3 bg-orange-50/60 border-b border-orange-100">
-        <button onClick={onToggle} className="p-0.5 rounded text-orange-500 hover:bg-orange-100" title={collapsed ? 'Déplier' : 'Replier'}>
-          {collapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-        </button>
-        <h3 className="text-sm font-black uppercase tracking-wider text-orange-700 flex-1">{POSTE_LABELS[cat]}</h3>
-        <span className="text-[11px] font-bold text-orange-600/70">{list.length} ressource{list.length > 1 ? 's' : ''}</span>
-        <button onClick={onAdd} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-600 text-white text-xs font-semibold hover:bg-orange-700 transition-all">
-          <Plus size={14} /> Ajouter
-        </button>
-      </div>
-
-      {!collapsed && (
-        list.length === 0 ? (
-          <p className="px-4 py-5 text-xs italic text-slate-400">Aucune ressource — cliquez « Ajouter » pour créer une entrée (avec un code).</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <div className={isFourn ? 'min-w-[640px]' : isST ? 'min-w-[460px]' : 'min-w-[720px]'}>
-              <Header isRes={isRes} isFourn={isFourn} isST={isST} />
-              {list.map(r => (
-                <Row key={r.id} r={r} isRes={isRes} isFourn={isFourn} isST={isST} upd={(patch) => onUpd(r, patch)} del={() => onDel(r.id)} />
-              ))}
-            </div>
+        {/* Barre : filtre + recherche + ajout */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
+            <FilterBtn active={filter === 'all'} onClick={() => setFilter('all')}>Tout</FilterBtn>
+            {POSTES.map(p => <FilterBtn key={p} active={filter === p} onClick={() => setFilter(p)}>{POSTE_LABELS[p]}</FilterBtn>)}
           </div>
-        )
-      )}
+          <div className="relative flex-1 min-w-[160px]">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher…"
+              className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200/60 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-orange-400" />
+          </div>
+          <button onClick={() => saveResource(emptyResource(filter === 'all' ? 'materiel' : filter))}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700 transition-all shadow-sm">
+            <Plus size={16} /> Ajouter
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-16"><Loader2 size={26} className="animate-spin text-orange-500" /></div>
+        ) : list.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-14 bg-white/60 border border-dashed border-gray-200 rounded-2xl text-center px-6">
+            <div className="p-4 rounded-2xl bg-orange-50 mb-3"><Package size={26} className="text-orange-500" /></div>
+            <p className="text-sm font-semibold text-gray-700">Bibliothèque vide</p>
+            <p className="text-xs text-gray-400 mt-1">Cliquez « Ajouter » pour créer une ressource (choisissez sa catégorie).</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {list.map(r => (
+              <ResourceRow key={r.id} r={r} upd={(p) => upd(r, p)} del={() => deleteResource(r.id)} badge={CAT_BADGE[r.category]} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-const GRID_RES = 'grid grid-cols-[80px_1fr_48px_72px_70px_70px_70px_70px_32px] gap-1 items-center';
-const GRID_FOURN = 'grid grid-cols-[80px_1fr_48px_72px_72px_90px_32px] gap-1 items-center';
-const GRID_ST = 'grid grid-cols-[80px_1fr_48px_90px_32px] gap-1 items-center';
-
-const Th = ({ children, className = '' }) => (
-  <div className={`text-[9px] font-black uppercase tracking-wide text-slate-400 px-1 ${className}`}>{children}</div>
-);
-
-function Header({ isRes, isFourn, isST }) {
-  const grid = isFourn ? GRID_FOURN : isST ? GRID_ST : GRID_RES;
+function ResourceRow({ r, upd, del, badge }) {
+  const isFourn = r.category === 'fourniture';
+  const isST = r.category === 'soustraitance';
+  const isRes = !isFourn && !isST;
   return (
-    <div className={`${grid} px-3 py-2 border-b border-slate-200`}>
-      <Th>Code</Th><Th>Désignation</Th><Th className="text-center">U</Th>
-      {isRes && <><Th className="text-right">PU/J</Th><Th className="text-right">Amort.</Th><Th className="text-right">Entret.</Th><Th className="text-right">Cons.</Th><Th className="text-right">Loc.</Th></>}
-      {isFourn && <><Th className="text-right">Épaiss.</Th><Th className="text-right">Densité</Th><Th className="text-right">PU barème</Th></>}
-      {isST && <Th className="text-right">PU barème</Th>}
-      <Th />
-    </div>
-  );
-}
-
-function Row({ r, isRes, isFourn, isST, upd, del }) {
-  const grid = isFourn ? GRID_FOURN : isST ? GRID_ST : GRID_RES;
-  return (
-    <div className={`group ${grid} px-3 py-1 border-b border-slate-50 hover:bg-slate-50/60`}>
-      <TxtCell value={r.code} upper onCommit={(v) => upd({ code: v })} placeholder="code" className="font-mono font-bold text-orange-600" />
-      <TxtCell value={r.designation} onCommit={(v) => upd({ designation: v })} placeholder="Désignation" className="font-semibold text-slate-700" />
-      <TxtCell value={r.unit} upper onCommit={(v) => upd({ unit: v })} className="text-center" />
+    <div className="group bg-white border border-slate-200 rounded-xl px-3 py-2 flex items-center gap-2 flex-wrap">
+      {/* Catégorie */}
+      <select value={r.category} onChange={(e) => upd({ category: e.target.value })}
+        className={`shrink-0 text-[10px] font-bold uppercase tracking-wide rounded-lg px-2 py-1 border-0 outline-none cursor-pointer ${badge}`}>
+        {POSTES.map(p => <option key={p} value={p}>{POSTE_LABELS[p]}</option>)}
+      </select>
+      {/* Désignation */}
+      <div className="flex-1 min-w-[160px]">
+        <TxtCell value={r.designation} onCommit={(v) => upd({ designation: v })} placeholder="Désignation" className="font-semibold text-slate-800" />
+      </div>
+      {/* Unité */}
+      <Labeled label="U"><div className="w-12"><TxtCell value={r.unit} upper onCommit={(v) => upd({ unit: v })} className="text-center" /></div></Labeled>
+      {/* Coûts selon catégorie */}
       {isRes && <>
-        <NumCell value={r.puJour} onCommit={(v) => upd({ puJour: v })} />
-        <NumCell value={r.amort} onCommit={(v) => upd({ amort: v })} />
-        <NumCell value={r.entret} onCommit={(v) => upd({ entret: v })} />
-        <NumCell value={r.cons} onCommit={(v) => upd({ cons: v })} />
-        <NumCell value={r.loc} onCommit={(v) => upd({ loc: v })} />
+        <Labeled label="PU/J"><Num v={r.puJour} on={(v) => upd({ puJour: v })} /></Labeled>
+        <Labeled label="Amort."><Num v={r.amort} on={(v) => upd({ amort: v })} /></Labeled>
+        <Labeled label="Entret."><Num v={r.entret} on={(v) => upd({ entret: v })} /></Labeled>
+        <Labeled label="Cons."><Num v={r.cons} on={(v) => upd({ cons: v })} /></Labeled>
+        <Labeled label="Loc."><Num v={r.loc} on={(v) => upd({ loc: v })} /></Labeled>
       </>}
       {isFourn && <>
-        <NumCell value={r.epaisseur} onCommit={(v) => upd({ epaisseur: v })} placeholder="—" />
-        <NumCell value={r.densite} onCommit={(v) => upd({ densite: v })} placeholder="—" />
-        <NumCell value={r.puBareme} onCommit={(v) => upd({ puBareme: v })} />
+        <Labeled label="Épaiss."><Num v={r.epaisseur} on={(v) => upd({ epaisseur: v })} ph="—" /></Labeled>
+        <Labeled label="Densité"><Num v={r.densite} on={(v) => upd({ densite: v })} ph="—" /></Labeled>
+        <Labeled label="PU barème"><Num v={r.puBareme} on={(v) => upd({ puBareme: v })} /></Labeled>
       </>}
-      {isST && <NumCell value={r.puBareme} onCommit={(v) => upd({ puBareme: v })} />}
-      <button onClick={del} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all flex justify-center"><Trash2 size={13} /></button>
+      {isST && <Labeled label="PU barème"><Num v={r.puBareme} on={(v) => upd({ puBareme: v })} /></Labeled>}
+      <button onClick={del} className="shrink-0 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={14} /></button>
     </div>
+  );
+}
+
+const Num = ({ v, on, ph = '0' }) => <div className="w-[68px]"><NumCell value={v} onCommit={on} placeholder={ph} /></div>;
+const Labeled = ({ label, children }) => (
+  <div className="shrink-0 flex flex-col items-end">
+    <span className="text-[8px] font-bold uppercase tracking-wide text-slate-400 pr-0.5">{label}</span>
+    {children}
+  </div>
+);
+
+function FilterBtn({ active, onClick, children }) {
+  return (
+    <button onClick={onClick}
+      className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${active ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
+      {children}
+    </button>
   );
 }

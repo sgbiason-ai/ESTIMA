@@ -1,80 +1,79 @@
 // src/views/estimaTp/ressources/TpLibraryPanel.jsx
-// ESTIMA TP — volet latéral « Bibliothèque » dans le sous-détail (façon BPU ESTIMA) :
-// filtre par catégorie + recherche, clic sur une ressource → insertion d'une ligne.
+// ESTIMA TP — barre latérale « Bibliothèque » du sous-détail, façon BPU ESTIMA :
+// volet gauche, recherche + filtre par catégorie, cartes cliquables → insertion.
 import React, { useMemo, useState } from 'react';
-import { X, Search, BookOpen, Plus } from 'lucide-react';
+import { Package, PanelLeftClose, Search, Filter, Plus } from 'lucide-react';
 import { POSTES, POSTE_LABELS } from '../../../utils/tp/tpPriceCompute';
 
 const removeAccents = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
+const ACCENT = {
+  materiel: 'text-orange-700 bg-orange-100/60 border-orange-100', mo: 'text-blue-700 bg-blue-100/60 border-blue-100',
+  fourniture: 'text-emerald-700 bg-emerald-100/60 border-emerald-100', soustraitance: 'text-violet-700 bg-violet-100/60 border-violet-100',
+  transport: 'text-sky-700 bg-sky-100/60 border-sky-100',
+};
+
 const previewPU = (r) => {
   if (r.category === 'fourniture' || r.category === 'soustraitance') return r.puBareme ? `${r.puBareme} €` : '';
-  const tot = (Number(r.puJour) || 0) + (Number(r.amort) || 0) + (Number(r.entret) || 0) + (Number(r.cons) || 0) + (Number(r.loc) || 0);
-  return tot ? `${tot} €/j` : '';
+  const t = (Number(r.puJour) || 0) + (Number(r.amort) || 0) + (Number(r.entret) || 0) + (Number(r.cons) || 0) + (Number(r.loc) || 0);
+  return t ? `${t} €/j` : '';
 };
 
 export default function TpLibraryPanel({ resources, onInsert, onClose }) {
   const [cat, setCat] = useState('all');
   const [search, setSearch] = useState('');
 
-  const filtered = useMemo(() => {
-    let list = cat === 'all' ? resources : resources.filter(r => r.category === cat);
-    if (search.trim()) {
-      const q = removeAccents(search);
-      list = list.filter(r => removeAccents(r.designation).includes(q) || removeAccents(r.code).includes(q));
-    }
-    return list;
+  const items = useMemo(() => {
+    let l = cat === 'all' ? resources : resources.filter(r => r.category === cat);
+    if (search.trim()) { const q = removeAccents(search); l = l.filter(r => removeAccents(r.designation).includes(q)); }
+    return [...l].sort((a, b) => POSTES.indexOf(a.category) - POSTES.indexOf(b.category) || (a.designation || '').localeCompare(b.designation || '', 'fr'));
   }, [resources, cat, search]);
 
   return (
-    <div className="w-72 shrink-0 border-l border-slate-200 bg-white flex flex-col">
-      <div className="px-3 py-2.5 border-b border-slate-200 flex items-center gap-2">
-        <BookOpen size={16} className="text-orange-600" />
-        <span className="text-sm font-bold text-slate-900 flex-1">Bibliothèque</span>
-        <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"><X size={15} /></button>
-      </div>
-
-      <div className="p-2 border-b border-slate-100 space-y-2">
+    <div className="w-72 shrink-0 bg-white border-r border-slate-200 flex flex-col shadow-sm">
+      <header className="p-3 border-b border-slate-100 bg-slate-50/50">
+        <div className="flex items-center justify-between mb-2.5">
+          <h3 className="font-black text-slate-800 flex items-center gap-2 uppercase text-[10px] tracking-widest">
+            <Package size={14} className="text-orange-600" /> Bibliothèque
+          </h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600" title="Fermer le volet"><PanelLeftClose size={17} /></button>
+        </div>
         <div className="relative">
-          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search className="absolute left-3 top-2.5 text-slate-400" size={14} />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher…"
-            className="w-full pl-8 pr-2 py-1.5 bg-slate-100 border border-slate-200/60 rounded-lg text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-orange-400" />
+            className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:border-orange-500 transition-all font-medium" />
         </div>
-        <div className="flex flex-wrap gap-1">
-          <Chip active={cat === 'all'} onClick={() => setCat('all')}>Tout</Chip>
-          {POSTES.map(p => <Chip key={p} active={cat === p} onClick={() => setCat(p)}>{POSTE_LABELS[p]}</Chip>)}
+        <div className="relative mt-2">
+          <Filter className="absolute left-3 top-2.5 text-slate-400" size={12} />
+          <select value={cat} onChange={(e) => setCat(e.target.value)}
+            className="w-full pl-9 pr-8 py-1.5 bg-white border border-slate-200 rounded-lg text-[11px] font-bold text-slate-600 outline-none focus:border-orange-500 appearance-none cursor-pointer uppercase tracking-wide">
+            <option value="all">Toutes catégories</option>
+            {POSTES.map(p => <option key={p} value={p}>{POSTE_LABELS[p]}</option>)}
+          </select>
         </div>
-      </div>
+      </header>
 
-      <div className="flex-1 overflow-y-auto">
-        {filtered.length === 0 ? (
-          <p className="px-3 py-6 text-center text-xs text-slate-400">
+      <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1.5 bg-slate-50/50">
+        {items.length === 0 ? (
+          <p className="px-3 py-6 text-center text-[11px] italic text-slate-400">
             {resources.length === 0 ? 'Bibliothèque vide — alimentez-la dans l\'onglet Ressources.' : 'Aucune ressource pour ce filtre.'}
           </p>
-        ) : filtered.map(r => (
+        ) : items.map(r => (
           <button key={r.id} onClick={() => onInsert(r)}
-            className="w-full text-left px-3 py-2 border-b border-slate-50 hover:bg-orange-50 group transition-colors">
-            <div className="flex items-center gap-2">
-              {r.code && <span className="text-[9px] font-mono font-bold px-1 rounded bg-slate-100 text-slate-500">{r.code}</span>}
-              <span className="flex-1 text-xs font-semibold text-slate-800 truncate">{r.designation || 'Sans nom'}</span>
-              <Plus size={13} className="text-slate-300 group-hover:text-orange-500 shrink-0" />
+            className="group relative w-full text-left flex items-start justify-between gap-2 p-2 bg-white border border-slate-200 rounded-lg shadow-sm hover:border-orange-400 hover:shadow-md hover:bg-orange-50/30 transition-all duration-200 active:scale-[0.98]">
+            <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg bg-orange-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="flex-1 min-w-0 pl-1.5">
+              <span className={`inline-block text-[8px] font-black uppercase tracking-wider px-1.5 py-px rounded border ${ACCENT[r.category] || ACCENT.materiel}`}>{POSTE_LABELS[r.category]}</span>
+              <p className="text-[10px] font-bold text-slate-700 uppercase leading-snug line-clamp-2 mt-1 group-hover:text-orange-800">{r.designation || 'Sans nom'}</p>
             </div>
-            <div className="flex items-center justify-between mt-0.5 pl-0.5">
-              <span className="text-[10px] text-slate-400">{POSTE_LABELS[r.category]} · {r.unit}</span>
-              <span className="text-[10px] font-mono font-bold text-slate-600">{previewPU(r)}</span>
+            <div className="flex flex-col items-end shrink-0 gap-1">
+              {previewPU(r) && <span className="text-[10px] font-black text-orange-700 font-mono bg-orange-100/50 border border-orange-100 px-1.5 py-0.5 rounded">{previewPU(r)}</span>}
+              <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider">{r.unit}</span>
+              <Plus size={12} className="text-slate-300 group-hover:text-orange-500" />
             </div>
           </button>
         ))}
       </div>
     </div>
-  );
-}
-
-function Chip({ active, onClick, children }) {
-  return (
-    <button onClick={onClick}
-      className={`px-2 py-0.5 rounded-lg text-[10px] font-semibold transition-all ${active ? 'bg-orange-600 text-white' : 'bg-slate-100 text-slate-500 hover:text-slate-700'}`}>
-      {children}
-    </button>
   );
 }
