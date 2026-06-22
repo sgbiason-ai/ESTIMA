@@ -7,7 +7,7 @@ import { fmt, fmt2 } from './sdFormat';
 import { RessourceTable, FournitureTable, SousTraitanceTable, TransportTable } from './TpDetailTables';
 import { emptyDetail, computeDetail, effectiveDuree, POSTES, POSTE_LABELS } from '../../../utils/tp/tpPriceCompute';
 
-export default function TpSousDetailEditor({ item, coef, onChange, libraryOpen, onToggleLibrary, onActivePoste }) {
+export default function TpSousDetailEditor({ item, coef, onChange, onQtyChange, libraryOpen, onToggleLibrary, onActivePoste }) {
   const detail = item.detail || emptyDetail();
   const qte = Number(item.qty || 0);
   const r = computeDetail(detail, qte, coef);
@@ -38,7 +38,11 @@ export default function TpSousDetailEditor({ item, coef, onChange, libraryOpen, 
               )}
             </div>
             <h3 className="text-sm font-bold text-slate-900 truncate">{item.designation || 'Article sans nom'}</h3>
-            <p className="text-xs text-slate-400">Quantité d'ouvrage : <span className="font-semibold text-slate-700">{qte.toLocaleString('fr-FR')} {item.unit}</span></p>
+            <div className="flex items-center gap-1.5 mt-1">
+              <span className="text-xs text-slate-400">Quantité d'ouvrage :</span>
+              <div className="w-24"><NumCell value={qte} onCommit={(v) => onQtyChange?.(v)} /></div>
+              <span className="text-[11px] text-slate-400">{item.unit}</span>
+            </div>
           </div>
           <div className="flex items-end gap-4">
             <label className="block">

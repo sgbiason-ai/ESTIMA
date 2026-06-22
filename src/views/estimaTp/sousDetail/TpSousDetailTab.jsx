@@ -52,6 +52,17 @@ export default function TpSousDetailTab({ study, setStudy, companyId }) {
     setStudy(prev => ({ ...prev, cadre: { ...(prev?.cadre || {}), chapters: next } }));
   };
 
+  // Quantité d'ouvrage éditable depuis le sous-détail : met à jour l'article du
+  // bordereau (on retire la formule de quantité éventuelle) + recalcule le PU.
+  const applyQty = (newQty) => {
+    const item = findNode(chapters, currentId);
+    if (!item) return;
+    const detail = item.detail || emptyDetail();
+    const { puRetenu } = computeDetail(detail, newQty, coef);
+    const next = updateNode(chapters, currentId, { qty: Number(newQty) || 0, formula: '', price: puRetenu });
+    setStudy(prev => ({ ...prev, cadre: { ...(prev?.cadre || {}), chapters: next } }));
+  };
+
   const insertFromLibrary = (res) => {
     if (!selectedItem) return;
     const [block, line] = lineFromResource(res);
@@ -99,7 +110,7 @@ export default function TpSousDetailTab({ study, setStudy, companyId }) {
           {selectedItem
             ? <TpSousDetailEditor
                 item={{ ...selectedItem, detail: selectedItem.detail || emptyDetail() }}
-                coef={coef} onChange={applyDetail}
+                coef={coef} onChange={applyDetail} onQtyChange={applyQty}
                 libraryOpen={libraryOpen} onToggleLibrary={() => setLibraryOpen(o => !o)}
                 onActivePoste={setActivePoste} />
             : <div className="flex items-center justify-center h-full text-slate-400"><Coins size={20} className="mr-2" /> Sélectionnez un article</div>}
