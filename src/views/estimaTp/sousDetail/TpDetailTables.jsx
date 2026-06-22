@@ -70,7 +70,7 @@ export function RessourceTable({ title, accent, addLabel, lines, onChange, duree
             <div key={l.id} className={`group ${RES_COLS} px-2 py-1 border-b border-slate-50 hover:bg-slate-50/60`}>
               <TxtCell value={l.designation} onCommit={(v) => upd(l.id, { designation: v })} placeholder="Désignation" className="font-semibold text-slate-700" />
               <NumCell value={l.nombre} onCommit={(v) => upd(l.id, { nombre: v })} align="center" />
-              <DureeCell value={l.duree} auto={duree} onCommit={(v) => upd(l.id, { duree: v })} />
+              <DureeCell forced={l.dureeForced} duree={l.duree} auto={duree} onCommit={(patch) => upd(l.id, patch)} />
               <NumCell value={l.puJour} onCommit={(v) => upd(l.id, { puJour: v })} />
               <NumCell value={l.amort} onCommit={(v) => upd(l.id, { amort: v })} />
               <NumCell value={l.entret} onCommit={(v) => upd(l.id, { entret: v })} />
@@ -168,7 +168,7 @@ export function TransportTable({ lines, onChange, duree = 0 }) {
           <div key={l.id} className={`group ${RES_COLS} px-2 py-1 border-b border-slate-50 hover:bg-slate-50/60`}>
             <TxtCell value={l.designation} onCommit={(v) => upd(l.id, { designation: v })} placeholder="Désignation" className="font-semibold text-slate-700" />
             <NumCell value={l.nombre} onCommit={(v) => upd(l.id, { nombre: v })} align="center" />
-            <DureeCell value={l.duree} auto={duree} onCommit={(v) => upd(l.id, { duree: v })} />
+            <DureeCell forced={l.dureeForced} duree={l.duree} auto={duree} onCommit={(patch) => upd(l.id, patch)} />
             <NumCell value={l.puJour} onCommit={(v) => upd(l.id, { puJour: v })} />
             <NumCell value={l.amort} onCommit={(v) => upd(l.id, { amort: v })} />
             <NumCell value={l.entret} onCommit={(v) => upd(l.id, { entret: v })} />

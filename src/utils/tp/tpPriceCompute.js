@@ -60,10 +60,10 @@ export const emptyDetail = () => ({
 // Durée effective d'une ligne : sa durée propre si renseignée, sinon la durée
 // TOTALE du chantier (= quantité / rendement). La durée est donc affichée et
 // modifiable par ligne mais pré-remplie avec la valeur calculée.
-export const lineDuree = (line, fallback) => {
-  const v = line?.duree;
-  return (v === null || v === undefined || v === '') ? num(fallback) : num(v);
-};
+// Durée forcée UNIQUEMENT si le flag `dureeForced` de la ligne est vrai ;
+// sinon on prend la durée totale calculée. (Un `duree` résiduel sans flag est
+// ignoré → les lignes suivent la durée calculée par défaut.)
+export const lineDuree = (line, fallback) => (line?.dureeForced ? num(line?.duree) : num(fallback));
 
 // Une ressource (matériel ou MO) contribue à DEUX postes :
 //   - part personnel (chauffeur / ouvrier)  → poste « mo »

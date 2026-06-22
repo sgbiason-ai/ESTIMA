@@ -23,31 +23,31 @@ export function NumCell({ value, onCommit, className = '', placeholder = '0', al
   );
 }
 
-// Cellule « durée » : affiche la durée calculée (auto, en gris) tant qu'elle n'est
-// pas surchargée ligne par ligne. Saisir une valeur force la durée ; vider revient
-// à la durée calculée. onCommit(null) = retour auto, onCommit(nombre) = forcée.
-export function DureeCell({ value, auto, onCommit }) {
-  const overridden = value !== null && value !== undefined && value !== '';
-  const eff = overridden ? value : auto;
+// Cellule « durée » : affiche la durée calculée (auto, en gris) tant que la ligne
+// n'est pas forcée. Saisir une valeur force la durée pour cette ligne ; vider
+// revient à la durée calculée. onCommit reçoit un patch { duree, dureeForced }.
+export function DureeCell({ forced, duree, auto, onCommit }) {
+  const eff = forced ? duree : auto;
   const [focus, setFocus] = useState(false);
   const [v, setV] = useState('');
   return (
     <input
       type="text"
       inputMode="decimal"
-      value={focus ? v : (eff ? String(eff) : (eff === 0 ? '0' : ''))}
-      onFocus={() => { setFocus(true); setV(overridden ? String(value) : String(auto || '')); }}
+      value={focus ? v : ((eff || eff === 0) ? String(eff) : '')}
+      onFocus={() => { setFocus(true); setV(forced ? String(duree ?? '') : String(auto || '')); }}
       onChange={(e) => setV(e.target.value)}
       onBlur={() => {
         setFocus(false);
         const t = String(v).trim();
-        if (t === '') { onCommit(null); return; }
+        if (t === '') { onCommit({ duree: null, dureeForced: false }); return; }
         const n = Number(t.replace(',', '.'));
-        onCommit(Number.isFinite(n) ? n : null);
+        if (!Number.isFinite(n)) { onCommit({ duree: null, dureeForced: false }); return; }
+        onCommit({ duree: n, dureeForced: true });
       }}
       onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-      title={overridden ? 'Durée forcée pour cette ligne (vider = durée calculée)' : 'Durée calculée (= quantité / rendement) — saisir pour forcer'}
-      className={`w-full rounded px-1 py-0.5 text-center text-xs font-mono outline-none border focus:border-orange-500 ${overridden ? 'bg-white border-orange-300 text-orange-700 font-bold' : 'bg-slate-50 border-slate-200 text-slate-400'}`}
+      title={forced ? 'Durée forcée pour cette ligne (vider = durée calculée)' : 'Durée calculée (= quantité / rendement) — saisir pour forcer'}
+      className={`w-full rounded px-1 py-0.5 text-center text-xs font-mono outline-none border focus:border-orange-500 ${forced ? 'bg-white border-orange-300 text-orange-700 font-bold' : 'bg-slate-50 border-slate-200 text-slate-400'}`}
     />
   );
 }

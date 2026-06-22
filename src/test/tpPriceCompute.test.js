@@ -35,9 +35,12 @@ describe('tpPriceCompute — coûts par ligne', () => {
     // durée totale (fallback) 2 jours → coût doublé
     expect(ressourceCosts({ nombre: 1, puJour: 520, amort: 950 }, 2))
       .toEqual({ perso: 1040, mat: 1900 });
-    // durée FORCÉE sur la ligne → prioritaire sur la durée totale
-    expect(ressourceCosts({ nombre: 1, duree: 1, puJour: 520, amort: 950 }, 5))
+    // durée FORCÉE sur la ligne (flag dureeForced) → prioritaire sur la durée totale
+    expect(ressourceCosts({ nombre: 1, duree: 1, dureeForced: true, puJour: 520, amort: 950 }, 5))
       .toEqual({ perso: 520, mat: 950 });
+    // un `duree` résiduel SANS flag est ignoré → durée totale (fallback) utilisée
+    expect(ressourceCosts({ nombre: 1, duree: 1, puJour: 520, amort: 950 }, 2))
+      .toEqual({ perso: 1040, mat: 1900 });
   });
 
   it('quantité fourniture = quantité × épaisseur × densité', () => {
