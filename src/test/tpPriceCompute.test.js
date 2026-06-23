@@ -107,13 +107,16 @@ describe('tpPriceCompute — déboursé = coût sur la durée totale / quantité
 });
 
 describe('tpPriceCompute — sous-traitance', () => {
-  it('quantité = quantité de la tâche si même unité (insensible à la casse)', () => {
-    expect(sousTraitanceQty({ unit: 'm2', qte: 5 }, 250, 'M2')).toBe(250);
+  it('quantité unitaire 1 par défaut si même unité (sous-traitance de l\'ouvrage entier)', () => {
+    expect(sousTraitanceQty({ unit: 'm2' }, 250, 'M2')).toBe(250); // insensible à la casse
     expect(sousTraitanceCost({ unit: 'm2', puBareme: 10 }, 250, 'M2')).toBe(2500);
   });
-  it('quantité saisie si unité différente', () => {
-    expect(sousTraitanceQty({ unit: 'U', qte: 5 }, 250, 'M2')).toBe(5);
-    expect(sousTraitanceCost({ unit: 'U', qte: 5, puForce: 8 }, 250, 'M2')).toBe(40);
+  it('quantité totale = quantité unitaire × quantité d\'ouvrage', () => {
+    expect(sousTraitanceQty({ qteUnitaire: 0.5 }, 200, 'M2')).toBe(100);
+    expect(sousTraitanceCost({ qteUnitaire: 0.5, puForce: 8 }, 200, 'M2')).toBe(800);
+  });
+  it('unité différente sans quantité unitaire → 0 (à renseigner)', () => {
+    expect(sousTraitanceQty({ unit: 'U' }, 250, 'M2')).toBe(0);
   });
 });
 

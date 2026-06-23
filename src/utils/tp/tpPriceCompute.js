@@ -41,7 +41,7 @@ export const newFournitureLine = (over = {}) => ({
 
 export const newSousTraitanceLine = (over = {}) => ({
   id: `tps_${generateId()}`, code: '', designation: '', unit: 'U',
-  qte: 0, puBareme: 0, puForce: 0, ...over,
+  qteUnitaire: 1, puBareme: 0, puForce: 0, ...over,
 });
 
 // Transport : contenance par voyage + voyages/jour + coût journalier du camion.
@@ -92,11 +92,15 @@ export const fournitureCost = (line, qteOuvrage) => {
 
 const sameUnit = (a, b) => !!a && !!b && String(a).trim().toUpperCase() === String(b).trim().toUpperCase();
 
-/** Quantité d'une sous-traitance : quantité de la tâche si l'unité est la même
- *  que l'ouvrage, sinon quantité saisie. */
+/** Quantité totale d'une sous-traitance = quantité unitaire (par unité d'ouvrage)
+ *  × quantité d'ouvrage. Quantité unitaire non renseignée → 1 si même unité que
+ *  l'ouvrage (sous-traitance de l'ouvrage entier), sinon 0 (à renseigner). */
 export function sousTraitanceQty(line, qteOuvrage, articleUnit) {
-  if (sameUnit(line?.unit, articleUnit)) return num(qteOuvrage);
-  return num(line?.qte);
+  const u = line?.qteUnitaire;
+  const ratio = (u === null || u === undefined || u === '')
+    ? (sameUnit(line?.unit, articleUnit) ? 1 : 0)
+    : num(u);
+  return r2(ratio * num(qteOuvrage));
 }
 
 export const sousTraitanceCost = (line, qteOuvrage, articleUnit) => {
