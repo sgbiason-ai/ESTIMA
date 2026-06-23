@@ -52,6 +52,35 @@ export function DureeCell({ forced, duree, auto, onCommit }) {
   );
 }
 
+// Cellule numérique « auto » : affiche la valeur par défaut (auto) en gris tant
+// qu'elle n'est pas saisie ; saisir = forcer, vider = retour à l'auto.
+// onCommit(null) = retour auto, onCommit(nombre) = valeur forcée.
+export function AutoNumCell({ value, auto, onCommit, className = '' }) {
+  const overridden = value !== null && value !== undefined && value !== '';
+  const eff = overridden ? value : auto;
+  const [focus, setFocus] = useState(false);
+  const [v, setV] = useState('');
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={focus ? v : ((eff || eff === 0) ? String(eff) : '')}
+      onFocus={() => { setFocus(true); setV(overridden ? String(value) : String(auto || '')); }}
+      onChange={(e) => setV(e.target.value)}
+      onBlur={() => {
+        setFocus(false);
+        const t = String(v).trim();
+        if (t === '') { onCommit(null); return; }
+        const n = Number(t.replace(',', '.'));
+        onCommit(Number.isFinite(n) ? n : null);
+      }}
+      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+      title={overridden ? 'Quantité modifiée (vider = quantité de la tâche)' : 'Par défaut : quantité de la tâche — saisir pour modifier'}
+      className={`w-full rounded px-1 py-0.5 text-right text-xs font-mono outline-none border focus:border-orange-500 ${overridden ? 'bg-white border-orange-300 text-orange-700 font-bold' : 'bg-slate-50 border-slate-200 text-slate-500'} ${className}`}
+    />
+  );
+}
+
 // Champ texte (commit au blur)
 export function TxtCell({ value, onCommit, className = '', placeholder = '', upper = false }) {
   const [v, setV] = useState(value ?? '');

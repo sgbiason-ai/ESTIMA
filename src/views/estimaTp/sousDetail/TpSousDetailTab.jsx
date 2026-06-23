@@ -47,7 +47,7 @@ export default function TpSousDetailTab({ study, setStudy, companyId }) {
   const applyDetail = (nextDetail) => {
     const item = findNode(chapters, currentId);
     if (!item) return;
-    const { puRetenu } = computeDetail(nextDetail, Number(item.qty || 0), coef, item.unit);
+    const { puRetenu } = computeDetail(nextDetail, Number(item.qty || 0), coef);
     const next = updateNode(chapters, currentId, { detail: nextDetail, price: puRetenu });
     setStudy(prev => ({ ...prev, cadre: { ...(prev?.cadre || {}), chapters: next } }));
   };
@@ -58,7 +58,7 @@ export default function TpSousDetailTab({ study, setStudy, companyId }) {
     const item = findNode(chapters, currentId);
     if (!item) return;
     const detail = item.detail || emptyDetail();
-    const { puRetenu } = computeDetail(detail, newQty, coef, item.unit);
+    const { puRetenu } = computeDetail(detail, newQty, coef);
     const next = updateNode(chapters, currentId, { qty: Number(newQty) || 0, formula: '', price: puRetenu });
     setStudy(prev => ({ ...prev, cadre: { ...(prev?.cadre || {}), chapters: next } }));
   };

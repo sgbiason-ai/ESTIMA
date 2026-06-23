@@ -41,7 +41,7 @@ export const newFournitureLine = (over = {}) => ({
 
 export const newSousTraitanceLine = (over = {}) => ({
   id: `tps_${generateId()}`, code: '', designation: '', unit: 'U',
-  qteUnitaire: 1, puBareme: 0, puForce: 0, ...over,
+  qte: null, puBareme: 0, puForce: 0, ...over,
 });
 
 // Transport : contenance par voyage + voyages/jour + coût journalier du camion.
@@ -90,22 +90,16 @@ export const fournitureCost = (line, qteOuvrage) => {
   return r2(fournitureQty(line, qteOuvrage) * pu);
 };
 
-const sameUnit = (a, b) => !!a && !!b && String(a).trim().toUpperCase() === String(b).trim().toUpperCase();
-
-/** Quantité totale d'une sous-traitance = quantité unitaire (par unité d'ouvrage)
- *  × quantité d'ouvrage. Quantité unitaire non renseignée → 1 si même unité que
- *  l'ouvrage (sous-traitance de l'ouvrage entier), sinon 0 (à renseigner). */
-export function sousTraitanceQty(line, qteOuvrage, articleUnit) {
-  const u = line?.qteUnitaire;
-  const ratio = (u === null || u === undefined || u === '')
-    ? (sameUnit(line?.unit, articleUnit) ? 1 : 0)
-    : num(u);
-  return r2(ratio * num(qteOuvrage));
+/** Quantité totale d'une sous-traitance : quantité saisie si renseignée, sinon
+ *  par défaut la quantité d'ouvrage (sous-traitance de l'ouvrage entier). */
+export function sousTraitanceQty(line, qteOuvrage) {
+  const q = line?.qte;
+  return (q === null || q === undefined || q === '') ? num(qteOuvrage) : num(q);
 }
 
-export const sousTraitanceCost = (line, qteOuvrage, articleUnit) => {
+export const sousTraitanceCost = (line, qteOuvrage) => {
   const pu = num(line.puForce) > 0 ? num(line.puForce) : num(line.puBareme);
-  return r2(sousTraitanceQty(line, qteOuvrage, articleUnit) * pu);
+  return r2(sousTraitanceQty(line, qteOuvrage) * pu);
 };
 
 /** Quantité à transporter : quantité d'ouvrage × épaisseur × densité, sinon quantité d'ouvrage. */
@@ -137,7 +131,7 @@ export const transportCost = (line, qteOuvrage) => r2(camionsJours(line, qteOuvr
  * @param {object} coef  coefficients de vente par poste
  * @returns totaux secs par poste, déboursé, PU sec, PV par poste, PV unitaire, PU retenu
  */
-export function computeDetail(detail, qteOuvrage, coef = defaultCoefficients(), articleUnit = '') {
+export function computeDetail(detail, qteOuvrage, coef = defaultCoefficients()) {
   const d = detail || emptyDetail();
   const qte = num(qteOuvrage);
   const duree = effectiveDuree(d, qte); // durée totale = quantité / rendement (ou forcée)
@@ -146,7 +140,7 @@ export function computeDetail(detail, qteOuvrage, coef = defaultCoefficients(), 
   (d.materiel || []).forEach(l => { sec.materiel += ressourceCosts(l, duree); });
   (d.mo || []).forEach(l => { sec.mo += ressourceCosts(l, duree); });
   (d.fourniture || []).forEach(l => { sec.fourniture += fournitureCost(l, qte); });
-  (d.soustraitance || []).forEach(l => { sec.soustraitance += sousTraitanceCost(l, qte, articleUnit); });
+  (d.soustraitance || []).forEach(l => { sec.soustraitance += sousTraitanceCost(l, qte); });
   (d.transport || []).forEach(l => { sec.transport += transportCost(l, qte); });
 
   POSTES.forEach(p => { sec[p] = r2(sec[p]); });

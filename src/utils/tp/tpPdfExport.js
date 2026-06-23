@@ -46,7 +46,7 @@ export async function generateTpPdf(study) {
   const tot = { deb: 0, vente: 0 };
   const body = arts.map(({ node, num }) => {
     const qte = Number(node.qty || 0);
-    const r = computeDetail(node.detail, qte, coef, node.unit);
+    const r = computeDetail(node.detail, qte, coef);
     tot.deb += r.deboursecSec; tot.vente += r.totalVente;
     return [num, node.designation || '', qte.toLocaleString('fr-FR'), node.unit || '', e2(r.puSec), e2(r.puRetenu), e2(r.totalVente)];
   });
@@ -66,7 +66,7 @@ export async function generateTpPdf(study) {
   arts.filter(a => a.node.detail).forEach(({ node, num }) => {
     const qte = Number(node.qty || 0);
     const d = node.detail;
-    const r = computeDetail(d, qte, coef, node.unit);
+    const r = computeDetail(d, qte, coef);
     const duree = r.duree;
     doc.addPage();
     doc.setFontSize(12); doc.setFont(undefined, 'bold'); doc.setTextColor(17, 24, 39);
@@ -105,7 +105,7 @@ export async function generateTpPdf(study) {
       autoTable(doc, {
         startY: y,
         head: [['Sous-traitance', 'U', 'Qté', 'PU barème', 'PU forcé', 'Total']],
-        body: d.soustraitance.map(l => [l.designation || '', l.unit || '', sousTraitanceQty(l, qte, node.unit).toLocaleString('fr-FR'), e2(l.puBareme), l.puForce ? e2(l.puForce) : '—', e2(sousTraitanceCost(l, qte, node.unit))]),
+        body: d.soustraitance.map(l => [l.designation || '', l.unit || '', sousTraitanceQty(l, qte).toLocaleString('fr-FR'), e2(l.puBareme), l.puForce ? e2(l.puForce) : '—', e2(sousTraitanceCost(l, qte))]),
         headStyles: { ...HEAD, fillColor: [124, 58, 237] }, bodyStyles: { fontSize: 7 },
         columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } },
         margin: { left: 14, right: 14 },

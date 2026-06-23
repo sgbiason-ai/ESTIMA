@@ -19,7 +19,7 @@ const POSTE_COLORS = {
 export default function TpSousDetailEditor({ item, coef, onChange, onQtyChange, libraryOpen, onToggleLibrary, onActivePoste }) {
   const detail = item.detail || emptyDetail();
   const qte = Number(item.qty || 0);
-  const r = computeDetail(detail, qte, coef, item.unit);
+  const r = computeDetail(detail, qte, coef);
   const duree = effectiveDuree(detail, qte);
 
   const patch = (p) => onChange({ ...detail, ...p });

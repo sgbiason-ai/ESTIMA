@@ -40,7 +40,7 @@ export default function RecapTab({ study }) {
       if (!n) return;
       if (n.type === 'item') {
         const qte = Number(n.qty || 0);
-        const r = computeDetail(n.detail, qte, coef, n.unit);
+        const r = computeDetail(n.detail, qte, coef);
         rows.push({ id: n.id, num: refMap.get(n.id) || '—', designation: n.designation, unit: n.unit, qte, ...r });
         totals.deboursec += r.deboursecSec;
         totals.vente += r.totalVente;
