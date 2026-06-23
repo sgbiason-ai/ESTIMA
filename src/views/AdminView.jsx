@@ -120,6 +120,7 @@ const AdminView = ({ currentUserEmail }) => {
         'folders', 'crr', 'devisMoe', 'fichesMarche', 'site_visits',
         'presence', 'expenseNotes', 'vehicles', 'expenseLocations',
         'expenseYearSettings', 'expenseSettings',
+        'tpStudies', 'tpResources',
       ];
       for (const colName of subcollections) {
         await deleteAllInCollection(collection(db, 'companies', company.id, colName));

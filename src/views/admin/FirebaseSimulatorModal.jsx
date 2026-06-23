@@ -13,6 +13,7 @@ const SPARK_WRITES_DAY  = 20000;
 const COMPANY_COLLECTIONS = [
   'projects', 'bpu', 'categories', 'units', 'resources', 'crr', 'devisMoe',
   'fichesMarche', 'folders', 'presence', 'site_visits', 'expenseSettings',
+  'tpStudies', 'tpResources',
 ];
 // Sous-collections par utilisateur (companies/{id}/users/{uid}/{col}) — notes de frais
 const USER_COLLECTIONS = ['expenseNotes', 'vehicles', 'expenseLocations', 'expenseYearSettings'];
@@ -377,7 +378,7 @@ const FirebaseSimulatorModal = ({ companies, users = [], onClose }) => {
         {/* Footer */}
         <div style={{ padding:'10px 20px 14px', borderTop:'1px solid rgba(255,255,255,0.05)' }}>
           <p style={{ fontFamily:'monospace', fontSize:8, color:'rgba(255,255,255,0.15)' }}>
-            {'\u26A0'} Simulation basee sur les donnees reelles Firebase ({TOTAL_COLLECTIONS} collections : Projets, BPU, CRC, Devis MOE, Fiches Marche, Ressources, Dossiers, Visites de site, Notes de frais, etc. — notes de frais agregees par utilisateur) — Moyenne : {avgMB.toFixed(2)} Mo / {Math.round(avgDocs)} docs par entreprise.
+            {'\u26A0'} Simulation basee sur les donnees reelles Firebase ({TOTAL_COLLECTIONS} collections : Projets, BPU, CRC, Devis MOE, Fiches Marche, Ressources, Dossiers, Visites de site, Etudes TP, Ressources TP, Notes de frais, etc. — notes de frais agregees par utilisateur) — Moyenne : {avgMB.toFixed(2)} Mo / {Math.round(avgDocs)} docs par entreprise.
             Overhead {'\u00D7'}{overhead} applique (index Firestore, metadata, padding).
             Heuristiques ajustees pour les modules intensifs (CRC, Visites : autosave, WYSIWYG, images).
           </p>

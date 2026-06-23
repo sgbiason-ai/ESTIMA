@@ -27,6 +27,8 @@ const COL_META = {
   folders:            { label: 'Dossiers',      color: '#64748b', icon: '📂' },
   presence:           { label: 'Présence',      color: '#0891b2', icon: '🟢' },
   site_visits:        { label: 'Visites',       color: '#16a34a', icon: '📍' },
+  tpStudies:          { label: 'Études TP',     color: '#ea580c', icon: '🦺' },
+  tpResources:        { label: 'Ressources TP', color: '#f59e0b', icon: '🧱' },
   expenseNotes:       { label: 'Notes frais',   color: '#e11d48', icon: '🧾', perUser: true },
   vehicles:           { label: 'Véhicules',     color: '#9333ea', icon: '🚗', perUser: true },
   expenseLocations:   { label: 'Lieux',         color: '#0284c7', icon: '🗺️', perUser: true },
