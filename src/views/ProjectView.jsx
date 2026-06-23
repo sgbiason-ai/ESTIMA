@@ -4,7 +4,7 @@ import PropTypes from 'prop-types';
 import { useStableHash } from '../hooks/useStableHash';
 import { useRobustSave } from '../hooks/useRobustSave';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { Plus, Trash2, GripVertical, Layers, AlertTriangle, Target, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, GripVertical, Layers, AlertTriangle, Target, ChevronDown, ChevronRight, Lock, Unlock } from 'lucide-react';
 
 import { ProjectContext } from '../context/ProjectContext';
 import { EditableTitle, OptionToggle, PseModeControl, PseDescriptionEditor } from '../components/ProjectUI';
@@ -85,8 +85,10 @@ const ProjectView = ({
   openMultiDeleteModal,
 }) => {
   const currentMode = viewMode || 'study';
-  // Mode Rendu (client) = lecture seule.
-  const isReadOnly = currentMode === 'client';
+  // Verrou « lecture seule » : verrouillé par défaut à l'ouverture d'une affaire
+  // (cf. effet de réinitialisation plus bas). Évite les modifications accidentelles.
+  const [isLocked, setIsLocked] = useState(true);
+  const isReadOnly = isLocked;
   // Le projet affiché est toujours le projet courant (la consultation des
   // versions figées se fait désormais dans la vue dédiée « Documents émis »).
   const viewedProject = project;
@@ -262,6 +264,12 @@ const ProjectView = ({
         updateProjectItem('root', 'root', '__isNew', false);
     }
   }, [project]);
+
+  // Verrouillage par défaut à chaque ouverture d'affaire ; un nouveau projet (__isNew)
+  // s'ouvre en édition pour pouvoir être construit immédiatement.
+  useEffect(() => {
+    setIsLocked(!project?.__isNew);
+  }, [project?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSaveDetails = (details) => {
     if (details?.name && details.name !== project?.name) updateProjectName(details.name);
@@ -805,7 +813,7 @@ const ProjectView = ({
 
   const contextValue = {
       selection, setSelection, updateProjectItem: handleUpdateItem, removeProjectItem: handleRemoveItem,
-      setModal: handleModalIntercept, addSubChapter, refMap, viewMode: currentMode, showComparison, showRendu,
+      setModal: handleModalIntercept, addSubChapter, refMap, viewMode: currentMode, isReadOnly, showComparison, showRendu,
       clientQtyMap, activeTrancheId, isGlobalMode, bpuConfig, onOpenCalculation: handleOpenCalculation,
       formulaMode, setFormulaMode, allItems, sourceIds: project?.sourceIds || [],
       multiSelection, toggleMultiSelection, priceIssueIds, insertTargetId,
@@ -849,7 +857,7 @@ const ProjectView = ({
         <div className="flex-1 flex flex-col overflow-hidden">
           <ProjectToolbar
             project={project} updateProjectName={updateProjectName} saveStatus={displayStatus} onSaveProject={handleManualCloudSave}
-            isReadOnly={isReadOnly} showBpu={showBpu} setShowBpu={setShowBpu} currentMode={currentMode} setViewMode={setViewMode}
+            isReadOnly={isReadOnly} onToggleLock={() => setIsLocked(v => !v)} showBpu={showBpu} setShowBpu={setShowBpu} currentMode={currentMode} setViewMode={setViewMode}
             showComparison={showComparison} setShowComparison={setShowComparison} showRendu={showRendu} setShowRendu={setShowRendu} totalBase={totalBase} activeTrancheId={activeTrancheId}
             onExport={(format, type) => {
               if (priceCheck.anomalyCount > 0) setExportGuard({ show: true, format, type });
@@ -885,6 +893,20 @@ const ProjectView = ({
               }}
               onClose={() => setShowCloudPicker(false)}
             />
+          )}
+
+          {isReadOnly && (
+            <div className="flex items-center justify-center gap-3 px-4 py-1.5 bg-amber-50 border-b border-amber-200 text-amber-800 text-[11px] font-bold uppercase tracking-wide shrink-0">
+              <Lock size={13} strokeWidth={2.2} />
+              <span>Étude verrouillée — lecture seule</span>
+              <button
+                onClick={() => setIsLocked(false)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-amber-600 text-white text-[10px] font-bold normal-case hover:bg-amber-700 transition-colors"
+                title="Déverrouiller pour modifier l'étude"
+              >
+                <Unlock size={11} /> Déverrouiller
+              </button>
+            </div>
           )}
 
           <ProjectStatsBar projectStats={projectStats} bpuConfig={bpuConfig} isReadOnly={isReadOnly} handleAutoSort={handleAutoSort} />

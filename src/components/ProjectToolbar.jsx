@@ -3,7 +3,7 @@ import {
   PanelLeft, Receipt, HardHat, UserCheck, ArrowLeftRight,
   FileSpreadsheet, FileText, Calculator, Plus, Loader2,
   CheckCircle2, CloudOff, FileSignature, Bookmark, ListOrdered, ListTree, Hash,
-  FolderOpen, Save, Upload, PlusCircle,
+  FolderOpen, Save, Upload, PlusCircle, Lock, Unlock,
   Download, Info, Table2, FileOutput,
   Cloud, PanelLeftOpen, FileDown, ShieldCheck, ClipboardCheck, Undo2, ScanSearch, HelpCircle, FilePlus
 } from 'lucide-react';
@@ -20,6 +20,7 @@ const ProjectToolbar = ({
   saveStatus,
   onSaveProject,
   isReadOnly,
+  onToggleLock,
   showBpu,
   setShowBpu,
   currentMode,
@@ -150,6 +151,20 @@ const ProjectToolbar = ({
           <>
             {/* ─── ZONE GAUCHE ─── */}
 
+            {/* Verrou lecture seule — toujours visible (sinon impossible de déverrouiller) */}
+            <RibbonGroup label={isReadOnly ? 'Verrouillé' : 'Édition'}>
+              <RibbonBtnLarge
+                icon={isReadOnly ? Lock : Unlock}
+                label={isReadOnly ? 'Déverrouiller' : 'Verrouiller'}
+                onClick={onToggleLock}
+                active={isReadOnly}
+                accent={isReadOnly ? 'text-amber-500' : 'text-emerald-500'}
+                title={isReadOnly
+                  ? 'Étude verrouillée (lecture seule) — cliquer pour déverrouiller et modifier'
+                  : "Verrouiller l'étude en lecture seule (évite les modifications accidentelles)"}
+              />
+            </RibbonGroup>
+
             {/* Panneau BPU */}
             {!isReadOnly && (
               <RibbonGroup label="Panneau">
@@ -163,26 +178,24 @@ const ProjectToolbar = ({
               </RibbonGroup>
             )}
 
-            {/* Fichier */}
-            {!isReadOnly && (
-              <RibbonGroup label="Fichier">
-                <RibbonBtnLarge
-                  icon={PlusCircle}
-                  label="Nouveau"
-                  onClick={onNewProject}
-                  accent="text-emerald-500"
-                  title="Créer un nouveau projet"
-                />
-                <div className="flex flex-col gap-[3px] justify-center">
-                  <RibbonBtnSmall icon={Cloud}  label="Ouvrir Cloud" onClick={onOpenCloudProject} title="Ouvrir un projet depuis le Cloud" accent="text-sky-500" />
-                  <RibbonBtnSmall icon={Upload} label="Sauver Cloud" onClick={onSaveProject}      title="Sauvegarder sur le Cloud"          accent="text-blue-500" />
-                </div>
-                <div className="flex flex-col gap-[3px] justify-center">
-                  <RibbonBtnSmall icon={FolderOpen} label="Ouvrir JSON"      onClick={onOpenAffaire} title="Charger une affaire (.json)"      accent="text-amber-500" />
-                  <RibbonBtnSmall icon={Save}       label="Enregistrer JSON" onClick={onSaveAffaire} title="Sauvegarder l'affaire (.json)"    accent="text-slate-500" />
-                </div>
-              </RibbonGroup>
-            )}
+            {/* Fichier — disponible même en lecture seule (navigation entre affaires) */}
+            <RibbonGroup label="Fichier">
+              <RibbonBtnLarge
+                icon={PlusCircle}
+                label="Nouveau"
+                onClick={onNewProject}
+                accent="text-emerald-500"
+                title="Créer un nouveau projet"
+              />
+              <div className="flex flex-col gap-[3px] justify-center">
+                <RibbonBtnSmall icon={Cloud}  label="Ouvrir Cloud" onClick={onOpenCloudProject} title="Ouvrir un projet depuis le Cloud" accent="text-sky-500" />
+                <RibbonBtnSmall icon={Upload} label="Sauver Cloud" onClick={onSaveProject}      title="Sauvegarder sur le Cloud"          accent="text-blue-500" />
+              </div>
+              <div className="flex flex-col gap-[3px] justify-center">
+                <RibbonBtnSmall icon={FolderOpen} label="Ouvrir JSON"      onClick={onOpenAffaire} title="Charger une affaire (.json)"      accent="text-amber-500" />
+                <RibbonBtnSmall icon={Save}       label="Enregistrer JSON" onClick={onSaveAffaire} title="Sauvegarder l'affaire (.json)"    accent="text-slate-500" />
+              </div>
+            </RibbonGroup>
 
             {/* Projet */}
             {!isReadOnly && (

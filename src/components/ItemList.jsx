@@ -968,7 +968,7 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
 const ItemList = ({ items, parentId, level = 0, bpuConfig, parentNumber = '' }) => {
   const {
     selection, setSelection, updateProjectItem, setModal, addSubChapter,
-    refMap, viewMode, showComparison, showRendu, clientQtyMap, isGlobalMode,
+    refMap, viewMode, isReadOnly, showComparison, showRendu, clientQtyMap, isGlobalMode,
     formulaMode, setFormulaMode, activeTrancheId, sourceIds, allItems,
     onEditItem,
     multiSelection, toggleMultiSelection,
@@ -983,7 +983,7 @@ const ItemList = ({ items, parentId, level = 0, bpuConfig, parentNumber = '' }) 
 
   if (!items || !Array.isArray(items)) return null;
 
-  const isReadOnly = viewMode === 'client';
+  // isReadOnly vient du contexte (verrou « lecture seule »), plus de l'ancien mode Rendu.
 
   const seen = new Map();
   const makeStableKey = (id, index) => {
