@@ -277,11 +277,11 @@ describe('recalculateProject', () => {
     expect(updatedChapters[0].children[0].quantities.t2).toBe(67);
     expect(updatedChapters[0].children[0].qty).toBe(100); // somme des tranches
   });
-  it('ne touche pas les composants de bloc (blocFactor) : precision conservee', () => {
+  it('arrondit aussi les composants de bloc (blocFactor) a l\'unite', () => {
     const surf = makeItem('s1', 83);
-    const comp = Object.assign({}, makeItem('c1i', 0), { formula: '={s1}*0.15', blocFactor: 0.15 }); // 12.45
+    const comp = Object.assign({}, makeItem('c1i', 0), { formula: '={s1}*0.15', blocFactor: 0.15 }); // 12.45 -> 12
     const { updatedChapters } = recalculateProject([makeChap('c1', [surf, comp])], []);
-    expect(updatedChapters[0].children[1].qty).toBeCloseTo(12.45, 2);
+    expect(updatedChapters[0].children[1].qty).toBe(12);
   });
   it('ne touche pas les forfaits (isFixed) issus d\'une formule', () => {
     const i1 = makeItem('i1', 10);

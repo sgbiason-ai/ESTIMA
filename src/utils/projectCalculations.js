@@ -294,11 +294,10 @@ export function recalculateProject(chapters, tranches = []) {
     };
 
     const hasTranches = tranches.length > 0;
-    // Quantités issues d'une formule saisie (articles) : arrondies à l'unité.
-    // Exclus : les composants de blocs (blocFactor, pilotés par la surface — précision
-    // du métré conservée) et les forfaits (isFixed).
+    // Quantités issues d'une formule (articles ET composants de blocs, pilotés par
+    // la surface) : arrondies à l'unité. Seuls les forfaits (isFixed) gardent leur valeur.
     const roundFormulaQty = (it, val) =>
-      (val !== null && it.blocFactor == null && !it.isFixed) ? Math.round(val) : val;
+      (val !== null && !it.isFixed) ? Math.round(val) : val;
     const apply = (nodes) => {
       nodes.forEach(it => {
         if (it.type === 'item') {

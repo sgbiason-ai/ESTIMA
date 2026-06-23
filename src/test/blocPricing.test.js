@@ -228,8 +228,8 @@ describe('bloc linéaire (ml) — tranchée', () => {
     node.qty = 80;
     const { updatedChapters } = recalculateProject([{ id: 'c1', type: 'chapter', children: [node] }], []);
     const f = updatedChapters[0].children[0].children;
-    expect(f.find(l => l.uid === 'rem').qty).toBeCloseTo(80 * 0.3 * 1.05, 4);  // 25.2
-    expect(f.find(l => l.uid === 'gnt').qty).toBeCloseTo(80 * 0.24 * 1.10, 4); // 21.12
+    expect(f.find(l => l.uid === 'rem').qty).toBe(Math.round(80 * 0.3 * 1.05));  // 25.2 -> 25
+    expect(f.find(l => l.uid === 'gnt').qty).toBe(Math.round(80 * 0.24 * 1.10)); // 21.12 -> 21
   });
   it('intégration AVEC tranches (ml) : quantité par tranche + somme globale', () => {
     const bloc = { name: 'Tranchée', unit: 'ml', articles: [{ id: 'rem', largeur: 0.6, epaisseur: 0.5 }] };
@@ -362,7 +362,7 @@ describe('intégration buildBlocSubChapter → recalculateProject', () => {
     node.qty = 250; // surface saisie sur l'en-tête du bloc
     const { updatedChapters } = recalculateProject(wrap(node), []);
     const f = comps(updatedChapters);
-    expect(f.find(l => l.uid === 'a1').qty).toBeCloseTo(250 * 0.06 * 2.45, 4); // 36.75
+    expect(f.find(l => l.uid === 'a1').qty).toBe(Math.round(250 * 0.06 * 2.45)); // 36.75 -> 37
     expect(f.find(l => l.uid === 'a3').qty).toBeCloseTo(250, 4);
     expect(f.find(l => l.uid === 'a5').qty).toBeCloseTo(100, 4);              // 250 × 0.4
   });
@@ -375,9 +375,9 @@ describe('intégration buildBlocSubChapter → recalculateProject', () => {
     const blocNode = updatedChapters[0].children[0];
     expect(blocNode.qty).toBeCloseTo(350, 4); // surface globale = somme des tranches
     const bb = blocNode.children.find(l => l.uid === 'a1');
-    expect(bb.quantities.t1).toBeCloseTo(250 * 0.147, 4); // 36.75
-    expect(bb.quantities.t2).toBeCloseTo(100 * 0.147, 4); // 14.70
-    expect(bb.qty).toBeCloseTo(350 * 0.147, 4);           // somme = 51.45
+    expect(bb.quantities.t1).toBe(Math.round(250 * 0.147)); // 36.75 -> 37
+    expect(bb.quantities.t2).toBe(Math.round(100 * 0.147)); // 14.70 -> 15
+    expect(bb.qty).toBe(Math.round(250 * 0.147) + Math.round(100 * 0.147)); // somme des tranches arrondies = 52
   });
 });
 
