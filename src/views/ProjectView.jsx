@@ -88,9 +88,7 @@ const ProjectView = ({
   // (cf. effet de réinitialisation plus bas). Évite les modifications accidentelles.
   const [isLocked, setIsLocked] = useState(true);
   const isReadOnly = isLocked;
-  // Verrouillé = vue client (rendu) : quantités et prix majorés, en lecture seule.
-  // Déverrouillé = vue étude : quantités réelles, édition.
-  const currentMode = isLocked ? 'client' : (viewMode || 'study');
+  const currentMode = viewMode || 'study';
   // Le projet affiché est toujours le projet courant (la consultation des
   // versions figées se fait désormais dans la vue dédiée « Documents émis »).
   const viewedProject = project;
@@ -815,7 +813,9 @@ const ProjectView = ({
 
   const contextValue = {
       selection, setSelection, updateProjectItem: handleUpdateItem, removeProjectItem: handleRemoveItem,
-      setModal: handleModalIntercept, addSubChapter, refMap, viewMode: currentMode, isReadOnly, showComparison, showRendu,
+      setModal: handleModalIntercept, addSubChapter, refMap, viewMode: currentMode, isReadOnly, showComparison,
+      // Verrouillé (lecture seule) : on force la comparaison complète Étude + Rendu.
+      showRendu: isLocked || showRendu,
       clientQtyMap, activeTrancheId, isGlobalMode, bpuConfig, onOpenCalculation: handleOpenCalculation,
       formulaMode, setFormulaMode, allItems, sourceIds: project?.sourceIds || [],
       multiSelection, toggleMultiSelection, priceIssueIds, insertTargetId,
@@ -1037,7 +1037,7 @@ const ProjectView = ({
                 </Droppable>
               </div>
 
-              <ProjectFooterStats totalBase={totalBase} currentMode={currentMode} theme={theme} projectStats={projectStats} showRendu={showRendu} />
+              <ProjectFooterStats totalBase={totalBase} currentMode={currentMode} theme={theme} projectStats={projectStats} showRendu={isLocked || showRendu} />
 
             </div>
           </DragDropContext>
