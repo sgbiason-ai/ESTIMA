@@ -117,6 +117,25 @@ const TabNegociation = ({
     });
   };
 
+  // ── Téléchargement Word (.docx) — corps repris de l'aperçu (letterHtml) ──
+  const handleDownloadWord = async () => {
+    if (!selectedCompany) return;
+    try {
+      const { generateNegoLetterWord } = await import('../../../utils/wordNegoLetterGenerator');
+      await generateNegoLetterWord({
+        companyName: selectedCompany,
+        letterHtml,
+        letterConfig,
+        consultation,
+        branding,
+        project,
+      });
+    } catch (err) {
+      console.error('[NegoWord] Export Word échoué :', err);
+      toast.error("L'export Word a échoué. Réessayez après avoir régénéré l'aperçu.");
+    }
+  };
+
   if (!selectedCompany || !companyNames.includes(selectedCompany)) return null;
 
   const ci = companyNames.indexOf(selectedCompany);
@@ -220,12 +239,20 @@ const TabNegociation = ({
                     Réinitialiser
                   </button>
                   <button
+                    onClick={handleDownloadWord}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-black uppercase tracking-wider transition-all shadow-md active:scale-95"
+                    title="Télécharger le courrier au format Word (.docx) modifiable"
+                  >
+                    <FileText size={14} />
+                    Word
+                  </button>
+                  <button
                     onClick={handleDownloadPDF}
                     className="flex items-center gap-1.5 px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-[11px] font-black uppercase tracking-wider transition-all shadow-md active:scale-95"
                     title="Télécharger le courrier au format PDF"
                   >
                     <FileOutput size={14} />
-                    Télécharger PDF
+                    PDF
                   </button>
                 </div>
               </div>
