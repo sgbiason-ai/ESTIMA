@@ -19,6 +19,7 @@ export const CHANGELOG = [
       'Estimation — l\'aide des formules rejoint le guide « Aide » : nouvel onglet « Formules » (syntaxe, insertion d\'une référence par clic, propagation aux tranches, raccourcis clavier). Le bouton flottant « Aide formules » a été retiré, l\'aide est désormais centralisée au même endroit que les autres modules',
       'Estimation — tous les nombres du tableau (quantités, prix, surfaces de blocs) s\'affichent désormais avec le séparateur de milliers (ex. « 12 500 » au lieu de « 12500 »), au repos comme les totaux. La valeur reste éditable en saisie brute au clic',
       'Estimation — les quantités issues d\'une formule ƒ(x) sont désormais arrondies à l\'unité (ex. « =[SURFACE]*0,333 » → 333 au lieu de 333,33). Les métrés des composants de blocs (pilotés par la surface) et les forfaits conservent leur précision',
+      'Estimation — workflow simplifié : fin de la bascule « Étude / Rendu ». Un seul mode d\'édition unifié ; les quantités et montants au rendu (majorés client) restent consultables à la demande via le bouton « Rendu » (colonnes + pied à deux colonnes). Les exports (PDF / Excel · DQE / Estimation) sont désormais accessibles en permanence dans le ruban (groupe « Export »), au lieu d\'être réservés à l\'ancien mode Rendu',
     ],
   },
   {

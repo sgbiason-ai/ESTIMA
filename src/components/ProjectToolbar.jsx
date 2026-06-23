@@ -3,8 +3,8 @@ import {
   PanelLeft, Receipt, HardHat, UserCheck, ArrowLeftRight,
   FileSpreadsheet, FileText, Calculator, Plus, Loader2,
   CheckCircle2, CloudOff, FileSignature, Bookmark, ListOrdered, ListTree, Hash,
-  FolderOpen, Save, Upload, Eye, Pencil, PlusCircle,
-  BarChart3, Download, Info, Table2, FileOutput,
+  FolderOpen, Save, Upload, PlusCircle,
+  Download, Info, Table2, FileOutput,
   Cloud, PanelLeftOpen, FileDown, ShieldCheck, ClipboardCheck, Undo2, ScanSearch, HelpCircle, FilePlus
 } from 'lucide-react';
 
@@ -23,9 +23,6 @@ const ProjectToolbar = ({
   showBpu,
   setShowBpu,
   currentMode,
-  setViewMode,
-  showComparison,
-  setShowComparison,
   showRendu,
   setShowRendu,
   onExport,
@@ -262,73 +259,22 @@ const ProjectToolbar = ({
               )}
             </RibbonGroup>
 
-            {/* ─── SPACER GAUCHE ─── */}
-            <RibbonSpacer />
-
-
-            {/* ─── TOGGLE CENTRAL ─── */}
-            <div className="flex flex-col items-center justify-center shrink-0 px-3">
-              <div className="relative flex items-center bg-gray-100 rounded-xl p-[3px]">
-                <div className={`absolute top-[3px] bottom-[3px] w-[calc(50%-3px)] rounded-md shadow-md transition-all duration-250 ease-out
-                  ${currentMode === 'study'
-                    ? 'left-[3px] bg-gradient-to-b from-emerald-500 to-emerald-600'
-                    : 'left-[calc(50%)] bg-gradient-to-b from-indigo-500 to-indigo-600'
-                  }`}
-                />
-                <button
-                  onClick={() => setViewMode('study')}
-                  title="Mode Étude (Édition)"
-                  className={`relative z-10 flex items-center gap-2 px-5 py-2 rounded-md text-[11px] font-bold uppercase tracking-wide transition-colors duration-200
-                    ${currentMode === 'study' ? 'text-white' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                  <Pencil size={15} strokeWidth={currentMode === 'study' ? 2.2 : 1.6} />
-                  Étude
-                </button>
-                <button
-                  onClick={() => setViewMode('client')}
-                  title="Mode Rendu (Lecture Seule)"
-                  className={`relative z-10 flex items-center gap-2 px-5 py-2 rounded-md text-[11px] font-bold uppercase tracking-wide transition-colors duration-200
-                    ${currentMode === 'client' ? 'text-white' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                  <Eye size={15} strokeWidth={currentMode === 'client' ? 2.2 : 1.6} />
-                  Rendu
-                </button>
-              </div>
-              <span className="text-[9px] text-slate-400 font-normal tracking-wide mt-0.5 select-none">Affichage</span>
-            </div>
-
-            {/* ─── SPACER DROIT ─── */}
+            {/* ─── SPACER (pousse les actions vers la droite) ─── */}
             <RibbonSpacer />
 
             {/* ─── ZONE DROITE ─── */}
 
-            {/* Analyse (mode client) */}
-            {currentMode === 'client' && (
-              <RibbonGroup label="Comparer">
-                <RibbonBtnLarge
-                  icon={BarChart3}
-                  label={'\u00c9carts'}
-                  onClick={() => setShowComparison(!showComparison)}
-                  active={showComparison}
-                  accent="text-amber-500"
-                  title="Voir les écarts comparatifs"
-                />
-              </RibbonGroup>
-            )}
-
-            {/* Exports rapides (mode client) */}
-            {currentMode === 'client' && (
-              <RibbonGroup label="Export rapide" noBorder>
-                <div className="flex flex-col gap-[3px] justify-center">
-                  <RibbonBtnSmall icon={FileText} label="PDF DQE" onClick={() => onExport('pdf', 'DQE')} accent="text-red-500" />
-                  <RibbonBtnSmall icon={FileText} label="PDF Estim." onClick={() => onExport('pdf', 'ESTIMATION')} accent="text-red-500" />
-                </div>
-                <div className="flex flex-col gap-[3px] justify-center">
-                  <RibbonBtnSmall icon={Table2} label="Excel DQE" onClick={() => onExport('excel', 'DQE')} accent="text-emerald-600" />
-                  <RibbonBtnSmall icon={Table2} label="Excel Estim." onClick={() => onExport('excel', 'ESTIMATION')} accent="text-emerald-600" />
-                </div>
-              </RibbonGroup>
-            )}
+            {/* Exports (toujours disponibles) — utilisent les quantités rendu (majorées client) */}
+            <RibbonGroup label="Export">
+              <div className="flex flex-col gap-[3px] justify-center">
+                <RibbonBtnSmall icon={FileText} label="PDF DQE" onClick={() => onExport('pdf', 'DQE')} accent="text-red-500" />
+                <RibbonBtnSmall icon={FileText} label="PDF Estim." onClick={() => onExport('pdf', 'ESTIMATION')} accent="text-red-500" />
+              </div>
+              <div className="flex flex-col gap-[3px] justify-center">
+                <RibbonBtnSmall icon={Table2} label="Excel DQE" onClick={() => onExport('excel', 'DQE')} accent="text-emerald-600" />
+                <RibbonBtnSmall icon={Table2} label="Excel Estim." onClick={() => onExport('excel', 'ESTIMATION')} accent="text-emerald-600" />
+              </div>
+            </RibbonGroup>
 
             {/* Colonne Rendu (mode étude) : qté majorée client à côté de la qté réelle */}
             {!isReadOnly && currentMode === 'study' && setShowRendu && (
