@@ -226,6 +226,10 @@ const formatPercent = (val) => {
   return `${val > 0 ? '+' : ''}${val.toFixed(0)}%`;
 };
 
+// Quantité rendu (majorée) affichée discrètement sous la qté d'étude.
+const formatQtyShort = (val) =>
+  Number(val || 0).toLocaleString('fr-FR', { maximumFractionDigits: 2 });
+
 // --------------------
 // ITEM ROW
 // --------------------
@@ -240,6 +244,7 @@ const ItemRow = memo(
     isGlobalMode,
     viewMode,
     showComparison,
+    showRendu,
     clientQtyMap,
     refMap,
     bpuConfig,
@@ -592,6 +597,23 @@ const ItemRow = memo(
               )}
             </div>
 
+            {/* Colonne Rendu (mode Étude) : qté majorée envoyée au client, à côté de la qté réelle */}
+            {showRendu && viewMode === 'study' && (
+              <div
+                className="w-20 px-1.5 shrink-0 flex flex-col justify-center items-end leading-none"
+                title="Quantité au rendu (majorée pour le client)"
+              >
+                <span className={`text-xs font-mono font-black ${qtyClient !== qtyStudy ? 'text-indigo-600' : 'text-slate-300'}`}>
+                  {formatQtyShort(qtyClient)}
+                </span>
+                {qtyClient !== qtyStudy && (
+                  <span className="text-[8px] font-bold text-indigo-400">
+                    {formatPercent(qtyStudy > 0 ? ((qtyClient - qtyStudy) / qtyStudy) * 100 : (qtyClient > 0 ? 100 : 0))}
+                  </span>
+                )}
+              </div>
+            )}
+
             {/* Prix */}
             <div className="w-32 px-2 shrink-0">
               <div className="relative flex items-center">
@@ -630,6 +652,20 @@ const ItemRow = memo(
               )}
             </div>
 
+            {/* Total au rendu (mode Étude) : qté majorée × PU, à côté du total d'étude */}
+            {showRendu && viewMode === 'study' && (
+              <div className="w-24 text-right px-2 shrink-0 flex flex-col justify-center items-end h-full" title="Total au rendu (quantité majorée × prix unitaire)">
+                <span className={`text-[11px] font-mono font-black ${qtyClient !== qtyStudy ? 'text-indigo-600' : 'text-slate-300'}`}>
+                  {isPM ? 'PM' : formatPrice(qtyClient * price)}
+                </span>
+                {qtyClient !== qtyStudy && (qtyClient * price - lineTotal) !== 0 && (
+                  <span className="text-[8px] font-bold text-emerald-600 leading-none">
+                    {(qtyClient * price - lineTotal) > 0 ? '+' : ''}{formatPrice(qtyClient * price - lineTotal)}
+                  </span>
+                )}
+              </div>
+            )}
+
             {/* Spacer (suppression via multi-selection checkbox a gauche) */}
             <div className="w-10 shrink-0" />
           </div>
@@ -666,9 +702,11 @@ const DEPTH_BG = [
   'bg-slate-50 border border-slate-200 shadow-sm',
 ];
 
-const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly, viewMode, clientQtyMap, bpuConfig, onUpdate, onSelect, onModal, stableKey, activeTrancheId, isGlobalMode, insertTargetId, treeNumber, collapsed, onToggleCollapse, pseInfo, pseNumber, pseCandidates, onPseChange }) => {
+const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly, viewMode, showRendu, clientQtyMap, bpuConfig, onUpdate, onSelect, onModal, stableKey, activeTrancheId, isGlobalMode, insertTargetId, treeNumber, collapsed, onToggleCollapse, pseInfo, pseNumber, pseCandidates, onPseChange }) => {
   const draggableId = `chapter:${stableKey}`;
   const total = sumNodeTotal(el, viewMode === 'client', clientQtyMap);
+  // Total du chapitre/bloc au rendu (quantités majorées) — pour la colonne « Total rendu ».
+  const renduTotal = sumNodeTotal(el, true, clientQtyMap);
   const depthBg = DEPTH_BG[Math.min(level, DEPTH_BG.length - 1)];
   const nbLines = collapsed ? countTreeItems(el.children) : 0;
   // PSE substitution : on affiche le delta (montant PSE − base) au lieu du total plein.
@@ -840,6 +878,11 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
                           }`}
                         />
                       </div>
+                      {showRendu && viewMode === 'study' && (
+                        <div className="w-20 px-1.5 shrink-0 flex items-center justify-end" title="Quantité pilote du bloc — non majorée au rendu">
+                          <span className="text-[9px] font-mono text-slate-300">—</span>
+                        </div>
+                      )}
                       <div className="w-32 px-2 shrink-0 text-right leading-none" title="PU moyen du bloc (Σ prix × facteur)">
                         <span className="text-[11px] font-mono font-black text-indigo-700">{formatPrice(blocPuMoyen)}</span>
                         <span className="block text-[8px] font-bold text-indigo-400 uppercase tracking-tight">/{normalizeUnitSymbol(el.unit)} moy.</span>
@@ -847,6 +890,20 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
                       <div className={`w-28 text-right px-3 text-[11px] font-mono font-black ${isSubPse ? 'text-violet-700' : el.isOption ? 'text-slate-500 line-through' : 'text-indigo-800'}`} title={pseTotalTitle}>
                         {isSubPse && displayTotal >= 0 ? '+' : ''}{formatPrice(displayTotal)}
                       </div>
+                      {showRendu && viewMode === 'study' && (
+                        <div className="w-24 text-right px-2 shrink-0 leading-none flex flex-col justify-center items-end" title="Total du bloc au rendu (quantités majorées)">
+                          {isSubPse ? (
+                            <span className="text-[9px] font-mono text-slate-300">—</span>
+                          ) : (
+                            <>
+                              <span className={`text-[11px] font-mono font-black ${renduTotal !== total ? 'text-indigo-600' : 'text-slate-300'}`}>{formatPrice(renduTotal)}</span>
+                              {renduTotal !== total && (
+                                <span className="text-[8px] font-bold text-emerald-600 leading-none">{(renduTotal - total) > 0 ? '+' : ''}{formatPrice(renduTotal - total)}</span>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )}
                       <div className="w-10 shrink-0" />
                     </>
                   ) : (
@@ -854,6 +911,20 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
                       <div className={`w-28 text-right px-3 text-[11px] font-mono font-black ${isSubPse ? 'text-violet-700' : el.isOption ? 'text-slate-500 line-through' : 'text-emerald-800'}`} title={pseTotalTitle}>
                         {isSubPse && displayTotal >= 0 ? '+' : ''}{formatPrice(displayTotal)}
                       </div>
+                      {showRendu && viewMode === 'study' && (
+                        <div className="w-24 text-right px-2 shrink-0 leading-none flex flex-col justify-center items-end" title="Total du chapitre au rendu (quantités majorées)">
+                          {isSubPse ? (
+                            <span className="text-[9px] font-mono text-slate-300">—</span>
+                          ) : (
+                            <>
+                              <span className={`text-[11px] font-mono font-black ${renduTotal !== total ? 'text-indigo-600' : 'text-slate-300'}`}>{formatPrice(renduTotal)}</span>
+                              {renduTotal !== total && (
+                                <span className="text-[8px] font-bold text-emerald-600 leading-none">{(renduTotal - total) > 0 ? '+' : ''}{formatPrice(renduTotal - total)}</span>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )}
                       <div className="w-10 shrink-0">{null}</div>
                     </>
                   )}
@@ -895,7 +966,7 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
 const ItemList = ({ items, parentId, level = 0, bpuConfig, parentNumber = '' }) => {
   const {
     selection, setSelection, updateProjectItem, setModal, addSubChapter,
-    refMap, viewMode, showComparison, clientQtyMap, isGlobalMode,
+    refMap, viewMode, showComparison, showRendu, clientQtyMap, isGlobalMode,
     formulaMode, setFormulaMode, activeTrancheId, sourceIds, allItems,
     onEditItem,
     multiSelection, toggleMultiSelection,
@@ -943,6 +1014,7 @@ const ItemList = ({ items, parentId, level = 0, bpuConfig, parentNumber = '' }) 
           isGlobalMode={isGlobalMode}
           viewMode={viewMode}
           showComparison={showComparison}
+          showRendu={showRendu}
           clientQtyMap={clientQtyMap}
           refMap={refMap}
           bpuConfig={bpuConfig}
@@ -984,6 +1056,7 @@ const ItemList = ({ items, parentId, level = 0, bpuConfig, parentNumber = '' }) 
         isSelected={isSelected}
         isReadOnly={isReadOnly}
         viewMode={viewMode}
+        showRendu={showRendu}
         clientQtyMap={clientQtyMap}
         bpuConfig={bpuConfig}
         onUpdate={updateProjectItem}

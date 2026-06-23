@@ -26,6 +26,8 @@ const ProjectToolbar = ({
   setViewMode,
   showComparison,
   setShowComparison,
+  showRendu,
+  setShowRendu,
   onExport,
   onOpenCalculation,
   onOpenDetails,
@@ -325,6 +327,20 @@ const ProjectToolbar = ({
                   <RibbonBtnSmall icon={Table2} label="Excel DQE" onClick={() => onExport('excel', 'DQE')} accent="text-emerald-600" />
                   <RibbonBtnSmall icon={Table2} label="Excel Estim." onClick={() => onExport('excel', 'ESTIMATION')} accent="text-emerald-600" />
                 </div>
+              </RibbonGroup>
+            )}
+
+            {/* Colonne Rendu (mode étude) : qté majorée client à côté de la qté réelle */}
+            {!isReadOnly && currentMode === 'study' && setShowRendu && (
+              <RibbonGroup label="Comparer">
+                <RibbonBtnLarge
+                  icon={ArrowLeftRight}
+                  label="Rendu"
+                  onClick={() => setShowRendu(!showRendu)}
+                  active={showRendu}
+                  accent="text-indigo-500"
+                  title="Afficher les quantités et totaux au rendu (majorés client) à côté de ceux de l'étude"
+                />
               </RibbonGroup>
             )}
 

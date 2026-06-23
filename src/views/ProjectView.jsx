@@ -255,6 +255,8 @@ const ProjectView = ({
     reader.readAsText(file);
   };
   const [showComparison, setShowComparison] = useState(false);
+  // Mode Étude : colonne « Rendu » (qté majorée client) à côté de la qté réelle.
+  const [showRendu, setShowRendu] = useState(false);
 
   useEffect(() => {
     if (project && project.__isNew) {
@@ -805,7 +807,7 @@ const ProjectView = ({
 
   const contextValue = {
       selection, setSelection, updateProjectItem: handleUpdateItem, removeProjectItem: handleRemoveItem,
-      setModal: handleModalIntercept, addSubChapter, refMap, viewMode: currentMode, showComparison,
+      setModal: handleModalIntercept, addSubChapter, refMap, viewMode: currentMode, showComparison, showRendu,
       clientQtyMap, activeTrancheId, isGlobalMode, bpuConfig, onOpenCalculation: handleOpenCalculation,
       formulaMode, setFormulaMode, allItems, sourceIds: project?.sourceIds || [],
       multiSelection, toggleMultiSelection, priceIssueIds, insertTargetId,
@@ -850,7 +852,7 @@ const ProjectView = ({
           <ProjectToolbar
             project={project} updateProjectName={updateProjectName} saveStatus={displayStatus} onSaveProject={handleManualCloudSave}
             isReadOnly={isReadOnly} showBpu={showBpu} setShowBpu={setShowBpu} currentMode={currentMode} setViewMode={setViewMode}
-            showComparison={showComparison} setShowComparison={setShowComparison} totalBase={totalBase} activeTrancheId={activeTrancheId}
+            showComparison={showComparison} setShowComparison={setShowComparison} showRendu={showRendu} setShowRendu={setShowRendu} totalBase={totalBase} activeTrancheId={activeTrancheId}
             onExport={(format, type) => {
               if (priceCheck.anomalyCount > 0) setExportGuard({ show: true, format, type });
               else setExportModalState({ show: true, format, type });
@@ -1013,7 +1015,7 @@ const ProjectView = ({
                 </Droppable>
               </div>
 
-              <ProjectFooterStats totalBase={totalBase} currentMode={currentMode} theme={theme} />
+              <ProjectFooterStats totalBase={totalBase} currentMode={currentMode} theme={theme} projectStats={projectStats} showRendu={showRendu} />
 
             </div>
           </DragDropContext>

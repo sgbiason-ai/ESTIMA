@@ -15,6 +15,7 @@ export const CHANGELOG = [
       'CCTP · RC · CCAP — le contenu du document est désormais sauvegardé PAR PROJET (et plus seulement comme gabarit partagé) : chaque édition de chapitre ou import est enregistrée automatiquement dans le projet, sans rien écraser pour les autres affaires. À l\'ouverture d\'un projet, on retrouve son propre contenu ; un nouveau projet démarre du gabarit maître. Le bouton « Sauver » devient « Gabarit » : il sert à enregistrer le contenu courant comme modèle maître pour les futurs projets (action volontaire), distinct de la sauvegarde automatique du projet',
       'Page de garde — les cases « Tampon / Signature » sont désormais masquées par défaut. Elles restent activables au cas par cas dans la fiche projet (section « Cases Tampon / Signature — Page de garde »)',
       'CCTP · RC · CCAP (export Word) — le sommaire se remplit enfin : les titres portent désormais un niveau de plan, donc lorsque Word propose de « mettre à jour les champs » à l\'ouverture (cliquer « Oui »), la table des matières s\'affiche avec sa pagination (auparavant elle restait vide)',
+      'Estimation (mode Étude) — nouveau bouton « Rendu » (ruban) qui affiche à la demande, à côté des quantités et montants d\'étude, leurs équivalents au rendu (quantités majorées pour le client) : une colonne « Qté rendu » (avec l\'écart %), une colonne « Total rendu » (avec le gain en €), et un pied de page à deux colonnes parfaitement alignées Étude / Rendu détaillant le Total HT, la TVA et le TTC. Masqué par défaut, sans rien changer à la saisie',
     ],
   },
   {

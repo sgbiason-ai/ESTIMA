@@ -2,11 +2,57 @@
 import React from 'react';
 import { formatPrice } from '../utils/helpers';
 
+// Grille commune à l'en-tête et à toutes les lignes → colonnes parfaitement alignées.
+const GRID = 'grid grid-cols-[1fr_9rem_9rem] gap-x-3 items-center';
+
 const ProjectFooterStats = ({
   totalBase,
   currentMode,
-  theme
+  theme,
+  projectStats,
+  showRendu = false,
 }) => {
+  // ── Mode comparatif : deux colonnes alignées (Étude / Rendu) HT · TVA · TTC ──
+  if (showRendu && projectStats) {
+    const studyHT = projectStats.study?.base || 0;
+    const clientHT = projectStats.client?.base || 0;
+    const rows = [
+      { label: 'Total HT',   s: studyHT,       c: clientHT,       strong: false },
+      { label: 'TVA (20%)',  s: studyHT * 0.2, c: clientHT * 0.2, strong: false },
+      { label: 'Total TTC',  s: studyHT * 1.2, c: clientHT * 1.2, strong: true  },
+    ];
+    return (
+      <div className="flex justify-end mt-8 mb-20">
+        <div className="bg-white rounded-2xl border border-gray-200/60 p-6 w-[34rem]">
+          {/* En-tête des colonnes */}
+          <div className={`${GRID} pb-2 mb-2 border-b border-gray-100`}>
+            <span />
+            <span className="text-right text-[10px] font-black uppercase tracking-widest text-emerald-600">Étude</span>
+            <span className="text-right text-[10px] font-black uppercase tracking-widest text-indigo-600">Rendu</span>
+          </div>
+
+          {rows.map((r) => (
+            <div
+              key={r.label}
+              className={`${GRID} ${r.strong ? 'mt-2 pt-2 border-t border-gray-100' : 'mb-1'}`}
+            >
+              <span className={`text-xs uppercase tracking-widest ${r.strong ? 'font-black text-gray-700' : 'font-bold text-gray-400'}`}>
+                {r.label}
+              </span>
+              <span className={`text-right font-mono tabular-nums ${r.strong ? 'text-base font-black text-emerald-700' : 'text-sm font-bold text-gray-600'}`}>
+                {formatPrice(r.s)}
+              </span>
+              <span className={`text-right font-mono tabular-nums ${r.strong ? 'text-base font-black text-indigo-700' : 'text-sm font-bold text-gray-600'}`}>
+                {formatPrice(r.c)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Mode simple : une colonne (mode courant) — comportement d'origine ──
   return (
     <div className="flex justify-end mt-8 mb-20">
       <div className="bg-white rounded-2xl border border-gray-200/60 p-6 w-96">
