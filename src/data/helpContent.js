@@ -81,7 +81,7 @@ export const helpContent = {
         ],
       },
       {
-        id: 'saisie', label: 'Saisie & formules', icon: 'Edit3',
+        id: 'saisie', label: 'Saisie', icon: 'Edit3',
         sections: [
           { type: 'intro', text: "Renseignez les quantités dans le tableau. Une quantité peut aussi être une formule qui se calcule à partir d'autres articles." },
           {
@@ -93,7 +93,45 @@ export const helpContent = {
               { color: 'purple', title: '% à valoir', description: "Bouton « % à valoir » : applique un pourcentage aux petites quantités / forfaits pour couvrir les aléas." },
             ],
           },
-          { type: 'tip', title: 'Aide formules dédiée', text: "Le détail de la syntaxe, l'insertion par clic et les raccourcis sont dans l'« Aide formules » (bouton flottant en bas à droite, ou icône ƒ(x) de la barre de formule)." },
+          { type: 'tip', title: 'Aide formules dédiée', text: "Le détail de la syntaxe, l'insertion par clic et les raccourcis sont dans l'onglet « Formules » de cette aide." },
+        ],
+      },
+      {
+        id: 'formules', label: 'Formules', icon: 'FunctionSquare',
+        sections: [
+          { type: 'intro', text: "La colonne Qté accepte des formules de style tableur : une quantité se calcule à partir d'autres articles du bordereau. Toute formule commence par le signe =." },
+          {
+            type: 'grid',
+            items: [
+              { title: '=[FOUILLE EN MASSE] * 1.1', text: "Quantité d'un article × 1,1", color: 'emerald' },
+              { title: '=[BÉTON C25] + [BÉTON C30]', text: 'Somme de deux articles', color: 'emerald' },
+              { title: '=([DÉBLAI] - [REMBLAI]) / 2', text: 'Expression avec parenthèses', color: 'emerald' },
+              { title: '=[SURFACE TOTALE] * 0.05', text: "5 % d'une autre quantité", color: 'emerald' },
+            ],
+          },
+          { type: 'tip', text: "Opérateurs supportés : + - * / ( ), ainsi que toute expression de calcul valide." },
+          {
+            type: 'steps',
+            items: [
+              { color: 'blue', title: 'Sélectionner', description: "Cliquez l'article à chiffrer dans le tableau (il se surligne en vert)." },
+              { color: 'emerald', title: 'Passer en formule', description: "Cliquez l'icône ƒ(x) ou la barre de formule, puis tapez = pour démarrer l'expression." },
+              { color: 'amber', title: 'Référencer par clic', description: "Cliquez un autre article du tableau : sa désignation s'insère automatiquement dans la formule." },
+              { color: 'purple', title: 'Valider', description: "Ajoutez opérateurs et références au besoin, puis validez avec Entrée." },
+            ],
+          },
+          {
+            type: 'card', icon: 'GitBranch', color: 'violet', title: 'Propagation aux tranches',
+            description: "Quand le projet comporte plusieurs tranches, une formule saisie dans la barre s'applique automatiquement à toutes les tranches.",
+          },
+          {
+            type: 'shortcuts',
+            items: [
+              { key: '↵ Entrée', desc: 'Valider et enregistrer la formule' },
+              { key: 'Échap', desc: 'Annuler sans sauvegarder' },
+              { key: 'Clic ƒ(x)', desc: 'Ouvrir / valider la barre de formule' },
+              { key: 'Clic Effacer', desc: 'Supprimer la formule sur toutes les tranches' },
+            ],
+          },
         ],
       },
       {

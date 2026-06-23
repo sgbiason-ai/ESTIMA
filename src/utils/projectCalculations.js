@@ -294,6 +294,11 @@ export function recalculateProject(chapters, tranches = []) {
     };
 
     const hasTranches = tranches.length > 0;
+    // Quantités issues d'une formule saisie (articles) : arrondies à l'unité.
+    // Exclus : les composants de blocs (blocFactor, pilotés par la surface — précision
+    // du métré conservée) et les forfaits (isFixed).
+    const roundFormulaQty = (it, val) =>
+      (val !== null && it.blocFactor == null && !it.isFixed) ? Math.round(val) : val;
     const apply = (nodes) => {
       nodes.forEach(it => {
         if (it.type === 'item') {
@@ -302,7 +307,7 @@ export function recalculateProject(chapters, tranches = []) {
             if (!it.quantities) it.quantities = {};
             for (const [tId, formulaStr] of Object.entries(it.quantitiesFormula)) {
               if (formulaStr?.startsWith('=')) {
-                const newVal = evalF(formulaStr, qtyMaps[tId] || {});
+                const newVal = roundFormulaQty(it, evalF(formulaStr, qtyMaps[tId] || {}));
                 if (newVal !== null && newVal !== it.quantities[tId]) {
                   it.quantities[tId] = newVal;
                   hasChanges = true;
@@ -314,7 +319,7 @@ export function recalculateProject(chapters, tranches = []) {
           if (hasTranches) {
             if (it.qty !== trancheSum) { it.qty = trancheSum; hasChanges = true; }
           } else if (it.formula?.startsWith('=')) {
-            const newVal = evalF(it.formula, qtyMaps.global);
+            const newVal = roundFormulaQty(it, evalF(it.formula, qtyMaps.global));
             if (newVal !== null && newVal !== it.qty) { it.qty = newVal; hasChanges = true; }
           }
         } else if (it.isBloc && hasTranches) {

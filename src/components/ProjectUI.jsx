@@ -4,8 +4,9 @@ import { Check, X, ArrowLeftRight, ChevronDown, Search, AlertTriangle, FileText 
 import RichTextEditor from './common/RichTextEditor';
 
 // --- LE COMPOSANT MANQUANT (A AJOUTER) ---
-export const FormattedInput = ({ value, onChange, onBlur, className, placeholder, ...props }) => {
+export const FormattedInput = ({ value, onChange, onBlur, onFocus, className, placeholder, ...props }) => {
   const [localValue, setLocalValue] = useState(value);
+  const [focused, setFocused] = useState(false);
 
   useEffect(() => {
     setLocalValue(value);
@@ -17,14 +18,23 @@ export const FormattedInput = ({ value, onChange, onBlur, className, placeholder
     if (onChange) onChange(val);
   };
 
+  // Au repos : séparateur de milliers (fr-FR). En édition : valeur brute saisissable.
+  const formatDisplay = (v) => {
+    if (v === '' || v === null || v === undefined) return '';
+    const num = Number(v);
+    if (isNaN(num)) return String(v);
+    return num.toLocaleString('fr-FR', { maximumFractionDigits: 2 });
+  };
+
   return (
     <input
-      value={localValue || ''}
+      {...props}
+      value={focused ? (localValue ?? '') : formatDisplay(localValue)}
       onChange={handleChange}
-      onBlur={onBlur}
+      onFocus={(e) => { setFocused(true); onFocus?.(e); }}
+      onBlur={(e) => { setFocused(false); onBlur?.(e); }}
       className={className}
       placeholder={placeholder}
-      {...props}
     />
   );
 };

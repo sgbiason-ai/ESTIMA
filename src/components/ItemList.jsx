@@ -169,7 +169,7 @@ const FormulaInput = ({ value, formula, formulaMode, setFormulaMode, onCommit, d
     if (isEditing) return inputValue;
     const num = Number(inputValue);
     if (num === 0 && !formula) return 'PM';
-    if (!isNaN(num) && inputValue !== '') return Number.isInteger(num) ? String(num) : num.toFixed(2);
+    if (!isNaN(num) && inputValue !== '') return num.toLocaleString('fr-FR', { maximumFractionDigits: 2 });
     return inputValue;
   };
 
@@ -731,6 +731,7 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
     return 'quantité';
   })();
   const [surfaceInput, setSurfaceInput] = useState(String(surfaceVal || ''));
+  const [surfaceFocused, setSurfaceFocused] = useState(false);
   useEffect(() => { setSurfaceInput(surfaceVal ? String(surfaceVal) : ''); }, [surfaceVal]);
   const commitSurface = () => {
     const n = Number(String(surfaceInput).replace(',', '.')) || 0;
@@ -865,10 +866,11 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
                         <input
                           type="text"
                           inputMode="decimal"
-                          value={surfaceInput}
+                          value={surfaceFocused ? surfaceInput : (surfaceVal ? formatQtyShort(surfaceVal) : '')}
                           disabled={surfaceDisabled}
                           onChange={(e) => setSurfaceInput(e.target.value)}
-                          onBlur={commitSurface}
+                          onFocus={() => setSurfaceFocused(true)}
+                          onBlur={() => { setSurfaceFocused(false); commitSurface(); }}
                           onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                           placeholder={pilotLabel}
                           className={`w-full text-right text-xs font-mono font-black rounded py-0.5 px-1.5 outline-none transition-colors border ${

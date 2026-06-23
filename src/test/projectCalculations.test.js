@@ -250,6 +250,45 @@ describe('recalculateProject', () => {
     );
     expect(updatedChapters[0].children[0].qty).toBe(50);
   });
+
+  // ── Arrondi à l'unité des quantités issues d'une formule ──────────────────
+  it('arrondit a l\'unite le resultat d\'une formule d\'article', () => {
+    const i1 = makeItem('i1', 1000);
+    const i2 = Object.assign({}, makeItem('i2', 0), { formula: '={i1}*0.3333' }); // 333.3
+    const { updatedChapters } = recalculateProject([makeChap('c1', [i1, i2])], []);
+    expect(updatedChapters[0].children[1].qty).toBe(333);
+  });
+  it('arrondit au plus proche (>= 0.5 vers le superieur)', () => {
+    const i1 = makeItem('i1', 152);
+    const i2 = Object.assign({}, makeItem('i2', 0), { formula: '={i1}*1.15' }); // 174.8 -> 175
+    const { updatedChapters } = recalculateProject([makeChap('c1', [i1, i2])], []);
+    expect(updatedChapters[0].children[1].qty).toBe(175);
+  });
+  it('arrondit aussi les formules de tranche', () => {
+    const i2 = Object.assign({}, makeItem('i2', 0), {
+      quantities: { t1: 0, t2: 0 },
+      quantitiesFormula: { t1: '=100*0.333', t2: '=100*0.666' }, // 33.3 / 66.6 -> 33 / 67
+    });
+    const { updatedChapters } = recalculateProject(
+      [makeChap('c1', [i2])],
+      [{ id: 't1' }, { id: 't2' }]
+    );
+    expect(updatedChapters[0].children[0].quantities.t1).toBe(33);
+    expect(updatedChapters[0].children[0].quantities.t2).toBe(67);
+    expect(updatedChapters[0].children[0].qty).toBe(100); // somme des tranches
+  });
+  it('ne touche pas les composants de bloc (blocFactor) : precision conservee', () => {
+    const surf = makeItem('s1', 83);
+    const comp = Object.assign({}, makeItem('c1i', 0), { formula: '={s1}*0.15', blocFactor: 0.15 }); // 12.45
+    const { updatedChapters } = recalculateProject([makeChap('c1', [surf, comp])], []);
+    expect(updatedChapters[0].children[1].qty).toBeCloseTo(12.45, 2);
+  });
+  it('ne touche pas les forfaits (isFixed) issus d\'une formule', () => {
+    const i1 = makeItem('i1', 10);
+    const forfait = Object.assign({}, makeItem('f1', 0), { formula: '={i1}*0.05', isFixed: true }); // 0.5
+    const { updatedChapters } = recalculateProject([makeChap('c1', [i1, forfait])], []);
+    expect(updatedChapters[0].children[1].qty).toBeCloseTo(0.5, 2);
+  });
 });
 
 // ── computeQtyMaps ─────────────────────────────────────────────────────────

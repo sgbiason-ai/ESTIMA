@@ -16,6 +16,9 @@ export const CHANGELOG = [
       'Page de garde — les cases « Tampon / Signature » sont désormais masquées par défaut. Elles restent activables au cas par cas dans la fiche projet (section « Cases Tampon / Signature — Page de garde »)',
       'CCTP · RC · CCAP (export Word) — le sommaire se remplit enfin : les titres portent désormais un niveau de plan, donc lorsque Word propose de « mettre à jour les champs » à l\'ouverture (cliquer « Oui »), la table des matières s\'affiche avec sa pagination (auparavant elle restait vide)',
       'Estimation (mode Étude) — nouveau bouton « Rendu » (ruban) qui affiche à la demande, à côté des quantités et montants d\'étude, leurs équivalents au rendu (quantités majorées pour le client) : une colonne « Qté rendu » (avec l\'écart %), une colonne « Total rendu » (avec le gain en €), et un pied de page à deux colonnes parfaitement alignées Étude / Rendu détaillant le Total HT, la TVA et le TTC. Masqué par défaut, sans rien changer à la saisie',
+      'Estimation — l\'aide des formules rejoint le guide « Aide » : nouvel onglet « Formules » (syntaxe, insertion d\'une référence par clic, propagation aux tranches, raccourcis clavier). Le bouton flottant « Aide formules » a été retiré, l\'aide est désormais centralisée au même endroit que les autres modules',
+      'Estimation — tous les nombres du tableau (quantités, prix, surfaces de blocs) s\'affichent désormais avec le séparateur de milliers (ex. « 12 500 » au lieu de « 12500 »), au repos comme les totaux. La valeur reste éditable en saisie brute au clic',
+      'Estimation — les quantités issues d\'une formule ƒ(x) sont désormais arrondies à l\'unité (ex. « =[SURFACE]*0,333 » → 333 au lieu de 333,33). Les métrés des composants de blocs (pilotés par la surface) et les forfaits conservent leur précision',
     ],
   },
   {

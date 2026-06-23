@@ -4,7 +4,7 @@ import PropTypes from 'prop-types';
 import { useStableHash } from '../hooks/useStableHash';
 import { useRobustSave } from '../hooks/useRobustSave';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { Plus, Trash2, GripVertical, Layers, HelpCircle, AlertTriangle, Target, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, GripVertical, Layers, AlertTriangle, Target, ChevronDown, ChevronRight } from 'lucide-react';
 
 import { ProjectContext } from '../context/ProjectContext';
 import { EditableTitle, OptionToggle, PseModeControl, PseDescriptionEditor } from '../components/ProjectUI';
@@ -24,8 +24,7 @@ import ProjectFooterStats from '../components/ProjectFooterStats';
 import HelpPanel from '../components/help/HelpPanel';
 
 // NOUVEAUX COMPOSANTS EXTRAITS
-import ProjectFormulaBar from '../components/project/ProjectFormulaBar'; 
-import FormulaHelpModal from '../components/modals/FormulaHelpModal';
+import ProjectFormulaBar from '../components/project/ProjectFormulaBar';
 import ConfirmDeleteModal from '../components/modals/ConfirmDeleteModal';
 import PriceAuditModal from '../components/modals/PriceAuditModal';
 import PriceConsistencyModal from '../components/modals/PriceConsistencyModal';
@@ -177,7 +176,6 @@ const ProjectView = ({
   const [exportModalState, setExportModalState] = useState({ show: false, format: 'pdf', type: 'ESTIMATION' });
   const [exportGuard, setExportGuard] = useState({ show: false, format: 'pdf', type: 'ESTIMATION' });
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, itemId: null });
-  const [showFormulaHelp, setShowFormulaHelp] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [calculationAnalysis, setCalculationAnalysis] = useState({ totalStudy: 0, lines: [] });
   const [formulaMode, setFormulaMode] = useState({ isActive: false, callback: null });
@@ -1035,7 +1033,6 @@ const ProjectView = ({
       <CalculationModal show={showCalculationModal} onClose={() => setShowCalculationModal(false)} onConfirm={handleApplyCalculation} analysis={calculationAnalysis} defaultThreshold={Number(project?.clientQtyThreshold ?? 20)} defaultPercent={Number(project?.clientPercent ?? clientPercent ?? 10)} />
       <ExportModal isOpen={exportModalState.show} onClose={() => setExportModalState(prev => ({ ...prev, show: false }))} onConfirm={handleConfirmExport} onPreviewPdf={handlePreviewPdf} format={exportModalState.format} type={exportModalState.type} hasTranches={hasTranches} tranches={tranches} activeTrancheId={activeTrancheId} />
       <ConfirmDeleteModal isOpen={deleteConfirm.show} onClose={() => setDeleteConfirm({ show: false, itemId: null })} onConfirm={() => { if(deleteConfirm.itemId) { handleRemoveItem(deleteConfirm.itemId); setDeleteConfirm({ show: false, itemId: null }); } }} />
-      <FormulaHelpModal isOpen={showFormulaHelp} onClose={() => setShowFormulaHelp(false)} />
       <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="estimation" />
       <PriceAuditModal
         show={showPriceAudit}
@@ -1087,13 +1084,6 @@ const ProjectView = ({
             </div>
           </div>
         </div>
-      )}
-
-      {!isReadOnly && (
-        <button onClick={() => setShowFormulaHelp(true)} className="fixed bottom-20 right-6 z-[9000] flex items-center gap-2 px-3 py-2.5 bg-white/90 backdrop-blur-xl hover:bg-gray-100 text-gray-700 hover:text-gray-900 border border-gray-200/60 rounded-full hover:shadow-lg transition-all duration-200 group">
-          <HelpCircle size={16} />
-          <span className="text-[11px] font-bold uppercase tracking-wide max-w-0 overflow-hidden group-hover:max-w-[120px] transition-all duration-300 whitespace-nowrap">Aide formules</span>
-        </button>
       )}
 
       {!isReadOnly && multiSelection && multiSelection.size > 0 && (
