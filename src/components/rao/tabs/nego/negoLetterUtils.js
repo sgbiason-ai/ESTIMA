@@ -85,7 +85,8 @@ export const buildAnomalySectionHtml = (type, templateText, items) => {
       return m ? { ref: m[1], label: m[2], pu: m[3].trim(), unit: m[4] || '' } : { ref: '—', label: String(it), pu: '', unit: '' };
     });
     const hasAnyUnit = structured.some(it => (it.unit || '').trim());
-    const headBg   = type === 'low' ? '#dc2626' : '#d97706'; // red-600 / amber-600 (match PDF)
+    // red-600 (bas) / amber-600 (haut) / slate-600 (unifié, neutre) — couleurs alignées sur le PDF
+    const headBg   = type === 'low' ? '#dc2626' : type === 'high' ? '#d97706' : '#475569';
     const headText = '#ffffff';
     html += `<p style="margin:6px 0 4px 0; text-align:justify;"><strong>Articles concernés :</strong></p>`;
     html += `<table style="width:100%; border-collapse:collapse; margin:4px 0 8px 0; font-size:10pt;">`;

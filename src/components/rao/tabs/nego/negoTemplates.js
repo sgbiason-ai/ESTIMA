@@ -75,6 +75,20 @@ export const DEFAULT_HIGH_TEMPLATE =
   "</ul>" +
   "<p>Dans l'hypothèse où vous souhaiteriez maintenir ces tarifs initiaux, nous vous serions reconnaissants de nous transmettre les éléments de décomposition (sous-détails de prix) nous permettant de mieux comprendre l'approche technique et les contraintes qui justifient cette valorisation.</p>";
 
+// ── Texte par défaut "Prix atypiques — BLOC UNIFIÉ" (format HTML Quill) ──
+// Un seul bloc neutre couvrant à la fois les prix bas ET hauts : tous les prix
+// atypiques sont listés dans un tableau unique (mode 'unified').
+export const DEFAULT_UNIFIED_TEMPLATE =
+  "<p><strong>➡️ PRIX ATYPIQUES (art. L.2152-6 et R.2152-3 du Code de la commande publique)</strong></p>" +
+  "<p>L'analyse de votre proposition fait apparaître plusieurs prix unitaires qui s'écartent sensiblement de l'estimation du maître d'œuvre — certains nettement en deçà, d'autres au-dessus — et qui pèsent sur l'appréciation économique globale de votre offre.</p>" +
+  "<p>Afin de nous assurer de la cohérence et de la faisabilité technique de votre proposition, et dans le cadre de la présente négociation, nous vous demandons, pour chacun des prix listés ci-dessous, de bien vouloir :</p>" +
+  "<ul>" +
+    "<li>Vérifier qu'il ne s'agit pas d'une erreur matérielle, d'une omission ou d'une erreur d'unité dans votre chiffrage ;</li>" +
+    "<li>Nous transmettre les sous-détails de prix correspondants (fournitures, main-d'œuvre, matériel, frais généraux et marge) ;</li>" +
+    "<li>Le cas échéant, réviser ces prix afin de garantir la bonne exécution des prestations dans les règles de l'art et d'améliorer la compétitivité de votre offre.</li>" +
+  "</ul>" +
+  "<p>À défaut de justifications satisfaisantes concernant les prix paraissant anormalement bas, le pouvoir adjudicateur se réserve la possibilité de les écarter en application de l'article L.2152-6 du Code de la commande publique.</p>";
+
 // ── Anciens défauts (texte brut) — sert à migrer auto les users qui avaient
 // sauvegardé les anciens textes sans les modifier (sinon ils ne verraient
 // jamais les nouveaux défauts). ──
@@ -96,3 +110,6 @@ export const OLD_HIGH_TEMPLATE =
 
 // Clé localStorage des templates "Prix atypiques"
 export const ANOMALY_TPL_KEY = 'estima_rao_anomaly_templates';
+
+// Clé localStorage du mode d'injection : 'split' = 2 blocs (bas/haut) | 'unified' = 1 bloc
+export const ANOMALY_MODE_KEY = 'estima_rao_anomaly_mode';

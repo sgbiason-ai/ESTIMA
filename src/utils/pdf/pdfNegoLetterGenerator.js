@@ -314,8 +314,14 @@ export async function generateNegoLetterPDF({
         y += 2;
       }
       if (block.items.length > 0) {
-        const isLow = /anormalement\s+bas|l\.?2152[-‐]6|rejet/i.test(block.intro || '');
-        const headColor = isLow ? [220, 38, 38] : [217, 119, 6];
+        // Couleur d'en-tête déduite du titre du bloc :
+        //  - "PRIX ATYPIQUES" (bloc unifié) → slate neutre
+        //  - "anormalement bas" / L.2152-6 / rejet → rouge
+        //  - sinon (prix excessifs) → amber
+        const intro = block.intro || '';
+        const isUnified = /prix\s+atypiques|atypique/i.test(intro);
+        const isLow = !isUnified && /anormalement\s+bas|l\.?2152[-‐]6|rejet/i.test(intro);
+        const headColor = isUnified ? [71, 85, 105] : isLow ? [220, 38, 38] : [217, 119, 6];
         checkPage(20);
         // Détecter si on a au moins une unité → afficher la colonne Unité
         const hasAnyUnit = block.items.some(it => (it.unit || '').trim());

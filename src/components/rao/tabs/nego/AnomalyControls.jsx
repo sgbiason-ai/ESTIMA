@@ -8,9 +8,11 @@ import { Wand2, SlidersHorizontal, X, Info, Edit3, CheckCircle2 } from 'lucide-r
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 
-import { DEFAULT_LOW_TEMPLATE, DEFAULT_HIGH_TEMPLATE } from './negoTemplates';
+import { DEFAULT_LOW_TEMPLATE, DEFAULT_HIGH_TEMPLATE, DEFAULT_UNIFIED_TEMPLATE } from './negoTemplates';
 
-const AnomalyControls = ({ onInject, thresholds, setThresholds, templates, onSaveTemplates }) => {
+const QUILL_MODULES = { toolbar: [['bold', 'italic', 'underline'], [{ list: 'bullet' }, { list: 'ordered' }], ['clean']] };
+
+const AnomalyControls = ({ onInject, thresholds, setThresholds, mode, setMode, templates, onSaveTemplates }) => {
   const [showThresholdSettings, setShowThresholdSettings] = useState(false);
   const [showTemplateEditor, setShowTemplateEditor] = useState(false);
 
@@ -99,6 +101,30 @@ const AnomalyControls = ({ onInject, thresholds, setThresholds, templates, onSav
             Réinitialiser seuils (15% / 1%)
           </button>
 
+          {/* Mode d'injection : 2 blocs distincts vs 1 bloc unifié */}
+          <div className="border-t border-slate-100 pt-3">
+            <label className="text-[11px] font-bold text-slate-700 mb-1.5 block">Format des prix atypiques</label>
+            <div className="flex bg-slate-100 p-0.5 rounded-xl">
+              <button
+                onClick={() => setMode('split')}
+                className={`flex-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${mode === 'split' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                2 blocs (bas / haut)
+              </button>
+              <button
+                onClick={() => setMode('unified')}
+                className={`flex-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${mode === 'unified' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                1 bloc unifié
+              </button>
+            </div>
+            <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
+              {mode === 'unified'
+                ? 'Tous les prix atypiques (bas et hauts) sont regroupés dans un seul bloc avec un tableau unique.'
+                : 'Deux blocs séparés : un texte « prix bas » et un texte « prix excessifs », chacun avec son tableau.'}
+            </p>
+          </div>
+
           <div className="border-t border-slate-100 pt-3">
             <button
               onClick={() => setShowTemplateEditor(v => !v)}
@@ -113,46 +139,69 @@ const AnomalyControls = ({ onInject, thresholds, setThresholds, templates, onSav
 
             {showTemplateEditor && (
               <div className="mt-2 space-y-3 [&_.ql-editor]:min-h-[240px] [&_.ql-editor]:max-h-[360px] [&_.ql-editor]:overflow-y-auto [&_.ql-editor]:text-[12px] [&_.ql-editor]:leading-relaxed [&_.ql-editor]:p-3 [&_.ql-container]:bg-slate-50 [&_.ql-toolbar]:bg-slate-50 [&_.ql-toolbar]:rounded-t-lg [&_.ql-container]:rounded-b-lg [&_.ql-toolbar]:border-slate-200 [&_.ql-container]:border-slate-200">
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-[11px] font-bold text-slate-700">Texte « Prix anormalement bas »</label>
-                    <button
-                      onClick={() => onSaveTemplates({ ...templates, low: DEFAULT_LOW_TEMPLATE })}
-                      className="text-[10px] font-bold text-slate-400 hover:text-indigo-600"
-                      title="Restaurer le texte par défaut"
-                    >
-                      Réinitialiser
-                    </button>
+                {mode === 'unified' ? (
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-bold text-slate-700">Texte « Prix atypiques » (bloc unifié)</label>
+                      <button
+                        onClick={() => onSaveTemplates({ ...templates, unified: DEFAULT_UNIFIED_TEMPLATE })}
+                        className="text-[10px] font-bold text-slate-400 hover:text-indigo-600"
+                        title="Restaurer le texte par défaut"
+                      >
+                        Réinitialiser
+                      </button>
+                    </div>
+                    <ReactQuill
+                      theme="snow"
+                      value={templates.unified}
+                      onChange={(html) => onSaveTemplates({ ...templates, unified: html })}
+                      modules={QUILL_MODULES}
+                    />
                   </div>
-                  <ReactQuill
-                    theme="snow"
-                    value={templates.low}
-                    onChange={(html) => onSaveTemplates({ ...templates, low: html })}
-                    modules={{ toolbar: [['bold', 'italic', 'underline'], [{ list: 'bullet' }, { list: 'ordered' }], ['clean']] }}
-                  />
-                </div>
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-[11px] font-bold text-slate-700">Texte « Prix excessifs »</label>
-                    <button
-                      onClick={() => onSaveTemplates({ ...templates, high: DEFAULT_HIGH_TEMPLATE })}
-                      className="text-[10px] font-bold text-slate-400 hover:text-indigo-600"
-                      title="Restaurer le texte par défaut"
-                    >
-                      Réinitialiser
-                    </button>
-                  </div>
-                  <ReactQuill
-                    theme="snow"
-                    value={templates.high}
-                    onChange={(html) => onSaveTemplates({ ...templates, high: html })}
-                    modules={{ toolbar: [['bold', 'italic', 'underline'], [{ list: 'bullet' }, { list: 'ordered' }], ['clean']] }}
-                  />
-                </div>
+                ) : (
+                  <>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] font-bold text-slate-700">Texte « Prix anormalement bas »</label>
+                        <button
+                          onClick={() => onSaveTemplates({ ...templates, low: DEFAULT_LOW_TEMPLATE })}
+                          className="text-[10px] font-bold text-slate-400 hover:text-indigo-600"
+                          title="Restaurer le texte par défaut"
+                        >
+                          Réinitialiser
+                        </button>
+                      </div>
+                      <ReactQuill
+                        theme="snow"
+                        value={templates.low}
+                        onChange={(html) => onSaveTemplates({ ...templates, low: html })}
+                        modules={QUILL_MODULES}
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] font-bold text-slate-700">Texte « Prix excessifs »</label>
+                        <button
+                          onClick={() => onSaveTemplates({ ...templates, high: DEFAULT_HIGH_TEMPLATE })}
+                          className="text-[10px] font-bold text-slate-400 hover:text-indigo-600"
+                          title="Restaurer le texte par défaut"
+                        >
+                          Réinitialiser
+                        </button>
+                      </div>
+                      <ReactQuill
+                        theme="snow"
+                        value={templates.high}
+                        onChange={(html) => onSaveTemplates({ ...templates, high: html })}
+                        modules={QUILL_MODULES}
+                      />
+                    </div>
+                  </>
+                )}
                 <div className="flex items-start gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
                   <CheckCircle2 size={13} className="text-emerald-500 shrink-0 mt-0.5" />
                   <p className="text-[10px] text-emerald-700 leading-relaxed">
-                    Sauvegarde automatique dans le navigateur. La liste des articles concernés est ajoutée à la fin de chaque texte lors de l'injection.
+                    Sauvegarde automatique dans le navigateur. La liste des articles concernés est ajoutée à la fin {mode === 'unified' ? 'du texte' : 'de chaque texte'} lors de l'injection.
                   </p>
                 </div>
               </div>

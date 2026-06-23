@@ -76,6 +76,8 @@ const TabNegociation = ({
   // ── Logique métier (aperçu, détection / injection / reset des prix atypiques) ──
   const {
     letterHtml,
+    anomalyMode,
+    setAnomalyMode,
     anomalyTemplates,
     saveAnomalyTemplates,
     anomalyThresholds,
@@ -193,6 +195,8 @@ const TabNegociation = ({
                     onInject={injectAnomalies}
                     thresholds={anomalyThresholds}
                     setThresholds={setAnomalyThresholds}
+                    mode={anomalyMode}
+                    setMode={setAnomalyMode}
                     templates={anomalyTemplates}
                     onSaveTemplates={saveAnomalyTemplates}
                   />
