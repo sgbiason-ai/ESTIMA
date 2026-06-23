@@ -84,11 +84,13 @@ const ProjectView = ({
   clearMultiSelection,
   openMultiDeleteModal,
 }) => {
-  const currentMode = viewMode || 'study';
   // Verrou « lecture seule » : verrouillé par défaut à l'ouverture d'une affaire
   // (cf. effet de réinitialisation plus bas). Évite les modifications accidentelles.
   const [isLocked, setIsLocked] = useState(true);
   const isReadOnly = isLocked;
+  // Verrouillé = vue client (rendu) : quantités et prix majorés, en lecture seule.
+  // Déverrouillé = vue étude : quantités réelles, édition.
+  const currentMode = isLocked ? 'client' : (viewMode || 'study');
   // Le projet affiché est toujours le projet courant (la consultation des
   // versions figées se fait désormais dans la vue dédiée « Documents émis »).
   const viewedProject = project;
