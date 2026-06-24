@@ -18,7 +18,7 @@ export function NumCell({ value, onCommit, className = '', placeholder = '0', al
       onChange={(e) => setV(e.target.value)}
       onBlur={() => { setFocus(false); const n = Number(String(v).replace(',', '.')); onCommit(Number.isFinite(n) ? n : 0); }}
       onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-      className={`w-full bg-white border border-slate-200 focus:border-orange-500 rounded px-1 py-0.5 text-${align} text-xs font-mono outline-none ${className}`}
+      className={`w-full bg-white border border-slate-200 focus:border-blue-500 rounded px-1 py-0.5 text-${align} text-xs font-mono outline-none ${className}`}
     />
   );
 }
@@ -47,7 +47,7 @@ export function DureeCell({ forced, duree, auto, onCommit }) {
       }}
       onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
       title={forced ? 'Durée forcée pour cette ligne (vider = durée calculée)' : 'Durée calculée (= quantité / rendement) — saisir pour forcer'}
-      className={`w-full rounded px-1 py-0.5 text-center text-xs font-mono outline-none border focus:border-orange-500 ${forced ? 'bg-white border-orange-300 text-orange-700 font-bold' : 'bg-slate-50 border-slate-200 text-slate-400'}`}
+      className={`w-full rounded px-1 py-0.5 text-center text-xs font-mono outline-none border focus:border-blue-500 ${forced ? 'bg-white border-orange-300 text-orange-700 font-bold' : 'bg-slate-50 border-slate-200 text-slate-400'}`}
     />
   );
 }
@@ -76,7 +76,7 @@ export function AutoNumCell({ value, auto, onCommit, className = '' }) {
       }}
       onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
       title={overridden ? 'Quantité modifiée (vider = quantité de la tâche)' : 'Par défaut : quantité de la tâche — saisir pour modifier'}
-      className={`w-full rounded px-1 py-0.5 text-right text-xs font-mono outline-none border focus:border-orange-500 ${overridden ? 'bg-white border-orange-300 text-orange-700 font-bold' : 'bg-slate-50 border-slate-200 text-slate-500'} ${className}`}
+      className={`w-full rounded px-1 py-0.5 text-right text-xs font-mono outline-none border focus:border-blue-500 ${overridden ? 'bg-white border-orange-300 text-orange-700 font-bold' : 'bg-slate-50 border-slate-200 text-slate-500'} ${className}`}
     />
   );
 }
@@ -92,7 +92,7 @@ export function TxtCell({ value, onCommit, className = '', placeholder = '', upp
       onChange={(e) => setV(upper ? e.target.value.toUpperCase() : e.target.value)}
       onBlur={() => { if (v !== (value ?? '')) onCommit(v); }}
       onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-      className={`w-full bg-transparent border border-transparent hover:border-slate-200 focus:border-orange-400 focus:bg-white rounded px-1.5 py-0.5 text-xs outline-none ${className}`}
+      className={`w-full bg-transparent border border-transparent hover:border-slate-200 focus:border-blue-400 focus:bg-white rounded px-1.5 py-0.5 text-xs outline-none ${className}`}
     />
   );
 }

@@ -1,13 +1,16 @@
 // src/views/estimaTp/sousDetail/TpSousDetailEditor.jsx
 // ESTIMA TP — éditeur de sous-détail d'un article (rendement/durée + 5 postes + PV).
+// Mise en page « 1 écran sans scroll » : bandeau récap figé en haut, puis les
+// 5 postes en onglets (segmented control) — un seul poste affiché à la fois.
 import React from 'react';
-import { Gauge, BookOpen, Hammer, Ruler, Clock } from 'lucide-react';
+import { Hammer, Wrench, Users, ShoppingCart, HardHat, Truck, Maximize2 } from 'lucide-react';
 import { NumCell } from './sdShared';
 import { fmt, fmt2 } from './sdFormat';
-import { RessourceTable, FournitureTable, SousTraitanceTable, TransportTable } from './TpDetailTables';
-import { emptyDetail, computeDetail, effectiveDuree, rendementFromDuree, POSTES, POSTE_LABELS } from '../../../utils/tp/tpPriceCompute';
+import { ArticleMetaTiles } from './TpArticleMeta';
+import { PosteTable } from './TpDetailTables';
+import { emptyDetail, computeDetail, effectiveDuree, POSTES, POSTE_LABELS } from '../../../utils/tp/tpPriceCompute';
 
-// Couleurs par poste (classes littérales — requis par le JIT Tailwind)
+// Couleurs par poste (classes littérales — requis par le JIT Tailwind) — barre de répartition
 const POSTE_COLORS = {
   materiel: 'bg-orange-500',
   mo: 'bg-blue-500',
@@ -16,64 +19,58 @@ const POSTE_COLORS = {
   transport: 'bg-amber-500',
 };
 
-export default function TpSousDetailEditor({ item, coef, onChange, onQtyChange, libraryOpen, onToggleLibrary, onActivePoste }) {
+// Icône par poste (onglets) — façon mockup
+const POSTE_ICONS = {
+  materiel: Wrench,
+  mo: Users,
+  fourniture: ShoppingCart,
+  soustraitance: HardHat,
+  transport: Truck,
+};
+
+// Couleur de texte par poste (icône d'onglet = clé de légende du graphique fusionné)
+const POSTE_TEXT = {
+  materiel: 'text-orange-500',
+  mo: 'text-blue-500',
+  fourniture: 'text-emerald-500',
+  soustraitance: 'text-violet-500',
+  transport: 'text-amber-500',
+};
+
+export default function TpSousDetailEditor({ item, coef, onChange, onQtyChange, activePoste, onSelectPoste, onShowAll }) {
   const detail = item.detail || emptyDetail();
   const qte = Number(item.qty || 0);
   const r = computeDetail(detail, qte, coef);
   const duree = effectiveDuree(detail, qte);
 
+  // Poste actif : source de vérité dans le parent → onglet affiché + filtre bibliothèque.
+  const poste = activePoste || 'materiel';
+
   const patch = (p) => onChange({ ...detail, ...p });
   const setBlock = (key) => (lines) => onChange({ ...detail, [key]: lines });
-  // Durée ↔ rendement liés par la quantité : saisir la durée recalcule le rendement.
-  const setDuree = (val) => patch({ rendement: rendementFromDuree(qte, val) });
-  // Tout clic/focus dans un bloc signale le poste actif → le volet bibliothèque s'y filtre.
-  const blockProps = (poste) => ({
-    onMouseDownCapture: () => onActivePoste?.(poste),
-    onFocusCapture: () => onActivePoste?.(poste),
-  });
 
   return (
     <div className="flex flex-col">
-      {/* Bloc résumé FIGÉ (sticky) : en-tête article + récap + répartition par poste */}
-      <div className="sticky top-0 z-20 bg-[#f5f5f7] pt-4 pb-3 space-y-3 border-b border-slate-200/70">
+      {/* Bloc résumé FIGÉ (sticky) : en-tête article + récap (la ventilation par poste
+          est fusionnée dans les onglets ci-dessous). */}
+      <div className="sticky top-0 z-20 bg-[#f5f5f7] pt-2 pb-2 space-y-1.5 border-b border-slate-200/70">
       {/* En-tête article — compact : désignation + quantité / rendement / durée sur une ligne */}
-      <div className="relative bg-gradient-to-br from-orange-50 to-white border border-orange-200 rounded-xl p-2.5 pl-3.5 shadow-sm overflow-hidden flex items-center gap-3 flex-wrap">
+      <div className="relative bg-gradient-to-br from-orange-50 to-white border border-orange-200 rounded-lg py-1.5 pl-3 pr-2 shadow-sm overflow-hidden flex items-center gap-2 flex-wrap">
         <div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-500" />
 
-        {/* Désignation + badge */}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-orange-600 text-white text-[9px] font-black uppercase tracking-widest shrink-0">
-              <Hammer size={10} /> Article
-            </span>
-            {onToggleLibrary && (
-              <button onClick={onToggleLibrary}
-                className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide transition-all shrink-0 ${libraryOpen ? 'bg-orange-600 text-white' : 'bg-white border border-orange-200 text-orange-600 hover:bg-orange-100'}`}
-                title="Insérer des ressources depuis la bibliothèque">
-                <BookOpen size={11} /> Biblio
-              </button>
-            )}
-          </div>
-          <h3 className="text-base font-black text-slate-900 leading-tight tracking-tight truncate mt-1">
+        {/* Désignation + badge sur UNE ligne */}
+        <div className="min-w-0 flex-1 flex items-center gap-2">
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-orange-600 text-white text-[9px] font-black uppercase tracking-widest shrink-0">
+            <Hammer size={10} /> Article
+          </span>
+          <h3 className="text-sm font-black text-slate-900 leading-tight tracking-tight truncate">
             {item.designation || 'Article sans nom'}
           </h3>
         </div>
 
-        {/* 3 mini-tuiles alignées à droite */}
-        <div className="flex items-stretch gap-2 shrink-0">
-          <MiniTile icon={Ruler} label="Quantité" unit={item.unit}>
-            <NumCell value={qte} onCommit={(v) => onQtyChange?.(v)} align="left"
-              className="!border-0 !bg-transparent !px-0 !py-0 !text-base !font-black !text-slate-900" />
-          </MiniTile>
-          <MiniTile icon={Gauge} label="Rendt/j" unit={`${item.unit}/j`}>
-            <NumCell value={detail.rendement} onCommit={(v) => patch({ rendement: v })} placeholder="0" align="left"
-              className="!border-0 !bg-transparent !px-0 !py-0 !text-base !font-black !text-orange-700" />
-          </MiniTile>
-          <MiniTile icon={Clock} label="Durée" unit="j">
-            <NumCell value={duree} onCommit={setDuree} placeholder="0" align="left"
-              className="!border-0 !bg-transparent !px-0 !py-0 !text-base !font-black !text-slate-900" />
-          </MiniTile>
-        </div>
+        {/* Tuiles Quantité / Rendt / Durée (partagées avec la modale « toutes les ressources ») */}
+        <ArticleMetaTiles unit={item.unit} qte={qte} rendement={detail.rendement} duree={duree}
+          onQtyChange={(v) => onQtyChange?.(v)} onRendementChange={(v) => patch({ rendement: v })} />
       </div>
 
       {/* Bandeau récap : total déboursé sec · total vente · PU sec · PU vente · PU forcé */}
@@ -85,62 +82,53 @@ export default function TpSousDetailEditor({ item, coef, onChange, onQtyChange, 
         <ForcedTile detail={detail} unit={item.unit} onChange={patch} />
       </div>
 
-      {/* Répartition du déboursé sec par poste — barre empilée pleine largeur */}
-      <div className="bg-white border border-slate-200 rounded-xl p-2.5">
-        <div className="flex h-3 w-full rounded-full overflow-hidden bg-slate-100">
-          {POSTES.map(p => (r.ratios[p] > 0 ? (
-            <div key={p} className={POSTE_COLORS[p]} style={{ width: `${r.ratios[p] * 100}%` }}
-              title={`${POSTE_LABELS[p]} : ${fmt(r.sec[p])} · ${(r.ratios[p] * 100).toFixed(0)}%`} />
-          ) : null))}
-        </div>
-        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
-          {POSTES.map(p => (
-            <span key={p} className="flex items-center gap-1.5 text-[11px]">
-              <span className={`w-2.5 h-2.5 rounded-sm shrink-0 ${POSTE_COLORS[p]}`} />
-              <span className="text-slate-600">{POSTE_LABELS[p]}</span>
-              <span className="font-bold text-slate-900">{fmt(r.sec[p])}</span>
-              <span className="text-slate-400">{(r.deboursecSec > 0 ? (r.ratios[p] * 100) : 0).toFixed(0)}%</span>
-            </span>
-          ))}
-        </div>
-      </div>
       </div>
 
-      {/* Les 5 postes (scrollent sous le bloc figé) — chaque bloc signale le poste actif */}
-      <div className="space-y-4 pt-3">
-      <div {...blockProps('materiel')}>
-        <RessourceTable title="Matériel (+ chauffeur)" accent="orange" addLabel="Matériel" lines={detail.materiel} onChange={setBlock('materiel')} duree={duree} />
-      </div>
-      <div {...blockProps('mo')}>
-        <RessourceTable title="Main d'œuvre (+ véhicule)" accent="sky" addLabel="Personnel" lines={detail.mo} onChange={setBlock('mo')} duree={duree} />
-      </div>
-      <div {...blockProps('fourniture')}>
-        <FournitureTable lines={detail.fourniture} onChange={setBlock('fourniture')} qteOuvrage={qte} />
-      </div>
-      <div {...blockProps('soustraitance')}>
-        <SousTraitanceTable lines={detail.soustraitance} onChange={setBlock('soustraitance')} qteOuvrage={qte} articleUnit={item.unit} />
-      </div>
-      <div {...blockProps('transport')}>
-        <TransportTable lines={detail.transport} onChange={setBlock('transport')} qteOuvrage={qte} duree={duree} />
-      </div>
-      </div>
-    </div>
-  );
-}
+      {/* Onglets-graphique fusionnés : chaque poste = une mini-barre (montant + % + jauge
+          proportionnelle au déboursé sec) qui sert aussi de sélecteur de la table ci-dessous.
+          Un seul poste affiché à la fois → pas de scroll. */}
+      <div className="pt-3">
+        {/* Bouton « tout afficher » → overlay « toutes les ressources » (5 postes empilés) */}
+        <div className="flex justify-end mb-1.5">
+          <button onClick={onShowAll}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold text-blue-600 hover:text-blue-800 hover:bg-blue-50 transition-colors">
+            <Maximize2 size={13} /> Toutes les ressources
+          </button>
+        </div>
+        <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+          {POSTES.map(p => {
+            const active = p === poste;
+            const Icon = POSTE_ICONS[p];
+            const count = (detail[p] || []).length;
+            const pct = r.deboursecSec > 0 ? r.ratios[p] * 100 : 0;
+            return (
+              <button key={p} onClick={() => onSelectPoste?.(p)} title={`${POSTE_LABELS[p]} : ${fmt(r.sec[p])} · ${pct.toFixed(0)}%`}
+                className={`flex-1 min-w-[128px] rounded-xl border px-3 py-2 text-left transition-all ${active ? 'bg-white border-gray-300 shadow-sm' : 'bg-gray-50 border-transparent hover:bg-white/70'}`}>
+                <span className="flex items-center gap-1.5">
+                  <Icon size={14} strokeWidth={active ? 2 : 1.5} className={POSTE_TEXT[p]} />
+                  <span className={`text-xs font-bold truncate ${active ? 'text-gray-900' : 'text-gray-500'}`}>{POSTE_LABELS[p]}</span>
+                  {count > 0 && (
+                    <span className={`ml-auto shrink-0 px-1.5 rounded-full text-[9px] font-bold ${active ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-500'}`}>{count}</span>
+                  )}
+                </span>
+                <span className="flex items-baseline justify-between mt-1">
+                  <span className={`text-[13px] font-mono font-bold ${active ? 'text-gray-900' : 'text-gray-600'}`}>{fmt(r.sec[p])}</span>
+                  <span className="text-[10px] font-semibold text-gray-400 shrink-0 ml-1">{pct.toFixed(0)}%</span>
+                </span>
+                <span className="mt-1 block h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+                  <span className={`block h-full rounded-full ${POSTE_COLORS[p]}`} style={{ width: `${pct}%` }} />
+                </span>
+              </button>
+            );
+          })}
+        </div>
 
-// Mini-tuile de saisie du header compact (label + icône + valeur + unité + action)
-function MiniTile({ icon: Icon, label, unit, action, children }) {
-  return (
-    <div className="bg-white border border-orange-200/70 rounded-lg px-2.5 py-1 min-w-[94px] transition-shadow focus-within:ring-2 focus-within:ring-orange-200">
-      <div className="flex items-center justify-between gap-1">
-        <span className="flex items-center gap-1 text-[8px] font-bold uppercase tracking-wide text-slate-500">
-          {Icon && <Icon size={10} className="text-orange-500" />}{label}
-        </span>
-        {action}
-      </div>
-      <div className="flex items-baseline gap-1">
-        <div className="flex-1 min-w-0">{children}</div>
-        {unit && <span className="shrink-0 text-[9px] font-semibold text-slate-400 lowercase">{unit}</span>}
+        {/* Table du poste actif uniquement */}
+        <div className="pt-3">
+          <PosteTable poste={poste} detail={detail} onChangeBlock={setBlock}
+            qte={qte} duree={duree} articleUnit={item.unit}
+            onHeaderClick={() => onSelectPoste?.(poste)} />
+        </div>
       </div>
     </div>
   );

@@ -88,7 +88,7 @@ export default function TpLandingView({ studies, loading, onOpen, onCreate, onDe
           </div>
           <div className="flex-1 text-left">
             <div className="text-sm font-semibold text-gray-900">Nouvelle étude de prix</div>
-            <div className="text-xs text-gray-400">Saisir le bordereau à la main (import DPGF Excel à venir en Phase 3)</div>
+            <div className="text-xs text-gray-400">Saisir le bordereau à la main ou importer un DPGF Excel</div>
           </div>
         </button>
 

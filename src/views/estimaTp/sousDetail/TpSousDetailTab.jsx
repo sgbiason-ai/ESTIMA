@@ -3,7 +3,7 @@
 // (façon ESTIMA), sélecteur d'articles compact en haut, éditeur en dessous.
 // Le PU retenu calculé est réinjecté dans le PU de l'article au bordereau.
 import React, { useMemo, useState } from 'react';
-import { Coins, FileWarning } from 'lucide-react';
+import { Coins, FileWarning, Package } from 'lucide-react';
 import { findNode, updateNode } from '../bordereau/tpBordereauModel';
 import {
   computeDetail, emptyDetail, defaultCoefficients,
@@ -12,6 +12,8 @@ import {
 import { useTpResources } from '../../../hooks/useTpResources';
 import { flattenArticles } from './sdFormat';
 import TpSousDetailEditor from './TpSousDetailEditor';
+import TpAllResourcesModal from './TpAllResourcesModal';
+import TpArticleNavigator from './TpArticleNavigator';
 import TpLibraryPanel from '../ressources/TpLibraryPanel';
 
 // Construit une ligne de sous-détail à partir d'une ressource de bibliothèque (sans code).
@@ -32,14 +34,18 @@ function lineFromResource(res) {
   }
 }
 
-export default function TpSousDetailTab({ study, setStudy, companyId }) {
+export default function TpSousDetailTab({ study, setStudy, companyId, selectedId, onSelectArticle }) {
   const chapters = useMemo(() => study?.cadre?.chapters || [], [study?.cadre?.chapters]);
   const coef = study?.coefficients || defaultCoefficients();
   const articles = useMemo(() => flattenArticles(chapters), [chapters]);
-  const [selectedId, setSelectedId] = useState(null);
-  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(true); // ouvert par défaut ; rabattable via la poignée latérale
   const [activePoste, setActivePoste] = useState(null);
+  const [showAll, setShowAll] = useState(false); // overlay « toutes les ressources » (5 postes empilés)
+  const [filterTick, setFilterTick] = useState(0); // bump → re-filtre la biblio même au re-clic du même poste
   const { resources } = useTpResources(companyId);
+
+  // Sélection d'un poste (onglet ou en-tête de table) : poste actif + re-filtrage forcé de la biblio.
+  const selectPoste = (p) => { setActivePoste(p); setFilterTick(t => t + 1); };
 
   const currentId = selectedId && articles.some(a => a.id === selectedId) ? selectedId : (articles[0]?.id || null);
   const selectedItem = currentId ? findNode(chapters, currentId) : null;
@@ -83,27 +89,27 @@ export default function TpSousDetailTab({ study, setStudy, companyId }) {
 
   return (
     <div className="flex-1 flex min-h-0 bg-[#f5f5f7]">
-      {/* Volet bibliothèque (gauche, façon ESTIMA) — filtre suit le bloc actif */}
-      {libraryOpen && (
-        <TpLibraryPanel resources={resources} onInsert={insertFromLibrary} onClose={() => setLibraryOpen(false)} activeCategory={activePoste} />
+      {/* Volet bibliothèque (gauche, façon ESTIMA) — filtre suit le bloc actif.
+          Ouvert par défaut ; rabattable via la croix du volet, ré-ouvrable via la poignée latérale. */}
+      {libraryOpen ? (
+        <TpLibraryPanel resources={resources} onInsert={insertFromLibrary} onClose={() => setLibraryOpen(false)} activeCategory={activePoste} filterTick={filterTick} />
+      ) : (
+        <button
+          onClick={() => setLibraryOpen(true)}
+          title="Ouvrir la bibliothèque de ressources"
+          className="group w-7 shrink-0 bg-white border-r border-slate-200 flex flex-col items-center justify-start py-3 gap-2 hover:bg-orange-50 transition-colors"
+        >
+          <Package size={14} className="text-orange-600 group-hover:scale-110 transition-transform" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 group-hover:text-orange-700"
+                style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+            Bibliothèque
+          </span>
+        </button>
       )}
 
-      <div className="flex-1 flex flex-col min-h-0">
-        {/* Sélecteur d'articles compact (horizontal) */}
-        <div className="shrink-0 flex items-center gap-1.5 px-4 py-2 bg-white border-b border-slate-200 overflow-x-auto">
-          {articles.map(a => {
-            const active = a.id === currentId;
-            return (
-              <button key={a.id} onClick={() => setSelectedId(a.id)}
-                title={a.designation}
-                className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-all ${active ? 'bg-orange-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-                <span className={`text-[10px] font-mono font-bold ${active ? 'text-orange-100' : 'text-slate-400'}`}>{a.num}</span>
-                <span className="font-semibold max-w-[140px] truncate">{a.designation || 'Sans nom'}</span>
-                {a.hasDetail && <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-emerald-300' : 'bg-emerald-500'}`} />}
-              </button>
-            );
-          })}
-        </div>
+      <div className="relative flex-1 flex flex-col min-h-0 min-w-0">
+        {/* Navigateur compact d'articles (recherche + précédent/suivant + compteur) */}
+        <TpArticleNavigator articles={articles} currentId={currentId} onSelect={onSelectArticle} />
 
         {/* Éditeur */}
         <div className="flex-1 overflow-y-auto px-5 pb-5">
@@ -111,10 +117,19 @@ export default function TpSousDetailTab({ study, setStudy, companyId }) {
             ? <TpSousDetailEditor
                 item={{ ...selectedItem, detail: selectedItem.detail || emptyDetail() }}
                 coef={coef} onChange={applyDetail} onQtyChange={applyQty}
-                libraryOpen={libraryOpen} onToggleLibrary={() => setLibraryOpen(o => !o)}
-                onActivePoste={setActivePoste} />
+                activePoste={activePoste} onSelectPoste={selectPoste}
+                onShowAll={() => setShowAll(true)} />
             : <div className="flex items-center justify-center h-full text-slate-400"><Coins size={20} className="mr-2" /> Sélectionnez un article</div>}
         </div>
+
+        {/* Overlay « toutes les ressources » : couvre UNIQUEMENT la zone d'édition (à droite
+            du volet) → la Bibliothèque reste cliquable pour insérer des ressources. */}
+        {showAll && selectedItem && (
+          <TpAllResourcesModal
+            item={{ ...selectedItem, detail: selectedItem.detail || emptyDetail() }}
+            coef={coef} activePoste={activePoste} onSelectPoste={selectPoste}
+            onChange={applyDetail} onQtyChange={applyQty} onClose={() => setShowAll(false)} />
+        )}
       </div>
     </div>
   );

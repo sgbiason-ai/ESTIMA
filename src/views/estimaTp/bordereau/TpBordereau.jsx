@@ -2,21 +2,24 @@
 // Bordereau ESTIMA TP — reprend la « forme du devis » ESTIMA (arborescence
 // chapitres/sous-chapitres/articles, colonnes, repli, glisser-déposer, ƒ(x))
 // sans la machinerie MOE (BPU/tranches/PSE/% client).
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Trash2, GripVertical, ChevronDown, ChevronRight, Plus, FolderPlus, Layers } from 'lucide-react';
 import { TpBordereauContext } from './TpBordereauContext';
 import TpItemList from './TpItemList';
 import {
-  newChapter, newSubChapter, newItem, addNode, removeNode, updateNode, moveNode,
+  newSubChapter, newItem, addNode, removeNode, updateNode, moveNode,
   refMapOf, nodeTotal, countItems, grandTotal,
 } from './tpBordereauModel';
 
 const fmt = (n) => `${Math.round(Number(n || 0)).toLocaleString('fr-FR')} €`;
 
-export default function TpBordereau({ chapters, onChange, readOnly = false }) {
+export default function TpBordereau({ chapters, onChange, readOnly = false, onOpenSousDetail, selectedId: selectedIdProp, onSelectId }) {
   const list = useMemo(() => chapters || [], [chapters]);
-  const [selectedId, setSelectedId] = useState(null);
+  // Sélection contrôlée si le parent fournit selectedId/onSelectId, sinon état interne.
+  const [selectedIdState, setSelectedIdState] = useState(null);
+  const selectedId = selectedIdProp !== undefined ? selectedIdProp : selectedIdState;
+  const setSelectedId = onSelectId || setSelectedIdState;
   const [collapsed, setCollapsed] = useState(() => new Set());
   const [formulaMode, setFormulaMode] = useState({ activeId: null });
 
@@ -31,12 +34,35 @@ export default function TpBordereau({ chapters, onChange, readOnly = false }) {
     setCollapsed(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }, []);
 
+  // Auto-déplie la chaîne d'ancêtres du nœud sélectionné — évite d'insérer (ou de
+  // sélectionner programmatiquement) un nœud invisible dans un chapitre replié.
+  useEffect(() => {
+    if (!selectedId) return;
+    const chain = [];
+    const walk = (arr, parents) => {
+      for (const n of arr || []) {
+        if (!n) continue;
+        if (n.id === selectedId) { chain.push(...parents); return true; }
+        if (n.children && walk(n.children, [...parents, n.id])) return true;
+      }
+      return false;
+    };
+    walk(list, []);
+    if (chain.length === 0) return;
+    setCollapsed(prev => {
+      let next = prev, changed = false;
+      chain.forEach(id => {
+        if (next.has(id)) { if (!changed) { next = new Set(next); changed = true; } next.delete(id); }
+      });
+      return changed ? next : prev;
+    });
+  }, [selectedId, list]);
+
   // Handlers d'édition (immuables, recalcul ƒ(x) intégré au modèle)
   const onUpdateNode = useCallback((id, patch) => onChange(updateNode(list, id, patch)), [list, onChange]);
   const onRemoveNode = useCallback((id) => onChange(removeNode(list, id)), [list, onChange]);
   const onAddItem = useCallback((parentId) => onChange(addNode(list, parentId, newItem())), [list, onChange]);
   const onAddSub = useCallback((parentId) => onChange(addNode(list, parentId, newSubChapter())), [list, onChange]);
-  const addRootChapter = useCallback(() => onChange([...(list || []), newChapter()]), [list, onChange]);
 
   const onDragEnd = useCallback((result) => {
     const { source, destination } = result;
@@ -48,33 +74,24 @@ export default function TpBordereau({ chapters, onChange, readOnly = false }) {
   const ctx = {
     refMap, reverseRefMap, selectedId, setSelectedId, collapsed, toggleCollapsed,
     formulaMode, setFormulaMode, onUpdateNode, onRemoveNode, onAddItem, onAddSub, readOnly,
+    onOpenSousDetail,
   };
 
   const total = grandTotal(list);
 
   return (
     <TpBordereauContext.Provider value={ctx}>
-      {/* Barre d'action */}
-      <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
-        <div className="flex items-center gap-2 text-sm">
-          <span className="px-2.5 py-1 rounded-lg bg-orange-100 text-orange-700 text-xs font-bold">{list.length} chapitre{list.length > 1 ? 's' : ''}</span>
-          <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-xs font-bold">{countItems(list)} article{countItems(list) > 1 ? 's' : ''}</span>
-        </div>
-        {!readOnly && (
-          <button onClick={addRootChapter} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700 active:scale-[0.98] transition-all shadow-sm">
-            <FolderPlus size={16} /> Ajouter un chapitre
-          </button>
-        )}
+      {/* Barre d'action — compteurs ; ajout de chapitre dans le ruban (groupe « Insertion ») */}
+      <div className="flex items-center gap-2 text-sm mb-3">
+        <span className="px-2.5 py-1 rounded-lg bg-orange-100 text-orange-700 text-xs font-bold">{list.length} chapitre{list.length > 1 ? 's' : ''}</span>
+        <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-xs font-bold">{countItems(list)} article{countItems(list) > 1 ? 's' : ''}</span>
       </div>
 
       {list.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 bg-white/60 border border-dashed border-slate-200 rounded-2xl text-center px-6">
           <div className="p-4 rounded-2xl bg-orange-50 mb-4"><Layers size={28} className="text-orange-500" strokeWidth={1.5} /></div>
           <p className="text-sm font-semibold text-slate-700">Bordereau vide</p>
-          <p className="text-xs text-slate-400 mt-1 max-w-sm">Ajoutez des chapitres, sous-chapitres et articles — comme dans un devis ESTIMA.</p>
-          {!readOnly && (
-            <button onClick={addRootChapter} className="mt-4 flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700 transition-all"><FolderPlus size={16} /> Premier chapitre</button>
-          )}
+          <p className="text-xs text-slate-400 mt-1 max-w-sm">Utilisez le ruban (groupe « Insertion ») pour ajouter chapitres, sous-chapitres et articles — comme dans un devis ESTIMA.</p>
         </div>
       ) : (
         <DragDropContext onDragEnd={readOnly ? () => {} : onDragEnd}>

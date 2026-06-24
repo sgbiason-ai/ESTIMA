@@ -31,7 +31,7 @@ function InlineInput({ value, onCommit, className, placeholder, upper = false, s
 
 // ─── Ligne ARTICLE ────────────────────────────────────────────────────────────
 const ItemRow = memo(function ItemRow({ el, index, level }) {
-  const { refMap, selectedId, setSelectedId, onUpdateNode, onRemoveNode, formulaMode, readOnly } = useTpBordereau();
+  const { refMap, selectedId, setSelectedId, onUpdateNode, onRemoveNode, formulaMode, readOnly, onOpenSousDetail } = useTpBordereau();
   const selected = selectedId === el.id;
   const total = Number(el.qty || 0) * Number(el.price || 0);
   const isPM = total === 0;
@@ -58,7 +58,17 @@ const ItemRow = memo(function ItemRow({ el, index, level }) {
             {!readOnly && <GripVertical size={14} />}
           </div>
           <div className="w-16 text-center shrink-0">
-            <span className="text-[10px] font-mono font-bold text-orange-600 bg-orange-50 px-1.5 rounded">{refMap.get(el.id) || '—'}</span>
+            <span
+              onDoubleClick={(e) => {
+                if (formActive || !onOpenSousDetail) return;
+                e.stopPropagation();
+                onOpenSousDetail(el.id);
+              }}
+              title={onOpenSousDetail ? 'Double-cliquer pour ouvrir le sous-détail de prix' : undefined}
+              className={`text-[10px] font-mono font-bold text-orange-600 bg-orange-50 px-1.5 rounded select-none ${onOpenSousDetail && !formActive ? 'cursor-pointer hover:bg-orange-200 hover:ring-1 hover:ring-orange-300' : ''}`}
+            >
+              {refMap.get(el.id) || '—'}
+            </span>
           </div>
           <div className="flex-1 px-2 min-w-0" style={{ paddingLeft: `${level * 18 + 8}px` }}>
             <InlineInput

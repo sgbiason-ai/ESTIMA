@@ -10,7 +10,7 @@ const removeAccents = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').
 const ACCENT = {
   materiel: 'text-orange-700 bg-orange-100/60 border-orange-100', mo: 'text-blue-700 bg-blue-100/60 border-blue-100',
   fourniture: 'text-emerald-700 bg-emerald-100/60 border-emerald-100', soustraitance: 'text-violet-700 bg-violet-100/60 border-violet-100',
-  transport: 'text-sky-700 bg-sky-100/60 border-sky-100',
+  transport: 'text-amber-700 bg-amber-100/60 border-amber-100',
 };
 
 const previewPU = (r) => {
@@ -19,11 +19,12 @@ const previewPU = (r) => {
   return t ? `${t} €/j` : '';
 };
 
-export default function TpLibraryPanel({ resources, onInsert, onClose, activeCategory = null }) {
+export default function TpLibraryPanel({ resources, onInsert, onClose, activeCategory = null, filterTick = 0 }) {
   const [cat, setCat] = useState('all');
   const [search, setSearch] = useState('');
-  // Le filtre suit le bloc cliqué dans le sous-détail (poste actif).
-  useEffect(() => { if (activeCategory) setCat(activeCategory); }, [activeCategory]);
+  // Le filtre suit le bloc cliqué dans le sous-détail (poste actif). `filterTick` force
+  // la ré-application même si on re-clique le même poste (sinon l'effet ne se redéclenche pas).
+  useEffect(() => { if (activeCategory) setCat(activeCategory); }, [activeCategory, filterTick]);
 
   const items = useMemo(() => {
     let l = cat === 'all' ? resources : resources.filter(r => r.category === cat);

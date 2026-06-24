@@ -39,6 +39,19 @@ export function findNode(chapters, id) {
   return null;
 }
 
+/** Id du parent d'un nœud ('root' si chapitre racine, undefined si introuvable). */
+export function findParentId(chapters, id) {
+  const walk = (arr, parentId) => {
+    for (const n of arr || []) {
+      if (!n) continue;
+      if (n.id === id) return parentId;
+      if (n.children) { const r = walk(n.children, n.id); if (r !== undefined) return r; }
+    }
+    return undefined;
+  };
+  return walk(chapters, 'root');
+}
+
 /** Tableau d'enfants d'un parent ('root' = racine), dans l'arbre fourni (référence vivante). */
 function childrenOf(chapters, parentId) {
   if (parentId === 'root') return chapters;
