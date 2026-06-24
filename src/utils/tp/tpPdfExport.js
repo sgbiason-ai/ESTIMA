@@ -5,7 +5,7 @@ import autoTable from 'jspdf-autotable';
 import { buildRefMap } from '../projectCalculations';
 import { saveFileWithPicker, FILE_TYPES, PICKER_IDS } from '../fileSaver';
 import {
-  computeDetail, defaultCoefficients, POSTES, POSTE_LABELS, effectiveDuree,
+  computeDetail, defaultCoefficients, POSTES, POSTE_LABELS, effectiveDuree, effectiveRendement,
   ressourceCosts, fournitureQty, fournitureCost, sousTraitanceCost, sousTraitanceQty, lineDuree,
   transportCost, transportCamions,
 } from './tpPriceCompute';
@@ -72,7 +72,7 @@ export async function generateTpPdf(study) {
     doc.setFontSize(12); doc.setFont(undefined, 'bold'); doc.setTextColor(17, 24, 39);
     doc.text(`${num ? num + ' — ' : ''}${node.designation || ''}`, 14, 16);
     doc.setFontSize(8.5); doc.setFont(undefined, 'normal'); doc.setTextColor(107, 114, 128);
-    doc.text(`Quantité : ${qte} ${node.unit}     Rendement : ${d.rendement || 0}/j     Durée : ${effectiveDuree(d, qte)} j`, 14, 22);
+    doc.text(`Quantité : ${qte} ${node.unit}     Rendement : ${effectiveRendement(d, qte)}/j     Durée : ${effectiveDuree(d, qte)} j`, 14, 22);
 
     let y = 27;
     const res = (key, label) => {

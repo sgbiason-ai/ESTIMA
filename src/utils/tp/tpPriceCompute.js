@@ -163,10 +163,22 @@ export function computeDetail(detail, qteOuvrage, coef = defaultCoefficients()) 
   return { sec, deboursecSec, puSec, pvParPoste, pvTotalTache, puVente, puRetenu, totalVente, ratios, qte, duree };
 }
 
-/** Durée totale = quantité / rendement (liée au rendement, éditable des deux côtés). */
+/** Durée totale de la tâche. Si elle est forcée (dureeForced), on la prend telle quelle
+ *  (valeur exacte saisie, pas d'aller-retour via le rendement) ; sinon = quantité / rendement. */
 export function effectiveDuree(detail, qteOuvrage) {
+  if (detail?.dureeForced) return num(detail?.duree);
   const r = num(detail?.rendement);
   return r > 0 ? r2(num(qteOuvrage) / r) : 0;
+}
+
+/** Rendement effectif : déduit de la durée forcée (quantité / durée) si forcée, sinon
+ *  le rendement saisi. Sert à l'affichage et aux exports (jamais re-injecté dans la durée). */
+export function effectiveRendement(detail, qteOuvrage) {
+  if (detail?.dureeForced) {
+    const d = num(detail?.duree);
+    return d > 0 ? r2(num(qteOuvrage) / d) : 0;
+  }
+  return num(detail?.rendement);
 }
 
 /** Rendement déduit d'une durée saisie : quantité / durée. */

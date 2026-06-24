@@ -5,7 +5,7 @@ import ExcelJS from 'exceljs';
 import { buildRefMap } from '../projectCalculations';
 import { saveFileWithPicker, FILE_TYPES, PICKER_IDS } from '../fileSaver';
 import {
-  computeDetail, defaultCoefficients, POSTES, POSTE_LABELS, effectiveDuree,
+  computeDetail, defaultCoefficients, POSTES, POSTE_LABELS, effectiveDuree, effectiveRendement,
   ressourceCosts, fournitureQty, fournitureCost, sousTraitanceCost, sousTraitanceQty, lineDuree,
   transportCost, transportCamions,
 } from './tpPriceCompute';
@@ -86,7 +86,7 @@ export async function generateTpExcel(study) {
     ws.mergeCells('A1:H1');
     ws.getCell('A1').value = `${num ? num + ' — ' : ''}${node.designation || ''}`;
     ws.getCell('A1').font = { bold: true, size: 12 };
-    ws.addRow([`Quantité : ${qte} ${node.unit}`, '', `Rendement : ${d.rendement || 0}/j`, '', `Durée : ${effectiveDuree(d, qte)} j`]);
+    ws.addRow([`Quantité : ${qte} ${node.unit}`, '', `Rendement : ${effectiveRendement(d, qte)}/j`, '', `Durée : ${effectiveDuree(d, qte)} j`]);
     ws.addRow([]);
 
     const sub = (title) => { const row = ws.addRow([title]); row.font = { bold: true, color: { argb: 'FFB45309' } }; };

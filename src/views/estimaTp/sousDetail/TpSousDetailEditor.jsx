@@ -3,12 +3,12 @@
 // Mise en page « 1 écran sans scroll » : bandeau récap figé en haut, puis les
 // 5 postes en onglets (segmented control) — un seul poste affiché à la fois.
 import React from 'react';
-import { Hammer, Wrench, Users, ShoppingCart, HardHat, Truck, Maximize2 } from 'lucide-react';
+import { Hammer, Wrench, Users, ShoppingCart, HardHat, Truck, LayoutGrid } from 'lucide-react';
 import { NumCell } from './sdShared';
 import { fmt, fmt2 } from './sdFormat';
 import { ArticleMetaTiles } from './TpArticleMeta';
 import { PosteTable } from './TpDetailTables';
-import { emptyDetail, computeDetail, effectiveDuree, POSTES, POSTE_LABELS } from '../../../utils/tp/tpPriceCompute';
+import { emptyDetail, computeDetail, effectiveDuree, effectiveRendement, POSTES, POSTE_LABELS } from '../../../utils/tp/tpPriceCompute';
 
 // Couleurs par poste (classes littérales — requis par le JIT Tailwind) — barre de répartition
 const POSTE_COLORS = {
@@ -69,8 +69,8 @@ export default function TpSousDetailEditor({ item, coef, onChange, onQtyChange, 
         </div>
 
         {/* Tuiles Quantité / Rendt / Durée (partagées avec la modale « toutes les ressources ») */}
-        <ArticleMetaTiles unit={item.unit} qte={qte} rendement={detail.rendement} duree={duree}
-          onQtyChange={(v) => onQtyChange?.(v)} onRendementChange={(v) => patch({ rendement: v })} />
+        <ArticleMetaTiles unit={item.unit} qte={qte} rendement={effectiveRendement(detail, qte)} duree={duree}
+          dureeForced={detail.dureeForced} onQtyChange={(v) => onQtyChange?.(v)} onPatch={patch} />
       </div>
 
       {/* Bandeau récap : total déboursé sec · total vente · PU sec · PU vente · PU forcé */}
@@ -88,13 +88,6 @@ export default function TpSousDetailEditor({ item, coef, onChange, onQtyChange, 
           proportionnelle au déboursé sec) qui sert aussi de sélecteur de la table ci-dessous.
           Un seul poste affiché à la fois → pas de scroll. */}
       <div className="pt-3">
-        {/* Bouton « tout afficher » → overlay « toutes les ressources » (5 postes empilés) */}
-        <div className="flex justify-end mb-1.5">
-          <button onClick={onShowAll}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold text-blue-600 hover:text-blue-800 hover:bg-blue-50 transition-colors">
-            <Maximize2 size={13} /> Toutes les ressources
-          </button>
-        </div>
         <div className="flex gap-1.5 overflow-x-auto pb-0.5">
           {POSTES.map(p => {
             const active = p === poste;
@@ -121,6 +114,26 @@ export default function TpSousDetailEditor({ item, coef, onChange, onQtyChange, 
               </button>
             );
           })}
+
+          {/* 6ᵉ onglet « Toutes » : ouvre la modale des 5 postes empilés. Aligné avec les
+              autres onglets (mêmes dimensions), n'est jamais « actif » (action ponctuelle). */}
+          <button onClick={onShowAll} title="Voir toutes les ressources de la tâche"
+            className="flex-1 min-w-[128px] rounded-xl border border-dashed border-gray-300 bg-gray-50 hover:bg-white hover:border-gray-400 px-3 py-2 text-left transition-all">
+            <span className="flex items-center gap-1.5">
+              <LayoutGrid size={14} strokeWidth={1.5} className="text-gray-500" />
+              <span className="text-xs font-bold truncate text-gray-700">Toutes</span>
+              <span className="ml-auto shrink-0 px-1.5 rounded-full text-[9px] font-bold bg-gray-200 text-gray-500">{POSTES.length}</span>
+            </span>
+            <span className="flex items-baseline justify-between mt-1">
+              <span className="text-[13px] font-mono font-bold text-gray-900">{fmt(r.deboursecSec)}</span>
+              <span className="text-[10px] font-semibold text-gray-400 shrink-0 ml-1">total</span>
+            </span>
+            <span className="mt-1 block h-1.5 w-full rounded-full bg-gray-100 overflow-hidden flex">
+              {POSTES.map(p => (r.ratios[p] > 0
+                ? <span key={p} className={`block h-full ${POSTE_COLORS[p]}`} style={{ width: `${r.ratios[p] * 100}%` }} />
+                : null))}
+            </span>
+          </button>
         </div>
 
         {/* Table du poste actif uniquement */}

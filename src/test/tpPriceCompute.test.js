@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import {
   computeDetail, ressourceCosts, fournitureQty, fournitureCost,
   sousTraitanceQty, sousTraitanceCost, transportQty, transportCost, transportCamions,
-  emptyDetail, defaultCoefficients, effectiveDuree, rendementFromDuree, DEFAULT_COEF,
+  emptyDetail, defaultCoefficients, effectiveDuree, effectiveRendement, rendementFromDuree, DEFAULT_COEF,
 } from '../utils/tp/tpPriceCompute';
 
 // Reproduit l'article 1 du fichier « Sous-détail » : « Enrobés sur 0.05 », 1390 m².
@@ -156,5 +156,21 @@ describe('tpPriceCompute — durée ↔ rendement (liés par la quantité)', () 
   it('valeurs nulles → 0', () => {
     expect(effectiveDuree({ rendement: 0 }, 1390)).toBe(0);
     expect(rendementFromDuree(1390, 0)).toBe(0);
+  });
+});
+
+describe('tpPriceCompute — durée forcée (forfait, pas de dérive d\'arrondi)', () => {
+  it('durée forcée prise telle quelle (forfait qté=1, durée=3 → 3, pas 3,03)', () => {
+    const d = { rendement: 0.33, duree: 3, dureeForced: true };
+    expect(effectiveDuree(d, 1)).toBe(3);
+    // sans forçage, l'aller-retour aurait donné 3,03 :
+    expect(effectiveDuree({ rendement: 0.33 }, 1)).toBe(3.03);
+  });
+  it('rendement effectif déduit de la durée forcée (1 / 3 ≈ 0,33)', () => {
+    expect(effectiveRendement({ duree: 3, dureeForced: true }, 1)).toBe(0.33);
+    expect(effectiveRendement({ duree: 0, dureeForced: true }, 1)).toBe(0);
+  });
+  it('rendement effectif = rendement saisi quand la durée n\'est pas forcée', () => {
+    expect(effectiveRendement({ rendement: 360, dureeForced: false }, 900)).toBe(360);
   });
 });

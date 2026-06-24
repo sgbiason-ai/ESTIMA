@@ -4,10 +4,12 @@
 import React from 'react';
 import { Ruler, Gauge, Clock } from 'lucide-react';
 import { NumCell } from './sdShared';
-import { rendementFromDuree } from '../../../utils/tp/tpPriceCompute';
 
-// Durée et rendement sont liés par la quantité : saisir la durée recalcule le rendement.
-export function ArticleMetaTiles({ unit, qte, rendement, duree, onQtyChange, onRendementChange }) {
+// Durée ⇄ rendement, liés par la quantité. UN des deux pilote (affiché en orange) :
+//  - saisir la Durée la fige (dureeForced) → valeur exacte, le rendement en découle ;
+//  - saisir le Rendement la délie (dureeForced=false) → la durée = quantité / rendement.
+export function ArticleMetaTiles({ unit, qte, rendement, duree, dureeForced = false, onQtyChange, onPatch }) {
+  const driver = dureeForced ? 'duree' : 'rendement';
   return (
     <div className="flex items-stretch gap-2 shrink-0">
       <MiniTile icon={Ruler} label="Quantité" unit={unit}>
@@ -15,17 +17,12 @@ export function ArticleMetaTiles({ unit, qte, rendement, duree, onQtyChange, onR
           className="!border-0 !bg-transparent !px-0 !py-0 !text-base !font-black !text-slate-900" />
       </MiniTile>
       <MiniTile icon={Gauge} label="Rendt/j" unit={`${unit}/j`}>
-        <NumCell value={rendement} onCommit={(v) => onRendementChange?.(v)} placeholder="0" align="left"
-          className="!border-0 !bg-transparent !px-0 !py-0 !text-base !font-black !text-orange-700" />
+        <NumCell value={rendement} onCommit={(v) => onPatch?.({ rendement: v, dureeForced: false })} placeholder="0" align="left"
+          className={`!border-0 !bg-transparent !px-0 !py-0 !text-base !font-black ${driver === 'rendement' ? '!text-orange-700' : '!text-slate-500'}`} />
       </MiniTile>
-      <MiniTile icon={Clock} label="Durée" unit={qte > 0 ? 'j' : ''}>
-        {qte > 0 ? (
-          <NumCell value={duree} onCommit={(v) => onRendementChange?.(rendementFromDuree(qte, v))} placeholder="0" align="left"
-            className="!border-0 !bg-transparent !px-0 !py-0 !text-base !font-black !text-slate-900" />
-        ) : (
-          // Sans quantité, la durée n'a pas de sens : non éditable pour ne pas écraser le rendement à 0.
-          <span className="text-base font-black text-slate-300" title="Définissez d'abord la quantité de l'ouvrage">—</span>
-        )}
+      <MiniTile icon={Clock} label="Durée" unit="j">
+        <NumCell value={duree} onCommit={(v) => onPatch?.({ duree: v, dureeForced: true })} placeholder="0" align="left"
+          className={`!border-0 !bg-transparent !px-0 !py-0 !text-base !font-black ${driver === 'duree' ? '!text-orange-700' : '!text-slate-900'}`} />
       </MiniTile>
     </div>
   );

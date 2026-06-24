@@ -10,6 +10,7 @@ const norm = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCa
 export default function TpArticleNavigator({ articles, currentId, onSelect }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'done' | 'todo'
   const wrapRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -31,18 +32,21 @@ export default function TpArticleNavigator({ articles, currentId, onSelect }) {
   // À l'ouverture : reset recherche + focus.
   useEffect(() => { if (open) { setSearch(''); const t = setTimeout(() => inputRef.current?.focus(), 0); return () => clearTimeout(t); } }, [open]);
 
-  // Liste filtrée, groupée par chapitre (ordre d'origine préservé).
+  // Liste filtrée (statut + recherche), groupée par chapitre (ordre d'origine préservé).
   const groups = useMemo(() => {
     const q = norm(search);
-    const filtered = q ? articles.filter(a => norm(a.num).includes(q) || norm(a.designation).includes(q)) : articles;
+    let l = articles;
+    if (statusFilter === 'done') l = l.filter(a => a.hasDetail);
+    else if (statusFilter === 'todo') l = l.filter(a => !a.hasDetail);
+    if (q) l = l.filter(a => norm(a.num).includes(q) || norm(a.designation).includes(q));
     const map = new Map();
-    filtered.forEach(a => {
+    l.forEach(a => {
       const key = a.chapterTitle || 'Sans chapitre';
       if (!map.has(key)) map.set(key, []);
       map.get(key).push(a);
     });
     return [...map.entries()];
-  }, [articles, search]);
+  }, [articles, search, statusFilter]);
 
   const firstMatch = groups[0]?.[1]?.[0] || null;
   const go = (i) => { const a = articles[i]; if (a) onSelect(a.id); };
@@ -88,6 +92,22 @@ export default function TpArticleNavigator({ articles, currentId, onSelect }) {
                 onKeyDown={(e) => { if (e.key === 'Enter' && firstMatch) select(firstMatch.id); }}
                 placeholder="Rechercher (n° ou désignation)…"
                 className="w-full pl-8 pr-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs outline-none focus:border-orange-400 focus:bg-white" />
+            </div>
+            {/* Filtre par statut de chiffrage */}
+            <div className="mt-2 flex gap-0.5 bg-slate-100 rounded-lg p-0.5">
+              {[
+                { k: 'all', label: 'Toutes', n: total },
+                { k: 'done', label: 'Chiffrées', n: chiffres },
+                { k: 'todo', label: 'Non chiffrées', n: total - chiffres },
+              ].map(o => {
+                const on = statusFilter === o.k;
+                return (
+                  <button key={o.k} onClick={() => setStatusFilter(o.k)}
+                    className={`flex-1 px-2 py-1 rounded-md text-[10px] font-bold transition-colors ${on ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>
+                    {o.label} <span className={on ? 'text-orange-600' : 'text-slate-400'}>{o.n}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
           <div className="max-h-80 overflow-y-auto p-1">
