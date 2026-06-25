@@ -85,6 +85,22 @@ export default function TpResourcesTab({ companyId }) {
     }
   };
 
+  // « Tout exporter » → un seul classeur .xlsx avec un onglet par type.
+  const handleExportAll = async () => {
+    if (!resources.length) { toast.error('Bibliothèque vide — rien à exporter.'); return; }
+    setExporting('all');
+    try {
+      const { exportBaremeAll } = await import('../../../utils/tp/tpBaremeTypeXlsx');
+      const n = await exportBaremeAll(resources);
+      toast.success(`${n} ressource(s) exportée(s) (tous types, un onglet par poste).`);
+    } catch (err) {
+      console.error('[ESTIMA TP] Export complet échoué:', err);
+      toast.error("Export impossible. Réessayez.");
+    } finally {
+      setExporting(null);
+    }
+  };
+
   // Import par type → fusion sans doublon (clé = catégorie + désignation).
   const handleImportType = async (e) => {
     const file = e.target.files?.[0];
@@ -93,11 +109,12 @@ export default function TpResourcesTab({ companyId }) {
     setImporting(true);
     try {
       const { parseBaremeTypeXlsx } = await import('../../../utils/tp/tpBaremeTypeXlsx');
-      const { category, resources: list, error } = await parseBaremeTypeXlsx(file);
+      const { resources: list, categories, error } = await parseBaremeTypeXlsx(file);
       if (error) { toast.error(error); return; }
       if (!list.length) { toast.error('Aucune ressource trouvée dans le fichier.'); return; }
       const { added, updated } = await mergeResources(list);
-      toast.success(`${POSTE_LABELS[category]} : ${added} ajoutée(s), ${updated} mise(s) à jour.`);
+      const lbl = categories.map(c => POSTE_LABELS[c]).join(', ');
+      toast.success(`${lbl} : ${added} ajoutée(s), ${updated} mise(s) à jour.`);
     } catch (err) {
       console.error('[ESTIMA TP] Import barème par type échoué:', err);
       toast.error('Impossible de lire le fichier. Vérifiez le format .xlsx.');
@@ -129,9 +146,14 @@ export default function TpResourcesTab({ companyId }) {
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher…"
               className="w-full pl-9 pr-3 py-1.5 bg-white border border-gray-200/60 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-orange-400" />
           </div>
-          {/* Exporter — un fichier .xlsx par type */}
+          {/* Exporter — tout (un classeur multi-onglets) ou un type (un fichier dédié) */}
           <ActionMenu label="Exporter" icon={Download} busy={!!exporting}>
-            <div className="px-3 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wide text-gray-400">Barème par type (.xlsx)</div>
+            <MenuItem onClick={handleExportAll} disabled={!resources.length}>
+              <span className="font-semibold">Tout exporter</span>
+              <span className="text-xs font-mono text-gray-400">{resources.length}</span>
+            </MenuItem>
+            <div className="my-1 border-t border-gray-100" />
+            <div className="px-3 pt-0.5 pb-1 text-[10px] font-bold uppercase tracking-wide text-gray-400">Par type (.xlsx)</div>
             {POSTES.map(p => (
               <MenuItem key={p} onClick={() => handleExportType(p)} disabled={!counts[p]}>
                 <span>{POSTE_LABELS[p]}</span>

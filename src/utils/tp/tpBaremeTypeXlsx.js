@@ -84,8 +84,8 @@ const getNum = (cell) => { const n = Number(getCellValue(cell)); return Number.i
 export const isValidCategory = (cat) => Boolean(SCHEMAS[cat]);
 
 // ─── EXPORT ─────────────────────────────────────────────────────────────────
-/** Construit le Blob .xlsx d'UN type (sans le sauvegarder). Testable hors navigateur. */
-export async function buildBaremeTypeBlob(category, resources) {
+// Ajoute au classeur un onglet pour `category` (en-tête stylé + lignes). Retourne le nb de lignes.
+function addCategorySheet(wb, category, resources) {
   const schema = SCHEMAS[category];
   if (!schema) throw new Error(`Catégorie inconnue : ${category}`);
 
@@ -93,12 +93,8 @@ export async function buildBaremeTypeBlob(category, resources) {
     .filter(r => r.category === category)
     .sort((a, b) => (a.designation || '').localeCompare(b.designation || '', 'fr'));
 
-  const { default: ExcelJS } = await import('exceljs');
-  const wb = new ExcelJS.Workbook();
-  wb.creator = 'ESTIMA TP';
   const ws = wb.addWorksheet(SHEET_BY_CAT[category], { views: [{ state: 'frozen', ySplit: 1 }] });
 
-  // En-tête
   const head = ws.addRow(schema.map(c => c.header));
   head.font = { bold: true, color: { argb: 'FFFFFFFF' } };
   head.eachCell(c => {
@@ -106,7 +102,6 @@ export async function buildBaremeTypeBlob(category, resources) {
     c.alignment = { horizontal: 'center', vertical: 'middle' };
   });
 
-  // Données
   list.forEach(r => {
     const row = ws.addRow(schema.map(c => {
       if (c.calc) return c.calc(r);
@@ -117,10 +112,29 @@ export async function buildBaremeTypeBlob(category, resources) {
   });
 
   ws.columns.forEach((c, i) => { c.width = i === 0 ? 44 : 16; });
+  return list.length;
+}
 
+/** Construit le Blob .xlsx d'UN type (sans le sauvegarder). Testable hors navigateur. */
+export async function buildBaremeTypeBlob(category, resources) {
+  if (!SCHEMAS[category]) throw new Error(`Catégorie inconnue : ${category}`);
+  const { default: ExcelJS } = await import('exceljs');
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'ESTIMA TP';
+  const count = addCategorySheet(wb, category, resources);
   const buffer = await wb.xlsx.writeBuffer();
-  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  return { blob, count: list.length };
+  return { blob: new Blob([buffer], { type: XLSX_MIME }), count };
+}
+
+/** Construit le Blob .xlsx de TOUS les types (un onglet par poste). Testable hors navigateur. */
+export async function buildBaremeAllBlob(resources) {
+  const { default: ExcelJS } = await import('exceljs');
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'ESTIMA TP';
+  let count = 0;
+  POSTES.forEach(cat => { count += addCategorySheet(wb, cat, resources); });
+  const buffer = await wb.xlsx.writeBuffer();
+  return { blob: new Blob([buffer], { type: XLSX_MIME }), count };
 }
 
 /** Génère et télécharge un .xlsx pour UN type. Retourne le nombre de lignes exportées. */
@@ -128,6 +142,15 @@ export async function exportBaremeType(category, resources, { companyName } = {}
   const { blob, count } = await buildBaremeTypeBlob(category, resources);
   const cn = companyName ? `_${sanitize(companyName)}` : '';
   const name = `Bareme_${FILE_LABEL_BY_CAT[category]}${cn}.xlsx`;
+  await saveFileWithPicker(blob, name, FILE_TYPES.excel, PICKER_IDS.exportExcel);
+  return count;
+}
+
+/** Génère et télécharge un .xlsx complet (tous les postes). Retourne le nombre total de lignes. */
+export async function exportBaremeAll(resources, { companyName } = {}) {
+  const { blob, count } = await buildBaremeAllBlob(resources);
+  const cn = companyName ? `_${sanitize(companyName)}` : '';
+  const name = `Bareme_complet${cn}.xlsx`;
   await saveFileWithPicker(blob, name, FILE_TYPES.excel, PICKER_IDS.exportExcel);
   return count;
 }
@@ -149,27 +172,10 @@ function detectCategory(ws, fileName) {
   return null;
 }
 
-/**
- * Lit un fichier .xlsx « barème par type ».
- * @returns {{ category: string|null, resources: object[], error?: string }}
- */
-export async function parseBaremeTypeXlsx(file) {
-  const { default: ExcelJS } = await import('exceljs');
-  const wb = new ExcelJS.Workbook();
-  await wb.xlsx.load(await file.arrayBuffer());
-  const ws = wb.worksheets[0];
-  if (!ws) return { category: null, resources: [], error: 'Fichier vide ou illisible.' };
-
-  const category = detectCategory(ws, file.name);
-  if (!category) {
-    return {
-      category: null, resources: [],
-      error: "Type non reconnu. Conservez le nom d'onglet d'origine (Matériel, Main d'œuvre, Fournitures, Sous-traitance, Transport) ou exportez d'abord un modèle.",
-    };
-  }
-
+// Lit les lignes d'un onglet selon le schéma de sa catégorie.
+function parseSheet(ws, category) {
   const schema = SCHEMAS[category];
-  const resources = [];
+  const out = [];
   ws.eachRow((row, rn) => {
     if (rn === 1) return; // en-tête
     const designation = String(getCellValue(row.getCell(1))).trim(); // colonne 1 = Désignation
@@ -185,8 +191,35 @@ export async function parseBaremeTypeXlsx(file) {
         r[c.key] = v;
       }
     });
-    resources.push(r);
+    out.push(r);
+  });
+  return out;
+}
+
+/**
+ * Lit un fichier .xlsx « barème » : parcourt TOUS les onglets reconnus (1 type ou complet).
+ * @returns {{ resources: object[], categories: string[], error?: string }}
+ */
+export async function parseBaremeTypeXlsx(file) {
+  const { default: ExcelJS } = await import('exceljs');
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(await file.arrayBuffer());
+  if (!wb.worksheets.length) return { resources: [], categories: [], error: 'Fichier vide ou illisible.' };
+
+  const resources = [];
+  const categories = [];
+  wb.worksheets.forEach(ws => {
+    const category = detectCategory(ws, file.name);
+    if (!category) return;
+    if (!categories.includes(category)) categories.push(category);
+    resources.push(...parseSheet(ws, category));
   });
 
-  return { category, resources };
+  if (!categories.length) {
+    return {
+      resources: [], categories: [],
+      error: "Type non reconnu. Conservez le nom d'onglet d'origine (Matériel, Main d'œuvre, Fournitures, Sous-traitance, Transport) ou exportez d'abord un modèle.",
+    };
+  }
+  return { resources, categories };
 }
