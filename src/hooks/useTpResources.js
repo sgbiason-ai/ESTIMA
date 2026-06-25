@@ -87,5 +87,39 @@ export function useTpResources(companyId) {
     return n;
   }, [companyId, reload]);
 
-  return { resources, loading, reload, saveResource, deleteResource, importResources };
+  // Fusion sans doublon (import par type). Clé = catégorie + désignation normalisée :
+  // une ligne dont la clé existe déjà MET À JOUR la ressource, les autres sont CRÉÉES.
+  // Le fichier est aussi dédoublonné en interne (dernière occurrence d'une clé gagne).
+  const mergeResources = useCallback(async (list) => {
+    if (!companyId || !Array.isArray(list) || list.length === 0) return { added: 0, updated: 0 };
+    const colRef = collection(db, 'companies', companyId, 'tpResources');
+    const norm = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+    const keyOf = (r) => `${r.category}::${norm(r.designation)}`;
+
+    const existing = new Map();
+    resources.forEach(r => existing.set(keyOf(r), r.id));
+
+    const byKey = new Map();
+    list.forEach(r => { if (norm(r.designation)) byKey.set(keyOf(r), r); });
+
+    const ops = [];
+    let added = 0, updated = 0;
+    byKey.forEach((r, key) => {
+      const data = { ...r }; delete data.id;
+      const id = existing.get(key);
+      if (id) { ops.push({ id, data }); updated++; }
+      else { ops.push({ id: `tpres_${generateId()}`, data }); added++; }
+    });
+
+    const CHUNK = 450;
+    for (let i = 0; i < ops.length; i += CHUNK) {
+      const b = writeBatch(db);
+      ops.slice(i, i + CHUNK).forEach(({ id, data }) => b.set(doc(colRef, id), data, { merge: true }));
+      await b.commit();
+    }
+    await reload();
+    return { added, updated };
+  }, [companyId, resources, reload]);
+
+  return { resources, loading, reload, saveResource, deleteResource, importResources, mergeResources };
 }
