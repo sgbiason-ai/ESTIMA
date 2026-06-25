@@ -3,7 +3,8 @@ import { describe, it, expect } from 'vitest';
 import {
   computeDetail, ressourceCosts, fournitureQty, fournitureCost,
   sousTraitanceQty, sousTraitanceCost, transportQty, transportCost, transportCamions,
-  emptyDetail, defaultCoefficients, effectiveDuree, effectiveRendement, rendementFromDuree, DEFAULT_COEF,
+  emptyDetail, defaultCoefficients, effectiveDuree, effectiveRendement, rendementFromDuree,
+  detailCalcQty, DEFAULT_COEF,
 } from '../utils/tp/tpPriceCompute';
 
 // Reproduit l'article 1 du fichier « Sous-détail » : « Enrobés sur 0.05 », 1390 m².
@@ -103,6 +104,58 @@ describe('tpPriceCompute — déboursé = coût sur la durée totale / quantité
     expect(r.sec.materiel).toBe(0);
     // les fournitures (basées sur la quantité) restent comptées
     expect(r.sec.fourniture).toBeCloseTo(14861.88, 2);
+  });
+});
+
+describe('tpPriceCompute — quantité de calcul (unité différente du cadre)', () => {
+  it('detailCalcQty : quantité de calcul si > 0, sinon quantité du cadre', () => {
+    expect(detailCalcQty({ qteCalcul: 300 }, 1000)).toBe(300);
+    expect(detailCalcQty({ qteCalcul: 0 }, 1000)).toBe(1000);
+    expect(detailCalcQty({ qteCalcul: null }, 1000)).toBe(1000);
+    expect(detailCalcQty({}, 1000)).toBe(1000);
+  });
+
+  it('le rendement/durée court sur la qté de calcul, le PU divise par la qté du cadre', () => {
+    // Décapage facturé au m² (1000 m²), piloté en m³ (300 m³). Pelle 200 m³/j → 1,5 j.
+    const d = emptyDetail();
+    d.rendement = 200; d.qteCalcul = 300; d.uniteCalcul = 'm³';
+    d.materiel = [{ nombre: 1, puJour: 500 }];
+    const r = computeDetail(d, 1000, defaultCoefficients());
+    expect(r.qteCalc).toBe(300);
+    expect(r.duree).toBe(1.5);          // 300 / 200
+    expect(r.sec.materiel).toBe(750);   // 1 × 1,5 × 500
+    expect(r.deboursecSec).toBe(750);
+    expect(r.puSec).toBe(0.75);         // 750 / 1000 (quantité du cadre)
+  });
+
+  it('les quantités des lignes suivent la quantité de calcul (si remplie)', () => {
+    // Qté de calcul 300 m³ : la sous-traitance sans qté propre prend 300 (et non 1000),
+    // la fourniture en direct reste à sa valeur saisie, le PU divise par le cadre (1000).
+    const d = emptyDetail();
+    d.qteCalcul = 300; d.uniteCalcul = 'm³';
+    d.soustraitance = [{ puBareme: 10 }];     // qté non renseignée → défaut = quantité de calcul
+    const r = computeDetail(d, 1000, defaultCoefficients());
+    expect(r.sec.soustraitance).toBe(3000);   // 300 × 10 (et non 1000 × 10)
+    expect(r.puSec).toBe(3);                   // 3000 / 1000 (PU ÷ quantité du cadre)
+  });
+
+  it('fourniture épaisseur×densité calculée depuis la quantité de calcul', () => {
+    const d = emptyDetail();
+    d.qteCalcul = 300; d.uniteCalcul = 'm³';
+    d.fourniture = [{ epaisseur: 0.3, densite: 1.8, puBareme: 10 }];
+    const r = computeDetail(d, 1000, defaultCoefficients());
+    expect(fournitureQty(d.fourniture[0], 300)).toBeCloseTo(162, 2); // 300 × 0,3 × 1,8
+    expect(r.sec.fourniture).toBeCloseTo(1620, 2);                   // 162 × 10
+  });
+
+  it('sans qté de calcul → comportement identique (durée sur la quantité du cadre)', () => {
+    const d = emptyDetail();
+    d.rendement = 500;
+    d.materiel = [{ nombre: 1, puJour: 500 }];
+    const r = computeDetail(d, 1000, defaultCoefficients());
+    expect(r.qteCalc).toBe(1000);
+    expect(r.duree).toBe(2);            // 1000 / 500
+    expect(r.sec.materiel).toBe(1000);  // 1 × 2 × 500
   });
 });
 

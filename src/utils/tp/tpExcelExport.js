@@ -6,8 +6,8 @@ import { buildRefMap } from '../projectCalculations';
 import { saveFileWithPicker, FILE_TYPES, PICKER_IDS } from '../fileSaver';
 import {
   computeDetail, defaultCoefficients, POSTES, POSTE_LABELS, effectiveDuree, effectiveRendement,
-  ressourceCosts, fournitureQty, fournitureCost, sousTraitanceCost, sousTraitanceQty, lineDuree,
-  transportCost, transportCamions,
+  detailCalcQty, ressourceCosts, fournitureQty, fournitureCost, sousTraitanceCost, sousTraitanceQty,
+  lineDuree, transportCost, transportCamions,
 } from './tpPriceCompute';
 
 const EUR = '# ##0.00 "€"';
@@ -81,12 +81,20 @@ export async function generateTpExcel(study) {
     const d = node.detail;
     const r = computeDetail(d, qte, coef);
     const duree = r.duree;
+    const qteCalc = detailCalcQty(d, qte);          // quantité de calcul (lignes + rendement)
+    const hasCalc = Number(d?.qteCalcul) > 0;
+    const calcUnit = (d?.uniteCalcul || node.unit || '');
     const ws = wb.addWorksheet(safeSheet(num ? `${num}` : node.designation, used));
 
     ws.mergeCells('A1:H1');
     ws.getCell('A1').value = `${num ? num + ' — ' : ''}${node.designation || ''}`;
     ws.getCell('A1').font = { bold: true, size: 12 };
-    ws.addRow([`Quantité : ${qte} ${node.unit}`, '', `Rendement : ${effectiveRendement(d, qte)}/j`, '', `Durée : ${effectiveDuree(d, qte)} j`]);
+    ws.addRow([
+      `Quantité : ${qte} ${node.unit}`, '',
+      hasCalc ? `Qté calcul : ${qteCalc} ${calcUnit}` : '', '',
+      `Rendement : ${effectiveRendement(d, qteCalc)}/j`, '',
+      `Durée : ${effectiveDuree(d, qteCalc)} j`,
+    ]);
     ws.addRow([]);
 
     const sub = (title) => { const row = ws.addRow([title]); row.font = { bold: true, color: { argb: 'FFB45309' } }; };
@@ -112,7 +120,7 @@ export async function generateTpExcel(study) {
       colHead(['Désignation', 'U', 'Épaiss.', 'Densité', 'Qté', 'PU barème', 'PU forcé', 'Total']);
       d.fourniture.forEach(l => {
         const row = ws.addRow([l.designation || '', l.unit || '', Number(l.epaisseur || 0), Number(l.densite || 0),
-          fournitureQty(l, qte), Number(l.puBareme || 0), Number(l.puForce || 0), fournitureCost(l, qte)]);
+          fournitureQty(l, qteCalc), Number(l.puBareme || 0), Number(l.puForce || 0), fournitureCost(l, qteCalc)]);
         [6, 7, 8].forEach(i => { row.getCell(i).numFmt = EUR; });
       });
       ws.addRow([]);
@@ -123,7 +131,7 @@ export async function generateTpExcel(study) {
       sub('SOUS-TRAITANCE');
       colHead(['Désignation', 'U', 'Qté', 'PU barème', 'PU forcé', 'Total']);
       d.soustraitance.forEach(l => {
-        const row = ws.addRow([l.designation || '', l.unit || '', sousTraitanceQty(l, qte), Number(l.puBareme || 0), Number(l.puForce || 0), sousTraitanceCost(l, qte)]);
+        const row = ws.addRow([l.designation || '', l.unit || '', sousTraitanceQty(l, qteCalc), Number(l.puBareme || 0), Number(l.puForce || 0), sousTraitanceCost(l, qteCalc)]);
         [4, 5, 6].forEach(i => { row.getCell(i).numFmt = EUR; });
       });
       ws.addRow([]);
@@ -136,7 +144,7 @@ export async function generateTpExcel(study) {
       d.transport.forEach(l => {
         const row = ws.addRow([l.designation || '', l.unit || '', Number(l.epaisseur || 0), Number(l.densite || 0),
           Number(l.contenance || 0), Number(l.voyagesParJour || 0), Number(l.coutJour || 0),
-          transportCamions(l, qte, duree), transportCost(l, qte)]);
+          transportCamions(l, qteCalc, duree), transportCost(l, qteCalc)]);
         [7, 9].forEach(i => { row.getCell(i).numFmt = EUR; });
       });
       ws.addRow([]);

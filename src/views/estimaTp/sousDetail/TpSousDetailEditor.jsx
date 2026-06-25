@@ -3,12 +3,12 @@
 // Mise en page « 1 écran sans scroll » : bandeau récap figé en haut, puis les
 // 5 postes en onglets (segmented control) — un seul poste affiché à la fois.
 import React from 'react';
-import { Hammer, Wrench, Users, ShoppingCart, HardHat, Truck, LayoutGrid } from 'lucide-react';
+import { Hammer, Wrench, Users, ShoppingCart, HardHat, Truck, LayoutGrid, AlertTriangle } from 'lucide-react';
 import { NumCell } from './sdShared';
 import { fmt, fmt2 } from './sdFormat';
 import { ArticleMetaTiles } from './TpArticleMeta';
 import { PosteTable } from './TpDetailTables';
-import { emptyDetail, computeDetail, effectiveDuree, effectiveRendement, POSTES, POSTE_LABELS } from '../../../utils/tp/tpPriceCompute';
+import { emptyDetail, computeDetail, effectiveDuree, effectiveRendement, detailCalcQty, POSTES, POSTE_LABELS } from '../../../utils/tp/tpPriceCompute';
 
 // Couleurs par poste (classes littérales — requis par le JIT Tailwind) — barre de répartition
 const POSTE_COLORS = {
@@ -39,9 +39,16 @@ const POSTE_TEXT = {
 
 export default function TpSousDetailEditor({ item, coef, onChange, onQtyChange, activePoste, onSelectPoste, onShowAll }) {
   const detail = item.detail || emptyDetail();
-  const qte = Number(item.qty || 0);
+  const qte = Number(item.qty || 0);              // quantité du cadre (bordereau)
+  const qteCalc = detailCalcQty(detail, qte);     // quantité de calcul (rendement/durée)
   const r = computeDetail(detail, qte, coef);
-  const duree = effectiveDuree(detail, qte);
+  const duree = effectiveDuree(detail, qteCalc);
+
+  // Alerte (non bloquante) : ressources Matériel/MO présentes mais aucune durée globale
+  // (ni rendement, ni durée forcée) → leurs coûts restent à 0. On ignore les lignes ayant
+  // leur propre durée forcée (elles ne dépendent pas du rendement global).
+  const timeLines = [...(detail.materiel || []), ...(detail.mo || [])];
+  const rendementMissing = duree <= 0 && timeLines.some(l => !l.dureeForced);
 
   // Poste actif : source de vérité dans le parent → onglet affiché + filtre bibliothèque.
   const poste = activePoste || 'materiel';
@@ -68,10 +75,19 @@ export default function TpSousDetailEditor({ item, coef, onChange, onQtyChange, 
           </h3>
         </div>
 
-        {/* Tuiles Quantité / Rendt / Durée (partagées avec la modale « toutes les ressources ») */}
-        <ArticleMetaTiles unit={item.unit} qte={qte} rendement={effectiveRendement(detail, qte)} duree={duree}
+        {/* Tuiles Quantité / Qté calcul / Rendt / Durée (partagées avec la modale « toutes les ressources ») */}
+        <ArticleMetaTiles unit={item.unit} qte={qte} calcQte={detail.qteCalcul} calcUnit={detail.uniteCalcul}
+          rendement={effectiveRendement(detail, qteCalc)} duree={duree} rendementMissing={rendementMissing}
           dureeForced={detail.dureeForced} onQtyChange={(v) => onQtyChange?.(v)} onPatch={patch} />
       </div>
+
+      {/* Alerte non bloquante : rendement/durée manquant alors que des ressources temps existent. */}
+      {rendementMissing && (
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-700">
+          <AlertTriangle size={14} className="shrink-0" />
+          <span className="text-[11px] font-semibold">Rendement (ou durée) manquant — les coûts Matériel / Main d'œuvre restent à 0.</span>
+        </div>
+      )}
 
       {/* Bandeau récap : total déboursé sec · total vente · PU sec · PU vente · PU forcé */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
@@ -139,7 +155,7 @@ export default function TpSousDetailEditor({ item, coef, onChange, onQtyChange, 
         {/* Table du poste actif uniquement */}
         <div className="pt-3">
           <PosteTable poste={poste} detail={detail} onChangeBlock={setBlock}
-            qte={qte} duree={duree} articleUnit={item.unit}
+            qte={qteCalc} duree={duree} articleUnit={detail.uniteCalcul || item.unit}
             onHeaderClick={() => onSelectPoste?.(poste)} />
         </div>
       </div>

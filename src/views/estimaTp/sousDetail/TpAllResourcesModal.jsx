@@ -4,18 +4,23 @@
 // Bibliothèque, à gauche de cette zone, reste visible et cliquable pour insérer des
 // ressources. Cliquer l'en-tête coloré d'un poste filtre la bibliothèque sur ce poste.
 import React, { useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, AlertTriangle } from 'lucide-react';
 import { fmt, fmt2 } from './sdFormat';
 import { ArticleMetaTiles } from './TpArticleMeta';
 import { PosteTable } from './TpDetailTables';
-import { emptyDetail, computeDetail, effectiveDuree, effectiveRendement, POSTES } from '../../../utils/tp/tpPriceCompute';
+import { emptyDetail, computeDetail, effectiveDuree, effectiveRendement, detailCalcQty, POSTES } from '../../../utils/tp/tpPriceCompute';
 
 export default function TpAllResourcesModal({ item, coef, activePoste, onSelectPoste, onChange, onQtyChange, onClose }) {
   const detail = item.detail || emptyDetail();
-  const qte = Number(item.qty || 0);
+  const qte = Number(item.qty || 0);              // quantité du cadre (bordereau)
+  const qteCalc = detailCalcQty(detail, qte);     // quantité de calcul (rendement/durée)
   const r = computeDetail(detail, qte, coef);
-  const duree = effectiveDuree(detail, qte);
+  const duree = effectiveDuree(detail, qteCalc);
   const setBlock = (key) => (lines) => onChange({ ...detail, [key]: lines });
+
+  // Alerte non bloquante : ressources temps (Matériel/MO) sans durée globale → coûts à 0.
+  const timeLines = [...(detail.materiel || []), ...(detail.mo || [])];
+  const rendementMissing = duree <= 0 && timeLines.some(l => !l.dureeForced);
 
   // Fermeture sur Échap.
   useEffect(() => {
@@ -53,15 +58,23 @@ export default function TpAllResourcesModal({ item, coef, activePoste, onSelectP
               </span>
               <span className="text-[9px] font-mono font-semibold text-slate-500">total {fmt(r.deboursecSec)}</span>
             </div>
-            <ArticleMetaTiles unit={item.unit} qte={qte} rendement={effectiveRendement(detail, qte)} duree={duree}
+            <ArticleMetaTiles unit={item.unit} qte={qte} calcQte={detail.qteCalcul} calcUnit={detail.uniteCalcul}
+              rendement={effectiveRendement(detail, qteCalc)} duree={duree} rendementMissing={rendementMissing}
               dureeForced={detail.dureeForced} onQtyChange={(v) => onQtyChange?.(v)} onPatch={(p) => onChange({ ...detail, ...p })} />
           </div>
+          {/* Alerte non bloquante : rendement/durée manquant alors que des ressources temps existent. */}
+          {rendementMissing && (
+            <div className="mt-2 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-700">
+              <AlertTriangle size={14} className="shrink-0" />
+              <span className="text-[11px] font-semibold">Rendement (ou durée) manquant — les coûts Matériel / Main d'œuvre restent à 0.</span>
+            </div>
+          )}
         </div>
         {/* Corps : 5 postes empilés, en-têtes colorés cliquables */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {POSTES.map(p => (
             <PosteTable key={p} poste={p} detail={detail} onChangeBlock={setBlock}
-              qte={qte} duree={duree} articleUnit={item.unit}
+              qte={qteCalc} duree={duree} articleUnit={detail.uniteCalcul || item.unit}
               onHeaderClick={() => onSelectPoste?.(p)} active={p === activePoste} collapseEmpty />
           ))}
         </div>

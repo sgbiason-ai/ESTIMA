@@ -166,7 +166,7 @@ export default function EstimaTpView({ companyId, onBackToHub }) {
     if (!findNode(chs, bordereauSelId)) setBordereauSelId(null);
   }, [study?.cadre?.chapters, bordereauSelId]);
 
-  // ── Exports (Excel / PDF) ──
+  // ── Exports (Excel / PDF Bordereau / PDF Sous-détails) ──
   const handleExport = async (kind) => {
     if (exporting || !study) return;
     setExporting(kind);
@@ -174,13 +174,16 @@ export default function EstimaTpView({ companyId, onBackToHub }) {
       if (kind === 'excel') {
         const { generateTpExcel } = await import('../../utils/tp/tpExcelExport');
         await generateTpExcel(study);
-      } else {
-        const { generateTpPdf } = await import('../../utils/tp/tpPdfExport');
-        await generateTpPdf(study);
+      } else if (kind === 'pdf-bordereau') {
+        const { generateTpBordereauPdf } = await import('../../utils/tp/tpPdfExport');
+        await generateTpBordereauPdf(study, { companyId });
+      } else if (kind === 'pdf-sd') {
+        const { generateTpSousDetailPdf } = await import('../../utils/tp/tpPdfExport');
+        await generateTpSousDetailPdf(study, { companyId });
       }
     } catch (e) {
       console.error('[ESTIMA TP] Export échoué:', e);
-      toast.error('Export impossible. Réessayez.');
+      toast.error(e?.message || 'Export impossible. Réessayez.');
     } finally {
       setExporting(null);
     }
@@ -284,8 +287,9 @@ export default function EstimaTpView({ companyId, onBackToHub }) {
           {isEditing && (
             <RibbonGroup label="Export">
               <div className="flex flex-col gap-[3px] justify-center">
-                <RibbonBtnSmall icon={exporting === 'excel' ? Loader2 : Table2} label="Excel" onClick={() => handleExport('excel')} disabled={!!exporting || !hasChapters} accent="text-emerald-600" title="Exporter le DQE chiffré (Excel)" />
-                <RibbonBtnSmall icon={exporting === 'pdf' ? Loader2 : FileText} label="PDF" onClick={() => handleExport('pdf')} disabled={!!exporting || !hasChapters} accent="text-red-500" title="Exporter le DQE chiffré (PDF)" />
+                <RibbonBtnSmall icon={exporting === 'excel' ? Loader2 : Table2} label="Excel DQE" onClick={() => handleExport('excel')} disabled={!!exporting || !hasChapters} accent="text-emerald-600" title="Exporter le bordereau chiffré (Excel)" />
+                <RibbonBtnSmall icon={exporting === 'pdf-bordereau' ? Loader2 : FileText} label="PDF Bordereau" onClick={() => handleExport('pdf-bordereau')} disabled={!!exporting || !hasChapters} accent="text-red-500" title="Exporter le bordereau chiffré (PDF, portrait)" />
+                <RibbonBtnSmall icon={exporting === 'pdf-sd' ? Loader2 : FileText} label="PDF Sous-détails" onClick={() => handleExport('pdf-sd')} disabled={!!exporting || !hasChapters} accent="text-orange-500" title="Exporter les sous-détails de prix (1 page par article, paysage)" />
               </div>
             </RibbonGroup>
           )}

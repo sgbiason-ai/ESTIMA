@@ -22,8 +22,8 @@ export const defaultCoefficients = () => ({
   soustraitance: DEFAULT_COEF, transport: DEFAULT_COEF,
 });
 
-const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
-const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+export const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+export const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 
 // ─── Fabriques de lignes ──────────────────────────────────────────────────────
 // Matériel / Main d'œuvre : même structure (part personnel + part matériel/véhicule
@@ -53,6 +53,10 @@ export const newTransportLine = (over = {}) => ({
 
 export const emptyDetail = () => ({
   rendement: 0, duree: 1, dureeForced: false,
+  // Quantité/unité « de calcul » : permet de raisonner le rendement dans une autre
+  // unité que celle du cadre (ex. décapage facturé au m² mais calculé en m³). Vides
+  // (null/'') → on reste sur la quantité d'ouvrage du bordereau.
+  qteCalcul: null, uniteCalcul: '',
   materiel: [], mo: [], fourniture: [], soustraitance: [], transport: [],
   pvForce: null,
 });
@@ -124,6 +128,15 @@ export const transportCamions = (line, qteOuvrage, duree) => {
 /** Coût transport = camions-jours × coût journalier du camion. */
 export const transportCost = (line, qteOuvrage) => r2(camionsJours(line, qteOuvrage) * num(line?.coutJour));
 
+/** Quantité « de calcul » : pilote le rendement & la durée. Si une quantité de calcul
+ *  a été saisie (> 0, ex. décapage exprimé en m³), c'est elle qui sert ; sinon on retombe
+ *  sur la quantité d'ouvrage du bordereau. La division du déboursé pour obtenir le PU reste
+ *  TOUJOURS faite sur la quantité du cadre (voir computeDetail). */
+export function detailCalcQty(detail, qteCadre) {
+  const q = num(detail?.qteCalcul);
+  return q > 0 ? q : num(qteCadre);
+}
+
 // ─── Calcul complet d'un sous-détail ──────────────────────────────────────────
 /**
  * @param {object} detail  sous-détail (emptyDetail())
@@ -133,15 +146,19 @@ export const transportCost = (line, qteOuvrage) => r2(camionsJours(line, qteOuvr
  */
 export function computeDetail(detail, qteOuvrage, coef = defaultCoefficients()) {
   const d = detail || emptyDetail();
-  const qte = num(qteOuvrage);
-  const duree = effectiveDuree(d, qte); // durée totale = quantité / rendement (ou forcée)
+  const qte = num(qteOuvrage);            // quantité du cadre (bordereau) → division du PU
+  const qteCalc = detailCalcQty(d, qte);  // quantité de calcul → rendement & durée
+  const duree = effectiveDuree(d, qteCalc); // durée totale = qté de calcul / rendement (ou forcée)
   const sec = { materiel: 0, mo: 0, fourniture: 0, soustraitance: 0, transport: 0 };
 
+  // Matériel/MO : pilotés par la durée. Fourniture/Sous-traitance/Transport : pilotés par
+  // la quantité de CALCUL (= qté de calcul saisie, sinon qté du cadre). Le PU final divise
+  // toujours par la quantité du cadre (voir plus bas).
   (d.materiel || []).forEach(l => { sec.materiel += ressourceCosts(l, duree); });
   (d.mo || []).forEach(l => { sec.mo += ressourceCosts(l, duree); });
-  (d.fourniture || []).forEach(l => { sec.fourniture += fournitureCost(l, qte); });
-  (d.soustraitance || []).forEach(l => { sec.soustraitance += sousTraitanceCost(l, qte); });
-  (d.transport || []).forEach(l => { sec.transport += transportCost(l, qte); });
+  (d.fourniture || []).forEach(l => { sec.fourniture += fournitureCost(l, qteCalc); });
+  (d.soustraitance || []).forEach(l => { sec.soustraitance += sousTraitanceCost(l, qteCalc); });
+  (d.transport || []).forEach(l => { sec.transport += transportCost(l, qteCalc); });
 
   POSTES.forEach(p => { sec[p] = r2(sec[p]); });
 
@@ -160,7 +177,7 @@ export function computeDetail(detail, qteOuvrage, coef = defaultCoefficients()) 
   const ratios = {};
   POSTES.forEach(p => { ratios[p] = deboursecSec > 0 ? r2(sec[p] / deboursecSec) : 0; });
 
-  return { sec, deboursecSec, puSec, pvParPoste, pvTotalTache, puVente, puRetenu, totalVente, ratios, qte, duree };
+  return { sec, deboursecSec, puSec, pvParPoste, pvTotalTache, puVente, puRetenu, totalVente, ratios, qte, qteCalc, duree };
 }
 
 /** Durée totale de la tâche. Si elle est forcée (dureeForced), on la prend telle quelle
