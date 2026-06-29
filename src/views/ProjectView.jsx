@@ -287,7 +287,7 @@ const ProjectView = ({
 
   const { activeTrancheId, setActiveTrancheId, tranches, hasTranches, isGlobalMode, addTranche, removeTranche } = useProjectTranches(project, updateProjectItem);
 
-  const { studyQtyMaps, clientQtyMap, clientQtyMaps, displayProject, refMap, duplicateIndex, pseDeltaMap, pseCandidatesFor, pseNumbers, projectStats, currentStats, totalBase } = useProjectCalculations({
+  const { studyQtyMaps, clientQtyMap, clientQtyMaps, displayProject, refMap, duplicateIndex, pseDeltaMap, pseCandidatesFor, pseNumbers, projectStats, totalBase, valoirTotals, etudeTotals } = useProjectCalculations({
     project: viewedProject, clientPercent, hasTranches, tranches, activeTrancheId, currentMode, bpuConfig
   });
 
@@ -823,6 +823,7 @@ const ProjectView = ({
       collapsedIds, toggleCollapsed,
       duplicateIndex, revealAndFlashItem,
       pseDeltaMap, pseCandidatesFor, pseNumbers,
+      valoirTotals, etudeTotals,
       onEditItem: (item) => {
         const bpuSource = allBpuItems?.find(b => String(b.id) === String(item?.uid) || String(b.uid) === String(item?.uid));
         setEditItemTarget({
@@ -947,7 +948,8 @@ const ProjectView = ({
                   {(provided) => (
                     <div ref={provided.innerRef} {...provided.droppableProps} className="p-4 space-y-8">
                       {displayProject?.chapters?.map((chap, index) => {
-                        const chapTotal = currentStats?.chapters?.[chap.id] || 0;
+                        // Total de chapitre = quantités « à valoir » (rendu), quel que soit le mode.
+                        const chapTotal = projectStats?.client?.chapters?.[chap.id] || 0;
                         const isCollapsed = collapsedIds.has(chap.id);
                         const nbLines = isCollapsed ? countTreeItems(chap.children) : 0;
                         return (

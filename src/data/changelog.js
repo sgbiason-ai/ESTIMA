@@ -8,8 +8,9 @@ export const CHANGELOG = [
   {
     version: '3.5.1',
     date: '2026-06-29',
-    title: 'RAO/Analyse — quantités à valoir dans les exports des affaires à tranches',
+    title: 'Estimation & RAO/Analyse — les totaux reprennent les quantités à valoir',
     highlights: [
+      'Estimation — tous les montants TOTAUX affichés reprennent désormais les quantités À VALOIR (majorées pour le client) : la pastille de total de chaque chapitre, les sous-totaux des sous-chapitres et des blocs, le total de chaque ligne et le total du pied de page. C\'est le total « commercial » (celui qui sera rendu au client) qui apparaît partout, alors qu\'auparavant ces totaux affichaient les quantités d\'étude. Les quantités que vous saisissez restent celles d\'étude — un total de ligne peut donc volontairement différer de « qté saisie × PU ». En activant le bouton « Rendu », une colonne secondaire rappelle, en regard, le total à l\'étude (quantités brutes) et le pied de page garde ses deux colonnes Étude / À valoir',
       'RAO & Analyse des prix — correctif des quantités dans les exports des affaires découpées en tranches : sur ces projets, le détail par tranche du PDF « Rapport d\'analyse (RAO) » (sur ordinateur comme sur mobile) ainsi que les onglets par tranche de l\'export Excel d\'analyse affichaient les quantités d\'ÉTUDE au lieu des quantités À VALOIR (majorées pour le client). Ces documents reprennent désormais exactement les mêmes quantités à valoir que le tableau d\'analyse à l\'écran et que le total global — les montants estimés et les totaux entreprises par tranche sont corrigés en conséquence. Les affaires sans tranche n\'étaient pas concernées',
     ],
   },

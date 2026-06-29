@@ -323,7 +323,10 @@ const ItemRow = memo(
     };
 
     const price = Number(el.price || 0);
-    const lineTotal = displayedQty * price;
+    const studyLineTotal = qtyStudy * price;     // total d'étude (qté saisie × PU)
+    const clientLineTotal = qtyClient * price;   // total « à valoir » (qté majorée × PU)
+    // Total prominent = quantités à valoir (rendu), quel que soit le mode.
+    const lineTotal = clientLineTotal;
 
     let diffTotal = 0, diffQty = 0, diffPercent = 0;
     if (showComparison && isReadOnly) {
@@ -634,8 +637,8 @@ const ItemRow = memo(
               </div>
             </div>
 
-            {/* Total ligne */}
-            <div className="w-28 text-right px-3 shrink-0 flex flex-col justify-center items-end h-full">
+            {/* Total ligne = quantité à valoir (rendu) × PU */}
+            <div className="w-28 text-right px-3 shrink-0 flex flex-col justify-center items-end h-full" title="Total à valoir (quantité majorée pour le client × prix unitaire)">
               {showComparison && isReadOnly ? (
                 <>
                   <span className="text-[11px] font-mono font-black text-slate-900">{isPM ? 'PM' : formatPrice(lineTotal)}</span>
@@ -652,15 +655,15 @@ const ItemRow = memo(
               )}
             </div>
 
-            {/* Total au rendu (mode Étude) : qté majorée × PU, à côté du total d'étude */}
+            {/* Total à l'étude (mode Étude) : qté saisie × PU, en référence à côté du total à valoir prominent */}
             {showRendu && viewMode === 'study' && (
-              <div className="w-24 text-right px-2 shrink-0 flex flex-col justify-center items-end h-full" title="Total au rendu (quantité majorée × prix unitaire)">
-                <span className={`text-[11px] font-mono font-black ${qtyClient !== qtyStudy ? 'text-indigo-600' : 'text-slate-300'}`}>
-                  {isPM ? 'PM' : formatPrice(qtyClient * price)}
+              <div className="w-24 text-right px-2 shrink-0 flex flex-col justify-center items-end h-full" title="Total à l'étude (quantité saisie × prix unitaire)">
+                <span className={`text-[11px] font-mono font-bold ${studyLineTotal !== lineTotal ? 'text-emerald-600' : 'text-slate-300'}`}>
+                  {isPM ? 'PM' : formatPrice(studyLineTotal)}
                 </span>
-                {qtyClient !== qtyStudy && (qtyClient * price - lineTotal) !== 0 && (
-                  <span className="text-[8px] font-bold text-emerald-600 leading-none">
-                    {(qtyClient * price - lineTotal) > 0 ? '+' : ''}{formatPrice(qtyClient * price - lineTotal)}
+                {studyLineTotal !== lineTotal && (
+                  <span className="text-[8px] font-bold text-slate-400 leading-none">
+                    {(studyLineTotal - lineTotal) > 0 ? '+' : ''}{formatPrice(studyLineTotal - lineTotal)}
                   </span>
                 )}
               </div>
@@ -702,16 +705,18 @@ const DEPTH_BG = [
   'bg-slate-50 border border-slate-200 shadow-sm',
 ];
 
-const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly, viewMode, showRendu, clientQtyMap, bpuConfig, onUpdate, onSelect, onModal, stableKey, activeTrancheId, isGlobalMode, insertTargetId, treeNumber, collapsed, onToggleCollapse, pseInfo, pseNumber, pseCandidates, onPseChange }) => {
+const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly, viewMode, showRendu, clientQtyMap, valoirTotals, etudeTotals, bpuConfig, onUpdate, onSelect, onModal, stableKey, activeTrancheId, isGlobalMode, insertTargetId, treeNumber, collapsed, onToggleCollapse, pseInfo, pseNumber, pseCandidates, onPseChange }) => {
   const draggableId = `chapter:${stableKey}`;
-  const total = sumNodeTotal(el, viewMode === 'client', clientQtyMap);
-  // Total du chapitre/bloc au rendu (quantités majorées) — pour la colonne « Total rendu ».
-  const renduTotal = sumNodeTotal(el, true, clientQtyMap);
+  // Total prominent du (sous-)chapitre = quantités « à valoir » (rendu), delta PSE inclus,
+  // quel que soit le mode. La source unique est valoirTotals (moteur de calcul).
+  const total = valoirTotals?.[el.id] ?? sumNodeTotal(el, true, clientQtyMap);
+  // Total d'étude (quantités brutes saisies) — affiché en référence secondaire (mode Étude).
+  const etudeTotal = etudeTotals?.[el.id] ?? sumNodeTotal(el, false, clientQtyMap);
   const depthBg = DEPTH_BG[Math.min(level, DEPTH_BG.length - 1)];
   const nbLines = collapsed ? countTreeItems(el.children) : 0;
-  // PSE substitution : on affiche le delta (montant PSE − base) au lieu du total plein.
+  // PSE substitution : on affiche le delta (montant PSE − base) — déjà inclus dans valoirTotals.
   const isSubPse = !!el.isOption && el.pseMode === 'substitution' && pseInfo && !pseInfo.missing;
-  const displayTotal = isSubPse ? pseInfo.delta : total;
+  const displayTotal = total;
   // Plus-value (delta ≥ 0) / moins-value (delta < 0) — terminologie alignée sur PDF/Excel.
   const pseTotalTitle = isSubPse
     ? `${displayTotal >= 0 ? 'Plus-value' : 'Moins-value'} PSE (montant PSE − prestation de base remplacée)`
@@ -893,14 +898,14 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
                         {isSubPse && displayTotal >= 0 ? '+' : ''}{formatPrice(displayTotal)}
                       </div>
                       {showRendu && viewMode === 'study' && (
-                        <div className="w-24 text-right px-2 shrink-0 leading-none flex flex-col justify-center items-end" title="Total du bloc au rendu (quantités majorées)">
+                        <div className="w-24 text-right px-2 shrink-0 leading-none flex flex-col justify-center items-end" title="Total du bloc à l'étude (quantités brutes)">
                           {isSubPse ? (
                             <span className="text-[9px] font-mono text-slate-300">—</span>
                           ) : (
                             <>
-                              <span className={`text-[11px] font-mono font-black ${renduTotal !== total ? 'text-indigo-600' : 'text-slate-300'}`}>{formatPrice(renduTotal)}</span>
-                              {renduTotal !== total && (
-                                <span className="text-[8px] font-bold text-emerald-600 leading-none">{(renduTotal - total) > 0 ? '+' : ''}{formatPrice(renduTotal - total)}</span>
+                              <span className={`text-[11px] font-mono font-bold ${etudeTotal !== total ? 'text-emerald-600' : 'text-slate-300'}`}>{formatPrice(etudeTotal)}</span>
+                              {etudeTotal !== total && (
+                                <span className="text-[8px] font-bold text-slate-400 leading-none">{(etudeTotal - total) > 0 ? '+' : ''}{formatPrice(etudeTotal - total)}</span>
                               )}
                             </>
                           )}
@@ -914,14 +919,14 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
                         {isSubPse && displayTotal >= 0 ? '+' : ''}{formatPrice(displayTotal)}
                       </div>
                       {showRendu && viewMode === 'study' && (
-                        <div className="w-24 text-right px-2 shrink-0 leading-none flex flex-col justify-center items-end" title="Total du chapitre au rendu (quantités majorées)">
+                        <div className="w-24 text-right px-2 shrink-0 leading-none flex flex-col justify-center items-end" title="Total du chapitre à l'étude (quantités brutes)">
                           {isSubPse ? (
                             <span className="text-[9px] font-mono text-slate-300">—</span>
                           ) : (
                             <>
-                              <span className={`text-[11px] font-mono font-black ${renduTotal !== total ? 'text-indigo-600' : 'text-slate-300'}`}>{formatPrice(renduTotal)}</span>
-                              {renduTotal !== total && (
-                                <span className="text-[8px] font-bold text-emerald-600 leading-none">{(renduTotal - total) > 0 ? '+' : ''}{formatPrice(renduTotal - total)}</span>
+                              <span className={`text-[11px] font-mono font-bold ${etudeTotal !== total ? 'text-emerald-600' : 'text-slate-300'}`}>{formatPrice(etudeTotal)}</span>
+                              {etudeTotal !== total && (
+                                <span className="text-[8px] font-bold text-slate-400 leading-none">{(etudeTotal - total) > 0 ? '+' : ''}{formatPrice(etudeTotal - total)}</span>
                               )}
                             </>
                           )}
@@ -977,6 +982,7 @@ const ItemList = ({ items, parentId, level = 0, bpuConfig, parentNumber = '' }) 
     collapsedIds, toggleCollapsed,
     duplicateIndex, revealAndFlashItem,
     pseDeltaMap, pseCandidatesFor, pseNumbers,
+    valoirTotals, etudeTotals,
   } = useContext(ProjectContext);
 
   const hasMultiSelection = multiSelection && multiSelection.size > 0;
@@ -1071,6 +1077,8 @@ const ItemList = ({ items, parentId, level = 0, bpuConfig, parentNumber = '' }) 
         treeNumber={treeNumber}
         collapsed={collapsedIds?.has(el.id) || false}
         onToggleCollapse={toggleCollapsed}
+        valoirTotals={valoirTotals}
+        etudeTotals={etudeTotals}
         pseInfo={pseDeltaMap?.get(el.id) || null}
         pseNumber={pseNumbers?.get(el.id) || null}
         pseCandidates={el.isOption && pseCandidatesFor ? pseCandidatesFor(el.id) : []}

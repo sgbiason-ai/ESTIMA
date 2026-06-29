@@ -247,7 +247,7 @@ export const useProjectCalculations = ({
 
   // --- STATISTIQUES ---
   const projectStats = useMemo(() => {
-    if (!displayProject || !displayProject.chapters) return { study: { base: 0, option: 0, chapters: {} }, client: { base: 0, option: 0, chapters: {} } };
+    if (!displayProject || !displayProject.chapters) return { study: { base: 0, option: 0, chapters: {}, nodeTotals: {} }, client: { base: 0, option: 0, chapters: {}, nodeTotals: {} } };
     const qtyOf = (node, isClientMode) => {
         if (isClientMode) return clientQtyMap.get(String(node.id)) || 0;
         const sVal = studyQtyMaps[activeTrancheId || 'global'];
@@ -259,17 +259,21 @@ export const useProjectCalculations = ({
         let globalBase = 0;
         let globalOption = 0;
         const chapterStats = {};
+        // Total par (sous-)chapitre — delta PSE inclus — pour l'affichage des totaux
+        // de section (pastille chapitre + sous-totaux de sous-chapitre / bloc).
+        const nodeTotals = {};
         displayProject.chapters.forEach(chap => {
             const calcNode = (node, parentIsOption) => {
-                let b = 0;
-                let o = 0;
                 const isEffectiveOption = parentIsOption || !!node.isOption;
                 // PSE substitution valide : on compte le delta et on NE descend PAS
                 // dans le sous-arbre (sinon double comptage). La base reste au Total Base.
                 const pse = pseDeltas.get(node.id);
                 if (pse && !pse.missing) {
+                    if (node.type !== 'item') nodeTotals[node.id] = pse.delta;
                     return { base: 0, option: pse.delta };
                 }
+                let b = 0;
+                let o = 0;
                 if (node.type === 'item') {
                     const q = qtyOf(node, isClientMode);
                     const p = Number(node.price || 0);
@@ -282,6 +286,7 @@ export const useProjectCalculations = ({
                         o += option;
                     });
                 }
+                if (node.type !== 'item') nodeTotals[node.id] = b + o;
                 return { base: b, option: o };
             };
             const { base, option } = calcNode(chap, false);
@@ -289,7 +294,7 @@ export const useProjectCalculations = ({
             globalBase += base;
             globalOption += option;
         });
-        return { base: globalBase, option: globalOption, chapters: chapterStats };
+        return { base: globalBase, option: globalOption, chapters: chapterStats, nodeTotals };
     };
     return { study: processMode(false), client: processMode(true) };
   }, [displayProject, clientQtyMap, studyQtyMaps, hasTranches, activeTrancheId]);
@@ -312,6 +317,10 @@ export const useProjectCalculations = ({
     projectStats,
     currentStats,
     totalBase,
-    totalOption
+    totalOption,
+    // Totaux de section « à valoir » (rendu) et « étude » par (sous-)chapitre / bloc —
+    // delta PSE inclus. Le total affiché des sections = à valoir, quel que soit le mode.
+    valoirTotals: projectStats.client.nodeTotals,
+    etudeTotals: projectStats.study.nodeTotals
   };
 };
