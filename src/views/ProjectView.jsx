@@ -256,7 +256,8 @@ const ProjectView = ({
   };
   const [showComparison, setShowComparison] = useState(false);
   // Mode Étude : colonne « Rendu » (qté majorée client) à côté de la qté réelle.
-  const [showRendu, setShowRendu] = useState(false);
+  // Actif par défaut → la comparaison Étude/Rendu est visible dès l'ouverture.
+  const [showRendu, setShowRendu] = useState(true);
 
   useEffect(() => {
     if (project && project.__isNew) {
