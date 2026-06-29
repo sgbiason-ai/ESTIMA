@@ -2,12 +2,13 @@
 // Detail d'une note de frais mensuelle : tableau des trajets + ajout/edition.
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Plus, Trash2, ArrowLeft, FileDown, Mail, Search, Copy, X, Car as CarIcon, Map as MapIcon, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, ArrowLeft, FileDown, Mail, Search, Copy, X, Car as CarIcon, Map as MapIcon, ChevronDown, List, CalendarDays } from 'lucide-react';
 import { calculateMonthAmount, calculateAnnualAmount, getActiveTranche, getMarginalRate, getRateForTranche, getTrancheLabel, PUISSANCES } from '../../data/baremeFiscal2025';
 import { getTripTotalKm } from '../../utils/distanceMargin';
 import { getHolidayLabel, getWeekendName } from '../../utils/frenchHolidays';
 import { getMotifColor } from '../../utils/motifColors';
 import TripFormModal from './TripFormModal';
+import MonthCalendarView from './MonthCalendarView';
 import MonthTripsMap from '../../components/expenseNotes/MonthTripsMap';
 import { confirm, toast } from '../../utils/globalUI';
 import { generateExpenseNotesPdf } from '../../utils/pdf/pdfExpenseNotesGenerator';
@@ -66,6 +67,18 @@ const ExpenseNotesMonthView = ({ month, expense, branding, user, onBack, onBackT
   const [editingKmValue, setEditingKmValue] = useState('');
   const [recentlyTouchedId, setRecentlyTouchedId] = useState(null);
   const [showMailModal, setShowMailModal] = useState(false);
+  // Bascule liste / calendrier (preference memorisee)
+  const [viewMode, setViewMode] = useState(() => {
+    try {
+      return localStorage.getItem('estima_expense_viewmode') === 'calendar' ? 'calendar' : 'list';
+    } catch {
+      return 'list';
+    }
+  });
+  const changeViewMode = (mode) => {
+    setViewMode(mode);
+    try { localStorage.setItem('estima_expense_viewmode', mode); } catch { /* ignore */ }
+  };
   const searchInputRef = useRef(null);
   const { config: smtpConfig } = useSmtpConfig();
 
@@ -266,6 +279,48 @@ const ExpenseNotesMonthView = ({ month, expense, branding, user, onBack, onBackT
     setShowForm(true);
   };
 
+  // Calendrier : ouvre le formulaire pre-rempli a la date cliquee (nouveau trajet).
+  const handleAddTripForDate = (dateIso) => {
+    setEditingTrip({ date: dateIso });
+    setShowForm(true);
+  };
+
+  // Calendrier : glisser-deposer d'un trajet vers un autre jour -> change sa date.
+  // Intra-mois uniquement (les jours hors mois ne sont pas des cibles de drop).
+  const handleMoveTrip = (tripId, newDateIso) => {
+    if (!newDateIso || newDateIso.slice(0, 7) !== month) return;
+    expense.updateTrip(month, tripId, { date: newDateIso })
+      .then(() => {
+        setRecentlyTouchedId(tripId);
+        setTimeout(() => setRecentlyTouchedId((id) => id === tripId ? null : id), 1800);
+      })
+      .catch((err) => {
+        console.error('[ExpenseNotes] move trip failed', err);
+        toast.error(`Échec du déplacement : ${err?.message || err}`);
+      });
+  };
+
+  // Calendrier : depot avec duplication -> copie le trajet source a la nouvelle
+  // date (l'original est conserve). On repart des donnees brutes en base (sans
+  // l'id ni les champs calcules effectiveKm/amount portes par tripsWithAmount).
+  const handleCopyTrip = (tripId, newDateIso) => {
+    if (!newDateIso || newDateIso.slice(0, 7) !== month) return;
+    const src = (note.trips || []).find((t) => t.id === tripId);
+    if (!src) return;
+    const { id: _id, ...rest } = src;
+    expense.addTrip(month, { ...rest, date: newDateIso })
+      .then((newId) => {
+        if (newId) {
+          setRecentlyTouchedId(newId);
+          setTimeout(() => setRecentlyTouchedId((x) => x === newId ? null : x), 1800);
+        }
+      })
+      .catch((err) => {
+        console.error('[ExpenseNotes] copy trip failed', err);
+        toast.error(`Échec de la duplication : ${err?.message || err}`);
+      });
+  };
+
   // Inline edit du km : passe la cellule en input, save sur Enter/blur, ESC = cancel
   const startEditKm = (trip) => {
     setEditingKmTripId(trip.id);
@@ -341,6 +396,31 @@ const ExpenseNotesMonthView = ({ month, expense, branding, user, onBack, onBackT
         </button>
         <div className="h-5 w-px bg-gray-200/60" />
         <h1 className="font-bold text-lg text-gray-900 tracking-tight">{monthLabel} {year}</h1>
+
+        {/* Bascule liste / calendrier (segmented control Apple) */}
+        <div className="ml-3 flex items-center bg-gray-100 p-0.5 rounded-xl">
+          <button
+            onClick={() => changeViewMode('list')}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              viewMode === 'list' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}
+            title="Vue liste"
+          >
+            <List size={14} />
+            Liste
+          </button>
+          <button
+            onClick={() => changeViewMode('calendar')}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              viewMode === 'calendar' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}
+            title="Vue calendrier"
+          >
+            <CalendarDays size={14} />
+            Calendrier
+          </button>
+        </div>
+
         <div className="flex-1" />
         <button
           onClick={handleExportPdf}
@@ -402,6 +482,19 @@ const ExpenseNotesMonthView = ({ month, expense, branding, user, onBack, onBackT
           </div>
         </div>
 
+        {viewMode === 'calendar' ? (
+          <MonthCalendarView
+            month={month}
+            tripsWithAmount={tripsWithAmount}
+            onEditTrip={(trip) => { setEditingTrip(trip); setShowForm(true); }}
+            onAddTripForDate={handleAddTripForDate}
+            onMoveTrip={handleMoveTrip}
+            onCopyTrip={handleCopyTrip}
+            onDeleteTrip={handleDeleteTrip}
+            onDuplicateTrip={handleDuplicateTrip}
+          />
+        ) : (
+        <>
         {/* Carte du mois (panneau dépliable) */}
         {tripsWithAmount.length > 0 && (
           <div className="mb-6">
@@ -645,6 +738,8 @@ const ExpenseNotesMonthView = ({ month, expense, branding, user, onBack, onBackT
             })
           )}
         </div>
+        </>
+        )}
       </div>
 
       {showForm && (
