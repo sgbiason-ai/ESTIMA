@@ -27,6 +27,21 @@ import { getCurrentPhaseCode } from './phaseModel';
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 const rgb = ([r, g, b]) => `rgb(${r},${g},${b})`;
 
+// Tronque `text` avec « … » pour tenir dans maxWidthPx (unités du contexte canvas),
+// à la police COURANTE de ctx. Renvoie la chaîne ajustée (ne dessine rien).
+function fitCanvasText(ctx, text, maxWidthPx) {
+  const s = String(text ?? '');
+  if (!s || !(maxWidthPx > 0) || ctx.measureText(s).width <= maxWidthPx) return s;
+  const ell = '…';
+  const ellW = ctx.measureText(ell).width;
+  let lo = 0, hi = s.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (ctx.measureText(s.slice(0, mid)).width + ellW <= maxWidthPx) lo = mid; else hi = mid - 1;
+  }
+  return s.slice(0, lo).trimEnd() + ell;
+}
+
 // Equivalent de jsPDF.splitTextToSize
 // ctx doit avoir la bonne police active avant l'appel
 const splitTextToSize = (ctx, text, maxWidthMm) => {
@@ -349,7 +364,7 @@ export const buildCoverPageCanvas = async (project, docLabel, branding = null, t
     ctx.font = `bold ${ptpx(7)}px Helvetica, Arial, sans-serif`;
     ctx.fillStyle = rgb(THEME.primary);
     ctx.textAlign = 'left';
-    ctx.fillText(branding.companyName.toUpperCase(), px(18), px(footerY - 3));
+    ctx.fillText(fitCanvasText(ctx, branding.companyName.toUpperCase(), px((PW - 36) / 2 - 4)), px(18), px(footerY - 3));
 
     if (branding.tagline) {
       ctx.font = `normal ${ptpx(6)}px Helvetica, Arial, sans-serif`;
@@ -362,7 +377,7 @@ export const buildCoverPageCanvas = async (project, docLabel, branding = null, t
       ctx.font = `normal ${ptpx(6)}px Helvetica, Arial, sans-serif`;
       ctx.fillStyle = rgb(THEME.lightText);
       ctx.textAlign = 'right';
-      ctx.fillText(contactParts.join('  ·  '), px(PW - 18), px(footerY - 3));
+      ctx.fillText(fitCanvasText(ctx, contactParts.join('  ·  '), px((PW - 36) / 2 - 4)), px(PW - 18), px(footerY - 3));
     }
 
     ctx.font = `normal ${ptpx(6)}px Helvetica, Arial, sans-serif`;

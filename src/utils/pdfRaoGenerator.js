@@ -5,7 +5,7 @@
 
 import { DEFAULT_CRITERIA, DEFAULT_ADMIN_PIECES, DEFAULT_OFFER_PIECES } from '../hooks/useRao';
 import { normalizeUnitSymbol } from './helpers';
-import { formatNumberFr, cleanText, loadLogos, drawCoverPage as _drawCoverPage } from './pdf/pdfSharedHelpers';
+import { formatNumberFr, cleanText, loadLogos, drawCoverPage as _drawCoverPage, fitTextToWidth } from './pdf/pdfSharedHelpers';
 import { buildTheme as _buildTheme } from './pdf/buildTheme';
 import { getCurrentPhaseCode } from './phaseModel';
 import { computeVatBreakdown } from './financeFormat';
@@ -696,24 +696,29 @@ export const generateRaoPDF = async (optionsParams) => {
   const depouillementBody = [];
 
   analysisCompanies.forEach((c, idx) => {
-    // Ligne entreprise (offre de base)
-    const aeAmount = c.aeAmount != null ? fmt(c.aeAmount) + ' €' : '—';
+    // Ligne entreprise (offre de base) — montant HT relevé sur l'AE + TTC au taux du projet
+    const aeAmountHt = c.aeAmount != null ? fmt(c.aeAmount) + ' €' : '—';
+    const aeAmountTtc = c.aeAmount != null
+      ? fmt(computeVatBreakdown(c.aeAmount, projectTvaRate).ttc) + ' €'
+      : '—';
     depouillementBody.push([
       { content: String(idx + 1), styles: { halign: 'center', fontStyle: 'bold' } },
       { content: cleanText(c.name), styles: { fontStyle: 'bold' } },
-      { content: aeAmount, styles: { halign: 'right', fontStyle: 'bold' } },
+      { content: aeAmountHt, styles: { halign: 'right', fontStyle: 'bold' } },
+      { content: aeAmountTtc, styles: { halign: 'right', fontStyle: 'bold' } },
       { content: (c.variants || []).length > 0 ? `${c.variants.length} variante${c.variants.length > 1 ? 's' : ''}` : '—', styles: { fontSize: 7, halign: 'center' } },
     ]);
 
-    // Une ligne supplémentaire par variante (montant explicite)
+    // Une ligne supplémentaire par variante (montant HT + TTC explicites)
     (c.variants || []).forEach((v, vi) => {
-      const vAmount = v.aeAmount != null
-        ? fmt(v.aeAmount) + ' €'
-        : (v.total ? fmt(v.total) + ' €' : '—');
+      const vHt = v.aeAmount != null ? v.aeAmount : (v.total != null ? v.total : null);
+      const vAmountHt = vHt != null ? fmt(vHt) + ' €' : '—';
+      const vAmountTtc = vHt != null ? fmt(computeVatBreakdown(vHt, projectTvaRate).ttc) + ' €' : '—';
       depouillementBody.push([
         { content: '', styles: { } },
         { content: `   > V${vi + 1} ${cleanText(v.label || `Variante ${vi + 1}`)}`, styles: { fontSize: 7, textColor: [88, 28, 135], fontStyle: 'italic' } },
-        { content: vAmount, styles: { halign: 'right', fontSize: 7, textColor: [88, 28, 135], fontStyle: 'italic' } },
+        { content: vAmountHt, styles: { halign: 'right', fontSize: 7, textColor: [88, 28, 135], fontStyle: 'italic' } },
+        { content: vAmountTtc, styles: { halign: 'right', fontSize: 7, textColor: [88, 28, 135], fontStyle: 'italic' } },
         { content: '', styles: { } },
       ]);
     });
@@ -721,11 +726,11 @@ export const generateRaoPDF = async (optionsParams) => {
 
   autoTable(doc, {
     startY: y,
-    head: [['N°', 'Entreprise / Variante', 'Montant AE annoncé', 'Variantes']],
+    head: [['N°', 'Entreprise / Variante', 'Montant AE HT', 'Montant AE TTC', 'Variantes']],
     body: depouillementBody,
     styles: { font: 'Helvetica', fontSize: 8, cellPadding: 3 },
     headStyles: { fillColor: THEME.primary, textColor: [255, 255, 255], fontStyle: 'bold' },
-    columnStyles: { 0: { cellWidth: 10 }, 2: { cellWidth: 40 }, 3: { cellWidth: 30, halign: 'center' } },
+    columnStyles: { 0: { cellWidth: 10 }, 2: { cellWidth: 33, halign: 'right' }, 3: { cellWidth: 33, halign: 'right' }, 4: { cellWidth: 26, halign: 'center' } },
     alternateRowStyles: { fillColor: THEME.tableAlt },
     margin: { left: M, right: M },
     didDrawPage: () => drawFooter(doc, pageNum, consultation, project, THEME),
@@ -735,7 +740,8 @@ export const generateRaoPDF = async (optionsParams) => {
   // Note de bas
   doc.setFontSize(7);
   doc.setTextColor(120, 120, 120);
-  const noteAe = "Les montants ci-dessus sont ceux relevés sur les actes d'engagement (AE) à l'ouverture des plis. Ils engagent contractuellement les soumissionnaires (article L2113-1 CCP). Toute divergence avec le total recalculé à partir du BPU sera signalée à la section Conformité.";
+  const tvaPct = (projectTvaRate * 100).toLocaleString('fr-FR', { maximumFractionDigits: 2 });
+  const noteAe = `Les montants HT ci-dessus sont ceux relevés sur les actes d'engagement (AE) à l'ouverture des plis ; le montant TTC est calculé au taux de TVA du projet (${tvaPct} %). Ils engagent contractuellement les soumissionnaires (article L2113-1 CCP). Toute divergence avec le total recalculé à partir du BPU sera signalée à la section Conformité.`;
   drawJustifiedText(doc, noteAe, M, y, W - 2 * M, 4);
 
   // ── ANALYSE ADMINISTRATIVE — Tableau comparatif avec colonnes subdivisées pour groupements ──
@@ -1002,7 +1008,7 @@ export const generateRaoPDF = async (optionsParams) => {
           doc.setFontSize(7);
           doc.setTextColor(120, 60, 0);
           const reasonLabel = admin.autoFlaggedReason === 'quantity_mismatch' ? 'Flag automatique : quantités du DQE modifiées par le soumissionnaire (L2152-2)' : `Flag automatique : ${admin.autoFlaggedReason}`;
-          doc.text(reasonLabel, M + 3, y);
+          doc.text(fitTextToWidth(doc, reasonLabel, W - 2 * M - 6), M + 3, y);
           y += 5;
         }
 
@@ -1521,7 +1527,7 @@ export const generateRaoPDF = async (optionsParams) => {
           doc.setFont('Helvetica', 'bold');
           doc.setFontSize(10);
           doc.setTextColor(...VERT_FONCE);
-          doc.text(`${cleanText(c.name)} — V${vi + 1} ${v.label ? `(${cleanText(v.label)})` : ''}`, M + 3, y + 5);
+          doc.text(fitTextToWidth(doc, `${cleanText(c.name)} — V${vi + 1} ${v.label ? `(${cleanText(v.label)})` : ''}`, W - 2 * M - 6), M + 3, y + 5);
           doc.setFont('Helvetica', 'normal');
           doc.setFontSize(8);
           doc.setTextColor(...THEME.lightText);
@@ -2161,7 +2167,7 @@ export const generateRaoPDF = async (optionsParams) => {
     doc.setFontSize(7.5);
     doc.setTextColor(120, 53, 15);
     const oabNames = oabCompanies.map(r => r.name).join(', ');
-    doc.text(`${oabNames} — Seuil OAB : ${fmt(oabThreshold)} € HT (méthode Double Moyenne)`, W / 2, y + 12, { align: 'center' });
+    doc.text(fitTextToWidth(doc, `${oabNames} — Seuil OAB : ${fmt(oabThreshold)} € HT (méthode Double Moyenne)`, W - 2 * M), W / 2, y + 12, { align: 'center' });
     doc.text('Conformément aux articles L2152-5 et R2152-3 du CCP, le pouvoir adjudicateur doit demander des précisions', W / 2, y + 17, { align: 'center' });
     doc.text('sur le prix proposé avant tout rejet éventuel de l\'offre (CE, 1er mars 2012, n°354159).', W / 2, y + 21, { align: 'center' });
     y += 28;
@@ -2179,6 +2185,12 @@ export const generateRaoPDF = async (optionsParams) => {
     // Le texte custom est stocke dans rao.recommendation (string).
     const customText = (rao?.recommendation || '').trim();
     const recoText = customText || `Au regard des critères d'attribution définis dans les documents de consultation, l'offre de l'entreprise ${winnerLabel} est l'offre économiquement la plus avantageuse.`;
+    // IMPORTANT : fixer la police AVANT de mesurer. splitTextToSize calcule le
+    // retour à la ligne avec la taille de police COURANTE ; si elle est héritée du
+    // bloc précédent (légende 5,5pt ou avertissement OAB 7,5pt), la phrase tient sur
+    // une seule ligne à la mesure puis est dessinée à 10pt → débordement horizontal.
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(10);
     // Mesurer la hauteur pour adapter le rectangle (wrap auto)
     const textWidth = W - 2 * M - 8;
     const lines = doc.splitTextToSize(cleanText(recoText), textWidth);
@@ -2190,8 +2202,6 @@ export const generateRaoPDF = async (optionsParams) => {
     doc.setFillColor(...THEME.primary);
     doc.roundedRect(M, y, W - 2 * M, rectH, 3, 3, 'F');
     doc.setTextColor(255, 255, 255);
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(10);
     let textY = y + padTop;
     lines.forEach(ln => { doc.text(ln, W / 2, textY, { align: 'center' }); textY += lineH; });
     doc.setFont('Helvetica', 'normal');

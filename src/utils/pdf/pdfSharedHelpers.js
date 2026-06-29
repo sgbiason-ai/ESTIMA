@@ -197,6 +197,36 @@ export const drawSignatureBoxes = (doc, theme, { signatories = [], zoneTop, zone
   }
 };
 
+// ─── TEXTE ─────────────────────────────────────────────────────────────────
+
+/**
+ * Tronque `text` avec une ellipse « … » pour qu'il tienne dans `maxWidth` (mm) à la
+ * police/taille COURANTE du doc. Ne dessine rien — renvoie la chaîne ajustée.
+ * À utiliser sur les chaînes DYNAMIQUES dessinées en UNE seule ligne (pieds de page,
+ * en-têtes, noms d'entreprise/projet, adresses) afin d'éviter tout débordement
+ * horizontal hors page, sans modifier la mise en page verticale.
+ * IMPORTANT : appeler APRÈS setFont/setFontSize (la mesure dépend de la police active).
+ * @param {object} doc - instance jsPDF
+ * @param {string} text - chaîne à ajuster
+ * @param {number} maxWidth - largeur max en mm
+ * @returns {string} la chaîne, tronquée avec « … » si nécessaire
+ */
+export const fitTextToWidth = (doc, text, maxWidth) => {
+  const s = String(text ?? '');
+  if (!s || !(maxWidth > 0)) return s;
+  if (doc.getTextWidth(s) <= maxWidth) return s;
+  const ell = '…';
+  const ellW = doc.getTextWidth(ell);
+  if (ellW >= maxWidth) return ell;
+  let lo = 0, hi = s.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    const w = doc.getTextWidth(s.slice(0, mid)) + ellW;
+    if (w <= maxWidth) lo = mid; else hi = mid - 1;
+  }
+  return s.slice(0, lo).trimEnd() + ell;
+};
+
 /**
  * Dessine le pied de page MOE (infos société) ou fallback date simple.
  * @param {object} doc - instance jsPDF
@@ -210,6 +240,9 @@ export const drawMoeFooter = (doc, branding, theme, today) => {
 
   if (branding?.companyName) {
     const footerY = pageHeight - 20;
+    // Nom (gauche) et contact (droite) partagent la même ligne → demi-largeur chacun,
+    // tronqués avec « … » pour ne pas se chevaucher ni déborder de la page.
+    const halfW = (pageWidth - 36) / 2 - 4;
 
     doc.setDrawColor(...theme.borders);
     doc.setLineWidth(0.3);
@@ -218,13 +251,13 @@ export const drawMoeFooter = (doc, branding, theme, today) => {
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(7);
     doc.setTextColor(...theme.primary);
-    doc.text(branding.companyName.toUpperCase(), 18, footerY - 3);
+    doc.text(fitTextToWidth(doc, branding.companyName.toUpperCase(), halfW), 18, footerY - 3);
 
     if (branding.tagline) {
       doc.setFont('Helvetica', 'normal');
       doc.setFontSize(6);
       doc.setTextColor(...theme.lightText);
-      doc.text(branding.tagline, 18, footerY + 2);
+      doc.text(fitTextToWidth(doc, branding.tagline, halfW), 18, footerY + 2);
     }
 
     const contactParts = [branding.address, branding.phone, branding.email, branding.website].filter(Boolean);
@@ -232,7 +265,7 @@ export const drawMoeFooter = (doc, branding, theme, today) => {
       doc.setFont('Helvetica', 'normal');
       doc.setFontSize(6);
       doc.setTextColor(...theme.lightText);
-      doc.text(contactParts.join('  ·  '), pageWidth - 18, footerY - 3, { align: 'right' });
+      doc.text(fitTextToWidth(doc, contactParts.join('  ·  '), halfW), pageWidth - 18, footerY - 3, { align: 'right' });
     }
 
     doc.setFontSize(6);
@@ -309,7 +342,8 @@ export const drawCoverPage = (doc, config, theme, logos) => {
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(...theme.lightText);
-    doc.text(docType, pageWidth - 18, 52, { align: 'right' });
+    // Aligné à droite au-dessus d'un trait de 77 mm → borner à ~90 mm avec « … ».
+    doc.text(fitTextToWidth(doc, docType, 90), pageWidth - 18, 52, { align: 'right' });
     doc.setDrawColor(...theme.borders); doc.setLineWidth(0.5);
     doc.line(pageWidth - 95, 57, pageWidth - 18, 57);
   }
@@ -328,15 +362,17 @@ export const drawCoverPage = (doc, config, theme, logos) => {
 
   // Sous-titres
   let subtitleOffset = 0;
+  // Sous-titres : offsets verticaux FIXES → garder une seule ligne (troncature « … »)
+  // pour ne pas empiéter sur le bloc d'infos qui suit.
   if (subtitle1) {
     subtitleOffset += 10;
     doc.setFontSize(13); doc.setFont('Helvetica', 'normal'); doc.setTextColor(...theme.lightText);
-    doc.text(subtitle1.toUpperCase(), 18, 100 + titleHeight + 4 + subtitleOffset);
+    doc.text(fitTextToWidth(doc, subtitle1.toUpperCase(), pageWidth - 40), 18, 100 + titleHeight + 4 + subtitleOffset);
   }
   if (subtitle2) {
     subtitleOffset += 7;
     doc.setFontSize(11); doc.setFont('Helvetica', 'normal'); doc.setTextColor(...theme.lightText);
-    doc.text(subtitle2.toUpperCase(), 18, 100 + titleHeight + 4 + subtitleOffset);
+    doc.text(fitTextToWidth(doc, subtitle2.toUpperCase(), pageWidth - 40), 18, 100 + titleHeight + 4 + subtitleOffset);
   }
 
   // Bloc 1 : infos MOA + phase/code

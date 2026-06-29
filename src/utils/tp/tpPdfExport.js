@@ -7,6 +7,7 @@ import autoTable from 'jspdf-autotable';
 import { buildRefMap } from '../projectCalculations';
 import { saveFileWithPicker, FILE_TYPES, PICKER_IDS } from '../fileSaver';
 import { ESTIMA_CREDIT } from '../estimaCredit';
+import { fitTextToWidth } from '../pdf/pdfSharedHelpers';
 import {
   computeDetail, defaultCoefficients, DEFAULT_COEF, POSTES, effectiveRendement, detailCalcQty,
   ressourceCosts, ressourceDailyCost, fournitureQty, fournitureCost,
@@ -97,7 +98,7 @@ function drawHeader(doc, { branding, study, art, pageNum }) {
   // Bloc entreprise (gauche)
   doc.setTextColor(...C.text);
   doc.setFont(undefined, 'bold'); doc.setFontSize(11);
-  doc.text(branding?.companyName || study?.companyName || '', xText, 10);
+  doc.text(fitTextToWidth(doc, branding?.companyName || study?.companyName || '', W - xText - 8), xText, 10);
   doc.setFont(undefined, 'normal'); doc.setFontSize(7.5); doc.setTextColor(...C.subtle);
   const lines = [
     branding?.tagline,
@@ -107,7 +108,7 @@ function drawHeader(doc, { branding, study, art, pageNum }) {
     branding?.email && `E-mail : ${branding.email}`,
   ].filter(Boolean);
   let yy = 14;
-  lines.forEach(l => { doc.text(String(l), xText, yy); yy += 3.2; });
+  lines.forEach(l => { doc.text(fitTextToWidth(doc, String(l), W - 2 * xText - 8), xText, yy); yy += 3.2; });
 
   // Bloc titre (centre)
   const titleX = W / 2;
@@ -120,7 +121,7 @@ function drawHeader(doc, { branding, study, art, pageNum }) {
   doc.setFont(undefined, 'normal'); doc.setFontSize(8.5); doc.setTextColor(...C.subtle);
   doc.text('Objet des travaux :', titleX - 40, 20);
   doc.setTextColor(...C.text); doc.setFont(undefined, 'bold');
-  doc.text(study?.name || '', titleX - 10, 20);
+  doc.text(fitTextToWidth(doc, study?.name || '', 50), titleX - 10, 20);
 
   if (art) {
     // N° prix encadré + désignation encadrée
@@ -135,7 +136,7 @@ function drawHeader(doc, { branding, study, art, pageNum }) {
     doc.roundedRect(titleX - 2, 23, W / 2 - 12, 7, 0.8, 0.8, 'S');
     doc.setFont(undefined, 'bold'); doc.setTextColor(...C.text); doc.setFontSize(9);
     const desig = art.node?.designation || '';
-    doc.text(desig.length > 70 ? desig.slice(0, 67) + '…' : desig, titleX, 27.5);
+    doc.text(fitTextToWidth(doc, desig, W / 2 - 16), titleX, 27.5);
   }
 
   // N° page (haut droit)
@@ -413,7 +414,7 @@ function drawFooter(doc, { branding }) {
   const H = doc.internal.pageSize.getHeight();
   const established = `Établi par ${branding?.companyName || ''}${branding?.city ? ' à ' + branding.city : ''}  le ${new Date().toLocaleDateString('fr-FR')}  ·  ${ESTIMA_CREDIT}`;
   doc.setFont(undefined, 'italic'); doc.setFontSize(8); doc.setTextColor(...C.subtle);
-  doc.text(established, W / 2, H - 6, { align: 'center' });
+  doc.text(fitTextToWidth(doc, established, W - 20), W / 2, H - 6, { align: 'center' });
 }
 
 // ─── Export 1 : Bordereau chiffré (DQE) — portrait, bouton dédié ─────────────
@@ -433,19 +434,19 @@ export async function generateTpBordereauPdf(study, opts = {}) {
     catch { /* image invalide */ }
   }
   doc.setFont(undefined, 'bold'); doc.setFontSize(12); doc.setTextColor(...C.text);
-  doc.text(branding?.companyName || study?.companyName || '', xText, 17);
+  doc.text(fitTextToWidth(doc, branding?.companyName || study?.companyName || '', W - xText - 14), xText, 17);
   doc.setFont(undefined, 'normal'); doc.setFontSize(8); doc.setTextColor(...C.subtle);
   const lines = [branding?.address, [branding?.zip, branding?.city].filter(Boolean).join(' ')].filter(Boolean);
   let yy = 22;
-  lines.forEach(l => { doc.text(String(l), xText, yy); yy += 3.5; });
+  lines.forEach(l => { doc.text(fitTextToWidth(doc, String(l), W - 2 * xText - 8), xText, yy); yy += 3.5; });
 
   doc.setFont(undefined, 'bold'); doc.setFontSize(15); doc.setTextColor(...C.orange);
   doc.text('BORDEREAU CHIFFRÉ', W - 14, 18, { align: 'right' });
   doc.setFontSize(10); doc.setTextColor(...C.text);
-  doc.text(study?.name || '', W - 14, 25, { align: 'right' });
+  doc.text(fitTextToWidth(doc, study?.name || '', W - 60), W - 14, 25, { align: 'right' });
   if (study?.reference) {
     doc.setFontSize(8); doc.setTextColor(...C.subtle);
-    doc.text(`Réf : ${study.reference}`, W - 14, 30, { align: 'right' });
+    doc.text(fitTextToWidth(doc, `Réf : ${study.reference}`, 60), W - 14, 30, { align: 'right' });
   }
 
   // Tableau

@@ -25,7 +25,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { cleanText, normalizeUnitSymbol } from './helpers';
-import { sanitizeFilename, formatNumberFr } from './pdf/pdfSharedHelpers';
+import { sanitizeFilename, formatNumberFr, fitTextToWidth } from './pdf/pdfSharedHelpers';
 import { stampPdfCredit } from './estimaCredit';
 import { buildTheme as _buildTheme } from './pdf/buildTheme';
 import { getCurrentPhaseCode } from './phaseModel';
@@ -187,24 +187,26 @@ const drawCoverPage = (doc, project, logoMoeData, logoMoeDims, logoClientData, l
   doc.setTextColor(60, 60, 60);
   doc.text("CLIENT / MAÎTRE D'OUVRAGE :", 20, 170);
   doc.setFont("Helvetica", "normal");
-  doc.text(clientRaw.toUpperCase(), 20, 178);
+  doc.text(fitTextToWidth(doc, clientRaw.toUpperCase(), pageWidth - 40), 20, 178);
 
   if (project.location) {
     doc.setFont("Helvetica", "bold");
     doc.text("LOCALISATION :", 20, 195);
     doc.setFont("Helvetica", "normal");
-    doc.text(project.location.toUpperCase(), 20, 203);
+    doc.text(fitTextToWidth(doc, project.location.toUpperCase(), pageWidth - 40), 20, 203);
   }
 
   // Phase ACT
   doc.setDrawColor(...THEME.primary);
   doc.setLineWidth(0.5);
   const phaseLabel = `PHASE ${getCurrentPhaseCode(project).toUpperCase()}`;
+  // Mesurer la largeur de la boîte AVEC la police de dessin (18pt bold), sinon
+  // getTextWidth mesure à 12pt (hérité) → boîte trop étroite pour le texte 18pt.
+  doc.setFontSize(18);
+  doc.setFont("Helvetica", "bold");
   const phaseBoxWidth = Math.max(80, doc.getTextWidth(phaseLabel) + 16);
   doc.roundedRect(centerX - phaseBoxWidth / 2, 235, phaseBoxWidth, 15, 2, 2, 'S');
-  doc.setFontSize(18);
   doc.setTextColor(...THEME.primary);
-  doc.setFont("Helvetica", "bold");
   doc.text(phaseLabel, centerX, 245, { align: 'center' });
 
   // ── [NOUVEAU] PIED DE PAGE MOE ──────────────────────────────────────────────
@@ -240,7 +242,7 @@ const drawCoverPage = (doc, project, logoMoeData, logoMoeDims, logoClientData, l
       doc.setFont("Helvetica", "normal");
       doc.setFontSize(6);
       doc.setTextColor(...THEME.lightText);
-      doc.text(contactParts.join('  ·  '), pageWidth - 20, footerY - 3, { align: 'right' });
+      doc.text(fitTextToWidth(doc, contactParts.join('  ·  '), (pageWidth - 40) / 2), pageWidth - 20, footerY - 3, { align: 'right' });
     }
 
     doc.setFontSize(6);
@@ -315,7 +317,7 @@ export const generateAnalysisPDF = async ({
   doc.setFontSize(16); doc.setTextColor(0, 0, 0);
   doc.text("SYNTHÈSE DE L'ANALYSE FINANCIÈRE", 14, 15);
   doc.setFontSize(10);
-  doc.text(`Lot/Tranche : ${trancheName} | Date : ${dateStr}`, 14, 22);
+  doc.text(fitTextToWidth(doc, `Lot/Tranche : ${trancheName} | Date : ${dateStr}`, doc.internal.pageSize.width - 28), 14, 22);
   doc.setFontSize(9); doc.setTextColor(80);
   const formulaLabel = SCORING_FORMULAS[scoringMode] || scoringMode.toUpperCase();
   doc.text(`Notation (${maxScore} pts) : ${formulaLabel}`, 14, 30);

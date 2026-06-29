@@ -3,6 +3,7 @@
 // Utilisé par EXE4, EXE5, EXE6
 
 import { formatDateLocale } from '../dateHelpers';
+import { fitTextToWidth } from '../pdf/pdfSharedHelpers';
 
 const formatDate = (s) => formatDateLocale(s);
 
@@ -45,7 +46,7 @@ export const generateAnnexeReservesPdf = async (pdf, data, exeLabel, fiche) => {
   const D = fiche?.sectionD || {};
   if (D.objet) {
     pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9);
-    pdf.text(`Marché : ${D.objet}`, mL, y);
+    pdf.text(fitTextToWidth(pdf, `Marché : ${D.objet}`, cW - 4), mL, y);
     y += 6;
   }
   if (data.dateOPR) {

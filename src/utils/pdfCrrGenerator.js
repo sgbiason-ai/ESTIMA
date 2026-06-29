@@ -13,7 +13,7 @@ import autoTable from 'jspdf-autotable';
 import { DEFAULT_BRANDING } from '../data/branding';
 import { MEETING_TYPES, GROUP_COLORS, abbreviateGroup, computeObsStats, obsDisplayNumber, obsAge } from '../data/crrData';
 import { parseObsHtml, stripHtml } from './formatObsText.jsx';
-import { lightenRgb, darkenRgb, loadImage, formatDateFr, formatDateLong, sanitizeFilename, loadLogos } from './pdf/pdfSharedHelpers';
+import { lightenRgb, darkenRgb, loadImage, formatDateFr, formatDateLong, sanitizeFilename, loadLogos, fitTextToWidth } from './pdf/pdfSharedHelpers';
 import { buildTheme as _buildTheme } from './pdf/buildTheme';
 
 // ─── HELPERS ────────────────────────────────────────────────────────────────
@@ -307,7 +307,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
     doc.setFont(fontB, 'bold');
     doc.setFontSize(9);
     doc.setTextColor(200, 80, 10);
-    doc.text(parts.join('  --  '), M.left + 5, cursor.y + 8.5);
+    doc.text(fitTextToWidth(doc, parts.join('  --  '), CW - 10), M.left + 5, cursor.y + 8.5);
 
     cursor.y += 13;
   }
@@ -1207,14 +1207,14 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
       doc.setFont(fontH, 'bold');
       doc.setFontSize(6.5);
       doc.setTextColor(...THEME.primary);
-      doc.text(branding.companyName, M.left, footY + 1);
+      doc.text(fitTextToWidth(doc, branding.companyName, CW / 2 - 5), M.left, footY + 1);
     }
 
     // Centre : projet + pagination
     doc.setFont(fontB, 'normal');
     doc.setFontSize(6);
     doc.setTextColor(...THEME.lightText);
-    doc.text(`${pdfProjectName}  --  Page ${p}/${totalPages}`, PW / 2, footY + 1, { align: 'center' });
+    doc.text(fitTextToWidth(doc, `${pdfProjectName}  --  Page ${p}/${totalPages}`, CW - 10), PW / 2, footY + 1, { align: 'center' });
 
     // Droite : date d'edition
     doc.text(

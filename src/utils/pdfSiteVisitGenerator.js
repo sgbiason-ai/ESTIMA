@@ -4,7 +4,7 @@
 
 import jsPDF from 'jspdf';
 import { buildTheme } from './pdf/buildTheme';
-import { loadImage, formatDateFr, formatDateLong, lightenRgb, loadLogos } from './pdf/pdfSharedHelpers';
+import { loadImage, formatDateFr, formatDateLong, lightenRgb, loadLogos, fitTextToWidth } from './pdf/pdfSharedHelpers';
 import { stampPdfCredit } from './estimaCredit';
 
 const PW = 210, PH = 297;
@@ -42,7 +42,7 @@ const drawHeader = (doc, THEME, visitName, date, logoMoe) => {
   doc.setFont('Helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(...THEME.text);
-  doc.text(visitName || 'Visite de Site', PW / 2, 10, { align: 'center' });
+  doc.text(fitTextToWidth(doc, visitName || 'Visite de Site', PW * 0.6), PW / 2, 10, { align: 'center' });
 
   doc.setFont('Helvetica', 'normal');
   doc.setFontSize(7);
@@ -66,7 +66,7 @@ const drawFooter = (doc, THEME, pageNum, totalPages, branding) => {
   doc.setFontSize(6);
   doc.setTextColor(...THEME.lightText);
   const footer = [branding?.companyName, branding?.phone, branding?.email].filter(Boolean).join(' • ');
-  if (footer) doc.text(footer, M.left, y + 1);
+  if (footer) doc.text(fitTextToWidth(doc, footer, CW / 2), M.left, y + 1);
 
   // Numero de page
   doc.text(`${pageNum} / ${totalPages}`, PW - M.right, y + 1, { align: 'right' });
@@ -123,8 +123,8 @@ const drawCoverPage = (doc, visit, THEME, logoMoe, branding) => {
   doc.setFont('Helvetica', 'normal');
   doc.setFontSize(11);
   doc.setTextColor(...THEME.lightText);
-  if (visit.lieu) { doc.text(visit.lieu, M.left + 8, y); y += 6; }
-  if (visit.client) { doc.text(`Client : ${visit.client}`, M.left + 8, y); y += 6; }
+  if (visit.lieu) { doc.text(fitTextToWidth(doc, visit.lieu, CW - 16), M.left + 8, y); y += 6; }
+  if (visit.client) { doc.text(fitTextToWidth(doc, `Client : ${visit.client}`, CW - 16), M.left + 8, y); y += 6; }
   if (visit.date) { doc.text(formatDateLong(visit.date), M.left + 8, y); y += 6; }
 
   // Bloc stats
@@ -167,14 +167,14 @@ const drawCoverPage = (doc, visit, THEME, logoMoe, branding) => {
   doc.setFont('Helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(...THEME.primary);
-  if (branding?.companyName) doc.text(branding.companyName, M.left + 8, footerY + 8);
+  if (branding?.companyName) doc.text(fitTextToWidth(doc, branding.companyName, CW - 16), M.left + 8, footerY + 8);
 
   doc.setFont('Helvetica', 'normal');
   doc.setFontSize(7);
   doc.setTextColor(...THEME.lightText);
   const contactLines = [branding?.address, [branding?.phone, branding?.email].filter(Boolean).join(' • '), branding?.website].filter(Boolean);
   contactLines.forEach((line, i) => {
-    doc.text(line, M.left + 8, footerY + 14 + i * 4);
+    doc.text(fitTextToWidth(doc, line, CW - 16), M.left + 8, footerY + 14 + i * 4);
   });
 
   // Date export
@@ -807,7 +807,11 @@ const drawObservations = async (doc, visit, THEME) => {
     const hasMap = !!miniMap;
     const textColW = hasMap ? CW - MAP_W - 5 - 13 : CW - 13; // largeur texte réduite si carte
 
-    // Estimer la hauteur nécessaire
+    // Estimer la hauteur nécessaire — mesurer avec la police de DESSIN du texte
+    // d'observation (9pt normal, cf. plus bas), sinon le wrap est calculé à 14pt
+    // (titre « Observations ») → lignes trop longues dessinées à 9pt → débordement.
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(9);
     const textLines = text ? doc.splitTextToSize(text, textColW) : [];
     const textH = textLines.length * 4;
     const hasImages = images.length > 0;
