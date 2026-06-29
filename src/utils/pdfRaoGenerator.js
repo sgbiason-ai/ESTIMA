@@ -295,6 +295,16 @@ export const generateRaoPDF = async (optionsParams) => {
     // Quantités « à valoir » (client, majorées) par tranche — source unique computeQtyMaps.
     // Indispensable pour le détail par tranche : sinon repli sur la quantité d'étude brute.
     clientQtyMaps = {},
+    // Inclure ou non TOUTES les références aux prix anormalement bas (OAB) dans le PDF :
+    //   #1 surlignage orange + légende dans le détail des prix
+    //   #2 bloc d'alerte nominatif « Offre(s) anormalement basse(s) détectée(s) » (Récap)
+    //   #3 Annexe A — Méthode OAB
+    // Défaut true pour préserver le comportement des appelants qui ne passent pas l'option (mobile).
+    includeOab = true,
+    // Inclure ou non les annexes B (formules de notation) et C (références CCP).
+    // L'Annexe A (méthode OAB) reste, elle, pilotée par includeOab.
+    // Défaut true : annexes présentes comme avant pour les appelants qui ne passent pas l'option.
+    includeAnnexes = true,
   } = optionsParams;
 
   // Taux de TVA configurable par projet (défaut 20 %), partagé par toutes les sorties RAO (audit F2).
@@ -1203,9 +1213,9 @@ export const generateRaoPDF = async (optionsParams) => {
         const title = hasTr ? `DÉTAIL DES PRIX UNITAIRES — ${tranche.name.toUpperCase()}` : "DÉTAIL DES PRIX UNITAIRES";
         doc.text(title, M, y);
 
-        if (analysisMode === 'oab' || analysisMode === 'heatmap') {
+        if (includeOab || analysisMode === 'heatmap') {
           doc.setFontSize(8); doc.setTextColor(0); doc.setFont("Helvetica", "normal");
-          if (analysisMode === 'oab') {
+          if (includeOab) {
             doc.setFillColor(255, 237, 213); doc.rect(80, y - 3, 4, 4, 'F');
             doc.text("Prix bas suspecté (OAB)", 86, y);
           } else if (analysisMode === 'heatmap') {
@@ -1295,7 +1305,7 @@ export const generateRaoPDF = async (optionsParams) => {
               { content: formatNumberFr(estTotal), styles: { fontStyle: 'bold' } }
             ];
             const itemPrices = detailColumns.map(col => Number(col.offers[item.id] || 0));
-            const lineOabThreshold = analysisMode === 'oab' ? calculateOABThreshold(itemPrices) : 0;
+            const lineOabThreshold = includeOab ? calculateOABThreshold(itemPrices) : 0;
 
             detailColumns.forEach((col) => {
               const isVar = col.kind === 'variant';
@@ -1310,7 +1320,7 @@ export const generateRaoPDF = async (optionsParams) => {
               let cellStyle = {};
               if (isRemoved) {
                 cellStyle = { fillColor: [241, 245, 249], textColor: [150, 150, 150], fontStyle: 'italic' };
-              } else if (analysisMode === 'oab' && hasPrice && price > 0 && price < lineOabThreshold) {
+              } else if (includeOab && hasPrice && price > 0 && price < lineOabThreshold) {
                 cellStyle = { fillColor: [255, 237, 213], textColor: [180, 83, 9], fontStyle: 'bold' };
               } else if (analysisMode === 'heatmap' && hasPrice && item.price > 0) {
                 const hs = getHeatmapStyle(price, item.price);
@@ -2133,11 +2143,11 @@ export const generateRaoPDF = async (optionsParams) => {
     y += 10;
   }
 
-  // ── Avertissement OAB si applicable ──
+  // ── Avertissement OAB si applicable (masqué si includeOab désactivé) ──
   const allTotals = ranking.map(r => r.price).filter(p => p > 0);
   const oabThreshold = calculateOABThreshold(allTotals);
   const oabCompanies = ranking.filter(r => r.price > 0 && r.price < oabThreshold);
-  if (oabCompanies.length > 0) {
+  if (includeOab && oabCompanies.length > 0) {
     if (y > 260) { y = addPage('Récapitulatif général', 'a4', 'portrait'); }
     doc.setFillColor(255, 237, 213);
     doc.roundedRect(M, y, W - 2 * M, 22, 3, 3, 'F');
@@ -2192,6 +2202,8 @@ export const generateRaoPDF = async (optionsParams) => {
   // ─────────────────────────────────────────────────────────────────────────
   // ── ANNEXES (méthode OAB, formules de scoring, références CCP) ──
   // ─────────────────────────────────────────────────────────────────────────
+  // Annexe A (méthode OAB) masquée si les références aux prix anormalement bas sont exclues.
+  if (includeOab) {
   y = addPage('Annexes', 'a4', 'portrait');
   tocEntries.push({ label: 'Annexe A — Méthode OAB', page: pageNum });
   y = sectionTitle(doc, 'ANNEXE A — Méthode OAB (Offre Anormalement Basse)', y, THEME.primary);
@@ -2238,7 +2250,10 @@ export const generateRaoPDF = async (optionsParams) => {
   doc.setFont('Helvetica', 'normal');
   doc.text("Une offre anormalement basse ne peut pas être rejetée automatiquement. Le pouvoir adjudicateur doit", M + 3, y + 12);
   doc.text("demander par écrit au soumissionnaire des précisions sur le prix proposé avant tout rejet motivé.", M + 3, y + 17);
+  }
 
+  // ── ANNEXES B & C (formules + références CCP) — masquées si exclues ──
+  if (includeAnnexes) {
   // ── ANNEXE B — Formules de scoring ──
   y = addPage('Annexes — Formules', 'a4', 'portrait');
   tocEntries.push({ label: 'Annexe B — Formules de scoring', page: pageNum });
@@ -2339,6 +2354,7 @@ export const generateRaoPDF = async (optionsParams) => {
     drawJustifiedText(doc, ref.desc, M + 4, y, W - 2 * M - 4, 4.5);
     y += lines.length * 4.5 + 6;
   });
+  }
 
   // ── REMPLIR LE SOMMAIRE (page 2) ──
   doc.setPage(sommairePageIndex);

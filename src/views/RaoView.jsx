@@ -11,6 +11,7 @@ import { db as fireDb } from '../firebase';
 import { useRao } from '../hooks/useRao';
 import { useRaoCompletion } from '../hooks/useRaoCompletion';
 import { toast } from '../utils/globalUI';
+import { computeOABThreshold } from '../utils/analysisCompute';
 import { useIsMobile } from '../hooks/useIsMobile';
 import TabConsultation from '../components/rao/tabs/TabConsultation';
 import TabAdministrative from '../components/rao/tabs/TabAdministrative';
@@ -69,6 +70,12 @@ const RaoView = ({
   const [isExporting, setIsExporting] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
   const [preExportOpen, setPreExportOpen] = useState(false);
+  // Inclure ou non les références aux prix anormalement bas (OAB) dans le PDF.
+  // Décoché par défaut : l'utilisateur choisit explicitement de les faire apparaître.
+  const [includeOab, setIncludeOab] = useState(false);
+  // Inclure ou non les annexes B (formules de notation) et C (références CCP).
+  // Coché par défaut : préserve le PDF actuel ; l'utilisateur décoche pour alléger.
+  const [includeAnnexes, setIncludeAnnexes] = useState(true);
   // showHelp / setShowHelp supprimés : l'aide est gérée par RaoAnalysisView
   // État de la modale Dépouillement
   const [depouillementOpen, setDepouillementOpen] = useState(false);
@@ -164,6 +171,12 @@ const RaoView = ({
   const ranking = rao.getRanking();
   const companyNames = analysisCompanies.map(c => c.name);
 
+  // Détection d'au moins une offre anormalement basse (seuil Double Moyenne sur les
+  // totaux du classement) : la case « inclure les références OAB » n'est proposée
+  // dans la modale d'export que s'il y a effectivement des OAB à signaler.
+  const oabThreshold = computeOABThreshold(ranking.map(r => r.price).filter(p => p > 0));
+  const hasOab = ranking.some(r => r.price > 0 && r.price < oabThreshold);
+
   // ─── État de complétion du RAO (alimente stepper + badges + checklist) ───
   const completion = useRaoCompletion({
     rao: project?.rao,
@@ -225,6 +238,10 @@ const RaoView = ({
           : null,
         analysisMode,
         scoringConfig,
+        // Inclure les références OAB seulement si l'utilisateur l'a coché ET qu'il y a des OAB.
+        includeOab: includeOab && hasOab,
+        // Inclure les annexes B (formules) et C (références CCP) selon le choix utilisateur.
+        includeAnnexes,
         // Nouvelles props pour la refonte complète du PDF
         optionChapters: rao.optionChapters,
         includedOptions: rao.includedOptions,
@@ -419,6 +436,11 @@ const RaoView = ({
         preExportChecks={completion.preExportChecks}
         isReadyForExport={completion.isReadyForExport}
         isExporting={isExporting}
+        hasOab={hasOab}
+        includeOab={includeOab}
+        onToggleIncludeOab={setIncludeOab}
+        includeAnnexes={includeAnnexes}
+        onToggleIncludeAnnexes={setIncludeAnnexes}
         onCancel={() => setPreExportOpen(false)}
         onNavigate={(tabId) => setActiveTab(tabId)}
         onConfirm={async () => {

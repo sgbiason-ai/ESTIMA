@@ -3,7 +3,7 @@
 // Affiche une checklist par onglet avec les items manquants cliquables.
 
 import React from 'react';
-import { CheckCircle2, AlertTriangle, X, FileDown, ArrowRight, Loader2 } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, X, FileDown, ArrowRight, Loader2, TrendingDown, Files } from 'lucide-react';
 
 const TAB_LABELS = {
   consultation: { num: 1, label: 'Consultation' },
@@ -20,6 +20,11 @@ const PreExportChecklistModal = ({
   onCancel,
   onNavigate,
   isExporting = false,
+  hasOab = false,
+  includeOab = false,
+  onToggleIncludeOab,
+  includeAnnexes = true,
+  onToggleIncludeAnnexes,
 }) => {
   if (!open) return null;
 
@@ -128,6 +133,53 @@ const PreExportChecklistModal = ({
                 </div>
               );
             })}
+          </div>
+
+          {/* Option OAB — affichée seulement si des offres anormalement basses sont détectées */}
+          {hasOab && (
+            <div className="shrink-0 px-6 py-3 border-t border-amber-100 bg-amber-50/50">
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={includeOab}
+                  onChange={(e) => onToggleIncludeOab && onToggleIncludeOab(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded border-amber-300 text-amber-600 focus:ring-amber-400 cursor-pointer"
+                />
+                <span className="flex-1">
+                  <span className="flex items-center gap-1.5 text-xs font-bold text-amber-800">
+                    <TrendingDown size={14} className="text-amber-600" />
+                    Inclure les références aux prix anormalement bas (OAB)
+                  </span>
+                  <span className="block text-[11px] text-amber-700/80 mt-0.5">
+                    Au moins une offre anormalement basse a été détectée. Si coché, le PDF signalera l'OAB
+                    (surlignage du détail des prix, encadré nominatif du récapitulatif et annexe « Méthode OAB »).
+                    Décoché, aucune mention d'OAB n'apparaîtra.
+                  </span>
+                </span>
+              </label>
+            </div>
+          )}
+
+          {/* Option Annexes — toujours proposée */}
+          <div className="shrink-0 px-6 py-3 border-t border-slate-100 bg-slate-50/40">
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={includeAnnexes}
+                onChange={(e) => onToggleIncludeAnnexes && onToggleIncludeAnnexes(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-400 cursor-pointer"
+              />
+              <span className="flex-1">
+                <span className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                  <Files size={14} className="text-slate-500" />
+                  Inclure les annexes
+                </span>
+                <span className="block text-[11px] text-slate-500 mt-0.5">
+                  Annexe B (formules de notation du critère prix) et Annexe C (références du Code de la
+                  commande publique). Décoché, le PDF est allégé sans ces annexes.
+                </span>
+              </span>
+            </label>
           </div>
 
           {/* Footer */}
