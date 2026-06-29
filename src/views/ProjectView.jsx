@@ -4,7 +4,7 @@ import PropTypes from 'prop-types';
 import { useStableHash } from '../hooks/useStableHash';
 import { useRobustSave } from '../hooks/useRobustSave';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { Plus, Trash2, GripVertical, Layers, AlertTriangle, Target, ChevronDown, ChevronRight, Lock, Unlock } from 'lucide-react';
+import { Plus, Trash2, GripVertical, Layers, AlertTriangle, Target, ChevronDown, ChevronRight, Lock, Unlock, Eye } from 'lucide-react';
 
 import { ProjectContext } from '../context/ProjectContext';
 import { EditableTitle, OptionToggle, PseModeControl, PseDescriptionEditor } from '../components/ProjectUI';
@@ -20,7 +20,7 @@ import ProjectToolbar from '../components/ProjectToolbar';
 import BpuSidebar from '../components/BpuSidebar';
 import TranchesBar from '../components/TranchesBar';
 import ProjectStatsBar from '../components/ProjectStatsBar';
-import ProjectFooterStats from '../components/ProjectFooterStats';
+import ProjectDocBanner from '../components/ProjectDocBanner';
 import HelpPanel from '../components/help/HelpPanel';
 
 // NOUVEAUX COMPOSANTS EXTRAITS
@@ -254,10 +254,15 @@ const ProjectView = ({
     };
     reader.readAsText(file);
   };
-  const [showComparison, setShowComparison] = useState(false);
-  // Mode Étude : colonne « Rendu » (qté majorée client) à côté de la qté réelle.
-  // Actif par défaut → la comparaison Étude/Rendu est visible dès l'ouverture.
-  const [showRendu, setShowRendu] = useState(true);
+  // Diff par ligne (Étude→Rendu) : réservé à un futur mode comparatif chiffré, inactif pour l'instant.
+  const [showComparison] = useState(false);
+  // Vue du tableau pilotée par le verrou (un seul bouton) :
+  //  • Déverrouillé → 'comparison' = vue ÉTUDE (qté réelle + à valoir + comparatifs, modifiable).
+  //  • Verrouillé   → 'rendu'       = vue RENDU « avant impression » (à valoir uniquement, lecture seule).
+  const tableViewEffective = isReadOnly ? 'rendu' : 'comparison';
+  const isRenduView = tableViewEffective === 'rendu';
+  // En Rendu, le tableau affiche les quantités à valoir (mode 'client') ; sinon mode Étude.
+  const contextViewMode = isRenduView ? 'client' : currentMode;
 
   useEffect(() => {
     if (project && project.__isNew) {
@@ -814,9 +819,10 @@ const ProjectView = ({
 
   const contextValue = {
       selection, setSelection, updateProjectItem: handleUpdateItem, removeProjectItem: handleRemoveItem,
-      setModal: handleModalIntercept, addSubChapter, refMap, viewMode: currentMode, isReadOnly, showComparison,
-      // Verrouillé (lecture seule) : on force la comparaison complète Étude + Rendu.
-      showRendu: isLocked || showRendu,
+      setModal: handleModalIntercept, addSubChapter, refMap, viewMode: contextViewMode, isReadOnly, showComparison,
+      // Colonne secondaire « Qté à valoir » + écart sous le total : présents en vue Étude
+      // (déverrouillé), masqués en vue Rendu (verrouillé, avant impression).
+      showRendu: tableViewEffective === 'comparison',
       clientQtyMap, activeTrancheId, isGlobalMode, bpuConfig, onOpenCalculation: handleOpenCalculation,
       formulaMode, setFormulaMode, allItems, sourceIds: project?.sourceIds || [],
       multiSelection, toggleMultiSelection, priceIssueIds, insertTargetId,
@@ -862,7 +868,7 @@ const ProjectView = ({
           <ProjectToolbar
             project={project} updateProjectName={updateProjectName} saveStatus={displayStatus} onSaveProject={handleManualCloudSave}
             isReadOnly={isReadOnly} onToggleLock={() => setIsLocked(v => !v)} showBpu={showBpu} setShowBpu={setShowBpu} currentMode={currentMode} setViewMode={setViewMode}
-            showComparison={showComparison} setShowComparison={setShowComparison} showRendu={showRendu} setShowRendu={setShowRendu} totalBase={totalBase} activeTrancheId={activeTrancheId}
+            totalBase={totalBase} activeTrancheId={activeTrancheId}
             onExport={(format, type) => {
               if (priceCheck.anomalyCount > 0) setExportGuard({ show: true, format, type });
               else setExportModalState({ show: true, format, type });
@@ -900,15 +906,15 @@ const ProjectView = ({
           )}
 
           {isReadOnly && (
-            <div className="flex items-center justify-center gap-3 px-4 py-1.5 bg-amber-50 border-b border-amber-200 text-amber-800 text-[11px] font-bold uppercase tracking-wide shrink-0">
-              <Lock size={13} strokeWidth={2.2} />
-              <span>Étude verrouillée — lecture seule</span>
+            <div className="flex items-center justify-center gap-3 px-4 py-1.5 bg-indigo-50 border-b border-indigo-200 text-indigo-800 text-[11px] font-bold uppercase tracking-wide shrink-0">
+              <Eye size={13} strokeWidth={2.2} />
+              <span>Vue Rendu — lecture seule (avant impression)</span>
               <button
                 onClick={() => setIsLocked(false)}
-                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-amber-600 text-white text-[10px] font-bold normal-case hover:bg-amber-700 transition-colors"
-                title="Déverrouiller pour modifier l'étude"
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-indigo-600 text-white text-[10px] font-bold normal-case hover:bg-indigo-700 transition-colors"
+                title="Déverrouiller pour passer en mode Étude (modifiable)"
               >
-                <Unlock size={11} /> Déverrouiller
+                <Unlock size={11} /> Passer en Étude
               </button>
             </div>
           )}
@@ -931,8 +937,8 @@ const ProjectView = ({
           )}
 
           <DragDropContext onDragEnd={isReadOnly ? () => {} : handleDragEndFixed}>
-            <div className={`flex-1 overflow-y-auto p-6 space-y-8 ${theme.bg} ${currentMode === 'client' ? 'border-l-[6px] border-indigo-600' : ''}`}>
-              
+            <div className={`flex-1 overflow-y-auto p-6 space-y-8 ${theme.bg} ${(currentMode === 'client' || isRenduView) ? 'border-l-[6px] border-indigo-600' : ''}`}>
+
               {isGlobalMode && !isReadOnly && (
                   <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-xl text-xs font-medium flex items-center gap-3 shadow-sm mb-4">
                       <div className="p-1.5 bg-blue-100 rounded-full text-blue-600"><Layers size={16} /></div>
@@ -1040,7 +1046,14 @@ const ProjectView = ({
                 </Droppable>
               </div>
 
-              <ProjectFooterStats totalBase={totalBase} currentMode={currentMode} theme={theme} projectStats={projectStats} showRendu={isLocked || showRendu} />
+              {/* Récap de totaux en pied de tableau (les 2 vues) : montants à valoir HT/TVA/TTC. */}
+              <div className="mt-8 mb-20">
+                <ProjectDocBanner
+                  projectStats={projectStats}
+                  tableView={tableViewEffective}
+                  tvaRate={Number(project?.tauxTVA ?? 20)}
+                />
+              </div>
 
             </div>
           </DragDropContext>

@@ -11,15 +11,17 @@ const ProjectFooterStats = ({
   theme,
   projectStats,
   showRendu = false,
+  tvaRate = 20,
 }) => {
+  const rate = Number(tvaRate) / 100;
   // ── Mode comparatif : deux colonnes alignées (Étude / Rendu) HT · TVA · TTC ──
   if (showRendu && projectStats) {
     const studyHT = projectStats.study?.base || 0;
     const clientHT = projectStats.client?.base || 0;
     const rows = [
-      { label: 'Total HT',   s: studyHT,       c: clientHT,       strong: false },
-      { label: 'TVA (20%)',  s: studyHT * 0.2, c: clientHT * 0.2, strong: false },
-      { label: 'Total TTC',  s: studyHT * 1.2, c: clientHT * 1.2, strong: true  },
+      { label: 'Total HT',          s: studyHT,            c: clientHT,            strong: false },
+      { label: `TVA (${tvaRate}%)`, s: studyHT * rate,     c: clientHT * rate,     strong: false },
+      { label: 'Total TTC',         s: studyHT * (1 + rate), c: clientHT * (1 + rate), strong: true  },
     ];
     return (
       <div className="flex justify-end mt-8 mb-20">
@@ -63,8 +65,8 @@ const ProjectFooterStats = ({
           </div>
           {/* Pas de total général PSE : les PSE sont indépendantes (parfois exclusives),
               chacune porte son propre total dans le tableau. */}
-        <div className="flex justify-between items-center mb-4 pb-4 border-b border-gray-100"><span className="text-xs font-bold text-gray-400 uppercase tracking-widest">TVA (20%)</span><span className="text-sm font-bold text-gray-500 font-mono">{formatPrice(baseTotal * 0.2)}</span></div>
-        <div className="flex justify-between items-center mb-6"><span className={`text-sm font-black uppercase tracking-widest ${currentMode === 'client' ? 'text-indigo-700' : 'text-emerald-700'}`}>Total TTC</span><span className={`text-xl font-black font-mono px-3 py-1 rounded-lg ${currentMode === 'client' ? 'bg-indigo-50 text-indigo-700' : 'bg-emerald-50 text-emerald-600'}`}>{formatPrice(baseTotal * 1.2)}</span></div>
+        <div className="flex justify-between items-center mb-4 pb-4 border-b border-gray-100"><span className="text-xs font-bold text-gray-400 uppercase tracking-widest">TVA ({tvaRate}%)</span><span className="text-sm font-bold text-gray-500 font-mono">{formatPrice(baseTotal * rate)}</span></div>
+        <div className="flex justify-between items-center mb-6"><span className={`text-sm font-black uppercase tracking-widest ${currentMode === 'client' ? 'text-indigo-700' : 'text-emerald-700'}`}>Total TTC</span><span className={`text-xl font-black font-mono px-3 py-1 rounded-lg ${currentMode === 'client' ? 'bg-indigo-50 text-indigo-700' : 'bg-emerald-50 text-emerald-600'}`}>{formatPrice(baseTotal * (1 + rate))}</span></div>
       </div>
     </div>
   );

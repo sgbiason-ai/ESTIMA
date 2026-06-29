@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  PanelLeft, Receipt, HardHat, UserCheck, ArrowLeftRight,
+  PanelLeft, Receipt, HardHat, UserCheck,
   FileSpreadsheet, FileText, Calculator, Plus, Loader2,
   CheckCircle2, CloudOff, FileSignature, Bookmark, ListOrdered, ListTree, Hash,
   FolderOpen, Save, Upload, PlusCircle, Lock, Unlock,
@@ -24,8 +24,6 @@ const ProjectToolbar = ({
   showBpu,
   setShowBpu,
   currentMode,
-  showRendu,
-  setShowRendu,
   onExport,
   onOpenCalculation,
   onOpenDetails,
@@ -152,16 +150,16 @@ const ProjectToolbar = ({
             {/* ─── ZONE GAUCHE ─── */}
 
             {/* Verrou lecture seule — toujours visible (sinon impossible de déverrouiller) */}
-            <RibbonGroup label={isReadOnly ? 'Verrouillé' : 'Édition'}>
+            <RibbonGroup label="Mode">
               <RibbonBtnLarge
                 icon={isReadOnly ? Lock : Unlock}
-                label={isReadOnly ? 'Déverrouiller' : 'Verrouiller'}
+                label={isReadOnly ? 'Rendu' : 'Étude'}
                 onClick={onToggleLock}
                 active={isReadOnly}
-                accent={isReadOnly ? 'text-amber-500' : 'text-emerald-500'}
+                accent={isReadOnly ? 'text-indigo-500' : 'text-emerald-500'}
                 title={isReadOnly
-                  ? 'Étude verrouillée (lecture seule) — cliquer pour déverrouiller et modifier'
-                  : "Verrouiller l'étude en lecture seule (évite les modifications accidentelles)"}
+                  ? 'Vue Rendu — verrouillée, lecture seule (uniquement les quantités à valoir, avant impression). Cliquer pour déverrouiller et passer en Étude (modifiable).'
+                  : 'Mode Étude — modifiable (quantités réelles + à valoir, comparatifs). Cliquer pour verrouiller en vue Rendu (lecture seule, avant impression).'}
               />
             </RibbonGroup>
 
@@ -288,20 +286,6 @@ const ProjectToolbar = ({
                 <RibbonBtnSmall icon={Table2} label="Excel Estim." onClick={() => onExport('excel', 'ESTIMATION')} accent="text-emerald-600" />
               </div>
             </RibbonGroup>
-
-            {/* Colonne Rendu (mode étude) : qté majorée client à côté de la qté réelle */}
-            {!isReadOnly && currentMode === 'study' && setShowRendu && (
-              <RibbonGroup label="Comparer">
-                <RibbonBtnLarge
-                  icon={ArrowLeftRight}
-                  label="Rendu"
-                  onClick={() => setShowRendu(!showRendu)}
-                  active={showRendu}
-                  accent="text-indigo-500"
-                  title="Afficher les quantités et totaux au rendu (majorés client) à côté de ceux de l'étude"
-                />
-              </RibbonGroup>
-            )}
 
             {/* Ajouter Chapitre / Article libre (tout à droite, mode étude) */}
             {!isReadOnly && currentMode === 'study' && (

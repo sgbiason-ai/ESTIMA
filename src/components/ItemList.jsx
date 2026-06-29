@@ -266,6 +266,12 @@ const ItemRow = memo(
   }) => {
     const draggableId = `item:${stableKey}`;
 
+    // Vue « Rendu » : le contexte passe viewMode='client' → la colonne quantité affiche les
+    // qtés à valoir (dérivées de l'étude) en LECTURE SEULE. Le reste de l'édition (prix,
+    // structure, ruban, glisser-déposer) reste identique au mode Étude.
+    const isRendu = viewMode === 'client';
+    const qtyReadOnly = isReadOnly || isGlobalMode || isRendu;
+
     // ── Prix répété : indicateur sur les occurrences suivantes (pas la 1ʳᵉ) ──
     const isRepeatedPrice = !!dupInfo && dupInfo.index > 0;
     const nextDupId = dupInfo ? dupInfo.ids[(dupInfo.index + 1) % dupInfo.count] : null;
@@ -584,15 +590,13 @@ const ItemRow = memo(
                   refMap={refMap}
                   sourceItemId={el.id}
                   onCommit={(val) => onUpdate(parentId, el.id, qtyFieldToUpdate, val)}
-                  disabled={isReadOnly || isGlobalMode} 
+                  disabled={qtyReadOnly}
                   className={`w-full border rounded py-0.5 px-1 text-right text-xs font-mono font-black outline-none transition-all
                     ${
-                      isReadOnly
+                      (isReadOnly || isRendu)
                         ? 'bg-transparent border-transparent text-slate-800'
                         : isGlobalMode
-                        ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' 
-                        : viewMode === 'client'
-                        ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                        ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
                         : 'bg-white border-slate-300 focus:border-emerald-500 text-black shadow-sm'
                     }`}
                   placeholder=""
@@ -637,7 +641,7 @@ const ItemRow = memo(
               </div>
             </div>
 
-            {/* Total ligne = quantité à valoir (rendu) × PU */}
+            {/* Total ligne = quantité à valoir (rendu) × PU ; écart vs étude affiché dessous (vue Étude) */}
             <div className="w-28 text-right px-3 shrink-0 flex flex-col justify-center items-end h-full" title="Total à valoir (quantité majorée pour le client × prix unitaire)">
               {showComparison && isReadOnly ? (
                 <>
@@ -649,25 +653,21 @@ const ItemRow = memo(
                   )}
                 </>
               ) : (
-                <span className={`text-[11px] font-mono font-black ${isPM ? 'italic text-slate-400 font-medium' : 'text-slate-900'}`}>
-                  {isPM ? 'PM' : formatPrice(lineTotal)}
-                </span>
+                <>
+                  <span className={`text-[11px] font-mono font-black ${isPM ? 'italic text-slate-400 font-medium' : 'text-slate-900'}`}>
+                    {isPM ? 'PM' : formatPrice(lineTotal)}
+                  </span>
+                  {showRendu && viewMode === 'study' && studyLineTotal !== lineTotal && (
+                    <span
+                      className="text-[8px] font-bold text-emerald-600 leading-none"
+                      title={`Écart vs étude (total d'étude : ${formatPrice(studyLineTotal)})`}
+                    >
+                      {(lineTotal - studyLineTotal) > 0 ? '+' : ''}{formatPrice(lineTotal - studyLineTotal)}
+                    </span>
+                  )}
+                </>
               )}
             </div>
-
-            {/* Total à l'étude (mode Étude) : qté saisie × PU, en référence à côté du total à valoir prominent */}
-            {showRendu && viewMode === 'study' && (
-              <div className="w-24 text-right px-2 shrink-0 flex flex-col justify-center items-end h-full" title="Total à l'étude (quantité saisie × prix unitaire)">
-                <span className={`text-[11px] font-mono font-bold ${studyLineTotal !== lineTotal ? 'text-emerald-600' : 'text-slate-300'}`}>
-                  {isPM ? 'PM' : formatPrice(studyLineTotal)}
-                </span>
-                {studyLineTotal !== lineTotal && (
-                  <span className="text-[8px] font-bold text-slate-400 leading-none">
-                    {(studyLineTotal - lineTotal) > 0 ? '+' : ''}{formatPrice(studyLineTotal - lineTotal)}
-                  </span>
-                )}
-              </div>
-            )}
 
             {/* Spacer (suppression via multi-selection checkbox a gauche) */}
             <div className="w-10 shrink-0" />
@@ -707,6 +707,9 @@ const DEPTH_BG = [
 
 const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly, viewMode, showRendu, clientQtyMap, valoirTotals, etudeTotals, bpuConfig, onUpdate, onSelect, onModal, stableKey, activeTrancheId, isGlobalMode, insertTargetId, treeNumber, collapsed, onToggleCollapse, pseInfo, pseNumber, pseCandidates, onPseChange }) => {
   const draggableId = `chapter:${stableKey}`;
+  // Vue « Rendu » : seule la quantité pilote (surface de bloc, dérivée de l'étude) passe en
+  // lecture seule ; le reste de l'édition du (sous-)chapitre reste identique au mode Étude.
+  const isRendu = viewMode === 'client';
   // Total prominent du (sous-)chapitre = quantités « à valoir » (rendu), delta PSE inclus,
   // quel que soit le mode. La source unique est valoirTotals (moteur de calcul).
   const total = valoirTotals?.[el.id] ?? sumNodeTotal(el, true, clientQtyMap);
@@ -726,7 +729,7 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
   const isBloc = !!el.isBloc;
   const isTrancheView = activeTrancheId && activeTrancheId !== 'global';
   const surfaceVal = isTrancheView ? Number(el.quantities?.[activeTrancheId] || 0) : Number(el.qty || 0);
-  const surfaceDisabled = isReadOnly || isGlobalMode;
+  const surfaceDisabled = isReadOnly || isGlobalMode || isRendu;
   // Libellé de la quantité pilote selon l'unité du bloc (m²→surface, ml→longueur, m³→volume).
   const pilotLabel = (() => {
     const u = normalizeUnitSymbol(el.unit);
@@ -894,44 +897,30 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
                         <span className="text-[11px] font-mono font-black text-indigo-700">{formatPrice(blocPuMoyen)}</span>
                         <span className="block text-[8px] font-bold text-indigo-400 uppercase tracking-tight">/{normalizeUnitSymbol(el.unit)} moy.</span>
                       </div>
-                      <div className={`w-28 text-right px-3 text-[11px] font-mono font-black ${isSubPse ? 'text-violet-700' : el.isOption ? 'text-slate-500 line-through' : 'text-indigo-800'}`} title={pseTotalTitle}>
-                        {isSubPse && displayTotal >= 0 ? '+' : ''}{formatPrice(displayTotal)}
+                      <div className="w-28 px-3 shrink-0 leading-none flex flex-col justify-center items-end" title={pseTotalTitle}>
+                        <span className={`text-[11px] font-mono font-black ${isSubPse ? 'text-violet-700' : el.isOption ? 'text-slate-500 line-through' : 'text-indigo-800'}`}>
+                          {isSubPse && displayTotal >= 0 ? '+' : ''}{formatPrice(displayTotal)}
+                        </span>
+                        {showRendu && viewMode === 'study' && !isSubPse && etudeTotal !== total && (
+                          <span className="text-[8px] font-bold text-emerald-600 leading-none" title={`Écart vs étude (total d'étude : ${formatPrice(etudeTotal)})`}>
+                            {(total - etudeTotal) > 0 ? '+' : ''}{formatPrice(total - etudeTotal)}
+                          </span>
+                        )}
                       </div>
-                      {showRendu && viewMode === 'study' && (
-                        <div className="w-24 text-right px-2 shrink-0 leading-none flex flex-col justify-center items-end" title="Total du bloc à l'étude (quantités brutes)">
-                          {isSubPse ? (
-                            <span className="text-[9px] font-mono text-slate-300">—</span>
-                          ) : (
-                            <>
-                              <span className={`text-[11px] font-mono font-bold ${etudeTotal !== total ? 'text-emerald-600' : 'text-slate-300'}`}>{formatPrice(etudeTotal)}</span>
-                              {etudeTotal !== total && (
-                                <span className="text-[8px] font-bold text-slate-400 leading-none">{(etudeTotal - total) > 0 ? '+' : ''}{formatPrice(etudeTotal - total)}</span>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      )}
                       <div className="w-10 shrink-0" />
                     </>
                   ) : (
                     <>
-                      <div className={`w-28 text-right px-3 text-[11px] font-mono font-black ${isSubPse ? 'text-violet-700' : el.isOption ? 'text-slate-500 line-through' : 'text-emerald-800'}`} title={pseTotalTitle}>
-                        {isSubPse && displayTotal >= 0 ? '+' : ''}{formatPrice(displayTotal)}
+                      <div className="w-28 px-3 shrink-0 leading-none flex flex-col justify-center items-end" title={pseTotalTitle}>
+                        <span className={`text-[11px] font-mono font-black ${isSubPse ? 'text-violet-700' : el.isOption ? 'text-slate-500 line-through' : 'text-emerald-800'}`}>
+                          {isSubPse && displayTotal >= 0 ? '+' : ''}{formatPrice(displayTotal)}
+                        </span>
+                        {showRendu && viewMode === 'study' && !isSubPse && etudeTotal !== total && (
+                          <span className="text-[8px] font-bold text-emerald-600 leading-none" title={`Écart vs étude (total d'étude : ${formatPrice(etudeTotal)})`}>
+                            {(total - etudeTotal) > 0 ? '+' : ''}{formatPrice(total - etudeTotal)}
+                          </span>
+                        )}
                       </div>
-                      {showRendu && viewMode === 'study' && (
-                        <div className="w-24 text-right px-2 shrink-0 leading-none flex flex-col justify-center items-end" title="Total du chapitre à l'étude (quantités brutes)">
-                          {isSubPse ? (
-                            <span className="text-[9px] font-mono text-slate-300">—</span>
-                          ) : (
-                            <>
-                              <span className={`text-[11px] font-mono font-bold ${etudeTotal !== total ? 'text-emerald-600' : 'text-slate-300'}`}>{formatPrice(etudeTotal)}</span>
-                              {etudeTotal !== total && (
-                                <span className="text-[8px] font-bold text-slate-400 leading-none">{(etudeTotal - total) > 0 ? '+' : ''}{formatPrice(etudeTotal - total)}</span>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      )}
                       <div className="w-10 shrink-0">{null}</div>
                     </>
                   )}
