@@ -21,7 +21,7 @@ const ProjectDocBanner = ({ projectStats, tableView = 'comparison', tvaRate = 20
     <div className="flex justify-end">
       <div className="bg-white rounded-2xl border border-gray-200/70 shadow-sm px-6 py-5 w-96">
         <div className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
-          Montant à valoir
+          Montant rendu
         </div>
 
         <div className="flex justify-between items-center mb-1">

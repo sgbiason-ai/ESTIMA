@@ -21,6 +21,7 @@ import BpuSidebar from '../components/BpuSidebar';
 import TranchesBar from '../components/TranchesBar';
 import ProjectStatsBar from '../components/ProjectStatsBar';
 import ProjectDocBanner from '../components/ProjectDocBanner';
+import ProjectTableHeader from '../components/ProjectTableHeader';
 import HelpPanel from '../components/help/HelpPanel';
 
 // NOUVEAUX COMPOSANTS EXTRAITS
@@ -937,7 +938,7 @@ const ProjectView = ({
           )}
 
           <DragDropContext onDragEnd={isReadOnly ? () => {} : handleDragEndFixed}>
-            <div className={`flex-1 overflow-y-auto p-6 space-y-8 ${theme.bg} ${(currentMode === 'client' || isRenduView) ? 'border-l-[6px] border-indigo-600' : ''}`}>
+            <div className={`flex-1 overflow-y-auto px-6 pb-6 pt-0 space-y-8 ${theme.bg} ${(currentMode === 'client' || isRenduView) ? 'border-l-[6px] border-indigo-600' : ''}`}>
 
               {isGlobalMode && !isReadOnly && (
                   <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-xl text-xs font-medium flex items-center gap-3 shadow-sm mb-4">
@@ -950,6 +951,9 @@ const ProjectView = ({
               )}
 
               <div className="bg-white border border-slate-200 rounded-xl shadow-sm min-h-[500px]">
+                {displayProject?.chapters?.length > 0 && (
+                  <ProjectTableHeader viewMode={contextViewMode} showRendu={tableViewEffective === 'comparison'} />
+                )}
                 <Droppable droppableId="root" type="CHAPTER" isDropDisabled={isReadOnly}>
                   {(provided) => (
                     <div ref={provided.innerRef} {...provided.droppableProps} className="p-4 space-y-8">
