@@ -10,7 +10,7 @@ import { ArticleMetaTiles } from './TpArticleMeta';
 import { PosteTable } from './TpDetailTables';
 import { emptyDetail, computeDetail, effectiveDuree, effectiveRendement, detailCalcQty, POSTES } from '../../../utils/tp/tpPriceCompute';
 
-export default function TpAllResourcesModal({ item, coef, activePoste, onSelectPoste, onChange, onQtyChange, onClose }) {
+export default function TpAllResourcesModal({ item, coef, activePoste, onSelectPoste, onChange, onQtyChange, onUnitChange, onClose }) {
   const detail = item.detail || emptyDetail();
   const qte = Number(item.qty || 0);              // quantité du cadre (bordereau)
   const qteCalc = detailCalcQty(detail, qte);     // quantité de calcul (rendement/durée)
@@ -60,7 +60,8 @@ export default function TpAllResourcesModal({ item, coef, activePoste, onSelectP
             </div>
             <ArticleMetaTiles unit={item.unit} qte={qte} calcQte={detail.qteCalcul} calcUnit={detail.uniteCalcul}
               rendement={effectiveRendement(detail, qteCalc)} duree={duree} rendementMissing={rendementMissing}
-              dureeForced={detail.dureeForced} onQtyChange={(v) => onQtyChange?.(v)} onPatch={(p) => onChange({ ...detail, ...p })} />
+              dureeForced={detail.dureeForced} onQtyChange={(v) => onQtyChange?.(v)}
+              onUnitChange={(v) => onUnitChange?.(v)} onPatch={(p) => onChange({ ...detail, ...p })} />
           </div>
           {/* Alerte non bloquante : rendement/durée manquant alors que des ressources temps existent. */}
           {rendementMissing && (

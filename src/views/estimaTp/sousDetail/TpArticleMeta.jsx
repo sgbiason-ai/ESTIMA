@@ -13,17 +13,26 @@ const CALC_UNITS = ['m²', 'm³', 'ml', 'm', 'T', 'kg', 'U', 'ha', 'F'];
 //  - saisir le Rendement la délie (dureeForced=false) → la durée = quantité de calcul / rendement.
 // La « Qté calcul » (quantité + unité) permet de raisonner le rendement dans une autre unité que
 // le cadre (ex. décapage facturé au m² mais piloté en m³). Vide → quantité d'ouvrage du cadre.
-export function ArticleMetaTiles({ unit, qte, calcQte, calcUnit, rendement, duree, dureeForced = false, rendementMissing = false, onQtyChange, onPatch }) {
+export function ArticleMetaTiles({ unit, qte, calcQte, calcUnit, rendement, duree, dureeForced = false, rendementMissing = false, onQtyChange, onUnitChange, onPatch }) {
   const driver = dureeForced ? 'duree' : 'rendement';
   const calcActive = Number(calcQte) > 0;                 // moteur : qté de calcul prise en compte si > 0
   const hasCalc = calcActive || !!(calcUnit && calcUnit.trim());
   const rUnit = ((calcActive && calcUnit) || unit || '').trim(); // rendement dans l'unité réellement utilisée
   return (
     <div className="flex items-stretch gap-2 shrink-0 flex-wrap">
-      <MiniTile icon={Ruler} label="Quantité" unit={unit}>
-        <NumCell value={qte} onCommit={(v) => onQtyChange?.(v)} align="left"
-          className="!border-0 !bg-transparent !px-0 !py-0 !text-base !font-black !text-slate-900" />
-      </MiniTile>
+      {/* Quantité d'ouvrage (cadre) — valeur + unité éditable (chip), harmonisée avec la Qté calcul.
+          L'unité s'écrit directement dans l'article du bordereau (même champ, pas de désync). */}
+      <div className="bg-white border border-orange-200/70 rounded-lg px-2.5 py-1 min-w-[128px] transition-shadow focus-within:ring-2 focus-within:ring-orange-200">
+        <span className="flex items-center gap-1 text-[8px] font-bold uppercase tracking-wide text-slate-500">
+          <Ruler size={10} className="text-orange-500" /> Quantité
+        </span>
+        <div className="flex items-center gap-1.5">
+          <NumCell value={qte} onCommit={(v) => onQtyChange?.(v)} align="left"
+            className="!border-0 !bg-transparent !px-0 !py-0 !text-base !font-black !text-slate-900" />
+          <UnitCell value={unit} placeholder="u" onCommit={(v) => onUnitChange?.(v)}
+            title="Unité de l'article (ex. m², m³, U) — modifie le bordereau" />
+        </div>
+      </div>
 
       {/* Qté + unité de CALCUL : pilotent le rendement dans une autre unité que le cadre.
           L'unité est un vrai champ éditable (chip orange) — vide = unité du cadre. */}
@@ -76,7 +85,7 @@ function MiniTile({ icon: Icon, label, unit, alert = false, title, children }) {
 
 // Champ d'unité de calcul éditable (chip orange, commit au blur) — ex. m³. Liste de
 // suggestions via datalist, saisie libre conservée. Vide = unité du cadre.
-function UnitCell({ value, placeholder = '', onCommit }) {
+function UnitCell({ value, placeholder = '', onCommit, title }) {
   const [v, setV] = useState(value ?? '');
   useEffect(() => { setV(value ?? ''); }, [value]);
   const commit = () => { const t = v.trim(); if (t !== (value ?? '')) onCommit?.(t); };
@@ -88,7 +97,7 @@ function UnitCell({ value, placeholder = '', onCommit }) {
       onChange={(e) => setV(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-      title="Unité de calcul (ex. m³) — vide = unité du cadre"
+      title={title || 'Unité de calcul (ex. m³) — vide = unité du cadre'}
       className="w-12 shrink-0 bg-orange-50 border border-orange-200 rounded px-1 py-0.5 text-[11px] font-bold text-orange-700 text-center outline-none focus:border-orange-400 focus:bg-white placeholder:font-normal placeholder:text-slate-400"
     />
   );

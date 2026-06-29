@@ -2,8 +2,8 @@
 // ESTIMA TP — éditeur de sous-détail d'un article (rendement/durée + 5 postes + PV).
 // Mise en page « 1 écran sans scroll » : bandeau récap figé en haut, puis les
 // 5 postes en onglets (segmented control) — un seul poste affiché à la fois.
-import React from 'react';
-import { Hammer, Wrench, Users, ShoppingCart, HardHat, Truck, LayoutGrid, AlertTriangle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Wrench, Users, ShoppingCart, HardHat, Truck, LayoutGrid, AlertTriangle, ChevronDown } from 'lucide-react';
 import { NumCell } from './sdShared';
 import { fmt, fmt2 } from './sdFormat';
 import { ArticleMetaTiles } from './TpArticleMeta';
@@ -37,8 +37,10 @@ const POSTE_TEXT = {
   transport: 'text-amber-500',
 };
 
-export default function TpSousDetailEditor({ item, coef, onChange, onQtyChange, activePoste, onSelectPoste, onShowAll }) {
+export default function TpSousDetailEditor({ item, coef, onChange, onQtyChange, onUnitChange, activePoste, onSelectPoste, onShowAll }) {
   const detail = item.detail || emptyDetail();
+  const [showRecap, setShowRecap] = useState(false); // repli « Détails » du récap (allégé par défaut)
+  const forced = detail.pvForce != null && detail.pvForce !== ''; // PU de vente imposé
   const qte = Number(item.qty || 0);              // quantité du cadre (bordereau)
   const qteCalc = detailCalcQty(detail, qte);     // quantité de calcul (rendement/durée)
   const r = computeDetail(detail, qte, coef);
@@ -61,25 +63,13 @@ export default function TpSousDetailEditor({ item, coef, onChange, onQtyChange, 
       {/* Bloc résumé FIGÉ (sticky) : en-tête article + récap (la ventilation par poste
           est fusionnée dans les onglets ci-dessous). */}
       <div className="sticky top-0 z-20 bg-[#f5f5f7] pt-2 pb-2 space-y-1.5 border-b border-slate-200/70">
-      {/* En-tête article — compact : désignation + quantité / rendement / durée sur une ligne */}
-      <div className="relative bg-gradient-to-br from-orange-50 to-white border border-orange-200 rounded-lg py-1.5 pl-3 pr-2 shadow-sm overflow-hidden flex items-center gap-2 flex-wrap">
-        <div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-500" />
-
-        {/* Désignation + badge sur UNE ligne */}
-        <div className="min-w-0 flex-1 flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-orange-600 text-white text-[9px] font-black uppercase tracking-widest shrink-0">
-            <Hammer size={10} /> Article
-          </span>
-          <h3 className="text-sm font-black text-slate-900 leading-tight tracking-tight truncate">
-            {item.designation || 'Article sans nom'}
-          </h3>
-        </div>
-
-        {/* Tuiles Quantité / Qté calcul / Rendt / Durée (partagées avec la modale « toutes les ressources ») */}
-        <ArticleMetaTiles unit={item.unit} qte={qte} calcQte={detail.qteCalcul} calcUnit={detail.uniteCalcul}
-          rendement={effectiveRendement(detail, qteCalc)} duree={duree} rendementMissing={rendementMissing}
-          dureeForced={detail.dureeForced} onQtyChange={(v) => onQtyChange?.(v)} onPatch={patch} />
-      </div>
+      {/* Métadonnées d'article : Quantité / Qté calcul / Rendt / Durée. Le nom de la tâche est
+          déjà porté par le navigateur ci-dessus → on ne le répète pas ici. Tuiles partagées
+          avec la modale « toutes les ressources ». */}
+      <ArticleMetaTiles unit={item.unit} qte={qte} calcQte={detail.qteCalcul} calcUnit={detail.uniteCalcul}
+        rendement={effectiveRendement(detail, qteCalc)} duree={duree} rendementMissing={rendementMissing}
+        dureeForced={detail.dureeForced} onQtyChange={(v) => onQtyChange?.(v)}
+        onUnitChange={(v) => onUnitChange?.(v)} onPatch={patch} />
 
       {/* Alerte non bloquante : rendement/durée manquant alors que des ressources temps existent. */}
       {rendementMissing && (
@@ -89,66 +79,77 @@ export default function TpSousDetailEditor({ item, coef, onChange, onQtyChange, 
         </div>
       )}
 
-      {/* Bandeau récap : total déboursé sec · total vente · PU sec · PU vente · PU forcé */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-        <Stat label="Total déboursé sec" value={fmt(r.deboursecSec)} tone="slate" />
-        <Stat label="Total vente" value={fmt(r.totalVente)} tone="emerald" />
-        <Stat label="PU sec" value={fmt2(r.puSec)} sub={`par ${item.unit}`} tone="slate" />
-        <Stat label="Prix unitaire vente" value={fmt2(r.puVente)} sub={`par ${item.unit}`} tone="orange" />
-        <ForcedTile detail={detail} unit={item.unit} onChange={patch} />
+      {/* Bandeau récap allégé : PU de vente (résultat) + déboursé sec mis en avant,
+          répartition dans une barre unique, le reste replié sous « Détails ». */}
+      <div className="space-y-1.5">
+        <div className="flex items-stretch gap-2">
+          {/* Résultat principal : PU déboursé sec (déboursé sec unitaire) */}
+          <div className="flex-1 rounded-xl border border-orange-200 bg-gradient-to-br from-orange-50 to-white px-3 py-1.5">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-700/70">
+              PU déboursé sec
+            </p>
+            <p className="font-mono font-black text-orange-700 leading-tight">
+              <span className="text-xl">{fmt2(r.puSec)}</span>
+              <span className="text-xs font-semibold text-orange-700/60"> /{item.unit}</span>
+            </p>
+          </div>
+          {/* Déboursé sec total */}
+          <div className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 min-w-[116px]">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Déboursé sec</p>
+            <p className="text-base font-mono font-black text-slate-900 leading-tight mt-0.5">{fmt(r.deboursecSec)}</p>
+          </div>
+          {/* Toggle « Détails » : total vente · PU sec · PU forcé */}
+          <button onClick={() => setShowRecap(s => !s)} title="Total vente, PU vente, PU forcé"
+            className="shrink-0 flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-500 hover:bg-slate-50 transition-colors">
+            {forced && <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[9px] font-black uppercase tracking-wide">PV imposé</span>}
+            Détails <ChevronDown size={13} className={`transition-transform ${showRecap ? 'rotate-180' : ''}`} />
+          </button>
+        </div>
+
+        {/* Barre de répartition unique (remplace les 6 mini-jauges des onglets) */}
+        <RepartitionBar r={r} />
+
+        {/* Repli détails */}
+        {showRecap && (
+          <div className="grid grid-cols-3 gap-2">
+            <Stat label="Total vente" value={fmt(r.totalVente)} tone="emerald" />
+            <Stat label="PU vente" value={fmt2(r.puVente)} sub={`par ${item.unit}`} tone="orange" />
+            <ForcedTile detail={detail} unit={item.unit} onChange={patch} />
+          </div>
+        )}
       </div>
 
       </div>
 
-      {/* Onglets-graphique fusionnés : chaque poste = une mini-barre (montant + % + jauge
-          proportionnelle au déboursé sec) qui sert aussi de sélecteur de la table ci-dessous.
-          Un seul poste affiché à la fois → pas de scroll. */}
+      {/* Sélecteur de poste — segmented control sobre (icône colorée + nom + compteur).
+          La répartition financière vit désormais dans la barre unique ci-dessus ; le
+          montant/% par poste reste accessible au survol (title). Un seul poste à la fois. */}
       <div className="pt-3">
-        <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-          {POSTES.map(p => {
-            const active = p === poste;
-            const Icon = POSTE_ICONS[p];
-            const count = (detail[p] || []).length;
-            const pct = r.deboursecSec > 0 ? r.ratios[p] * 100 : 0;
-            return (
-              <button key={p} onClick={() => onSelectPoste?.(p)} title={`${POSTE_LABELS[p]} : ${fmt(r.sec[p])} · ${pct.toFixed(0)}%`}
-                className={`flex-1 min-w-[128px] rounded-xl border px-3 py-2 text-left transition-all ${active ? 'bg-white border-gray-300 shadow-sm' : 'bg-gray-50 border-transparent hover:bg-white/70'}`}>
-                <span className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5">
+          <div className="flex-1 flex gap-0.5 bg-gray-100 p-0.5 rounded-xl overflow-x-auto">
+            {POSTES.map(p => {
+              const active = p === poste;
+              const Icon = POSTE_ICONS[p];
+              const count = (detail[p] || []).length;
+              const pct = r.deboursecSec > 0 ? r.ratios[p] * 100 : 0;
+              return (
+                <button key={p} onClick={() => onSelectPoste?.(p)}
+                  title={`${POSTE_LABELS[p]} : ${fmt(r.sec[p])} · ${pct.toFixed(0)}%`}
+                  className={`flex-1 min-w-[96px] flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-all ${active ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
                   <Icon size={14} strokeWidth={active ? 2 : 1.5} className={POSTE_TEXT[p]} />
-                  <span className={`text-xs font-bold truncate ${active ? 'text-gray-900' : 'text-gray-500'}`}>{POSTE_LABELS[p]}</span>
+                  <span className="truncate">{POSTE_LABELS[p]}</span>
                   {count > 0 && (
-                    <span className={`ml-auto shrink-0 px-1.5 rounded-full text-[9px] font-bold ${active ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-500'}`}>{count}</span>
+                    <span className={`shrink-0 px-1.5 rounded-full text-[9px] font-bold ${active ? 'bg-orange-100 text-orange-700' : 'bg-gray-200 text-gray-500'}`}>{count}</span>
                   )}
-                </span>
-                <span className="flex items-baseline justify-between mt-1">
-                  <span className={`text-[13px] font-mono font-bold ${active ? 'text-gray-900' : 'text-gray-600'}`}>{fmt(r.sec[p])}</span>
-                  <span className="text-[10px] font-semibold text-gray-400 shrink-0 ml-1">{pct.toFixed(0)}%</span>
-                </span>
-                <span className="mt-1 block h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
-                  <span className={`block h-full rounded-full ${POSTE_COLORS[p]}`} style={{ width: `${pct}%` }} />
-                </span>
-              </button>
-            );
-          })}
+                </button>
+              );
+            })}
+          </div>
 
-          {/* 6ᵉ onglet « Toutes » : ouvre la modale des 5 postes empilés. Aligné avec les
-              autres onglets (mêmes dimensions), n'est jamais « actif » (action ponctuelle). */}
+          {/* « Toutes » : action ponctuelle → ouvre la modale des 5 postes empilés. */}
           <button onClick={onShowAll} title="Voir toutes les ressources de la tâche"
-            className="flex-1 min-w-[128px] rounded-xl border border-dashed border-gray-300 bg-gray-50 hover:bg-white hover:border-gray-400 px-3 py-2 text-left transition-all">
-            <span className="flex items-center gap-1.5">
-              <LayoutGrid size={14} strokeWidth={1.5} className="text-gray-500" />
-              <span className="text-xs font-bold truncate text-gray-700">Toutes</span>
-              <span className="ml-auto shrink-0 px-1.5 rounded-full text-[9px] font-bold bg-gray-200 text-gray-500">{POSTES.length}</span>
-            </span>
-            <span className="flex items-baseline justify-between mt-1">
-              <span className="text-[13px] font-mono font-bold text-gray-900">{fmt(r.deboursecSec)}</span>
-              <span className="text-[10px] font-semibold text-gray-400 shrink-0 ml-1">total</span>
-            </span>
-            <span className="mt-1 block h-1.5 w-full rounded-full bg-gray-100 overflow-hidden flex">
-              {POSTES.map(p => (r.ratios[p] > 0
-                ? <span key={p} className={`block h-full ${POSTE_COLORS[p]}`} style={{ width: `${r.ratios[p] * 100}%` }} />
-                : null))}
-            </span>
+            className="shrink-0 flex items-center gap-1.5 rounded-xl border border-dashed border-gray-300 bg-white hover:bg-gray-50 hover:border-gray-400 px-3 py-2 text-xs font-bold text-gray-600 transition-all">
+            <LayoutGrid size={14} strokeWidth={1.5} /> Toutes
           </button>
         </div>
 
@@ -158,6 +159,32 @@ export default function TpSousDetailEditor({ item, coef, onChange, onQtyChange, 
             qte={qteCalc} duree={duree} articleUnit={detail.uniteCalcul || item.unit}
             onHeaderClick={() => onSelectPoste?.(poste)} />
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Barre de répartition unique du déboursé sec entre postes (remplace les jauges par onglet).
+// N'affiche que les postes effectivement présents ; légende qui passe à la ligne au besoin.
+function RepartitionBar({ r }) {
+  if (!(r.deboursecSec > 0)) return null;
+  const parts = POSTES.filter(p => r.ratios[p] > 0);
+  if (!parts.length) return null;
+  return (
+    <div className="space-y-1">
+      <span className="flex h-2 w-full rounded-full overflow-hidden bg-gray-100">
+        {parts.map(p => (
+          <span key={p} className={POSTE_COLORS[p]} style={{ width: `${r.ratios[p] * 100}%` }}
+            title={`${POSTE_LABELS[p]} · ${fmt(r.sec[p])}`} />
+        ))}
+      </span>
+      <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+        {parts.map(p => (
+          <span key={p} className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500">
+            <span className={`w-1.5 h-1.5 rounded-full ${POSTE_COLORS[p]}`} />
+            {POSTE_LABELS[p]} <span className="text-slate-400">{(r.ratios[p] * 100).toFixed(0)}%</span>
+          </span>
+        ))}
       </div>
     </div>
   );

@@ -69,6 +69,15 @@ export default function TpSousDetailTab({ study, setStudy, companyId, selectedId
     setStudy(prev => ({ ...prev, cadre: { ...(prev?.cadre || {}), chapters: next } }));
   };
 
+  // Unité d'ouvrage éditable depuis le sous-détail : met à jour l'article du bordereau
+  // (même champ que le Cadre). Le PU est par unité → la valeur ne change pas, juste le libellé.
+  const applyUnit = (newUnit) => {
+    const item = findNode(chapters, currentId);
+    if (!item) return;
+    const next = updateNode(chapters, currentId, { unit: (newUnit || '').trim() });
+    setStudy(prev => ({ ...prev, cadre: { ...(prev?.cadre || {}), chapters: next } }));
+  };
+
   const insertFromLibrary = (res) => {
     if (!selectedItem) return;
     const [block, line] = lineFromResource(res);
@@ -116,7 +125,7 @@ export default function TpSousDetailTab({ study, setStudy, companyId, selectedId
           {selectedItem
             ? <TpSousDetailEditor
                 item={{ ...selectedItem, detail: selectedItem.detail || emptyDetail() }}
-                coef={coef} onChange={applyDetail} onQtyChange={applyQty}
+                coef={coef} onChange={applyDetail} onQtyChange={applyQty} onUnitChange={applyUnit}
                 activePoste={activePoste} onSelectPoste={selectPoste}
                 onShowAll={() => setShowAll(true)} />
             : <div className="flex items-center justify-center h-full text-slate-400"><Coins size={20} className="mr-2" /> Sélectionnez un article</div>}
@@ -128,7 +137,7 @@ export default function TpSousDetailTab({ study, setStudy, companyId, selectedId
           <TpAllResourcesModal
             item={{ ...selectedItem, detail: selectedItem.detail || emptyDetail() }}
             coef={coef} activePoste={activePoste} onSelectPoste={selectPoste}
-            onChange={applyDetail} onQtyChange={applyQty} onClose={() => setShowAll(false)} />
+            onChange={applyDetail} onQtyChange={applyQty} onUnitChange={applyUnit} onClose={() => setShowAll(false)} />
         )}
       </div>
     </div>
