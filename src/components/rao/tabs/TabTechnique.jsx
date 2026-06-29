@@ -84,7 +84,7 @@ const TabTechnique = ({
         selectedCompany={selectedCompany}
         onSelectCompany={onSelectCompany}
         getCompletionStatus={getTechCompletion}
-        getWarning={(n) => isNonRegular(n) ? 'Offre non régulière — exclue de l\'export PDF' : null}
+        getWarning={(n) => isNonRegular(n) ? 'Offre non régulière — notée et classée sous réserve' : null}
       />
 
       {/* ── Contenu entreprise sélectionnée ── */}
@@ -99,12 +99,12 @@ const TabTechnique = ({
             }}
           />
 
-          {/* Avertissement offre non régulière — conservée à l'écran mais exclue du PDF */}
+          {/* Avertissement offre non régulière — notée ET reprise dans le rapport, sous réserve */}
           {isNonRegular(name) && (
             <div className="flex items-start gap-3 px-5 py-3.5 rounded-2xl border-2 border-amber-300 bg-amber-50 shadow-sm">
               <AlertTriangle size={20} className="text-amber-600 shrink-0 mt-0.5" />
               <div className="text-xs text-amber-900 leading-snug">
-                <strong className="font-black uppercase tracking-wide">Offre non régulière</strong> — cette entreprise reste affichée et modifiable ici pour mémoire, mais elle <strong>n'apparaîtra pas dans l'analyse technique du PDF</strong> exporté (RAO §8).
+                <strong className="font-black uppercase tracking-wide">Offre non régulière</strong> — pensez à la noter techniquement : elle est désormais <strong>reprise dans l'analyse technique du PDF</strong> (RAO §8), signalée « sous réserve de régularisation » et classée avec les autres. La régularisation (CCP R2152-2) reste une décision du pouvoir adjudicateur.
               </div>
             </div>
           )}

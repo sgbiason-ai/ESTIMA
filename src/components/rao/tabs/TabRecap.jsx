@@ -2,6 +2,7 @@
 import React, { useMemo } from 'react';
 import { Award, Download, ShieldCheck, Info, Layers, CheckCircle2, XCircle, GitBranch, Check } from 'lucide-react';
 import { FORMULA_LABELS_CONSULT } from '../RaoConstants';
+import { computePriceReference } from '../../../utils/analysisCompute';
 
 // ─── Formatage montant FR ─────────────────────────────────────────────────────
 const fmtPrice = (v) =>
@@ -55,13 +56,9 @@ const TabRecap = ({
       });
     });
 
-    // 2. Recalculer Pmin/Pmax/Pmoy sur TOUTES les lignes (hors irrégulières)
-    const validPrices = flatList
-      .filter(r => !r.irregular && r.price > 0)
-      .map(r => r.price);
-    const Pmin = validPrices.length ? Math.min(...validPrices) : 0;
-    const Pmax = validPrices.length ? Math.max(...validPrices) : 0;
-    const Pmoy = validPrices.length ? validPrices.reduce((a, b) => a + b, 0) / validPrices.length : 0;
+    // 2. Recalculer Pmin/Pmax/Pmoy sur TOUTES les lignes (irrégulières incluses)
+    //    — computePriceReference (source unique de la règle CCP).
+    const { Pmin, Pmax, Pmoy } = computePriceReference(flatList.map(r => r.price));
 
     // 3. Recalculer priceScore pour chaque ligne (formule scoring)
     const scoreFor = (price) => {
@@ -82,9 +79,9 @@ const TabRecap = ({
       return Math.max(0, Math.min(N, s));
     };
 
-    // 4. Mettre à jour priceScore et totalScore pour TOUTES les lignes
+    // 4. Mettre à jour priceScore et totalScore pour TOUTES les lignes (irrégulières incluses)
     const recomputed = flatList.map(r => {
-      const priceScore = r.irregular ? 0 : scoreFor(r.price);
+      const priceScore = scoreFor(r.price);
       const techTotal = Object.values(r.techScores || {}).reduce((a, b) => a + b, 0);
       return {
         ...r,
@@ -93,13 +90,11 @@ const TabRecap = ({
       };
     });
 
-    // 5. Re-trier : régulières par totalScore décroissant, irrégulières en bas, attribuer rangs
-    const regular = recomputed.filter(r => !r.irregular).sort((a, b) => b.totalScore - a.totalScore);
-    const irregular = recomputed.filter(r => r.irregular);
-    return [
-      ...regular.map((r, i) => ({ ...r, rank: i + 1 })),
-      ...irregular.map(r => ({ ...r, rank: null })),
-    ];
+    // 5. Re-trier : TOUTES les offres classées ensemble par totalScore décroissant.
+    //    Les irrégulières conservent leur flag pour être marquées « sous réserve ».
+    return recomputed
+      .sort((a, b) => b.totalScore - a.totalScore)
+      .map((r, i) => ({ ...r, rank: i + 1 }));
   }, [ranking, analysisCompanies, scoringConfig]);
   const trancheName = hasTranches && raoTrancheId !== 'global'
     ? (tranches || []).find(t => t.id === raoTrancheId)?.name || raoTrancheId
@@ -251,7 +246,7 @@ const TabRecap = ({
                 const isVariant = r.kind === 'variant';
                 const isWinner = r.rank === 1 && !isIrregular;
                 const rowCls = isIrregular
-                  ? 'bg-slate-100/70 opacity-60'
+                  ? 'bg-rose-50/60 border-l-4 border-l-rose-300'
                   : isVariant ? 'bg-purple-50/40 border-l-4 border-l-purple-300'
                   : isWinner ? 'bg-emerald-50/30' : '';
                 const rowKey = isVariant ? `${r.name}_${r.variantId}` : r.name;
@@ -279,49 +274,39 @@ const TabRecap = ({
                           </span>
                         )}
                         {isIrregular && (
-                          <span className="text-[10px] bg-red-500 text-white px-2.5 py-1 rounded-full font-black shadow-sm tracking-widest uppercase" title="Offre exclue de la notation (CCP)">
-                            ⚠ Irrégulière
+                          <span className="text-[10px] bg-red-500 text-white px-2.5 py-1 rounded-full font-black shadow-sm tracking-widest uppercase" title="Offre non régulière — classée sous réserve de régularisation (CCP R2152-2)">
+                            ⚠ {(r.irregularLabel || 'Irrégulière').replace('_', ' ')}
                           </span>
                         )}
                       </div>
                     </td>
                     <td className="px-4 py-5 text-center font-bold text-base">
-                      {isIrregular
-                        ? <span className="text-slate-400">—</span>
-                        : <span className="text-emerald-700">{r.priceScore?.toFixed(2)}</span>}
+                      <span className="text-emerald-700">{r.priceScore?.toFixed(2)}</span>
                     </td>
                     {techCs.map(c => (
                       <td key={c.id} className="px-4 py-5 text-center font-semibold text-base">
-                        {isIrregular
-                          ? <span className="text-slate-400">—</span>
-                          : <span className="text-blue-700">{(r.techScores?.[c.id] || 0).toFixed(2)}</span>}
+                        <span className="text-blue-700">{(r.techScores?.[c.id] || 0).toFixed(2)}</span>
                       </td>
                     ))}
                     <td className="px-6 py-5 text-right text-slate-700 font-mono font-bold text-sm">
-                      {isIrregular ? <span className="line-through text-slate-400">{fmtPrice(r.price)}</span> : fmtPrice(r.price)}
+                      {fmtPrice(r.price)}
                     </td>
                     <td className="px-6 py-5 text-center">
-                      {isIrregular ? (
-                        <span className="font-bold text-xs text-red-600 uppercase tracking-wider">Hors notation</span>
-                      ) : (
-                        <span className={`font-black text-xl ${isWinner ? 'text-emerald-600' : 'text-slate-900'}`}>
-                          {r.totalScore?.toFixed(2)}
-                        </span>
-                      )}
+                      <span className={`font-black text-xl ${isWinner ? 'text-emerald-600' : isIrregular ? 'text-rose-700' : 'text-slate-900'}`}>
+                        {r.totalScore?.toFixed(2)}
+                      </span>
+                      {isIrregular && <div className="text-[9px] font-bold text-rose-600 uppercase tracking-wider">Sous réserve</div>}
                     </td>
                     <td className="px-6 py-5 text-center">
-                      {isIrregular ? (
-                        <span className="text-slate-400 text-2xl">—</span>
-                      ) : (
-                        <div className={`mx-auto w-10 h-10 rounded-2xl flex items-center justify-center font-black text-base shadow-sm ${
-                          r.rank === 1 ? 'bg-amber-400 text-amber-900 ring-4 ring-amber-400/20'
-                        : r.rank === 2 ? 'bg-slate-300 text-slate-700'
-                        : r.rank === 3 ? 'bg-orange-300 text-orange-900'
-                        : 'bg-slate-100 text-slate-500'
-                        }`}>
-                          {r.rank}
-                        </div>
-                      )}
+                      <div className={`mx-auto w-10 h-10 rounded-2xl flex items-center justify-center font-black text-base shadow-sm ${
+                        isIrregular ? 'bg-rose-100 text-rose-700 ring-2 ring-rose-200'
+                      : r.rank === 1 ? 'bg-amber-400 text-amber-900 ring-4 ring-amber-400/20'
+                      : r.rank === 2 ? 'bg-slate-300 text-slate-700'
+                      : r.rank === 3 ? 'bg-orange-300 text-orange-900'
+                      : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        {r.rank}
+                      </div>
                     </td>
                   </tr>
                 );

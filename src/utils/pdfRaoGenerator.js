@@ -10,7 +10,7 @@ import { NON_REGULAR_STATUSES } from '../components/rao/RaoConstants';
 import { buildTheme as _buildTheme } from './pdf/buildTheme';
 import { getCurrentPhaseCode } from './phaseModel';
 import { computeVatBreakdown } from './financeFormat';
-import { scoreOffer, computeOABThreshold as calculateOABThreshold } from './analysisCompute';
+import { scoreOffer, computePriceReference } from './analysisCompute';
 import { stampPdfCredit } from './estimaCredit';
 
 // ─── COULEUR PRIMAIRE RAO : VERT PAPYRUS ────────────────────────────────────
@@ -139,7 +139,7 @@ const drawJustifiedText = (doc, text, x, y, maxWidth, lineH = 4.5) => {
 };
 
 // ─── PAGE DE GARDE RAO — utilise drawCoverPage partagé + bloc consultation ──
-const drawCoverPageRao = (doc, project, consultation, logoMoe, logoClient, today, branding, THEME, logoCoTraitants = []) => {
+const drawCoverPageRao = (doc, project, consultation, logoMoe, logoClient, today, branding, THEME, logoCoTraitants = [], negotiationPhase = 'none') => {
   // Formater la date de remise
   let remiseStr = '—';
   if (consultation?.dateRemise) {
@@ -157,6 +157,7 @@ const drawCoverPageRao = (doc, project, consultation, logoMoe, logoClient, today
     subtitle1: (consultation?.subtitle1 || project?.subtitle1 || '').trim(),
     subtitle2: (consultation?.subtitle2 || project?.subtitle2 || '').trim(),
     phaseLabel: (consultation?.phase || getCurrentPhaseCode(project)).toUpperCase(),
+    negotiationPhase,
     clientName: consultation?.client || project?.client || 'Non renseigné',
     clientStreet: project?.clientAddress ? project.clientAddress.trim() : '',
     clientCityZip: [project?.clientZip, project?.clientCity].filter(Boolean).join(' ').trim(),
@@ -296,16 +297,14 @@ export const generateRaoPDF = async (optionsParams) => {
     // Quantités « à valoir » (client, majorées) par tranche — source unique computeQtyMaps.
     // Indispensable pour le détail par tranche : sinon repli sur la quantité d'étude brute.
     clientQtyMaps = {},
-    // Inclure ou non TOUTES les références aux prix anormalement bas (OAB) dans le PDF :
-    //   #1 surlignage orange + légende dans le détail des prix
-    //   #2 bloc d'alerte nominatif « Offre(s) anormalement basse(s) détectée(s) » (Récap)
-    //   #3 Annexe A — Méthode OAB
-    // Défaut true pour préserver le comportement des appelants qui ne passent pas l'option (mobile).
-    includeOab = true,
-    // Inclure ou non les annexes B (formules de notation) et C (références CCP).
-    // L'Annexe A (méthode OAB) reste, elle, pilotée par includeOab.
+    // Inclure ou non les annexes A (formules de notation) et B (références CCP).
     // Défaut true : annexes présentes comme avant pour les appelants qui ne passent pas l'option.
     includeAnnexes = true,
+    // Phase de négociation à marquer sur le rapport : 'none' | 'before' | 'after'.
+    //   - badge coloré sur la page de garde (ambre « AVANT » / vert « APRÈS »)
+    //   - préfixe de la phrase de recommandation par défaut (conclusion)
+    // Défaut 'none' : aucune mention (rétro-compatible, ex. appelants mobile).
+    negotiationPhase = 'none',
   } = optionsParams;
 
   // Taux de TVA configurable par projet (défaut 20 %), partagé par toutes les sorties RAO (audit F2).
@@ -362,27 +361,24 @@ export const generateRaoPDF = async (optionsParams) => {
       });
     });
 
-    const valid = flat.filter(r => !r.irregular && r.price > 0).map(r => r.price);
-    const Pmin = valid.length ? Math.min(...valid) : 0;
-    const Pmax = valid.length ? Math.max(...valid) : 0;
-    const Pmoy = valid.length ? valid.reduce((a, b) => a + b, 0) / valid.length : 0;
+    // Réintégration CCP : toutes les offres concourent (régulières ET irrégulières).
+    const { Pmin, Pmax, Pmoy } = computePriceReference(flat.map(r => r.price));
 
     // Notation prix : primitif partagé scoreOffer (src/utils/analysisCompute.js).
     // Garde Pmin > 0 conservée (sinon pas de moins-disant valide → 0).
     const scoreFor = (p) => (Pmin > 0 ? scoreOffer(p, Pmin, Pmax, Pmoy, N, mode) : 0);
 
     const recomputed = flat.map(r => {
-      const priceScore = r.irregular ? 0 : scoreFor(r.price);
+      const priceScore = scoreFor(r.price);
       const techTotal = Object.values(r.techScores || {}).reduce((a, b) => a + b, 0);
       return { ...r, priceScore, totalScore: priceScore + techTotal };
     });
 
-    const reg = recomputed.filter(r => !r.irregular).sort((a, b) => b.totalScore - a.totalScore);
-    const irreg = recomputed.filter(r => r.irregular);
-    return [
-      ...reg.map((r, i) => ({ ...r, rank: i + 1 })),
-      ...irreg.map(r => ({ ...r, rank: null })),
-    ];
+    // Toutes les offres classées ensemble ; le flag `irregular` est conservé pour
+    // le marquage « sous réserve de régularisation » dans le rapport.
+    return recomputed
+      .sort((a, b) => b.totalScore - a.totalScore)
+      .map((r, i) => ({ ...r, rank: i + 1 }));
   };
   const extendedRanking = buildExtendedRanking();
 
@@ -396,7 +392,7 @@ export const generateRaoPDF = async (optionsParams) => {
   };
 
   // ── PAGE 1 : COUVERTURE ──
-  drawCoverPageRao(doc, project, consultation, logoMoe, logoClient, today, branding, THEME, logoCoTraitants);
+  drawCoverPageRao(doc, project, consultation, logoMoe, logoClient, today, branding, THEME, logoCoTraitants, negotiationPhase);
 
   // ── PAGE 2 : SOMMAIRE ──
   // On insère une page placeholder pour le sommaire — on la remplira à la fin
@@ -716,6 +712,8 @@ export const generateRaoPDF = async (optionsParams) => {
 
   // Tableau des entreprises avec montants AE annoncés + variantes (montant inclus)
   // Une ligne par variante en plus de la base — pas de ligne de cumul (peu utile)
+  // La colonne « Variantes » n'est affichée que si au moins une entreprise en a déposé.
+  const hasAnyVariant = analysisCompanies.some(c => (c.variants || []).length > 0);
   const depouillementBody = [];
 
   analysisCompanies.forEach((c, idx) => {
@@ -724,13 +722,14 @@ export const generateRaoPDF = async (optionsParams) => {
     const aeAmountTtc = c.aeAmount != null
       ? fmt(computeVatBreakdown(c.aeAmount, projectTvaRate).ttc) + ' €'
       : '—';
-    depouillementBody.push([
+    const baseRow = [
       { content: String(idx + 1), styles: { halign: 'center', fontStyle: 'bold' } },
       { content: cleanText(c.name), styles: { fontStyle: 'bold' } },
       { content: aeAmountHt, styles: { halign: 'right', fontStyle: 'bold' } },
       { content: aeAmountTtc, styles: { halign: 'right', fontStyle: 'bold' } },
-      { content: (c.variants || []).length > 0 ? `${c.variants.length} variante${c.variants.length > 1 ? 's' : ''}` : '—', styles: { fontSize: 7, halign: 'center' } },
-    ]);
+    ];
+    if (hasAnyVariant) baseRow.push({ content: (c.variants || []).length > 0 ? `${c.variants.length} variante${c.variants.length > 1 ? 's' : ''}` : '—', styles: { fontSize: 7, halign: 'center' } });
+    depouillementBody.push(baseRow);
 
     // Une ligne supplémentaire par variante (montant HT + TTC explicites)
     (c.variants || []).forEach((v, vi) => {
@@ -749,11 +748,13 @@ export const generateRaoPDF = async (optionsParams) => {
 
   autoTable(doc, {
     startY: y,
-    head: [['N°', 'Entreprise / Variante', 'Montant AE HT', 'Montant AE TTC', 'Variantes']],
+    head: [hasAnyVariant
+      ? ['N°', 'Entreprise / Variante', 'Montant AE HT', 'Montant AE TTC', 'Variantes']
+      : ['N°', 'Entreprise', 'Montant AE HT', 'Montant AE TTC']],
     body: depouillementBody,
     styles: { font: 'Helvetica', fontSize: 8, cellPadding: 3 },
     headStyles: { fillColor: THEME.primary, textColor: [255, 255, 255], fontStyle: 'bold' },
-    columnStyles: { 0: { cellWidth: 10 }, 2: { cellWidth: 33, halign: 'right' }, 3: { cellWidth: 33, halign: 'right' }, 4: { cellWidth: 26, halign: 'center' } },
+    columnStyles: { 0: { cellWidth: 10 }, 2: { cellWidth: 33, halign: 'right' }, 3: { cellWidth: 33, halign: 'right' }, ...(hasAnyVariant ? { 4: { cellWidth: 26, halign: 'center' } } : {}) },
     alternateRowStyles: { fillColor: THEME.tableAlt },
     margin: { left: M, right: M },
     didDrawPage: () => drawFooter(doc, pageNum, consultation, project, THEME),
@@ -763,8 +764,7 @@ export const generateRaoPDF = async (optionsParams) => {
   // Note de bas
   doc.setFontSize(7);
   doc.setTextColor(120, 120, 120);
-  const tvaPct = (projectTvaRate * 100).toLocaleString('fr-FR', { maximumFractionDigits: 2 });
-  const noteAe = `Les montants HT ci-dessus sont ceux relevés sur les actes d'engagement (AE) à l'ouverture des plis ; le montant TTC est calculé au taux de TVA du projet (${tvaPct} %). Ils engagent contractuellement les soumissionnaires (article L2113-1 CCP). Toute divergence avec le total recalculé à partir du BPU sera signalée à la section Conformité.`;
+  const noteAe = `Les montants HT et TTC ci-dessus sont ceux relevés sur les actes d'engagement (AE) à l'ouverture des plis. Ils engagent contractuellement les soumissionnaires (article L2113-1 CCP). Toute divergence avec le total recalculé à partir du BPU sera signalée à la section Conformité.`;
   drawJustifiedText(doc, noteAe, M, y, W - 2 * M, 4);
 
   // ── ANALYSE ADMINISTRATIVE — Tableau comparatif avec colonnes subdivisées pour groupements ──
@@ -936,9 +936,14 @@ export const generateRaoPDF = async (optionsParams) => {
       doc.setFont('Helvetica', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(...THEME.lightText);
-      const introCnf = "Les offres présentant des écarts avec le DQE ou avec leur acte d'engagement, ou jugées non régulières, sont signalées ci-dessous ; le motif retenu est précisé sous l'entreprise concernée. Conformément à l'article L2152-2 du CCP, une offre qui modifie les quantités du DQE est considérée comme irrégulière (régularisable manuellement par décision motivée du pouvoir adjudicateur).";
+      const introCnf = "Les offres présentant des écarts avec le DQE ou avec leur acte d'engagement, ou jugées non régulières, sont signalées ci-dessous ; le motif retenu est précisé sous l'entreprise concernée. Conformément aux articles L2152-1 et suivants du CCP, ces offres restent analysées et classées SOUS RÉSERVE : une offre non régularisée ne peut être déclarée attributaire en l'état."
+        + (negotiationPhase === 'before'
+          ? " La présente analyse étant établie AVANT négociation, il est rappelé sous chaque entreprise concernée la possibilité d'inviter le(s) soumissionnaire(s) à régulariser leur offre (art. R2152-2), dans le respect de l'égalité de traitement."
+          : "");
       ({ y } = drawJustifiedText(doc, introCnf, M, y, W - 2 * M, 4.5));
       y += 6;
+
+      const NON_REG_CNF = ['irreguliere', 'inacceptable', 'inappropriee'];
 
       irregularCompanies.forEach(c => {
         const admin = companiesData[c.name]?.admin || {};
@@ -984,6 +989,37 @@ export const generateRaoPDF = async (optionsParams) => {
           doc.setTextColor(...THEME.lightText);
           ({ y } = drawJustifiedText(doc, conformityComment, M + 3, y, W - 2 * M - 6, 4));
           y += 4;
+        }
+
+        // Recommandation de régularisation (CCP) — différenciée par statut.
+        if (NON_REG_CNF.includes(concl)) {
+          let recoTxt = '';
+          let boxColor = [254, 243, 199]; // amber-100 (recommandation)
+          let txtColor = [146, 64, 14];   // amber-800
+          if (concl === 'inappropriee') {
+            recoTxt = "Offre inappropriée (art. L2152-4) : elle est éliminée et NE PEUT PAS être régularisée (art. R2152-1), quelle que soit la procédure.";
+            boxColor = [254, 226, 226]; txtColor = [153, 27, 27]; // rose-100 / red-800
+          } else if (negotiationPhase === 'before') {
+            recoTxt = `Recommandation (analyse avant négociation) : avant tout écartement, inviter ${cleanText(c.name)} — ainsi que tout autre soumissionnaire dans la même situation, par égalité de traitement — à régulariser son offre dans un délai approprié (art. R2152-2), sans modification de ses caractéristiques substantielles.`;
+          } else {
+            recoTxt = "Offre non régulière : sa régularisation (art. R2152-2) relève d'une décision du pouvoir adjudicateur, sans modification des caractéristiques substantielles.";
+          }
+          // IMPORTANT : mesurer dans la MÊME police que le rendu (gras), sinon les
+          // lignes calculées en normal débordent une fois dessinées en gras.
+          doc.setFont('Helvetica', 'bold');
+          doc.setFontSize(8);
+          const rLines = doc.splitTextToSize(recoTxt, W - 2 * M - 8);
+          const rLineH = 4.4;
+          const rH = 4.5 + rLines.length * rLineH + 4;
+          if (y + rH > 285 && y > 60) { y = addPage('Conformité et anomalies (suite)', 'a4', 'portrait'); }
+          doc.setFillColor(...boxColor);
+          doc.roundedRect(M, y, W - 2 * M, rH, 1.5, 1.5, 'F');
+          doc.setTextColor(...txtColor);
+          doc.setFont('Helvetica', 'bold');
+          doc.setFontSize(8);
+          let ry = y + 5.5;
+          rLines.forEach(ln => { doc.text(ln, M + 4, ry); ry += rLineH; });
+          y += rH + 4;
         }
 
         // Écart AE (si présent)
@@ -1070,22 +1106,20 @@ export const generateRaoPDF = async (optionsParams) => {
     const grandTotalBase = analysisStats.totalEstimation || 0;
     const NON_REGULAR_SYNTH = ['irreguliere', 'inacceptable', 'inappropriee'];
 
-    // 1. Construire la liste : base régulière + variantes retenues (irrégulières éliminées)
+    // 1. Construire la liste : base + variantes retenues. Réintégration CCP : les
+    //    offres non régulières sont INCLUSES (statut conservé pour marquage « sous réserve »).
     const synthRows = [];
     analysisCompanies.forEach(c => {
       const admin = companiesData[c.name]?.admin || {};
-      const isBaseIrregular = admin.conclusion && NON_REGULAR_SYNTH.includes(admin.conclusion);
-      // Base : uniquement si régulière
-      if (!isBaseIrregular) {
-        synthRows.push({
-          id: c.id, name: c.name, kind: 'base',
-          total: analysisStats.companiesTotals[c.id] || 0,
-        });
-      }
+      const baseConcl = admin.conclusion && NON_REGULAR_SYNTH.includes(admin.conclusion) ? admin.conclusion : null;
+      synthRows.push({
+        id: c.id, name: c.name, kind: 'base',
+        total: analysisStats.companiesTotals[c.id] || 0,
+        irregular: !!baseConcl, irregularLabel: baseConcl,
+      });
       // Variantes retenues : ajoutées en plus
       (c.variants || []).filter(v => v.retained).forEach((v, vi) => {
-        const vConcl = v.adminConclusion || null;
-        if (vConcl && NON_REGULAR_SYNTH.includes(vConcl)) return; // variante elle-même irrégulière → exclue
+        const vConcl = v.adminConclusion && NON_REGULAR_SYNTH.includes(v.adminConclusion) ? v.adminConclusion : null;
         synthRows.push({
           id: `${c.id}_${v.id}`,
           name: c.name,
@@ -1094,15 +1128,13 @@ export const generateRaoPDF = async (optionsParams) => {
           variantLabel: v.label || `Variante ${vi + 1}`,
           baseCompanyId: c.id,
           total: Number(v.total || 0),
+          irregular: !!vConcl, irregularLabel: vConcl,
         });
       });
     });
 
-    // 2. Recalcul Pmin/Pmoy/Pmax sur les lignes valides (prix > 0)
-    const validPrices = synthRows.map(r => r.total).filter(t => t > 0);
-    const PminS = validPrices.length ? Math.min(...validPrices) : 0;
-    const PmaxS = validPrices.length ? Math.max(...validPrices) : 0;
-    const PmoyS = validPrices.length ? validPrices.reduce((a, b) => a + b, 0) / validPrices.length : 0;
+    // 2. Recalcul Pmin/Pmoy/Pmax — toutes les offres incluses (irrégulières comprises).
+    const { Pmin: PminS, Pmax: PmaxS, Pmoy: PmoyS } = computePriceReference(synthRows.map(r => r.total));
     const modeS = scoringConfig?.mode || 'f1';
     // Notation prix : même primitif partagé scoreOffer (source unique de la formule).
     const scoreForS = (p) => (PminS > 0 ? scoreOffer(p, PminS, PmaxS, PmoyS, maxScore, modeS) : 0);
@@ -1114,25 +1146,32 @@ export const generateRaoPDF = async (optionsParams) => {
     }));
     summaryData.sort((a, b) => b.score - a.score);
 
+    const STATUS_LABEL_SYNTH = { irreguliere: 'IRRÉGULIÈRE', inacceptable: 'INACCEPTABLE', inappropriee: 'INAPPROPRIÉE' };
     const summaryBody = summaryData.map((d, index) => {
       const origIdx = analysisCompanies.findIndex(c => c.name === d.name);
       const cStyle = getCompanyStyle(origIdx !== -1 ? origIdx : 0);
       const ttc = computeVatBreakdown(d.total, projectTvaRate).ttc;
       const isVariant = d.kind === 'variant';
-      const displayName = isVariant
+      const irr = !!d.irregular;
+      // Lignes non régulières : fond rosé + mention « sous réserve » ; variantes : violet.
+      const rowFill = irr ? [254, 226, 226] : (isVariant ? [243, 232, 255] : undefined);
+      const statusTag = irr ? `\n${STATUS_LABEL_SYNTH[d.irregularLabel] || 'NON RÉGULIÈRE'} (sous réserve)` : '';
+      const displayName = (isVariant
         ? `  > ${d.name} - V${d.variantIndex}${d.variantLabel ? ` (${d.variantLabel})` : ''}`
-        : d.name;
+        : d.name) + statusTag;
       const rangSuffix = index === 0 ? 'er' : 'ème';
-      const nameStyles = isVariant
-        ? { textColor: [88, 28, 135], fontStyle: 'italic', fontSize: 8 }
-        : { textColor: cStyle.header, fontStyle: 'bold' };
+      const nameStyles = irr
+        ? { textColor: [190, 18, 60], fontStyle: 'bold', fontSize: 8 }
+        : isVariant
+          ? { textColor: [88, 28, 135], fontStyle: 'italic', fontSize: 8 }
+          : { textColor: cStyle.header, fontStyle: 'bold' };
       return [
-        { content: `${index + 1}${rangSuffix}`, styles: { fontStyle: 'bold', halign: 'center', fillColor: isVariant ? [243, 232, 255] : undefined } },
-        { content: displayName, styles: { ...nameStyles, fillColor: isVariant ? [243, 232, 255] : undefined } },
-        { content: formatNumberFr(d.total) + ' €', styles: { fontStyle: 'bold', halign: 'right', fillColor: isVariant ? [243, 232, 255] : undefined } },
-        { content: formatNumberFr(ttc) + ' €', styles: { halign: 'right', fillColor: isVariant ? [243, 232, 255] : undefined } },
-        { content: (d.deviation > 0 ? '+' : '') + d.deviation.toFixed(2) + '%', styles: { textColor: d.deviation > 0 ? [200, 0, 0] : [0, 150, 0], halign: 'center', fillColor: isVariant ? [243, 232, 255] : undefined } },
-        { content: d.score.toFixed(2) + ` / ${maxScore}`, styles: { fontStyle: 'bold', halign: 'center', fillColor: isVariant ? [243, 232, 255] : undefined } }
+        { content: `${index + 1}${rangSuffix}`, styles: { fontStyle: 'bold', halign: 'center', fillColor: rowFill } },
+        { content: displayName, styles: { ...nameStyles, fillColor: rowFill } },
+        { content: formatNumberFr(d.total) + ' €', styles: { fontStyle: 'bold', halign: 'right', fillColor: rowFill } },
+        { content: formatNumberFr(ttc) + ' €', styles: { halign: 'right', fillColor: rowFill } },
+        { content: (d.deviation > 0 ? '+' : '') + d.deviation.toFixed(2) + '%', styles: { textColor: d.deviation > 0 ? [200, 0, 0] : [0, 150, 0], halign: 'center', fillColor: rowFill } },
+        { content: d.score.toFixed(2) + ` / ${maxScore}`, styles: { fontStyle: 'bold', halign: 'center', fillColor: rowFill } }
       ];
     });
 
@@ -1205,31 +1244,31 @@ export const generateRaoPDF = async (optionsParams) => {
 
       let tocAdded = false;
 
-      // ─── Construction des "colonnes virtuelles" : base régulière + variantes retenues ─
+      // ─── Construction des "colonnes virtuelles" : base + variantes retenues ─
       // Même logique que l'onglet d'analyse financière de l'app (AnalysisTable).
-      // Exclusion des bases irrégulières (CCP L2152-2).
+      // Réintégration CCP : les offres non régulières sont INCLUSES (colonne marquée
+      // « sous réserve »), leur statut conservé via `irregular` / `irregularLabel`.
       const NON_REG_DETAIL = ['irreguliere', 'inacceptable', 'inappropriee'];
       const detailColumns = [];
       analysisCompanies.forEach((c, idx) => {
         const admin = companiesData[c.name]?.admin || {};
-        const isBaseIrregular = admin.conclusion && NON_REG_DETAIL.includes(admin.conclusion);
-        if (!isBaseIrregular) {
-          detailColumns.push({
-            key: `${c.id}_base`,
-            companyId: c.id,
-            companyName: c.name,
-            companyIndex: idx,
-            kind: 'base',
-            offers: c.offers || {},
-            quantities: {},
-            removedIds: new Set(),
-            newItems: [],
-          });
-        }
+        const baseConcl = admin.conclusion && NON_REG_DETAIL.includes(admin.conclusion) ? admin.conclusion : null;
+        detailColumns.push({
+          key: `${c.id}_base`,
+          companyId: c.id,
+          companyName: c.name,
+          companyIndex: idx,
+          kind: 'base',
+          offers: c.offers || {},
+          quantities: {},
+          removedIds: new Set(),
+          newItems: [],
+          irregular: !!baseConcl,
+          irregularLabel: baseConcl,
+        });
         // Variantes retenues uniquement (CCP R2151-11)
         (c.variants || []).filter(v => v.retained).forEach((v, vi) => {
-          const vConcl = v.adminConclusion || null;
-          if (vConcl && NON_REG_DETAIL.includes(vConcl)) return;
+          const vConcl = v.adminConclusion && NON_REG_DETAIL.includes(v.adminConclusion) ? v.adminConclusion : null;
           detailColumns.push({
             key: `${c.id}_${v.id}`,
             companyId: c.id,
@@ -1242,6 +1281,8 @@ export const generateRaoPDF = async (optionsParams) => {
             quantities: v.quantities || {},
             removedIds: new Set((v.removedItems || []).map(it => it.itemId)),
             newItems: v.newItems || [],
+            irregular: !!vConcl,
+            irregularLabel: vConcl,
           });
         });
       });
@@ -1262,15 +1303,10 @@ export const generateRaoPDF = async (optionsParams) => {
         const title = hasTr ? `DÉTAIL DES PRIX UNITAIRES — ${tranche.name.toUpperCase()}` : "DÉTAIL DES PRIX UNITAIRES";
         doc.text(title, M, y);
 
-        if (includeOab || analysisMode === 'heatmap') {
+        if (analysisMode === 'heatmap') {
           doc.setFontSize(8); doc.setTextColor(0); doc.setFont("Helvetica", "normal");
-          if (includeOab) {
-            doc.setFillColor(255, 237, 213); doc.rect(80, y - 3, 4, 4, 'F');
-            doc.text("Prix bas suspecté (OAB)", 86, y);
-          } else if (analysisMode === 'heatmap') {
-            doc.setFillColor(248, 113, 113); doc.rect(80, y - 3, 4, 4, 'F'); doc.text("> +50%", 86, y);
-            doc.setFillColor(52, 211, 153); doc.rect(100, y - 3, 4, 4, 'F'); doc.text("< -50%", 106, y);
-          }
+          doc.setFillColor(248, 113, 113); doc.rect(80, y - 3, 4, 4, 'F'); doc.text("> +50%", 86, y);
+          doc.setFillColor(52, 211, 153); doc.rect(100, y - 3, 4, 4, 'F'); doc.text("< -50%", 106, y);
         }
         y += 6;
 
@@ -1307,17 +1343,25 @@ export const generateRaoPDF = async (optionsParams) => {
         ];
         const columnStyles = {};
 
+        const STATUS_LABEL_DETAIL = { irreguliere: 'IRRÉGULIÈRE', inacceptable: 'INACCEPTABLE', inappropriee: 'INAPPROPRIÉE' };
         let runningColIdx = 6;
         detailColumns.forEach((col) => {
           const style = getCompanyStyle(col.companyIndex);
           const isVar = col.kind === 'variant';
           // Variante = même couleur que l'entreprise mais plus claire (header + body)
-          const headerBg = isVar ? lighten(style.header, 0.45) : style.header;
-          const headerText = isVar ? style.text : [255, 255, 255];
-          const bodyBg = isVar ? lighten(style.header, 0.88) : style.body;
-          const labelTitle = isVar
+          let headerBg = isVar ? lighten(style.header, 0.45) : style.header;
+          let headerText = isVar ? style.text : [255, 255, 255];
+          let bodyBg = isVar ? lighten(style.header, 0.88) : style.body;
+          let labelTitle = isVar
             ? `${col.companyName} - V${col.variantIndex} (RETENUE)`
             : col.companyName;
+          // Offre non régulière : en-tête rouge + mention « sous réserve », corps rosé.
+          if (col.irregular) {
+            headerBg = [190, 18, 60];   // rose-700
+            headerText = [255, 255, 255];
+            bodyBg = [254, 226, 226];   // rose-100
+            labelTitle = `${col.companyName}${isVar ? ` - V${col.variantIndex}` : ''}\n${STATUS_LABEL_DETAIL[col.irregularLabel] || 'NON RÉGULIÈRE'}`;
+          }
 
           mainHeaders.push({
             content: labelTitle,
@@ -1353,9 +1397,6 @@ export const generateRaoPDF = async (optionsParams) => {
               { content: formatNumberFr(item.price) },
               { content: formatNumberFr(estTotal), styles: { fontStyle: 'bold' } }
             ];
-            const itemPrices = detailColumns.map(col => Number(col.offers[item.id] || 0));
-            const lineOabThreshold = includeOab ? calculateOABThreshold(itemPrices) : 0;
-
             detailColumns.forEach((col) => {
               const isVar = col.kind === 'variant';
               const isRemoved = col.removedIds.has(item.id);
@@ -1369,8 +1410,6 @@ export const generateRaoPDF = async (optionsParams) => {
               let cellStyle = {};
               if (isRemoved) {
                 cellStyle = { fillColor: [241, 245, 249], textColor: [150, 150, 150], fontStyle: 'italic' };
-              } else if (includeOab && hasPrice && price > 0 && price < lineOabThreshold) {
-                cellStyle = { fillColor: [255, 237, 213], textColor: [180, 83, 9], fontStyle: 'bold' };
               } else if (analysisMode === 'heatmap' && hasPrice && item.price > 0) {
                 const hs = getHeatmapStyle(price, item.price);
                 if (hs) cellStyle = { fillColor: hs.fill, textColor: hs.text, fontStyle: 'bold' };
@@ -1807,12 +1846,12 @@ export const generateRaoPDF = async (optionsParams) => {
             const BAR_H = 6, HEADER_BLOCK = BAR_H + 4; // nom + barre + note + petit gap interne
 
             // Mesure chaque bloc entreprise (texte complet, pas de troncature).
-            // Les offres non régulières sont écartées de l'analyse technique ; on conserve
-            // l'index « ci » d'origine pour garder la couleur d'entreprise cohérente.
+            // Réintégration CCP : les offres non régulières restent dans l'analyse
+            // technique, signalées « sous réserve ». Index « ci » d'origine conservé.
             const blocks = companyNames
               .map((name, ci) => ({ name, ci }))
-              .filter(({ name }) => !NON_REGULAR_STATUSES.includes(companiesData[name]?.admin?.conclusion))
               .map(({ name, ci }) => {
+                const irregular = NON_REGULAR_STATUSES.includes(companiesData[name]?.admin?.conclusion);
                 const tech = companiesData[name]?.technical || {};
                 const sd = tech[sc.id] || {};
                 let h = HEADER_BLOCK;
@@ -1821,7 +1860,7 @@ export const generateRaoPDF = async (optionsParams) => {
                   lines = doc.splitTextToSize(sd.text, W - 2 * M - 10);
                   h += lines.length * LINE_H;
                 }
-                return { name, ci, sd, h, lines };
+                return { name, ci, sd, h, lines, irregular };
               });
 
             // Distribution gloutonne sur 1+ pages
@@ -1872,9 +1911,9 @@ export const generateRaoPDF = async (optionsParams) => {
 
                 doc.setFont('Helvetica', 'bold');
                 doc.setFontSize(9);
-                doc.setTextColor(...cStyle.header);
+                doc.setTextColor(...(b.irregular ? [190, 18, 60] : cStyle.header));
                 doc.text(cleanText(b.name), M + 3, y + BAR_H / 2 + 1.5);
-                drawScoreBar(doc, 75, y, W - 115, BAR_H, sPond, scMax, cStyle.header);
+                drawScoreBar(doc, 75, y, W - 115, BAR_H, sPond, scMax, b.irregular ? [190, 18, 60] : cStyle.header);
                 doc.setTextColor(...THEME.text);
                 doc.setFont('Helvetica', 'bold');
                 doc.setFontSize(8);
@@ -1906,11 +1945,12 @@ export const generateRaoPDF = async (optionsParams) => {
           const FONT_BODY = 8.5, LINE_H = 4.5, MIN_GAP = 6, MAX_GAP = 25;
           const BAR_H = 6, HEADER_BLOCK = BAR_H + 4;
 
-          // Offres non régulières écartées ; index « ci » d'origine conservé (couleur stable).
+          // Réintégration CCP : offres non régulières incluses (marquées « sous réserve »).
+          // Index « ci » d'origine conservé (couleur stable).
           const blocks = companyNames
             .map((name, ci) => ({ name, ci }))
-            .filter(({ name }) => !NON_REGULAR_STATUSES.includes(companiesData[name]?.admin?.conclusion))
             .map(({ name, ci }) => {
+              const irregular = NON_REGULAR_STATUSES.includes(companiesData[name]?.admin?.conclusion);
               const tech = companiesData[name]?.technical || {};
               const d = tech[crit.id] || {};
               let h = HEADER_BLOCK;
@@ -1919,7 +1959,7 @@ export const generateRaoPDF = async (optionsParams) => {
                 lines = doc.splitTextToSize(d.text, W - 2 * M - 5);
                 h += lines.length * LINE_H;
               }
-              return { name, ci, d, h, lines };
+              return { name, ci, d, h, lines, irregular };
             });
 
           const spaceAvail = BOTTOM - y;
@@ -1959,9 +1999,9 @@ export const generateRaoPDF = async (optionsParams) => {
 
               doc.setFont('Helvetica', 'bold');
               doc.setFontSize(9);
-              doc.setTextColor(...cStyle.header);
+              doc.setTextColor(...(b.irregular ? [190, 18, 60] : cStyle.header));
               doc.text(cleanText(b.name), M + 3, y + BAR_H / 2 + 1.5);
-              drawScoreBar(doc, 75, y, W - 115, BAR_H, notePond, critMax, cStyle.header);
+              drawScoreBar(doc, 75, y, W - 115, BAR_H, notePond, critMax, b.irregular ? [190, 18, 60] : cStyle.header);
               doc.setTextColor(...THEME.text);
               doc.setFont('Helvetica', 'bold');
               doc.setFontSize(8);
@@ -2056,17 +2096,21 @@ export const generateRaoPDF = async (optionsParams) => {
     'Rang'
   ];
 
+  const STATUS_LABEL_RECAP = { irreguliere: 'IRRÉGULIÈRE', inacceptable: 'INACCEPTABLE', inappropriee: 'INAPPROPRIÉE' };
   const bodyRows = extendedRanking.map((r) => {
-    const displayName = r.kind === 'variant'
+    // Offre non régulière : notée et classée comme les autres, mais signalée
+    // « sous réserve » (le statut est ajouté sous le nom, fond rosé via didParseCell).
+    const statusTag = r.irregular ? `\n${STATUS_LABEL_RECAP[r.irregularLabel] || 'NON RÉGULIÈRE'} (sous réserve)` : '';
+    const displayName = (r.kind === 'variant'
       ? `  > ${r.name} - V${r.variantIndex}${r.variantLabel ? ` (${r.variantLabel})` : ''} [RETENUE]`
-      : r.name.toUpperCase();
+      : r.name.toUpperCase()) + statusTag;
     return [
       displayName,
-      ...techCs.map(c => r.irregular ? '—' : fmtScore(r.techScores?.[c.id] || 0)),
-      r.irregular ? '—' : fmtScore(r.priceScore || 0),
+      ...techCs.map(c => fmtScore(r.techScores?.[c.id] || 0)),
+      fmtScore(r.priceScore || 0),
       fmt(r.price) + ' €',
-      r.irregular ? 'HORS' : fmtScore(r.totalScore),
-      r.rank == null ? '—' : `${r.rank}`,
+      fmtScore(r.totalScore),
+      `${r.rank}`,
     ];
   });
 
@@ -2094,10 +2138,15 @@ export const generateRaoPDF = async (optionsParams) => {
         const originalIdx = analysisCompanies.findIndex(c => c.name === rowData.name);
         const cStyle = getCompanyStyle(originalIdx !== -1 ? originalIdx : 0);
 
-        // Ligne irrégulière : grisée
+        // Ligne irrégulière : notée et classée, mais signalée (fond rosé + texte rouge).
+        // Pas de médaille de rang (réservée aux offres régulières attribuables).
         if (isIrregular) {
-          data.cell.styles.textColor = [120, 120, 120];
-          data.cell.styles.fillColor = [241, 245, 249];
+          data.cell.styles.fillColor = [254, 226, 226];
+          data.cell.styles.textColor = [153, 27, 27];
+          if (data.column.index === 0) {
+            data.cell.styles.textColor = [190, 18, 60];
+            data.cell.styles.fontStyle = 'bold';
+          }
         } else {
           // Ligne variante : fond légèrement violet
           if (isVariant) {
@@ -2145,7 +2194,7 @@ export const generateRaoPDF = async (optionsParams) => {
     doc.text('VISUALISATION DES SCORES', M, y + 3);
     y += 8;
     const barMaxW = W - 80;
-    extendedRanking.filter(r => !r.irregular).forEach((r) => {
+    extendedRanking.forEach((r) => {
       if (y > 280) return;
       const origIdx = analysisCompanies.findIndex(c => c.name === r.name);
       const cStyle = getCompanyStyle(origIdx !== -1 ? origIdx : 0);
@@ -2155,12 +2204,10 @@ export const generateRaoPDF = async (optionsParams) => {
 
       const barH = 6;
       const isVariant = r.kind === 'variant';
-      const label = isVariant
-        ? `${r.name} · V${r.variantIndex}`
-        : r.name;
+      const label = isVariant ? `${r.name} · V${r.variantIndex}` : r.name;
       doc.setFont('Helvetica', 'bold');
       doc.setFontSize(6.5);
-      doc.setTextColor(...cStyle.header);
+      doc.setTextColor(...(r.irregular ? [190, 18, 60] : cStyle.header));
       doc.text(label, M, y + barH / 2 + 6.5 * 0.13);
 
       // Fond gris
@@ -2201,30 +2248,6 @@ export const generateRaoPDF = async (optionsParams) => {
     y += 10;
   }
 
-  // ── Avertissement OAB si applicable (masqué si includeOab désactivé) ──
-  const allTotals = ranking.map(r => r.price).filter(p => p > 0);
-  const oabThreshold = calculateOABThreshold(allTotals);
-  const oabCompanies = ranking.filter(r => r.price > 0 && r.price < oabThreshold);
-  if (includeOab && oabCompanies.length > 0) {
-    if (y > 260) { y = addPage('Récapitulatif général', 'a4', 'portrait'); }
-    doc.setFillColor(255, 237, 213);
-    doc.roundedRect(M, y, W - 2 * M, 22, 3, 3, 'F');
-    doc.setDrawColor(245, 158, 11);
-    doc.roundedRect(M, y, W - 2 * M, 22, 3, 3, 'S');
-    doc.setTextColor(180, 83, 9);
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.text('OFFRE(S) ANORMALEMENT BASSE(S) DÉTECTÉE(S)', W / 2, y + 6, { align: 'center' });
-    doc.setFont('Helvetica', 'normal');
-    doc.setFontSize(7.5);
-    doc.setTextColor(120, 53, 15);
-    const oabNames = oabCompanies.map(r => r.name).join(', ');
-    doc.text(fitTextToWidth(doc, `${oabNames} — Seuil OAB : ${fmt(oabThreshold)} € HT (méthode Double Moyenne)`, W - 2 * M), W / 2, y + 12, { align: 'center' });
-    doc.text('Conformément aux articles L2152-5 et R2152-3 du CCP, le pouvoir adjudicateur doit demander des précisions', W / 2, y + 17, { align: 'center' });
-    doc.text('sur le prix proposé avant tout rejet éventuel de l\'offre (CE, 1er mars 2012, n°354159).', W / 2, y + 21, { align: 'center' });
-    y += 28;
-  }
-
   // ── Recommandation conforme CCP — utilise extendedRanking (rang 1 réel) ──
   const winner = extendedRanking.find(r => r.rank === 1) || ranking[0];
   if (winner) {
@@ -2236,11 +2259,23 @@ export const generateRaoPDF = async (optionsParams) => {
     // Texte personnalise si l'utilisateur l'a edite dans TabRecap, sinon texte par defaut.
     // Le texte custom est stocke dans rao.recommendation (string).
     const customText = (rao?.recommendation || '').trim();
-    const recoText = customText || `Au regard des critères d'attribution définis dans les documents de consultation, l'offre de l'entreprise ${winnerLabel} est l'offre économiquement la plus avantageuse.`;
+    // Préfixe selon la phase de négociation — appliqué uniquement au texte par défaut
+    // (un texte personnalisé saisi dans TabRecap est respecté tel quel).
+    const negoPrefix = negotiationPhase === 'after'
+      ? "À l'issue de la phase de négociation, et au regard des critères d'attribution définis dans les documents de consultation,"
+      : negotiationPhase === 'before'
+        ? "Sur la base des offres initiales remises, et au regard des critères d'attribution définis dans les documents de consultation,"
+        : "Au regard des critères d'attribution définis dans les documents de consultation,";
+    // Une offre non régulière ne peut être déclarée économiquement la plus avantageuse
+    // ni attributaire en l'état (CCP) : la conclusion par défaut le mentionne explicitement.
+    const winnerIrregular = !!winner.irregular;
+    const recoText = customText || (winnerIrregular
+      ? `${negoPrefix} l'offre de l'entreprise ${winnerLabel} obtient le meilleur classement, mais elle est jugée NON RÉGULIÈRE : elle ne peut être déclarée économiquement la plus avantageuse ni attributaire en l'état, sous réserve de sa régularisation (art. R2152-2).`
+      : `${negoPrefix} l'offre de l'entreprise ${winnerLabel} est l'offre économiquement la plus avantageuse.`);
     // IMPORTANT : fixer la police AVANT de mesurer. splitTextToSize calcule le
     // retour à la ligne avec la taille de police COURANTE ; si elle est héritée du
-    // bloc précédent (légende 5,5pt ou avertissement OAB 7,5pt), la phrase tient sur
-    // une seule ligne à la mesure puis est dessinée à 10pt → débordement horizontal.
+    // bloc précédent (légende 5,5pt par ex.), la phrase tient sur une seule ligne
+    // à la mesure puis est dessinée à 10pt → débordement horizontal.
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(10);
     // Mesurer la hauteur pour adapter le rectangle (wrap auto)
@@ -2251,7 +2286,7 @@ export const generateRaoPDF = async (optionsParams) => {
     const padBottom = 10;
     const scoreLineH = 6;
     const rectH = padTop + lines.length * lineH + scoreLineH + padBottom;
-    doc.setFillColor(...THEME.primary);
+    doc.setFillColor(...(winnerIrregular ? [153, 27, 27] : THEME.primary)); // rouge si offre non régulière
     doc.roundedRect(M, y, W - 2 * M, rectH, 3, 3, 'F');
     doc.setTextColor(255, 255, 255);
     let textY = y + padTop;
@@ -2262,64 +2297,13 @@ export const generateRaoPDF = async (optionsParams) => {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // ── ANNEXES (méthode OAB, formules de scoring, références CCP) ──
+  // ── ANNEXES (formules de scoring, références CCP) — masquées si exclues ──
   // ─────────────────────────────────────────────────────────────────────────
-  // Annexe A (méthode OAB) masquée si les références aux prix anormalement bas sont exclues.
-  if (includeOab) {
-  y = addPage('Annexes', 'a4', 'portrait');
-  tocEntries.push({ label: 'Annexe A — Méthode OAB', page: pageNum });
-  y = sectionTitle(doc, 'ANNEXE A — Méthode OAB (Offre Anormalement Basse)', y, THEME.primary);
-
-  doc.setFont('Helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(...THEME.text);
-  const oabIntro = "La méthode de la double moyenne, dite \"OAB\", permet de détecter les offres dont le prix peut être considéré comme anormalement bas par rapport au marché et qui doivent faire l'objet d'une demande de précision auprès du soumissionnaire (articles L2152-5 et R2152-3 du CCP).";
-  ({ y } = drawJustifiedText(doc, oabIntro, M, y, W - 2 * M, 4.5));
-  y += 6;
-
-  doc.setFont('Helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(...VERT_FONCE);
-  doc.text('Étapes de calcul :', M, y);
-  y += 6;
-
-  const oabSteps = [
-    '1. M1 = moyenne arithmétique de toutes les offres reçues (HT)',
-    '2. Borne haute = M1 × 1,20 (offres considérées comme acceptables au-dessus)',
-    '3. M2 = moyenne des offres inférieures ou égales à la borne haute',
-    '4. Seuil OAB = M2 × 0,90 (10% sous la moyenne corrigée)',
-    '5. Toute offre dont le montant total est strictement inférieur au seuil OAB est signalée comme anormalement basse.',
-  ];
-  doc.setFont('Helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(...THEME.lightText);
-  oabSteps.forEach(step => {
-    const lines = doc.splitTextToSize(step, W - 2 * M - 4);
-    drawJustifiedText(doc, step, M + 4, y, W - 2 * M - 4, 4.2);
-    y += lines.length * 4.2 + 1;
-  });
-  y += 4;
-
-  doc.setFillColor(254, 252, 232);
-  doc.rect(M, y, W - 2 * M, 22, 'F');
-  doc.setDrawColor(252, 211, 77);
-  doc.setLineWidth(0.5);
-  doc.rect(M, y, W - 2 * M, 22);
-  doc.setFont('Helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(120, 80, 0);
-  doc.text('Important :', M + 3, y + 6);
-  doc.setFont('Helvetica', 'normal');
-  doc.text("Une offre anormalement basse ne peut pas être rejetée automatiquement. Le pouvoir adjudicateur doit", M + 3, y + 12);
-  doc.text("demander par écrit au soumissionnaire des précisions sur le prix proposé avant tout rejet motivé.", M + 3, y + 17);
-  }
-
-  // ── ANNEXES B & C (formules + références CCP) — masquées si exclues ──
   if (includeAnnexes) {
-  // ── ANNEXE B — Formules de scoring ──
+  // ── ANNEXE A — Formules de scoring ──
   y = addPage('Annexes — Formules', 'a4', 'portrait');
-  tocEntries.push({ label: 'Annexe B — Formules de scoring', page: pageNum });
-  y = sectionTitle(doc, 'ANNEXE B — Formules de notation du critère prix', y, THEME.primary);
+  tocEntries.push({ label: 'Annexe A — Formules de scoring', page: pageNum });
+  y = sectionTitle(doc, 'ANNEXE A — Formules de notation du critère prix', y, THEME.primary);
 
   doc.setFont('Helvetica', 'normal');
   doc.setFontSize(9);
@@ -2360,10 +2344,10 @@ export const generateRaoPDF = async (optionsParams) => {
   });
   y = doc.lastAutoTable.finalY + 10;
 
-  // ── ANNEXE C — Références CCP ──
+  // ── ANNEXE B — Références CCP ──
   if (y > 200) { y = addPage('Annexes — Références CCP', 'a4', 'portrait'); }
-  tocEntries.push({ label: 'Annexe C — Références CCP', page: pageNum });
-  y = sectionTitle(doc, 'ANNEXE C — Références du Code de la Commande Publique', y, THEME.primary);
+  tocEntries.push({ label: 'Annexe B — Références CCP', page: pageNum });
+  y = sectionTitle(doc, 'ANNEXE B — Références du Code de la Commande Publique', y, THEME.primary);
 
   const ccpRefs = [
     {
@@ -2375,11 +2359,6 @@ export const generateRaoPDF = async (optionsParams) => {
       art: 'L2152-2',
       titre: 'Offre irrégulière',
       desc: "Une offre est irrégulière lorsqu'elle ne respecte pas les exigences des documents de consultation, notamment si elle modifie les quantités du DQE. Elle peut être régularisée par décision motivée du pouvoir adjudicateur dans le respect du principe d'égalité de traitement."
-    },
-    {
-      art: 'L2152-5 / R2152-3',
-      titre: 'Offre anormalement basse',
-      desc: "L'acheteur ne peut rejeter une offre anormalement basse qu'après avoir demandé par écrit au soumissionnaire des précisions sur la teneur de son offre. La motivation du rejet doit s'appuyer sur les justifications fournies (CE, 1er mars 2012, n°354159)."
     },
     {
       art: 'R2151-8 à R2151-11',

@@ -63,6 +63,25 @@ export function computeOABThreshold(values) {
 }
 
 /**
+ * Référence de prix (Pmin / Pmax / Pmoy) servant à la notation du critère prix.
+ * TOUTES les offres concourent (régulières ET irrégulières) — la régularité relève
+ * d'une décision du pouvoir adjudicateur, pas du barème. Simple min / max / moyenne
+ * des totaux valides (> 0).
+ *
+ * @param   {number[]} values - totaux HT des offres concourantes
+ * @returns {{ Pmin:number, Pmax:number, Pmoy:number }}
+ */
+export function computePriceReference(values) {
+  const valid = (Array.isArray(values) ? values : []).filter(v => v > 0);
+  if (valid.length === 0) return { Pmin: 0, Pmax: 0, Pmoy: 0 };
+  return {
+    Pmin: Math.min(...valid),
+    Pmax: Math.max(...valid),
+    Pmoy: valid.reduce((a, b) => a + b, 0) / valid.length,
+  };
+}
+
+/**
  * Construit chaptersData : liste de chapitres avec leurs items enrichis
  * de companyData (PU, lineTotal, ecart) par entreprise.
  *

@@ -314,6 +314,7 @@ export const drawCoverPage = (doc, config, theme, logos) => {
     showSignatures = false, signatories = [],
     branding, today,
     extraBlocks = [],
+    negotiationPhase = 'none',
   } = config;
   const { logoMoe, logoClient, logoCoTraitants = [] } = logos;
 
@@ -418,6 +419,18 @@ export const drawCoverPage = (doc, config, theme, logos) => {
   doc.roundedRect(col2X, startY + 3, phasePillW, 6, 1.5, 1.5, 'F');
   doc.setTextColor(255, 255, 255);
   doc.text(phaseLabel, col2X + phasePillW / 2, startY + 7.5, { align: 'center' });
+
+  // Badge phase de négociation (sous la pastille de phase) — ambre « AVANT » / vert « APRÈS »
+  if (negotiationPhase === 'before' || negotiationPhase === 'after') {
+    const negoLabel = negotiationPhase === 'after' ? 'APRÈS NÉGOCIATION' : 'AVANT NÉGOCIATION';
+    const negoColor = negotiationPhase === 'after' ? [22, 163, 74] : [217, 119, 6]; // emerald-600 / amber-600
+    doc.setFontSize(8); doc.setFont('Helvetica', 'bold');
+    const negoPillW = Math.max(28, doc.getTextWidth(negoLabel) + 7);
+    doc.setFillColor(...negoColor);
+    doc.roundedRect(col2X, startY + 11, negoPillW, 5.5, 1.5, 1.5, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.text(negoLabel, col2X + negoPillW / 2, startY + 14.8, { align: 'center' });
+  }
 
   const rightY = startY + 22;
   doc.setFontSize(8); doc.setTextColor(...theme.lightText); doc.setFont('Helvetica', 'bold');

@@ -3,7 +3,7 @@
 // Affiche une checklist par onglet avec les items manquants cliquables.
 
 import React from 'react';
-import { CheckCircle2, AlertTriangle, X, FileDown, ArrowRight, Loader2, TrendingDown, Files } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, X, FileDown, ArrowRight, Loader2, Files, Handshake } from 'lucide-react';
 
 const TAB_LABELS = {
   consultation: { num: 1, label: 'Consultation' },
@@ -20,11 +20,10 @@ const PreExportChecklistModal = ({
   onCancel,
   onNavigate,
   isExporting = false,
-  hasOab = false,
-  includeOab = false,
-  onToggleIncludeOab,
   includeAnnexes = true,
   onToggleIncludeAnnexes,
+  negotiationPhase = 'none',
+  onChangeNegotiationPhase,
 }) => {
   if (!open) return null;
 
@@ -135,31 +134,6 @@ const PreExportChecklistModal = ({
             })}
           </div>
 
-          {/* Option OAB — affichée seulement si des offres anormalement basses sont détectées */}
-          {hasOab && (
-            <div className="shrink-0 px-6 py-3 border-t border-amber-100 bg-amber-50/50">
-              <label className="flex items-start gap-3 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={includeOab}
-                  onChange={(e) => onToggleIncludeOab && onToggleIncludeOab(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 rounded border-amber-300 text-amber-600 focus:ring-amber-400 cursor-pointer"
-                />
-                <span className="flex-1">
-                  <span className="flex items-center gap-1.5 text-xs font-bold text-amber-800">
-                    <TrendingDown size={14} className="text-amber-600" />
-                    Inclure les références aux prix anormalement bas (OAB)
-                  </span>
-                  <span className="block text-[11px] text-amber-700/80 mt-0.5">
-                    Au moins une offre anormalement basse a été détectée. Si coché, le PDF signalera l'OAB
-                    (surlignage du détail des prix, encadré nominatif du récapitulatif et annexe « Méthode OAB »).
-                    Décoché, aucune mention d'OAB n'apparaîtra.
-                  </span>
-                </span>
-              </label>
-            </div>
-          )}
-
           {/* Option Annexes — toujours proposée */}
           <div className="shrink-0 px-6 py-3 border-t border-slate-100 bg-slate-50/40">
             <label className="flex items-start gap-3 cursor-pointer group">
@@ -180,6 +154,38 @@ const PreExportChecklistModal = ({
                 </span>
               </span>
             </label>
+          </div>
+
+          {/* Phase de négociation — marque le rapport avant / après négociation */}
+          <div className="shrink-0 px-6 py-3 border-t border-slate-100 bg-slate-50/40">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 mb-2">
+              <Handshake size={14} className="text-slate-500" />
+              Phase de négociation
+            </div>
+            <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
+              {[
+                { value: 'none', label: 'Sans mention' },
+                { value: 'before', label: 'Avant négociation' },
+                { value: 'after', label: 'Après négociation' },
+              ].map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => onChangeNegotiationPhase && onChangeNegotiationPhase(opt.value)}
+                  className={`flex-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
+                    negotiationPhase === opt.value
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <span className="block text-[11px] text-slate-500 mt-1.5">
+              Ajoute un badge sur la page de garde et adapte la phrase de recommandation
+              («&nbsp;Sur la base des offres initiales remises…&nbsp;» / «&nbsp;À l'issue de la phase de négociation…&nbsp;»).
+            </span>
           </div>
 
           {/* Footer */}

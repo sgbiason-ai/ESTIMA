@@ -2,7 +2,7 @@ import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { Trash2, ChevronRight, AlertTriangle, Info, HelpCircle, TrendingDown, TrendingUp, GitBranch, Plus } from 'lucide-react';
 import { formatPrice, normalizeUnitSymbol } from '../../utils/helpers';
 import { COMPANY_STYLES } from '../../utils/analysisConstants';
-import { computeOABThreshold as calculateOABThreshold } from '../../utils/analysisCompute';
+import { computeOABThreshold as calculateOABThreshold, computePriceReference } from '../../utils/analysisCompute';
 import OabDetailModal from './OabDetailModal';
 
 // --- SOUS-COMPOSANT : Cellule de Prix ---
@@ -307,25 +307,23 @@ const AnalysisTable = ({
   const hasAnyNewItems = aggregatedNewItems.length > 0;
 
   // --- CALCULS GLOBAUX POUR LE PIED DE PAGE ---
-  // Les colonnes irrégulières (admin.conclusion ≠ régulière) sont EXCLUES du calcul
-  // de notation (Pmin / Pmoy / Pmax) — CCP : offres irrégulières ne participent pas à l'attribution.
+  // Réintégration CCP : toutes les offres concourent (régulières ET irrégulières)
+  // pour la fourchette Pmin/Pmoy/Pmax (computePriceReference — source unique).
+  // Note : l'OAB reste un repère d'analyse propre à ce tableau (heatmap / mode OAB),
+  // il n'intervient pas dans le calcul de la note prix.
   const totalsList = displayColumns
-    .filter(col => !col.irregular)
     .map(col => columnTotals[col.key] || 0)
     .filter(t => t > 0);
-  const Pmin = totalsList.length > 0 ? Math.min(...totalsList) : 0;
-  const Pmoy = totalsList.length > 0 ? totalsList.reduce((a,b)=>a+b,0)/totalsList.length : 0;
-  const Pmax = totalsList.length > 0 ? Math.max(...totalsList) : 0;
+  const { Pmin, Pmoy, Pmax } = computePriceReference(totalsList);
 
-  // Scores par colonne (base + chaque variante) — colonnes irrégulières non notées
+  // Scores par colonne (base + chaque variante) — toutes les offres sont notées ;
+  // les irrégulières restent signalées (badge) mais reçoivent une note.
   const columnScores = useMemo(() => {
     if (totalsList.length === 0) return {};
     const N = Number(scoringConfig?.maxScore || 40);
     const mode = scoringConfig?.mode || 'f1';
     const scores = {};
     displayColumns.forEach(col => {
-      // Offres irrégulières exclues : pas de note
-      if (col.irregular) { scores[col.key] = null; return; }
       const P = columnTotals[col.key] || 0;
       if (P <= 0) { scores[col.key] = 0; return; }
       let s = 0;
@@ -619,7 +617,7 @@ const AnalysisTable = ({
                             </div>
                           </td>
                           <td className={`px-0.5 py-1 text-center border-r border-slate-300 ${cellBg} ${irregularOpacity}`}>
-                            {col.irregular ? <span className="text-slate-300">-</span> : renderDelta(chapCompTotal, chapEstTotal)}
+                            {renderDelta(chapCompTotal, chapEstTotal)}
                           </td>
                         </React.Fragment>
                       );
@@ -755,7 +753,7 @@ const AnalysisTable = ({
                        <div className="flex items-center justify-end gap-1">
                           {isGlobalOAB && <AlertTriangle size={12} className="text-white animate-pulse" />}
                           {col.irregular ? (
-                            <span className="line-through text-slate-300" title="Offre exclue de la notation">{formatPrice(total)}</span>
+                            <span title="Offre irrégulière — classée sous réserve de régularisation (CCP R2152-2)">{formatPrice(total)}</span>
                           ) : formatPrice(total)}
                           {analysisMode === 'oab' && total > 0 && !isVariant && !col.irregular && (
                             <button
@@ -769,7 +767,7 @@ const AnalysisTable = ({
                         </div>
                     </td>
                     <td className={`px-0.5 py-2 text-center border-r border-slate-800 bg-slate-900 ${opacityCls}`}>
-                      {col.irregular ? <span className="text-slate-500">-</span> : renderDelta(total, stats.totalEstimation)}
+                      {renderDelta(total, stats.totalEstimation)}
                     </td>
                   </React.Fragment>
                 );
@@ -795,28 +793,20 @@ const AnalysisTable = ({
                 const isVariant = col.kind === 'variant';
                 const style = COMPANY_STYLES[col.companyIndex % COMPANY_STYLES.length];
                 const tooltipText = col.irregular
-                  ? `Offre exclue de la notation\nStatut : ${(col.irregularLabel || 'Non régulière').toUpperCase()}\n(CCP — offre irrégulière ne participe pas à l'attribution)`
+                  ? `Offre ${(col.irregularLabel || 'Non régulière').toUpperCase()}\nNotée et classée SOUS RÉSERVE de régularisation (CCP R2152-2)\nFormule: ${scoringConfig.mode.toUpperCase()} — P: ${formatPrice(total)} — Pmin: ${formatPrice(Pmin)}`
                   : `Formule: ${scoringConfig.mode.toUpperCase()}\nP (Offre): ${formatPrice(total)}\nPmin (Bas): ${formatPrice(Pmin)}\nMoyenne: ${formatPrice(Pmoy)}\nNote Max: ${scoringConfig.maxScore}${isVariant ? '\n— Variante : ' + (col.variantLabel || '') : ''}`;
-                const isMin = !col.irregular && total > 0 && total === Pmin;
+                const isMin = total > 0 && total === Pmin;
 
                 return (
                   <React.Fragment key={`score-${col.key}`}>
                     <td colSpan={subColsCount(col)} className={`px-1 py-2 text-center border-r text-sm font-black tabular-nums relative group cursor-help transition-colors ${
-                      col.irregular ? 'bg-slate-200 text-slate-400 border-slate-300 opacity-70' :
+                      col.irregular ? 'bg-rose-50 text-rose-700 border-rose-200' :
                       isVariant ? `${style.variantScoreBg} ${style.variantScoreText} hover:brightness-95 border-amber-200` :
                       'text-amber-900 hover:bg-amber-200 border-amber-200'
                     } ${isMin ? 'ring-2 ring-inset ring-emerald-400' : ''}`}>
-                      {col.irregular ? (
-                        <div className="flex flex-col items-center gap-0.5">
-                          <span className="text-base font-black">—</span>
-                          <span className="text-[8px] font-bold text-red-600 uppercase tracking-wider">Hors notation</span>
-                        </div>
-                      ) : (
-                        <>
-                          {score != null ? score.toFixed(2) : '0.00'}
-                          {isMin && <div className="text-[8px] font-bold text-emerald-700 uppercase tracking-wider">Moins-disant</div>}
-                        </>
-                      )}
+                      {score != null ? score.toFixed(2) : '0.00'}
+                      {col.irregular && <div className="text-[8px] font-bold text-rose-600 uppercase tracking-wider">Sous réserve</div>}
+                      {isMin && !col.irregular && <div className="text-[8px] font-bold text-emerald-700 uppercase tracking-wider">Moins-disant</div>}
                       <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-slate-800 text-white text-[10px] rounded p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl whitespace-pre-line font-normal text-left border border-slate-600">
                         <div className="font-bold border-b border-slate-600 pb-1 mb-1 text-center text-amber-400">Détail du calcul</div>
                         {tooltipText}

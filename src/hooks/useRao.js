@@ -1,5 +1,6 @@
 // src/hooks/useRao.js
 import { useCallback, useMemo } from 'react';
+import { computePriceReference } from '../utils/analysisCompute';
 
 // ── CONSTANTES ──────────────────────────────────────────────────────────────
 
@@ -316,7 +317,9 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
     const effectiveStats = raoAnalysisStats || analysisStats;
     const companiesTotals = effectiveStats?.companiesTotals || {};
 
-    // Détection des offres irrégulières (CCP : exclues de la notation)
+    // Statut de régularité (CCP) — conservé comme MARQUEUR, plus comme exclusion.
+    // Les offres irrégulières concourent désormais au classement (réintégration) ;
+    // la régularisation reste une décision du pouvoir adjudicateur (cf. RAO §5.bis).
     // Source : project.rao.companies[name].admin.conclusion
     const NON_REGULAR = ['irreguliere', 'inacceptable', 'inappropriee'];
     const isIrregular = (companyName) => {
@@ -324,14 +327,12 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
       return conclusion && NON_REGULAR.includes(conclusion);
     };
 
-    // Calcul Pmin/Pmax/Pmoy depuis les totaux — EXCLUSION des entreprises irrégulières
-    const validTotals = analysisCompanies
-      .filter(c => !isIrregular(c.name))
+    // Fourchette Pmin/Pmax/Pmoy : toutes les offres concourent (régulières et
+    // irrégulières) — cf. computePriceReference (source unique de la règle).
+    const allTotals = analysisCompanies
       .map(c => companiesTotals[c.id] || 0)
       .filter(t => t > 0);
-    const Pmin = validTotals.length ? Math.min(...validTotals) : 0;
-    const Pmax = validTotals.length ? Math.max(...validTotals) : 0;
-    const Pmoy = validTotals.length ? validTotals.reduce((a, b) => a + b, 0) / validTotals.length : 0;
+    const { Pmin, Pmax, Pmoy } = computePriceReference(allTotals);
 
     const scores = {};
     analysisCompanies.forEach((company) => {
@@ -339,9 +340,9 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
       const price = companiesTotals[company.id] || 0;
       const irregular = isIrregular(name);
 
-      // Score prix : 0 si offre irrégulière (exclue de la notation — CCP)
+      // Score prix : calculé pour TOUTES les offres (régulières et irrégulières).
       let priceScore = 0;
-      if (!irregular) {
+      {
         let rawScore = 0;
         if (price > 0 && Pmin > 0) {
           switch (mode) {
@@ -388,18 +389,14 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
   };
 
   // ── CLASSEMENT ────────────────────────────────────────────────────────────
-  // Les offres irrégulières sont placées en bas et n'ont pas de rang (CCP).
+  // Toutes les offres sont classées ensemble (rang chiffré), y compris les
+  // irrégulières — celles-ci restent signalées par leur flag `irregular` afin
+  // d'être marquées « sous réserve de régularisation » dans l'UI et le rapport.
   const getRanking = () => {
     const scores = computeScores();
-    const entries = Object.entries(scores);
-    const regular = entries
-      .filter(([, s]) => !s.irregular)
+    return Object.entries(scores)
       .sort((a, b) => b[1].totalScore - a[1].totalScore)
       .map(([name, s], i) => ({ name, rank: i + 1, ...s }));
-    const irregular = entries
-      .filter(([, s]) => s.irregular)
-      .map(([name, s]) => ({ name, rank: null, ...s }));
-    return [...regular, ...irregular];
   };
 
   return {
