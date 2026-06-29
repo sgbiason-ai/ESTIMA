@@ -5,6 +5,7 @@
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { normalizeUnitSymbol } from './helpers';
+import { stampExcelCredit } from './estimaCredit';
 
 // ─── Constantes couleurs (identiques à AnalysisTable) ────────────────────────
 const COMPANY_COLORS = [
@@ -514,6 +515,7 @@ export async function generateAnalysisExcel({
   const date        = new Date().toISOString().slice(0, 10);
   const filename    = `ANALYSE_${projectName}_${date}.xlsx`;
 
+  stampExcelCredit(wb);
   const buffer = await wb.xlsx.writeBuffer();
   saveAs(new Blob([buffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

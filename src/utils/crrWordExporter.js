@@ -5,6 +5,7 @@
 
 import { MEETING_TYPES, computeObsStats } from '../data/crrData';
 import { obsTextToHtml } from './formatObsText.jsx';
+import { ESTIMA_CREDIT, isEstimaCreditEnabled } from './estimaCredit';
 
 const formatDate = (dateStr) => {
   if (!dateStr) return '';
@@ -214,6 +215,7 @@ export const generateWordCrr = (meeting, crrConfig, projectName = '', branding =
   <span>${pdfProjectName}</span>
   <span>Edite le ${new Date().toLocaleDateString('fr-FR')}</span>
 </div>
+${isEstimaCreditEnabled() ? `<div style="text-align:center;color:#aaaaaa;font-size:9px;font-style:italic;margin-top:6px">${ESTIMA_CREDIT}</div>` : ''}
 </body></html>`;
 
   // Telechargement

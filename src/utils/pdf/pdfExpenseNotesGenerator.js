@@ -329,7 +329,7 @@ export async function generateExpenseNotesPdf(opts) {
   doc.setFontSize(7.5);
   doc.setTextColor(...theme.lightText);
   doc.text(
-    clean(`Document généré le ${new Date().toLocaleDateString('fr-FR')} - EstimaVRD`),
+    clean(`Édité le ${new Date().toLocaleDateString('fr-FR')} avec ESTIMA VRD`),
     pageW / 2,
     pageH - 8,
     { align: 'center' }

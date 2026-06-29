@@ -1,6 +1,7 @@
 import { saveAs } from "file-saver";
 import { DEFAULT_BRANDING } from "../data/branding";
 import { buildCoverPageElements } from "./wordCoverPage";
+import { appendEstimaWordCredit } from "./estimaWordCredit";
 
 // Lazy-loaded docx classes (initialisées au premier appel de generateWordCCTP)
 let Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
@@ -495,6 +496,8 @@ export const generateWordCCTP = async (selectedNodes, variables, masterData, bra
         })
     ]
   });
+
+  appendEstimaWordCredit(docChildren);
 
   const doc = new Document({
     // Word propose de mettre à jour les champs à l'ouverture ; « Oui » remplit

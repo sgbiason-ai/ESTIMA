@@ -3,6 +3,7 @@ import ExcelJS from 'exceljs';
 import { getItemRefMap, cleanText, normalizeUnitSymbol } from './helpers';
 import { roundEuro } from './financeFormat';
 import { saveFileWithPicker, FILE_TYPES, PICKER_IDS } from './fileSaver';
+import { stampExcelCredit } from './estimaCredit';
 import { computePseDeltas, buildPseNumbers, collectPseRoots, collectSubstitutions, buildChapterNumberMap } from './projectCalculations';
 import { htmlToPlainText, htmlToRichBlocks } from './richText';
 
@@ -510,6 +511,7 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
     }
   }
 
+  stampExcelCredit(workbook);
   const xlsxBuffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([xlsxBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const safeName = (project.name || 'Projet').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '').replace(/_+/g, '_');

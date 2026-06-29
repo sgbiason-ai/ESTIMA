@@ -3,6 +3,7 @@
 // Reproduit fidèlement la structure officielle du formulaire ministériel
 
 import { saveAs } from 'file-saver';
+import { appendEstimaWordCredit } from '../estimaWordCredit';
 import { loadMoeSignatureWithDimensions } from './moeDefaults.js';
 import { formatDateLocale } from '../dateHelpers';
 
@@ -491,6 +492,8 @@ export const generateExe1Document = async (fiche, exe1Data) => {
   children.push(
     para([text('Date de mise à jour : 01/04/2019.', { size: 16 })], { after: 40 })
   );
+
+  appendEstimaWordCredit(children);
 
   // ── CONSTRUCTION DU DOCUMENT ──────────────────────────────────────────────
   const doc = new Document({

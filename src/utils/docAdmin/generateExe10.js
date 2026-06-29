@@ -2,6 +2,7 @@
 // Génération EXE10 — Avenant
 // Conforme au formulaire officiel (DAJ - mise à jour 01/04/2019)
 import { saveAs } from 'file-saver';
+import { appendEstimaWordCredit } from '../estimaWordCredit';
 import { formatDateLocale } from '../dateHelpers';
 
 const loadMarianneImage = async () => {
@@ -681,6 +682,8 @@ export const exportExe10Docx = async (fiche, rawData) => {
 
   // Pied de page
   children.push(para([text('Date de mise à jour : 01/04/2019.', { size: 16 })], { after: 0 }));
+
+  appendEstimaWordCredit(children);
 
   const doc = new Document({ sections: [{ properties: { page: { margin: { top: 720, bottom: 720, left: 1080, right: 1080 } } }, children }] });
   const blob = await Packer.toBlob(doc);

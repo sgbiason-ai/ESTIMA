@@ -6,6 +6,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { getItemRefMap, normalizeUnitSymbol } from './helpers';
 import { saveFileWithPicker, FILE_TYPES, PICKER_IDS } from './fileSaver';
+import { stampPdfCredit } from './estimaCredit';
 import { sanitizeFilename, loadLogos, drawCoverPage as _drawCoverPage } from './pdf/pdfSharedHelpers';
 import { buildTheme } from './pdf/buildTheme';
 import { computePseDeltas, buildPseNumbers, collectPseRoots, collectSubstitutions, buildChapterNumberMap } from './projectCalculations';
@@ -682,6 +683,8 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
     const pageLabel = includeCover ? i - 1 : i;
     doc.text(`PAGE : ${pageLabel} / ${totalPagesCount}`, doc.internal.pageSize.width - 20, 43, { align: 'right' });
   }
+
+  stampPdfCredit(doc);
 
   const safeName = sanitizeFilename(project?.name || 'Projet');
   const dateStr = new Date().toISOString().slice(0, 10);

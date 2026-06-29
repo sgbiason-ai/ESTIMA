@@ -9,6 +9,7 @@
 // Le document Word est entièrement modifiable (paragraphes, listes, tableaux).
 
 import { saveAs } from 'file-saver';
+import { appendEstimaWordCredit } from './estimaWordCredit';
 import { DEFAULT_BRANDING } from '../data/branding';
 import { sanitizeFilename, loadImage } from './pdf/pdfSharedHelpers';
 import { stripStructuralFromHtml } from '../components/rao/tabs/nego/negoLetterUtils';
@@ -323,6 +324,8 @@ export const generateNegoLetterWord = async ({
     // 4. Corps + tableaux de prix
     ...bodyElements,
   ];
+
+  appendEstimaWordCredit(children);
 
   const doc = new Document({
     numbering: { config: [{ reference: 'nego-ol', levels: [{ level: 0, format: 'decimal', text: '%1.', alignment: AlignmentType.START }] }] },

@@ -26,6 +26,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { cleanText, normalizeUnitSymbol } from './helpers';
 import { sanitizeFilename, formatNumberFr } from './pdf/pdfSharedHelpers';
+import { stampPdfCredit } from './estimaCredit';
 import { buildTheme as _buildTheme } from './pdf/buildTheme';
 import { getCurrentPhaseCode } from './phaseModel';
 import { computeOABThreshold as calculateOABThreshold } from './analysisCompute';
@@ -473,6 +474,8 @@ export const generateAnalysisPDF = async ({
       }
     }
   });
+
+  stampPdfCredit(doc);
 
   const safeTitle = sanitizeFilename(project?.title || project?.name || "Export");
   const safeTranche = sanitizeFilename(activeTrancheId === 'global' ? 'Global' : activeTrancheId);

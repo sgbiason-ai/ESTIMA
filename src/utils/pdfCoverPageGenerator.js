@@ -4,6 +4,7 @@
 
 import jsPDF from 'jspdf';
 import { saveFileWithPicker, FILE_TYPES, PICKER_IDS } from './fileSaver';
+import { stampPdfCredit } from './estimaCredit';
 import { sanitizeFilename, loadLogos, drawCoverPage } from './pdf/pdfSharedHelpers';
 import { buildTheme } from './pdf/buildTheme';
 import { getCurrentPhaseCode } from './phaseModel';
@@ -32,6 +33,7 @@ export const generateCoverPagePDF = async (project, branding = null) => {
   }, THEME, { logoMoe, logoClient, logoCoTraitants });
 
   const fileName = `Page_de_garde_${sanitizeFilename(project?.name || 'projet')}.pdf`;
+  stampPdfCredit(doc);
   const blob = doc.output('blob');
   await saveFileWithPicker(blob, fileName, FILE_TYPES.pdf, PICKER_IDS.exportPdf);
 };

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { toast } from '../../../utils/globalUI';
 import { saveAs } from 'file-saver';
+import { estimaWordCreditParagraph, isEstimaCreditEnabled } from '../../../utils/estimaWordCredit';
 import { cleanText, normalizeUnitSymbol } from '../../../utils/helpers';
 import { hexToDocxColor } from '../utils/bpuBrandingUtils';
 import { getRawDescription, normalizeToHtml } from '../utils/bpuDescriptionUtils';
@@ -351,6 +352,7 @@ export const useBpuWordExport = ({
           new Paragraph({ text: '', spacing: { before: 400 } }),
           new Paragraph({ children: [new TextRun({ text: "Cachet et Signature de l'entreprise :", bold: true, font: mainFont })], spacing: { before: 800 } }),
           new Paragraph({ text: '\n\n\n\n', border: { top: { style: BorderStyle.DASHED, size: 4, color: '000000' }, bottom: { style: BorderStyle.DASHED, size: 4, color: '000000' }, left: { style: BorderStyle.DASHED, size: 4, color: '000000' }, right: { style: BorderStyle.DASHED, size: 4, color: '000000' } } }),
+          ...(isEstimaCreditEnabled() ? [estimaWordCreditParagraph()] : []),
         ],
       };
 

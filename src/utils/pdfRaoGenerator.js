@@ -10,6 +10,7 @@ import { buildTheme as _buildTheme } from './pdf/buildTheme';
 import { getCurrentPhaseCode } from './phaseModel';
 import { computeVatBreakdown } from './financeFormat';
 import { scoreOffer, computeOABThreshold as calculateOABThreshold } from './analysisCompute';
+import { stampPdfCredit } from './estimaCredit';
 
 // ─── COULEUR PRIMAIRE RAO : VERT PAPYRUS ────────────────────────────────────
 const VERT_PAPYRUS = [45, 138, 78];   // #2d8a4e
@@ -2371,5 +2372,6 @@ export const generateRaoPDF = async (optionsParams) => {
   });
 
   const safeName = (consultation?.objet || project?.name || 'RAO').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '').replace(/_+/g, '_').replace(/^_|_$/g, '').slice(0, 60);
+  stampPdfCredit(doc);
   doc.save(`RAO_${safeName}_${new Date().toISOString().slice(0, 10)}.pdf`);
 };

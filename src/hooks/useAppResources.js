@@ -11,6 +11,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { DEFAULT_BRANDING } from '../data/branding';
 import { useToast } from '../contexts/ToastContext';
+import { setEstimaCreditEnabled } from '../utils/estimaCredit';
 
 export const useAppResources = (user, companyId) => {
   const toast = useToast();
@@ -52,6 +53,12 @@ export const useAppResources = (user, companyId) => {
 
     fetchResources();
   }, [user, companyId]);
+
+  // Mention « Édité avec ESTIMA VRD » : pilotée par la charte MOE.
+  // Activée par défaut, désactivable depuis la vue Branding.
+  useEffect(() => {
+    setEstimaCreditEnabled(masterBranding?.showEstimaCredit !== false);
+  }, [masterBranding]);
 
   const handleSaveMasterCctp = async (data) => {
     setMasterCctp(data);

@@ -2,6 +2,7 @@
 // Génération EXE6 — Décision de Réception
 // Conforme au formulaire officiel (DAJ - mise à jour 01/04/2019)
 import { saveAs } from 'file-saver';
+import { appendEstimaWordCredit } from '../estimaWordCredit';
 import { generateAnnexeReservesPdf, generateAnnexeReservesDocx } from './annexeReserves.js';
 import { formatDateLocale } from '../dateHelpers';
 
@@ -426,6 +427,8 @@ export const exportExe6Docx = async (fiche, rawData) => {
   // Annexe des réserves (si présentes)
   const annexeChildren = await generateAnnexeReservesDocx(data, 'EXE6', fiche);
   children.push(...annexeChildren);
+
+  appendEstimaWordCredit(children);
 
   const doc = new Document({ sections: [{ properties: { page: { margin: { top: 720, bottom: 720, left: 1080, right: 1080 } } }, children }] });
   const blob = await Packer.toBlob(doc);

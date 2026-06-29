@@ -6,6 +6,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { buildRefMap } from '../projectCalculations';
 import { saveFileWithPicker, FILE_TYPES, PICKER_IDS } from '../fileSaver';
+import { ESTIMA_CREDIT } from '../estimaCredit';
 import {
   computeDetail, defaultCoefficients, DEFAULT_COEF, POSTES, effectiveRendement, detailCalcQty,
   ressourceCosts, ressourceDailyCost, fournitureQty, fournitureCost,
@@ -410,7 +411,7 @@ function drawMatrix(doc, { d, qteLines, qteCadre, duree, sec, puSecGlobal, puVen
 function drawFooter(doc, { branding }) {
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
-  const established = `Établi par ${branding?.companyName || ''}${branding?.city ? ' à ' + branding.city : ''}  le ${new Date().toLocaleDateString('fr-FR')}`;
+  const established = `Établi par ${branding?.companyName || ''}${branding?.city ? ' à ' + branding.city : ''}  le ${new Date().toLocaleDateString('fr-FR')}  ·  ${ESTIMA_CREDIT}`;
   doc.setFont(undefined, 'italic'); doc.setFontSize(8); doc.setTextColor(...C.subtle);
   doc.text(established, W / 2, H - 6, { align: 'center' });
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { stampPdfCredit } from '../../../utils/estimaCredit';
 import { cleanText } from '../../../utils/helpers';
 import { toast } from '../../../utils/globalUI';
 import { PAGE_WIDTH_PX, PAGE_HEIGHT_PX } from '../constants/bpuLayout';
@@ -141,6 +142,7 @@ export const useBpuPdfExport = ({ project }) => {
         setPdfProgress({ current: done, total });
       }
 
+      stampPdfCredit(doc);
       doc.save(`BPU_${project?.name ? cleanText(project.name) : 'PROJET'}_${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (error) {
       console.error('Erreur PDF:', error);

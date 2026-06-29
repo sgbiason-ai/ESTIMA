@@ -3,6 +3,7 @@
 //                    relatives à la Levée des Réserves
 // Conforme au formulaire officiel (DAJ - mise à jour 01/04/2019)
 import { saveAs } from 'file-saver';
+import { appendEstimaWordCredit } from '../estimaWordCredit';
 import { loadMoeSignatureWithDimensions } from './moeDefaults.js';
 import { formatDateLocale } from '../dateHelpers';
 
@@ -612,6 +613,8 @@ export const exportExe9Docx = async (fiche, rawData) => {
   children.push(emptyLine(200));
   // Pied de page
   children.push(para([text('Date de mise \u00e0 jour : 01/04/2019.', { size: 16 })], { after: 0 }));
+
+  appendEstimaWordCredit(children);
 
   const doc = new Document({ sections: [{ properties: { page: { margin: { top: 720, bottom: 720, left: 1080, right: 1080 } } }, children }] });
   const blob = await Packer.toBlob(doc);

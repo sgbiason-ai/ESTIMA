@@ -8,6 +8,7 @@
 // Seuls les glyphes hors Latin-1 (emoji, CJK, etc.) ne sont pas supportés.
 
 import jsPDF from 'jspdf';
+import { stampPdfCredit } from './estimaCredit';
 import autoTable from 'jspdf-autotable';
 import { DEFAULT_BRANDING } from '../data/branding';
 import { MEETING_TYPES, GROUP_COLORS, abbreviateGroup, computeObsStats, obsDisplayNumber, obsAge } from '../data/crrData';
@@ -1237,6 +1238,8 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
     const crNum = String(meeting.number).padStart(2, '0');
     filename = `CR_${crNum}_${safeName}_${meeting.date || 'ND'}.pdf`;
   }
+
+  stampPdfCredit(doc);
 
   // Si returnBlob, retourner le blob + filename sans telecharger
   if (options?.returnBlob) {

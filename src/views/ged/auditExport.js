@@ -3,6 +3,7 @@
 // Générateurs chargés dynamiquement (code-splitting), comme les autres exports.
 
 import { formatPrice } from '../../utils/helpers';
+import { stampPdfCredit, stampExcelCredit } from '../../utils/estimaCredit';
 
 const fmt = (n) => formatPrice(n);
 const safe = (s) => String(s || '').replace(/[^a-z0-9_-]/gi, '_');
@@ -59,6 +60,7 @@ export const exportAuditExcel = async ({ cmp, sourceLabel, targetLabel, projectN
   cmp.items.added.forEach((i) => a.addRow(['Ajouté', i.designation, i.qty, i.price, i.amount]));
   cmp.items.removed.forEach((i) => a.addRow(['Supprimé', i.designation, i.qty, i.price, i.amount]));
 
+  stampExcelCredit(wb);
   const buf = await wb.xlsx.writeBuffer();
   const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const { saveFileWithPicker, FILE_TYPES, PICKER_IDS } = await import('../../utils/fileSaver');
@@ -123,6 +125,7 @@ export const exportAuditPdf = async ({ cmp, sourceLabel, targetLabel, projectNam
     });
   }
 
+  stampPdfCredit(doc);
   const blob = doc.output('blob');
   const { saveFileWithPicker, FILE_TYPES, PICKER_IDS } = await import('../../utils/fileSaver');
   await saveFileWithPicker(blob, `Audit_${safe(sourceLabel)}_${safe(targetLabel)}.pdf`, FILE_TYPES.pdf, PICKER_IDS.exportPdf);

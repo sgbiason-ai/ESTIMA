@@ -31,6 +31,7 @@ export const DEFAULT_BRANDING = {
   phone:       '',
   email:       '',
   website:     '',
+  showEstimaCredit: true,
   colors: {
     primary:   '#286E55',
     secondary: '#32B482',

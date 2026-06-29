@@ -32,6 +32,9 @@ export const DEFAULT_BRANDING = {
   email:       '',
   website:     '',
 
+  // Mention produit « Édité avec ESTIMA VRD » sur les exports (true = affichée)
+  showEstimaCredit: true,
+
   // Couleurs (hexadécimaux)
   colors: {
     primary:   '#286E55',  // titres, bandeau, accents forts

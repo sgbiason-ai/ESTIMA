@@ -8,6 +8,7 @@
 // Détection du type à l'import : nom d'onglet (Matériel, Main d'œuvre, …), puis nom de
 // fichier en secours, puis signature de colonnes pour le seul cas non ambigu (Transport).
 import { saveFileWithPicker, FILE_TYPES, PICKER_IDS } from '../fileSaver';
+import { stampExcelCredit } from '../estimaCredit';
 import { POSTES, ressourceDailyCost } from './tpPriceCompute';
 
 const EUR = '# ##0.00 "€"';
@@ -122,6 +123,7 @@ export async function buildBaremeTypeBlob(category, resources) {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'ESTIMA TP';
   const count = addCategorySheet(wb, category, resources);
+  stampExcelCredit(wb);
   const buffer = await wb.xlsx.writeBuffer();
   return { blob: new Blob([buffer], { type: XLSX_MIME }), count };
 }
@@ -133,6 +135,7 @@ export async function buildBaremeAllBlob(resources) {
   wb.creator = 'ESTIMA TP';
   let count = 0;
   POSTES.forEach(cat => { count += addCategorySheet(wb, cat, resources); });
+  stampExcelCredit(wb);
   const buffer = await wb.xlsx.writeBuffer();
   return { blob: new Blob([buffer], { type: XLSX_MIME }), count };
 }

@@ -6,6 +6,7 @@
 
 import { sanitizeFilename, loadLogos, renderLogo } from './pdfSharedHelpers';
 import { buildTheme } from './buildTheme';
+import { stampPdfCredit } from '../estimaCredit';
 
 const FONT = 'helvetica';
 const PAGE_W = 210;
@@ -589,6 +590,7 @@ export async function generateNegoLetterPDF({
   }
   doc.setPage(totalPages);
 
+  stampPdfCredit(doc);
   const safeName = sanitizeFilename(companyName);
   doc.save(`Courrier_Negociation_${safeName}.pdf`);
 }

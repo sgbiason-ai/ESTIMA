@@ -23,6 +23,9 @@ export const DEFAULT_BRANDING = {
   email: '',
   website: '',
 
+  // Mention produit « Édité avec ESTIMA VRD » sur les exports (true = affichée)
+  showEstimaCredit: true,
+
   // Couleurs
   colors: {
     primary:   '#286E55',
@@ -334,6 +337,29 @@ const BrandingView = ({
                   placeholder="www.cabinet.fr"
                 />
               </Field>
+
+              <SectionTitle>Mention « Édité avec ESTIMA VRD »</SectionTitle>
+              <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-gray-700">Afficher sur les exports</p>
+                  <p className="text-xs text-gray-400 mt-0.5 leading-snug">
+                    Petite signature grise en bas de la dernière page des documents générés (PDF, Excel, Word).
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={branding.showEstimaCredit !== false}
+                  onClick={() => update('showEstimaCredit', branding.showEstimaCredit === false)}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors duration-200
+                    ${branding.showEstimaCredit !== false ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200
+                      ${branding.showEstimaCredit !== false ? 'translate-x-5' : 'translate-x-0.5'}`}
+                  />
+                </button>
+              </div>
             </>
           )}
 

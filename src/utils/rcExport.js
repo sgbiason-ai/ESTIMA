@@ -1,6 +1,7 @@
 import { saveAs } from "file-saver";
 import { DEFAULT_BRANDING } from "../data/branding";
 import { buildCoverPageElements } from "./wordCoverPage";
+import { appendEstimaWordCredit } from "./estimaWordCredit";
 import { renderForExport } from "./docContent";
 
 let Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
@@ -306,6 +307,8 @@ export const generateWordRC = async (selectedNodes, variables, masterData, brand
 
   // --- PIED DE PAGE ---
   const footerTable = new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: { top: { style: BorderStyle.SINGLE, size: 6, color: "E0E0E0" }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideVertical: { style: BorderStyle.NONE } }, rows: [ new TableRow({ children: [ new TableCell({ width: { size: 33, type: WidthType.PERCENTAGE }, borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } }, children: [new Paragraph({ children: [new TextRun({ text: sanitizeText(variables.code || "Ref"), size: 16, color: "888888" })] })] }), new TableCell({ width: { size: 33, type: WidthType.PERCENTAGE }, borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } }, children: [ new Paragraph({ alignment: AlignmentType.CENTER, children: [ new TextRun({ text: "Page ", size: 16, color: "888888" }), new TextRun({ children: [PageNumber.CURRENT], size: 16, color: "888888" }), new TextRun({ text: " / ", size: 16, color: "888888" }), new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 16, color: "888888" }) ] }) ] }), new TableCell({ width: { size: 33, type: WidthType.PERCENTAGE }, borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } }, children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: new Date().toLocaleDateString("fr-FR"), size: 16, color: "888888" })] })] }), ] }) ] });
+
+  appendEstimaWordCredit(docChildren);
 
   const doc = new Document({
     // Word propose de mettre à jour les champs à l'ouverture ; « Oui » remplit

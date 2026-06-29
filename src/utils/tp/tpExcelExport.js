@@ -4,6 +4,7 @@
 import ExcelJS from 'exceljs';
 import { buildRefMap } from '../projectCalculations';
 import { saveFileWithPicker, FILE_TYPES, PICKER_IDS } from '../fileSaver';
+import { stampExcelCredit } from '../estimaCredit';
 import {
   computeDetail, defaultCoefficients, POSTES, POSTE_LABELS, effectiveDuree, effectiveRendement,
   detailCalcQty, ressourceCosts, fournitureQty, fournitureCost, sousTraitanceCost, sousTraitanceQty,
@@ -166,6 +167,7 @@ export async function generateTpExcel(study) {
     ws.columns.forEach((c, i) => { c.width = i === 0 ? 34 : 11; });
   });
 
+  stampExcelCredit(wb);
   const buffer = await wb.xlsx.writeBuffer();
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const safeName = (study?.name || 'etude_tp').replace(/[^a-z0-9_-]/gi, '_');

@@ -5,6 +5,7 @@
 import jsPDF from 'jspdf';
 import { buildTheme } from './pdf/buildTheme';
 import { loadImage, formatDateFr, formatDateLong, lightenRgb, loadLogos } from './pdf/pdfSharedHelpers';
+import { stampPdfCredit } from './estimaCredit';
 
 const PW = 210, PH = 297;
 const M = { top: 18, left: 15, right: 15, bottom: 18 };
@@ -1017,5 +1018,6 @@ export const generateSiteVisitPdf = async (visit, options = {}) => {
 
   // Telecharger
   const filename = `Visite_${(visit.nom || 'site').replace(/[^a-zA-Z0-9]/g, '_')}_${visit.date || 'nd'}.pdf`;
+  stampPdfCredit(doc);
   doc.save(filename);
 };
