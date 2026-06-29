@@ -400,6 +400,7 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
             tranches: tranchesList,
             analysisMode: analysisData.analysisMode || 'global',
             scoringConfig: fullProject.scoringConfig || null,
+            clientQtyMaps: calcHook.clientQtyMaps,
           });
           break;
         }

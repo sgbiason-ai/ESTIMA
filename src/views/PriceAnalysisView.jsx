@@ -87,6 +87,7 @@ const PriceAnalysisView = ({
         tranches,
         analysisMode,
         branding: masterBranding,
+        clientQtyMaps,
       });
     } catch (error) { console.error("Erreur Excel", error); }
   };
@@ -134,6 +135,7 @@ const PriceAnalysisView = ({
           scoringConfig={analysis.scoringConfig}
           masterBranding={masterBranding}
           chaptersData={analysis.chaptersData}
+          clientQtyMaps={clientQtyMaps}
           bpuRefMap={bpuRefMap}
           activeTrancheId={activeTrancheId}
           tranches={tranches}

@@ -2,9 +2,17 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '3.5.0';
+export const APP_VERSION = '3.5.1';
 
 export const CHANGELOG = [
+  {
+    version: '3.5.1',
+    date: '2026-06-29',
+    title: 'RAO/Analyse — quantités à valoir dans les exports des affaires à tranches',
+    highlights: [
+      'RAO & Analyse des prix — correctif des quantités dans les exports des affaires découpées en tranches : sur ces projets, le détail par tranche du PDF « Rapport d\'analyse (RAO) » (sur ordinateur comme sur mobile) ainsi que les onglets par tranche de l\'export Excel d\'analyse affichaient les quantités d\'ÉTUDE au lieu des quantités À VALOIR (majorées pour le client). Ces documents reprennent désormais exactement les mêmes quantités à valoir que le tableau d\'analyse à l\'écran et que le total global — les montants estimés et les totaux entreprises par tranche sont corrigés en conséquence. Les affaires sans tranche n\'étaient pas concernées',
+    ],
+  },
   {
     version: '3.5.0',
     date: '2026-06-19',

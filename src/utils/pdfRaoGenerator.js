@@ -292,6 +292,9 @@ export const generateRaoPDF = async (optionsParams) => {
     analysisStats, chaptersData, bpuRefMap, tranches, analysisMode, scoringConfig,
     // Nouvelles props refonte complète
     optionChapters = [], includedOptions = {},
+    // Quantités « à valoir » (client, majorées) par tranche — source unique computeQtyMaps.
+    // Indispensable pour le détail par tranche : sinon repli sur la quantité d'étude brute.
+    clientQtyMaps = {},
   } = optionsParams;
 
   // Taux de TVA configurable par projet (défaut 20 %), partagé par toutes les sorties RAO (audit F2).
@@ -1110,14 +1113,21 @@ export const generateRaoPDF = async (optionsParams) => {
     // ── DÉTAIL DES PRIX UNITAIRES — Un tableau A3 par tranche ──
     if (chaptersData && chaptersData.length > 0) {
 
-      // Helper : construit chaptersData pour une tranche donnée
+      // Helper : construit chaptersData pour une tranche donnée.
+      // Les quantités affichées doivent être les « à valoir » (clientQtyMaps[trancheId])
+      // — identiques à l'écran et au global — et NON les quantités d'étude brutes.
+      // Repli sur l'étude (node.quantities[trancheId] / node.qty) seulement si la map manque.
       const buildTrancheChapters = (trancheId) => {
+        const tMap = (trancheId ? clientQtyMaps?.[trancheId] : clientQtyMaps?.global) || {};
         return (project?.chapters || []).map(chapter => {
           const items = [];
           const extract = (nodes) => {
             nodes.forEach(node => {
               if (node.type === 'item') {
-                const rawQty = trancheId ? node.quantities?.[trancheId] : node.qty;
+                const avaloir = tMap[node.id];
+                const rawQty = (avaloir !== undefined)
+                  ? avaloir
+                  : (trancheId ? node.quantities?.[trancheId] : node.qty);
                 const activeQty = Number(rawQty) || 0;
                 items.push({ ...node, activeQty });
               } else if (node.children) extract(node.children);
