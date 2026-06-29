@@ -42,6 +42,10 @@ const db = initializeFirestore(app, {
   // (symptôme « coupures / tentative de reconnexion » réseau OK par ailleurs).
   // Le SDK bascule automatiquement en long-polling quand c'est nécessaire.
   experimentalAutoDetectLongPolling: true,
+  // Ignorer les champs `undefined` au lieu de faire échouer tout le setDoc :
+  // un seul champ undefined (ex. amountMismatch non renseigné) bloquait sinon
+  // la sauvegarde complète d'un document (« Sauvegarde impossible »).
+  ignoreUndefinedProperties: true,
   localCache: isTeslaBrowser
     ? memoryLocalCache()
     : persistentLocalCache({ tabManager: persistentMultipleTabManager() })

@@ -145,6 +145,8 @@ const PriceAnalysisView = ({
           onToggleVariantRetained={analysis.toggleVariantRetained}
           onUpdateVariantJustification={analysis.updateVariantJustification}
           onApplyDepouillement={analysis.applyDepouillement}
+          onUpdateAeAmount={analysis.updateCompanyAeAmount}
+          onUpdateVariantAeAmount={analysis.updateVariantAeAmount}
           onImportOffer={(companyName, file) =>
             analysis.handleImportExcel({ target: { files: [file], value: null } }, companyName)
           }

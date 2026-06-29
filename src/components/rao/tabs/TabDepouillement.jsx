@@ -7,7 +7,7 @@
 //   ③ Import variante (bouton sur la sous-ligne variante)
 //   ④ Analyse technique (lien vers l'onglet Technique avec entreprise pré-sélectionnée)
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   ScrollText, Calendar, GitBranch, Building2, FileSpreadsheet, Brain,
   CheckCircle2, AlertTriangle, Clock, RefreshCw, Plus, ChevronRight, FileText
@@ -29,6 +29,23 @@ const fmtEUR = (n) => {
   return Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
 };
 
+// Nombre formaté FR avec séparateur de milliers, sans symbole € (pour les champs de saisie au repos)
+const fmtNumber = (n) => {
+  if (n == null || !Number.isFinite(Number(n))) return '';
+  return Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+// Taux de TVA appliqué pour déduire le TTC à partir du montant AE saisi (HT)
+const TVA_RATE = 0.20;
+
+// Parse une saisie utilisateur "1 234,56 €" → 1234.56 (ou null si vide/invalide)
+const parseAmount = (v) => {
+  if (v === '' || v == null) return null;
+  const cleaned = String(v).replace(/[\s€]/g, '').replace(',', '.');
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
+};
+
 const fmtDate = (iso) => {
   if (!iso) return '—';
   try { return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' }); }
@@ -39,6 +56,8 @@ export default function TabDepouillement({
   consultation = {},
   analysisCompanies = [],
   onReopenDepouillement,
+  onUpdateAeAmount,        // (companyId, value:number|null) → void — édition inline AE entreprise
+  onUpdateVariantAeAmount, // (companyId, variantId, value:number|null) → void — édition inline AE variante
   onImportOffer,     // (companyName, file) → Promise
   onImportPdfOffer,  // (companyName, file) → Promise — fichier PDF
   onImportVariant,   // (companyId, file, { label }) → Promise
@@ -226,6 +245,8 @@ export default function TabDepouillement({
                     onImportPdf={onImportPdfOffer ? () => triggerPdfFile(c.id) : null}
                     onImportVariantXlsx={(variantId, label) => triggerVariantXlsx(c.id, variantId, label)}
                     onImportVariantPdf={(variantId, label) => triggerVariantPdf(c.id, variantId, label)}
+                    onUpdateAe={onUpdateAeAmount ? (value) => onUpdateAeAmount(c.id, value) : null}
+                    onUpdateVariantAe={onUpdateVariantAeAmount ? (variantId, value) => onUpdateVariantAeAmount(c.id, variantId, value) : null}
                     onGoToTechnique={() => onGoToTechnique?.(c.name)}
                     onGoToAdmin={() => onGoToAdmin?.(c.name)}
                     adminDone={adminDone}
@@ -304,6 +325,7 @@ function InfoTile({ icon, label, value, valueClass = 'text-slate-900', bg = 'bg-
 function CompanyProgressCard({
   company, index, regime,
   onImportOffer, onImportPdf, onImportVariantXlsx, onImportVariantPdf,
+  onUpdateAe, onUpdateVariantAe,
   onGoToTechnique, onGoToAdmin,
   adminDone = false, adminConclusion = null,
   techDone = false, techRatio = null,
@@ -338,14 +360,11 @@ function CompanyProgressCard({
         </div>
         <div className="flex-1 min-w-0">
           <h4 className="text-base font-extrabold text-slate-900 truncate">{company.name}</h4>
-          <div className="flex items-center gap-3 text-[11px] text-slate-500 mt-0.5">
-            {company.aeAmount != null && (
-              <span>AE : <strong className="font-mono text-slate-700">{fmtEUR(company.aeAmount)}</strong></span>
-            )}
-            {variants.length > 0 && (
+          {variants.length > 0 && (
+            <div className="flex items-center gap-3 text-[11px] text-slate-500 mt-0.5">
               <span className="text-purple-600">{variants.length} variante{variants.length > 1 ? 's' : ''} annoncée{variants.length > 1 ? 's' : ''}</span>
-            )}
-          </div>
+            </div>
+          )}
         </div>
         {hasAeMismatch && (
           <span title={`Écart AE : ${fmtEUR(company.amountMismatch.delta)} (${company.amountMismatch.deltaPct}%)`}
@@ -370,6 +389,13 @@ function CompanyProgressCard({
           label="Offre de base"
           status={offerStatus}
           statusLabel={offerStatusLabel}
+          statusContent={
+            <AeStatus
+              ae={company.aeAmount}
+              onUpdateAe={onUpdateAe}
+              importedLabel={offerImported ? `Importée — ${fmtEUR(company.computedTotal || 0)}` : null}
+            />
+          }
           actionLabel="Excel"
           actionIcon={<FileSpreadsheet size={12} />}
           actionAccent="green"
@@ -396,10 +422,13 @@ function CompanyProgressCard({
                   icon={<GitBranch size={14} className="text-purple-600" />}
                   label={v.label || `Variante ${vi + 1}`}
                   status={imported ? 'done' : 'todo'}
-                  statusLabel={
-                    imported
-                      ? `Importée — ${fmtEUR(v.total || 0)}`
-                      : (v.aeAmount != null ? `Annoncée : ${fmtEUR(v.aeAmount)}` : 'À importer')
+                  statusContent={
+                    <AeStatus
+                      ae={v.aeAmount}
+                      accent="purple"
+                      onUpdateAe={onUpdateVariantAe ? (value) => onUpdateVariantAe(v.id, value) : null}
+                      importedLabel={imported ? `Importée — ${fmtEUR(v.total || 0)}` : null}
+                    />
                   }
                   actionLabel="Excel"
                   actionIcon={<FileSpreadsheet size={12} />}
@@ -474,7 +503,7 @@ function CompanyProgressCard({
 }
 
 // ─── Ligne d'étape avec status + action ────────────────────────────────────
-function StepRow({ stepNumber, icon, label, status, statusLabel, actionLabel, actionIcon = null, actionAccent = 'primary', onAction, disabled, isVariant, extraAction = null, buttonsGroupLabel = null }) {
+function StepRow({ stepNumber, icon, label, status, statusLabel, statusContent = null, actionLabel, actionIcon = null, actionAccent = 'primary', onAction, disabled, isVariant, extraAction = null, buttonsGroupLabel = null }) {
   const statusIcon = status === 'done'
     ? <CheckCircle2 size={14} className="text-emerald-500" />
     : status === 'disabled'
@@ -505,9 +534,13 @@ function StepRow({ stepNumber, icon, label, status, statusLabel, actionLabel, ac
           <span className="text-xs font-bold text-slate-800 truncate">{label}</span>
           {statusIcon}
         </div>
-        <div className={`text-[11px] mt-0.5 ${status === 'done' ? 'text-emerald-600' : status === 'disabled' ? 'text-slate-400' : 'text-amber-600'}`}>
-          {statusLabel}
-        </div>
+        {statusContent ? (
+          <div className="mt-1">{statusContent}</div>
+        ) : (
+          <div className={`text-[11px] mt-0.5 ${status === 'done' ? 'text-emerald-600' : status === 'disabled' ? 'text-slate-400' : 'text-amber-600'}`}>
+            {statusLabel}
+          </div>
+        )}
       </div>
       {/* Boutons d'action — wrappés dans un fieldset si label de groupe fourni */}
       {buttonsGroupLabel ? (
@@ -562,6 +595,75 @@ function StepRow({ stepNumber, icon, label, status, statusLabel, actionLabel, ac
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Zone "statut" de l'offre/variante : libellé "Montant AE" + champ éditable ─
+function AeStatus({ ae, onUpdateAe, importedLabel, accent = 'slate' }) {
+  const ttc = (ae != null && Number.isFinite(Number(ae))) ? Number(ae) * (1 + TVA_RATE) : null;
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Montant AE (HT)</span>
+      {onUpdateAe ? (
+        <AeAmountInput value={ae} onCommit={onUpdateAe} accent={accent} />
+      ) : (
+        <span className="font-mono text-[11px] text-slate-700">{ae != null ? fmtEUR(ae) : '—'}</span>
+      )}
+      {ttc != null && (
+        <span className="text-[11px] text-slate-500">
+          TTC (TVA&nbsp;20&nbsp;%)&nbsp;: <strong className="font-mono text-slate-700">{fmtEUR(ttc)}</strong>
+        </span>
+      )}
+      {importedLabel && (
+        <span className="text-[11px] font-semibold text-emerald-600">· {importedLabel}</span>
+      )}
+    </div>
+  );
+}
+
+// ─── Champ AE éditable inline (string locale → commit nombre parsé) ───────────
+function AeAmountInput({ value, onCommit, accent = 'slate' }) {
+  // Au repos : nombre formaté avec séparateur de milliers (« 1 234 567,89 »)
+  const fmtRest = (v) => fmtNumber(v);
+  // En saisie : valeur brute éditable, virgule décimale, sans séparateur (« 1234567,89 »)
+  const fmtEdit = (v) => (v == null ? '' : String(v).replace('.', ','));
+
+  const [draft, setDraft] = useState(fmtRest(value));
+  const [focused, setFocused] = useState(false);
+
+  // Resync depuis le prop hors focus (ex. import Excel qui ajuste l'AE)
+  useEffect(() => {
+    if (!focused) setDraft(fmtRest(value));
+  }, [value, focused]);
+
+  const commit = () => {
+    const parsed = parseAmount(draft);
+    setDraft(fmtRest(parsed));
+    onCommit(parsed);
+  };
+
+  const accentCls = accent === 'purple'
+    ? 'border-purple-200 focus:border-purple-400 focus:ring-purple-100'
+    : 'border-slate-300 focus:border-indigo-400 focus:ring-indigo-100';
+
+  return (
+    <div className="relative inline-flex items-center">
+      <input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onFocus={() => { setFocused(true); setDraft(fmtEdit(value)); }}
+        onBlur={() => { setFocused(false); commit(); }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.currentTarget.blur(); }
+          else if (e.key === 'Escape') { setDraft(fmtRest(value)); e.currentTarget.blur(); }
+        }}
+        onClick={(e) => e.stopPropagation()}
+        placeholder="0,00"
+        inputMode="decimal"
+        className={`w-36 pl-2.5 pr-5 py-1 text-xs text-right font-mono tabular-nums text-slate-900 bg-white border rounded-lg focus:outline-none focus:ring-2 transition-all ${accentCls}`}
+      />
+      <span className="absolute right-2 text-[11px] text-slate-400 pointer-events-none">€</span>
     </div>
   );
 }

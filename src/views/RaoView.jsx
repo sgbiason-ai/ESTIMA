@@ -58,6 +58,8 @@ const RaoView = ({
   onToggleVariantRetained = null,
   onUpdateVariantJustification = null,
   onApplyDepouillement = null,
+  onUpdateAeAmount = null,
+  onUpdateVariantAeAmount = null,
   onImportOffer = null,
   onImportPdfOffer = null,
   handleSaveProject = null,
@@ -465,6 +467,8 @@ const RaoView = ({
               consultation={rao.consultation}
               analysisCompanies={analysisCompanies}
               onReopenDepouillement={() => setDepouillementOpen(true)}
+              onUpdateAeAmount={onUpdateAeAmount}
+              onUpdateVariantAeAmount={onUpdateVariantAeAmount}
               onImportOffer={onImportOffer}
               onImportPdfOffer={onImportPdfOffer}
               onImportVariant={onImportVariant}

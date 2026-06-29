@@ -1097,6 +1097,51 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
     ));
   };
 
+  // ─── Édition inline du montant AE (dépouillement) ──────────────────────────
+  // value = nombre déjà parsé (ou null) fourni par la vue Dépouillement.
+  // Si une offre a déjà été importée (computedTotal connu), on recalcule
+  // l'écart AE ↔ total recalculé pour garder le badge « Écart AE » cohérent.
+  const updateCompanyAeAmount = (companyId, value) => {
+    const aeAmount = (value == null || !Number.isFinite(Number(value))) ? null : Number(value);
+    setCompanies(prev => prev.map(c => {
+      if (c.id !== companyId) return c;
+      // null (jamais undefined) : Firestore rejette tout document contenant un
+      // champ `undefined`, ce qui ferait échouer la sauvegarde de toute l'analyse.
+      let amountMismatch = c.amountMismatch ?? null;
+      if (c.computedTotal != null && Number.isFinite(c.computedTotal)) {
+        if (aeAmount != null && aeAmount > 0) {
+          const delta = Math.round((c.computedTotal - aeAmount) * 100) / 100;
+          amountMismatch = Math.abs(delta) > 0.01
+            ? {
+                expectedAe: aeAmount,
+                computedTotal: c.computedTotal,
+                delta,
+                deltaPct: Math.round((delta / aeAmount) * 100 * 100) / 100,
+                checkedAt: new Date().toISOString(),
+              }
+            : null;
+        } else {
+          amountMismatch = null;
+        }
+      }
+      return { ...c, aeAmount, amountMismatch };
+    }));
+  };
+
+  const updateVariantAeAmount = (companyId, variantId, value) => {
+    const aeAmount = (value == null || !Number.isFinite(Number(value))) ? null : Number(value);
+    setCompanies(prev => prev.map(c =>
+      c.id !== companyId
+        ? c
+        : {
+            ...c,
+            variants: (c.variants || []).map(v =>
+              v.id === variantId ? { ...v, aeAmount } : v
+            ),
+          }
+    ));
+  };
+
   const removeVariant = async (companyId, variantId) => {
     const company = companies.find(c => c.id === companyId);
     const variant = (company?.variants || []).find(v => v.id === variantId);
@@ -1244,7 +1289,7 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
     // Variantes — CCP R2151-8 à R2151-11
     handleImportVariant, removeVariant, toggleVariantRetained, updateVariantJustification,
     // Dépouillement — CCP L2113-1 / R2151-1
-    applyDepouillement,
+    applyDepouillement, updateCompanyAeAmount, updateVariantAeAmount,
     // Import PDF
     handleImportPdfOffer,
     // Progression OCR (PDF scannés)
