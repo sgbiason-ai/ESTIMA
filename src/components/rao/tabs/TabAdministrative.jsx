@@ -417,31 +417,52 @@ const TabAdministrative = ({
           </DragDropContext>
 
           {/* ── Conclusion ── */}
-          <div id={`admin-concl-${name}`} className={`p-6 rounded-2xl border shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 ${!admin.conclusion ? 'rao-empty border-2' : 'bg-white border-slate-200'}`}>
-            <div>
-              <h4 className="text-sm font-black uppercase tracking-widest text-slate-800 mb-1">
-                Conclusion de l'analyse
-                {!admin.conclusion && (
-                  <span className="ml-2 text-[10px] font-black text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md uppercase tracking-wide">⚠ Requise</span>
+          <div id={`admin-concl-${name}`} className={`p-6 rounded-2xl border shadow-sm ${!admin.conclusion ? 'rao-empty border-2' : 'bg-white border-slate-200'}`}>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h4 className="text-sm font-black uppercase tracking-widest text-slate-800 mb-1">
+                  Conclusion de l'analyse
+                  {!admin.conclusion && (
+                    <span className="ml-2 text-[10px] font-black text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md uppercase tracking-wide">⚠ Requise</span>
+                  )}
+                </h4>
+                <p className="text-xs text-slate-500">Statut officiel de la candidature pour la suite de l'analyse.</p>
+              </div>
+              <div className="flex flex-wrap gap-2 p-1.5 bg-slate-50 rounded-xl border border-slate-100 shadow-inner">
+                {CONCLUSION_OPTIONS.map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => updateAdminField(name, 'conclusion', opt.value)}
+                    className={`px-5 py-2.5 rounded-lg text-xs font-black transition-all duration-300 ${
+                      concl === opt.value && admin.conclusion
+                        ? opt.color === 'emerald' ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30'
+                        : opt.color === 'orange'  ? 'bg-orange-500 text-white shadow-md shadow-orange-500/30'
+                        :                           'bg-red-500 text-white shadow-md shadow-red-500/30'
+                        : 'bg-transparent text-slate-500 hover:bg-white hover:shadow-sm'
+                    }`}
+                  >{opt.label}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Commentaire sur la conformité — requis dès que l'offre n'est pas régulière (CCP L2152-2) */}
+            {admin.conclusion && admin.conclusion !== 'reguliere' && (
+              <div id={`admin-conf-comment-${name}`} className="mt-5 pt-5 border-t border-slate-100">
+                <Field label="Commentaire sur la conformité" icon={MessageSquare}>
+                  <Textarea
+                    value={admin.conformityComment || ''}
+                    onChange={v => updateAdminField(name, 'conformityComment', v)}
+                    placeholder="Motiver le caractère non régulier de l'offre : écarts constatés, pièces manquantes, fondement (CCP L2152-2…)…"
+                    rows={3}
+                  />
+                </Field>
+                {!(admin.conformityComment || '').trim() && (
+                  <p className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-amber-700">
+                    <AlertTriangle size={12} /> Requis : précisez le motif pour une offre non régulière.
+                  </p>
                 )}
-              </h4>
-              <p className="text-xs text-slate-500">Statut officiel de la candidature pour la suite de l'analyse.</p>
-            </div>
-            <div className="flex flex-wrap gap-2 p-1.5 bg-slate-50 rounded-xl border border-slate-100 shadow-inner">
-              {CONCLUSION_OPTIONS.map(opt => (
-                <button
-                  key={opt.value}
-                  onClick={() => updateAdminField(name, 'conclusion', opt.value)}
-                  className={`px-5 py-2.5 rounded-lg text-xs font-black transition-all duration-300 ${
-                    concl === opt.value && admin.conclusion
-                      ? opt.color === 'emerald' ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30'
-                      : opt.color === 'orange'  ? 'bg-orange-500 text-white shadow-md shadow-orange-500/30'
-                      :                           'bg-red-500 text-white shadow-md shadow-red-500/30'
-                      : 'bg-transparent text-slate-500 hover:bg-white hover:shadow-sm'
-                  }`}
-                >{opt.label}</button>
-              ))}
-            </div>
+              </div>
+            )}
           </div>
 
         </div>

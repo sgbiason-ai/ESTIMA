@@ -6,6 +6,7 @@
 import { DEFAULT_CRITERIA, DEFAULT_ADMIN_PIECES, DEFAULT_OFFER_PIECES } from '../hooks/useRao';
 import { normalizeUnitSymbol } from './helpers';
 import { formatNumberFr, cleanText, loadLogos, drawCoverPage as _drawCoverPage, fitTextToWidth } from './pdf/pdfSharedHelpers';
+import { NON_REGULAR_STATUSES } from '../components/rao/RaoConstants';
 import { buildTheme as _buildTheme } from './pdf/buildTheme';
 import { getCurrentPhaseCode } from './phaseModel';
 import { computeVatBreakdown } from './financeFormat';
@@ -478,28 +479,31 @@ export const generateRaoPDF = async (optionsParams) => {
   const COL_WEIGHT_W = 34;     // largeur "%"
   const COL_LABEL_W = W - 2 * M - COL_NUM_W - COL_WEIGHT_W;
   const PAD_X = 4;             // padding horizontal cellule
-  const PAD_Y = 5;             // padding vertical cellule
-  const FS_MAIN = 11;          // font critère principal
-  const FS_SUB = 9;            // font sous-critère
-  const FS_WEIGHT_MAIN = 12;
-  const FS_WEIGHT_SUB = 10;
+  // ⚠ Ces 5 tailles sont volontairement `let` : un facteur d'échelle (calculé plus
+  //   bas) les réduit pour faire tenir tout le rappel des critères sur une seule page.
+  let PAD_Y = 5;               // padding vertical cellule
+  let FS_MAIN = 11;            // font critère principal
+  let FS_SUB = 9;              // font sous-critère
+  let FS_WEIGHT_MAIN = 12;
+  let FS_WEIGHT_SUB = 10;
+  const HEADER_H = 10;         // hauteur du bandeau d'en-tête du tableau
 
   // Header tableau (bandeau vert pleine largeur)
   const drawCritHeader = (yPos) => {
     doc.setFillColor(...THEME.primary);
-    doc.rect(M, yPos, W - 2 * M, 10, 'F');
+    doc.rect(M, yPos, W - 2 * M, HEADER_H, 'F');
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(255, 255, 255);
     doc.text('Critère',     M + COL_NUM_W / 2,                           yPos + 6, { align: 'center' });
     doc.text('Intitulé',    M + COL_NUM_W + COL_LABEL_W / 2,             yPos + 6, { align: 'center' });
     doc.text('Pondération', M + COL_NUM_W + COL_LABEL_W + COL_WEIGHT_W / 2, yPos + 6, { align: 'center' });
-    return yPos + 10;
+    return yPos + HEADER_H;
   };
-  y = drawCritHeader(y);
 
-  // Calcule la hauteur effective d'un bloc (label + ligne vide + description)
-  const computeBlockHeight = (label, description, fs) => {
+  // Calcule la hauteur effective d'un bloc (label + ligne vide + description).
+  // `padY` est passé explicitement pour permettre la simulation à différentes échelles.
+  const computeBlockHeight = (label, description, fs, padY = PAD_Y) => {
     const lineH = fs * 0.5;
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(fs);
@@ -516,7 +520,7 @@ export const generateRaoPDF = async (optionsParams) => {
       });
       h += lineH; // ligne vide entre label et description
     }
-    return h + 2 * PAD_Y;
+    return h + 2 * padY;
   };
 
   // Dessine un bloc complet (1 critère ou 1 sous-critère)
@@ -576,28 +580,47 @@ export const generateRaoPDF = async (optionsParams) => {
     return yPos + blockH;
   };
 
-  // Itérer sur les critères
+  // ── Facteur d'échelle « tout sur une page » ─────────────────────────────
+  // On simule la hauteur totale (en-tête + tous les blocs) à différentes
+  // échelles, puis on réduit police + paddings jusqu'à ce que l'ensemble
+  // tienne sous BOTTOM_CRIT, sur la page courante (sous §1 / §2).
+  const availH = BOTTOM_CRIT - y;                 // hauteur dispo sous le titre §3
+  const BASE = { FS_MAIN, FS_SUB, FS_WEIGHT_MAIN, FS_WEIGHT_SUB, PAD_Y };
+  const totalHeightAt = (s) => {
+    let total = HEADER_H;
+    criteria.forEach((c) => {
+      const hasSubs = (c.subCriteria || []).length > 0;
+      total += computeBlockHeight(c.label, !hasSubs ? c.description : '', BASE.FS_MAIN * s, BASE.PAD_Y * s);
+      if (hasSubs) {
+        c.subCriteria.forEach((sc) => {
+          total += computeBlockHeight(sc.label, sc.description, BASE.FS_SUB * s, BASE.PAD_Y * s);
+        });
+      }
+    });
+    return total;
+  };
+  // Plancher de lisibilité : on ne descend pas sous 0.55 (≈ 6 pt) même si, dans
+  // un cas extrême, le contenu devait alors déborder très légèrement.
+  let scale = 1;
+  while (scale > 0.55 && totalHeightAt(scale) > availH) scale -= 0.02;
+  // Applique l'échelle retenue aux constantes de rendu (police + interlignes + padding).
+  FS_MAIN *= scale; FS_SUB *= scale;
+  FS_WEIGHT_MAIN *= scale; FS_WEIGHT_SUB *= scale;
+  PAD_Y *= scale;
+
+  y = drawCritHeader(y);
+
+  // Itérer sur les critères — plus aucun saut de page : l'échelle garantit la tenue sur 1 page.
   criteria.forEach((c, i) => {
     const hasSubs = (c.subCriteria || []).length > 0;
     const weight = c.auto
       ? (scoringConfig?.maxScore || c.weight)
       : (hasSubs ? c.subCriteria.reduce((s, sc) => s + (Number(sc.weight) || 0), 0) : c.weight);
 
-    // Hauteur estimée pour saut de page (avec petite marge)
-    const blockH = computeBlockHeight(c.label, !hasSubs ? c.description : '', FS_MAIN);
-    if (y + blockH > BOTTOM_CRIT) {
-      y = addPage('Critères de notation (suite)', 'a4', 'portrait');
-      y = drawCritHeader(y);
-    }
     y = drawCritBlock(`Critère ${i + 1}`, c.label, !hasSubs ? c.description : '', `${weight}%`, true, y);
 
     if (hasSubs) {
       c.subCriteria.forEach((sc, si) => {
-        const subH = computeBlockHeight(sc.label, sc.description, FS_SUB);
-        if (y + subH > BOTTOM_CRIT) {
-          y = addPage('Critères de notation (suite)', 'a4', 'portrait');
-          y = drawCritHeader(y);
-        }
         y = drawCritBlock(`${i + 1}.${si + 1}`, sc.label, sc.description, `${sc.weight || 0}%`, false, y);
       });
     }
@@ -913,7 +936,7 @@ export const generateRaoPDF = async (optionsParams) => {
       doc.setFont('Helvetica', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(...THEME.lightText);
-      const introCnf = "Les offres présentant des écarts avec le DQE ou avec leur acte d'engagement sont signalées ci-dessous. Conformément à l'article L2152-2 du CCP, une offre qui modifie les quantités du DQE est considérée comme irrégulière (régularisable manuellement par décision motivée du pouvoir adjudicateur).";
+      const introCnf = "Les offres présentant des écarts avec le DQE ou avec leur acte d'engagement, ou jugées non régulières, sont signalées ci-dessous ; le motif retenu est précisé sous l'entreprise concernée. Conformément à l'article L2152-2 du CCP, une offre qui modifie les quantités du DQE est considérée comme irrégulière (régularisable manuellement par décision motivée du pouvoir adjudicateur).";
       ({ y } = drawJustifiedText(doc, introCnf, M, y, W - 2 * M, 4.5));
       y += 6;
 
@@ -942,6 +965,26 @@ export const generateRaoPDF = async (optionsParams) => {
         doc.setFontSize(7);
         doc.text(conclLabel, W - M - badgeW / 2 - 3, y + 4.5, { align: 'center' });
         y += 10;
+
+        // Commentaire sur la conformité (saisi par l'analyste pour toute offre non régulière)
+        const conformityComment = (admin.conformityComment || '').replace(/\r\n?/g, '\n').trim();
+        if (conformityComment) {
+          doc.setFontSize(8);
+          const cLines = doc.splitTextToSize(conformityComment, W - 2 * M - 6);
+          const estH = 5 + cLines.length * 4 + 4;
+          // Saut de page si le commentaire ne tient pas dans l'espace restant (sauf si déjà en haut de page)
+          if (y + estH > 285 && y > 60) { y = addPage('Conformité et anomalies (suite)', 'a4', 'portrait'); }
+          doc.setFont('Helvetica', 'bold');
+          doc.setFontSize(8);
+          doc.setTextColor(...THEME.text);
+          doc.text('Commentaire sur la conformité', M + 3, y);
+          y += 5;
+          doc.setFont('Helvetica', 'normal');
+          doc.setFontSize(8);
+          doc.setTextColor(...THEME.lightText);
+          ({ y } = drawJustifiedText(doc, conformityComment, M + 3, y, W - 2 * M - 6, 4));
+          y += 4;
+        }
 
         // Écart AE (si présent)
         if (c.amountMismatch) {
@@ -1763,18 +1806,23 @@ export const generateRaoPDF = async (optionsParams) => {
             const FONT_BODY = 8.5, LINE_H = 4.5, MIN_GAP = 6, MAX_GAP = 25;
             const BAR_H = 6, HEADER_BLOCK = BAR_H + 4; // nom + barre + note + petit gap interne
 
-            // Mesure chaque bloc entreprise (texte complet, pas de troncature)
-            const blocks = companyNames.map((name, ci) => {
-              const tech = companiesData[name]?.technical || {};
-              const sd = tech[sc.id] || {};
-              let h = HEADER_BLOCK;
-              let lines = [];
-              if (sd.text) {
-                lines = doc.splitTextToSize(sd.text, W - 2 * M - 10);
-                h += lines.length * LINE_H;
-              }
-              return { name, ci, sd, h, lines };
-            });
+            // Mesure chaque bloc entreprise (texte complet, pas de troncature).
+            // Les offres non régulières sont écartées de l'analyse technique ; on conserve
+            // l'index « ci » d'origine pour garder la couleur d'entreprise cohérente.
+            const blocks = companyNames
+              .map((name, ci) => ({ name, ci }))
+              .filter(({ name }) => !NON_REGULAR_STATUSES.includes(companiesData[name]?.admin?.conclusion))
+              .map(({ name, ci }) => {
+                const tech = companiesData[name]?.technical || {};
+                const sd = tech[sc.id] || {};
+                let h = HEADER_BLOCK;
+                let lines = [];
+                if (sd.text) {
+                  lines = doc.splitTextToSize(sd.text, W - 2 * M - 10);
+                  h += lines.length * LINE_H;
+                }
+                return { name, ci, sd, h, lines };
+              });
 
             // Distribution gloutonne sur 1+ pages
             const spaceAvail = BOTTOM - y;
@@ -1858,17 +1906,21 @@ export const generateRaoPDF = async (optionsParams) => {
           const FONT_BODY = 8.5, LINE_H = 4.5, MIN_GAP = 6, MAX_GAP = 25;
           const BAR_H = 6, HEADER_BLOCK = BAR_H + 4;
 
-          const blocks = companyNames.map((name, ci) => {
-            const tech = companiesData[name]?.technical || {};
-            const d = tech[crit.id] || {};
-            let h = HEADER_BLOCK;
-            let lines = [];
-            if (d.text) {
-              lines = doc.splitTextToSize(d.text, W - 2 * M - 5);
-              h += lines.length * LINE_H;
-            }
-            return { name, ci, d, h, lines };
-          });
+          // Offres non régulières écartées ; index « ci » d'origine conservé (couleur stable).
+          const blocks = companyNames
+            .map((name, ci) => ({ name, ci }))
+            .filter(({ name }) => !NON_REGULAR_STATUSES.includes(companiesData[name]?.admin?.conclusion))
+            .map(({ name, ci }) => {
+              const tech = companiesData[name]?.technical || {};
+              const d = tech[crit.id] || {};
+              let h = HEADER_BLOCK;
+              let lines = [];
+              if (d.text) {
+                lines = doc.splitTextToSize(d.text, W - 2 * M - 5);
+                h += lines.length * LINE_H;
+              }
+              return { name, ci, d, h, lines };
+            });
 
           const spaceAvail = BOTTOM - y;
           const pages = [];

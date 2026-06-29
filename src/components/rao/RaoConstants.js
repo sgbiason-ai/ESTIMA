@@ -7,6 +7,11 @@ export const CONCLUSION_OPTIONS = [
   { value: 'inappropriee', label: 'Offre inappropriée', color: 'orange' },
 ];
 
+// Statuts d'offre « non réguliers » (CCP L2152-2 et s.). Source unique consommée par
+// l'analyse technique (UI desktop/mobile + PDF §8) et le calcul de complétion :
+// ces offres sont écartées de l'analyse technique.
+export const NON_REGULAR_STATUSES = ['irreguliere', 'inacceptable', 'inappropriee'];
+
 export const COMPANY_UI_COLORS = [
   { border: 'border-blue-500', bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-500', ring: 'ring-blue-500/20' },
   { border: 'border-violet-500', bg: 'bg-violet-50', text: 'text-violet-700', dot: 'bg-violet-500', ring: 'ring-violet-500/20' },

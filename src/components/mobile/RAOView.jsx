@@ -9,6 +9,7 @@ import { fmt, fmtShort } from './formatters';
 import { flattenItems } from './helpers';
 import { scoreOffer, computeOABThreshold, computeChaptersData, computeAnalysisStats } from '../../utils/analysisCompute';
 import { computeVatBreakdown } from '../../utils/financeFormat';
+import { NON_REGULAR_STATUSES } from '../rao/RaoConstants';
 
 // Notation prix : primitif partagé scoreOffer (src/utils/analysisCompute.js),
 // même source que le desktop — inclut le clamp [0, N] (les offres chères ne
@@ -150,13 +151,11 @@ export default function RAOView({ project, companyId, calcHook }) {
   // ─── Totaux par entreprise (avec variantes retenues comme entrees additionnelles) ──
   // Reproduit la logique desktop pdfRaoGenerator synthRows : base ajoutee si reguliere,
   // chaque variante retenue ajoutee si reguliere.
-  const NON_REGULAR = ['irreguliere', 'inacceptable', 'inappropriee'];
-
   const companyStats = useMemo(() => {
     const entries = [];
     companies.forEach((c, ci) => {
       const admin = raoCompanies[c.name]?.admin || {};
-      const baseIrregular = !!(admin.conclusion && NON_REGULAR.includes(admin.conclusion));
+      const baseIrregular = !!(admin.conclusion && NON_REGULAR_STATUSES.includes(admin.conclusion));
       // Base (toujours ajoutee — la regularite est juste un marqueur visuel).
       // Total de base aligne sur le desktop (options exclues, repli qty 0) — audit F4.
       const baseTotal = baseStats.companiesTotals[c.id] || 0;
@@ -166,7 +165,7 @@ export default function RAOView({ project, companyId, calcHook }) {
       });
       // Variantes retenues (filtrees si elles-memes irregulieres)
       (c.variants || []).filter(v => v.retained).forEach((v, vi) => {
-        if (v.adminConclusion && NON_REGULAR.includes(v.adminConclusion)) return;
+        if (v.adminConclusion && NON_REGULAR_STATUSES.includes(v.adminConclusion)) return;
         const vTotal = computeVariantTotal(c, v, allItems, qtyMap);
         entries.push({
           ...c, // herite id/name pour technique/admin lookup
@@ -569,27 +568,38 @@ export default function RAOView({ project, companyId, calcHook }) {
                 const tech = raoCompanies[c.name]?.technical || {};
                 const isOpen = openTechCompany === c.name;
                 const totalScore = techScoresMap[c.name]?.total || 0;
+                // Offre non régulière : grisée + avertissement (mais exclue uniquement du PDF).
+                const isNonReg = NON_REGULAR_STATUSES.includes(raoCompanies[c.name]?.admin?.conclusion);
 
                 return (
-                  <div key={c.id} className={`bg-white rounded-xl border overflow-hidden ${ui.border}`}>
+                  <div key={c.id} className={`bg-white rounded-xl border overflow-hidden ${isNonReg ? 'border-amber-200' : ui.border}`}>
                     {/* Header */}
                     <button
                       onClick={() => setOpenTechCompany(isOpen ? null : c.name)}
                       className="w-full flex items-center gap-3 p-3 active:bg-gray-50"
                     >
-                      <div className={`w-7 h-7 rounded-lg ${ui.bg} ${ui.text} flex items-center justify-center text-xs font-black`}>
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black ${isNonReg ? 'bg-gray-100 text-gray-400' : `${ui.bg} ${ui.text}`}`}>
                         {c.name.substring(0, 1).toUpperCase()}
                       </div>
-                      <span className="flex-1 text-left text-sm font-bold text-gray-900 truncate">{c.name}</span>
-                      <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg">
-                        {totalScore.toFixed(2)} pts
-                      </span>
+                      <span className={`flex-1 text-left text-sm font-bold truncate ${isNonReg ? 'text-gray-400 italic line-through' : 'text-gray-900'}`}>{c.name}</span>
+                      {isNonReg ? (
+                        <span className="text-[9px] font-black text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded uppercase tracking-wide">Non régulière</span>
+                      ) : (
+                        <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg">
+                          {totalScore.toFixed(2)} pts
+                        </span>
+                      )}
                       <Icon name="chevron" size={12} color="#6b7280" />
                     </button>
 
                     {/* Détail par critère */}
                     {isOpen && (
                       <div className="border-t border-gray-100 px-3 pb-3 pt-2 space-y-3">
+                        {isNonReg && (
+                          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900 leading-snug">
+                            <strong className="font-black uppercase">Offre non régulière</strong> — affichée pour mémoire, mais exclue de l'analyse technique du PDF exporté.
+                          </div>
+                        )}
                         {nonAutoCriteria.map((crit, critIdx) => {
                           const hasSubs = (crit.subCriteria || []).length > 0;
                           const critScore = techScoresMap[c.name]?.perCrit?.[crit.id] || 0;

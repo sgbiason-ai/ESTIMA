@@ -4,8 +4,7 @@
 // ET les banners d'alerte / marquages inline dans chaque onglet.
 
 import { useMemo } from 'react';
-
-const NON_REGULAR_STATUSES = ['irreguliere', 'inacceptable', 'inappropriee'];
+import { NON_REGULAR_STATUSES } from '../components/rao/RaoConstants';
 
 export const useRaoCompletion = ({
   rao,
@@ -62,9 +61,22 @@ export const useRaoCompletion = ({
 
     // ─── 3. Administratif ───
     const adminConcl = companyNames.filter(name => !!companiesData[name]?.admin?.conclusion).length;
+    // Offres non régulières : un commentaire de conformité motivé est obligatoire.
+    const nonRegularNames = companyNames.filter(name => NON_REGULAR_STATUSES.includes(companiesData[name]?.admin?.conclusion));
+    const commentMissingNames = nonRegularNames.filter(name => !(companiesData[name]?.admin?.conformityComment || '').trim());
     const adminItems = [
       { id: 'conclusions', label: `Conclusions admin (${adminConcl}/${nbCompanies})`, ok: adminConcl === nbCompanies && nbCompanies > 0, value: `${adminConcl}/${nbCompanies}` },
     ];
+    if (nonRegularNames.length > 0) {
+      const commented = nonRegularNames.length - commentMissingNames.length;
+      adminItems.push({
+        id: 'conformity_comments',
+        label: `Commentaires conformité — offres non régulières (${commented}/${nonRegularNames.length})`,
+        ok: commentMissingNames.length === 0,
+        warn: commentMissingNames.length > 0,
+        value: `${commented}/${nonRegularNames.length}`,
+      });
+    }
     const adminMissing = [];
     companyNames.forEach(name => {
       if (!companiesData[name]?.admin?.conclusion) {
@@ -76,6 +88,15 @@ export const useRaoCompletion = ({
           type: 'admin_conclusion',
         });
       }
+    });
+    commentMissingNames.forEach(name => {
+      adminMissing.push({
+        id: `conf_comment_${name}`,
+        label: `Commentaire sur la conformité pour ${name}`,
+        anchorId: `admin-conf-comment-${name}`,
+        companyName: name,
+        type: 'admin_conformity_comment',
+      });
     });
     const adminDone = nbCompanies > 0 && adminMissing.length === 0;
     const adminRatio = nbCompanies > 0 ? `${adminConcl}/${nbCompanies}` : null;

@@ -1,8 +1,8 @@
 // src/components/rao/tabs/TabTechnique.jsx
 import React, { useRef, useEffect } from 'react';
-import { Brain, MessageSquare, AlertCircle, GitBranch, Check, X } from 'lucide-react';
+import { Brain, MessageSquare, AlertCircle, AlertTriangle, GitBranch, Check, X } from 'lucide-react';
 import { ScoreBadge } from '../RaoUI';
-import { COMPANY_UI_COLORS, FORMULA_LABELS_CONSULT } from '../RaoConstants';
+import { COMPANY_UI_COLORS, FORMULA_LABELS_CONSULT, NON_REGULAR_STATUSES } from '../RaoConstants';
 import CompanySidebar from '../CompanySidebar';
 import TabAlertBanner from '../TabAlertBanner';
 
@@ -22,6 +22,10 @@ const TabTechnique = ({
 }) => {
   const nonAuto = criteria.filter(c => !c.auto);
   const autoCrit = criteria.find(c => c.auto);
+
+  // Offres non régulières : restent visibles et éditables à l'écran, mais grisées +
+  // signalées par un avertissement, et exclues de l'export PDF du RAO (§8 technique).
+  const isNonRegular = (n) => NON_REGULAR_STATUSES.includes(companiesData[n]?.admin?.conclusion);
 
   // ── Logique complétion pour sidebar ──
   const getTechCompletion = (companyName) => {
@@ -80,6 +84,7 @@ const TabTechnique = ({
         selectedCompany={selectedCompany}
         onSelectCompany={onSelectCompany}
         getCompletionStatus={getTechCompletion}
+        getWarning={(n) => isNonRegular(n) ? 'Offre non régulière — exclue de l\'export PDF' : null}
       />
 
       {/* ── Contenu entreprise sélectionnée ── */}
@@ -93,6 +98,16 @@ const TabTechnique = ({
               if (item.companyName && item.companyName !== name) onSelectCompany(item.companyName);
             }}
           />
+
+          {/* Avertissement offre non régulière — conservée à l'écran mais exclue du PDF */}
+          {isNonRegular(name) && (
+            <div className="flex items-start gap-3 px-5 py-3.5 rounded-2xl border-2 border-amber-300 bg-amber-50 shadow-sm">
+              <AlertTriangle size={20} className="text-amber-600 shrink-0 mt-0.5" />
+              <div className="text-xs text-amber-900 leading-snug">
+                <strong className="font-black uppercase tracking-wide">Offre non régulière</strong> — cette entreprise reste affichée et modifiable ici pour mémoire, mais elle <strong>n'apparaîtra pas dans l'analyse technique du PDF</strong> exporté (RAO §8).
+              </div>
+            </div>
+          )}
 
           {/* Header entreprise */}
           <div className={`flex items-center gap-5 px-6 py-4 bg-white rounded-2xl border ${uiColor.border} border-l-[5px] shadow-sm`}>

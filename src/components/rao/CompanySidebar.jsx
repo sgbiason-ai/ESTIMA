@@ -1,6 +1,6 @@
 // src/components/rao/CompanySidebar.jsx — Sidebar entreprises RAO
 import React from 'react';
-import { Building2 } from 'lucide-react';
+import { Building2, AlertTriangle } from 'lucide-react';
 import { COMPANY_UI_COLORS } from './RaoConstants';
 
 const STATUS_DOT = {
@@ -15,7 +15,10 @@ const STATUS_LABEL = {
   empty: 'À renseigner',
 };
 
-const CompanySidebar = ({ companyNames, selectedCompany, onSelectCompany, getCompletionStatus }) => {
+// getWarning : optionnel — renvoie un libellé d'avertissement pour une entreprise
+// (ex. offre non régulière dans l'onglet Technique). Si présent, le nom est grisé et
+// une icône d'alerte remplace la pastille de complétion.
+const CompanySidebar = ({ companyNames, selectedCompany, onSelectCompany, getCompletionStatus, getWarning = null }) => {
   if (!companyNames || companyNames.length === 0) return null;
 
   return (
@@ -36,6 +39,7 @@ const CompanySidebar = ({ companyNames, selectedCompany, onSelectCompany, getCom
           const uiColor = COMPANY_UI_COLORS[idx % COMPANY_UI_COLORS.length];
           const isSelected = selectedCompany === name;
           const status = getCompletionStatus ? getCompletionStatus(name) : 'empty';
+          const warning = getWarning ? getWarning(name) : null;
 
           return (
             <button
@@ -49,26 +53,29 @@ const CompanySidebar = ({ companyNames, selectedCompany, onSelectCompany, getCom
                   : 'border-l-transparent hover:bg-gray-50/70'
                 }
               `}
-              title={`${name} — ${STATUS_LABEL[status]}`}
+              title={warning ? `${name} — ${warning}` : `${name} — ${STATUS_LABEL[status]}`}
             >
               {/* Avatar initiale */}
               <div className={`
                 w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm shrink-0 transition-all
-                ${isSelected ? `${uiColor.bg} ${uiColor.text}` : 'bg-gray-100 text-gray-500'}
+                ${warning ? 'bg-gray-100 text-gray-400' : isSelected ? `${uiColor.bg} ${uiColor.text}` : 'bg-gray-100 text-gray-500'}
               `}>
                 {name.substring(0, 1).toUpperCase()}
               </div>
 
-              {/* Nom */}
+              {/* Nom — grisé si avertissement (offre non régulière) */}
               <span className={`
                 flex-1 text-left text-[13px] font-semibold truncate transition-colors
-                ${isSelected ? 'text-gray-900' : 'text-gray-600'}
+                ${warning ? 'text-gray-400 italic line-through decoration-gray-300' : isSelected ? 'text-gray-900' : 'text-gray-600'}
               `}>
                 {name}
               </span>
 
-              {/* Pastille complétion */}
-              <div className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[status]}`} />
+              {/* Avertissement (offre non régulière) ou pastille de complétion */}
+              {warning
+                ? <AlertTriangle size={14} className="text-amber-500 shrink-0" strokeWidth={2.2} />
+                : <div className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[status]}`} />
+              }
             </button>
           );
         })}
