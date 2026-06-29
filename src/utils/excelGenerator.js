@@ -70,8 +70,12 @@ const getImageDimensions = (buffer) => {
 // ─── FONCTION PRINCIPALE ──────────────────────────────────────────────────────
 
 export const generateProfessionalExcel = async (project, clientQtyMaps, type = 'ESTIMATION', bpuConfig = {}, options = {}, branding = null) => {
-  const { selectedExports = ['global'], includeSummary = false, includePM = true, tranches = [] } = options;
+  const { selectedExports = ['global'], includeSummary = false, includePM = true, tranches = [], lockPrices = false } = options;
   const workbook = new ExcelJS.Workbook();
+  // Feuilles à protéger en fin de génération (option « verrouiller tout sauf les P.U. ») :
+  // toutes les cellules restent verrouillées sauf les P.U. des articles, déverrouillées
+  // une à une dans processNodes. La protection effective est posée après remplissage.
+  const sheetsToProtect = [];
 
   let projectRefMap = new Map();
   try { if (project?.chapters) projectRefMap = getItemRefMap(project); } catch { /* ignore */ }
@@ -83,6 +87,37 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
   const totalHtLabel = hasPse ? 'TOTAL GÉNÉRAL HT (Hors PSE)' : 'TOTAL GÉNÉRAL HT';
 
   const getTrancheName = (id) => id === 'global' ? 'GLOBAL' : tranches.find(t => t.id === id)?.name || id;
+
+  // ── MISE EN PAGE IMPRESSION (A4 portrait, prêt à imprimer) ──
+  // Chaque feuille est calibrée pour une impression directe : ajustée à la largeur
+  // d'une A4 portrait (1 page de large, hauteur libre), marges étroites, en-tête de
+  // tableau répété sur chaque page, en-tête/pied de page projet + date + n° de page.
+  const projectLabel = project.name || 'PROJET SANS NOM';
+  const editDate = new Date().toLocaleDateString('fr-FR');
+  // Échappe '&' (code réservé dans les en-têtes/pieds Excel) en le doublant.
+  const xlEsc = (s) => String(s ?? '').replace(/&/g, '&&');
+  const applyPrintLayout = (ws, headerRowNum, sheetLabel) => {
+    ws.pageSetup = {
+      paperSize: 9,                 // A4
+      orientation: 'portrait',
+      fitToPage: true,
+      fitToWidth: 1,                // tout le tableau tient sur 1 page de large
+      fitToHeight: 0,               // hauteur libre → autant de pages que nécessaire
+      horizontalCentered: true,
+      margins: { left: 0.4, right: 0.4, top: 0.55, bottom: 0.55, header: 0.3, footer: 0.3 },
+    };
+    // Répète la ligne d'en-tête du tableau en haut de chaque page imprimée.
+    if (headerRowNum) ws.pageSetup.printTitlesRow = `${headerRowNum}:${headerRowNum}`;
+    // ⚠️ Ordre TAILLE puis POLICE obligatoire. Excel lit un code taille « &8 » en
+    // happant TOUS les chiffres qui suivent : « &8 » collé à « 29/06/2026 » est lu
+    // « taille 829 » → texte géant en travers de la page. En mettant la police après
+    // la taille, le texte suit le guillemet fermant " et n'est jamais happé (robuste
+    // même si un projet/tranche commence par un chiffre).
+    ws.headerFooter = {
+      oddHeader: `&L&10&"Aptos,Bold"${xlEsc(projectLabel)}&R&9&"Aptos"${xlEsc(sheetLabel)}`,
+      oddFooter: `&L&8&"Aptos"${xlEsc(editDate)}&C&8&"Aptos"Page &P / &N&R&8&"Aptos"${xlEsc(projectLabel)}`,
+    };
+  };
 
   // ── STYLES ──
   const fonts = {
@@ -108,12 +143,14 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
     subTotalMain: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } },
     subTotalSub: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } },
     total: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } },
-    totalPse: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFBEB' } }
+    totalPse: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFBEB' } },
+    editable: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF9C3' } } // jaune clair : cellule P.U. à saisir
   };
 
   const borders = {
     thin: { top: { style: 'thin', color: { argb: 'FFE5E7EB' } }, bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } }, left: { style: 'thin', color: { argb: 'FFE5E7EB' } }, right: { style: 'thin', color: { argb: 'FFE5E7EB' } } },
-    dotted: { bottom: { style: 'dotted', color: { argb: 'FFE5E7EB' } }, left: { style: 'thin', color: { argb: 'FFE5E7EB' } }, right: { style: 'thin', color: { argb: 'FFE5E7EB' } } }
+    dotted: { bottom: { style: 'dotted', color: { argb: 'FFE5E7EB' } }, left: { style: 'thin', color: { argb: 'FFE5E7EB' } }, right: { style: 'thin', color: { argb: 'FFE5E7EB' } } },
+    editable: { top: { style: 'thin', color: { argb: 'FFD97706' } }, bottom: { style: 'thin', color: { argb: 'FFD97706' } }, left: { style: 'thin', color: { argb: 'FFD97706' } }, right: { style: 'thin', color: { argb: 'FFD97706' } } } // contour ambre cellule P.U.
   };
 
   // ── CHARGEMENT LOGOS ──
@@ -146,11 +183,18 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
   if (includeSummary && selectedExports.length > 0) {
     summarySheet = workbook.addWorksheet('RÉCAPITULATIF', { views: [{ showGridLines: false }] });
     const headers = ['DÉSIGNATION', ...selectedExports.map(getTrancheName)];
-    summarySheet.columns = [{ key: 'desc', width: 50 }, ...selectedExports.map(() => ({ width: 18 }))];
+    summarySheet.columns = [{ key: 'desc', width: 50 }, ...selectedExports.map(() => ({ width: 20 }))];
     summarySheet.addRow(['RÉCAPITULATIF FINANCIER']).font = fonts.title;
     summarySheet.addRow([]);
     const headerRow = summarySheet.addRow(headers);
-    headerRow.eachCell(cell => { cell.font = fonts.header; cell.fill = fills.header; cell.alignment = { horizontal: 'center' }; });
+    // Hauteur + retour à la ligne : les noms de tranche longs (« Tranche OPTIONNELLE 1 »)
+    // s'enroulent sur 2 lignes au lieu de déborder/se chevaucher.
+    headerRow.height = 34;
+    headerRow.eachCell(cell => { cell.font = fonts.header; cell.fill = fills.header; cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; });
+    // Impression prête : A4 portrait, ajusté à la largeur, en-tête répété.
+    applyPrintLayout(summarySheet, headerRow.number, 'Récapitulatif');
+    // Récap entièrement verrouillé (formules inter-feuilles) si l'option est active.
+    if (lockPrices) sheetsToProtect.push(summarySheet);
   }
 
   // ── TRAITEMENT NŒUDS ──
@@ -268,6 +312,15 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
         rowItem.getCell(1).alignment = { horizontal: 'center' };
         rowItem.getCell(5).numFmt = '#,##0.00 €';
         rowItem.eachCell(cell => cell.border = borders.dotted);
+        // Option « verrouiller tout sauf les P.U. » : seule la cellule P.U. (col. E) reste
+        // éditable (déverrouillée), repérée par un fond jaune + contour ambre. Posé APRÈS
+        // borders.dotted pour ne pas être écrasé. La feuille est protégée en fin de génération.
+        if (lockPrices) {
+          const priceCell = rowItem.getCell(5);
+          priceCell.protection = { locked: false };
+          priceCell.fill = fills.editable;
+          priceCell.border = borders.editable;
+        }
         // Mémorise la cellule total de l'article (base potentielle d'une PSE substitution).
         if (cellRefMap && !isPM) cellRefMap.set(String(node.id), `F${currentRowNum}`);
       }
@@ -275,14 +328,21 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
   };
 
   const addTotalRow = (ws, label, formulaStr, isGreen, isPse = false) => {
-    const row = ws.addRow(['', '', '', '', label, { formula: formulaStr }]);
+    const row = ws.addRow(['', '', '', '', '', { formula: formulaStr }]);
+    const r = row.number;
     const valCell = row.getCell(6);
     valCell.numFmt = '#,##0.00 €'; valCell.alignment = { horizontal: 'right' };
-    row.getCell(5).alignment = { horizontal: 'right' };
+    // Libellé fusionné A→E : pleine largeur, aligné à droite, jamais rogné. Sans fusion,
+    // le texte aligné à droite dans la seule colonne E était tronqué car A–D (chaînes
+    // vides) bloquaient le débordement à gauche (« TOTAL GÉNÉRAL HT » → « TAL GÉNÉRAL HT »).
+    ws.mergeCells(`A${r}:E${r}`);
+    const labelCell = row.getCell(1);
+    labelCell.value = label;
+    labelCell.alignment = { horizontal: 'right' };
     if (isPse) { row.font = fonts.totalPse; valCell.fill = fills.totalPse; }
     else if (isGreen) { row.font = fonts.total; valCell.fill = fills.total; }
     else { row.font = fonts.bold; }
-    return row.number;
+    return r;
   };
 
   // ── FEUILLES DÉTAILLÉES ──
@@ -347,6 +407,10 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
       cell.font = fonts.header; cell.fill = fills.header;
       cell.alignment = { horizontal: 'center', vertical: 'middle' }; cell.border = borders.thin;
     });
+
+    // Impression prête : A4 portrait, ajusté à la largeur, en-tête de tableau répété.
+    applyPrintLayout(worksheet, headerRow.number, trancheName);
+    if (lockPrices) sheetsToProtect.push(worksheet);
 
     const mainSubTotalsRefs = [];
     // Cellule de total de chaque prestation de base (id → 'F{row}') : sert aux
@@ -427,12 +491,14 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
           });
           // Net HT = montant + Σ déductions ; libellé plus-value / moins-value DYNAMIQUE (IF).
           const netFormula = `F${rowMontant}${dedCells.map(c => `+${c}`).join('')}`;
+          // Libellé dynamique posé sur la cellule MAÎTRE de la fusion (col. A) — après
+          // mergeCells A:E dans addTotalRow, écrire en E n'afficherait rien.
           const rowNetHT = addTotalRow(worksheet, '', netFormula, false, true);
-          worksheet.getRow(rowNetHT).getCell(5).value = { formula: `IF(F${rowNetHT}>=0,"PLUS-VALUE HT PSE","MOINS-VALUE HT PSE")` };
-          worksheet.getRow(rowNetHT).getCell(5).alignment = { horizontal: 'right' };
+          worksheet.getRow(rowNetHT).getCell(1).value = { formula: `IF(F${rowNetHT}>=0,"PLUS-VALUE HT PSE","MOINS-VALUE HT PSE")` };
+          worksheet.getRow(rowNetHT).getCell(1).alignment = { horizontal: 'right' };
           const rowNetTTC = addTotalRow(worksheet, '', `F${rowNetHT}+ROUND(F${rowNetHT}*${tvaRate},2)`, false, true);
-          worksheet.getRow(rowNetTTC).getCell(5).value = { formula: `IF(F${rowNetHT}>=0,"PLUS-VALUE TTC PSE","MOINS-VALUE TTC PSE")` };
-          worksheet.getRow(rowNetTTC).getCell(5).alignment = { horizontal: 'right' };
+          worksheet.getRow(rowNetTTC).getCell(1).value = { formula: `IF(F${rowNetHT}>=0,"PLUS-VALUE TTC PSE","MOINS-VALUE TTC PSE")` };
+          worksheet.getRow(rowNetTTC).getCell(1).alignment = { horizontal: 'right' };
           netRow = rowNetHT;
         } else {
           // PSE simple : total plein.
@@ -508,6 +574,16 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
           dRow.getCell(1).alignment = { wrapText: true, vertical: 'middle' };
         }
       });
+    }
+  }
+
+  // ── PROTECTION « tout sauf P.U. » (sans mot de passe) ──
+  // Sur feuille protégée, toute cellule verrouillée (par défaut) devient non éditable ;
+  // seules les P.U. d'articles, déverrouillées plus haut, restent saisissables. Sans mot
+  // de passe : anti-erreur pour l'entreprise, qui peut l'ôter via Excel › Révision au besoin.
+  if (lockPrices) {
+    for (const ws of sheetsToProtect) {
+      await ws.protect('', { selectLockedCells: true, selectUnlockedCells: true });
     }
   }
 

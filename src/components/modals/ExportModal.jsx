@@ -3,7 +3,7 @@ import { FileText, FileSpreadsheet, X, Check, Eye, Download, ArrowLeft, Loader2,
 import { toast } from '../../utils/globalUI';
 
 // Étape 1 : Options d'export
-const OptionsStep = ({ isPdf, hasTranches, tranches, includeCover, setIncludeCover, includeSummary, setIncludeSummary, includePM, setIncludePM, selectedExports, handleToggleExport, onClose, onGenerate, isGenerating }) => {
+const OptionsStep = ({ isPdf, hasTranches, tranches, includeCover, setIncludeCover, includeSummary, setIncludeSummary, includePM, setIncludePM, lockPrices, setLockPrices, selectedExports, handleToggleExport, onClose, onGenerate, isGenerating }) => {
   const allOptions = [{ id: 'global', name: 'Global' }, ...(tranches || [])];
   const canGenerate = !hasTranches || selectedExports.length > 0;
 
@@ -65,6 +65,17 @@ const OptionsStep = ({ isPdf, hasTranches, tranches, includeCover, setIncludeCov
           label="Afficher les prix pour mémoire"
           desc="Lignes avec quantité à 0 (PM)"
         />
+
+        {/* Verrouillage P.U. — Excel uniquement (DQE entreprises) */}
+        {!isPdf && (
+          <OptionRow
+            checked={lockPrices}
+            onChange={setLockPrices}
+            color="yellow"
+            label="Verrouiller tout sauf les prix unitaires"
+            desc="Bordereau entreprises : seules les cellules P.U. (en jaune) restent saisissables, le reste est protégé"
+          />
+        )}
       </div>
 
       {/* Footer */}
@@ -201,6 +212,7 @@ const Checkbox = ({ checked, color }) => {
     indigo:  'bg-indigo-500  border-indigo-500',
     amber:   'bg-amber-500   border-amber-500',
     sky:     'bg-sky-500     border-sky-500',
+    yellow:  'bg-yellow-500  border-yellow-500',
   };
   return (
     <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0 ${checked ? colors[color] : 'bg-white border-gray-300'}`}>
@@ -214,6 +226,7 @@ const OptionRow = ({ checked, onChange, color, label, desc }) => {
     emerald: 'border-emerald-300 bg-emerald-50',
     indigo:  'border-indigo-300  bg-indigo-50',
     amber:   'border-amber-300   bg-amber-50',
+    yellow:  'border-yellow-300  bg-yellow-50',
   };
   return (
     <div
@@ -241,6 +254,7 @@ const ExportModal = ({
   const [includeCover, setIncludeCover]   = useState(true);
   const [includeSummary, setIncludeSummary] = useState(false);
   const [includePM, setIncludePM]         = useState(true);
+  const [lockPrices, setLockPrices]       = useState(false); // Excel : verrouiller tout sauf les P.U.
   const [selectedExports, setSelectedExports] = useState([]);
 
   const [step, setStep]             = useState('options'); // 'options' | 'preview'
@@ -255,6 +269,7 @@ const ExportModal = ({
       setIncludeSummary(false);
       setIncludeCover(true);
       setIncludePM(true);
+      setLockPrices(false);
       setStep('options');
       setPreviewData(null);
     }
@@ -269,7 +284,7 @@ const ExportModal = ({
 
   if (!isOpen) return null;
 
-  const currentOptions = { includeCover, selectedExports, includeSummary, includePM };
+  const currentOptions = { includeCover, selectedExports, includeSummary, includePM, lockPrices };
 
   const handleToggleExport = (id) => {
     setSelectedExports(prev =>
@@ -358,6 +373,8 @@ const ExportModal = ({
             setIncludeSummary={setIncludeSummary}
             includePM={includePM}
             setIncludePM={setIncludePM}
+            lockPrices={lockPrices}
+            setLockPrices={setLockPrices}
             selectedExports={selectedExports}
             handleToggleExport={handleToggleExport}
             onClose={onClose}

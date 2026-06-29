@@ -642,7 +642,7 @@ const ProjectView = ({
     );
   };
 
-  const handleConfirmExport = async ({ includeCover, selectedExports, includeSummary, includePM, _previewBlob, _suggestedName }) => {
+  const handleConfirmExport = async ({ includeCover, selectedExports, includeSummary, includePM, lockPrices, _previewBlob, _suggestedName }) => {
     setExportModalState(prev => ({ ...prev, show: false }));
     const { format, type } = exportModalState;
     const projectForExport = { ...project, ...displayProject, clientLogo: project?.clientLogo };
@@ -656,7 +656,7 @@ const ProjectView = ({
       }
     } else if (format === 'excel') {
       const { generateProfessionalExcel } = await import('../utils/excelGenerator');
-      generateProfessionalExcel(projectForExport, clientQtyMaps, type, bpuConfig, { selectedExports, includeSummary, includePM, tranches }, masterBranding);
+      generateProfessionalExcel(projectForExport, clientQtyMaps, type, bpuConfig, { selectedExports, includeSummary, includePM, lockPrices, tranches }, masterBranding);
     }
   };
 
