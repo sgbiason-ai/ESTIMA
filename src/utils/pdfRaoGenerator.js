@@ -1,6 +1,6 @@
 // src/utils/pdfRaoGenerator.js
 // Génère le PDF du Rapport d'Analyse des Offres (RAO)
-// INCLUT l'Analyse Financière (Synthèse A4 + Détails A3) avec codes couleurs par entreprise
+// INCLUT l'Analyse Financière (Synthèse A4 + Détails A4 paysage) avec codes couleurs par entreprise
 // Style : Vert Papyrus — typographie H1 14pt / H2 12pt / body 9pt — marges 15mm
 
 import { DEFAULT_CRITERIA, DEFAULT_ADMIN_PIECES, DEFAULT_OFFER_PIECES } from '../hooks/useRao';
@@ -1169,7 +1169,7 @@ export const generateRaoPDF = async (optionsParams) => {
     });
     y += 6;
 
-    // ── DÉTAIL DES PRIX UNITAIRES — Un tableau A3 par tranche ──
+    // ── DÉTAIL DES PRIX UNITAIRES — Un tableau A4 paysage par tranche ──
     if (chaptersData && chaptersData.length > 0) {
 
       // Helper : construit chaptersData pour une tranche donnée.
@@ -1252,9 +1252,9 @@ export const generateRaoPDF = async (optionsParams) => {
 
       trancheList.forEach((tranche) => {
         const trLabel = hasTr ? tranche.name : 'Détail des Prix Unitaires';
-        y = addPage(`Analyse financière — ${trLabel}`, 'a3', 'landscape');
+        y = addPage(`Analyse financière — ${trLabel}`, 'a4', 'landscape');
         if (!tocAdded) {
-          tocEntries.push({ label: '7. Détail des prix unitaires (A3)', page: pageNum });
+          tocEntries.push({ label: '7. Détail des prix unitaires (A4 paysage)', page: pageNum });
           tocAdded = true;
         }
 
@@ -1296,7 +1296,7 @@ export const generateRaoPDF = async (optionsParams) => {
         const tableBody = [];
         const mainHeaders = [
           { content: 'N°', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
-          { content: 'Désignation', rowSpan: 2, styles: { halign: 'left', valign: 'middle', cellWidth: 60 } },
+          { content: 'Désignation', rowSpan: 2, styles: { halign: 'left', valign: 'middle', cellWidth: 42 } },
           { content: 'U', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
           { content: 'Qté', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
           { content: 'Estimation', colSpan: 2, styles: { halign: 'center', fillColor: [240, 240, 255] } }
@@ -1530,7 +1530,7 @@ export const generateRaoPDF = async (optionsParams) => {
           head: [mainHeaders, subHeaders],
           body: tableBody,
           theme: 'grid',
-          styles: { font: 'Helvetica', fontSize: 7, cellPadding: 1.5, lineColor: [220, 220, 220], lineWidth: 0.1 },
+          styles: { font: 'Helvetica', fontSize: 6, cellPadding: 1, lineColor: [220, 220, 220], lineWidth: 0.1 },
           headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], lineWidth: 0.1, lineColor: [180, 180, 180] },
           columnStyles,
           margin: { left: 10, right: 10 },
