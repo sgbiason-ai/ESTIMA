@@ -3,6 +3,7 @@
 
 import React, { useState, useRef } from 'react';
 import Icon from './Icon';
+import { fmtCoord, fmtDist } from '../../utils/geoHelpers';
 import { uploadSiteVisitImage, deleteSiteVisitImage } from '../../utils/siteVisitImageStorage';
 
 // Cle stable d'une image (path Storage, sinon src/base64)
@@ -14,6 +15,7 @@ export default function SiteVisitObsEditSheet({ obs, onUpdate, onDelete, onClose
   const [uploading, setUploading] = useState(false);
   const originalRef = useRef(obs.images || []);
   const fileRef = useRef(null);
+  const isSegment = !!(obs.segmentFrom && obs.segmentTo);
 
   // Enregistrer : supprimer de Storage les images retirees.
   const handleSave = () => {
@@ -76,12 +78,26 @@ export default function SiteVisitObsEditSheet({ obs, onUpdate, onDelete, onClose
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200/60 bg-white/80 backdrop-blur-xl shrink-0">
         <button onClick={handleCancel} className="text-[13px] font-medium text-gray-500">Annuler</button>
-        <span className="text-[14px] font-bold text-gray-900">Observation</span>
+        <span className="text-[14px] font-bold text-gray-900">{isSegment ? 'Segment' : 'Observation'}</span>
         <button onClick={handleSave} disabled={uploading} className="text-[13px] font-bold text-blue-600 disabled:opacity-40">Enregistrer</button>
       </div>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-4 pb-4">
+          {/* Contexte du segment (lecture seule) */}
+          {isSegment && (
+            <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-xl">
+              <div className="flex items-center gap-1.5 text-[13px] font-bold text-blue-700">
+                <Icon name="map" size={14} color="#1d4ed8" />
+                Segment — {fmtDist(obs.segmentDistance)}
+                {obs.segmentUncertainty != null && <span className="font-normal text-gray-400 text-[10px]">±{Math.round(obs.segmentUncertainty)}m</span>}
+              </div>
+              <div className="text-[11px] text-gray-500 mt-1 font-mono">
+                {fmtCoord(obs.segmentFrom.lat, obs.segmentFrom.lng)} → {fmtCoord(obs.segmentTo.lat, obs.segmentTo.lng)}
+              </div>
+            </div>
+          )}
+
           {/* Bouton ajouter photo — en haut, agrandi */}
           <button
             onClick={() => fileRef.current?.click()}
@@ -98,7 +114,7 @@ export default function SiteVisitObsEditSheet({ obs, onUpdate, onDelete, onClose
           <textarea
             value={text}
             onChange={e => setText(e.target.value)}
-            placeholder="Décrivez votre observation…"
+            placeholder={isSegment ? 'Commentaire sur ce segment…' : 'Décrivez votre observation…'}
             className="w-full min-h-[120px] p-3 bg-gray-50 border border-gray-200 rounded-xl text-[14px] text-gray-800 placeholder-gray-400 resize-none focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 mt-3"
           />
 

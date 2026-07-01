@@ -2,7 +2,7 @@
 // Vue détail d'une visite de site — observations + terrain.
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { MapPin, Flag, LocateFixed, X, Ruler } from 'lucide-react';
+import { MapPin, Flag, LocateFixed, X, Ruler, Navigation } from 'lucide-react';
 import Icon from './Icon';
 import { dateFr } from './formatters';
 import { stripHtml } from '../../utils/formatObsText';
@@ -11,7 +11,7 @@ import SiteVisitObsEditSheet from './SiteVisitObsEditSheet';
 import GpsTrackingSection from './GpsTrackingSection';
 import SaveStatusDot from './SaveStatusDot';
 import {
-  fmtCoord, fmtDist, fmtUncertainty,
+  fmtCoord, fmtDist, fmtUncertainty, accuracyColor,
   haversine, computeUncertainty, getCurrentPosition, fetchIgnRoute,
 } from '../../utils/geoHelpers';
 import { deleteSiteVisitImage } from '../../utils/siteVisitImageStorage';
@@ -31,7 +31,7 @@ function SectionTab({ label, active, onClick }) {
 
 // Barre de capture GPS d'un segment (Départ → Fin, distance routière) ou d'un point.
 // Rendue dans les onglets Observations ET Terrain (état partagé via le parent).
-function SegmentCaptureBar({ pendingPoint, gettingPosition, onDepart, onFin, onPoint, onCancel }) {
+function SegmentCaptureBar({ pendingPoint, gettingPosition, liveRouteDist, liveRouteStatus, liveStraight, liveAccuracy, onDepart, onFin, onPoint, onCancel }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-200 p-3">
       <div className="flex items-center justify-between mb-2">
@@ -39,9 +39,10 @@ function SegmentCaptureBar({ pendingPoint, gettingPosition, onDepart, onFin, onP
           <Ruler size={14} className="text-blue-600" />
           <span className="text-[13px] font-bold text-gray-900">Mesurer un segment</span>
         </div>
-        {pendingPoint && (
-          <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600">
-            <MapPin size={11} /> Départ posé
+        {pendingPoint && liveAccuracy != null && (
+          <span className="flex items-center gap-1 text-[11px] font-bold" style={{ color: accuracyColor(liveAccuracy) }}>
+            <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: accuracyColor(liveAccuracy) }} />
+            ±{Math.round(liveAccuracy)}m
           </span>
         )}
       </div>
@@ -58,21 +59,44 @@ function SegmentCaptureBar({ pendingPoint, gettingPosition, onDepart, onFin, onP
           </button>
         </div>
       ) : (
-        <div className="flex items-center gap-2">
-          <button onClick={onFin} disabled={gettingPosition}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[13px] font-bold bg-red-500 text-white active:scale-[0.97] transition disabled:opacity-50 shadow-sm">
-            <Flag size={15} /> {gettingPosition ? 'GPS…' : 'Fin — distance routière'}
-          </button>
-          <button onClick={onCancel} disabled={gettingPosition}
-            className="p-2.5 rounded-xl bg-gray-100 text-gray-500 active:bg-gray-200 transition disabled:opacity-50">
-            <X size={16} />
-          </button>
-        </div>
+        <>
+          {/* Distance PAR LA ROUTE en direct depuis le départ (IGN) */}
+          <div className="flex items-center justify-center gap-2 mb-2 py-2.5 bg-blue-50 rounded-xl">
+            <Navigation size={16} className="text-blue-600" />
+            {liveRouteDist != null ? (
+              <>
+                <span className="text-[17px] font-bold text-blue-700 tabular-nums">{fmtDist(liveRouteDist)}</span>
+                <span className="text-[10px] text-gray-400 font-medium">par la route</span>
+              </>
+            ) : liveAccuracy == null ? (
+              <span className="text-[13px] font-semibold text-blue-600">Acquisition GPS…</span>
+            ) : liveRouteStatus === 'error' && liveStraight != null ? (
+              <span className="text-[13px] font-semibold text-gray-500 tabular-nums">
+                ≈ {fmtDist(liveStraight)} <span className="text-[10px] font-normal">vol d'oiseau · route indispo.</span>
+              </span>
+            ) : (
+              <span className="text-[13px] font-semibold text-blue-600 flex items-center gap-1.5">
+                <span className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                Calcul de la route…
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={onFin} disabled={gettingPosition}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[13px] font-bold bg-red-500 text-white active:scale-[0.97] transition disabled:opacity-50 shadow-sm">
+              <Flag size={15} /> {gettingPosition ? 'GPS…' : 'Fin — distance routière'}
+            </button>
+            <button onClick={onCancel} disabled={gettingPosition}
+              className="p-2.5 rounded-xl bg-gray-100 text-gray-500 active:bg-gray-200 transition disabled:opacity-50">
+              <X size={16} />
+            </button>
+          </div>
+        </>
       )}
 
       <p className="text-[10px] text-gray-400 mt-1.5 leading-tight">
         {pendingPoint
-          ? 'Rendez-vous à l\'arrivée puis « Fin » — la distance par la route (IGN) est calculée automatiquement.'
+          ? 'Distance par la route mise à jour au fil de votre déplacement. Valeur définitive à l\'appui sur « Fin ».'
           : 'Posez le départ, marchez jusqu\'à l\'arrivée, puis « Fin ». « Point » enregistre un seul repère GPS.'}
       </p>
     </div>
@@ -107,16 +131,16 @@ function ObsCard({ obs, number, onTap, onDelete, onViewImage }) {
         <span className="shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-[11px] font-bold flex items-center justify-center mt-0.5">{number}</span>
         <div className="flex-1 min-w-0">
       {obs.segmentFrom && obs.segmentTo && (
-        <div className="text-[11px] font-mono mb-1.5 space-y-0.5" onClick={e => e.stopPropagation()}>
+        <div className="text-[11px] font-mono mb-1.5 space-y-0.5">
           <div className="flex items-center gap-1">
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
             <a href={`https://www.google.com/maps?q=${obs.segmentFrom.lat},${obs.segmentFrom.lng}`} target="_blank" rel="noreferrer"
-              className="text-blue-600 font-medium">{fmtCoord(obs.segmentFrom.lat, obs.segmentFrom.lng)}</a>
+              onClick={e => e.stopPropagation()} className="text-blue-600 font-medium">{fmtCoord(obs.segmentFrom.lat, obs.segmentFrom.lng)}</a>
           </div>
           <div className="flex items-center gap-1">
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
             <a href={`https://www.google.com/maps?q=${obs.segmentTo.lat},${obs.segmentTo.lng}`} target="_blank" rel="noreferrer"
-              className="text-blue-600 font-medium">{fmtCoord(obs.segmentTo.lat, obs.segmentTo.lng)}</a>
+              onClick={e => e.stopPropagation()} className="text-blue-600 font-medium">{fmtCoord(obs.segmentTo.lat, obs.segmentTo.lng)}</a>
           </div>
           <div className="flex items-center gap-1">
             <span className="text-blue-700 font-bold">{fmtDist(obs.segmentDistance)}</span>
@@ -129,6 +153,11 @@ function ObsCard({ obs, number, onTap, onDelete, onViewImage }) {
       )}
       {!text && !obs.segmentFrom && images.length === 0 && (
         <p className="text-[13px] text-gray-500 italic">Observation vide — appuyez pour éditer</p>
+      )}
+      {!text && obs.segmentFrom && (
+        <p className="text-[12px] text-blue-500 italic flex items-center gap-1">
+          <Icon name="edit" size={11} color="#3b82f6" /> Appuyez pour ajouter un commentaire
+        </p>
       )}
       {images.length > 0 && (
         <div className="flex gap-1.5 mt-2" onClick={e => e.stopPropagation()}>
@@ -315,6 +344,56 @@ export default function SiteVisitDetailView({ visit, onSave, saveStatus, onToast
 
   const cancelPending = useCallback(() => setPendingPoint(null), []);
 
+  // ── Suivi GPS en direct pendant la mesure (entre Départ et Fin) ──
+  const [livePos, setLivePos] = useState(null);
+  const livePosRef = useRef(null);
+  livePosRef.current = livePos;
+  useEffect(() => {
+    if (!pendingPoint || !navigator.geolocation) { setLivePos(null); return; }
+    const id = navigator.geolocation.watchPosition(
+      (p) => setLivePos({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }),
+      () => {},
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 2000 }
+    );
+    return () => { navigator.geolocation.clearWatch(id); setLivePos(null); };
+  }, [pendingPoint]);
+
+  // ── Distance PAR LA ROUTE en direct (IGN), throttlée (~3 s, ≥10 m, 1 requête à la fois) ──
+  const [liveRoute, setLiveRoute] = useState({ dist: null, status: 'idle' }); // status: idle|loading|ok|error
+  const routeCtlRef = useRef({ inFlight: false, lastPos: null });
+  useEffect(() => {
+    if (!pendingPoint) { setLiveRoute({ dist: null, status: 'idle' }); routeCtlRef.current = { inFlight: false, lastPos: null }; return; }
+    let cancelled = false;
+    const tick = async () => {
+      const cur = livePosRef.current;
+      const ctl = routeCtlRef.current;
+      if (!cur || ctl.inFlight) return;
+      if (ctl.lastPos && haversine(ctl.lastPos, cur) < 10) return; // pas assez bougé → on garde la dernière valeur
+      ctl.inFlight = true;
+      setLiveRoute(prev => (prev.dist == null ? { ...prev, status: 'loading' } : prev));
+      try {
+        const route = await fetchIgnRoute(pendingPoint, cur, 0);
+        if (cancelled) return;
+        if (route && route.distance > 0) {
+          ctl.lastPos = cur;
+          setLiveRoute({ dist: route.distance, status: 'ok' });
+        } else {
+          setLiveRoute(prev => (prev.dist == null ? { dist: null, status: 'error' } : prev));
+        }
+      } catch {
+        if (!cancelled) setLiveRoute(prev => (prev.dist == null ? { dist: null, status: 'error' } : prev));
+      } finally {
+        ctl.inFlight = false;
+      }
+    };
+    const iv = setInterval(tick, 3000);
+    const t0 = setTimeout(tick, 500); // premier calcul dès que le GPS est acquis
+    return () => { cancelled = true; clearInterval(iv); clearTimeout(t0); };
+  }, [pendingPoint]);
+
+  // Repli vol d'oiseau uniquement si la route est indisponible (hors réseau)
+  const liveStraight = pendingPoint && livePos ? haversine(pendingPoint, livePos) : null;
+
   const observations = localVisit.observations || [];
 
   // ── Export PDF ──
@@ -430,6 +509,7 @@ export default function SiteVisitDetailView({ visit, onSave, saveStatus, onToast
           <div className="space-y-2">
             <SegmentCaptureBar
               pendingPoint={pendingPoint} gettingPosition={gettingPosition}
+              liveRouteDist={liveRoute.dist} liveRouteStatus={liveRoute.status} liveStraight={liveStraight} liveAccuracy={livePos?.accuracy}
               onDepart={handleDepart} onFin={handleFin} onPoint={handlePoint} onCancel={cancelPending}
             />
 
@@ -457,6 +537,7 @@ export default function SiteVisitDetailView({ visit, onSave, saveStatus, onToast
           <div className="mb-3">
             <SegmentCaptureBar
               pendingPoint={pendingPoint} gettingPosition={gettingPosition}
+              liveRouteDist={liveRoute.dist} liveRouteStatus={liveRoute.status} liveStraight={liveStraight} liveAccuracy={livePos?.accuracy}
               onDepart={handleDepart} onFin={handleFin} onPoint={handlePoint} onCancel={cancelPending}
             />
           </div>
