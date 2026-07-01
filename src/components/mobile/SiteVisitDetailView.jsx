@@ -2,6 +2,7 @@
 // Vue détail d'une visite de site — observations + terrain.
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { MapPin, Flag, LocateFixed, X, Ruler } from 'lucide-react';
 import Icon from './Icon';
 import { dateFr } from './formatters';
 import { stripHtml } from '../../utils/formatObsText';
@@ -9,7 +10,10 @@ import ImageViewerModal from './ImageViewerModal';
 import SiteVisitObsEditSheet from './SiteVisitObsEditSheet';
 import GpsTrackingSection from './GpsTrackingSection';
 import SaveStatusDot from './SaveStatusDot';
-import { fmtCoord, fmtDist } from '../../utils/geoHelpers';
+import {
+  fmtCoord, fmtDist, fmtUncertainty,
+  haversine, computeUncertainty, getCurrentPosition, fetchIgnRoute,
+} from '../../utils/geoHelpers';
 import { deleteSiteVisitImage } from '../../utils/siteVisitImageStorage';
 
 // ─── Sous-composants ───────────────────────────────────────────────────────
@@ -22,6 +26,56 @@ function SectionTab({ label, active, onClick }) {
       }`}>
       {label}
     </button>
+  );
+}
+
+// Barre de capture GPS d'un segment (Départ → Fin, distance routière) ou d'un point.
+// Rendue dans les onglets Observations ET Terrain (état partagé via le parent).
+function SegmentCaptureBar({ pendingPoint, gettingPosition, onDepart, onFin, onPoint, onCancel }) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 p-3">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-1.5">
+          <Ruler size={14} className="text-blue-600" />
+          <span className="text-[13px] font-bold text-gray-900">Mesurer un segment</span>
+        </div>
+        {pendingPoint && (
+          <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600">
+            <MapPin size={11} /> Départ posé
+          </span>
+        )}
+      </div>
+
+      {!pendingPoint ? (
+        <div className="flex items-center gap-2">
+          <button onClick={onDepart} disabled={gettingPosition}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[13px] font-bold bg-emerald-500 text-white active:scale-[0.97] transition disabled:opacity-50 shadow-sm">
+            <MapPin size={15} /> {gettingPosition ? 'GPS…' : 'Départ'}
+          </button>
+          <button onClick={onPoint} disabled={gettingPosition}
+            className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-[13px] font-bold bg-violet-500 text-white active:scale-[0.97] transition disabled:opacity-50 shadow-sm">
+            <LocateFixed size={15} /> Point
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <button onClick={onFin} disabled={gettingPosition}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[13px] font-bold bg-red-500 text-white active:scale-[0.97] transition disabled:opacity-50 shadow-sm">
+            <Flag size={15} /> {gettingPosition ? 'GPS…' : 'Fin — distance routière'}
+          </button>
+          <button onClick={onCancel} disabled={gettingPosition}
+            className="p-2.5 rounded-xl bg-gray-100 text-gray-500 active:bg-gray-200 transition disabled:opacity-50">
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      <p className="text-[10px] text-gray-400 mt-1.5 leading-tight">
+        {pendingPoint
+          ? 'Rendez-vous à l\'arrivée puis « Fin » — la distance par la route (IGN) est calculée automatiquement.'
+          : 'Posez le départ, marchez jusqu\'à l\'arrivée, puis « Fin ». « Point » enregistre un seul repère GPS.'}
+      </p>
+    </div>
   );
 }
 
@@ -175,6 +229,92 @@ export default function SiteVisitDetailView({ visit, onSave, saveStatus, onToast
     setLocalVisit(prev => ({ ...prev, ...patch }));
   }, []);
 
+  // ── Segments GPS (Départ / Fin / Point) — parité desktop SiteVisitsView ──
+  const [pendingPoint, setPendingPoint] = useState(null);
+  const [gettingPosition, setGettingPosition] = useState(false);
+
+  const getPosition = useCallback(async () => {
+    try {
+      return await getCurrentPosition();
+    } catch (e) {
+      onToast?.('GPS indisponible : ' + (e.message || 'position non obtenue'));
+      throw e;
+    }
+  }, [onToast]);
+
+  const handleDepart = useCallback(async () => {
+    if (gettingPosition) return;
+    setGettingPosition(true);
+    try {
+      const pos = await getPosition();
+      setPendingPoint({ lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy, timestamp: Date.now() });
+      onToast?.(`Départ marqué (±${Math.round(pos.accuracy)}m)`);
+    } catch { /* toast déjà émis */ }
+    setGettingPosition(false);
+  }, [gettingPosition, getPosition, onToast]);
+
+  const handleFin = useCallback(async () => {
+    if (!pendingPoint || gettingPosition) return;
+    setGettingPosition(true);
+    try {
+      const pos = await getPosition();
+      const pointA = pendingPoint;
+      const pointB = { lat: pos.lat, lng: pos.lng };
+      setPendingPoint(null);
+      onToast?.('Calcul de l\'itinéraire IGN…');
+
+      // Distance routière IGN (visu + distance), fallback vol d'oiseau (haversine).
+      let routeCoords = null, distance = null, source = null;
+      const ign = await fetchIgnRoute(pointA, pointB);
+      if (ign && ign.distance > 0 && ign.coordinates?.length >= 2) {
+        routeCoords = ign.coordinates.map(c => ({ lat: c[0], lng: c[1] }));
+        distance = ign.distance;
+        source = 'ign';
+      } else {
+        distance = haversine(pointA, pointB);
+        source = 'haversine';
+      }
+
+      const uncertainty = computeUncertainty(source, pointA.accuracy, pos.accuracy, distance);
+      const newSeg = {
+        id: `seg_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        text: '', images: [], date: new Date().toISOString().split('T')[0],
+        segmentFrom: pointA, segmentTo: pointB,
+        segmentDistance: distance,
+        segmentDistanceStraight: haversine(pointA, pointB),
+        segmentUncertainty: uncertainty,
+        segmentSource: source,
+        segmentRoute: routeCoords,
+      };
+      isUserEdit.current = true;
+      setLocalVisit(prev => ({ ...prev, observations: [...(prev.observations || []), newSeg] }));
+      const label = source === 'ign' ? 'route IGN' : 'vol d\'oiseau';
+      onToast?.(`Segment créé — ${fmtDist(distance)} (${label}) ${fmtUncertainty(uncertainty)}`);
+    } catch { /* toast déjà émis */ }
+    setGettingPosition(false);
+  }, [pendingPoint, gettingPosition, getPosition, onToast]);
+
+  const handlePoint = useCallback(async () => {
+    if (gettingPosition) return;
+    setGettingPosition(true);
+    try {
+      const pos = await getPosition();
+      const newPt = {
+        id: `pt_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        text: `${fmtCoord(pos.lat, pos.lng)} (±${Math.round(pos.accuracy)}m)`,
+        images: [], date: new Date().toISOString().split('T')[0],
+        pointLocation: { lat: pos.lat, lng: pos.lng },
+        pointAccuracy: Math.round(pos.accuracy),
+      };
+      isUserEdit.current = true;
+      setLocalVisit(prev => ({ ...prev, observations: [...(prev.observations || []), newPt] }));
+      onToast?.(`Point marqué — ${fmtCoord(pos.lat, pos.lng)} (±${Math.round(pos.accuracy)}m)`);
+    } catch { /* toast déjà émis */ }
+    setGettingPosition(false);
+  }, [gettingPosition, getPosition, onToast]);
+
+  const cancelPending = useCallback(() => setPendingPoint(null), []);
+
   const observations = localVisit.observations || [];
 
   // ── Export PDF ──
@@ -195,13 +335,17 @@ export default function SiteVisitDetailView({ visit, onSave, saveStatus, onToast
     gpsTracking: localVisit.gpsTracking || { coordinates: [], startTime: null, endTime: null, distance: 0 },
   }), [localVisit]);
 
-  // ObsMarkers numérotés pour la carte
+  // ObsMarkers numérotés pour la carte (les segments sont tracés à part → ignorés ici)
   const obsMarkersForMap = useMemo(() => {
     const coords = localVisit.gpsTracking?.coordinates || [];
     return observations.map((obs, idx) => {
+      if (obs.segmentFrom && obs.segmentTo) return null; // segment = ligne + départ/arrivée dédiés
       let lat = null, lng = null;
-      for (const img of (obs.images || [])) {
-        if (typeof img === 'object' && img.lat != null) { lat = img.lat; lng = img.lng; break; }
+      if (obs.pointLocation) { lat = obs.pointLocation.lat; lng = obs.pointLocation.lng; }
+      if (lat == null) {
+        for (const img of (obs.images || [])) {
+          if (typeof img === 'object' && img.lat != null) { lat = img.lat; lng = img.lng; break; }
+        }
       }
       if (lat == null && coords.length > 0) {
         const pos = Math.min(Math.floor((idx / Math.max(observations.length, 1)) * coords.length), coords.length - 1);
@@ -284,6 +428,11 @@ export default function SiteVisitDetailView({ visit, onSave, saveStatus, onToast
           />
         ) : activeSection === 'observations' && (
           <div className="space-y-2">
+            <SegmentCaptureBar
+              pendingPoint={pendingPoint} gettingPosition={gettingPosition}
+              onDepart={handleDepart} onFin={handleFin} onPoint={handlePoint} onCancel={cancelPending}
+            />
+
             {observations.map((obs, idx) => (
               <ObsCard key={obs.id} obs={obs} number={idx + 1} onTap={setEditingObs} onDelete={deleteObservation} onViewImage={setViewingImage} />
             ))}
@@ -295,9 +444,9 @@ export default function SiteVisitDetailView({ visit, onSave, saveStatus, onToast
             </button>
 
             {observations.length === 0 && (
-              <div className="text-center py-8">
+              <div className="text-center py-6">
                 <p className="text-[13px] text-gray-400">Aucune observation</p>
-                <p className="text-[11px] text-gray-300 mt-1">Appuyez sur le bouton ci-dessus pour commencer</p>
+                <p className="text-[11px] text-gray-300 mt-1">« Départ / Fin » pour un segment, ou « Ajouter » pour une note</p>
               </div>
             )}
           </div>
@@ -305,6 +454,12 @@ export default function SiteVisitDetailView({ visit, onSave, saveStatus, onToast
 
         {/* Terrain toujours monté (GPS en arrière-plan), masqué si pas actif ou si éditeur ouvert */}
         <div style={{ display: activeSection === 'terrain' && !editingObs ? 'block' : 'none' }}>
+          <div className="mb-3">
+            <SegmentCaptureBar
+              pendingPoint={pendingPoint} gettingPosition={gettingPosition}
+              onDepart={handleDepart} onFin={handleFin} onPoint={handlePoint} onCancel={cancelPending}
+            />
+          </div>
           <GpsTrackingSection
             meeting={fakeMeeting}
             manager={manager}

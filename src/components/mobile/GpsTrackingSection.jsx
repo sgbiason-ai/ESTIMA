@@ -201,6 +201,8 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
 
   const distance = totalDistance(liveCoords);
   const hasTrack = liveCoords.length > 0;
+  // La carte s'affiche aussi quand il y a des segments ou des photos géolocalisées, pas seulement un tracé.
+  const hasMapData = hasTrack || segmentLines.length > 0 || photoMarkers.length > 0;
   const coords = liveCoords;
   const currentLivePosition = isRecording && liveCoords.length > 0 ? [liveCoords[liveCoords.length - 1].lat, liveCoords[liveCoords.length - 1].lng] : null;
 
@@ -271,13 +273,15 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
       </div>
 
       {/* ── Carte (miniature ou plein écran) ── */}
-      {hasTrack && !fullscreenMap && (
+      {hasMapData && !fullscreenMap && (
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
             <span className="text-[13px] font-bold text-gray-900">Carte</span>
             <div className="flex items-center gap-2">
               <span className="text-[11px] text-gray-400">
-                {photoMarkers.length} photo{photoMarkers.length !== 1 ? 's' : ''} · {coords.length} pts
+                {photoMarkers.length} photo{photoMarkers.length !== 1 ? 's' : ''}
+                {segmentLines.length > 0 && ` · ${segmentLines.length} segment${segmentLines.length !== 1 ? 's' : ''}`}
+                {coords.length > 0 && ` · ${coords.length} pts`}
               </span>
               <button
                 onClick={() => setFullscreenMap(true)}
@@ -307,13 +311,15 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
         </div>
       )}
 
-      {hasTrack && fullscreenMap && (
+      {hasMapData && fullscreenMap && (
         <div className="fixed inset-0 z-50 bg-white flex flex-col">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 shrink-0 bg-white/80 backdrop-blur-xl">
             <span className="text-[15px] font-bold text-gray-900">Carte terrain</span>
             <div className="flex items-center gap-2">
               <span className="text-[11px] text-gray-400">
-                {photoMarkers.length} photo{photoMarkers.length !== 1 ? 's' : ''} · {coords.length} pts
+                {photoMarkers.length} photo{photoMarkers.length !== 1 ? 's' : ''}
+                {segmentLines.length > 0 && ` · ${segmentLines.length} segment${segmentLines.length !== 1 ? 's' : ''}`}
+                {coords.length > 0 && ` · ${coords.length} pts`}
               </span>
               <button
                 onClick={() => setFullscreenMap(false)}
@@ -346,7 +352,7 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
       )}
 
       {/* ── Pas de tracé ── */}
-      {!hasTrack && !isRecording && (
+      {!hasMapData && !isRecording && (
         <div className="text-center py-8">
           <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
             <Icon name="chart" size={24} color="#9ca3af" />
