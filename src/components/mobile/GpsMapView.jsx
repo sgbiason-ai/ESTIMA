@@ -342,6 +342,10 @@ function RouteOverlay({ from, to }) {
   );
 }
 
+// Un point [lat, lng] valide (protège Leaflet des coordonnées undefined/NaN,
+// ex. marqueurs de saut « break » dans un tracé importé du desktop).
+const isValidLatLng = (p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]);
+
 // ─── Composant principal ────────────────────────────────────────────────────
 
 export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMarkers = [], segmentEndpoints = [], segmentLines = [], livePosition = null, height = '100%', highlightedObs = null, onSelectObs = null, showMeasure = false }) {
@@ -360,7 +364,7 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
   const handleUserInteraction = useCallback(() => setFollowMode(false), []);
   const handleRecenter = useCallback(() => setFollowMode(true), []);
 
-  const positions = coordinates.map(c => [c.lat, c.lng]);
+  const positions = coordinates.map(c => [c.lat, c.lng]).filter(isValidLatLng);
 
   const bounds = useMemo(() => {
     const allPoints = [
@@ -369,7 +373,7 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
       ...obsMarkers.map(o => [o.lat, o.lng]),
       ...segmentEndpoints.map(p => [p.lat, p.lng]),
       ...segmentLines.flatMap(s => [s.from, s.to]),
-    ];
+    ].filter(isValidLatLng);
     if (allPoints.length === 0) return null;
     return L.latLngBounds(allPoints);
   }, [positions, photoMarkers, obsMarkers, segmentEndpoints, segmentLines]);
@@ -380,6 +384,7 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
 
   useEffect(() => {
     segmentLines.forEach((seg) => {
+      if (!isValidLatLng(seg.from) || !isValidLatLng(seg.to)) return;
       const key = `${seg.from[0]},${seg.from[1]}-${seg.to[0]},${seg.to[1]}`;
       if (fetchedRef.current.has(key)) return;
       fetchedRef.current.add(key);
@@ -420,6 +425,7 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
 
           {/* Segments mesurés (trait épais orange, route OSRM) */}
           {segmentLines.map((seg, i) => {
+            if (!isValidLatLng(seg.from) || !isValidLatLng(seg.to)) return null;
             const key = `${seg.from[0]},${seg.from[1]}-${seg.to[0]},${seg.to[1]}`;
             const routeCoords = segmentRoutes[key];
             return routeCoords
@@ -457,7 +463,7 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
           <RouteOverlay from={routeFrom} to={routeTo} />
 
           {/* Marqueurs observations (numérotés, anti-chevauchement, cliquables) */}
-          {spreadOverlapping(obsMarkers).map((o, i) => {
+          {spreadOverlapping(obsMarkers.filter(o => Number.isFinite(o?.lat) && Number.isFinite(o?.lng))).map((o, i) => {
             const isHighlighted = highlightedObs === o.number;
             const isRoutePoint = routeFrom && o.lat === routeFrom[0] && o.lng === routeFrom[1]
               || routeTo && o.lat === routeTo[0] && o.lng === routeTo[1];
@@ -485,7 +491,7 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
           })}
 
           {/* Marqueurs départ/arrivée des segments */}
-          {segmentEndpoints.map((pt, i) => (
+          {segmentEndpoints.filter(pt => Number.isFinite(pt?.lat) && Number.isFinite(pt?.lng)).map((pt, i) => (
             <Marker key={`seg-ep-${i}`} position={[pt.lat, pt.lng]}
               icon={createIcon(pt.type === 'start' ? '#22c55e' : '#ef4444', 10)}>
               <Popup>
