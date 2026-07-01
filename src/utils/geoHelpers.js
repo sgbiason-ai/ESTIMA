@@ -127,3 +127,28 @@ export async function fetchIgnRoute(from, to, retries = 2) {
   }
   return null;
 }
+
+// ─── Géocodage inverse commune ────────────────────────────────────────────────
+
+/**
+ * Commune (nom + INSEE) d'un point GPS via la Base Adresse Nationale (gratuit, France).
+ * @param {{lat:number, lng:number}} pt
+ * @returns {{ nom: string|null, insee: string|null, cp: string|null } | null}
+ */
+export async function reverseGeocodeCommune(pt, retries = 1) {
+  if (pt?.lat == null || pt?.lng == null) return null;
+  const url = `https://api-adresse.data.gouv.fr/reverse/?lon=${pt.lng}&lat=${pt.lat}&limit=1`;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        const p = (await res.json())?.features?.[0]?.properties;
+        if (p && (p.city || p.citycode)) {
+          return { nom: p.city || null, insee: p.citycode || null, cp: p.postcode || null };
+        }
+      }
+    } catch { /* retry */ }
+    if (attempt < retries) await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+  }
+  return null;
+}
