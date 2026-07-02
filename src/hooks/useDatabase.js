@@ -218,7 +218,8 @@ export const useDatabase = (user, companyId) => {
     try {
       await setDoc(dref(companyId, 'bpu', newItem.id), newItem);
       toast.success('Article ajouté à la bibliothèque.');
-    } catch {
+    } catch (error) {
+      console.error('[BPU] Ajout échoué :', error?.code, error);
       setBpu(prevBpu);
       setDatabaseVersion(v => v + 1);
       toast.error("L'article n'a pas pu être sauvegardé sur le Cloud.", { title: 'Erreur sauvegarde' });
@@ -233,10 +234,35 @@ export const useDatabase = (user, companyId) => {
     setDatabaseVersion(v => v + 1);
     try {
       await updateDoc(dref(companyId, 'bpu', id), updated);
-    } catch {
+    } catch (error) {
+      // Lien projet → bibliothèque orphelin (article supprimé de la bibliothèque,
+      // ou issu d'une base externe jamais écrite dans le Cloud) : updateDoc exige
+      // un document existant. On recrée l'article avec le même id pour préserver
+      // le lien, si on dispose d'un article complet (exigé aussi par les rules).
+      if (error?.code === 'not-found') {
+        const localItem = prevBpu.find(i => i.id === id);
+        const full = { ...(localItem || {}), ...updated, id };
+        if (full.designation && full.unit && typeof full.price === 'number') {
+          try {
+            await setDoc(dref(companyId, 'bpu', id), full);
+            setBpu(prev => prev.some(i => i.id === id) ? prev.map(i => i.id === id ? full : i) : [...prev, full]);
+            setDatabaseVersion(v => v + 1);
+            toast.success("Article recréé dans la bibliothèque (il n'y figurait plus).");
+            return;
+          } catch (e2) {
+            console.error('[BPU] Recréation échouée :', e2?.code, e2);
+          }
+        }
+      }
+      console.error('[BPU] Mise à jour échouée :', error?.code, error);
       setBpu(prevBpu);
       setDatabaseVersion(v => v + 1);
-      toast.error('Modification non sauvegardée sur le Cloud.', { title: 'Erreur sauvegarde' });
+      const msg = error?.code === 'permission-denied'
+        ? 'Droits insuffisants sur la bibliothèque (règles Firestore).'
+        : error?.code === 'invalid-argument'
+          ? 'Article trop volumineux pour le Cloud (images dans la description ?).'
+          : 'Modification non sauvegardée sur le Cloud.';
+      toast.error(msg, { title: 'Erreur sauvegarde' });
     }
   };
 
