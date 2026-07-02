@@ -6,6 +6,7 @@ import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { LocateFixed, Layers } from 'lucide-react';
+import RotatingMapFrame from '../common/RotatingMapFrame';
 
 // Fix icônes Leaflet
 delete L.Icon.Default.prototype._getIconUrl;
@@ -348,7 +349,7 @@ const isValidLatLng = (p) => Array.isArray(p) && Number.isFinite(p[0]) && Number
 
 // ─── Composant principal ────────────────────────────────────────────────────
 
-export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMarkers = [], segmentEndpoints = [], segmentLines = [], livePosition = null, height = '100%', highlightedObs = null, onSelectObs = null, showMeasure = false }) {
+export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMarkers = [], segmentEndpoints = [], segmentLines = [], livePosition = null, liveBearing = null, height = '100%', highlightedObs = null, onSelectObs = null, showMeasure = false }) {
   const [activeLayer, setActiveLayer] = useState('satellite');
   const [overlayLayer, setOverlayLayer] = useState(null);
   const [overlayOpacity, setOverlayOpacity] = useState(0.5);
@@ -359,10 +360,24 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
   const [routeFrom, setRouteFrom] = useState(null); // [lat, lng]
   const [routeTo, setRouteTo] = useState(null);
 
-  // Follow mode : la carte suit la position GPS live (désactivé dès qu'on touche la carte)
+  // Follow mode : la carte suit la position GPS live. Toucher la carte suspend le
+  // suivi, qui se ré-engage automatiquement après 10 s sans interaction (GPS voiture).
   const [followMode, setFollowMode] = useState(true);
-  const handleUserInteraction = useCallback(() => setFollowMode(false), []);
-  const handleRecenter = useCallback(() => setFollowMode(true), []);
+  const refollowTimerRef = useRef(null);
+  const handleUserInteraction = useCallback(() => {
+    setFollowMode(false);
+    clearTimeout(refollowTimerRef.current);
+    refollowTimerRef.current = setTimeout(() => setFollowMode(true), 10000);
+  }, []);
+  const handleRecenter = useCallback(() => {
+    clearTimeout(refollowTimerRef.current);
+    setFollowMode(true);
+  }, []);
+  useEffect(() => () => clearTimeout(refollowTimerRef.current), []);
+
+  // Rotation « cap vers le haut » : uniquement en suivi actif avec un cap connu,
+  // jamais pendant Mesurer/Route (les taps carte seraient décalés par la rotation CSS).
+  const mapRotation = (followMode && livePosition && liveBearing != null && !measuring && !routeMode) ? liveBearing : 0;
 
   const positions = coordinates.map(c => [c.lat, c.lng]).filter(isValidLatLng);
 
@@ -400,6 +415,7 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
     <div style={{ height, width: '100%', position: 'relative' }}>
       {/* Carte */}
       <div style={{ width: '100%', height: '100%', borderRadius: '16px', overflow: 'hidden', position: 'relative' }}>
+        <RotatingMapFrame rotation={mapRotation} style={{ position: 'absolute', inset: 0 }}>
         <MapContainer
           center={defaultCenter}
           zoom={17}
@@ -502,6 +518,7 @@ export default function GpsMapView({ coordinates = [], photoMarkers = [], obsMar
             </Marker>
           ))}
         </MapContainer>
+        </RotatingMapFrame>
 
         {/* Bouton recentrer — en bas à gauche */}
         {livePosition && (

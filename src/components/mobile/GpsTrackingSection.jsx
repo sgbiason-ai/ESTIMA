@@ -10,6 +10,7 @@ import { Maximize2, X } from 'lucide-react';
 import {
   haversine, totalDistance, accuracyColor,
   fmtDuration, fmtDist as fmtDistance,
+  bearingBetween, smoothBearing,
 } from '../../utils/geoHelpers';
 
 const GpsMapView = lazyWithReload(() => import('./GpsMapView'));
@@ -23,6 +24,8 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
   const [fullscreenMap, setFullscreenMap] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [lastAccuracy, setLastAccuracy] = useState(null);
+  const [liveBearing, setLiveBearing] = useState(null); // cap de déplacement (° depuis le nord)
+  const lastBearingPtRef = useRef(null);
   const watchIdRef = useRef(null);
   const wakeLockRef = useRef(null);
   const timerRef = useRef(null);
@@ -124,6 +127,7 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
     }
 
     // GPS watch
+    lastBearingPtRef.current = null;
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
         const point = {
@@ -133,6 +137,17 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
           accuracy: Math.round(pos.coords.accuracy * 10) / 10,
         };
         setLastAccuracy(point.accuracy);
+        // Cap de déplacement : heading GPS si dispo (en mouvement), sinon cap entre 2 fixes ≥5m
+        {
+          const h = pos.coords.heading, s = pos.coords.speed;
+          let cand = (h != null && !Number.isNaN(h) && s != null && s > 0.5) ? h : null;
+          const lastPt = lastBearingPtRef.current;
+          if (lastPt == null || haversine(lastPt, point) >= 5) {
+            if (cand == null && lastPt) cand = bearingBetween(lastPt, point);
+            lastBearingPtRef.current = point;
+          }
+          if (cand != null) setLiveBearing(prev => smoothBearing(prev, cand));
+        }
         setLiveCoords(prev => {
           // Filtre distance min 5m — ignorer si trop proche du dernier point
           if (prev.length > 0) {
@@ -305,6 +320,7 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
               segmentEndpoints={segmentEndpoints}
               segmentLines={segmentLines}
               livePosition={currentLivePosition}
+              liveBearing={liveBearing}
               height="50vh"
             />
           </Suspense>
@@ -343,6 +359,7 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
                 segmentEndpoints={segmentEndpoints}
                 segmentLines={segmentLines}
                 livePosition={currentLivePosition}
+                liveBearing={liveBearing}
                 height="100%"
                 showMeasure
               />

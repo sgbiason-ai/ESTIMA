@@ -16,8 +16,9 @@ import {
 import {
   haversine, totalDistance, accuracyColor, fmtDuration,
   fmtDist, fmtUncertainty, fmtCoord, computeUncertainty,
-  getCurrentPosition, fetchIgnRoute,
+  getCurrentPosition, fetchIgnRoute, bearingBetween, smoothBearing,
 } from '../utils/geoHelpers';
+import RotatingMapFrame from '../components/common/RotatingMapFrame';
 import {
   TILE_LAYERS, createDot, createSegmentIcon, createPointIcon,
   pendingIcon, startGpsIcon, endGpsIcon,
@@ -120,11 +121,32 @@ export default function TeslaModeView({ user, companyId, onExit }) {
   // Map ref (pour fallback position = centre de la carte)
   const mapRef = useRef(null);
 
-  // Follow mode : la carte suit la position GPS (désactivé dès qu'on touche la carte)
+  // Follow mode : la carte suit la position GPS. Toucher la carte suspend le suivi,
+  // qui se ré-engage automatiquement après 10 s sans interaction (GPS voiture).
   const [followMode, setFollowMode] = useState(true);
+  const refollowTimerRef = useRef(null);
 
-  // Drag/zoom = navigation libre, follow désactivé
-  const handleUserInteraction = useCallback(() => setFollowMode(false), []);
+  // Cap de déplacement (° depuis le nord) — pour l'orientation « cap vers le haut »
+  const [travelBearing, setTravelBearing] = useState(null);
+  const lastBearingPtRef = useRef(null);
+  const updateBearingFromFix = useCallback((pos, point) => {
+    const h = pos.coords.heading, s = pos.coords.speed;
+    let cand = (h != null && !Number.isNaN(h) && s != null && s > 0.5) ? h : null;
+    const lastPt = lastBearingPtRef.current;
+    if (lastPt == null || haversine(lastPt, point) >= 5) {
+      if (cand == null && lastPt) cand = bearingBetween(lastPt, point);
+      lastBearingPtRef.current = point;
+    }
+    if (cand != null) setTravelBearing(prev => smoothBearing(prev, cand));
+  }, []);
+
+  // Drag/zoom = navigation libre, follow suspendu puis ré-engagé après 10 s
+  const handleUserInteraction = useCallback(() => {
+    setFollowMode(false);
+    clearTimeout(refollowTimerRef.current);
+    refollowTimerRef.current = setTimeout(() => setFollowMode(true), 10000);
+  }, []);
+  useEffect(() => () => clearTimeout(refollowTimerRef.current), []);
 
   // Ref pour bounds (synchronisé via useEffect après bounds useMemo)
   const boundsRef = useRef(null);
@@ -132,6 +154,7 @@ export default function TeslaModeView({ user, companyId, onExit }) {
   // Bouton recentrer : si suivi actif → stop ; si pas de suivi → zoom global sur toutes les obs + trace
   const handleRecenter = useCallback(() => {
     if (!mapRef.current) return;
+    clearTimeout(refollowTimerRef.current); // choix explicite → pas de ré-engagement auto
     if (followMode) {
       setFollowMode(false);
       return;
@@ -142,7 +165,7 @@ export default function TeslaModeView({ user, companyId, onExit }) {
   }, [followMode]);
 
   // Re-engager suivi GPS (seulement visible quand enregistrement + pas en suivi)
-  const handleFollowGps = useCallback(() => setFollowMode(true), []);
+  const handleFollowGps = useCallback(() => { clearTimeout(refollowTimerRef.current); setFollowMode(true); }, []);
 
   // Segments (observations)
   const [segments, setSegments] = useState([]);
@@ -394,11 +417,13 @@ export default function TeslaModeView({ user, companyId, onExit }) {
     const ref = doc(db, 'companies', companyId, 'site_visits', activeVisit.id);
     updateDoc(ref, { 'gpsTracking.startTime': new Date().toISOString() }).catch(() => {});
 
+    lastBearingPtRef.current = null;
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
         const point = { lat: pos.coords.latitude, lng: pos.coords.longitude, timestamp: new Date().toISOString(), accuracy: Math.round(pos.coords.accuracy * 10) / 10 };
         if (gpsBreakNextRef.current) { point._break = true; gpsBreakNextRef.current = false; }
         setLastAccuracy(point.accuracy);
+        updateBearingFromFix(pos, point);
         setLiveCoords(prev => {
           // Filtre distance min 5m — ignorer si trop proche du dernier point (sauf break = nouveau segment)
           if (!point._break && prev.length > 0) {
@@ -416,7 +441,7 @@ export default function TeslaModeView({ user, companyId, onExit }) {
       () => {},
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
     );
-  }, [companyId, activeVisit?.id, liveCoords.length]);
+  }, [companyId, activeVisit?.id, liveCoords.length, updateBearingFromFix]);
 
   const stopGps = useCallback(async () => {
     setIsRecording(false);
@@ -470,6 +495,7 @@ export default function TeslaModeView({ user, companyId, onExit }) {
             const point = { lat: pos.coords.latitude, lng: pos.coords.longitude, timestamp: new Date().toISOString(), accuracy: Math.round(pos.coords.accuracy * 10) / 10 };
             if (gpsBreakNextRef.current) { point._break = true; gpsBreakNextRef.current = false; }
             setLastAccuracy(point.accuracy);
+            updateBearingFromFix(pos, point);
             setLiveCoords(prev => {
               if (!point._break && prev.length > 0 && haversine(prev[prev.length - 1], point) < 5) return prev;
               const updated = [...prev, point];
@@ -505,6 +531,9 @@ export default function TeslaModeView({ user, companyId, onExit }) {
   const gpsCoords = isRecording ? liveCoords : (activeVisit?.gpsTracking?.coordinates || []);
   const gpsPositions = gpsCoords.map(c => [c.lat, c.lng]);
   const currentGpsPosition = gpsPositions.length > 0 ? gpsPositions[gpsPositions.length - 1] : null;
+
+  // Rotation « cap vers le haut » (GPS voiture) : suivi actif + enregistrement + cap connu
+  const mapRotation = (followMode && isRecording && travelBearing != null) ? travelBearing : 0;
 
   // Découper le tracé GPS en segments séparés aux points _break (pas de ligne entre arrêt/reprise)
   const gpsSegments = useMemo(() => {
@@ -625,6 +654,7 @@ export default function TeslaModeView({ user, companyId, onExit }) {
 
       {/* ── Carte plein ecran ── */}
       <div className="flex-1 relative min-h-0">
+        <RotatingMapFrame rotation={mapRotation} style={{ position: 'absolute', inset: 0 }}>
         <MapContainer center={defaultCenter} zoom={17} style={{ height: '100%', width: '100%' }} zoomControl={false} attributionControl={false}>
           <TileLayer url={TILE_LAYERS[activeLayer].url} maxZoom={TILE_LAYERS[activeLayer].maxZoom} />
           <DynamicTileLayer layerKey={activeLayer} />
@@ -687,6 +717,7 @@ export default function TeslaModeView({ user, companyId, onExit }) {
           {gpsPositions.length > 0 && <Marker position={gpsPositions[0]} icon={startGpsIcon} />}
           {gpsPositions.length > 1 && <Marker position={gpsPositions[gpsPositions.length - 1]} icon={endGpsIcon} />}
         </MapContainer>
+        </RotatingMapFrame>
 
         {/* ── Overlay controls — top (Tesla dark glass) ── */}
         <div className="absolute top-3 left-3 right-3 z-[1000] flex items-center justify-between pointer-events-none">

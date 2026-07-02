@@ -27,6 +27,22 @@ export const totalDistance = (coords) => {
   return d;
 };
 
+/** Cap géographique (° horaire depuis le nord) du point a vers le point b */
+export const bearingBetween = (a, b) => {
+  const toRad = (x) => (x * Math.PI) / 180;
+  const φ1 = toRad(a.lat), φ2 = toRad(b.lat), Δλ = toRad(b.lng - a.lng);
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+};
+
+/** Lissage angulaire (gère le passage 359°→1°) — alpha ∈ ]0,1], 1 = pas de lissage */
+export const smoothBearing = (prev, next, alpha = 0.35) => {
+  if (prev == null) return next;
+  const d = ((next - prev + 540) % 360) - 180;
+  return (prev + alpha * d + 360) % 360;
+};
+
 /** Découpe un tableau de coordonnées avec des {break:true} en segments continus [[lat,lng], …] */
 export const splitTraceSegments = (coords) => {
   const segs = [];
