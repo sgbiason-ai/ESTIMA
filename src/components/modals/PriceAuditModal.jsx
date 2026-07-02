@@ -3,7 +3,7 @@ import React, { useMemo, useState } from 'react';
 import {
   X, Search, AlertTriangle, CheckCircle2, ArrowRightLeft,
   RotateCcw, RefreshCw, Filter, TrendingUp, TrendingDown, Minus,
-  ChevronDown, ChevronRight, Info
+  ChevronDown, ChevronRight, Info, FileDown, Loader2
 } from 'lucide-react';
 import { formatPrice } from '../../utils/helpers';
 
@@ -12,12 +12,13 @@ import { formatPrice } from '../../utils/helpers';
    Possibilité de rétablir un ou tous les prix depuis la BPU.
    ════════════════════════════════════════════════════════════════ */
 
-const PriceAuditModal = ({ show, onClose, project, allBpuItems, onRestorePrice, onRestoreAllPrices }) => {
+const PriceAuditModal = ({ show, onClose, project, allBpuItems, onRestorePrice, onRestoreAllPrices, branding = null }) => {
   const [search, setSearch] = useState('');
   const [filterMode, setFilterMode] = useState('all'); // 'all' | 'diff' | 'missing' | 'match'
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [expandedChapters, setExpandedChapters] = useState(new Set());
   const [confirmRestoreAll, setConfirmRestoreAll] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // ── Aplatir tous les items du projet avec leur chemin ──
   const auditData = useMemo(() => {
@@ -143,6 +144,29 @@ const PriceAuditModal = ({ show, onClose, project, allBpuItems, onRestorePrice, 
     }
     setConfirmRestoreAll(false);
     setSelectedIds(new Set());
+  };
+
+  // Export PDF fidèle à l'affichage (filtre + recherche actifs). Générateur
+  // chargé à la demande (jsPDF hors du chemin critique).
+  const handleExportPdf = async () => {
+    if (exporting || filtered.length === 0) return;
+    setExporting(true);
+    try {
+      const { generatePriceAuditPdf } = await import('../../utils/pdf/pdfPriceAuditGenerator');
+      await generatePriceAuditPdf({
+        project,
+        rows: filtered,
+        stats,
+        totalImpact,
+        filterMode,
+        search,
+        branding,
+      });
+    } catch (e) {
+      console.error('[AuditPrix] Export PDF échoué :', e);
+    } finally {
+      setExporting(false);
+    }
   };
 
   const toggleChapter = (key) => {
@@ -441,12 +465,23 @@ const PriceAuditModal = ({ show, onClose, project, allBpuItems, onRestorePrice, 
               <span className="ml-2 text-emerald-600 font-bold">{selectedIds.size} sélectionné{selectedIds.size > 1 ? 's' : ''}</span>
             )}
           </div>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-[11px] font-bold uppercase tracking-wide border border-slate-300 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"
-          >
-            Fermer
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportPdf}
+              disabled={exporting || filtered.length === 0}
+              title="Exporter en PDF ce qui est affiché (filtre et recherche appliqués)"
+              className="flex items-center gap-1.5 px-4 py-2 text-[11px] font-bold uppercase tracking-wide bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {exporting ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />}
+              Exporter PDF
+            </button>
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-[11px] font-bold uppercase tracking-wide border border-slate-300 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"
+            >
+              Fermer
+            </button>
+          </div>
         </div>
 
         {/* ── Confirm restore all ── */}

@@ -1109,6 +1109,7 @@ const ProjectView = ({
         allBpuItems={allBpuItems}
         onRestorePrice={handleRestorePrice}
         onRestoreAllPrices={handleRestoreAllPrices}
+        branding={masterBranding}
       />
       <PriceConsistencyModal
         show={showPriceCheck}
