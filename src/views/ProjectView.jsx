@@ -7,7 +7,7 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Plus, Trash2, GripVertical, Layers, AlertTriangle, Target, ChevronDown, ChevronRight, Lock, Unlock, Eye } from 'lucide-react';
 
 import { ProjectContext } from '../context/ProjectContext';
-import { EditableTitle, OptionToggle, PseModeControl, PseDescriptionEditor } from '../components/ProjectUI';
+import { EditableTitle, OptionToggle, PseModeControl, PseDescriptionEditor, ChapterCommentButton, ChapterCommentEditor } from '../components/ProjectUI';
 import ItemList from '../components/ItemList';
 import { formatPrice, generateId } from '../utils/helpers';
 import { toast, confirm } from '../utils/globalUI';
@@ -784,6 +784,16 @@ const ProjectView = ({
     });
   };
 
+  // ── Commentaires de chapitre : panneaux ouverts (état d'affichage, non persisté) ──
+  const [commentOpenIds, setCommentOpenIds] = useState(() => new Set());
+  const toggleCommentOpen = (id) => {
+    setCommentOpenIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   // ── Navigation vers une occurrence d'un prix répété ───────────────────────
   // Déplie les chapitres/sous-chapitres ancêtres si besoin, puis scroll + flash.
   const revealAndFlashItem = (itemId) => {
@@ -1016,6 +1026,13 @@ const ProjectView = ({
                                         </span>
                                       );
                                     })()}
+                                    {(!isReadOnly || chap.comment) && (
+                                      <ChapterCommentButton
+                                        hasComment={!!chap.comment}
+                                        onClick={() => toggleCommentOpen(chap.id)}
+                                        className={chap.isOption ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-200' : 'text-white/50 hover:text-white hover:bg-white/10'}
+                                      />
+                                    )}
                                     {!isReadOnly && (
                                       <button onClick={(e) => { e.stopPropagation(); addSubChapter(chap.id); }} className={`p-1.5 rounded-md ${chap.isOption ? 'hover:bg-slate-200 text-slate-500' : 'hover:bg-white/20 text-white'}`} title="Ajouter un sous-chapitre"><Plus size={16} /></button>
                                     )}
@@ -1025,6 +1042,13 @@ const ProjectView = ({
                                   <PseDescriptionEditor
                                     value={chap.pseDescription || ''}
                                     onChange={(html) => updateProjectItem('root', chap.id, 'pseDescription', html)}
+                                    disabled={isReadOnly}
+                                  />
+                                )}
+                                {!isCollapsed && commentOpenIds.has(chap.id) && (
+                                  <ChapterCommentEditor
+                                    value={chap.comment || ''}
+                                    onSave={(val) => updateProjectItem('root', chap.id, 'comment', val)}
                                     disabled={isReadOnly}
                                   />
                                 )}

@@ -4,7 +4,7 @@ import { Draggable, Droppable } from '@hello-pangea/dnd';
 import { GripVertical, Layers, Trash2, Plus, ShieldCheck, AlertCircle, AlertTriangle, FunctionSquare, Check, Boxes, Pencil, Target, Lock, Unlock, ChevronDown, ChevronRight, Link2 } from 'lucide-react';
 
 import { ProjectContext } from '../context/ProjectContext';
-import { EditableTitle, FormattedInput, OptionToggle, PseModeControl, PseDescriptionEditor } from './ProjectUI';
+import { EditableTitle, FormattedInput, OptionToggle, PseModeControl, PseDescriptionEditor, ChapterCommentButton, ChapterCommentEditor } from './ProjectUI';
 import { formatPrice, cleanText, normalizeUnitSymbol } from '../utils/helpers';
 import { safeEvalMathExpr } from '../utils/projectCalculations';
 
@@ -740,6 +740,8 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
   })();
   const [surfaceInput, setSurfaceInput] = useState(String(surfaceVal || ''));
   const [surfaceFocused, setSurfaceFocused] = useState(false);
+  // Panneau commentaire du sous-chapitre (état d'affichage local, replié par défaut).
+  const [commentOpen, setCommentOpen] = useState(false);
   useEffect(() => { setSurfaceInput(surfaceVal ? String(surfaceVal) : ''); }, [surfaceVal]);
   const commitSurface = () => {
     const n = Number(String(surfaceInput).replace(',', '.')) || 0;
@@ -847,6 +849,13 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
                         onChange={onPseChange}
                       />
                     )}
+                    {(!isReadOnly || el.comment) && (
+                      <ChapterCommentButton
+                        hasComment={!!el.comment}
+                        onClick={() => setCommentOpen((o) => !o)}
+                        className="shrink-0 text-slate-400 hover:text-blue-600 hover:bg-black/5"
+                      />
+                    )}
                     {collapsed && (
                       <span className="shrink-0 text-[9px] font-bold text-slate-500 bg-white/70 border border-slate-200 px-1.5 py-0.5 rounded-full">
                         {nbLines} ligne{nbLines > 1 ? 's' : ''}
@@ -930,6 +939,14 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
                   <PseDescriptionEditor
                     value={el.pseDescription || ''}
                     onChange={(html) => onUpdate(parentId, el.id, 'pseDescription', html)}
+                    disabled={isReadOnly}
+                  />
+                )}
+
+                {!collapsed && commentOpen && (
+                  <ChapterCommentEditor
+                    value={el.comment || ''}
+                    onSave={(val) => onUpdate(parentId, el.id, 'comment', val)}
                     disabled={isReadOnly}
                   />
                 )}

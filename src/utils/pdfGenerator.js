@@ -142,6 +142,8 @@ const collectData = (nodes, isParentOption, level, mode, projectRefMap, currentQ
         const numberedTitle = chapNum ? `${chapNum}. ${titleStr}` : titleStr;
         const displayTitle = level > 0 ? `  ${numberedTitle}` : numberedTitle;
         rows.push({ type: 'HEADER', designation: displayTitle, level });
+        // Commentaire de chapitre : ligne italique sous le titre (DQE + pages PSE).
+        if (node.comment) rows.push({ type: 'COMMENT', designation: node.comment, level });
         rows = rows.concat(childData.rows);
         rows.push({ type: 'SUBTOTAL', designation: `SOUS-TOTAL ${numberedTitle.trim()}`, total: childData.total, level });
         total += childData.total;
@@ -507,6 +509,7 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
           head: [["N°", "DÉSIGNATION DES OUVRAGES", "U", "QTÉ", "P.U. HT", "TOTAL HT"]],
           body: allDetailRows.map(row => {
             if (row.type === 'HEADER') return [safeRender(row.designation), '', '', '', '', ''];
+            if (row.type === 'COMMENT') return [safeRender(row.designation), '', '', '', '', ''];
             if (row.type === 'SUBTOTAL') return ['', safeRender(row.designation), '', '', '', isDQE ? '' : cleanFormat(row.total) + " €"];
             const displayQty = row.qty === 0 ? "PM" : row.qty;
             const displayPrice = isDQE ? '' : cleanFormat(row.price);
@@ -521,6 +524,12 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
                 data.cell.styles.halign = 'left'; data.cell.colSpan = 6; data.cell.styles.fontStyle = 'bold';
                 data.cell.styles.cellPadding = { left: 5, top: 2, bottom: 2 };
                 if (row.level === 0) { data.cell.styles.fillColor = THEME.chapterBg; data.cell.styles.fontSize = 8; }
+              }
+              if (row.type === 'COMMENT') {
+                data.cell.styles.halign = 'left'; data.cell.colSpan = 6;
+                data.cell.styles.fontStyle = 'italic'; data.cell.styles.fontSize = 6.5;
+                data.cell.styles.textColor = THEME.lightText;
+                data.cell.styles.cellPadding = { left: 8, top: 0.5, bottom: 2, right: 4 };
               }
               if ((data.column.index === 3 || data.column.index === 5) && data.cell.raw === "PM") {
                 data.cell.styles.fontStyle = 'italic'; data.cell.styles.textColor = THEME.lightText;
@@ -601,6 +610,7 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
               pseData._filteredRows = filteredPseRows;
               return filteredPseRows.map(row => {
                 if (row.type === 'HEADER') return [safeRender(row.designation), '', '', '', '', ''];
+                if (row.type === 'COMMENT') return [safeRender(row.designation), '', '', '', '', ''];
                 if (row.type === 'SUBTOTAL') return ['', safeRender(row.designation), '', '', '', isDQE ? '' : cleanFormat(row.total) + " €"];
                 const dQty = row.qty === 0 ? "PM" : row.qty;
                 const dPrice = isDQE ? '' : cleanFormat(row.price);
@@ -616,6 +626,12 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
                   data.cell.styles.halign = 'left'; data.cell.colSpan = 6; data.cell.styles.fontStyle = 'bold';
                   data.cell.styles.cellPadding = { left: 5, top: 2, bottom: 2 };
                   if (row.level === 0) data.cell.styles.fillColor = THEME.pseBg;
+                }
+                if (row.type === 'COMMENT') {
+                  data.cell.styles.halign = 'left'; data.cell.colSpan = 6;
+                  data.cell.styles.fontStyle = 'italic'; data.cell.styles.fontSize = 6.5;
+                  data.cell.styles.textColor = THEME.lightText;
+                  data.cell.styles.cellPadding = { left: 8, top: 0.5, bottom: 2, right: 4 };
                 }
                 if (row.type === 'SUBTOTAL') {
                   data.cell.styles.fontStyle = 'bold';

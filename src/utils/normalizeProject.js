@@ -91,6 +91,9 @@ function normalizeNode(node) {
   if (node.isOption && node.pseDescription) {
     chapter.pseDescription = str(node.pseDescription);
   }
+  // Commentaire de chapitre (texte simple) : affiché sous le titre, repris dans
+  // les exports client (DQE PDF, Excel).
+  if (node.comment) chapter.comment = str(node.comment);
   // Sous-chapitre "bloc" (ouvrage composite) : conserver unité + surface (Qté/tranches).
   if (node.isBloc) {
     chapter.isBloc = true;

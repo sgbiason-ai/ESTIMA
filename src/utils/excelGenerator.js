@@ -242,6 +242,15 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
         }
         rowHeader.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
         if (level > 0) rowHeader.getCell(2).alignment = { horizontal: 'left', indent: 2 };
+        // Commentaire de chapitre : ligne italique fusionnée (B→F) sous le titre.
+        if (node.comment) {
+          const rowComment = ws.addRow(['', cleanText(node.comment), '', '', '', '']);
+          ws.mergeCells(`B${rowComment.number}:F${rowComment.number}`);
+          const commentCell = rowComment.getCell(2);
+          commentCell.font = { name: 'Aptos', size: 9, italic: true, color: { argb: 'FF6B7280' } };
+          commentCell.alignment = { horizontal: 'left', vertical: 'top', wrapText: true, indent: 1 };
+          for (let c = 1; c <= 6; c++) rowComment.getCell(c).border = borders.thin;
+        }
         const startChildRow = ws.lastRow.number + 1;
         processNodes(node.children, ws, qtyMap, level + 1, mode, isEffectiveOption, null, _includePM, cellRefMap);
         const endChildRow = ws.lastRow.number;

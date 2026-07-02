@@ -41,7 +41,7 @@ export default function DQEView({ project, calcHook, tranchesHook }) {
       });
 
       if (lignes.length > 0) {
-        chapters.push({ nom: node.title || 'Sans titre', parents, lignes, sousTotal });
+        chapters.push({ nom: node.title || 'Sans titre', parents, lignes, sousTotal, commentaire: node.comment || '' });
         total += sousTotal;
       }
 
@@ -112,6 +112,9 @@ export default function DQEView({ project, calcHook, tranchesHook }) {
                   </div>
                 )}
                 <div className="text-[13px] font-bold text-gray-900 uppercase">{chap.nom}</div>
+                {chap.commentaire && (
+                  <div className={`text-[11px] italic text-gray-700 mt-0.5 whitespace-pre-wrap ${isOpen ? '' : 'line-clamp-2'}`}>{chap.commentaire}</div>
+                )}
                 <div className="text-[11px] text-gray-700 mt-0.5">{chap.lignes.length} ligne{chap.lignes.length > 1 ? 's' : ''} • {pct}%</div>
               </div>
               <span className="text-sm font-extrabold text-gray-900">{fmt(chap.sousTotal)}</span>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, X, ArrowLeftRight, ChevronDown, Search, AlertTriangle, FileText } from 'lucide-react';
+import { Check, X, ArrowLeftRight, ChevronDown, Search, AlertTriangle, FileText, MessageSquare } from 'lucide-react';
 import RichTextEditor from './common/RichTextEditor';
 
 // --- LE COMPOSANT MANQUANT (A AJOUTER) ---
@@ -288,6 +288,48 @@ export const PseDescriptionEditor = ({ value, onChange, disabled = false }) => {
             </div>
           )}
         </div>
+      )}
+    </div>
+  );
+};
+
+// Bouton 💬 d'en-tête de chapitre/sous-chapitre : ouvre/ferme le panneau commentaire.
+// Pastille ambre = un commentaire est renseigné (visible même panneau fermé).
+export const ChapterCommentButton = ({ hasComment, onClick, className = '' }) => (
+  <button
+    type="button"
+    onClick={(e) => { e.stopPropagation(); onClick(); }}
+    className={`relative p-1 rounded-md transition-colors ${className}`}
+    title="Commentaire du chapitre — repris dans les exports (PDF, Excel)"
+  >
+    <MessageSquare size={15} />
+    {hasComment && <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-amber-400" />}
+  </button>
+);
+
+// Panneau commentaire de chapitre : texte simple multiligne, commit au blur
+// (évite un re-render de l'arbre à chaque frappe).
+export const ChapterCommentEditor = ({ value, onSave, disabled = false }) => {
+  const [draft, setDraft] = useState(value || '');
+  useEffect(() => { setDraft(value || ''); }, [value]);
+
+  return (
+    <div className="ml-8 mr-3 mt-1.5 mb-2" onClick={(e) => e.stopPropagation()}>
+      {disabled ? (
+        value ? (
+          <p className="text-[11px] text-slate-700 bg-slate-50 border border-slate-200 rounded-lg p-2.5 whitespace-pre-wrap leading-relaxed">{value}</p>
+        ) : (
+          <p className="text-[11px] italic text-slate-400 px-1">Aucun commentaire.</p>
+        )
+      ) : (
+        <textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => { if (draft !== (value || '')) onSave(draft); }}
+          placeholder="Commentaire du chapitre — repris dans les exports (PDF, Excel)…"
+          rows={2}
+          className="w-full text-[11px] text-slate-700 bg-slate-50 border border-slate-200 rounded-lg p-2.5 leading-relaxed outline-none resize-y min-h-[52px] focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 placeholder:italic placeholder:text-slate-400"
+        />
       )}
     </div>
   );
