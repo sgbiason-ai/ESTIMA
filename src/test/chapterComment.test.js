@@ -60,14 +60,14 @@ describe('commentaires de chapitre (fumée)', () => {
     expect(res.blob).toBeInstanceOf(Blob);
     expect(res.blob.size).toBeGreaterThan(800);
     // Flux jsPDF non compressés : le texte est lisible dans les octets du PDF.
-    const raw = Buffer.from(await res.blob.arrayBuffer()).toString('latin1');
+    const raw = new TextDecoder('latin1').decode(await res.blob.arrayBuffer());
     expect(raw).toContain('ZZCOMMENTRACINE');
     expect(raw).toContain('ZZCOMMENTSOUSCHAP');
   });
 
   it("l'Excel contient une ligne commentaire fusionnée sous chaque titre", async () => {
     // Env node : stub minimal de document pour cleanText (strip HTML via DOM en navigateur).
-    global.document = {
+    globalThis.document = {
       createElement: () => {
         let html = '';
         return {
