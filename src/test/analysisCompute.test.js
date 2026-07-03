@@ -12,6 +12,8 @@ import {
   getEffectiveConclusion,
   isConclusionNonRegular,
   isRegularizedAfterNego,
+  fuzzyPrefixScore,
+  findBestPrefixMatch,
 } from '../utils/analysisCompute';
 
 // ── scoreOffer : primitif de notation partagé desktop + mobile ──────────────
@@ -400,5 +402,61 @@ describe('computeOABThreshold', () => {
     const values = [100, 110, 120, 500];
     expect(computeOABThreshold(values)).toBe(computeOABDetail(values).threshold);
     expect(computeOABThreshold([])).toBe(0);
+  });
+});
+
+// ── fuzzyPrefixScore / findBestPrefixMatch — matching tolérant des import Excel ──
+// Bug prod (marché VRD Peyrole/Eurovia) : "Couche d'accrochage" (DQE base) et
+// "Couche d'accrochage DE NUIT" (variante technique, prix distinct) étaient
+// fusionnés à tort par l'ancien fallback préfixe (startsWith croisé, premier
+// trouvé). Le score gradué doit rejeter ce cas tout en gardant la tolérance
+// aux vraies troncatures OCR/typos.
+describe('fuzzyPrefixScore', () => {
+  it('rejette un qualificatif sensible même avec un préfixe commun (bug couche d\'accrochage)', () => {
+    expect(fuzzyPrefixScore('COUCHE DACCROCHAGE', 'COUCHE DACCROCHAGE DE NUIT')).toBe(0);
+  });
+  it('rejette "VARIANTE" comme qualificatif sensible', () => {
+    expect(fuzzyPrefixScore('ENROBE BBSG 0 10 NOIR', 'ENROBE BBSG 0 10 NOIR VARIANTE')).toBe(0);
+  });
+  it('rejette "RENFORCEE" comme qualificatif sensible', () => {
+    expect(fuzzyPrefixScore('TRANCHEE COMMUNE', 'TRANCHEE COMMUNE RENFORCEE')).toBe(0);
+  });
+  it('tolère une troncature triviale de fin de chaîne (tail <= 4 caractères)', () => {
+    expect(fuzzyPrefixScore('BORDURE T2 BETON', 'BORDURE T2 BETO')).toBeGreaterThan(0);
+    expect(fuzzyPrefixScore('REGARD DE VISITE 1000', 'REGARD DE VISITE 1000 EP')).toBeGreaterThan(0);
+  });
+  it('tolère un complément de contexte court sans qualificatif sensible', () => {
+    expect(fuzzyPrefixScore('GRAVES NON TRAITEES 0 80', 'GRAVES NON TRAITEES 0 80 POUR VOIRIE')).toBeGreaterThan(0);
+  });
+  it('rejette un complément de contexte trop long (> 15 caractères)', () => {
+    expect(fuzzyPrefixScore('DEPOSE BORDURE EXISTANTE', 'DEPOSE BORDURE EXISTANTE ET EVACUATION DECHETTERIE')).toBe(0);
+  });
+  it('rejette deux désignations sans préfixe commun', () => {
+    expect(fuzzyPrefixScore('ENROBE BBSG', 'BORDURE T2')).toBe(0);
+  });
+  it('est robuste aux entrées vides', () => {
+    expect(fuzzyPrefixScore('', 'COUCHE DACCROCHAGE')).toBe(0);
+    expect(fuzzyPrefixScore('COUCHE DACCROCHAGE', '')).toBe(0);
+  });
+});
+
+describe('findBestPrefixMatch', () => {
+  it('choisit le candidat au score le plus haut (tail le plus court), pas le premier inséré dans le Map', () => {
+    // Les deux clés sont des préfixes valides de la ligne importée ; la clé au
+    // tail le plus court (match le plus proche) doit gagner, même insérée en
+    // second — l'ancien fallback "premier trouvé" aurait pu retenir l'autre.
+    const map = new Map([
+      ['ENROBE BBSG 0 10 EP', 'id_moins_proche'],   // tail " 6CM" (4 car.) → score 96
+      ['ENROBE BBSG 0 10 EP 6C', 'id_plus_proche'], // tail "M" (1 car.) → score 99
+    ]);
+    expect(findBestPrefixMatch('ENROBE BBSG 0 10 EP 6CM', map)).toBe('id_plus_proche');
+  });
+  it('retourne null si aucun candidat ne dépasse le seuil de tolérance', () => {
+    const map = new Map([['BORDURE T2', 'id_1'], ['ENROBE BBSG', 'id_2']]);
+    expect(findBestPrefixMatch('COUCHE DACCROCHAGE', map)).toBe(null);
+  });
+  it('retrouve un candidat tronqué de quelques caractères', () => {
+    const map = new Map([['ENROBE BBSG 0 10 EP 6CM', 'id_1']]);
+    expect(findBestPrefixMatch('ENROBE BBSG 0 10 EP 6C', map)).toBe('id_1');
   });
 });

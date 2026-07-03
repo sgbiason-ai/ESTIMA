@@ -10,7 +10,7 @@ import { NON_REGULAR_STATUSES } from '../components/rao/RaoConstants';
 import { buildTheme as _buildTheme } from './pdf/buildTheme';
 import { getCurrentPhaseCode } from './phaseModel';
 import { computeVatBreakdown } from './financeFormat';
-import { scoreOffer, computePriceReference, getEffectiveOffers, getEffectiveVariantOffers, getVariantEffectiveTotal, getCompanyRabaisPct, getEffectiveConclusion, isRegularizedAfterNego } from './analysisCompute';
+import { scoreOffer, computePriceReference, getEffectiveOffers, getEffectiveVariantOffers, getEffectiveVariantNewItems, getVariantEffectiveTotal, getCompanyRabaisPct, getEffectiveConclusion, isRegularizedAfterNego } from './analysisCompute';
 import { stampPdfCredit } from './estimaCredit';
 
 // ─── COULEUR PRIMAIRE RAO : VERT PAPYRUS ────────────────────────────────────
@@ -1731,7 +1731,7 @@ export const generateRaoPDF = async (optionsParams) => {
             offers: getEffectiveVariantOffers(c, v, negoActive ? 'nego' : 'initial'),
             quantities: v.quantities || {},
             removedIds: new Set((v.removedItems || []).map(it => it.itemId)),
-            newItems: v.newItems || [],
+            newItems: getEffectiveVariantNewItems(v, negoActive ? 'nego' : 'initial'),
             irregular: !!vConcl,
             irregularLabel: vConcl,
             rabaisPct,
@@ -2116,8 +2116,9 @@ export const generateRaoPDF = async (optionsParams) => {
             y = tmpY + justifH + 4;
           }
 
-          // Articles ajoutés (newItems)
-          const newItems = (v.newItems || []).filter(it => Number(it.qty || 0) > 0);
+          // Articles ajoutés (newItems) — prix négociés appliqués en phase après négo
+          const newItems = getEffectiveVariantNewItems(v, negoActive ? 'nego' : 'initial')
+            .filter(it => Number(it.qty || 0) > 0);
           if (newItems.length > 0) {
             doc.setFont('Helvetica', 'bold');
             doc.setFontSize(8);

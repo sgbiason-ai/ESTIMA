@@ -7,7 +7,7 @@ import { db as fireDb } from '../../firebase';
 import Icon from './Icon';
 import { fmt, fmtShort } from './formatters';
 import { flattenItems } from './helpers';
-import { scoreOffer, computeOABThreshold, computeChaptersData, computeAnalysisStats, getVariantEffectiveTotal, getEffectiveConclusion } from '../../utils/analysisCompute';
+import { scoreOffer, computeOABThreshold, computeChaptersData, computeAnalysisStats, getVariantEffectiveTotal, getEffectiveConclusion, getEffectiveOffers, getEffectiveVariantOffers, getEffectiveVariantNewItems } from '../../utils/analysisCompute';
 import { computeVatBreakdown } from '../../utils/financeFormat';
 import { NON_REGULAR_STATUSES } from '../rao/RaoConstants';
 
@@ -749,11 +749,12 @@ export default function RAOView({ project, companyId, calcHook }) {
       {/* ═══ ONGLET DÉTAIL ═══ */}
       {tab === 'detail' && (() => {
         // ── Liste plate base + variantes pour le sélecteur ──
+        const detailBasis = scoringConfig?.basis === 'nego' ? 'nego' : 'initial';
         const detailEntries = [];
         companies.forEach((c, ci) => {
           detailEntries.push({
             key: c.id, kind: 'base', companyId: c.id, companyIndex: ci,
-            label: c.name, offers: c.offers || {}, quantities: {},
+            label: c.name, offers: getEffectiveOffers(c, detailBasis), quantities: {},
             removedIds: new Set(), newItems: [],
           });
           (c.variants || []).forEach((v, vi) => {
@@ -761,10 +762,10 @@ export default function RAOView({ project, companyId, calcHook }) {
               key: `${c.id}_${v.id}`, kind: 'variant', companyId: c.id, companyIndex: ci,
               variantIndex: vi, variantLabel: v.label || `V${vi + 1}`,
               label: `${c.name} · ${v.label || `V${vi + 1}`}`,
-              offers: { ...(c.offers || {}), ...(v.offers || {}) },
+              offers: getEffectiveVariantOffers(c, v, detailBasis),
               quantities: v.quantities || {},
               removedIds: new Set((v.removedItems || []).map(it => it.itemId)),
-              newItems: v.newItems || [],
+              newItems: getEffectiveVariantNewItems(v, detailBasis),
               retained: !!v.retained,
               adminConclusion: v.adminConclusion || null,
             });

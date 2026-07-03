@@ -4,7 +4,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db as fireDb } from '../firebase';
 import { useDialog } from '../contexts/DialogContext';
 import { useToast } from '../contexts/ToastContext';
-import { computeChaptersData, computeAnalysisStats, computeOABThreshold as calculateOABThreshold, companiesHaveNego, computeVariantTotal, variantHasNego } from '../utils/analysisCompute';
+import { computeChaptersData, computeAnalysisStats, computeOABThreshold as calculateOABThreshold, companiesHaveNego, computeVariantTotal, variantHasNego, newItemMatchKey, findMatchingVariantNewItem, findBestPrefixMatch } from '../utils/analysisCompute';
 
 // Algorithme OAB (Double Moyenne) : source unique dans analysisCompute.
 
@@ -493,16 +493,14 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
               refMatchedRows++;
             }
           }
-          // 3. Fallback : match par préfixe de désignation (30 premiers caractères normalisés)
-          //    Utile pour les libellés tronqués ou avec suffixe différent
+          // 3. Fallback : match par préfixe tolérant (score gradué, rejette les
+          //    qualificatifs qui changent le prix/la nature technique, ex. "DE
+          //    NUIT" — cf. bug matching couche d'accrochage / variante nocturne)
           if (!itemId) {
-            const prefix = designationNorm.slice(0, 30);
-            for (const [key, id] of projectItemsMap.entries()) {
-              if (key.startsWith(prefix) || prefix.startsWith(key.slice(0, 30))) {
-                itemId = id;
-                refMatchedRows++; // compté dans les approximatifs
-                break;
-              }
+            const candidate = findBestPrefixMatch(designationNorm, projectItemsMap);
+            if (candidate) {
+              itemId = candidate;
+              refMatchedRows++; // compté dans les approximatifs
             }
           }
 
@@ -740,6 +738,51 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
     if (negoActive) return { ...c, offersNego: { ...(c.offersNego || {}), [iId]: Number(val) } };
     return { ...c, offers: { ...c.offers, [iId]: Number(val) } };
   }));
+
+  // ─── ÉDITION MANUELLE — prix d'une VARIANTE (article du DQE) ───────────────
+  // Même logique que updateCompanyOffer mais scopée à la variante : permet de
+  // corriger à la main un prix qui n'aurait pas été reconnu par l'import Excel
+  // (matching imparfait, désignation trop différente du fichier entreprise).
+  const updateVariantOffer = (companyId, variantId, itemId, val) => setCompanies(prev => prev.map(c => {
+    if (c.id !== companyId) return c;
+    return {
+      ...c,
+      variants: (c.variants || []).map(v => {
+        if (v.id !== variantId) return v;
+        if (negoActive) return { ...v, offersNego: { ...(v.offersNego || {}), [itemId]: Number(val) } };
+        return { ...v, offers: { ...(v.offers || {}), [itemId]: Number(val) } };
+      }),
+    };
+  }));
+
+  // ─── ÉDITION MANUELLE — prix d'un article HORS DQE d'une variante ──────────
+  // En phase négo, écrit dans v.newItemsNego (clé = newItemMatchKey, cohérent
+  // avec le réimport négocié) sans toucher le prix initial. Sinon, modifie
+  // directement l'article dans v.newItems (prix + total recalculé).
+  const updateVariantNewItemPrice = (companyId, variantId, newItemId, val) => setCompanies(prev => prev.map(c => {
+    if (c.id !== companyId) return c;
+    return {
+      ...c,
+      variants: (c.variants || []).map(v => {
+        if (v.id !== variantId) return v;
+        const items = v.newItems || [];
+        const target = items.find(it => it.id === newItemId);
+        if (!target) return v;
+        const price = Number(val) || 0;
+        if (negoActive) {
+          const key = newItemMatchKey(target);
+          return { ...v, newItemsNego: { ...(v.newItemsNego || {}), [key]: { price } } };
+        }
+        return {
+          ...v,
+          newItems: items.map(it => it.id === newItemId
+            ? { ...it, price, lineTotal: Math.round(Number(it.qty || 0) * price * 1e6) / 1e6 }
+            : it),
+        };
+      }),
+    };
+  }));
+
   const renameCompany = (cId, val) => setCompanies(prev => prev.map(c => c.id === cId ? { ...c, name: val } : c));
 
   // ─── RABAIS COMMERCIAL (%) sur le Total HT — phase négo, par entreprise ────
@@ -971,11 +1014,17 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
       const newItems = []; // articles ajoutés par la variante (absents du DQE base)
       let totalRows = 0;
 
+      // Détecte les rangs de mise en forme (titres de chapitre, sous-totaux, total
+      // général) : ils ont une désignation non vide mais ne portent aucun prix. Ils
+      // ne doivent JAMAIS être comptés comme « articles hors DQE ».
+      const SUBTOTAL_RE = /^SOUS[-\s]?TOTAL\b/i;
+      const TOTAL_RE    = /^TOTAL\b/i;
+      const TVA_RE      = /^T\.?\s?V\.?\s?A\.?/i;
+
       for (const ws of validSheets) {
         const headerRowNum = sheetHeaderRows.get(ws.name) || 1;
         ws.eachRow((row, rowNumber) => {
           if (rowNumber <= headerRowNum) return;
-          totalRows++;
           const desigRaw = safeCellStr(row.getCell(2)).trim();
           const designationNorm = normalizeDesignation(desigRaw);
           if (!designationNorm) return;
@@ -984,6 +1033,16 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
           const qty   = safeCellNum(row.getCell(4));
           const unit  = safeCellStr(row.getCell(3)).trim();
           const rawRef = safeCellStr(row.getCell(1)).trim();
+
+          // Rang de mise en forme (titre section, sous-total, TVA, total général) :
+          // on ignore sans warning — ce ne sont pas des articles.
+          const isSubtotal = SUBTOTAL_RE.test(desigRaw) || SUBTOTAL_RE.test(rawRef);
+          const isTotal    = (TOTAL_RE.test(desigRaw) || TOTAL_RE.test(rawRef)) && !rawRef.match(/^\d/);
+          const isTva      = TVA_RE.test(desigRaw) || TVA_RE.test(rawRef);
+          const isSectionHeader = !rawRef && price === 0 && qty === 0;
+          if (isSubtotal || isTotal || isTva || isSectionHeader) return;
+
+          totalRows++;
 
           // 1. Match par désignation normalisée
           let itemId = projectItemsMap.get(designationNorm);
@@ -994,15 +1053,11 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
               itemId = projectRefMap.get(refNorm);
             }
           }
-          // 3. Fallback : match par préfixe (30 caractères normalisés)
+          // 3. Fallback : match par préfixe tolérant (score gradué, rejette les
+          //    qualificatifs qui changent le prix/la nature technique)
           if (!itemId) {
-            const prefix = designationNorm.slice(0, 30);
-            for (const [key, id] of projectItemsMap.entries()) {
-              if (key.startsWith(prefix) || prefix.startsWith(key.slice(0, 30))) {
-                itemId = id;
-                break;
-              }
-            }
+            const candidate = findBestPrefixMatch(designationNorm, projectItemsMap);
+            if (candidate) itemId = candidate;
           }
 
           if (!itemId) {
@@ -1055,7 +1110,11 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
       // Écrit les prix dans v.offersNego (les articles absents du fichier
       // conservent leur prix initial) et dénormalise v.totalNego (BRUT — le
       // rabais commercial global est déduit à la lecture). Les lignes hors DQE
-      // sont ignorées : les articles hors DQE de la variante gardent leur prix.
+      // (col non matchée au DQE base) sont recroisées avec les articles hors
+      // DQE déjà connus de la variante (v.newItems, importés à l'origine) via
+      // newItemMatchKey (ref sinon désignation normalisée) → v.newItemsNego.
+      // Seules les lignes vraiment inconnues (ni DQE, ni newItems existants)
+      // sont ignorées.
       if (importVariantToNego) {
         const targetVariant = (company.variants || []).find(v => v.id === opts.variantId);
         if (!targetVariant) {
@@ -1066,11 +1125,44 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
           toast.warning('Aucun article du DQE reconnu dans le fichier négocié de la variante.');
           return { ok: false, reason: 'no_match' };
         }
+        // Recroisement des lignes hors DQE avec les newItems existants de la variante :
+        // cascade tolérante (désignation exacte → référence exacte → préfixe), la clé
+        // de stockage est dérivée de l'article EXISTANT (pas de la ligne importée) afin
+        // que la lecture (getEffectiveVariantNewItems) retrouve toujours l'override même
+        // si ref/désignation diffèrent légèrement d'un import à l'autre (ex. variante
+        // initiale déclarée via PDF/OCR, réimport négocié via Excel propre).
+        const existingNewItems = targetVariant.newItems || [];
+        const matchedNewItemsNego = {};
+        const unmatchedNewItemDetails = [];
+        newItems.forEach(it => {
+          const existing = findMatchingVariantNewItem(it, existingNewItems);
+          if (existing) {
+            matchedNewItemsNego[newItemMatchKey(existing)] = { price: it.price };
+          } else {
+            unmatchedNewItemDetails.push({ ref: it.ref, designation: it.designation, price: it.price });
+          }
+        });
+        if (unmatchedNewItemDetails.length > 0) {
+          console.warn('[Nego variante] Lignes hors DQE non reconnues (ni DQE, ni hors-DQE existant) :', unmatchedNewItemDetails);
+          console.warn('[Nego variante] Articles hors DQE existants de la variante :', existingNewItems.map(it => ({ ref: it.ref, designation: it.designation, price: it.price })));
+        }
+        const unmatchedNewItemRows = unmatchedNewItemDetails.length;
         const mergedNego = { ...(targetVariant.offersNego || {}), ...variantOffers };
-        const updatedVariant = { ...targetVariant, offersNego: mergedNego };
+        const mergedNewItemsNego = { ...(targetVariant.newItemsNego || {}), ...matchedNewItemsNego };
+        const updatedVariant = { ...targetVariant, offersNego: mergedNego, newItemsNego: mergedNewItemsNego };
+        // Diagnostic complet — à retirer une fois le bug de matching confirmé/résolu.
+        // JSON.stringify pour que la console affiche les valeurs en clair (pas "Object" replié).
+        console.warn('[Nego variante] DEBUG variant=' + targetVariant.label + ' variantId=' + opts.variantId);
+        console.warn('[Nego variante] DEBUG variantOffers (fichier négocié) =', JSON.stringify(variantOffers));
+        console.warn('[Nego variante] DEBUG offersNego AVANT ce réimport =', JSON.stringify(targetVariant.offersNego || {}));
+        console.warn('[Nego variante] DEBUG offersNego APRÈS fusion (sauvegardé) =', JSON.stringify(mergedNego));
+        console.warn('[Nego variante] DEBUG v.offers (offre initiale variante) =', JSON.stringify(targetVariant.offers || {}));
+        console.warn('[Nego variante] DEBUG itemId "accrochage" =', JSON.stringify([...itemIdToDesignation.entries()].filter(([, d]) => /accrochage/i.test(d))));
+        console.warn('[Nego variante] DEBUG newItems (hors DQE, fichier négocié) =', JSON.stringify(newItems));
+        console.warn('[Nego variante] DEBUG v.newItems (hors DQE existants variante) =', JSON.stringify(targetVariant.newItems || []));
         // Total négocié BRUT : même périmètre que le total initial (quantités
-        // variante > à valoir, articles supprimés exclus, articles hors DQE
-        // conservés au prix initial). Rabais volontairement NON déduit ici.
+        // variante > à valoir, articles supprimés exclus). Rabais volontairement
+        // NON déduit ici.
         const flatItems = chaptersData.flatMap(ch => ch.items).map(it => ({ id: it.id, qty: it.activeQty }));
         const totalNego = computeVariantTotal(
           { ...company, negoRabaisPct: undefined },
@@ -1087,6 +1179,7 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
                     : {
                         ...v,
                         offersNego: mergedNego,
+                        newItemsNego: mergedNewItemsNego,
                         totalNego,
                         negoImportAt: new Date().toISOString(),
                         negoImportFile: file.name,
@@ -1094,8 +1187,12 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
                 ),
               }
         ));
-        if (newItems.length > 0) {
-          toast.warning(`${newItems.length} ligne(s) hors DQE ignorée(s) — les articles hors DQE de la variante conservent leur prix initial.`);
+        const negoNewItemCount = Object.keys(matchedNewItemsNego).length;
+        if (negoNewItemCount > 0) {
+          toast.info(`${negoNewItemCount} prix négocié(s) importé(s) pour les articles hors DQE de la variante.`);
+        }
+        if (unmatchedNewItemRows > 0) {
+          toast.warning(`${unmatchedNewItemRows} ligne(s) non reconnue(s) ignorée(s) (ni DQE, ni article hors DQE existant de la variante).`);
         }
         toast.success(`${matchCount} prix négocié(s) importé(s) pour la variante "${targetVariant.label || 'sans nom'}".`);
         if (!negoActive) {
@@ -1508,6 +1605,7 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
     handleExportJson, handleImportJson,
     // Variantes — CCP R2151-8 à R2151-11
     handleImportVariant, removeVariant, toggleVariantRetained, updateVariantJustification,
+    updateVariantOffer, updateVariantNewItemPrice,
     // Dépouillement — CCP L2113-1 / R2151-1
     applyDepouillement, updateCompanyAeAmount, updateVariantAeAmount,
     // Dépouillement après négociation (PV négo)

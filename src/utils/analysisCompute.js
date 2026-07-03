@@ -175,6 +175,183 @@ export function getEffectiveVariantOffers(company, variant, basis = 'initial') {
 }
 
 /**
+ * Clé de matching stable pour un article HORS DQE (variant.newItems) : par
+ * référence normalisée si présente, sinon par désignation normalisée. Utilisée
+ * pour retrouver un article hors DQE d'un import à l'autre (les newItems n'ont
+ * pas d'id stable — régénéré à chaque import). Source unique écriture (import
+ * négocié) / lecture (getEffectiveVariantNewItems).
+ */
+export function newItemMatchKey(it) {
+  const ref = (it?.ref || '').replace(/[\s.\-_]/g, '').toUpperCase().trim();
+  if (ref) return `ref:${ref}`;
+  const desig = (it?.designation || '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/['"]/g, '')
+    .replace(/[.,;:()[\]]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase();
+  return `desig:${desig}`;
+}
+
+const _normNewItemDesig = (s) => (s || '')
+  .normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .replace(/['"]/g, '')
+  .replace(/[.,;:()[\]]/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim()
+  .toUpperCase();
+const _normNewItemRef = (s) => (s || '').replace(/[\s.\-_]/g, '').toUpperCase().trim();
+
+// Qualificatifs qui changent le prix / la nature technique de l'article — leur
+// présence dans le "reste" interdit tout match par préfixe (article différent,
+// pas juste un libellé plus complet). Liste à enrichir au fil des faux positifs
+// observés en prod (VRD/BTP : variantes techniques, options, teintes, états).
+const SENSITIVE_QUALIFIERS = new Set([
+  'NUIT', 'JOUR', 'VARIANTE', 'VARIANTES', 'OPTION', 'RENFORCE', 'RENFORCEE',
+  'ALTERNATIF', 'ALTERNATIVE', 'DEMOLITION', 'DEPOSE', 'REPRISE', 'PROVISOIRE',
+  'DEFINITIF', 'MODIFIE', 'MODIFIEE', 'SPECIAL', 'SPECIALE', 'ADAPTE', 'ADAPTEE',
+  'TEINTE', 'TEINTEE', 'COLORE', 'COLOREE',
+]);
+
+function hasSensitiveQualifier(tail) {
+  const words = tail.trim().split(/\s+/).filter(Boolean);
+  return words.some((w) => SENSITIVE_QUALIFIERS.has(w));
+}
+
+/**
+ * Score de confiance d'un match par préfixe tolérant entre deux désignations
+ * DÉJÀ NORMALISÉES. Remplace le simple booléen startsWith par un score gradué :
+ * 0 = pas de match, plus le score est élevé, plus le match est fiable. Permet
+ * de choisir le MEILLEUR candidat plutôt que le premier trouvé dans l'ordre
+ * d'insertion (Map ou tableau) — évite un matching non-déterministe si le DQE
+ * ou les newItems changent d'ordre entre deux imports.
+ *
+ * Règles : tail vide = identiques (sécurité) ; tail <= 4 caractères =
+ * troncature/typo/OCR triviale toujours tolérée ; tail <= 15 caractères sans
+ * qualificatif sensible = complément de contexte plausible (score bas) ;
+ * qualificatif sensible détecté (NUIT, VARIANTE, RENFORCEE, TEINTE...) = 0 quelle
+ * que soit la longueur, car il dénote un article techniquement/financièrement
+ * distinct (ex: "Couche d'accrochage" vs "Couche d'accrochage DE NUIT") ; tail
+ * > 15 caractères sans qualificatif connu = 0 par prudence.
+ *
+ * Limite assumée : le distinguo repose sur une liste noire métier
+ * (SENSITIVE_QUALIFIERS), pas sur une analyse sémantique générale — à enrichir
+ * au fil des cas observés plutôt que de généraliser une heuristique fragile.
+ *
+ * @param {string} a - désignation normalisée A
+ * @param {string} b - désignation normalisée B
+ * @returns {number} score de confiance, 0 si aucun match toléré
+ */
+export function fuzzyPrefixScore(a, b) {
+  if (!a || !b) return 0;
+  const shorter = a.length <= b.length ? a : b;
+  const longer = a.length <= b.length ? b : a;
+  if (!longer.startsWith(shorter)) return 0;
+  const tail = longer.slice(shorter.length);
+  if (!tail) return 1000; // identiques (sécurité, normalement déjà matché en exact)
+  if (hasSensitiveQualifier(tail)) return 0;
+  if (tail.length <= 4) return 100 - tail.length;
+  if (tail.length <= 15) return 50 - tail.length;
+  return 0;
+}
+
+/**
+ * Meilleur match par préfixe tolérant parmi les entrées d'un Map (clé =
+ * désignation normalisée, valeur = itemId). Remplace la boucle "premier
+ * trouvé" non-déterministe.
+ *
+ * @param {string} designationNorm
+ * @param {Map<string,string>} projectItemsMap
+ * @returns {string|null}
+ */
+export function findBestPrefixMatch(designationNorm, projectItemsMap) {
+  let bestId = null;
+  let bestScore = 0;
+  for (const [key, id] of projectItemsMap.entries()) {
+    const score = fuzzyPrefixScore(designationNorm, key);
+    if (score > bestScore) { bestScore = score; bestId = id; }
+  }
+  return bestId;
+}
+
+/**
+ * Variante de findBestPrefixMatch pour une LISTE d'objets (ex: variant.newItems),
+ * où la clé à comparer n'est pas pré-stockée mais dérivée via getKey(item).
+ *
+ * @param {string} designationNorm
+ * @param {Array} list
+ * @param {(item: any) => string} getKey
+ * @returns {any|null} l'élément du tableau ayant le meilleur score, ou null
+ */
+export function findBestPrefixMatchInList(designationNorm, list, getKey) {
+  let best = null;
+  let bestScore = 0;
+  for (const item of (list || [])) {
+    const key = getKey(item);
+    if (!key) continue;
+    const score = fuzzyPrefixScore(designationNorm, key);
+    if (score > bestScore) { bestScore = score; best = item; }
+  }
+  return best;
+}
+
+/**
+ * Retrouve, parmi les articles hors DQE déjà connus d'une variante (v.newItems),
+ * celui qui correspond à une ligne importée — cascade tolérante identique au
+ * matching DQE de base (désignation exacte → référence exacte → préfixe
+ * tolérant par score). Nécessaire car la variante initiale peut avoir été
+ * importée via un PDF (OCR imparfait) puis renégociée via un Excel propre :
+ * ref/désignation peuvent légèrement différer d'un import à l'autre.
+ *
+ * @param {{ref?: string, designation?: string}} row - ligne importée (brute)
+ * @param {Array} existingNewItems - variant.newItems (articles hors DQE connus)
+ * @returns {Object|null} l'article existant correspondant, ou null
+ */
+export function findMatchingVariantNewItem(row, existingNewItems) {
+  const items = existingNewItems || [];
+  const rowDesig = _normNewItemDesig(row?.designation);
+  const rowRef = _normNewItemRef(row?.ref);
+
+  if (rowDesig) {
+    const exact = items.find(it => _normNewItemDesig(it.designation) === rowDesig);
+    if (exact) return exact;
+  }
+  if (rowRef) {
+    const byRef = items.find(it => {
+      const ref = _normNewItemRef(it.ref);
+      return ref && ref === rowRef;
+    });
+    if (byRef) return byRef;
+  }
+  if (rowDesig) {
+    const byPrefix = findBestPrefixMatchInList(rowDesig, items, (it) => _normNewItemDesig(it.designation));
+    if (byPrefix) return byPrefix;
+  }
+  return null;
+}
+
+/**
+ * Articles HORS DQE effectifs d'une variante : en phase 'nego', le PU des
+ * articles déjà connus (variant.newItems) est remplacé par le prix renégocié
+ * (variant.newItemsNego, clé = newItemMatchKey) si disponible — même logique
+ * que getEffectiveVariantOffers mais pour les articles absents du DQE de base.
+ */
+export function getEffectiveVariantNewItems(variant, basis = 'initial') {
+  const items = variant?.newItems || [];
+  if (basis !== 'nego') return items;
+  const nego = variant?.newItemsNego;
+  if (!nego || Object.keys(nego).length === 0) return items;
+  return items.map(it => {
+    const override = nego[newItemMatchKey(it)];
+    if (!override) return it;
+    const qty = Number(it.qty || 0);
+    const price = Number(override.price || 0);
+    return { ...it, price, lineTotal: Math.round(qty * price * 1e6) / 1e6, priceInitial: Number(it.price || 0) };
+  });
+}
+
+/**
  * Total d'une variante recalculé à la volée — source unique desktop / mobile /
  * écran d'accueil RAO. Applique le rabais commercial GLOBAL de l'entreprise en
  * phase 'nego' (le rabais porte sur le Total HT, base et variantes).
@@ -194,7 +371,7 @@ export function computeVariantTotal(company, variant, items, qtyMap, basis = 'in
     const qty = Number(vQtys[it.id] ?? qm[it.id] ?? it.qty ?? 0);
     total += qty * pu;
   });
-  (variant?.newItems || []).forEach(it => {
+  getEffectiveVariantNewItems(variant, basis).forEach(it => {
     total += Number(it.lineTotal || ((it.qty || 0) * (it.price || 0)) || 0);
   });
   const rabais = getCompanyRabaisPct(company, basis);

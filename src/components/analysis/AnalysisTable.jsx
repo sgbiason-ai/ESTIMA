@@ -2,7 +2,7 @@ import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { Trash2, ChevronRight, AlertTriangle, Info, HelpCircle, TrendingDown, TrendingUp, GitBranch, Plus } from 'lucide-react';
 import { formatPrice, normalizeUnitSymbol } from '../../utils/helpers';
 import { COMPANY_STYLES } from '../../utils/analysisConstants';
-import { computeOABThreshold as calculateOABThreshold, computePriceReference, getEffectiveOffers, getCompanyRabaisPct, getEffectiveConclusion } from '../../utils/analysisCompute';
+import { computeOABThreshold as calculateOABThreshold, computePriceReference, getEffectiveOffers, getEffectiveVariantOffers, getEffectiveVariantNewItems, getCompanyRabaisPct, getEffectiveConclusion } from '../../utils/analysisCompute';
 import OabDetailModal from './OabDetailModal';
 
 // --- SOUS-COMPOSANT : Cellule de Prix ---
@@ -119,7 +119,8 @@ const getHeatmapColor = (value, reference) => {
 
 const AnalysisTable = ({
   chaptersData, companies, stats, updateCompanyOffer, renameCompany, removeCompany, project, bpuConfig, scoringConfig,
-  analysisMode, averagesHorsOAB = {}, negoActive = false, updateCompanyNegoRabais = null
+  analysisMode, averagesHorsOAB = {}, negoActive = false, updateCompanyNegoRabais = null,
+  updateVariantOffer = null, updateVariantNewItemPrice = null
 }) => {
 
   // COMPANY_STYLES : couleur par entreprise (cycle si plus d'entreprises que de styles).
@@ -255,10 +256,11 @@ const AnalysisTable = ({
           kind: 'variant',
           variantId: v.id,
           variantLabel: v.label || `Variante ${vi + 1}`,
-          offers: { ...(c.offers || {}), ...(v.offers || {}) },
+          offers: getEffectiveVariantOffers(c, v, negoActive ? 'nego' : 'initial'),
+          initialOffers: { ...(c.offers || {}), ...(v.offers || {}) },
           quantities: v.quantities || {},
           removedIds: new Set((v.removedItems || []).map(it => it.itemId)),
-          newItems: v.newItems || [],
+          newItems: getEffectiveVariantNewItems(v, negoActive ? 'nego' : 'initial'),
           irregular: variantIrregular,
           irregularLabel: variantConclusion,
         });
@@ -316,6 +318,8 @@ const AnalysisTable = ({
           qty,
           price: Number(it.price || 0),
           total: Number(it.lineTotal || (qty * it.price) || 0),
+          priceInitial: it.priceInitial != null ? Number(it.priceInitial) : null,
+          itemId: it.id,
         };
       });
     });
@@ -587,9 +591,15 @@ const AnalysisTable = ({
                                 {isRemoved ? (
                                   <div className="text-[10px] text-slate-400 italic text-center">supprimé</div>
                                 ) : isVariant ? (
-                                  <div className="text-right px-1 text-[11px] font-medium tabular-nums text-slate-700">
-                                    {pu > 0 ? formatPrice(pu) : <span className="text-slate-300">-</span>}
-                                  </div>
+                                  <PriceCell
+                                    value={pu}
+                                    onChange={(val) => updateVariantOffer?.(col.companyId, col.variantId, item.id, val)}
+                                    style={{...style, bg: cellBg}}
+                                    anomaly={anomaly}
+                                    nego={negoActive && Number(col.initialOffers?.[item.id] || 0) !== pu
+                                      ? { initialPu: Number(col.initialOffers?.[item.id] || 0) }
+                                      : null}
+                                  />
                                 ) : (
                                   <PriceCell
                                     value={pu}
@@ -721,13 +731,19 @@ const AnalysisTable = ({
                       }
                       // Variante avec article hors DQE
                       if (cell) {
+                        const isNego = cell.priceInitial != null && cell.priceInitial !== cell.price;
                         return (
                           <React.Fragment key={`new-${ri}-${col.key}`}>
                             <td className={`px-1 py-1 text-center border-r ${borderCls} bg-emerald-100 text-[11px] font-bold text-emerald-800 tabular-nums`}>
                               {cell.qty}
                             </td>
-                            <td className={`px-1 py-1 text-right border-r ${borderCls} bg-emerald-50 text-[11px] font-medium text-emerald-700 tabular-nums`}>
-                              {formatPrice(cell.price)}
+                            <td className={`px-0.5 py-1 border-r ${borderCls} bg-emerald-50 relative`}>
+                              <PriceCell
+                                value={cell.price}
+                                onChange={(val) => updateVariantNewItemPrice?.(col.companyId, col.variantId, cell.itemId, val)}
+                                style={{ bg: 'bg-emerald-50' }}
+                                nego={isNego ? { initialPu: cell.priceInitial } : null}
+                              />
                             </td>
                             <td className={`px-1 py-1 text-right border-r ${borderCls} bg-emerald-100 text-[11px] font-black text-emerald-800 tabular-nums`}>
                               {formatPrice(cell.total)}
