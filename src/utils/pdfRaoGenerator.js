@@ -10,7 +10,7 @@ import { NON_REGULAR_STATUSES } from '../components/rao/RaoConstants';
 import { buildTheme as _buildTheme } from './pdf/buildTheme';
 import { getCurrentPhaseCode } from './phaseModel';
 import { computeVatBreakdown } from './financeFormat';
-import { scoreOffer, computePriceReference } from './analysisCompute';
+import { scoreOffer, computePriceReference, getEffectiveOffers, getEffectiveVariantOffers, getVariantEffectiveTotal, getCompanyRabaisPct, getEffectiveConclusion, isRegularizedAfterNego } from './analysisCompute';
 import { stampPdfCredit } from './estimaCredit';
 
 // ─── COULEUR PRIMAIRE RAO : VERT PAPYRUS ────────────────────────────────────
@@ -136,6 +136,272 @@ const drawJustifiedText = (doc, text, x, y, maxWidth, lineH = 4.5) => {
     totalLines += lines.length;
   });
   return { y: curY, lines: totalLines };
+};
+
+// ─── RENDU HTML → PDF (Gras / Italique / Souligné + listes à puces / numérotées) ──
+// Parseur minimaliste utilisé par la §6.ter (réponses & engagements de négociation).
+// Produit une liste de blocs { kind, olIndex?, runs:[{text, bold, italic, underline}] }.
+// Ignore les balises non gérées (structure conservée, styles WYSIWYG hors périmètre).
+
+// Sanitize pour la police Helvetica standard (WinAnsi/CP1252). Le texte utilisateur
+// peut contenir des caractères hors jeu (flèches, symboles math, espaces spéciaux,
+// zero-width…) qui, s'ils atteignent `doc.text()`, sortent en glyphes de substitution
+// (« !' » ou « ” ») et cassent le kerning. Ici on les remplace par un équivalent ASCII,
+// on retire les caractères invisibles/parasites, et on collapse les blancs.
+const sanitizeForPdf = (s) => {
+  if (!s) return '';
+  return String(s)
+    // Zero-width, joiners, BOM (U+200B..U+200F, U+202A..U+202E, U+2060..U+2064, U+FEFF, U+FFF9..U+FFFB)
+    .replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF\uFFF9-\uFFFB]/g, '')
+    // Line/paragraph separators (U+2028, U+2029) -> newline
+    .replace(/[\u2028\u2029]/g, '\n')
+    // Espaces speciaux (U+2000..U+200A, U+202F, U+205F, U+3000) -> espace normal
+    .replace(/[\u2000-\u200A\u202F\u205F\u3000]/g, ' ')
+    // Fleches courantes -> equivalents ASCII
+    .replace(/[\u2190\u21D0\u2906]/g, '<-')          // <- / <= / <==
+    .replace(/[\u2192\u21D2\u2907\u21A6]/g, '->')   // -> / => / ==> / |->
+    .replace(/[\u2194\u21D4]/g, '<->')
+    .replace(/[\u2191\u21D1]/g, '^')
+    .replace(/[\u2193\u21D3]/g, 'v')
+    // Symboles math (hors WinAnsi)
+    .replace(/\u2212/g, '-')       // MINUS SIGN
+    .replace(/\u2248/g, '~')       // ALMOST EQUAL TO
+    .replace(/\u2265/g, '>=')      // GREATER-THAN OR EQUAL TO
+    .replace(/\u2264/g, '<=')      // LESS-THAN OR EQUAL TO
+    .replace(/\u2260/g, '!=')      // NOT EQUAL TO
+    .replace(/\u221A/g, 'racine')  // SQUARE ROOT
+    .replace(/\u221E/g, 'inf')     // INFINITY
+    // Guillemet bas simple (U+201A) -> virgule
+    .replace(/\u201A/g, ',')
+    // Puces exotiques (U+25AA U+25AB U+25CB U+25CF U+25C6 U+25C7) -> tiret
+    .replace(/[\u25AA\u25AB\u25CB\u25CF\u25C6\u25C7]/g, '-');
+};
+
+const parseHtmlToBlocks = (html) => {
+  const blocks = [];
+  if (!html || typeof DOMParser === 'undefined') return blocks;
+  const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
+  const root = doc.body.firstChild;
+  if (!root) return blocks;
+
+  const decode = (s) => (s || '').replace(/&nbsp;/gi, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+
+  // Assemble les runs d'un noeud inline (récursif). style = { bold, italic, underline }.
+  const collectRuns = (node, style, runs) => {
+    if (node.nodeType === 3) {
+      // TEXT — sanitize WinAnsi ici pour que la mesure de largeur (utilisée par
+      // le wrap) reçoive du texte propre (sinon les glyphes non-mappables font
+      // planter le kerning et fragmentent le rendu en « e t 1 0 0 5 »).
+      const t = sanitizeForPdf(decode(node.nodeValue));
+      if (t) runs.push({ text: t, ...style });
+      return;
+    }
+    if (node.nodeType !== 1) return;
+    const tag = node.tagName.toLowerCase();
+    const next = { ...style };
+    if (tag === 'b' || tag === 'strong') next.bold = true;
+    if (tag === 'i' || tag === 'em') next.italic = true;
+    if (tag === 'u') next.underline = true;
+    if (tag === 'br') { runs.push({ text: '\n', ...style }); return; }
+    for (const child of node.childNodes) collectRuns(child, next, runs);
+  };
+
+  // Découpe une séquence de runs sur \n → plusieurs blocs paragraphes.
+  const flushParagraph = (runs) => {
+    // Sépare sur \n : les newlines créent des blocs séparés
+    let cur = [];
+    runs.forEach(r => {
+      const parts = r.text.split('\n');
+      parts.forEach((p, i) => {
+        if (p) cur.push({ ...r, text: p });
+        if (i < parts.length - 1) {
+          if (cur.length) blocks.push({ kind: 'para', runs: cur });
+          else blocks.push({ kind: 'para', runs: [{ text: '', bold: false, italic: false, underline: false }] });
+          cur = [];
+        }
+      });
+    });
+    if (cur.length) blocks.push({ kind: 'para', runs: cur });
+  };
+
+  const traverse = (node) => {
+    for (const child of node.childNodes) {
+      if (child.nodeType !== 1) {
+        if (child.nodeType === 3 && decode(child.nodeValue).trim()) {
+          const runs = [];
+          collectRuns(child, { bold: false, italic: false, underline: false }, runs);
+          if (runs.length) flushParagraph(runs);
+        }
+        continue;
+      }
+      const tag = child.tagName.toLowerCase();
+      if (tag === 'p' || tag === 'div') {
+        const runs = [];
+        collectRuns(child, { bold: false, italic: false, underline: false }, runs);
+        if (runs.length) flushParagraph(runs);
+        else blocks.push({ kind: 'para', runs: [{ text: '', bold: false, italic: false, underline: false }] });
+      } else if (tag === 'ul' || tag === 'ol') {
+        let idx = 1;
+        for (const li of child.querySelectorAll(':scope > li')) {
+          const runs = [];
+          collectRuns(li, { bold: false, italic: false, underline: false }, runs);
+          if (runs.length) blocks.push({ kind: tag === 'ol' ? 'li-ol' : 'li-ul', olIndex: idx, runs });
+          idx++;
+        }
+      } else if (tag === 'br') {
+        blocks.push({ kind: 'para', runs: [{ text: '', bold: false, italic: false, underline: false }] });
+      } else {
+        // Inline non enveloppé dans un bloc → un paragraphe
+        const runs = [];
+        collectRuns(child, { bold: false, italic: false, underline: false }, runs);
+        if (runs.length) flushParagraph(runs);
+      }
+    }
+  };
+  traverse(root);
+  return blocks;
+};
+
+// Résout la variante de police jsPDF pour un style de run donné.
+const _fontStyle = (bold, italic) => (bold && italic) ? 'bolditalic' : bold ? 'bold' : italic ? 'italic' : 'normal';
+
+// Wrap une liste de runs sur une largeur maxWidth → tableau de lignes,
+// chaque ligne = tableau de segments { text, bold, italic, underline, width }.
+const _wrapRunsToLines = (doc, runs, maxWidth, fontName, fontSize) => {
+  const measure = (text, bold, italic) => {
+    doc.setFont(fontName, _fontStyle(bold, italic));
+    doc.setFontSize(fontSize);
+    return doc.getStringUnitWidth(text) * fontSize / doc.internal.scaleFactor;
+  };
+  const lines = [];
+  let curLine = [];
+  let curWidth = 0;
+  runs.forEach(run => {
+    // Coupe le run en tokens : mots + espaces (préserve les espaces)
+    const tokens = run.text.split(/(\s+)/).filter(t => t.length > 0);
+    tokens.forEach(tok => {
+      const tokW = measure(tok, run.bold, run.italic);
+      // Un token vide de type espace en début de ligne : ignoré
+      if (/^\s+$/.test(tok) && curLine.length === 0) return;
+      if (curWidth + tokW > maxWidth && curLine.length > 0) {
+        // Push la ligne courante et démarre une nouvelle
+        lines.push(curLine);
+        curLine = [];
+        curWidth = 0;
+        if (/^\s+$/.test(tok)) return; // pas d'espace en tête de nouvelle ligne
+      }
+      // Ajoute (ou fusionne au dernier segment si même style)
+      const last = curLine[curLine.length - 1];
+      const same = last && last.bold === run.bold && last.italic === run.italic && last.underline === run.underline;
+      if (same) {
+        last.text += tok;
+        last.width += tokW;
+      } else {
+        curLine.push({ text: tok, bold: run.bold, italic: run.italic, underline: run.underline, width: tokW });
+      }
+      curWidth += tokW;
+    });
+  });
+  if (curLine.length) lines.push(curLine);
+  return lines;
+};
+
+/**
+ * Dessine une séquence de blocs HTML (parseHtmlToBlocks) dans le PDF.
+ * Gère : gras / italique / souligné (via jsPDF setFont + doc.line pour l'underline)
+ * et listes à puces / numérotées (préfixe + indentation).
+ *
+ * @returns {number} nouvel y après le dernier bloc
+ */
+const drawHtmlBlocks = (doc, blocks, x, y, maxWidth, opts = {}) => {
+  const fontName = opts.fontName || 'Helvetica';
+  const fontSize = opts.fontSize || 9;
+  const lineH = opts.lineH || 4.5;
+  // blockGap = 0 par defaut : le browser contentEditable enveloppe CHAQUE ligne
+  // dans son propre <div> (typique apres Enter). Avec un gap non nul, les
+  // reponses saisies au champ « Reponses & Engagements » apparaissaient trop
+  // aerees dans le PDF (l'utilisateur percoit un espacement « trop grand » alors
+  // qu'il n'a tape que des retours-ligne simples). lineH seul suffit à separer
+  // visuellement les paragraphes de facon compacte, comme dans Word single spacing.
+  const blockGap = opts.blockGap != null ? opts.blockGap : 0;
+  const listIndent = opts.listIndent || 5; // mm
+  const pageBreak = opts.pageBreak; // fn(y, height) → { y (post-break), broke: bool } ou null
+
+  let curY = y;
+  const textColor = opts.textColor || [0, 0, 0];
+  // La couleur du texte doit etre re-appliquee apres CHAQUE saut de page :
+  // addPage → drawHeader/drawFooter changent la couleur (blanc pour le titre,
+  // gris pour le pied) ; sans reset le corps du bloc suivant sortirait "delave".
+  const applyTextColor = () => doc.setTextColor(...textColor);
+  applyTextColor();
+
+  // Compaction : les <div><br></div> / <p></p> / <br><br> generes par le browser
+  // ou lors du typing produisent des paragraphes vides successifs. On les fusionne
+  // (max 1 blanc consecutif) pour eviter les « trous » verticaux involontaires.
+  const isEmpty = (b) => b.kind === 'para' && b.runs.length === 1 && !b.runs[0].text;
+  const compactedBlocks = [];
+  let prevEmpty = false;
+  blocks.forEach(b => {
+    const e = isEmpty(b);
+    if (e && prevEmpty) return; // skip : doublon
+    compactedBlocks.push(b);
+    prevEmpty = e;
+  });
+  // Enleve un blanc en tete/queue (le user n'attend pas de vide avant/apres son texte).
+  while (compactedBlocks.length && isEmpty(compactedBlocks[0])) compactedBlocks.shift();
+  while (compactedBlocks.length && isEmpty(compactedBlocks[compactedBlocks.length - 1])) compactedBlocks.pop();
+
+  compactedBlocks.forEach((blk) => {
+    // Préfixe éventuel (liste)
+    const isList = blk.kind === 'li-ul' || blk.kind === 'li-ol';
+    const prefix = blk.kind === 'li-ul' ? '•  ' : blk.kind === 'li-ol' ? `${blk.olIndex || 1}.  ` : '';
+    const indent = isList ? listIndent : 0;
+
+    // Wrap les runs sur la largeur disponible (moins le prefixe pour la 1re ligne, indent pour la suite)
+    doc.setFont(fontName, 'normal'); doc.setFontSize(fontSize);
+    const contentMaxW = maxWidth - indent;
+    // Ligne vide (paragraphe blanc) : juste un espace vertical
+    if (blk.runs.length === 1 && !blk.runs[0].text) {
+      curY += lineH;
+      return;
+    }
+    const lines = _wrapRunsToLines(doc, blk.runs, contentMaxW, fontName, fontSize);
+    if (lines.length === 0) return;
+
+    const totalH = lines.length * lineH + blockGap;
+    if (pageBreak) {
+      const res = pageBreak(curY, totalH);
+      if (res && res.broke) {
+        curY = res.y;
+        // addPage a change la couleur (drawHeader / drawFooter) : reset avant de continuer.
+        applyTextColor();
+      }
+    }
+
+    lines.forEach((line, li) => {
+      let curX = x + indent;
+      // Préfixe de liste sur la 1re ligne
+      if (isList && li === 0 && prefix) {
+        doc.setFont(fontName, 'normal'); doc.setFontSize(fontSize);
+        doc.text(prefix, x, curY);
+      }
+      line.forEach(seg => {
+        doc.setFont(fontName, _fontStyle(seg.bold, seg.italic));
+        doc.setFontSize(fontSize);
+        doc.text(seg.text, curX, curY);
+        if (seg.underline && seg.text.trim()) {
+          const uY = curY + 0.6;
+          doc.setLineWidth(0.25);
+          doc.line(curX, uY, curX + seg.width, uY);
+        }
+        curX += seg.width;
+      });
+      curY += lineH;
+    });
+    curY += blockGap;
+  });
+
+  return curY;
 };
 
 // ─── PAGE DE GARDE RAO — utilise drawCoverPage partagé + bloc consultation ──
@@ -305,6 +571,16 @@ export const generateRaoPDF = async (optionsParams) => {
     //   - préfixe de la phrase de recommandation par défaut (conclusion)
     // Défaut 'none' : aucune mention (rétro-compatible, ex. appelants mobile).
     negotiationPhase = 'none',
+    // Format papier du detail des prix unitaires (§7) : 'a4' (defaut, compact) ou
+    // 'a3' (police plus lisible, utile quand il y a beaucoup d'entreprises/variantes).
+    pricesPaperSize = 'a4',
+    // Comparatif avant/après négociation : [{ name, initialTotal, negoTotal,
+    // delta, deltaPct, negotiated, scoreInitial, scoreNego }] | null.
+    // Rendu en section 6.bis uniquement si negotiationPhase === 'after'.
+    negoComparison = null,
+    // Phase « après négo » active dans l'analyse : le détail des prix unitaires
+    // reprend alors les prix négociés (fusion initial + négocié par article).
+    negoActive = false,
   } = optionsParams;
 
   // Taux de TVA configurable par projet (défaut 20 %), partagé par toutes les sorties RAO (audit F2).
@@ -354,7 +630,9 @@ export const generateRaoPDF = async (optionsParams) => {
           variantId: v.id,
           variantIndex: vi + 1,
           variantLabel: v.label || '',
-          price: Number(v.total || 0),
+          // Total net (rabais commercial global de l'entreprise déduit) — même
+          // primitif que le comparatif RAO et le Récap (source unique).
+          price: getVariantEffectiveTotal(co, v, negoActive ? 'nego' : 'initial'),
           irregular: !!variantIrregular,
           irregularLabel: variantConcl,
         });
@@ -923,9 +1201,16 @@ export const generateRaoPDF = async (optionsParams) => {
   // ── SECTION 6.bis : CONFORMITÉ ET ANOMALIES DÉTECTÉES ──
   // Pour chaque entreprise avec écart AE / écart quantité, liste détaillée
   {
+    // Une entreprise apparaît en §5.bis si elle a un écart AE/quantités, OU un
+    // statut non régulier (initial OU effectif), OU a été régularisée en négo
+    // (pour tracer la transition avant → après, CCP R2152-2).
     const irregularCompanies = analysisCompanies.filter(c => {
       const admin = companiesData[c.name]?.admin || {};
-      return (c.amountMismatch || (c.quantityMismatches || []).length > 0 || ['irreguliere', 'inacceptable', 'inappropriee'].includes(admin.conclusion));
+      const effConcl = getEffectiveConclusion(admin, negoActive ? 'nego' : 'initial');
+      return (c.amountMismatch
+        || (c.quantityMismatches || []).length > 0
+        || ['irreguliere', 'inacceptable', 'inappropriee'].includes(admin.conclusion)
+        || ['irreguliere', 'inacceptable', 'inappropriee'].includes(effConcl));
     });
 
     if (irregularCompanies.length > 0) {
@@ -945,10 +1230,14 @@ export const generateRaoPDF = async (optionsParams) => {
 
       const NON_REG_CNF = ['irreguliere', 'inacceptable', 'inappropriee'];
 
+      const CONCL_LABELS_CNF = { reguliere: 'RÉGULIÈRE', irreguliere: 'IRRÉGULIÈRE', inacceptable: 'INACCEPTABLE', inappropriee: 'INAPPROPRIÉE' };
+
       irregularCompanies.forEach(c => {
         const admin = companiesData[c.name]?.admin || {};
-        const concl = admin.conclusion || 'reguliere';
-        const conclLabel = { reguliere: 'RÉGULIÈRE', irreguliere: 'IRRÉGULIÈRE', inacceptable: 'INACCEPTABLE', inappropriee: 'INAPPROPRIÉE' }[concl] || concl;
+        // Statut effectif (après régularisation éventuelle) = celui du badge et du classement.
+        const concl = getEffectiveConclusion(admin, negoActive ? 'nego' : 'initial') || 'reguliere';
+        const conclLabel = CONCL_LABELS_CNF[concl] || concl;
+        const regularized = negoActive && isRegularizedAfterNego(admin);
 
         // Pagination
         if (y > 250) { y = addPage('Conformité et anomalies (suite)', 'a4', 'portrait'); }
@@ -961,7 +1250,7 @@ export const generateRaoPDF = async (optionsParams) => {
         doc.setTextColor(...VERT_FONCE);
         doc.text(cleanText(c.name), M + 3, y + 5);
 
-        // Badge statut
+        // Badge statut (effectif)
         const badgeColor = concl === 'reguliere' ? THEME.yes : (concl === 'irreguliere' ? [255, 140, 0] : THEME.no);
         const badgeW = doc.getTextWidth(conclLabel) + 6;
         doc.setFillColor(...badgeColor);
@@ -971,24 +1260,33 @@ export const generateRaoPDF = async (optionsParams) => {
         doc.text(conclLabel, W - M - badgeW / 2 - 3, y + 4.5, { align: 'center' });
         y += 10;
 
-        // Commentaire sur la conformité (saisi par l'analyste pour toute offre non régulière)
-        const conformityComment = (admin.conformityComment || '').replace(/\r\n?/g, '\n').trim();
-        if (conformityComment) {
-          doc.setFontSize(8);
-          const cLines = doc.splitTextToSize(conformityComment, W - 2 * M - 6);
-          const estH = 5 + cLines.length * 4 + 4;
-          // Saut de page si le commentaire ne tient pas dans l'espace restant (sauf si déjà en haut de page)
-          if (y + estH > 285 && y > 60) { y = addPage('Conformité et anomalies (suite)', 'a4', 'portrait'); }
+        // Transition de régularisation (CCP R2152-2) — offre non régulière avant
+        // négociation, régularisée à l'issue de la négociation. Encadré vert + motif.
+        if (regularized) {
+          const initLabel = CONCL_LABELS_CNF[admin.conclusion] || admin.conclusion;
+          const regComment = (admin.regularizationComment || '').replace(/\r\n?/g, '\n').trim();
+          const headTxt = `Offre ${initLabel} avant négociation, RÉGULARISÉE à l'issue de la négociation (art. R2152-2).`;
           doc.setFont('Helvetica', 'bold');
           doc.setFontSize(8);
-          doc.setTextColor(...THEME.text);
-          doc.text('Commentaire sur la conformité', M + 3, y);
-          y += 5;
-          doc.setFont('Helvetica', 'normal');
-          doc.setFontSize(8);
-          doc.setTextColor(...THEME.lightText);
-          ({ y } = drawJustifiedText(doc, conformityComment, M + 3, y, W - 2 * M - 6, 4));
-          y += 4;
+          const hLines = doc.splitTextToSize(headTxt, W - 2 * M - 8);
+          const mLines = regComment ? doc.splitTextToSize(`Motif : ${regComment}`, W - 2 * M - 8) : [];
+          const boxH = 4.5 + hLines.length * 4.2 + (mLines.length ? 2 + mLines.length * 4 : 0) + 4;
+          if (y + boxH > 285 && y > 60) { y = addPage('Conformité et anomalies (suite)', 'a4', 'portrait'); }
+          doc.setFillColor(236, 253, 245); // emerald-50
+          doc.roundedRect(M, y, W - 2 * M, boxH, 1.5, 1.5, 'F');
+          doc.setDrawColor(167, 243, 208); // emerald-200
+          doc.setLineWidth(0.3);
+          doc.roundedRect(M, y, W - 2 * M, boxH, 1.5, 1.5);
+          doc.setTextColor(6, 78, 59); // emerald-900
+          let ry = y + 5.5;
+          hLines.forEach(ln => { doc.text(ln, M + 4, ry); ry += 4.2; });
+          if (mLines.length) {
+            ry += 2;
+            doc.setFont('Helvetica', 'normal');
+            doc.setTextColor(30, 50, 40);
+            mLines.forEach(ln => { doc.text(ln, M + 4, ry); ry += 4; });
+          }
+          y += boxH + 4;
         }
 
         // Recommandation de régularisation (CCP) — différenciée par statut.
@@ -1111,7 +1409,9 @@ export const generateRaoPDF = async (optionsParams) => {
     const synthRows = [];
     analysisCompanies.forEach(c => {
       const admin = companiesData[c.name]?.admin || {};
-      const baseConcl = admin.conclusion && NON_REGULAR_SYNTH.includes(admin.conclusion) ? admin.conclusion : null;
+      // Statut effectif : en phase après négo, une offre régularisée redevient régulière.
+      const effConcl = getEffectiveConclusion(admin, negoActive ? 'nego' : 'initial');
+      const baseConcl = effConcl && NON_REGULAR_SYNTH.includes(effConcl) ? effConcl : null;
       synthRows.push({
         id: c.id, name: c.name, kind: 'base',
         total: analysisStats.companiesTotals[c.id] || 0,
@@ -1127,7 +1427,9 @@ export const generateRaoPDF = async (optionsParams) => {
           variantIndex: vi + 1,
           variantLabel: v.label || `Variante ${vi + 1}`,
           baseCompanyId: c.id,
-          total: Number(v.total || 0),
+          // Total net (rabais commercial global déduit en phase après négo) —
+          // même primitif que le comparatif RAO et le Récap (source unique).
+          total: getVariantEffectiveTotal(c, v, negoActive ? 'nego' : 'initial'),
           irregular: !!vConcl, irregularLabel: vConcl,
         });
       });
@@ -1156,9 +1458,12 @@ export const generateRaoPDF = async (optionsParams) => {
       // Lignes non régulières : fond rosé + mention « sous réserve » ; variantes : violet.
       const rowFill = irr ? [254, 226, 226] : (isVariant ? [243, 232, 255] : undefined);
       const statusTag = irr ? `\n${STATUS_LABEL_SYNTH[d.irregularLabel] || 'NON RÉGULIÈRE'} (sous réserve)` : '';
+      // Rabais commercial (phase après négo) : le total affiché est NET — rappel sous le nom.
+      const rabaisSynth = d.kind === 'base' ? (analysisStats.companiesRabais?.[d.id] || 0) : 0;
+      const rabaisTag = rabaisSynth > 0 ? `\n(rabais commercial -${String(rabaisSynth).replace('.', ',')} % déduit)` : '';
       const displayName = (isVariant
         ? `  > ${d.name} - V${d.variantIndex}${d.variantLabel ? ` (${d.variantLabel})` : ''}`
-        : d.name) + statusTag;
+        : d.name) + statusTag + rabaisTag;
       const rangSuffix = index === 0 ? 'er' : 'ème';
       const nameStyles = irr
         ? { textColor: [190, 18, 60], fontStyle: 'bold', fontSize: 8 }
@@ -1208,6 +1513,144 @@ export const generateRaoPDF = async (optionsParams) => {
     });
     y += 6;
 
+    // ── SECTION 6.bis : ANALYSE AVANT / APRÈS NÉGOCIATION ──
+    // Rendue uniquement quand le rapport est établi « après négociation » et que
+    // des prix négociés existent. Compare les montants initiaux et finaux par
+    // entreprise ; la note prix du rapport est établie sur les montants négociés.
+    if (negotiationPhase === 'after' && Array.isArray(negoComparison) && negoComparison.length > 0) {
+      y = addPage('Analyse financière — Après négociation', 'a4', 'portrait');
+      tocEntries.push({ label: '6.bis Analyse avant / après négociation', page: pageNum });
+      y = sectionTitle(doc, `6.bis  ANALYSE AVANT / APRÈS NÉGOCIATION`, y, THEME.primary);
+
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(60, 60, 60);
+      const introNego = doc.splitTextToSize(
+        "À l'issue de la phase de négociation menée conformément aux documents de la consultation, les soumissionnaires ont été invités à remettre leur meilleure offre finale. " +
+        "Le tableau ci-dessous compare, pour chaque entreprise, le montant de l'offre initiale et le montant de l'offre finale après négociation. " +
+        "Le rabais commercial éventuellement consenti sur le montant total HT est indiqué et déduit du montant final. " +
+        "Les entreprises n'ayant pas remis de contre-proposition conservent leur offre initiale. " +
+        "La notation du critère prix du présent rapport est établie sur les montants après négociation (nets de rabais).",
+        W - 2 * M
+      );
+      doc.text(introNego, M, y);
+      y += introNego.length * 4 + 4;
+
+      const maxScoreNego = Number(scoringConfig?.maxScore || 40);
+      const negoBody = negoComparison.map(r => {
+        const origIdx = analysisCompanies.findIndex(c => c.name === r.name);
+        const cStyle = getCompanyStyle(origIdx !== -1 ? origIdx : 0);
+        const down = r.delta < -0.005;
+        const up = r.delta > 0.005;
+        const deltaColor = down ? [0, 150, 0] : up ? [200, 0, 0] : [120, 120, 120];
+        return [
+          { content: cleanText(r.name) + (r.negotiated ? '' : '\n(offre initiale reprise)'), styles: { textColor: cStyle.header, fontStyle: 'bold' } },
+          { content: formatNumberFr(r.initialTotal) + ' €', styles: { halign: 'right' } },
+          { content: (r.rabaisPct || 0) > 0 ? `-${String(r.rabaisPct).replace('.', ',')} %` : '—', styles: { halign: 'center', textColor: (r.rabaisPct || 0) > 0 ? [0, 150, 0] : [150, 150, 150], fontStyle: 'bold' } },
+          { content: formatNumberFr(r.negoTotal) + ' €', styles: { halign: 'right', fontStyle: 'bold' } },
+          { content: (r.delta > 0 ? '+' : '') + formatNumberFr(r.delta) + ' €', styles: { halign: 'right', textColor: deltaColor, fontStyle: 'bold' } },
+          { content: (r.deltaPct > 0 ? '+' : '') + r.deltaPct.toFixed(2) + ' %', styles: { halign: 'center', textColor: deltaColor } },
+          { content: r.scoreInitial.toFixed(2), styles: { halign: 'center', textColor: [120, 120, 120] } },
+          { content: r.scoreNego.toFixed(2) + ` / ${maxScoreNego}`, styles: { halign: 'center', fontStyle: 'bold' } },
+        ];
+      });
+
+      autoTable(doc, {
+        startY: y + 2,
+        head: [['Entreprise', 'Montant initial HT', 'Rabais', 'Après négo HT (net)', 'Écart (€)', 'Écart (%)', 'Note init.', 'Note prix finale']],
+        body: negoBody,
+        theme: 'striped',
+        headStyles: { fillColor: THEME.primary, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+        styles: { font: 'Helvetica', fontSize: 8, cellPadding: 2.5 },
+        columnStyles: {
+          1: { cellWidth: 27 }, 2: { cellWidth: 15 }, 3: { cellWidth: 28 },
+          4: { cellWidth: 24 }, 5: { cellWidth: 15 }, 6: { cellWidth: 15 }, 7: { cellWidth: 21 },
+        },
+        didDrawPage: () => drawFooter(doc, pageNum, consultation, project, THEME),
+      });
+      y = doc.lastAutoTable.finalY + 8;
+    }
+
+    // ── SECTION 6.ter : RÉPONSES & ENGAGEMENTS DES SOUMISSIONNAIRES ──
+    // Rendue uniquement si au moins une entreprise a consigné des réponses
+    // (champ nego.responses saisi dans l'onglet Négociation).
+    // Contenu WYSIWYG : gras / italique / souligné + listes à puces/numérotées
+    // (parsés HTML via parseHtmlToBlocks / drawHtmlBlocks). Compat : les anciennes
+    // saisies texte plain (avec \n) sont converties transparente à l'affichage.
+    {
+      const isHtmlContent = (v) => typeof v === 'string' && /<[a-z][^>]*>/i.test(v);
+      const negoRespRows = analysisCompanies
+        .map(c => {
+          const raw = companiesData[c.name]?.negotiation?.responses || '';
+          // Test de non-vidité : on retire balises + &nbsp; pour ne pas garder un <p></p> vide.
+          const plainProbe = String(raw).replace(/<[^>]+>/g, '').replace(/&nbsp;/gi, ' ').trim();
+          return { name: c.name, raw: String(raw), hasContent: plainProbe.length > 0 };
+        })
+        .filter(r => r.hasContent);
+
+      if (negoRespRows.length > 0) {
+        y = addPage('Réponses & engagements — Négociation', 'a4', 'portrait');
+        tocEntries.push({ label: '6.ter Réponses & engagements des soumissionnaires', page: pageNum });
+        y = sectionTitle(doc, `6.ter  RÉPONSES & ENGAGEMENTS DES SOUMISSIONNAIRES`, y, THEME.primary);
+
+        doc.setFont('Helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(60, 60, 60);
+        const introResp = doc.splitTextToSize(
+          "Les réponses et engagements ci-dessous ont été consignés à l'issue de la négociation, à partir des retours écrits des soumissionnaires (courrier de réponse, échanges formalisés). Ils actent les engagements pris par chaque entreprise dans le cadre de la présente consultation.",
+          W - 2 * M
+        );
+        doc.text(introResp, M, y);
+        y += introResp.length * 4 + 6;
+
+        negoRespRows.forEach(r => {
+          // Contenu WYSIWYG : parse une fois pour connaître la hauteur avant le bandeau,
+          // et pour paginer proprement si nécessaire.
+          const htmlSrc = isHtmlContent(r.raw)
+            ? r.raw
+            // Legacy texte plain → conversion minimale (retours à la ligne préservés)
+            : String(r.raw).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+          const blocks = parseHtmlToBlocks(htmlSrc);
+
+          const nameH = 10;
+          // Estimation grossière de la hauteur (lignes de bloc à 4.5 mm)
+          const estH = blocks.reduce((acc, b) => {
+            if (b.runs.length === 1 && !b.runs[0].text) return acc + 4.5;
+            const chars = b.runs.reduce((s, r) => s + r.text.length, 0);
+            const lineChars = 90; // approx à 9pt sur W-2M-6
+            return acc + Math.max(1, Math.ceil(chars / lineChars)) * 4.5 + 1.5;
+          }, 0);
+          if (y + nameH + Math.min(estH, 60) > 285 && y > 60) {
+            y = addPage('Réponses & engagements (suite)', 'a4', 'portrait');
+          }
+
+          // Bandeau nom d'entreprise (fond vert clair, texte vert foncé)
+          doc.setFillColor(...VERT_CLAIR);
+          doc.rect(M, y, W - 2 * M, 7, 'F');
+          doc.setFont('Helvetica', 'bold');
+          doc.setFontSize(10);
+          doc.setTextColor(...VERT_FONCE);
+          doc.text(cleanText(r.name), M + 3, y + 5);
+          y += 10;
+
+          // Corps : rendu HTML (styles inline + listes)
+          y = drawHtmlBlocks(doc, blocks, M + 3, y, W - 2 * M - 6, {
+            fontName: 'Helvetica', fontSize: 9, lineH: 4.5, blockGap: 1.5,
+            textColor: THEME.text,
+            // Pagination automatique bloc par bloc si dépassement
+            pageBreak: (curY, blockH) => {
+              if (curY + blockH > 285 && curY > 60) {
+                const newY = addPage('Réponses & engagements (suite)', 'a4', 'portrait');
+                return { y: newY, broke: true };
+              }
+              return { y: curY, broke: false };
+            },
+          });
+          y += 6;
+        });
+      }
+    }
+
     // ── DÉTAIL DES PRIX UNITAIRES — Un tableau A4 paysage par tranche ──
     if (chaptersData && chaptersData.length > 0) {
 
@@ -1252,19 +1695,25 @@ export const generateRaoPDF = async (optionsParams) => {
       const detailColumns = [];
       analysisCompanies.forEach((c, idx) => {
         const admin = companiesData[c.name]?.admin || {};
-        const baseConcl = admin.conclusion && NON_REG_DETAIL.includes(admin.conclusion) ? admin.conclusion : null;
+        // Statut effectif (régularisation après négo prise en compte).
+        const effConcl = getEffectiveConclusion(admin, negoActive ? 'nego' : 'initial');
+        const baseConcl = effConcl && NON_REG_DETAIL.includes(effConcl) ? effConcl : null;
+        // Rabais commercial global (phase après négo) — s'applique à la colonne
+        // base ET à ses variantes (déduit du Total HT en pied de tableau).
+        const rabaisPct = negoActive ? getCompanyRabaisPct(c, 'nego') : 0;
         detailColumns.push({
           key: `${c.id}_base`,
           companyId: c.id,
           companyName: c.name,
           companyIndex: idx,
           kind: 'base',
-          offers: c.offers || {},
+          offers: getEffectiveOffers(c, negoActive ? 'nego' : 'initial'),
           quantities: {},
           removedIds: new Set(),
           newItems: [],
           irregular: !!baseConcl,
           irregularLabel: baseConcl,
+          rabaisPct,
         });
         // Variantes retenues uniquement (CCP R2151-11)
         (c.variants || []).filter(v => v.retained).forEach((v, vi) => {
@@ -1277,12 +1726,15 @@ export const generateRaoPDF = async (optionsParams) => {
             variantIndex: vi + 1,
             variantLabel: v.label || `Variante ${vi + 1}`,
             kind: 'variant',
-            offers: { ...(c.offers || {}), ...(v.offers || {}) },
+            // Fusion base + variante, puis prix négociés propres à la variante en
+            // phase après négo (source unique — cohérent avec le total dénormalisé v.totalNego).
+            offers: getEffectiveVariantOffers(c, v, negoActive ? 'nego' : 'initial'),
             quantities: v.quantities || {},
             removedIds: new Set((v.removedItems || []).map(it => it.itemId)),
             newItems: v.newItems || [],
             irregular: !!vConcl,
             irregularLabel: vConcl,
+            rabaisPct,
           });
         });
       });
@@ -1293,7 +1745,7 @@ export const generateRaoPDF = async (optionsParams) => {
 
       trancheList.forEach((tranche) => {
         const trLabel = hasTr ? tranche.name : 'Détail des Prix Unitaires';
-        y = addPage(`Analyse financière — ${trLabel}`, 'a4', 'landscape');
+        y = addPage(`Analyse financière — ${trLabel}`, pricesPaperSize, 'landscape');
         if (!tocAdded) {
           tocEntries.push({ label: '7. Détail des prix unitaires (A4 paysage)', page: pageNum });
           tocAdded = true;
@@ -1512,6 +1964,19 @@ export const generateRaoPDF = async (optionsParams) => {
           });
         }
 
+        // Total net d'une colonne (brut qté×PU + newItems variante, rabais commercial
+        // global déduit en phase après négo) — cohérent avec la synthèse financière
+        // et le comparatif avant/après négo (source unique du montant noté).
+        const colNetTotal = (col) => {
+          const isVar = col.kind === 'variant';
+          let total = trColumnTotals[col.key] || 0;
+          if (isVar) {
+            total += (col.newItems || []).reduce((s, it) => s + Number(it.lineTotal || (it.qty * it.price) || 0), 0);
+          }
+          if (col.rabaisPct > 0) total *= (1 - col.rabaisPct / 100);
+          return total;
+        };
+
         // Total HT tranche (avec newItems pour les variantes)
         const totalRow = [
           { content: `TOTAL ${hasTr ? tranche.name.toUpperCase() : 'GÉNÉRAL'} HT`, colSpan: 4, styles: { fontStyle: 'bold', halign: 'right' } },
@@ -1520,10 +1985,7 @@ export const generateRaoPDF = async (optionsParams) => {
         ];
         detailColumns.forEach(col => {
           const isVar = col.kind === 'variant';
-          let total = trColumnTotals[col.key] || 0;
-          if (isVar) {
-            total += (col.newItems || []).reduce((s, it) => s + Number(it.lineTotal || (it.qty * it.price) || 0), 0);
-          }
+          const total = colNetTotal(col);
           const deviation = trEstTotal > 0 ? ((total - trEstTotal) / trEstTotal) * 100 : 0;
           if (isVar) totalRow.push({ content: '-', styles: { halign: 'center' } });
           totalRow.push({ content: '-', styles: { halign: 'center' } });
@@ -1539,9 +2001,7 @@ export const generateRaoPDF = async (optionsParams) => {
         const tvaRow = [{ content: `TVA (${projectTvaPct}%)`, colSpan: 4, styles: { fontStyle: 'bold', halign: 'right', fillColor: [245, 245, 250] } }, { content: '', styles: { fillColor: [245, 245, 250] } }, { content: formatNumberFr(tvaEstTotal), styles: { fontStyle: 'bold', halign: 'right', fillColor: [245, 245, 250] } }];
         detailColumns.forEach(col => {
           const isVar = col.kind === 'variant';
-          let total = trColumnTotals[col.key] || 0;
-          if (isVar) total += (col.newItems || []).reduce((s, it) => s + Number(it.lineTotal || (it.qty * it.price) || 0), 0);
-          const tva = computeVatBreakdown(total, tvaRate).tva;
+          const tva = computeVatBreakdown(colNetTotal(col), tvaRate).tva;
           if (isVar) tvaRow.push({ content: '', styles: { fillColor: [245, 245, 250] } });
           tvaRow.push({ content: '', styles: { fillColor: [245, 245, 250] } });
           tvaRow.push({ content: formatNumberFr(tva), styles: { halign: 'right', fillColor: [245, 245, 250] } });
@@ -1554,9 +2014,7 @@ export const generateRaoPDF = async (optionsParams) => {
         const ttcRow = [{ content: `TOTAL ${hasTr ? tranche.name.toUpperCase() : 'GÉNÉRAL'} TTC`, colSpan: 4, styles: { fontStyle: 'bold', halign: 'right', fillColor: [209, 250, 229] } }, { content: '', styles: { fillColor: [209, 250, 229] } }, { content: formatNumberFr(ttcEstTotal), styles: { fontStyle: 'bold', halign: 'right', fillColor: [209, 250, 229] } }];
         detailColumns.forEach(col => {
           const isVar = col.kind === 'variant';
-          let total = trColumnTotals[col.key] || 0;
-          if (isVar) total += (col.newItems || []).reduce((s, it) => s + Number(it.lineTotal || (it.qty * it.price) || 0), 0);
-          const ttc = computeVatBreakdown(total, tvaRate).ttc;
+          const ttc = computeVatBreakdown(colNetTotal(col), tvaRate).ttc;
           if (isVar) ttcRow.push({ content: '', styles: { fillColor: [209, 250, 229] } });
           ttcRow.push({ content: '', styles: { fillColor: [209, 250, 229] } });
           ttcRow.push({ content: formatNumberFr(ttc), styles: { fontStyle: 'bold', halign: 'right', fillColor: [209, 250, 229] } });
@@ -1569,8 +2027,11 @@ export const generateRaoPDF = async (optionsParams) => {
           head: [mainHeaders, subHeaders],
           body: tableBody,
           theme: 'grid',
-          styles: { font: 'Helvetica', fontSize: 6, cellPadding: 1, lineColor: [220, 220, 220], lineWidth: 0.1 },
-          headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], lineWidth: 0.1, lineColor: [180, 180, 180] },
+          // Font size adapte au format papier : A4 compact (5.5 pt) ou A3 confort
+          // de lecture (6.5 pt — le format offre ~40% de largeur en plus, on peut relacher).
+          // Padding legerement plus serre en A4 pour eviter le wrap sur les grands nombres.
+          styles: { font: 'Helvetica', fontSize: pricesPaperSize === 'a3' ? 6.5 : 5.5, cellPadding: pricesPaperSize === 'a3' ? 1.2 : 0.8, lineColor: [220, 220, 220], lineWidth: 0.1 },
+          headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], lineWidth: 0.1, lineColor: [180, 180, 180], fontSize: pricesPaperSize === 'a3' ? 6.5 : 5.5 },
           columnStyles,
           margin: { left: 10, right: 10 },
           didDrawPage: () => drawFooter(doc, pageNum, consultation, project, THEME),
@@ -1613,7 +2074,13 @@ export const generateRaoPDF = async (optionsParams) => {
           doc.setFont('Helvetica', 'normal');
           doc.setFontSize(8);
           doc.setTextColor(...THEME.lightText);
-          doc.text(`Total HT : ${fmt(v.total || 0)} €  •  Base HT : ${fmt(analysisStats?.companiesTotals?.[c.id] || 0)} €`, M + 3, y + 10);
+          {
+            // Total net (rabais commercial global de l'entreprise déduit en phase après négo) —
+            // même primitif que la synthèse financière et le Récap (source unique).
+            const vTotalEff = getVariantEffectiveTotal(c, v, negoActive ? 'nego' : 'initial');
+            const vRabaisPct = negoActive ? getCompanyRabaisPct(c, 'nego') : 0;
+            doc.text(`Total HT : ${fmt(vTotalEff)} €${vRabaisPct > 0 ? ` (net, rabais -${vRabaisPct}%)` : ''}  •  Base HT : ${fmt(analysisStats?.companiesTotals?.[c.id] || 0)} €`, M + 3, y + 10);
+          }
           y += 16;
 
           if (v.description) {
@@ -1851,7 +2318,7 @@ export const generateRaoPDF = async (optionsParams) => {
             const blocks = companyNames
               .map((name, ci) => ({ name, ci }))
               .map(({ name, ci }) => {
-                const irregular = NON_REGULAR_STATUSES.includes(companiesData[name]?.admin?.conclusion);
+                const irregular = NON_REGULAR_STATUSES.includes(getEffectiveConclusion(companiesData[name]?.admin, negoActive ? 'nego' : 'initial'));
                 const tech = companiesData[name]?.technical || {};
                 const sd = tech[sc.id] || {};
                 let h = HEADER_BLOCK;
@@ -1950,7 +2417,7 @@ export const generateRaoPDF = async (optionsParams) => {
           const blocks = companyNames
             .map((name, ci) => ({ name, ci }))
             .map(({ name, ci }) => {
-              const irregular = NON_REGULAR_STATUSES.includes(companiesData[name]?.admin?.conclusion);
+              const irregular = NON_REGULAR_STATUSES.includes(getEffectiveConclusion(companiesData[name]?.admin, negoActive ? 'nego' : 'initial'));
               const tech = companiesData[name]?.technical || {};
               const d = tech[crit.id] || {};
               let h = HEADER_BLOCK;
@@ -2317,13 +2784,13 @@ export const generateRaoPDF = async (optionsParams) => {
   y += 8;
 
   const formulasBody = [
-    ['f1', 'Lineaire',                     'N x (Pmin / P)'],
+    ['f1', 'Linéaire',                     'N x (Pmin / P)'],
     ['f2', 'Quadratique',                  'N x (Pmin / P)^2'],
     ['f3', 'Cubique',                      'N x (Pmin / P)^3'],
-    ['f4', 'Ecart relatif',                'N x (1 - (P - Pmin) / Pmin)'],
+    ['f4', 'Écart relatif',                'N x (1 - (P - Pmin) / Pmin)'],
     ['f5', 'Amortie par moyenne',          'N x (1 - (P - Pmin) / Pmoy)'],
     ['f6', 'Mixte (sous/au-dessus moy.)',  'Si P <= Pmoy : N x racine(Pmin/P) ; sinon : N x (Pmin/P)^2'],
-    ['f7', 'Bornee Pmin / Pmax',           'N x (1 - (P - Pmin) / (Pmax - Pmin))'],
+    ['f7', 'Bornée Pmin / Pmax',           'N x (1 - (P - Pmin) / (Pmax - Pmin))'],
     ['f8', 'Inverse de moyenne',           '(N x Pmoy) / (Pmoy + P)'],
     ['f9', 'Double minimum',               'N x (2 x Pmin / (Pmin + P))'],
   ];

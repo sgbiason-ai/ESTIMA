@@ -67,13 +67,18 @@ export const sanitizeFilename = (name) => {
 /** Retire les retours a la ligne et trim. */
 export const cleanText = (str) => typeof str === 'string' ? str.replace(/[\r\n]+/g, ' ').trim() : '';
 
-/** Formate un nombre avec locale FR (ex: 1 234,56). */
+/**
+ * Formate un nombre avec locale FR (ex: 1 234,56).
+ * Separateur des milliers = espace INSECABLE (U+00A0) pour empecher jsPDF/autoTable
+ * de wrapper au milieu du nombre quand une cellule est etroite (bug « 23 » retour
+ * ligne « 075,00 » dans les tableaux de prix). WinAnsi-safe (0xA0 CP1252).
+ */
 export const formatNumberFr = (value) => {
   if (value === undefined || value === null || value === '' || isNaN(Number(value))) return '-';
   const num = Number(value);
   const fixed = num.toFixed(2);
   const parts = fixed.split('.');
-  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   return parts.join(',');
 };
 

@@ -177,15 +177,15 @@ describe('cleanText', () => {
 
 describe('formatNumberFr', () => {
   it('formate un entier avec decimales', () => {
-    expect(formatNumberFr(1234)).toBe('1 234,00');
+    expect(formatNumberFr(1234)).toBe('1 234,00');
   });
 
   it('formate un decimal', () => {
-    expect(formatNumberFr(1234.56)).toBe('1 234,56');
+    expect(formatNumberFr(1234.56)).toBe('1 234,56');
   });
 
   it('formate un grand nombre', () => {
-    expect(formatNumberFr(1234567.89)).toBe('1 234 567,89');
+    expect(formatNumberFr(1234567.89)).toBe('1 234 567,89');
   });
 
   it('formate zero', () => {
@@ -193,11 +193,11 @@ describe('formatNumberFr', () => {
   });
 
   it('formate un nombre negatif', () => {
-    expect(formatNumberFr(-1234.56)).toBe('-1 234,56');
+    expect(formatNumberFr(-1234.56)).toBe('-1 234,56');
   });
 
   it('accepte une string numerique', () => {
-    expect(formatNumberFr('5000')).toBe('5 000,00');
+    expect(formatNumberFr('5000')).toBe('5 000,00');
   });
 
   it('retourne tiret pour valeurs invalides', () => {

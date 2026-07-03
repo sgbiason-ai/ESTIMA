@@ -3,7 +3,7 @@
 // Affiche une checklist par onglet avec les items manquants cliquables.
 
 import React from 'react';
-import { CheckCircle2, AlertTriangle, X, FileDown, ArrowRight, Loader2, Files, Handshake } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, X, FileDown, ArrowRight, Loader2, Files, Handshake, Printer } from 'lucide-react';
 
 const TAB_LABELS = {
   consultation: { num: 1, label: 'Consultation' },
@@ -24,6 +24,8 @@ const PreExportChecklistModal = ({
   onToggleIncludeAnnexes,
   negotiationPhase = 'none',
   onChangeNegotiationPhase,
+  pricesPaperSize = 'a4',
+  onChangePricesPaperSize,
 }) => {
   if (!open) return null;
 
@@ -154,6 +156,38 @@ const PreExportChecklistModal = ({
                 </span>
               </span>
             </label>
+          </div>
+
+          {/* Format papier du detail des prix (§7) — A4 compact ou A3 confort de lecture */}
+          <div className="shrink-0 px-6 py-3 border-t border-slate-100 bg-slate-50/40">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 mb-2">
+              <Printer size={14} className="text-slate-500" />
+              Impression du détail des prix (§7)
+            </div>
+            <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
+              {[
+                { value: 'a4', label: 'A4 paysage', desc: 'compact' },
+                { value: 'a3', label: 'A3 paysage', desc: 'confort de lecture' },
+              ].map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => onChangePricesPaperSize && onChangePricesPaperSize(opt.value)}
+                  className={`flex-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
+                    pricesPaperSize === opt.value
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <span>{opt.label}</span>
+                  <span className="ml-1 text-[10px] font-normal text-slate-400">· {opt.desc}</span>
+                </button>
+              ))}
+            </div>
+            <span className="block text-[11px] text-slate-500 mt-1.5">
+              A4 : format standard d'impression bureautique (police compacte 5,5 pt).
+              A3 : format élargi, police plus lisible (6,5 pt) — utile quand il y a beaucoup d'entreprises ou de variantes.
+            </span>
           </div>
 
           {/* Phase de négociation — marque le rapport avant / après négociation */}
