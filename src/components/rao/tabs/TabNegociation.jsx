@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 
 import { Textarea } from '../RaoUI';
+import RichTextField from '../../common/RichTextField';
 import { COMPANY_UI_COLORS } from '../RaoConstants';
 import CompanySidebar from '../CompanySidebar';
 import { toast } from '../../../utils/globalUI';
@@ -27,6 +28,7 @@ import TemplateEditorModal from './nego/TemplateEditorModal';
 import AnomalyControls from './nego/AnomalyControls';
 import NegoLetterPreview from './nego/NegoLetterPreview';
 import NegoConfigSidebar from './nego/NegoConfigSidebar';
+import NegoComparisonPanel from './nego/NegoComparisonPanel';
 
 const TabNegociation = ({
   companyNames,
@@ -43,6 +45,12 @@ const TabNegociation = ({
   project = null,
   raoLetterConfig = null,
   updateRaoLetterConfig = () => {},
+  // Analyse après négociation (comparatif avant/après + phase de notation)
+  negoComparison = null,
+  negoActive = false,
+  scoringConfig = null,
+  onUpdateNegoRabais = null,
+  onImportNegoOffer = null,
 }) => {
   // Trame globale persistée au niveau utilisateur (users/{uid}/preferences/negotiation_template)
   const { template: masterTemplate, saveTemplate } = useNegoTemplate(DEFAULT_TEMPLATE);
@@ -191,6 +199,15 @@ const TabNegociation = ({
             {/* ── Colonne principale : courrier + accordéon ── */}
             <div className="flex-1 min-w-0 space-y-6">
 
+              {/* ── Analyse après négociation (comparatif toutes entreprises) ── */}
+              <NegoComparisonPanel
+                comparison={negoComparison}
+                negoActive={negoActive}
+                scoringConfig={scoringConfig}
+                onUpdateRabais={onUpdateNegoRabais}
+                onImportNegoOffer={onImportNegoOffer}
+              />
+
               {/* ── Header entreprise ── */}
               <div className={`flex items-center gap-5 px-6 py-4 bg-white rounded-2xl border ${uiColor.border} border-l-[5px] shadow-sm`}>
                 <div className={`w-12 h-12 rounded-2xl ${uiColor.bg} ${uiColor.text} flex items-center justify-center font-black text-xl shadow-inner`}>
@@ -278,7 +295,16 @@ const TabNegociation = ({
                     <div>
                       <h4 className="text-base font-black uppercase tracking-widest text-slate-900">Réponses & Engagements</h4>
                       <p className="text-xs text-slate-500 mt-0.5">
-                        {nego.responses ? `${nego.responses.length} caractère${nego.responses.length > 1 ? 's' : ''} saisi${nego.responses.length > 1 ? 's' : ''}` : 'Consignez ici les retours après envoi du courrier'}
+                        {(() => {
+                          // Compter les caractères visibles (retirer les balises HTML pour ne pas gonfler le décompte).
+                          const plain = typeof nego.responses === 'string'
+                            ? nego.responses.replace(/<[^>]+>/g, '').replace(/&nbsp;/gi, ' ').trim()
+                            : '';
+                          const n = plain.length;
+                          return n > 0
+                            ? `${n} caractère${n > 1 ? 's' : ''} saisi${n > 1 ? 's' : ''}`
+                            : 'Consignez ici les retours après envoi du courrier';
+                        })()}
                       </p>
                     </div>
                   </div>
@@ -286,12 +312,11 @@ const TabNegociation = ({
                 </button>
                 {nego.__responsesOpen && (
                   <div className="px-6 pb-6 border-t border-slate-100 pt-4">
-                    <Textarea
+                    <RichTextField
                       value={nego.responses}
                       onChange={v => updateNegotiation(name, 'responses', v)}
                       placeholder="Consignez ici les retours de l'entreprise après l'envoi du courrier."
                       rows={6}
-                      className="bg-white border-slate-300 shadow-sm rounded-2xl text-slate-900 font-medium text-[15px] leading-relaxed placeholder:text-slate-400 focus:ring-emerald-500/20 min-h-[140px]"
                     />
                   </div>
                 )}

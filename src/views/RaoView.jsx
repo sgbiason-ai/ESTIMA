@@ -1,5 +1,5 @@
 // src/views/RaoView.jsx
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   FileDown, Loader2, Users, Save, CheckCircle2, FileSignature, 
   FileText, ScrollText as ScrollIcon, CheckSquare, Brain, MessageSquare, 
@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db as fireDb } from '../firebase';
+import { getCompanyRabaisPct, getVariantEffectiveTotal, variantHasNego, computePriceReference, scoreOffer } from '../utils/analysisCompute';
 import { useRao } from '../hooks/useRao';
 import { useRaoCompletion } from '../hooks/useRaoCompletion';
 import { toast } from '../utils/globalUI';
@@ -19,6 +20,7 @@ import TabNegociation from '../components/rao/tabs/TabNegociation';
 import TabRecap from '../components/rao/tabs/TabRecap';
 import TabDepouillement from '../components/rao/tabs/TabDepouillement';
 import DepouillementModal from '../components/rao/DepouillementModal';
+import DepouillementNegoModal from '../components/rao/DepouillementNegoModal';
 import ProjectDetailsModal from '../components/modals/ProjectDetailsModal';
 import PreExportChecklistModal from '../components/rao/PreExportChecklistModal';
 import {
@@ -45,6 +47,10 @@ const RaoView = ({
   analysisCompanies = [],
   analysisLoaded = true,
   analysisStats = null,
+  analysisStatsInitial = null,
+  analysisStatsNego = null,
+  negoActive = false,
+  hasNegoOffers = false,
   scoringConfig = null,
   masterBranding = null,
   chaptersData = [],
@@ -59,6 +65,12 @@ const RaoView = ({
   onApplyDepouillement = null,
   onUpdateAeAmount = null,
   onUpdateVariantAeAmount = null,
+  onUpdateNegoRabais = null,
+  onImportNegoOffer = null,
+  onApplyDepouillementNego = null,
+  onUpdateAeAmountNego = null,
+  onUpdateVariantAeAmountNego = null,
+  onSetNegoPhase = null,
   onImportOffer = null,
   onImportPdfOffer = null,
   handleSaveProject = null,
@@ -77,9 +89,20 @@ const RaoView = ({
   // Phase de négociation à marquer sur le rapport : 'none' | 'before' | 'after'.
   // 'none' par défaut : page de garde et conclusion inchangées (marchés sans négo).
   const [negotiationPhase, setNegotiationPhase] = useState('none');
+  // Format papier du detail des prix unitaires (§7) : 'a4' (compact) ou 'a3' (confort de lecture).
+  // Defaut 'a4' : imprimable partout sans reglage particulier ; l'utilisateur bascule sur A3
+  // quand il y a beaucoup d'entreprises/variantes pour ameliorer la lisibilite.
+  const [pricesPaperSize, setPricesPaperSize] = useState('a4');
+  // Si l'analyse est basculée « après négo », proposer d'office la phase 'after'
+  // (l'utilisateur peut toujours la changer dans la checklist pré-export).
+  useEffect(() => {
+    if (negoActive) setNegotiationPhase(p => (p === 'none' ? 'after' : p));
+  }, [negoActive]);
   // showHelp / setShowHelp supprimés : l'aide est gérée par RaoAnalysisView
   // État de la modale Dépouillement
   const [depouillementOpen, setDepouillementOpen] = useState(false);
+  // État de la modale Dépouillement après négociation (PV des offres finales)
+  const [depouillementNegoOpen, setDepouillementNegoOpen] = useState(false);
   // Trace si la modale a déjà été présentée pour éviter la réouverture en boucle
   const autoOpenedRef = useRef(false);
   // État de la modale Fiche affaire (identique au module ESTIMA)
@@ -172,6 +195,73 @@ const RaoView = ({
   const ranking = rao.getRanking();
   const companyNames = analysisCompanies.map(c => c.name);
 
+  // ─── COMPARATIF AVANT / APRÈS NÉGOCIATION ────────────────────────────────
+  // Lignes = offres de base + variantes RETENUES (mêmes offres concourantes que
+  // le Récap). Montants des deux phases (hors options PSE), rabais commercial
+  // global déduit des montants négo, notes prix recalculées sur la fourchette
+  // complète (computePriceReference → scoreOffer, source unique).
+  // Alimente le panneau Négociation, l'onglet Dépouillement (mode négo) et le PDF 6.bis.
+  const negoComparison = useMemo(() => {
+    // Visible dès que des données négo existent OU que la phase est active
+    // (permet de saisir rabais / PV après négo depuis le RAO avant tout prix négocié).
+    if ((!hasNegoOffers && !negoActive) || !analysisStatsInitial || !analysisStatsNego) return null;
+
+    const rows = [];
+    analysisCompanies.forEach(c => {
+      const rabaisPct = getCompanyRabaisPct(c, 'nego');
+      rows.push({
+        kind: 'base',
+        id: c.id,
+        companyId: c.id,
+        name: c.name,
+        initialTotal: analysisStatsInitial.companiesTotals?.[c.id] || 0,
+        // Total NET (rabais commercial déduit par computeAnalysisStats)
+        negoTotal: analysisStatsNego.companiesTotals?.[c.id] || 0,
+        negoTotalBrut: analysisStatsNego.companiesTotalsBrut?.[c.id] ?? (analysisStatsNego.companiesTotals?.[c.id] || 0),
+        rabaisPct,
+        negotiated: !!(c.offersNego && Object.keys(c.offersNego).length > 0) || rabaisPct > 0,
+        negoImportFile: c.negoImportFile || null,
+        negoImportAt: c.negoImportAt || null,
+        aeAmountNego: c.aeAmountNego ?? null,
+      });
+      (c.variants || []).filter(v => v.retained).forEach((v, vi) => {
+        rows.push({
+          kind: 'variant',
+          id: `${c.id}_${v.id}`,
+          companyId: c.id,
+          variantId: v.id,
+          name: `${c.name} · ${v.label || `V${vi + 1}`}`,
+          initialTotal: getVariantEffectiveTotal(c, v, 'initial'),
+          negoTotal: getVariantEffectiveTotal(c, v, 'nego'),
+          negoTotalBrut: Number(v.totalNego ?? v.total ?? 0),
+          rabaisPct,
+          negotiated: variantHasNego(v) || rabaisPct > 0,
+          negoImportFile: v.negoImportFile || null,
+          negoImportAt: v.negoImportAt || null,
+          aeAmountNego: v.aeAmountNego ?? null,
+        });
+      });
+    });
+
+    const kept = rows.filter(r => r.initialTotal > 0 || r.negoTotal > 0);
+    if (kept.length === 0) return null;
+
+    // Notes prix des deux phases — toutes les offres concourent (bases +
+    // variantes retenues), même méthodologie que le Récap.
+    const N = Number(scoringConfig?.maxScore || 40);
+    const mode = scoringConfig?.mode || 'f1';
+    const refInitial = computePriceReference(kept.map(r => r.initialTotal));
+    const refNego = computePriceReference(kept.map(r => r.negoTotal));
+    kept.forEach(r => {
+      r.delta = r.negoTotal - r.initialTotal;
+      r.deltaPct = r.initialTotal > 0 ? (r.delta / r.initialTotal) * 100 : 0;
+      r.scoreInitial = refInitial.Pmin > 0 ? scoreOffer(r.initialTotal, refInitial.Pmin, refInitial.Pmax, refInitial.Pmoy, N, mode) : 0;
+      r.scoreNego = refNego.Pmin > 0 ? scoreOffer(r.negoTotal, refNego.Pmin, refNego.Pmax, refNego.Pmoy, N, mode) : 0;
+    });
+
+    return kept.sort((a, b) => a.negoTotal - b.negoTotal);
+  }, [hasNegoOffers, negoActive, analysisStatsInitial, analysisStatsNego, analysisCompanies, scoringConfig]);
+
   // ─── État de complétion du RAO (alimente stepper + badges + checklist) ───
   const completion = useRaoCompletion({
     rao: project?.rao,
@@ -237,6 +327,11 @@ const RaoView = ({
         includeAnnexes,
         // Phase de négociation : badge page de garde + adaptation de la recommandation.
         negotiationPhase,
+        // Format papier du detail des prix unitaires : 'a4' | 'a3'.
+        pricesPaperSize,
+        // Comparatif avant/après négociation (montants + notes prix des deux phases).
+        negoComparison,
+        negoActive,
         // Nouvelles props pour la refonte complète du PDF
         optionChapters: rao.optionChapters,
         includedOptions: rao.includedOptions,
@@ -425,6 +520,17 @@ const RaoView = ({
         onCancel={() => setDepouillementOpen(false)}
       />
 
+      {/* Modale Dépouillement après négociation (PV des offres finales) */}
+      <DepouillementNegoModal
+        open={depouillementNegoOpen}
+        companies={analysisCompanies}
+        onConfirm={(entries) => {
+          if (onApplyDepouillementNego) onApplyDepouillementNego(entries);
+          setDepouillementNegoOpen(false);
+        }}
+        onCancel={() => setDepouillementNegoOpen(false)}
+      />
+
       {/* Modale checklist pré-export PDF */}
       <PreExportChecklistModal
         open={preExportOpen}
@@ -435,6 +541,8 @@ const RaoView = ({
         onToggleIncludeAnnexes={setIncludeAnnexes}
         negotiationPhase={negotiationPhase}
         onChangeNegotiationPhase={setNegotiationPhase}
+        pricesPaperSize={pricesPaperSize}
+        onChangePricesPaperSize={setPricesPaperSize}
         onCancel={() => setPreExportOpen(false)}
         onNavigate={(tabId) => setActiveTab(tabId)}
         onConfirm={async () => {
@@ -468,13 +576,20 @@ const RaoView = ({
               onGoToAdmin={(name) => { setSelectedCompany(name); setActiveTab('admin'); }}
               companiesData={project?.rao?.companies || {}}
               criteria={rao.criteria}
+              negoActive={negoActive}
+              onSetNegoPhase={onSetNegoPhase}
+              negoRows={negoComparison}
+              onOpenDepouillementNego={onApplyDepouillementNego ? () => setDepouillementNegoOpen(true) : null}
+              onUpdateAeAmountNego={onUpdateAeAmountNego}
+              onUpdateVariantAeAmountNego={onUpdateVariantAeAmountNego}
+              onImportNegoOffer={onImportNegoOffer}
             />
           )}
           {activeTab === 'consultation' && (
             <TabConsultation consultation={rao.consultation} updateConsultation={rao.updateConsultation} criteria={rao.criteria} updateCriteria={rao.updateCriteria} addCriterion={rao.addCriterion} removeCriterion={rao.removeCriterion} addSubCriterion={rao.addSubCriterion} removeSubCriterion={rao.removeSubCriterion} updateSubCriterion={rao.updateSubCriterion} scoringConfig={scoringConfig} hasTranches={rao.hasTranches} tranches={rao.tranches} raoTrancheId={rao.raoTrancheId} setRaoTrancheId={rao.setRaoTrancheId} />
           )}
           {activeTab === 'admin' && (
-            <TabAdministrative companyNames={companyNames} companiesData={project?.rao?.companies || {}} updateAdminPiece={rao.updateAdminPiece} updateAdminField={rao.updateAdminField} selectedCompany={selectedCompany} onSelectCompany={setSelectedCompany} adminPieces={rao.adminPieces} offerPieces={rao.offerPieces} setAdminPieces={rao.setAdminPieces} setOfferPieces={rao.setOfferPieces} analysisCompanies={analysisCompanies} consultation={rao.consultation} onImportVariant={onImportVariant} onRemoveVariant={onRemoveVariant} onToggleVariantRetained={onToggleVariantRetained} missing={completion.tabStates.admin?.missing || []} />
+            <TabAdministrative companyNames={companyNames} companiesData={project?.rao?.companies || {}} updateAdminPiece={rao.updateAdminPiece} updateAdminField={rao.updateAdminField} selectedCompany={selectedCompany} onSelectCompany={setSelectedCompany} adminPieces={rao.adminPieces} offerPieces={rao.offerPieces} setAdminPieces={rao.setAdminPieces} setOfferPieces={rao.setOfferPieces} analysisCompanies={analysisCompanies} consultation={rao.consultation} onImportVariant={onImportVariant} onRemoveVariant={onRemoveVariant} onToggleVariantRetained={onToggleVariantRetained} missing={completion.tabStates.admin?.missing || []} negoActive={negoActive} />
           )}
           {activeTab === 'technique' && (
             <TabTechnique companyNames={companyNames} companiesData={project?.rao?.companies || {}} criteria={rao.criteria} updateTechnical={rao.updateTechnical} analysisStats={rao.raoAnalysisStats} scoringConfig={scoringConfig} analysisCompanies={analysisCompanies} selectedCompany={selectedCompany} onSelectCompany={setSelectedCompany} onUpdateVariantJustification={onUpdateVariantJustification} missing={completion.tabStates.technique?.missing || []} />
@@ -495,10 +610,15 @@ const RaoView = ({
               project={project}
               raoLetterConfig={rao.letterConfig}
               updateRaoLetterConfig={rao.updateLetterConfig}
+              negoComparison={negoComparison}
+              negoActive={negoActive}
+              scoringConfig={scoringConfig}
+              onUpdateNegoRabais={onUpdateNegoRabais}
+              onImportNegoOffer={onImportNegoOffer}
             />
           )}
           {activeTab === 'recap' && (
-            <TabRecap criteria={rao.criteria} ranking={ranking} companyNames={companyNames} onExportPDF={handleExportPDF} isExporting={isExporting} scoringConfig={scoringConfig} hasTranches={rao.hasTranches} raoTrancheId={rao.raoTrancheId} tranches={rao.tranches} analysisCompanies={analysisCompanies} optionChapters={rao.optionChapters} includedOptions={rao.includedOptions} recommendation={rao.recommendation} updateRecommendation={rao.updateRecommendation} />
+            <TabRecap criteria={rao.criteria} ranking={ranking} companyNames={companyNames} onExportPDF={handleExportPDF} isExporting={isExporting} scoringConfig={scoringConfig} hasTranches={rao.hasTranches} raoTrancheId={rao.raoTrancheId} tranches={rao.tranches} analysisCompanies={analysisCompanies} optionChapters={rao.optionChapters} includedOptions={rao.includedOptions} recommendation={rao.recommendation} updateRecommendation={rao.updateRecommendation} negoActive={negoActive} />
           )}
         </div>
       </div>

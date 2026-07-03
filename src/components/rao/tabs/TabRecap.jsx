@@ -2,7 +2,7 @@
 import React, { useMemo } from 'react';
 import { Award, Download, ShieldCheck, Info, Layers, CheckCircle2, XCircle, GitBranch, Check } from 'lucide-react';
 import { FORMULA_LABELS_CONSULT } from '../RaoConstants';
-import { computePriceReference } from '../../../utils/analysisCompute';
+import { computePriceReference, getVariantEffectiveTotal } from '../../../utils/analysisCompute';
 
 // ─── Formatage montant FR ─────────────────────────────────────────────────────
 const fmtPrice = (v) =>
@@ -15,6 +15,7 @@ const TabRecap = ({
   optionChapters = [], includedOptions = {},
   analysisCompanies = [],
   recommendation = '', updateRecommendation = () => {},
+  negoActive = false,
 }) => {
   const priceC  = criteria.find(c => c.auto) || criteria[0];
   const techCs  = criteria.filter(c => !c.auto);
@@ -47,8 +48,10 @@ const TabRecap = ({
           variantId: v.id,
           variantLabel: v.label,
           variantIndex: vi + 1,
-          // Le prix devient le total de la variante
-          price: Number(v.total || 0),
+          // Le prix devient le total NET de la variante (rabais commercial global
+          // de l'entreprise déduit en phase après négo) — même primitif que le
+          // comparatif RAO et l'export PDF (source unique, cf. analysisCompute).
+          price: getVariantEffectiveTotal(company, v, negoActive ? 'nego' : 'initial'),
           // Surcharge : statut indépendant de la base
           irregular: !!variantIrregular,
           irregularLabel: v.adminConclusion || null,
@@ -95,7 +98,7 @@ const TabRecap = ({
     return recomputed
       .sort((a, b) => b.totalScore - a.totalScore)
       .map((r, i) => ({ ...r, rank: i + 1 }));
-  }, [ranking, analysisCompanies, scoringConfig]);
+  }, [ranking, analysisCompanies, scoringConfig, negoActive]);
   const trancheName = hasTranches && raoTrancheId !== 'global'
     ? (tranches || []).find(t => t.id === raoTrancheId)?.name || raoTrancheId
     : null;

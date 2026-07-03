@@ -3,6 +3,7 @@ import React, { useRef, useEffect } from 'react';
 import { Brain, MessageSquare, AlertCircle, AlertTriangle, GitBranch, Check, X } from 'lucide-react';
 import { ScoreBadge } from '../RaoUI';
 import { COMPANY_UI_COLORS, FORMULA_LABELS_CONSULT, NON_REGULAR_STATUSES } from '../RaoConstants';
+import { getEffectiveConclusion } from '../../../utils/analysisCompute';
 import CompanySidebar from '../CompanySidebar';
 import TabAlertBanner from '../TabAlertBanner';
 
@@ -25,7 +26,9 @@ const TabTechnique = ({
 
   // Offres non régulières : restent visibles et éditables à l'écran, mais grisées +
   // signalées par un avertissement, et exclues de l'export PDF du RAO (§8 technique).
-  const isNonRegular = (n) => NON_REGULAR_STATUSES.includes(companiesData[n]?.admin?.conclusion);
+  // Phase après négo : une offre régularisée (conclusionNego) n'est plus grisée.
+  const basis = scoringConfig?.basis === 'nego' ? 'nego' : 'initial';
+  const isNonRegular = (n) => NON_REGULAR_STATUSES.includes(getEffectiveConclusion(companiesData[n]?.admin, basis));
 
   // ── Logique complétion pour sidebar ──
   const getTechCompletion = (companyName) => {

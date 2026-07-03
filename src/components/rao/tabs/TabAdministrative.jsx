@@ -3,7 +3,8 @@ import React, { useState } from 'react';
 import { FileText, Target, MessageSquare, Users, Plus, Trash2, Pencil, Check, X, AlertTriangle, ScrollText, GitBranch, Lock, FileSpreadsheet, Calendar, GripVertical } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Field, Textarea, OuiNonToggle } from '../RaoUI';
-import { COMPANY_UI_COLORS, CONCLUSION_OPTIONS } from '../RaoConstants';
+import { COMPANY_UI_COLORS, CONCLUSION_OPTIONS, NON_REGULAR_STATUSES } from '../RaoConstants';
+import { getEffectiveConclusion, isRegularizedAfterNego } from '../../../utils/analysisCompute';
 import CompanySidebar from '../CompanySidebar';
 import AddVariantModal from '../AddVariantModal';
 import TabAlertBanner from '../TabAlertBanner';
@@ -83,6 +84,7 @@ const TabAdministrative = ({
   onRemoveVariant = null,
   onToggleVariantRetained = null,
   missing = [], // items à compléter dans cet onglet
+  negoActive = false, // phase après négo → bloc « Statut après négociation »
 }) => {
   const [variantModalOpen, setVariantModalOpen] = useState(false);
 
@@ -94,7 +96,9 @@ const TabAdministrative = ({
     const allPieceIds = [...adminPieces.map(p => p.id), ...offerPieces.map(p => p.id)];
     const answeredCount = allPieceIds.filter(id => pcs[id] !== undefined && pcs[id] !== null).length;
     const hasConclusion = conclusion && conclusion !== '';
-    if (hasConclusion && answeredCount === allPieceIds.length) return 'complete';
+    // Phase après négo : une régularisation non motivée laisse l'onglet incomplet.
+    const regMotifMissing = negoActive && isRegularizedAfterNego(admin) && !(admin.regularizationComment || '').trim();
+    if (hasConclusion && answeredCount === allPieceIds.length && !regMotifMissing) return 'complete';
     if (hasConclusion || answeredCount > 0) return 'partial';
     return 'empty';
   };
@@ -445,25 +449,75 @@ const TabAdministrative = ({
               </div>
             </div>
 
-            {/* Commentaire sur la conformité — requis dès que l'offre n'est pas régulière (CCP L2152-2) */}
-            {admin.conclusion && admin.conclusion !== 'reguliere' && (
-              <div id={`admin-conf-comment-${name}`} className="mt-5 pt-5 border-t border-slate-100">
-                <Field label="Commentaire sur la conformité" icon={MessageSquare}>
-                  <Textarea
-                    value={admin.conformityComment || ''}
-                    onChange={v => updateAdminField(name, 'conformityComment', v)}
-                    placeholder="Motiver le caractère non régulier de l'offre : écarts constatés, pièces manquantes, fondement (CCP L2152-2…)…"
-                    rows={3}
-                  />
-                </Field>
-                {!(admin.conformityComment || '').trim() && (
-                  <p className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-amber-700">
-                    <AlertTriangle size={12} /> Requis : précisez le motif pour une offre non régulière.
+          </div>
+
+          {/* ── Statut après négociation (CCP R2152-2) — phase après négo uniquement ── */}
+          {negoActive && (() => {
+            const effNego = getEffectiveConclusion(admin, 'nego') || 'reguliere';
+            const initialNonRegular = NON_REGULAR_STATUSES.includes(admin.conclusion);
+            const regularized = isRegularizedAfterNego(admin);
+            const initialLabel = (CONCLUSION_OPTIONS.find(o => o.value === admin.conclusion) || {}).label || 'Non défini';
+            return (
+              <div id={`admin-concl-nego-${name}`} className="p-6 rounded-2xl border border-emerald-200 bg-emerald-50/40 shadow-sm">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <h4 className="text-sm font-black uppercase tracking-widest text-emerald-800 mb-1">
+                      Statut après négociation
+                    </h4>
+                    <p className="text-xs text-slate-500">
+                      Statut initial : <strong className="text-slate-700">{initialLabel}</strong>. Une offre irrégulière peut être régularisée à l'issue de la négociation (art. R2152-2).
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 p-1.5 bg-white rounded-xl border border-emerald-100 shadow-inner">
+                    {CONCLUSION_OPTIONS.map(opt => (
+                      <button
+                        key={opt.value}
+                        onClick={() => updateAdminField(name, 'conclusionNego', opt.value)}
+                        className={`px-5 py-2.5 rounded-lg text-xs font-black transition-all duration-300 ${
+                          effNego === opt.value
+                            ? opt.color === 'emerald' ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30'
+                            : opt.color === 'orange'  ? 'bg-orange-500 text-white shadow-md shadow-orange-500/30'
+                            :                           'bg-red-500 text-white shadow-md shadow-red-500/30'
+                            : 'bg-transparent text-slate-500 hover:bg-white hover:shadow-sm'
+                        }`}
+                      >{opt.label}</button>
+                    ))}
+                    {admin.conclusionNego && (
+                      <button
+                        onClick={() => updateAdminField(name, 'conclusionNego', '')}
+                        title="Revenir au statut initial (hériter)"
+                        className="px-3 py-2.5 rounded-lg text-xs font-bold text-slate-400 hover:text-slate-600 hover:bg-white transition-all"
+                      >↺ Hériter</button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Motif de la régularisation — requis quand irrégulière → régulière (CCP R2152-2) */}
+                {regularized && (
+                  <div id={`admin-reg-comment-${name}`} className="mt-5 pt-5 border-t border-emerald-100">
+                    <Field label="Motif de la régularisation" icon={MessageSquare}>
+                      <Textarea
+                        value={admin.regularizationComment || ''}
+                        onChange={v => updateAdminField(name, 'regularizationComment', v)}
+                        placeholder="Justifier la régularisation à l'issue de la négociation (nature de l'écart corrigé, engagement du candidat, égalité de traitement…) — art. R2152-2."
+                        rows={3}
+                      />
+                    </Field>
+                    {!(admin.regularizationComment || '').trim() && (
+                      <p className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-amber-700">
+                        <AlertTriangle size={12} /> Requis : motivez la régularisation de l'offre.
+                      </p>
+                    )}
+                  </div>
+                )}
+                {initialNonRegular && !regularized && effNego !== admin.conclusion && (
+                  <p className="mt-3 text-[11px] text-slate-500 italic">
+                    Statut modifié après négociation. Sélectionnez « Offre régulière » pour régulariser l'offre.
                   </p>
                 )}
               </div>
-            )}
-          </div>
+            );
+          })()}
 
         </div>
       </div>

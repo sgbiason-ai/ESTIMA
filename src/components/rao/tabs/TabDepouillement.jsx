@@ -7,11 +7,12 @@
 //   ③ Import variante (bouton sur la sous-ligne variante)
 //   ④ Analyse technique (lien vers l'onglet Technique avec entreprise pré-sélectionnée)
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import {
   ScrollText, Calendar, GitBranch, Building2, FileSpreadsheet, Brain,
-  CheckCircle2, AlertTriangle, Clock, RefreshCw, Plus, ChevronRight, FileText
+  CheckCircle2, AlertTriangle, Clock, RefreshCw, Plus, ChevronRight, FileText, Handshake
 } from 'lucide-react';
+import { getVariantEffectiveTotal, variantHasNego, getCompanyRabaisPct, getEffectiveConclusion } from '../../../utils/analysisCompute';
 
 const REGIME_LABELS = {
   forbidden: 'Variantes interdites',
@@ -66,9 +67,23 @@ export default function TabDepouillement({
   // Pour calculer si l'analyse admin/tech est complète par entreprise
   companiesData = {},
   criteria = [],
+  // ─── Phase après négociation (dépouillement des offres finales) ───
+  negoActive = false,            // phase de notation active (scoringConfig.basis)
+  onSetNegoPhase = null,         // (bool) → bascule Offres initiales / Après négo
+  negoRows = null,               // lignes du comparatif (RaoView.negoComparison) — totaux nets
+  onOpenDepouillementNego = null,// ouvre la modale PV après négo
+  onUpdateAeAmountNego = null,   // (companyId, value) → montant annoncé après négo
+  onUpdateVariantAeAmountNego = null, // (companyId, variantId, value)
+  onImportNegoOffer = null,      // (row, file) → import offre/variante négociée
 }) {
   const regime = consultation.variantsAllowed || 'forbidden';
   const regimeStyle = REGIME_STYLES[regime] || REGIME_STYLES.forbidden;
+
+  // Lookup des lignes du comparatif : base → c.id, variante → `${c.id}_${v.id}`
+  const negoRowById = useMemo(
+    () => new Map((negoRows || []).map(r => [r.id, r])),
+    [negoRows]
+  );
 
   // Inputs cachés pour les imports
   const offerFileRefs = useRef({});         // { companyId: HTMLInputElement } — Excel offre
@@ -81,34 +96,48 @@ export default function TabDepouillement({
   const triggerPdfFile = (companyId) => pdfFileRefs.current[companyId]?.click();
   const triggerVariantXlsx = (companyId, variantId, label) => {
     const key = `${companyId}_${variantId}`;
-    setPendingVariantCtx(prev => ({ ...prev, [key]: { companyId, label } }));
+    setPendingVariantCtx(prev => ({ ...prev, [key]: { companyId, variantId, label } }));
     variantXlsxRefs.current[key]?.click();
   };
   const triggerVariantPdf = (companyId, variantId, label) => {
     const key = `${companyId}_${variantId}`;
-    setPendingVariantCtx(prev => ({ ...prev, [key]: { companyId, label } }));
+    setPendingVariantCtx(prev => ({ ...prev, [key]: { companyId, variantId, label } }));
     variantPdfRefs.current[key]?.click();
   };
 
-  const handleOfferChange = async (companyName, e) => {
+  // En phase après négo, les mêmes boutons d'import alimentent les prix NÉGOCIÉS
+  // (offersNego / variante.offersNego) via onImportNegoOffer — sinon flux initial.
+  const handleOfferChange = async (company, e) => {
     const file = e.target.files?.[0];
-    if (!file || !onImportOffer) { e.target.value = null; return; }
-    await onImportOffer(companyName, file);
+    if (!file) { e.target.value = null; return; }
+    if (negoActive && onImportNegoOffer) {
+      await onImportNegoOffer({ kind: 'base', companyId: company.id, name: company.name }, file);
+    } else if (onImportOffer) {
+      await onImportOffer(company.name, file);
+    }
     e.target.value = null;
   };
 
-  const handlePdfChange = async (companyName, e) => {
+  const handlePdfChange = async (company, e) => {
     const file = e.target.files?.[0];
-    if (!file || !onImportPdfOffer) { e.target.value = null; return; }
-    await onImportPdfOffer(companyName, file);
+    if (!file) { e.target.value = null; return; }
+    if (negoActive && onImportNegoOffer) {
+      await onImportNegoOffer({ kind: 'base', companyId: company.id, name: company.name }, file);
+    } else if (onImportPdfOffer) {
+      await onImportPdfOffer(company.name, file);
+    }
     e.target.value = null;
   };
 
   const handleVariantChange = async (key, e) => {
     const file = e.target.files?.[0];
     const ctx = pendingVariantCtx[key];
-    if (!file || !ctx || !onImportVariant) { e.target.value = null; return; }
-    await onImportVariant(ctx.companyId, file, { label: ctx.label });
+    if (!file || !ctx) { e.target.value = null; return; }
+    if (negoActive && onImportNegoOffer) {
+      await onImportNegoOffer({ kind: 'variant', companyId: ctx.companyId, variantId: ctx.variantId, name: ctx.label }, file);
+    } else if (onImportVariant) {
+      await onImportVariant(ctx.companyId, file, { label: ctx.label });
+    }
     e.target.value = null;
   };
 
@@ -118,15 +147,51 @@ export default function TabDepouillement({
 
         {/* ─── Synthèse de la consultation ─────────────────────────────────── */}
         <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <header className="flex items-center gap-3 px-5 py-3 bg-gradient-to-r from-indigo-50 to-blue-50 border-b border-slate-200/70">
-            <div className="p-2 rounded-xl bg-indigo-100">
-              <ScrollText size={18} className="text-indigo-700" />
+          <header className={`flex items-center gap-3 px-5 py-3 border-b border-slate-200/70 ${negoActive ? 'bg-gradient-to-r from-emerald-50 to-teal-50' : 'bg-gradient-to-r from-indigo-50 to-blue-50'}`}>
+            <div className={`p-2 rounded-xl ${negoActive ? 'bg-emerald-100' : 'bg-indigo-100'}`}>
+              {negoActive
+                ? <Handshake size={18} className="text-emerald-700" />
+                : <ScrollText size={18} className="text-indigo-700" />}
             </div>
             <div className="flex-1">
-              <h2 className="text-base font-extrabold text-slate-800">Synthèse du dépouillement</h2>
-              <p className="text-[11px] text-slate-500">Ouverture des plis et régime applicable aux variantes (CCP)</p>
+              <h2 className="text-base font-extrabold text-slate-800">
+                {negoActive ? 'Dépouillement après négociation' : 'Synthèse du dépouillement'}
+              </h2>
+              <p className="text-[11px] text-slate-500">
+                {negoActive
+                  ? 'Offres finales — la notation porte sur les montants après négociation (rabais déduit)'
+                  : 'Ouverture des plis et régime applicable aux variantes (CCP)'}
+              </p>
             </div>
-            {onReopenDepouillement && (
+
+            {/* Bascule de phase — pilote scoringConfig.basis (tableau, notation, exports) */}
+            {onSetNegoPhase && (
+              <div className="flex bg-gray-100 p-0.5 rounded-xl shrink-0" title="Phase d'analyse : la notation du RAO suit la phase sélectionnée">
+                <button
+                  onClick={() => onSetNegoPhase(false)}
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${!negoActive ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  Offres initiales
+                </button>
+                <button
+                  onClick={() => onSetNegoPhase(true)}
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${negoActive ? 'bg-white shadow-sm text-emerald-700' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  Après négo
+                </button>
+              </div>
+            )}
+
+            {negoActive && onOpenDepouillementNego ? (
+              <button
+                onClick={onOpenDepouillementNego}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-50 text-xs font-bold shadow-sm transition-all"
+                title="Saisir les montants annoncés des offres finales (PV après négociation)"
+              >
+                <Handshake size={12} />
+                PV après négo
+              </button>
+            ) : onReopenDepouillement && (
               <button
                 onClick={onReopenDepouillement}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 text-xs font-bold shadow-sm transition-all"
@@ -179,7 +244,9 @@ export default function TabDepouillement({
               Entreprises et progression
             </h3>
             <span className="text-[11px] text-slate-400">
-              ① Import offre · ② Import variantes · ③ Analyse technique
+              {negoActive
+                ? '① Import offre négociée · ② Import variantes négociées · ③ Analyse technique'
+                : '① Import offre · ② Import variantes · ③ Analyse technique'}
             </span>
           </div>
 
@@ -250,9 +317,13 @@ export default function TabDepouillement({
                     onGoToTechnique={() => onGoToTechnique?.(c.name)}
                     onGoToAdmin={() => onGoToAdmin?.(c.name)}
                     adminDone={adminDone}
-                    adminConclusion={admin.conclusion}
+                    adminConclusion={getEffectiveConclusion(admin, negoActive ? 'nego' : 'initial')}
                     techDone={techDone}
                     techRatio={techRatio}
+                    negoActive={negoActive}
+                    negoRowBase={negoRowById.get(c.id) || null}
+                    onUpdateAeNego={onUpdateAeAmountNego ? (value) => onUpdateAeAmountNego(c.id, value) : null}
+                    onUpdateVariantAeNego={onUpdateVariantAeAmountNego ? (variantId, value) => onUpdateVariantAeAmountNego(c.id, variantId, value) : null}
                   />
                 );
               })}
@@ -290,14 +361,14 @@ export default function TabDepouillement({
                 type="file"
                 accept=".xlsx,.xls"
                 className="hidden"
-                onChange={(e) => handleOfferChange(c.name, e)}
+                onChange={(e) => handleOfferChange(c, e)}
               />
               <input
                 ref={(el) => { pdfFileRefs.current[c.id] = el; }}
                 type="file"
                 accept=".pdf,application/pdf"
                 className="hidden"
-                onChange={(e) => handlePdfChange(c.name, e)}
+                onChange={(e) => handlePdfChange(c, e)}
               />
               {variantInputs}
             </React.Fragment>
@@ -329,6 +400,11 @@ function CompanyProgressCard({
   onGoToTechnique, onGoToAdmin,
   adminDone = false, adminConclusion = null,
   techDone = false, techRatio = null,
+  // ─── Phase après négociation ───
+  negoActive = false,
+  negoRowBase = null,        // ligne comparatif (RaoView.negoComparison) — base uniquement, totaux qté-exacts
+  onUpdateAeNego = null,     // (value) → montant annoncé après négo (entreprise)
+  onUpdateVariantAeNego = null, // (variantId, value) → montant annoncé après négo (variante)
 }) {
   // Label pour la conclusion admin
   const CONCL_LABELS = {
@@ -343,7 +419,13 @@ function CompanyProgressCard({
   const hasQtyMismatch = (company.quantityMismatches || []).length > 0;
   const variants = company.variants || [];
 
-  const offerStatus = offerImported ? 'done' : 'todo';
+  // Rabais commercial global de l'entreprise (phase négo) — s'applique base + variantes
+  const rabaisPct = negoActive ? getCompanyRabaisPct(company, 'nego') : 0;
+  const offerNegoImported = !!(company.offersNego && Object.keys(company.offersNego).length > 0);
+
+  const offerStatus = negoActive
+    ? ((offerNegoImported || rabaisPct > 0) ? 'done' : 'todo')
+    : (offerImported ? 'done' : 'todo');
   const offerStatusLabel = offerImported
     ? `Importée — ${fmtEUR(company.computedTotal || 0)}`
     : (company.aeAmount != null ? `Annoncée : ${fmtEUR(company.aeAmount)}` : 'À importer');
@@ -394,6 +476,17 @@ function CompanyProgressCard({
               ae={company.aeAmount}
               onUpdateAe={onUpdateAe}
               importedLabel={offerImported ? `Importée — ${fmtEUR(company.computedTotal || 0)}` : null}
+              nego={negoActive ? {
+                initialTotal: negoRowBase?.initialTotal ?? (company.computedTotal ?? company.aeAmount ?? 0),
+                total: negoRowBase?.negoTotal ?? null,
+                totalBrut: negoRowBase?.negoTotalBrut ?? null,
+                rabaisPct,
+                imported: offerNegoImported,
+                aeNego: company.aeAmountNego ?? null,
+                importFile: company.negoImportFile || null,
+                importAt: company.negoImportAt || null,
+              } : null}
+              onUpdateAeNego={onUpdateAeNego}
             />
           }
           actionLabel="Excel"
@@ -407,7 +500,7 @@ function CompanyProgressCard({
             accent: 'red',
             title: 'Importer une offre depuis un PDF (extraction automatique du tableau)',
           } : null}
-          buttonsGroupLabel="Importer"
+          buttonsGroupLabel={negoActive ? 'Négo' : 'Importer'}
         />
 
         {/* ② Variantes */}
@@ -415,19 +508,34 @@ function CompanyProgressCard({
           <div className="ml-7 space-y-1.5">
             {variants.map((v, vi) => {
               const imported = (v.offers && Object.keys(v.offers).length > 0) || (v.newItems || []).length > 0;
+              const variantNegoImported = negoActive && variantHasNego(v);
+              const variantStatus = negoActive
+                ? ((variantNegoImported || rabaisPct > 0) ? 'done' : 'todo')
+                : (imported ? 'done' : 'todo');
               return (
                 <StepRow
                   key={v.id}
                   stepNumber={`V${vi + 1}`}
                   icon={<GitBranch size={14} className="text-purple-600" />}
                   label={v.label || `Variante ${vi + 1}`}
-                  status={imported ? 'done' : 'todo'}
+                  status={variantStatus}
                   statusContent={
                     <AeStatus
                       ae={v.aeAmount}
                       accent="purple"
                       onUpdateAe={onUpdateVariantAe ? (value) => onUpdateVariantAe(v.id, value) : null}
                       importedLabel={imported ? `Importée — ${fmtEUR(v.total || 0)}` : null}
+                      nego={negoActive ? {
+                        initialTotal: v.aeAmount ?? v.total ?? 0,
+                        total: getVariantEffectiveTotal(company, v, 'nego'),
+                        totalBrut: Number(v.totalNego ?? v.total ?? 0),
+                        rabaisPct,
+                        imported: variantNegoImported,
+                        aeNego: v.aeAmountNego ?? null,
+                        importFile: v.negoImportFile || null,
+                        importAt: v.negoImportAt || null,
+                      } : null}
+                      onUpdateAeNego={onUpdateVariantAeNego ? (value) => onUpdateVariantAeNego(v.id, value) : null}
                     />
                   }
                   actionLabel="Excel"
@@ -441,7 +549,7 @@ function CompanyProgressCard({
                     accent: 'red',
                     title: 'Importer la variante depuis un PDF',
                   } : null}
-                  buttonsGroupLabel="Importer"
+                  buttonsGroupLabel={negoActive ? 'Négo' : 'Importer'}
                   isVariant
                 />
               );
@@ -600,7 +708,48 @@ function StepRow({ stepNumber, icon, label, status, statusLabel, statusContent =
 }
 
 // ─── Zone "statut" de l'offre/variante : libellé "Montant AE" + champ éditable ─
-function AeStatus({ ae, onUpdateAe, importedLabel, accent = 'slate' }) {
+// nego : { initialTotal, total, totalBrut, rabaisPct, imported, aeNego, importFile, importAt } | null
+//   Fourni uniquement en phase après négo — bascule tout l'affichage sur le PV négo
+//   (montant annoncé après négo éditable + total recalculé net de rabais).
+function AeStatus({ ae, onUpdateAe, importedLabel, accent = 'slate', nego = null, onUpdateAeNego = null }) {
+  if (nego) {
+    const showNegoTotal = nego.imported || nego.rabaisPct > 0;
+    return (
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400" title="Montant de l'offre initiale (dépouillement)">
+            Initial
+          </span>
+          <span className="font-mono text-[11px] text-slate-500">{fmtEUR(nego.initialTotal)}</span>
+          <span className="text-slate-300">→</span>
+          <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600">Après négo (HT)</span>
+          {onUpdateAeNego ? (
+            <AeAmountInput value={nego.aeNego} onCommit={onUpdateAeNego} accent="emerald" />
+          ) : (
+            <span className="font-mono text-[11px] text-slate-700">{nego.aeNego != null ? fmtEUR(nego.aeNego) : '—'}</span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 flex-wrap text-[11px]">
+          {showNegoTotal ? (
+            <span
+              className="font-semibold text-emerald-600"
+              title={nego.rabaisPct > 0 && nego.totalBrut != null ? `Total brut (avant rabais) : ${fmtEUR(nego.totalBrut)}` : undefined}
+            >
+              Négocié — {fmtEUR(nego.total)}{nego.rabaisPct > 0 ? ` (net, rabais −${nego.rabaisPct}%)` : ''}
+            </span>
+          ) : (
+            <span className="text-slate-400 italic">Offre initiale reprise (aucun prix renégocié)</span>
+          )}
+          {nego.importFile && (
+            <span className="text-slate-400" title={nego.importAt ? new Date(nego.importAt).toLocaleString('fr-FR') : ''}>
+              ⇡ {nego.importFile}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   const ttc = (ae != null && Number.isFinite(Number(ae))) ? Number(ae) * (1 + TVA_RATE) : null;
   return (
     <div className="flex items-center gap-2 flex-wrap">
@@ -645,7 +794,9 @@ function AeAmountInput({ value, onCommit, accent = 'slate' }) {
 
   const accentCls = accent === 'purple'
     ? 'border-purple-200 focus:border-purple-400 focus:ring-purple-100'
-    : 'border-slate-300 focus:border-indigo-400 focus:ring-indigo-100';
+    : accent === 'emerald'
+      ? 'border-emerald-300 focus:border-emerald-400 focus:ring-emerald-100'
+      : 'border-slate-300 focus:border-indigo-400 focus:ring-indigo-100';
 
   return (
     <div className="relative inline-flex items-center">
