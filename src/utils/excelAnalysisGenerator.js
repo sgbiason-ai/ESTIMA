@@ -58,7 +58,7 @@ const styleFixed = (cell, bgArgb = '334155') => {
 //   Total gén  = SOMME(sous-totaux)
 
 function buildSheet(wb, sheetLabel, trancheLabel, {
-  project, companies, chaptersData, stats, scoringConfig, bpuRefMap,
+  project, companies, chaptersData, stats, scoringConfig, bpuRefMap, negoActive = false,
 }) {
   const ws = wb.addWorksheet(sheetLabel, {
     views: [{ state: 'frozen', xSplit: 5, ySplit: 3 }],
@@ -90,7 +90,7 @@ function buildSheet(wb, sheetLabel, trancheLabel, {
   ws.getRow(1).height = 28;
   ws.mergeCells(1, 1, 1, lastCol);
   const titleCell = ws.getCell(1, 1);
-  titleCell.value = `ANALYSE COMPARATIVE — ${(project?.name || 'Projet').toUpperCase()} — ${trancheLabel}`;
+  titleCell.value = `ANALYSE COMPARATIVE — ${(project?.name || 'Projet').toUpperCase()} — ${trancheLabel}${negoActive ? ' — APRÈS NÉGOCIATION' : ''}`;
   setFont(titleCell, { bold: true, size: 13, color: { argb: 'FFFFFFFF' } });
   setAlign(titleCell, 'left', 'middle');
   setBg(titleCell, '1E293B');
@@ -365,7 +365,8 @@ function buildSheet(wb, sheetLabel, trancheLabel, {
     const totCell = ws.getCell(r, b);
     totCell.value = {
       formula: stCoRefs || '0',
-      result: stats.companiesTotals[companies[i].id] || 0,
+      // La formule somme les sous-totaux (BRUT) : le résultat en cache doit l'être aussi.
+      result: stats.companiesTotalsBrut?.[companies[i].id] ?? (stats.companiesTotals[companies[i].id] || 0),
     };
     totCell.numFmt = '#,##0.00 "€"';
     setFont(totCell, { bold: true, size: 10, color: { argb: 'FFFFFFFF' } });
@@ -384,6 +385,66 @@ function buildSheet(wb, sheetLabel, trancheLabel, {
     setAlign(ecCell, 'center', 'middle');
     setBg(ecCell, cc(i).header);
     applyBorder(ecCell, 'medium');
+  }
+
+  // ── Rabais commercial (phase après négo) : ligne rabais + TOTAL NET HT ──
+  // Le total général ci-dessus reste BRUT (somme des sous-totaux) ; le net,
+  // qui sert à la notation, est calculé par formule : brut × (1 − rabais).
+  const rabaisPcts = companies.map(c => {
+    if (!negoActive) return 0;
+    const v = Number(c.negoRabaisPct);
+    return Number.isFinite(v) && v > 0 ? Math.min(100, v) : 0;
+  });
+  if (rabaisPcts.some(v => v > 0)) {
+    const totalRowNum = r;
+
+    // Ligne 1 : rabais consenti (%)
+    r++;
+    ws.getRow(r).height = 16;
+    ws.mergeCells(r, C.REF, r, C.ESTTOTAL);
+    const rabaisLabel = ws.getCell(r, C.REF);
+    rabaisLabel.value = 'RABAIS COMMERCIAL CONSENTI';
+    setFont(rabaisLabel, { bold: true, size: 9, color: { argb: 'FF15803D' } });
+    setAlign(rabaisLabel, 'right', 'middle');
+    setBg(rabaisLabel, 'DCFCE7');
+    applyBorder(rabaisLabel);
+    for (let i = 0; i < nCo; i++) {
+      const b = firstCo + i * coPer;
+      ws.mergeCells(r, b, r, b + coPer - 1);
+      const cell = ws.getCell(r, b);
+      cell.value = rabaisPcts[i] > 0 ? -rabaisPcts[i] / 100 : '—';
+      if (rabaisPcts[i] > 0) cell.numFmt = '-0.0#%';
+      setFont(cell, { bold: true, size: 9, color: { argb: rabaisPcts[i] > 0 ? 'FF15803D' : 'FF94A3B8' } });
+      setAlign(cell, 'center', 'middle');
+      setBg(cell, 'DCFCE7');
+      applyBorder(cell);
+    }
+
+    // Ligne 2 : total net HT (formule brut × (1 − rabais)) — base de la notation
+    r++;
+    ws.getRow(r).height = 20;
+    ws.mergeCells(r, C.REF, r, C.ESTTOTAL);
+    const netLabel = ws.getCell(r, C.REF);
+    netLabel.value = 'TOTAL NET HT (après rabais) — base de notation';
+    setFont(netLabel, { bold: true, size: 10, color: { argb: 'FFFFFFFF' } });
+    setAlign(netLabel, 'right', 'middle');
+    setBg(netLabel, '166534');
+    applyBorder(netLabel, 'medium');
+    for (let i = 0; i < nCo; i++) {
+      const b = firstCo + i * coPer;
+      const totCoRef = `${colLetter(b)}${totalRowNum}`;
+      ws.mergeCells(r, b, r, b + coPer - 1);
+      const cell = ws.getCell(r, b);
+      cell.value = {
+        formula: rabaisPcts[i] > 0 ? `${totCoRef}*(1-${String(rabaisPcts[i] / 100).replace(',', '.')})` : totCoRef,
+        result: stats.companiesTotals[companies[i].id] || 0,
+      };
+      cell.numFmt = '#,##0.00 "€"';
+      setFont(cell, { bold: true, size: 10, color: { argb: 'FFFFFFFF' } });
+      setAlign(cell, 'right', 'middle');
+      setBg(cell, '166534');
+      applyBorder(cell, 'medium');
+    }
   }
 
   r += 2;
@@ -423,6 +484,9 @@ export async function generateAnalysisExcel({
   tranches,
   // Pour générer tous les onglets, on a besoin des données brutes + clientQtyMaps
   clientQtyMaps = {},
+  // Phase après négociation : les offres passées sont déjà résolues (fusion
+  // initial + négocié) par l'appelant — ce flag ne sert qu'au libellé.
+  negoActive = false,
 }) {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'EstimaVRD';
@@ -432,7 +496,7 @@ export async function generateAnalysisExcel({
 
   // ── Onglet GLOBAL ─────────────────────────────────────────────────────────
   buildSheet(wb, 'GLOBAL', 'GLOBAL', {
-    project, companies, chaptersData, stats, scoringConfig, bpuRefMap,
+    project, companies, chaptersData, stats, scoringConfig, bpuRefMap, negoActive,
   });
 
   // ── Onglets par tranche ───────────────────────────────────────────────────
@@ -458,7 +522,7 @@ export async function generateAnalysisExcel({
       });
 
       // Recalculer stats pour cette tranche
-      const trancheStats = { totalEstimation: 0, companiesTotals: {}, companyScores: {} };
+      const trancheStats = { totalEstimation: 0, companiesTotals: {}, companiesTotalsBrut: {}, companyScores: {} };
       trancheChaptersData.forEach(chap => {
         if (chap.isOption) return;
         chap.items.forEach(item => {
@@ -469,6 +533,20 @@ export async function generateAnalysisExcel({
           });
         });
       });
+
+      // Rabais commercial (phase après négo) : le rabais porte sur le Total HT,
+      // il s'applique donc linéairement au total de chaque tranche.
+      trancheStats.companiesTotalsBrut = { ...trancheStats.companiesTotals };
+      if (negoActive) {
+        companies.forEach(co => {
+          const rv = Number(co.negoRabaisPct);
+          const rabais = Number.isFinite(rv) && rv > 0 ? Math.min(100, rv) : 0;
+          if (rabais > 0) {
+            trancheStats.companiesTotals[co.id] =
+              Math.round((trancheStats.companiesTotals[co.id] || 0) * (1 - rabais / 100) * 100) / 100;
+          }
+        });
+      }
 
       // Scores (formule F1 simplifiée si scoringConfig non disponible)
       const totals = Object.values(trancheStats.companiesTotals).filter(t => t > 0);
@@ -506,6 +584,7 @@ export async function generateAnalysisExcel({
         stats: trancheStats,
         scoringConfig,
         bpuRefMap,
+        negoActive,
       });
     });
   }

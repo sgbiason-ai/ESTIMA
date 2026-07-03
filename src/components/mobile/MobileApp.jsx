@@ -52,7 +52,7 @@ import { useCrrManager }     from '../../hooks/useCrrManager';
 import { useOrientation }   from '../../hooks/useOrientation';
 import { useRobustSave, loadDraft, clearDraft } from '../../hooks/useRobustSave';
 import { useNegoTemplate }  from '../../hooks/useNegoTemplate';
-import { computeChaptersData, computeAnalysisStats } from '../../utils/analysisCompute';
+import { computeChaptersData, computeAnalysisStats, getEffectiveOffers } from '../../utils/analysisCompute';
 import { usePresence, useCoEditors } from '../../hooks/usePresence';
 import CoEditBanner from '../common/CoEditBanner';
 
@@ -321,16 +321,33 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
     // chaptersData + stats sont des calculs derives (non stockes en Firestore) :
     // on les recalcule a la demande pour les exports analyse/RAO
     const analysisData = fullProject.analysis || {};
-    const analysisCompanies = analysisData.companies || [];
+    // Phase « après négo » (scoringConfig.basis du doc analysis).
+    const negoBasis = analysisData.scoringConfig?.basis === 'nego';
+    const rawCompanies = analysisData.companies || [];
+    // Companies avec offers pré-résolues (fusion initial + négocié) — pour les
+    // générateurs Analyse/NegoLetter, qui n'opèrent pas leur propre résolution.
+    const analysisCompanies = negoBasis
+      ? rawCompanies.map(c => ({ ...c, offers: getEffectiveOffers(c, 'nego') }))
+      : rawCompanies;
     const activeTrancheId = tranchesHook.activeTrancheId || 'global';
     const currentQtyMap = calcHook.clientQtyMaps?.[activeTrancheId] || {};
-    const computedChapters = (exportType === 'Analyse' || exportType === 'AnalyseExcel'
-                              || exportType === 'RAO' || exportType === 'NegoLetter')
+    const computedChapters = (exportType === 'Analyse' || exportType === 'AnalyseExcel' || exportType === 'NegoLetter')
       ? computeChaptersData(fullProject, analysisCompanies, currentQtyMap)
       : [];
-    const computedStats = (exportType === 'Analyse' || exportType === 'AnalyseExcel'
-                           || exportType === 'RAO')
-      ? computeAnalysisStats(computedChapters, analysisCompanies, fullProject.scoringConfig)
+    const computedStats = (exportType === 'Analyse' || exportType === 'AnalyseExcel')
+      ? computeAnalysisStats(computedChapters, analysisCompanies, fullProject.scoringConfig, negoBasis ? 'nego' : 'initial')
+      : null;
+
+    // RAO : companies RAW (parité desktop — RaoView.jsx passe analysis.companies
+    // non résolu). generateRaoPDF résout lui-même offres base + variantes + rabais
+    // selon negoActive ; les totaux dénormalisés des variantes (v.totalNego) ont
+    // été calculés à l'import avec des companies RAW — repasser des companies
+    // déjà mélangées romprait la cohérence base/variante (fallback de prix).
+    const raoChapters = exportType === 'RAO'
+      ? computeChaptersData(fullProject, rawCompanies, currentQtyMap, negoBasis ? 'nego' : 'initial')
+      : [];
+    const raoStats = exportType === 'RAO'
+      ? computeAnalysisStats(raoChapters, rawCompanies, fullProject.scoringConfig, negoBasis ? 'nego' : 'initial')
       : null;
 
     try {
@@ -378,29 +395,31 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
             analysisMode: analysisData.analysisMode || 'global',
             scoringConfig: fullProject.scoringConfig || null,
             branding,
+            negoActive: negoBasis,
           });
           break;
         }
         case 'RAO': {
           const { generateRaoPDF } = await loadRaoPdf();
-          if (analysisCompanies.length === 0) { setToast('Aucune analyse disponible'); return; }
+          if (rawCompanies.length === 0) { setToast('Aucune analyse disponible'); return; }
           await generateRaoPDF({
             project: fullProject,
             consultation: fullProject.consultation || {},
             criteria: fullProject.criteria || [],
             rao: fullProject.rao || {},
-            analysisCompanies,
+            analysisCompanies: rawCompanies,
             scores: analysisData.scores || {},
             ranking: analysisData.ranking || [],
             branding,
-            analysisStats: computedStats,
-            chaptersData: computedChapters,
+            analysisStats: raoStats,
+            chaptersData: raoChapters,
             bpuRefMap: calcHook.refMap,
             activeTrancheId,
             tranches: tranchesList,
             analysisMode: analysisData.analysisMode || 'global',
             scoringConfig: fullProject.scoringConfig || null,
             clientQtyMaps: calcHook.clientQtyMaps,
+            negoActive: negoBasis,
           });
           break;
         }
@@ -423,6 +442,7 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
             tranches: tranchesList,
             branding,
             clientQtyMaps: calcHook.clientQtyMaps,
+            negoActive: negoBasis,
           });
           break;
         }

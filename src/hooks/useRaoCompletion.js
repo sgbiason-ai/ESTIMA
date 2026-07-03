@@ -5,6 +5,7 @@
 
 import { useMemo } from 'react';
 import { NON_REGULAR_STATUSES } from '../components/rao/RaoConstants';
+import { getEffectiveConclusion, isRegularizedAfterNego } from '../utils/analysisCompute';
 
 export const useRaoCompletion = ({
   rao,
@@ -60,21 +61,26 @@ export const useRaoCompletion = ({
     const depouillementDone = depouillementMissing.length === 0 && nbCompanies > 0;
 
     // ─── 3. Administratif ───
+    // Phase après négo : le statut effectif (régularisation prise en compte) pilote
+    // les exigences ; un motif de régularisation est requis pour toute offre régularisée.
+    const adminBasis = scoringConfig?.basis === 'nego' ? 'nego' : 'initial';
     const adminConcl = companyNames.filter(name => !!companiesData[name]?.admin?.conclusion).length;
-    // Offres non régulières : un commentaire de conformité motivé est obligatoire.
-    const nonRegularNames = companyNames.filter(name => NON_REGULAR_STATUSES.includes(companiesData[name]?.admin?.conclusion));
-    const commentMissingNames = nonRegularNames.filter(name => !(companiesData[name]?.admin?.conformityComment || '').trim());
+    // Offres régularisées en négociation : motif de régularisation obligatoire (CCP R2152-2).
+    const regularizedNames = adminBasis === 'nego'
+      ? companyNames.filter(name => isRegularizedAfterNego(companiesData[name]?.admin))
+      : [];
+    const regCommentMissingNames = regularizedNames.filter(name => !(companiesData[name]?.admin?.regularizationComment || '').trim());
     const adminItems = [
       { id: 'conclusions', label: `Conclusions admin (${adminConcl}/${nbCompanies})`, ok: adminConcl === nbCompanies && nbCompanies > 0, value: `${adminConcl}/${nbCompanies}` },
     ];
-    if (nonRegularNames.length > 0) {
-      const commented = nonRegularNames.length - commentMissingNames.length;
+    if (regularizedNames.length > 0) {
+      const motived = regularizedNames.length - regCommentMissingNames.length;
       adminItems.push({
-        id: 'conformity_comments',
-        label: `Commentaires conformité — offres non régulières (${commented}/${nonRegularNames.length})`,
-        ok: commentMissingNames.length === 0,
-        warn: commentMissingNames.length > 0,
-        value: `${commented}/${nonRegularNames.length}`,
+        id: 'regularization_comments',
+        label: `Motifs de régularisation après négo (${motived}/${regularizedNames.length})`,
+        ok: regCommentMissingNames.length === 0,
+        warn: regCommentMissingNames.length > 0,
+        value: `${motived}/${regularizedNames.length}`,
       });
     }
     const adminMissing = [];
@@ -89,21 +95,21 @@ export const useRaoCompletion = ({
         });
       }
     });
-    commentMissingNames.forEach(name => {
+    regCommentMissingNames.forEach(name => {
       adminMissing.push({
-        id: `conf_comment_${name}`,
-        label: `Commentaire sur la conformité pour ${name}`,
-        anchorId: `admin-conf-comment-${name}`,
+        id: `reg_comment_${name}`,
+        label: `Motif de régularisation après négo pour ${name}`,
+        anchorId: `admin-reg-comment-${name}`,
         companyName: name,
-        type: 'admin_conformity_comment',
+        type: 'admin_regularization_comment',
       });
     });
     const adminDone = nbCompanies > 0 && adminMissing.length === 0;
     const adminRatio = nbCompanies > 0 ? `${adminConcl}/${nbCompanies}` : null;
 
-    // ─── 4. Technique (entreprises régulières uniquement) ───
+    // ─── 4. Technique (entreprises régulières uniquement — statut effectif) ───
     const regularCompanies = analysisCompanies.filter(c => {
-      const concl = companiesData[c.name]?.admin?.conclusion;
+      const concl = getEffectiveConclusion(companiesData[c.name]?.admin, adminBasis);
       return !concl || !NON_REGULAR_STATUSES.includes(concl);
     });
 

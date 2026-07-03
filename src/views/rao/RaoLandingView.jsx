@@ -10,7 +10,7 @@ import { db } from '../../firebase';
 import { useDialog } from '../../contexts/DialogContext';
 import { useToast } from '../../contexts/ToastContext';
 import { computeQtyMaps } from '../../utils/projectCalculations';
-import { computeChaptersData, computeAnalysisStats } from '../../utils/analysisCompute';
+import { computeChaptersData, computeAnalysisStats, getVariantEffectiveTotal } from '../../utils/analysisCompute';
 
 const removeAccents = (s) =>
   (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -60,29 +60,13 @@ const getItems = (chapters) => {
 // Statuts administratifs rendant une offre/variante non régulière (exclue du mieux-disant).
 const NON_REGULAR_STATUSES = ['irreguliere', 'inacceptable', 'inappropriee'];
 
-// Total d'une variante recalculé depuis ses offers/quantities (v.total peut être
-// obsolète ou absent) — même logique que usePriceAnalysis.handleImportVariant et
-// le desktop. Articles supprimés exclus, articles ajoutés (newItems) inclus.
-function computeVariantTotal(base, variant, items, qtyM) {
-  const mergedOffers = { ...(base.offers || {}), ...(variant.offers || {}) };
-  const mergedQty    = variant.quantities || {};
-  const removed      = new Set((variant.removedItems || []).map(it => it.itemId));
-  let totalMatched = 0;
-  items.forEach(it => {
-    if (removed.has(it.id)) return;
-    const pu  = Number(mergedOffers[it.id] ?? 0);
-    const qty = Number(mergedQty[it.id] ?? qtyM[it.id] ?? it.qty ?? 0);
-    totalMatched += qty * pu;
-  });
-  const totalNew = (variant.newItems || []).reduce((s, it) => s + Number(it.lineTotal || 0), 0);
-  return totalMatched + totalNew;
-}
-
 // Synthèse financière d'un RAO : mêmes fonctions pures que la vue d'analyse
 // (computeQtyMaps → computeChaptersData → computeAnalysisStats), tranche "global".
 // Les variantes retenues comptent comme des offres indépendantes (CCP R2151-8) :
 // elles entrent dans le classement et peuvent devenir le mieux-disant.
-function computeRaoSummary(proj, companies) {
+// negoBasis : phase « après négociation » active (scoringConfig.basis du doc analysis)
+// → les totaux affichés reprennent les prix négociés, comme la vue d'analyse.
+function computeRaoSummary(proj, companies, negoBasis = false) {
   const base = { count: companies.length, names: companies.map(c => c.name || '?') };
   try {
     const tranches = proj.tranches || [];
@@ -95,8 +79,8 @@ function computeRaoSummary(proj, companies) {
       Number(proj.clientQtyThreshold ?? 20)
     );
     const qtyM = clientQtyMaps.global || {};
-    const chaptersData = computeChaptersData(proj, companies, qtyM);
-    const stats = computeAnalysisStats(chaptersData, companies, proj.scoringConfig);
+    const chaptersData = computeChaptersData(proj, companies, qtyM, negoBasis ? 'nego' : 'initial');
+    const stats = computeAnalysisStats(chaptersData, companies, proj.scoringConfig, negoBasis ? 'nego' : 'initial');
 
     // Offres = bases + variantes retenues (régulières par défaut, sauf adminConclusion non-régulier)
     const offers = [];
@@ -106,7 +90,9 @@ function computeRaoSummary(proj, companies) {
       if (baseTotal > 0) offers.push({ name: c.name || 'Entreprise', total: baseTotal, isVariant: false });
       (c.variants || []).filter(v => v.retained).forEach((v, vi) => {
         if (v.adminConclusion && NON_REGULAR_STATUSES.includes(v.adminConclusion)) return;
-        const vTotal = computeVariantTotal(c, v, items, qtyM);
+        // Total net (rabais commercial global déduit en phase après négo) — même
+        // primitif que le comparatif RAO, le Récap et l'export PDF (source unique).
+        const vTotal = getVariantEffectiveTotal(c, v, negoBasis ? 'nego' : 'initial');
         if (vTotal > 0) {
           retainedCount++;
           offers.push({
@@ -183,7 +169,7 @@ export default function RaoLandingView({
             const companies = s.exists() ? (s.data()?.companies || []) : [];
             if (companies.length > 0) {
               ids.add(proj.id);
-              sums[proj.id] = computeRaoSummary(proj, companies);
+              sums[proj.id] = computeRaoSummary(proj, companies, s.data()?.scoringConfig?.basis === 'nego');
             }
           } catch { /* ignore */ }
         }));

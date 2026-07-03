@@ -2,12 +2,13 @@ import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { Trash2, ChevronRight, AlertTriangle, Info, HelpCircle, TrendingDown, TrendingUp, GitBranch, Plus } from 'lucide-react';
 import { formatPrice, normalizeUnitSymbol } from '../../utils/helpers';
 import { COMPANY_STYLES } from '../../utils/analysisConstants';
-import { computeOABThreshold as calculateOABThreshold, computePriceReference } from '../../utils/analysisCompute';
+import { computeOABThreshold as calculateOABThreshold, computePriceReference, getEffectiveOffers, getCompanyRabaisPct, getEffectiveConclusion } from '../../utils/analysisCompute';
 import OabDetailModal from './OabDetailModal';
 
 // --- SOUS-COMPOSANT : Cellule de Prix ---
 // anomaly: { type: 'low' | 'high', z, mean, deltaPct, n } | null
-const PriceCell = ({ value, onChange, style, anomaly }) => {
+// nego: { initialPu } | null — prix modifié en phase après négociation
+const PriceCell = ({ value, onChange, style, anomaly, nego = null }) => {
   const [isEditing, setIsEditing] = useState(false);
   const inputRef = useRef(null);
 
@@ -45,6 +46,9 @@ const PriceCell = ({ value, onChange, style, anomaly }) => {
     const label = anomaly.type === 'low' ? 'Anormalement bas' : 'Anormalement haut';
     tooltip = `${label}\nMediane marche: ${formatPrice(anomaly.median)}\nEcart: ${sign}${anomaly.deltaPct.toFixed(0)}%\nBase sur ${anomaly.n} offres`;
   }
+  if (nego) {
+    tooltip = `Prix négocié\nInitial : ${formatPrice(nego.initialPu)}${anomaly ? '\n' + tooltip : ''}`;
+  }
 
   return (
     <div
@@ -54,6 +58,7 @@ const PriceCell = ({ value, onChange, style, anomaly }) => {
     >
       {anomaly?.type === 'low' && <TrendingDown size={10} className="text-amber-700 absolute left-0.5" />}
       {anomaly?.type === 'high' && <TrendingUp size={10} className="text-orange-700 absolute left-0.5" />}
+      {nego && !anomaly && <span className="absolute left-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500" />}
       <span className={`text-[11px] tabular-nums tracking-tight ${anomaly ? 'font-black' : 'font-medium'} ${!value ? 'text-slate-300 font-normal' : ''}`}>
         {value ? formatPrice(value) : '-'}
       </span>
@@ -114,7 +119,7 @@ const getHeatmapColor = (value, reference) => {
 
 const AnalysisTable = ({
   chaptersData, companies, stats, updateCompanyOffer, renameCompany, removeCompany, project, bpuConfig, scoringConfig,
-  analysisMode, averagesHorsOAB = {}
+  analysisMode, averagesHorsOAB = {}, negoActive = false, updateCompanyNegoRabais = null
 }) => {
 
   // COMPANY_STYLES : couleur par entreprise (cycle si plus d'entreprises que de styles).
@@ -195,7 +200,11 @@ const AnalysisTable = ({
   // Les statuts non-régulière → exclue de la notation + grisée
   const NON_REGULAR_STATUSES = ['irreguliere', 'inacceptable', 'inappropriee'];
   const getCompanyIrregular = (company) => {
-    const conclusion = project?.rao?.companies?.[company.name]?.admin?.conclusion;
+    // Phase après négo : régularisation prise en compte (conclusionNego).
+    const conclusion = getEffectiveConclusion(
+      project?.rao?.companies?.[company.name]?.admin,
+      negoActive ? 'nego' : 'initial'
+    );
     return conclusion && NON_REGULAR_STATUSES.includes(conclusion);
   };
 
@@ -209,9 +218,14 @@ const AnalysisTable = ({
       // Chaque variante est une offre indépendante (CCP R2151-8) — elle peut être
       // régulière même si la base ne l'est pas (et inversement).
       const baseIrregular = getCompanyIrregular(c);
-      const baseIrregularLabel = project?.rao?.companies?.[c.name]?.admin?.conclusion;
+      // Statut effectif (après négo = régularisation prise en compte) pour le badge.
+      const baseIrregularLabel = getEffectiveConclusion(
+        project?.rao?.companies?.[c.name]?.admin,
+        negoActive ? 'nego' : 'initial'
+      );
 
-      // Colonne base
+      // Colonne base — en phase « après négo », les prix négociés se substituent
+      // article par article (initialOffers conservé pour le marqueur visuel).
       cols.push({
         key: `${c.id}_base`,
         companyId: c.id,
@@ -219,7 +233,9 @@ const AnalysisTable = ({
         kind: 'base',
         variantId: null,
         variantLabel: null,
-        offers: c.offers || {},
+        offers: getEffectiveOffers(c, negoActive ? 'nego' : 'initial'),
+        initialOffers: c.offers || {},
+        rabaisPct: negoActive ? getCompanyRabaisPct(c, 'nego') : 0,
         quantities: {},
         removedIds: new Set(),
         newItems: [],
@@ -249,7 +265,7 @@ const AnalysisTable = ({
       });
     });
     return cols;
-  }, [companies, project?.rao?.companies]);
+  }, [companies, project?.rao?.companies, negoActive]);
 
   // Largeur sub-colonnes par "displayColumn" : 3 pour base, 4 pour variante (Qté var en plus)
   const subColsCount = (col) => (col.kind === 'variant' ? 4 : 3);
@@ -272,6 +288,8 @@ const AnalysisTable = ({
       (col.newItems || []).forEach(it => {
         total += Number(it.lineTotal || (it.qty * it.price) || 0);
       });
+      // Rabais commercial (phase négo) : déduit du Total HT de la colonne base.
+      if (col.rabaisPct > 0) total *= (1 - col.rabaisPct / 100);
       totals[col.key] = Math.round(total * 100) / 100;
     });
     return totals;
@@ -420,6 +438,21 @@ const AnalysisTable = ({
                           ? <span title={col.variantLabel}>Variante {col.variantLabel ? `· ${col.variantLabel.slice(0, 20)}` : ''}</span>
                           : 'Base'}
                       </div>
+                      {/* Rabais commercial (%) sur le Total HT — phase après négo uniquement */}
+                      {negoActive && col.kind === 'base' && updateCompanyNegoRabais && (
+                        <div className="flex items-center justify-center gap-1 text-[9px] text-white/90 font-semibold">
+                          <span className="uppercase tracking-wider">Rabais</span>
+                          <input
+                            type="number" min="0" max="100" step="0.1"
+                            value={company.negoRabaisPct ?? ''}
+                            onChange={(e) => updateCompanyNegoRabais(company.id, e.target.value)}
+                            placeholder="0"
+                            className="w-11 bg-white/15 border border-white/30 rounded px-1 text-right text-[10px] font-bold text-white outline-none focus:ring-1 ring-white/50 tabular-nums placeholder:text-white/40"
+                            title="Rabais commercial en % consenti sur le Total HT (déduit du montant noté)"
+                          />
+                          <span>%</span>
+                        </div>
+                      )}
                     </div>
                   </th>
                 );
@@ -563,6 +596,9 @@ const AnalysisTable = ({
                                     onChange={(val) => updateCompanyOffer(col.companyId, item.id, val)}
                                     style={{...style, bg: cellBg}}
                                     anomaly={anomaly}
+                                    nego={negoActive && Number(col.initialOffers?.[item.id] || 0) !== pu
+                                      ? { initialPu: Number(col.initialOffers?.[item.id] || 0) }
+                                      : null}
                                   />
                                 )}
                               </td>
@@ -765,6 +801,11 @@ const AnalysisTable = ({
                             </button>
                           )}
                         </div>
+                        {col.rabaisPct > 0 && (
+                          <div className="text-[8px] font-bold text-emerald-300 text-right tracking-wide" title="Total HT net après rabais commercial">
+                            dont rabais −{col.rabaisPct}%
+                          </div>
+                        )}
                     </td>
                     <td className={`px-0.5 py-2 text-center border-r border-slate-800 bg-slate-900 ${opacityCls}`}>
                       {renderDelta(total, stats.totalEstimation)}
@@ -794,7 +835,7 @@ const AnalysisTable = ({
                 const style = COMPANY_STYLES[col.companyIndex % COMPANY_STYLES.length];
                 const tooltipText = col.irregular
                   ? `Offre ${(col.irregularLabel || 'Non régulière').toUpperCase()}\nNotée et classée SOUS RÉSERVE de régularisation (CCP R2152-2)\nFormule: ${scoringConfig.mode.toUpperCase()} — P: ${formatPrice(total)} — Pmin: ${formatPrice(Pmin)}`
-                  : `Formule: ${scoringConfig.mode.toUpperCase()}\nP (Offre): ${formatPrice(total)}\nPmin (Bas): ${formatPrice(Pmin)}\nMoyenne: ${formatPrice(Pmoy)}\nNote Max: ${scoringConfig.maxScore}${isVariant ? '\n— Variante : ' + (col.variantLabel || '') : ''}`;
+                  : `Formule: ${scoringConfig.mode.toUpperCase()}\nP (Offre): ${formatPrice(total)}${col.rabaisPct > 0 ? `\nRabais commercial: −${col.rabaisPct}% (P = total net)` : ''}\nPmin (Bas): ${formatPrice(Pmin)}\nMoyenne: ${formatPrice(Pmoy)}\nNote Max: ${scoringConfig.maxScore}${isVariant ? '\n— Variante : ' + (col.variantLabel || '') : ''}`;
                 const isMin = total > 0 && total === Pmin;
 
                 return (

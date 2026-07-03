@@ -4,7 +4,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db as fireDb } from '../firebase';
 import { useDialog } from '../contexts/DialogContext';
 import { useToast } from '../contexts/ToastContext';
-import { computeChaptersData, computeAnalysisStats, computeOABThreshold as calculateOABThreshold } from '../utils/analysisCompute';
+import { computeChaptersData, computeAnalysisStats, computeOABThreshold as calculateOABThreshold, companiesHaveNego, computeVariantTotal, variantHasNego } from '../utils/analysisCompute';
 
 // Algorithme OAB (Double Moyenne) : source unique dans analysisCompute.
 
@@ -257,18 +257,41 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
     }
   }, [toast, setProject]);
 
+  // ─── PHASE D'ANALYSE — offres initiales vs après négociation ─────────────
+  // scoringConfig.basis ('initial' | 'nego') est persisté avec l'analyse :
+  // c'est LE commutateur qui pilote le tableau, la notation RAO et les exports.
+  const negoActive = scoringConfig?.basis === 'nego';
+  const hasNego = useMemo(() => companiesHaveNego(companies), [companies]);
+
   // ─── DONNÉES PAR CHAPITRE ─────────────────────────────────────────────────
   // Calcul deporte dans src/utils/analysisCompute.js (reutilise par les exports mobile)
-  const chaptersData = useMemo(() => {
+  const chaptersDataInitial = useMemo(() => {
     const currentQtyMap = clientQtyMaps[activeTrancheId || 'global'] || {};
-    return computeChaptersData(project, companies, currentQtyMap);
+    return computeChaptersData(project, companies, currentQtyMap, 'initial');
   }, [project, activeTrancheId, companies, clientQtyMaps]);
 
-  // ─── STATISTIQUES GLOBALES ───────────────────────────────────────────────
-  const stats = useMemo(
-    () => computeAnalysisStats(chaptersData, companies, scoringConfig),
-    [chaptersData, companies, scoringConfig]
+  // Version « après négo » calculée seulement si utile (phase active ou comparatif)
+  const chaptersDataNego = useMemo(() => {
+    if (!negoActive && !hasNego) return null;
+    const currentQtyMap = clientQtyMaps[activeTrancheId || 'global'] || {};
+    return computeChaptersData(project, companies, currentQtyMap, 'nego');
+  }, [project, activeTrancheId, companies, clientQtyMaps, negoActive, hasNego]);
+
+  // Données effectives : celles de la phase sélectionnée (consommées par le
+  // tableau, le RAO, les exports — tout suit le commutateur).
+  const chaptersData = negoActive && chaptersDataNego ? chaptersDataNego : chaptersDataInitial;
+
+  // ─── STATISTIQUES GLOBALES (les deux phases pour le comparatif RAO) ──────
+  // basis 'nego' → le rabais commercial est déduit du Total HT de chaque entreprise.
+  const statsInitial = useMemo(
+    () => computeAnalysisStats(chaptersDataInitial, companies, scoringConfig, 'initial'),
+    [chaptersDataInitial, companies, scoringConfig]
   );
+  const statsNego = useMemo(
+    () => chaptersDataNego ? computeAnalysisStats(chaptersDataNego, companies, scoringConfig, 'nego') : null,
+    [chaptersDataNego, companies, scoringConfig]
+  );
+  const stats = negoActive && statsNego ? statsNego : statsInitial;
 
   // ─── ACTIONS ──────────────────────────────────────────────────────────────
   const handleAddManualCompany = async () => {
@@ -286,7 +309,7 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
   // ─── IMPORT PDF — extraction texte + conversion vers le parser Excel ──────
   // Le PDF est extrait via pdfjs-dist, converti en workbook ExcelJS en mémoire,
   // puis le parser Excel normal s'occupe du matching avec le DQE MOE.
-  const handleImportPdfOffer = async (file, forcedCompanyName = null) => {
+  const handleImportPdfOffer = async (file, forcedCompanyName = null, opts = {}) => {
     if (!file) return { ok: false, reason: 'no_file' };
     try {
       const { parsePdfOffer, pdfToWorkbookFile } = await import('../utils/parsePdfOffer');
@@ -306,7 +329,7 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
       toast.info(`PDF${ocrLabel} : ${result.articles.length} article(s) extrait(s) (total ≈ ${totalStr} €). Matching en cours…`);
 
       const xlsxFile = await pdfToWorkbookFile(result.articles, file.name.replace(/\.pdf$/i, '.xlsx'));
-      await handleImportExcel({ target: { files: [xlsxFile], value: null } }, forcedCompanyName);
+      await handleImportExcel({ target: { files: [xlsxFile], value: null } }, forcedCompanyName, opts);
       return { ok: true, articleCount: result.articles.length, viaOcr: result.viaOcr };
     } catch (e) {
       setOcrProgress(null);
@@ -316,11 +339,15 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
     }
   };
 
-  const handleImportExcel = async (event, forcedCompanyName = null) => {
+  const handleImportExcel = async (event, forcedCompanyName = null, opts = {}) => {
     // event peut être un événement DOM (input file) ou un objet { target: { files: [file] } }
     // forcedCompanyName : si fourni, skip le prompt (workflow guidé depuis Dépouillement)
+    // opts.toNego : force l'import vers les prix NÉGOCIÉS (offersNego) même si la
+    //   phase « Après négo » n'est pas encore active — utilisé par l'onglet
+    //   Négociation du RAO. La phase est alors activée automatiquement.
     const file = event.target?.files?.[0];
     if (!file) return;
+    const importToNego = negoActive || opts.toNego === true;
 
     const suggestedName = file.name.replace(/\.[^/.]+$/, "").split('_')[0];
     let companyName;
@@ -544,6 +571,40 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
 
       const finalCompanyName = companyName.trim() || suggestedName;
 
+      // ─── PHASE APRÈS NÉGO : l'import alimente offersNego (diff par article) ─
+      // de l'entreprise EXISTANTE, sans toucher l'offre initiale ni les contrôles
+      // de dépouillement déjà actés (montant AE, flag irrégulière CCP L2152-2).
+      if (importToNego) {
+        const existing = companies.find(
+          c => c.name.toLowerCase().trim() === finalCompanyName.toLowerCase().trim()
+        );
+        if (!existing) {
+          toast.error(`"${finalCompanyName}" est absente de l'analyse. Importez d'abord son offre initiale (phase « Offres initiales »).`);
+          return;
+        }
+        setCompanies(prev => prev.map(c =>
+          c.id === existing.id
+            ? {
+                ...c,
+                offersNego: { ...(c.offersNego || {}), ...importedOffers },
+                negoImportAt: new Date().toISOString(),
+                negoImportFile: file.name,
+              }
+            : c
+        ));
+        if (quantityMismatches.length > 0) {
+          toast.warning(`⚠ Offre négociée de "${finalCompanyName}" : ${quantityMismatches.length} article(s) avec quantité divergente du DQE.`);
+        }
+        toast.success(`${matchCount}/${totalRows} prix négocié(s) importé(s) pour "${finalCompanyName}".`);
+        // Import déclenché depuis le RAO alors que la phase initiale est active :
+        // bascule automatique — la notation porte immédiatement sur les montants négociés.
+        if (!negoActive) {
+          setScoringConfig(prev => ({ ...prev, basis: 'nego' }));
+          toast.info('Phase « Après négo » activée : la notation porte désormais sur les montants après négociation.');
+        }
+        return;
+      }
+
       // ─── Calcul du total recalculé (qté MOE × prix importés, hors options) ──
       // Utilisé pour comparer avec le montant AE saisi au dépouillement (CCP L2113-1).
       const optionItemIds = new Set();
@@ -672,16 +733,119 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
     }
   };
 
-  const updateCompanyOffer = (cId, iId, val) => setCompanies(prev => prev.map(c => c.id === cId ? { ...c, offers: { ...c.offers, [iId]: Number(val) } } : c));
+  // Saisie d'un PU : en phase « après négo », on écrit dans offersNego (diff par
+  // article) sans toucher l'offre initiale — sinon comportement historique.
+  const updateCompanyOffer = (cId, iId, val) => setCompanies(prev => prev.map(c => {
+    if (c.id !== cId) return c;
+    if (negoActive) return { ...c, offersNego: { ...(c.offersNego || {}), [iId]: Number(val) } };
+    return { ...c, offers: { ...c.offers, [iId]: Number(val) } };
+  }));
   const renameCompany = (cId, val) => setCompanies(prev => prev.map(c => c.id === cId ? { ...c, name: val } : c));
+
+  // ─── RABAIS COMMERCIAL (%) sur le Total HT — phase négo, par entreprise ────
+  // Valeur bornée [0, 100] ; vide ou 0 → champ retiré (pas de rabais).
+  const updateCompanyNegoRabais = (cId, value) => {
+    const num = Number(String(value ?? '').replace(',', '.'));
+    setCompanies(prev => prev.map(c => {
+      if (c.id !== cId) return c;
+      if (!Number.isFinite(num) || num <= 0) {
+        if (c.negoRabaisPct === undefined) return c;
+        const { negoRabaisPct: _drop, ...rest } = c;
+        return rest;
+      }
+      return { ...c, negoRabaisPct: Math.min(100, num) };
+    }));
+  };
+
+  // ─── MONTANTS ANNONCÉS APRÈS NÉGO (PV de négociation) ──────────────────────
+  // Pendants négo de aeAmount / variant.aeAmount. Toujours null (jamais
+  // undefined) : Firestore rejette les documents contenant `undefined`.
+  const updateCompanyAeAmountNego = (companyId, value) => {
+    const aeAmountNego = (value == null || !Number.isFinite(Number(value))) ? null : Number(value);
+    setCompanies(prev => prev.map(c => c.id === companyId ? { ...c, aeAmountNego } : c));
+  };
+
+  const updateVariantAeAmountNego = (companyId, variantId, value) => {
+    const aeAmountNego = (value == null || !Number.isFinite(Number(value))) ? null : Number(value);
+    setCompanies(prev => prev.map(c =>
+      c.id !== companyId
+        ? c
+        : { ...c, variants: (c.variants || []).map(v => v.id === variantId ? { ...v, aeAmountNego } : v) }
+    ));
+  };
+
+  // ─── DÉPOUILLEMENT APRÈS NÉGOCIATION (modale PV pré-remplie) ───────────────
+  // entries : [{ companyId, aeAmountNego, variants: [{ variantId, aeAmountNego }] }]
+  // Ne crée AUCUNE entreprise (les soumissionnaires sont ceux du dépouillement
+  // initial) — enregistre seulement les montants annoncés après négo, puis
+  // active la phase « Après négo » (le PV acte l'entrée en phase de notation négociée).
+  const applyDepouillementNego = (entries) => {
+    if (!Array.isArray(entries) || entries.length === 0) return;
+    const byId = new Map(entries.map(e => [e.companyId, e]));
+    setCompanies(prev => prev.map(c => {
+      const e = byId.get(c.id);
+      if (!e) return c;
+      const vById = new Map((e.variants || []).map(v => [v.variantId, v]));
+      return {
+        ...c,
+        aeAmountNego: e.aeAmountNego ?? null,
+        variants: (c.variants || []).map(v => {
+          const ev = vById.get(v.id);
+          return ev ? { ...v, aeAmountNego: ev.aeAmountNego ?? null } : v;
+        }),
+      };
+    }));
+    if (!negoActive) {
+      setScoringConfig(prev => ({ ...prev, basis: 'nego' }));
+      toast.info('Phase « Après négo » activée : la notation porte désormais sur les montants après négociation.');
+    }
+    toast.success(`Dépouillement après négociation enregistré : ${entries.length} entreprise(s).`);
+  };
+
+  // ─── RESET des prix négociés + rabais + PV négo (toutes entreprises) ───────
+  const handleClearNego = async () => {
+    const count = companies.filter(c =>
+      (c.offersNego && Object.keys(c.offersNego).length > 0)
+      || Number(c.negoRabaisPct) > 0
+      || c.aeAmountNego != null
+      || (c.variants || []).some(v => variantHasNego(v) || v.aeAmountNego != null)
+    ).length;
+    if (count === 0) { toast.info('Aucun prix négocié saisi.'); return; }
+    const ok = await confirm(
+      `Effacer les prix négociés, rabais et montants annoncés après négo de ${count} entreprise(s) ? Les offres initiales sont conservées.`,
+      { title: 'Vider les prix négociés', danger: true, confirmLabel: 'Effacer' }
+    );
+    if (!ok) return;
+    setCompanies(prev => prev.map(c => {
+      const {
+        offersNego: _o, negoRabaisPct: _r, aeAmountNego: _a,
+        negoImportAt: _at, negoImportFile: _f, ...rest
+      } = c;
+      return {
+        ...rest,
+        variants: (c.variants || []).map(v => {
+          const {
+            offersNego: _vo, totalNego: _vt, aeAmountNego: _va,
+            negoImportAt: _vat, negoImportFile: _vf, ...vRest
+          } = v;
+          return vRest;
+        }),
+      };
+    }));
+    toast.success('Données de négociation effacées — retour aux offres initiales.');
+  };
 
   // ─── VARIANTES — CCP R2151-8 à R2151-11 ────────────────────────────────────
   // Importe un fichier Excel comme variante d'une entreprise.
   // La variante se substitue à la solution de base dans ses éléments différents.
-  const handleImportVariant = async (companyId, file, metadata = {}) => {
+  // opts.toNego + opts.variantId : RÉIMPORT de l'offre négociée d'une variante
+  //   existante → alimente v.offersNego (diff par article) + v.totalNego, sans
+  //   toucher la variante initiale (offers, total, newItems, removedItems).
+  const handleImportVariant = async (companyId, file, metadata = {}, opts = {}) => {
     if (!file) return { ok: false, reason: 'no_file' };
     const company = companies.find(c => c.id === companyId);
     if (!company) return { ok: false, reason: 'company_not_found' };
+    const importVariantToNego = opts.toNego === true && !!opts.variantId;
 
     // ─── Détection format PDF → conversion en workbook Excel en mémoire ───
     let workingFile = file;
@@ -885,6 +1049,60 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
       if (matchCount === 0 && newItems.length === 0) {
         toast.warning(`Aucune correspondance dans le fichier variante.`);
         return { ok: false, reason: 'no_match' };
+      }
+
+      // ─── RÉIMPORT NÉGOCIÉ d'une variante existante ─────────────────────────
+      // Écrit les prix dans v.offersNego (les articles absents du fichier
+      // conservent leur prix initial) et dénormalise v.totalNego (BRUT — le
+      // rabais commercial global est déduit à la lecture). Les lignes hors DQE
+      // sont ignorées : les articles hors DQE de la variante gardent leur prix.
+      if (importVariantToNego) {
+        const targetVariant = (company.variants || []).find(v => v.id === opts.variantId);
+        if (!targetVariant) {
+          toast.error('Variante introuvable pour cet import négocié.');
+          return { ok: false, reason: 'variant_not_found' };
+        }
+        if (matchCount === 0) {
+          toast.warning('Aucun article du DQE reconnu dans le fichier négocié de la variante.');
+          return { ok: false, reason: 'no_match' };
+        }
+        const mergedNego = { ...(targetVariant.offersNego || {}), ...variantOffers };
+        const updatedVariant = { ...targetVariant, offersNego: mergedNego };
+        // Total négocié BRUT : même périmètre que le total initial (quantités
+        // variante > à valoir, articles supprimés exclus, articles hors DQE
+        // conservés au prix initial). Rabais volontairement NON déduit ici.
+        const flatItems = chaptersData.flatMap(ch => ch.items).map(it => ({ id: it.id, qty: it.activeQty }));
+        const totalNego = computeVariantTotal(
+          { ...company, negoRabaisPct: undefined },
+          updatedVariant, flatItems, {}, 'nego'
+        );
+        setCompanies(prev => prev.map(c =>
+          c.id !== companyId
+            ? c
+            : {
+                ...c,
+                variants: (c.variants || []).map(v =>
+                  v.id !== opts.variantId
+                    ? v
+                    : {
+                        ...v,
+                        offersNego: mergedNego,
+                        totalNego,
+                        negoImportAt: new Date().toISOString(),
+                        negoImportFile: file.name,
+                      }
+                ),
+              }
+        ));
+        if (newItems.length > 0) {
+          toast.warning(`${newItems.length} ligne(s) hors DQE ignorée(s) — les articles hors DQE de la variante conservent leur prix initial.`);
+        }
+        toast.success(`${matchCount} prix négocié(s) importé(s) pour la variante "${targetVariant.label || 'sans nom'}".`);
+        if (!negoActive) {
+          setScoringConfig(prev => ({ ...prev, basis: 'nego' }));
+          toast.info('Phase « Après négo » activée : la notation porte désormais sur les montants après négociation.');
+        }
+        return { ok: true, variant: { ...updatedVariant, totalNego } };
       }
 
       // Comparaisons : variante vs DQE MOE + variante vs offre de base
@@ -1279,6 +1497,8 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
 
   return {
     chaptersData, companies, stats, scoringConfig, setScoringConfig,
+    // Phase après négociation — commutateur + stats des deux phases (comparatif RAO)
+    negoActive, hasNego, statsInitial, statsNego, handleClearNego, updateCompanyNegoRabais,
     firestoreLoaded,
     canUndoObservatory: history.length > 0, lastSaved,
     handleAddManualCompany, handleImportExcel, updateCompanyOffer,
@@ -1290,6 +1510,8 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
     handleImportVariant, removeVariant, toggleVariantRetained, updateVariantJustification,
     // Dépouillement — CCP L2113-1 / R2151-1
     applyDepouillement, updateCompanyAeAmount, updateVariantAeAmount,
+    // Dépouillement après négociation (PV négo)
+    applyDepouillementNego, updateCompanyAeAmountNego, updateVariantAeAmountNego,
     // Import PDF
     handleImportPdfOffer,
     // Progression OCR (PDF scannés)

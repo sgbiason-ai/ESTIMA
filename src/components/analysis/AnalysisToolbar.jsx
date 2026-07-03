@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import {
   FileSpreadsheet, FileText, Plus, Upload, Trash2, History, CheckCircle2, BarChart3,
   Calculator, Settings2, Thermometer, AlertTriangle, EyeOff, Layers, ChevronDown,
-  FileDown, Database, Save, Download, FileUp
+  FileDown, Database, Save, Download, FileUp, Handshake, Eraser
 } from 'lucide-react';
 
 import { RibbonGroup, RibbonBtnLarge, RibbonBtnSmall, RibbonContainer, RibbonSpacer } from '../common/RibbonParts';
@@ -30,7 +30,8 @@ const AnalysisToolbar = ({
   analysisMode, setAnalysisMode,
   onAddManualCompany, onImportOffer, onClearAll, onUndoObservatory, canUndoObservatory, onExportPDF, onExportExcel,
   onPushAveragesToBpu, averagesHorsOABCount = 0, onManualSave, companiesCount = 0,
-  onExportJson, onImportJson
+  onExportJson, onImportJson,
+  negoActive = false, hasNego = false, onClearNego = null,
 }) => {
   const [showScoringSettings, setShowScoringSettings] = useState(false);
   const fileInputRef = useRef(null);
@@ -88,6 +89,39 @@ const AnalysisToolbar = ({
             active={analysisMode === 'oab'}
             accent="text-amber-500"
           />
+        </RibbonGroup>
+
+        {/* ── Phase des offres : initiales vs après négociation ── */}
+        {/* Persisté dans scoringConfig.basis : tableau, notation RAO et exports suivent. */}
+        <RibbonGroup label="Phase">
+          <RibbonBtnLarge
+            icon={FileText}
+            label="Offres initiales"
+            onClick={() => setScoringConfig({ ...scoringConfig, basis: 'initial' })}
+            active={!negoActive}
+            accent="text-slate-500"
+            title="Analyser et noter sur les offres initiales remises"
+          />
+          <RibbonBtnLarge
+            icon={Handshake}
+            label={<>Après négo{hasNego && <span className="ml-0.5 text-[9px] opacity-70">●</span>}</>}
+            onClick={() => setScoringConfig({ ...scoringConfig, basis: 'nego' })}
+            active={negoActive}
+            accent="text-emerald-600"
+            title="Analyser et noter sur les montants après négociation — les prix initiaux sont repris tels quels tant qu'ils ne sont pas modifiés ; la notation du RAO suit cette phase"
+          />
+          {negoActive && onClearNego && (
+            <div className="flex flex-col gap-[3px] justify-center">
+              <RibbonBtnSmall
+                icon={Eraser}
+                label="Vider négo"
+                onClick={onClearNego}
+                accent="text-red-400"
+                title="Effacer tous les prix négociés (les offres initiales sont conservées)"
+                disabled={!hasNego}
+              />
+            </div>
+          )}
         </RibbonGroup>
 
         {/* ── Notation ── */}

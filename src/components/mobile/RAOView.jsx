@@ -7,7 +7,7 @@ import { db as fireDb } from '../../firebase';
 import Icon from './Icon';
 import { fmt, fmtShort } from './formatters';
 import { flattenItems } from './helpers';
-import { scoreOffer, computeOABThreshold, computeChaptersData, computeAnalysisStats } from '../../utils/analysisCompute';
+import { scoreOffer, computeOABThreshold, computeChaptersData, computeAnalysisStats, getVariantEffectiveTotal, getEffectiveConclusion } from '../../utils/analysisCompute';
 import { computeVatBreakdown } from '../../utils/financeFormat';
 import { NON_REGULAR_STATUSES } from '../rao/RaoConstants';
 
@@ -120,33 +120,15 @@ export default function RAOView({ project, companyId, calcHook }) {
     return project.chapters.filter(c => !c.isOption);
   }, [project?.chapters]);
 
-  const allItems = useMemo(() => flattenItems(project?.chapters || []), [project?.chapters]);
-
   // Base de comparaison IDENTIQUE au desktop (audit F4) : options exclues + repli quantité 0.
   // Réutilise les primitives partagées analysisCompute → totaux et classement mobile == bureau.
+  // scoringConfig.basis = 'nego' → montants après négociation (fusion initial + négocié,
+  // rabais commercial déduit du Total HT).
   const baseStats = useMemo(
-    () => computeAnalysisStats(computeChaptersData(project, companies, qtyMap), companies, scoringConfig),
+    () => computeAnalysisStats(computeChaptersData(project, companies, qtyMap, scoringConfig?.basis), companies, scoringConfig, scoringConfig?.basis),
     [project, companies, qtyMap, scoringConfig]
   );
   const totalEstimation = baseStats.totalEstimation;
-
-  // ─── Helper : total d'une variante (matched + new items, removed exclus) ──
-  // Recalcule a la volee depuis offers/quantities de la variante (au cas ou v.total
-  // est obsolete ou absent) — meme logique que usePriceAnalysis.handleImportVariant.
-  const computeVariantTotal = (base, variant, items, qtyM) => {
-    const mergedOffers = { ...(base.offers || {}), ...(variant.offers || {}) };
-    const mergedQty    = variant.quantities || {};
-    const removed      = new Set((variant.removedItems || []).map(it => it.itemId));
-    let totalMatched = 0;
-    items.forEach(it => {
-      if (removed.has(it.id)) return;
-      const pu = Number(mergedOffers[it.id] ?? 0);
-      const qty = Number(mergedQty[it.id] ?? qtyM[it.id] ?? it.qty ?? 0);
-      totalMatched += qty * pu;
-    });
-    const totalNew = (variant.newItems || []).reduce((s, it) => s + Number(it.lineTotal || 0), 0);
-    return totalMatched + totalNew;
-  };
 
   // ─── Totaux par entreprise (avec variantes retenues comme entrees additionnelles) ──
   // Reproduit la logique desktop pdfRaoGenerator synthRows : base ajoutee si reguliere,
@@ -155,7 +137,9 @@ export default function RAOView({ project, companyId, calcHook }) {
     const entries = [];
     companies.forEach((c, ci) => {
       const admin = raoCompanies[c.name]?.admin || {};
-      const baseIrregular = !!(admin.conclusion && NON_REGULAR_STATUSES.includes(admin.conclusion));
+      // Phase après négo : régularisation prise en compte (getEffectiveConclusion).
+      const effConcl = getEffectiveConclusion(admin, scoringConfig?.basis === 'nego' ? 'nego' : 'initial');
+      const baseIrregular = !!(effConcl && NON_REGULAR_STATUSES.includes(effConcl));
       // Base (toujours ajoutee — la regularite est juste un marqueur visuel).
       // Total de base aligne sur le desktop (options exclues, repli qty 0) — audit F4.
       const baseTotal = baseStats.companiesTotals[c.id] || 0;
@@ -166,7 +150,9 @@ export default function RAOView({ project, companyId, calcHook }) {
       // Variantes retenues (filtrees si elles-memes irregulieres)
       (c.variants || []).filter(v => v.retained).forEach((v, vi) => {
         if (v.adminConclusion && NON_REGULAR_STATUSES.includes(v.adminConclusion)) return;
-        const vTotal = computeVariantTotal(c, v, allItems, qtyMap);
+        // Total net (rabais commercial global déduit en phase après négo) — même
+        // primitif que le desktop (RaoView/TabRecap/pdfRaoGenerator, source unique).
+        const vTotal = getVariantEffectiveTotal(c, v, scoringConfig?.basis === 'nego' ? 'nego' : 'initial');
         entries.push({
           ...c, // herite id/name pour technique/admin lookup
           kind: 'variant',
@@ -204,7 +190,7 @@ export default function RAOView({ project, companyId, calcHook }) {
       .map((e, i) => ({ ...e, rank: i + 1 }));
 
     return { ranked, Pmin, Pmax, Pmoy, oabThreshold, N, mode };
-  }, [companies, allItems, qtyMap, baseStats, totalEstimation, scoringConfig, raoCompanies]);
+  }, [companies, baseStats, totalEstimation, scoringConfig, raoCompanies]);
 
   // ─── Notes techniques par entreprise ─────────────────────────────────
   const techScoresMap = useMemo(() => {
@@ -478,7 +464,8 @@ export default function RAOView({ project, companyId, calcHook }) {
             const ui = getUI(ci);
             const admin = raoCompanies[c.name]?.admin || {};
             const pieces = admin.pieces || {};
-            const concl = admin.conclusion || 'reguliere';
+            // Statut effectif (régularisation après négo prise en compte si phase active).
+            const concl = getEffectiveConclusion(admin, scoringConfig?.basis === 'nego' ? 'nego' : 'initial') || 'reguliere';
             const isOpen = openAdminCompany === c.name;
             const isGroupement = !!admin.isGroupement;
             const members = admin.groupementMembers || [];
@@ -568,8 +555,8 @@ export default function RAOView({ project, companyId, calcHook }) {
                 const tech = raoCompanies[c.name]?.technical || {};
                 const isOpen = openTechCompany === c.name;
                 const totalScore = techScoresMap[c.name]?.total || 0;
-                // Offre non régulière : grisée + avertissement (mais exclue uniquement du PDF).
-                const isNonReg = NON_REGULAR_STATUSES.includes(raoCompanies[c.name]?.admin?.conclusion);
+                // Offre non régulière : grisée + avertissement (statut effectif : régularisation après négo prise en compte).
+                const isNonReg = NON_REGULAR_STATUSES.includes(getEffectiveConclusion(raoCompanies[c.name]?.admin, scoringConfig?.basis === 'nego' ? 'nego' : 'initial'));
 
                 return (
                   <div key={c.id} className={`bg-white rounded-xl border overflow-hidden ${isNonReg ? 'border-amber-200' : ui.border}`}>
@@ -683,8 +670,9 @@ export default function RAOView({ project, companyId, calcHook }) {
                             <div className="space-y-2">
                               {c.variants.map((v, vi) => {
                                 const justifMissing = v.retained && !(v.justification || '').trim();
-                                // Total recalcule a la volee (v.total stocke peut etre obsolete ou absent)
-                                const vTotalComputed = computeVariantTotal(c, v, allItems, qtyMap);
+                                // Total net (rabais commercial global déduit en phase après négo) —
+                                // même primitif que le desktop (source unique, analysisCompute).
+                                const vTotalComputed = getVariantEffectiveTotal(c, v, scoringConfig?.basis === 'nego' ? 'nego' : 'initial');
                                 const baseTot = companyStats.ranked.find(r => r.kind === 'base' && r.id === c.id)?.baseTotal
                                              ?? companyStats.ranked.find(r => r.kind === 'variant' && r.baseCompanyId === c.id)?.baseTotal
                                              ?? 0;
@@ -1006,12 +994,18 @@ export default function RAOView({ project, companyId, calcHook }) {
                         <p className="text-[11px] text-gray-700 leading-snug">{nego.questions}</p>
                       </div>
                     )}
-                    {nego.responses && (
-                      <div>
-                        <p className="text-[9px] font-black text-gray-500 uppercase">Réponses</p>
-                        <p className="text-[11px] text-gray-700 leading-snug">{nego.responses}</p>
-                      </div>
-                    )}
+                    {nego.responses && (() => {
+                      // nego.responses peut être du HTML (édité avec RichTextField) ou du texte plain (legacy).
+                      const isHtml = /<[a-z][^>]*>/i.test(nego.responses);
+                      const plain = isHtml ? nego.responses.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' ').trim() : nego.responses;
+                      if (!plain) return null;
+                      return (
+                        <div>
+                          <p className="text-[9px] font-black text-gray-500 uppercase">Réponses</p>
+                          <p className="text-[11px] text-gray-700 leading-snug">{plain}</p>
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}

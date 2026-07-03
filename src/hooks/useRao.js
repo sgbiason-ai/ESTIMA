@@ -1,6 +1,6 @@
 // src/hooks/useRao.js
 import { useCallback, useMemo } from 'react';
-import { computePriceReference } from '../utils/analysisCompute';
+import { computePriceReference, getCompanyRabaisPct, getEffectiveConclusion } from '../utils/analysisCompute';
 
 // ── CONSTANTES ──────────────────────────────────────────────────────────────
 
@@ -255,6 +255,10 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
     const includedChaps = chaptersData.filter(c => c.isOption && includedOptions[c.id]);
     if (includedChaps.length === 0) return analysisStats;
 
+    // Phase après négo : le rabais commercial porte sur le Total HT — les lignes
+    // d'options ajoutées ici doivent donc être nettes de rabais, comme la base.
+    const raoBasis = scoringConfig?.basis === 'nego' ? 'nego' : 'initial';
+
     const newTotals = { ...analysisStats.companiesTotals };
     let newTotalEst = analysisStats.totalEstimation;
     includedChaps.forEach(chap => {
@@ -262,7 +266,9 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
         newTotalEst += item.estimationTotal || (item.activeQty * (item.price || 0));
         analysisCompanies.forEach(company => {
           if (!newTotals[company.id]) newTotals[company.id] = 0;
-          newTotals[company.id] += item.companyData?.[company.id]?.lineTotal ?? 0;
+          const rabais = getCompanyRabaisPct(company, raoBasis);
+          const lineTotal = item.companyData?.[company.id]?.lineTotal ?? 0;
+          newTotals[company.id] += rabais > 0 ? lineTotal * (1 - rabais / 100) : lineTotal;
         });
       });
     });
@@ -320,10 +326,12 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
     // Statut de régularité (CCP) — conservé comme MARQUEUR, plus comme exclusion.
     // Les offres irrégulières concourent désormais au classement (réintégration) ;
     // la régularisation reste une décision du pouvoir adjudicateur (cf. RAO §5.bis).
-    // Source : project.rao.companies[name].admin.conclusion
+    // Phase après négo : une offre régularisée (admin.conclusionNego) n'est plus
+    // marquée « sous réserve » — cf. getEffectiveConclusion (CCP R2152-2).
+    const basis = scoringConfig?.basis === 'nego' ? 'nego' : 'initial';
     const NON_REGULAR = ['irreguliere', 'inacceptable', 'inappropriee'];
     const isIrregular = (companyName) => {
-      const conclusion = rao.companies?.[companyName]?.admin?.conclusion;
+      const conclusion = getEffectiveConclusion(rao.companies?.[companyName]?.admin, basis);
       return conclusion && NON_REGULAR.includes(conclusion);
     };
 

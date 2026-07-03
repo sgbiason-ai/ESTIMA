@@ -8,6 +8,7 @@ import OcrProgressModal from '../components/rao/OcrProgressModal';
 
 // MAGIE : On importe le moteur de calcul du projet !
 import { useProjectCalculations } from '../hooks/useProjectCalculations';
+import { getEffectiveOffers } from '../utils/analysisCompute';
 
 const PriceAnalysisView = ({
   project, companyId, setProject, handleSaveProject = null,
@@ -55,12 +56,18 @@ const PriceAnalysisView = ({
   );
 
   // --- EXPORTS ---
+  // En phase « après négo », les générateurs lisent c.offers : on leur passe des
+  // entreprises dont les offres sont déjà résolues (initial fusionné + négocié).
+  const exportCompanies = () => analysis.negoActive
+    ? (analysis.companies || []).map(c => ({ ...c, offers: getEffectiveOffers(c, 'nego') }))
+    : analysis.companies;
+
   const handleExportPDF = async () => {
     try {
       const module = await import('../utils/pdfAnalysisGenerator');
-      module.generateAnalysisPDF({ 
-        project: project, 
-        companies: analysis.companies,
+      module.generateAnalysisPDF({
+        project: project,
+        companies: exportCompanies(),
         chaptersData: analysis.chaptersData,
         stats: analysis.stats,
         scoringConfig: analysis.scoringConfig,
@@ -69,6 +76,7 @@ const PriceAnalysisView = ({
         tranches,
         analysisMode,
         branding: masterBranding,
+        negoActive: analysis.negoActive,
       });
     } catch (error) { console.error("Erreur PDF", error); }
   };
@@ -76,9 +84,9 @@ const PriceAnalysisView = ({
   const handleExportExcel = async () => {
     try {
       const module = await import('../utils/excelAnalysisGenerator');
-      module.generateAnalysisExcel({ 
+      module.generateAnalysisExcel({
         project: project,
-        companies: analysis.companies,
+        companies: exportCompanies(),
         chaptersData: analysis.chaptersData,
         stats: analysis.stats,
         scoringConfig: analysis.scoringConfig,
@@ -88,6 +96,7 @@ const PriceAnalysisView = ({
         analysisMode,
         branding: masterBranding,
         clientQtyMaps,
+        negoActive: analysis.negoActive,
       });
     } catch (error) { console.error("Erreur Excel", error); }
   };
@@ -132,6 +141,10 @@ const PriceAnalysisView = ({
           analysisCompanies={analysis.companies || []}
           analysisLoaded={analysis.firestoreLoaded}
           analysisStats={analysis.stats}
+          analysisStatsInitial={analysis.statsInitial}
+          analysisStatsNego={analysis.statsNego}
+          negoActive={analysis.negoActive}
+          hasNegoOffers={analysis.hasNego}
           scoringConfig={analysis.scoringConfig}
           masterBranding={masterBranding}
           chaptersData={analysis.chaptersData}
@@ -147,12 +160,29 @@ const PriceAnalysisView = ({
           onApplyDepouillement={analysis.applyDepouillement}
           onUpdateAeAmount={analysis.updateCompanyAeAmount}
           onUpdateVariantAeAmount={analysis.updateVariantAeAmount}
+          onUpdateNegoRabais={analysis.updateCompanyNegoRabais}
+          onApplyDepouillementNego={analysis.applyDepouillementNego}
+          onUpdateAeAmountNego={analysis.updateCompanyAeAmountNego}
+          onUpdateVariantAeAmountNego={analysis.updateVariantAeAmountNego}
+          onSetNegoPhase={(active) =>
+            analysis.setScoringConfig(prev => ({ ...prev, basis: active ? 'nego' : 'initial' }))
+          }
           onImportOffer={(companyName, file) =>
             analysis.handleImportExcel({ target: { files: [file], value: null } }, companyName)
           }
           onImportPdfOffer={(companyName, file) =>
             analysis.handleImportPdfOffer(file, companyName)
           }
+          onImportNegoOffer={(row, file) => {
+            // row.kind === 'variant' → offre négociée d'une variante existante (offersNego propre à la variante)
+            // row.kind === 'base'    → offre négociée de l'entreprise (offersNego de la base)
+            if (row.kind === 'variant') {
+              return analysis.handleImportVariant(row.companyId, file, {}, { toNego: true, variantId: row.variantId });
+            }
+            return /\.pdf$/i.test(file.name)
+              ? analysis.handleImportPdfOffer(file, row.name, { toNego: true })
+              : analysis.handleImportExcel({ target: { files: [file], value: null } }, row.name, { toNego: true });
+          }}
           handleSaveProject={handleSaveProject}
           onExportJson={analysis.handleExportJson}
           onImportJson={analysis.handleImportJson}
@@ -182,15 +212,18 @@ const PriceAnalysisView = ({
         companiesCount={analysis.companies?.length || 0}
         onExportJson={analysis.handleExportJson}
         onImportJson={analysis.handleImportJson}
+        negoActive={analysis.negoActive}
+        hasNego={analysis.hasNego}
+        onClearNego={analysis.handleClearNego}
       />
 
       <div className="flex-1 overflow-auto p-4 relative">
-        <AnalysisTable 
-          {...analysis} 
+        <AnalysisTable
+          {...analysis}
           project={project}
           activeTrancheId={activeTrancheId}
-          bpuConfig={bpuConfig} 
-          analysisMode={analysisMode} 
+          bpuConfig={bpuConfig}
+          analysisMode={analysisMode}
         />
       </div>
       </>}

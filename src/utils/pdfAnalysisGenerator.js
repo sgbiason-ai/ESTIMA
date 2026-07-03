@@ -56,7 +56,7 @@ const SCORING_FORMULAS = {
   f3: 'N × ( Pmin / P )³',
   f4: 'N × [ 1 - ( P - Pmin ) / Pmin ]',
   f5: 'N × [ 1 - ( P - Pmin ) / Pmoy ]',
-  f6: 'Si P < Pmoy : N × √( Pmin / P ) | Sinon : N × ( Pmin / P )²',
+  f6: 'Si P < Pmoy : N × racine( Pmin / P ) | Sinon : N × ( Pmin / P )²',
   f7: 'N × [ 1 - ( P - Pmin ) / ( Pmax - Pmin ) ]',
   f8: '( N × Pmoy ) / ( Pmoy + P )',
   f9: 'N × ( 2 × Pmin ) / ( Pmin + P )'
@@ -270,6 +270,9 @@ export const generateAnalysisPDF = async ({
   analysisMode,
   scoringConfig,
   branding = null,
+  // Phase après négociation : les offres passées sont déjà résolues (fusion
+  // initial + négocié) par l'appelant — ce flag ne sert qu'au libellé.
+  negoActive = false,
 }) => {
   const doc = new jsPDF('p', 'mm', 'a4');
   const dateStr = new Date().toLocaleDateString('fr-FR');
@@ -315,9 +318,9 @@ export const generateAnalysisPDF = async ({
   // En-tête A3
   const trancheName = activeTrancheId === 'global' ? 'GLOBAL' : tranches.find(t => t.id === activeTrancheId)?.name || 'Tranche';
   doc.setFontSize(16); doc.setTextColor(0, 0, 0);
-  doc.text("SYNTHÈSE DE L'ANALYSE FINANCIÈRE", 14, 15);
+  doc.text(`SYNTHÈSE DE L'ANALYSE FINANCIÈRE${negoActive ? ' — APRÈS NÉGOCIATION' : ''}`, 14, 15);
   doc.setFontSize(10);
-  doc.text(fitTextToWidth(doc, `Lot/Tranche : ${trancheName} | Date : ${dateStr}`, doc.internal.pageSize.width - 28), 14, 22);
+  doc.text(fitTextToWidth(doc, `Lot/Tranche : ${trancheName} | Date : ${dateStr}${negoActive ? ' | Montants après négociation' : ''}`, doc.internal.pageSize.width - 28), 14, 22);
   doc.setFontSize(9); doc.setTextColor(80);
   const formulaLabel = SCORING_FORMULAS[scoringMode] || scoringMode.toUpperCase();
   doc.text(`Notation (${maxScore} pts) : ${formulaLabel}`, 14, 30);
@@ -338,9 +341,12 @@ export const generateAnalysisPDF = async ({
   }
 
   // Tableau de synthèse — [MODIFIÉ] : en-tête avec couleur primaire du branding
+  // Rabais commercial (phase après négo) : les totaux de stats sont NETS —
+  // la mention du rabais appliqué est rappelée sous le nom de l'entreprise.
+  const companiesRabais = stats.companiesRabais || {};
   const summaryBody = summaryData.map((d, index) => [
     { content: `${index + 1}${index === 0 ? 'er' : 'ème'}`, styles: { fontStyle: 'bold', halign: 'center' } },
-    d.name,
+    companiesRabais[d.id] > 0 ? `${d.name}\n(dont rabais commercial -${String(companiesRabais[d.id]).replace('.', ',')} %)` : d.name,
     { content: formatNumberFr(d.total) + ' €', styles: { fontStyle: 'bold', halign: 'right' } },
     { content: (d.deviation > 0 ? '+' : '') + d.deviation.toFixed(2) + '%', styles: { textColor: d.deviation > 0 ? [200, 0, 0] : [0, 150, 0], halign: 'center' } },
     { content: d.score.toFixed(2) + ` / ${maxScore}`, styles: { fontStyle: 'bold', halign: 'center' } }
@@ -443,7 +449,26 @@ export const generateAnalysisPDF = async ({
     }
   });
 
-  const totalRow = [{ content: 'TOTAL GÉNÉRAL HT', colSpan: 4, styles: { fontStyle: 'bold', halign: 'right' } }, { content: '-', styles: { halign: 'center' } }, { content: formatNumberFr(stats.totalEstimation), styles: { fontStyle: 'bold', halign: 'right', fillColor: [209, 250, 229] } }];
+  // Ligne rabais commercial (phase après négo) : rend explicite l'écart entre la
+  // somme des chapitres (brute) et le TOTAL GÉNÉRAL (net de rabais).
+  const hasAnyRabais = Object.keys(companiesRabais).length > 0;
+  if (hasAnyRabais) {
+    const rabaisRow = [
+      { content: 'RABAIS COMMERCIAL', colSpan: 4, styles: { fontStyle: 'bold', halign: 'right', textColor: [21, 128, 61] } },
+      { content: '', colSpan: 2 },
+    ];
+    companies.forEach(company => {
+      const r = companiesRabais[company.id] || 0;
+      rabaisRow.push({
+        content: r > 0 ? `-${String(r).replace('.', ',')} %` : '—',
+        colSpan: 3,
+        styles: { fontStyle: 'bold', halign: 'center', textColor: r > 0 ? [21, 128, 61] : [150, 150, 150] },
+      });
+    });
+    tableBody.push(rabaisRow);
+  }
+
+  const totalRow = [{ content: hasAnyRabais ? 'TOTAL GÉNÉRAL HT (net de rabais)' : 'TOTAL GÉNÉRAL HT', colSpan: 4, styles: { fontStyle: 'bold', halign: 'right' } }, { content: '-', styles: { halign: 'center' } }, { content: formatNumberFr(stats.totalEstimation), styles: { fontStyle: 'bold', halign: 'right', fillColor: [209, 250, 229] } }];
   companies.forEach(company => {
     const total = stats.companiesTotals[company.id] || 0;
     const deviation = grandTotalBase > 0 ? ((total - grandTotalBase) / grandTotalBase) * 100 : 0;

@@ -6,6 +6,12 @@ import {
   computeAnalysisStats,
   computeOABDetail,
   computeOABThreshold,
+  getEffectiveOffers,
+  companiesHaveNego,
+  getCompanyRabaisPct,
+  getEffectiveConclusion,
+  isConclusionNonRegular,
+  isRegularizedAfterNego,
 } from '../utils/analysisCompute';
 
 // ── scoreOffer : primitif de notation partagé desktop + mobile ──────────────
@@ -164,6 +170,191 @@ describe('computeChaptersData', () => {
 
   it('retourne [] si le projet est vide', () => {
     expect(computeChaptersData(null, companies, qtyMap)).toEqual([]);
+  });
+});
+
+// ── Phase après négociation : offres effectives + comparatif ─────────────────
+describe('getEffectiveOffers', () => {
+  const company = { offers: { i1: 100, i2: 50 }, offersNego: { i1: 90 } };
+
+  it("basis 'initial' (ou absent) → offres initiales telles quelles", () => {
+    expect(getEffectiveOffers(company)).toEqual({ i1: 100, i2: 50 });
+    expect(getEffectiveOffers(company, 'initial')).toEqual({ i1: 100, i2: 50 });
+  });
+
+  it("basis 'nego' → fusion article par article (le négocié prime, le reste est repris)", () => {
+    expect(getEffectiveOffers(company, 'nego')).toEqual({ i1: 90, i2: 50 });
+  });
+
+  it('entreprise sans contre-proposition → offre initiale reprise intégralement', () => {
+    expect(getEffectiveOffers({ offers: { i1: 100 } }, 'nego')).toEqual({ i1: 100 });
+    expect(getEffectiveOffers({ offers: { i1: 100 }, offersNego: {} }, 'nego')).toEqual({ i1: 100 });
+  });
+
+  it('est robuste à une entreprise nulle', () => {
+    expect(getEffectiveOffers(null, 'nego')).toEqual({});
+  });
+});
+
+describe('companiesHaveNego', () => {
+  it('détecte au moins une entreprise avec prix négociés', () => {
+    expect(companiesHaveNego([{ offers: {} }, { offers: {}, offersNego: { i1: 5 } }])).toBe(true);
+    expect(companiesHaveNego([{ offers: { i1: 10 } }, { offersNego: {} }])).toBe(false);
+    expect(companiesHaveNego([])).toBe(false);
+    expect(companiesHaveNego(null)).toBe(false);
+  });
+
+  it('détecte aussi un rabais commercial seul (sans prix renégociés)', () => {
+    expect(companiesHaveNego([{ offers: { i1: 10 }, negoRabaisPct: 2.5 }])).toBe(true);
+    expect(companiesHaveNego([{ offers: { i1: 10 }, negoRabaisPct: 0 }])).toBe(false);
+  });
+});
+
+describe('getCompanyRabaisPct', () => {
+  it("ne s'applique qu'en basis 'nego'", () => {
+    expect(getCompanyRabaisPct({ negoRabaisPct: 3 })).toBe(0);
+    expect(getCompanyRabaisPct({ negoRabaisPct: 3 }, 'initial')).toBe(0);
+    expect(getCompanyRabaisPct({ negoRabaisPct: 3 }, 'nego')).toBe(3);
+  });
+
+  it('borne à [0, 100] et ignore les valeurs invalides', () => {
+    expect(getCompanyRabaisPct({ negoRabaisPct: 150 }, 'nego')).toBe(100);
+    expect(getCompanyRabaisPct({ negoRabaisPct: -5 }, 'nego')).toBe(0);
+    expect(getCompanyRabaisPct({ negoRabaisPct: 'abc' }, 'nego')).toBe(0);
+    expect(getCompanyRabaisPct({}, 'nego')).toBe(0);
+    expect(getCompanyRabaisPct(null, 'nego')).toBe(0);
+  });
+});
+
+describe("computeAnalysisStats — rabais commercial (basis 'nego')", () => {
+  // A : 1000 € brut avec 10 % de rabais ; B : 950 € sans rabais.
+  const chaptersData = [
+    {
+      id: 'c1', title: 'Lot', isOption: false,
+      items: [{ estimationTotal: 900, companyData: { A: { lineTotal: 1000 }, B: { lineTotal: 950 } } }],
+    },
+  ];
+  const companies = [{ id: 'A', negoRabaisPct: 10 }, { id: 'B' }];
+  const cfg = { mode: 'f1', maxScore: 40 };
+
+  it('déduit le rabais du Total HT (net) et conserve le brut', () => {
+    const r = computeAnalysisStats(chaptersData, companies, cfg, 'nego');
+    expect(r.companiesTotals.A).toBe(900);        // 1000 × (1 − 10 %)
+    expect(r.companiesTotalsBrut.A).toBe(1000);
+    expect(r.companiesTotals.B).toBe(950);        // sans rabais
+    expect(r.companiesRabais).toEqual({ A: 10 });
+  });
+
+  it('la notation porte sur les montants nets (le rabais peut inverser le classement)', () => {
+    const r = computeAnalysisStats(chaptersData, companies, cfg, 'nego');
+    // Net : A = 900 (moins-disant), B = 950
+    expect(r.Pmin).toBe(900);
+    expect(r.companyScores.A).toBe(40);
+    expect(r.companyScores.B).toBeCloseTo(40 * (900 / 950), 5);
+  });
+
+  it("basis 'initial' (ou absent) : aucun rabais appliqué", () => {
+    const r = computeAnalysisStats(chaptersData, companies, cfg);
+    expect(r.companiesTotals.A).toBe(1000);
+    expect(r.companiesRabais).toEqual({});
+    expect(r.Pmin).toBe(950);
+  });
+});
+
+// ── Régularité effective : régularisation d'une offre après négociation ──────
+describe('getEffectiveConclusion / régularisation après négo', () => {
+  it("phase 'initial' : renvoie toujours le statut initial (ignore conclusionNego)", () => {
+    const admin = { conclusion: 'irreguliere', conclusionNego: 'reguliere' };
+    expect(getEffectiveConclusion(admin, 'initial')).toBe('irreguliere');
+    expect(getEffectiveConclusion(admin)).toBe('irreguliere');
+  });
+
+  it("phase 'nego' : conclusionNego prend le pas (régularisation)", () => {
+    const admin = { conclusion: 'irreguliere', conclusionNego: 'reguliere' };
+    expect(getEffectiveConclusion(admin, 'nego')).toBe('reguliere');
+  });
+
+  it("phase 'nego' sans override : hérite du statut initial", () => {
+    expect(getEffectiveConclusion({ conclusion: 'irreguliere' }, 'nego')).toBe('irreguliere');
+    expect(getEffectiveConclusion({ conclusion: 'irreguliere', conclusionNego: '' }, 'nego')).toBe('irreguliere');
+  });
+
+  it('robuste à un admin nul', () => {
+    expect(getEffectiveConclusion(null, 'nego')).toBeUndefined();
+  });
+
+  it('isConclusionNonRegular suit le statut effectif selon la phase', () => {
+    const admin = { conclusion: 'irreguliere', conclusionNego: 'reguliere' };
+    expect(isConclusionNonRegular(admin, 'initial')).toBe(true);   // irrégulière avant négo
+    expect(isConclusionNonRegular(admin, 'nego')).toBe(false);     // régularisée après négo
+    expect(isConclusionNonRegular({ conclusion: 'inacceptable' }, 'nego')).toBe(true);
+    expect(isConclusionNonRegular({ conclusion: 'reguliere' })).toBe(false);
+  });
+
+  it('isRegularizedAfterNego : vrai seulement si initial non régulier ET nego régulier', () => {
+    expect(isRegularizedAfterNego({ conclusion: 'irreguliere', conclusionNego: 'reguliere' })).toBe(true);
+    expect(isRegularizedAfterNego({ conclusion: 'inacceptable', conclusionNego: 'reguliere' })).toBe(true);
+    // initial déjà régulier → pas une régularisation
+    expect(isRegularizedAfterNego({ conclusion: 'reguliere', conclusionNego: 'reguliere' })).toBe(false);
+    // reste non régulier après négo → pas régularisée
+    expect(isRegularizedAfterNego({ conclusion: 'irreguliere', conclusionNego: 'inacceptable' })).toBe(false);
+    // pas d'override → pas régularisée
+    expect(isRegularizedAfterNego({ conclusion: 'irreguliere' })).toBe(false);
+    expect(isRegularizedAfterNego(null)).toBe(false);
+  });
+});
+
+describe("computeChaptersData — basis 'nego'", () => {
+  const project = {
+    chapters: [
+      {
+        id: 'c1', title: 'Lot 1', isOption: false,
+        children: [
+          { type: 'item', id: 'i1', price: 100 },
+          { type: 'item', id: 'i2', price: 50 },
+        ],
+      },
+    ],
+  };
+  // A a renégocié i1 (120 → 100) ; B n'a rien renégocié.
+  const companies = [
+    { id: 'A', offers: { i1: 120, i2: 60 }, offersNego: { i1: 100 } },
+    { id: 'B', offers: { i1: 90, i2: 40 } },
+  ];
+  const qtyMap = { i1: 10, i2: 4 };
+
+  it('reprend le prix négocié quand il existe, sinon le prix initial', () => {
+    const data = computeChaptersData(project, companies, qtyMap, 'nego');
+    const [i1, i2] = data[0].items;
+    expect(i1.companyData.A.pu).toBe(100);        // négocié
+    expect(i1.companyData.A.lineTotal).toBe(1000);
+    expect(i2.companyData.A.pu).toBe(60);         // non renégocié → initial
+    expect(i1.companyData.B.pu).toBe(90);         // pas de contre-proposition
+  });
+
+  it('porte puInitial (prix avant négo) pour le marqueur visuel', () => {
+    const data = computeChaptersData(project, companies, qtyMap, 'nego');
+    expect(data[0].items[0].companyData.A.puInitial).toBe(120);
+    expect(data[0].items[0].companyData.B.puInitial).toBe(90);
+  });
+
+  it("basis 'initial' : ni fusion ni puInitial (comportement historique)", () => {
+    const data = computeChaptersData(project, companies, qtyMap);
+    expect(data[0].items[0].companyData.A.pu).toBe(120);
+    expect(data[0].items[0].companyData.A.puInitial).toBeUndefined();
+  });
+
+  it('la notation suit les montants négociés (chaîne complète stats)', () => {
+    const cfg = { mode: 'f1', maxScore: 40 };
+    const statsInitial = computeAnalysisStats(computeChaptersData(project, companies, qtyMap), companies, cfg);
+    const statsNego = computeAnalysisStats(computeChaptersData(project, companies, qtyMap, 'nego'), companies, cfg);
+    // A : 10·120 + 4·60 = 1440 → après négo 10·100 + 4·60 = 1240
+    expect(statsInitial.companiesTotals.A).toBe(1440);
+    expect(statsNego.companiesTotals.A).toBe(1240);
+    // B inchangé (offre initiale reprise)
+    expect(statsNego.companiesTotals.B).toBe(1060);
+    // Le score de A s'améliore avec la baisse négociée
+    expect(statsNego.companyScores.A).toBeGreaterThan(statsInitial.companyScores.A);
   });
 });
 
