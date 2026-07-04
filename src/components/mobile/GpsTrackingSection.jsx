@@ -222,75 +222,56 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
   const currentLivePosition = isRecording && liveCoords.length > 0 ? [liveCoords[liveCoords.length - 1].lat, liveCoords[liveCoords.length - 1].lng] : null;
 
   return (
-    <div className="flex flex-col gap-4 pb-6">
+    <div className="h-full flex flex-col gap-2">
 
-      {/* ── Contrôle enregistrement ── */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h3 className="text-[15px] font-bold text-gray-900">Suivi terrain</h3>
-            <p className="text-[12px] text-gray-500 mt-0.5">
-              {isRecording ? 'Enregistrement en cours…' : hasTrack ? 'Tracé enregistré' : 'Démarrer le suivi GPS'}
-            </p>
-          </div>
-          {isRecording && lastAccuracy != null && (
-            <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: accuracyColor(lastAccuracy) }} />
-              <span className="text-[11px] font-bold" style={{ color: accuracyColor(lastAccuracy) }}>
-                ±{lastAccuracy}m
-              </span>
+      {/* ── Contrôle enregistrement (barre compacte : stats inline + bouton) ── */}
+      <div className="bg-white rounded-2xl border border-gray-200 px-3 py-2.5 shrink-0">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <h3 className="text-[13px] font-bold text-gray-900">Suivi terrain</h3>
+              {isRecording && lastAccuracy != null && (
+                <span className="flex items-center gap-1 text-[10px] font-bold" style={{ color: accuracyColor(lastAccuracy) }}>
+                  <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: accuracyColor(lastAccuracy) }} />
+                  ±{lastAccuracy}m
+                </span>
+              )}
             </div>
+            <div className="text-[11px] text-gray-500 font-medium mt-0.5 truncate">
+              {(isRecording || hasTrack) ? (
+                <>
+                  {coords.length} pts · {fmtDistance(distance)} <span className="text-gray-400">±{Math.round(distance * 0.05)}m</span> · {isRecording ? fmtDuration(elapsed) : tracking.endTime ? fmtDuration(new Date(tracking.endTime) - new Date(tracking.startTime)) : '—'}
+                  {isRecording && <span className="text-gray-400"> · écran allumé</span>}
+                </>
+              ) : 'Enregistrez vos déplacements GPS'}
+            </div>
+          </div>
+
+          {/* Bouton Start/Stop */}
+          {isRecording ? (
+            <button
+              onClick={stopRecording}
+              className="shrink-0 px-4 py-2.5 rounded-xl bg-red-500 text-white text-[13px] font-bold flex items-center gap-2 active:scale-[0.97] transition shadow-sm"
+            >
+              <div className="w-3 h-3 rounded-sm bg-white" />
+              Arrêter
+            </button>
+          ) : (
+            <button
+              onClick={startRecording}
+              className="shrink-0 px-4 py-2.5 rounded-xl bg-emerald-500 text-white text-[13px] font-bold flex items-center gap-2 active:scale-[0.97] transition shadow-sm"
+            >
+              <div className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
+              Démarrer
+            </button>
           )}
         </div>
-
-        {/* Stats */}
-        {(isRecording || hasTrack) && (
-          <div className="flex gap-3 mb-4">
-            <div className="flex-1 bg-gray-50 rounded-xl p-3 text-center">
-              <div className="text-lg font-bold text-gray-900">{coords.length}</div>
-              <div className="text-[10px] text-gray-500 font-medium">Points</div>
-            </div>
-            <div className="flex-1 bg-gray-50 rounded-xl p-3 text-center">
-              <div className="text-lg font-bold text-gray-900">{fmtDistance(distance)} <span className="text-[9px] text-gray-400 font-medium">±{Math.round(distance * 0.05)}m</span></div>
-              <div className="text-[10px] text-gray-500 font-medium">Distance</div>
-            </div>
-            <div className="flex-1 bg-gray-50 rounded-xl p-3 text-center">
-              <div className="text-lg font-bold text-gray-900">{isRecording ? fmtDuration(elapsed) : tracking.endTime ? fmtDuration(new Date(tracking.endTime) - new Date(tracking.startTime)) : '—'}</div>
-              <div className="text-[10px] text-gray-500 font-medium">Durée</div>
-            </div>
-          </div>
-        )}
-
-        {/* Bouton Start/Stop */}
-        {isRecording ? (
-          <button
-            onClick={stopRecording}
-            className="w-full py-4 rounded-2xl bg-red-500 text-white text-[15px] font-bold flex items-center justify-center gap-2 active:scale-[0.97] transition shadow-sm"
-          >
-            <div className="w-4 h-4 rounded-sm bg-white" />
-            Arrêter l'enregistrement
-          </button>
-        ) : (
-          <button
-            onClick={startRecording}
-            className="w-full py-4 rounded-2xl bg-emerald-500 text-white text-[15px] font-bold flex items-center justify-center gap-2 active:scale-[0.97] transition shadow-sm"
-          >
-            <div className="w-3 h-3 rounded-full bg-white animate-pulse" />
-            Démarrer le suivi GPS
-          </button>
-        )}
-
-        {isRecording && (
-          <p className="text-[10px] text-gray-400 text-center mt-2 italic">
-            L'écran reste allumé pendant l'enregistrement
-          </p>
-        )}
       </div>
 
-      {/* ── Carte (miniature ou plein écran) ── */}
+      {/* ── Carte (occupe tout l'espace restant, ou plein écran) ── */}
       {hasMapData && !fullscreenMap && (
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden flex-1 min-h-[300px] flex flex-col">
+          <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between shrink-0">
             <span className="text-[13px] font-bold text-gray-900">Carte</span>
             <div className="flex items-center gap-2">
               <span className="text-[11px] text-gray-400">
@@ -307,23 +288,25 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
               </button>
             </div>
           </div>
-          <Suspense fallback={
-            <div className="flex items-center justify-center py-16 text-gray-400">
-              <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mr-2" />
-              Chargement de la carte…
-            </div>
-          }>
-            <GpsMapView
-              coordinates={coords}
-              photoMarkers={photoMarkers}
-              obsMarkers={obsMarkers}
-              segmentEndpoints={segmentEndpoints}
-              segmentLines={segmentLines}
-              livePosition={currentLivePosition}
-              liveBearing={liveBearing}
-              height="50vh"
-            />
-          </Suspense>
+          <div className="flex-1 min-h-0">
+            <Suspense fallback={
+              <div className="flex items-center justify-center h-full text-gray-400">
+                <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mr-2" />
+                Chargement de la carte…
+              </div>
+            }>
+              <GpsMapView
+                coordinates={coords}
+                photoMarkers={photoMarkers}
+                obsMarkers={obsMarkers}
+                segmentEndpoints={segmentEndpoints}
+                segmentLines={segmentLines}
+                livePosition={currentLivePosition}
+                liveBearing={liveBearing}
+                height="100%"
+              />
+            </Suspense>
+          </div>
         </div>
       )}
 
@@ -370,7 +353,7 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
 
       {/* ── Pas de tracé ── */}
       {!hasMapData && !isRecording && (
-        <div className="text-center py-8">
+        <div className="flex-1 flex flex-col items-center justify-center text-center py-8">
           <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
             <Icon name="chart" size={24} color="#9ca3af" />
           </div>

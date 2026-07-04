@@ -586,7 +586,7 @@ export default function SiteVisitDetailView({ visit, onSave, saveStatus, onToast
         )}
 
         {/* Terrain toujours monté (GPS en arrière-plan), masqué si pas actif ou si éditeur ouvert */}
-        <div style={{ display: activeSection === 'terrain' && !editingObs ? 'block' : 'none' }}>
+        <div className="h-full" style={{ display: activeSection === 'terrain' && !editingObs ? 'block' : 'none' }}>
           <GpsTrackingSection
             meeting={fakeMeeting}
             manager={manager}

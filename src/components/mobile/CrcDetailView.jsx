@@ -461,7 +461,7 @@ export default function CrcDetailView({ chantier, branding, onToast, manager, is
           />
         )}
         {/* Terrain toujours monté (GPS en arrière-plan), masqué si pas actif */}
-        <div style={{ display: activeSection === 'terrain' && meeting ? 'block' : 'none' }}>
+        <div className="h-full" style={{ display: activeSection === 'terrain' && meeting ? 'block' : 'none' }}>
           <GpsTrackingSection
             meeting={meeting}
             manager={canEdit ? manager : null}
