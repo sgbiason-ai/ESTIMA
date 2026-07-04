@@ -60,7 +60,7 @@ const MODULES = [
   // Row 1 — Projet & Estimation (white)
   { id: 'projects_manager', label: 'Gestion de Projets', description: 'Création, organisation et gestion de vos projets VRD', icon: Folder, access: 'all', tag: 'Core', row: 1 },
   { id: 'estima', label: 'ESTIMA VRD', description: 'Estimation, chiffrage et documents de consultation', icon: Calculator, access: 'all', tag: 'Core', row: 1, featured: true },
-  { id: 'rao_analysis', label: 'RAO & Analyse', description: "Rapport d'analyse des offres et analyse comparative", icon: BarChart3, access: 'all', tag: 'Analyse', row: 1 },
+  { id: 'rao_analysis', label: 'RAO & Analyse des offres', description: "Rapport d'analyse des offres et analyse comparative", icon: BarChart3, access: 'all', tag: 'Analyse', row: 1 },
   // Row 2 — Outils & Administration (copper glass)
   { id: 'devis_moe', label: 'Devis MOE', description: "Proposition d'honoraires de maîtrise d'œuvre VRD", icon: Receipt, access: 'admin_only', tag: 'Finance', row: 2 },
   { id: 'expense_notes', label: 'Notes de Frais', description: 'Frais kilométriques avec barème fiscal', icon: Car, access: 'admin_only', tag: 'Finance', row: 2 },

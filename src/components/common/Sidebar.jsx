@@ -25,7 +25,7 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout, userEmail, onOpenCalculato
       { id: 'rc', label: 'Règlement Consul.', icon: FileCheck },
       { id: 'ccap', label: 'CCAP', icon: Scale },
     ]},
-    { id: 'analyse_section', items: [{ id: 'price_analysis', label: 'Analyse des Prix', icon: LineChart }] },
+    { id: 'analyse_section', items: [{ id: 'price_analysis', label: 'RAO & Analyse des offres', icon: LineChart }] },
   ];
 
   const libraryItem  = { id: 'database',  label: 'Bibliothèque', icon: Database };

@@ -255,7 +255,7 @@ export default function RaoAnalysisView({ user, companyId, onBackToHub }) {
           </div>
           <div className="min-w-0">
             <h1 className="font-bold text-base text-gray-900 tracking-tight truncate">
-              RAO & Analyse des Prix
+              RAO & Analyse des offres
             </h1>
             {!isLanding && project && (
               <p className="text-xs text-gray-400 -mt-0.5 truncate max-w-md">

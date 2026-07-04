@@ -371,8 +371,37 @@ const AnalysisTable = ({
 
   const [oabDetailCompanyId, setOabDetailCompanyId] = useState(null);
 
+  // ─── Repli des chapitres ────────────────────────────────────────────────
+  // Sur un DQE de 200+ articles, on commence par comparer les sous-totaux de
+  // chapitre (le total du chapitre reste visible) et on ne déplie que les
+  // chapitres en écart. Set d'ids repliés.
+  const [collapsedChapters, setCollapsedChapters] = useState(() => new Set());
+  const allChapterIds = chaptersData.map(c => c.id);
+  const allCollapsed = allChapterIds.length > 0 && allChapterIds.every(id => collapsedChapters.has(id));
+  const toggleChapter = (id) => setCollapsedChapters(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const toggleAllChapters = () => setCollapsedChapters(allCollapsed ? new Set() : new Set(allChapterIds));
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full">
+      {/* Barre de contrôle du tableau : repli global des chapitres */}
+      <div className="shrink-0 flex items-center justify-between gap-2 px-3 py-1.5 border-b border-slate-100 bg-slate-50/60">
+        <span className="text-[10px] font-medium text-slate-400">
+          {chaptersData.length} chapitre{chaptersData.length > 1 ? 's' : ''}
+          {collapsedChapters.size > 0 ? ` · ${collapsedChapters.size} replié${collapsedChapters.size > 1 ? 's' : ''}` : ''}
+        </span>
+        <button
+          type="button"
+          onClick={toggleAllChapters}
+          className="flex items-center gap-1 text-[10px] font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-100 px-2 py-1 rounded-lg transition-colors"
+        >
+          <ChevronRight size={12} className={`transition-transform ${allCollapsed ? '' : 'rotate-90'}`} />
+          {allCollapsed ? 'Tout déplier' : 'Tout replier'}
+        </button>
+      </div>
       <div className="overflow-auto flex-1">
         <table className="border-collapse text-left table-fixed w-full">
           <colgroup>
@@ -499,13 +528,22 @@ const AnalysisTable = ({
               });
               const chapterOABThreshold = (analysisMode === 'oab') ? calculateOABThreshold(chapterTotalsPerColumn) : 0;
 
+              const isCollapsed = collapsedChapters.has(chapter.id);
+
               return (
                 <React.Fragment key={chapter.id}>
-                  <tr className="bg-slate-50 border-y border-slate-200">
+                  <tr
+                    className="bg-slate-50 border-y border-slate-200 cursor-pointer select-none hover:bg-slate-100 transition-colors"
+                    onClick={() => toggleChapter(chapter.id)}
+                    title={isCollapsed ? 'Déplier le chapitre' : 'Replier le chapitre'}
+                  >
                     <td colSpan={5} style={STICKY.DESIG} className="px-2 py-1.5 bg-slate-50">
                       <div className="flex items-center gap-2">
-                        <ChevronRight size={14} className="text-slate-500" />
+                        <ChevronRight size={14} className={`text-slate-500 transition-transform ${isCollapsed ? '' : 'rotate-90'}`} />
                         <span className="text-[11px] font-bold uppercase text-slate-800 truncate">{chapter.title}</span>
+                        {isCollapsed && (
+                          <span className="text-[9px] font-bold text-slate-400 normal-case">({chapter.items.length} article{chapter.items.length > 1 ? 's' : ''} replié{chapter.items.length > 1 ? 's' : ''})</span>
+                        )}
                       </div>
                     </td>
                     {displayColumns.map(col => (
@@ -513,7 +551,7 @@ const AnalysisTable = ({
                     ))}
                   </tr>
 
-                  {chapter.items.map((item) => {
+                  {!isCollapsed && chapter.items.map((item) => {
                     const itemPrices = displayColumns.map(col => col.offers[item.id] || 0);
                     const medianStats = (analysisMode === 'oab') ? calculatePriceMedian(itemPrices) : null;
 

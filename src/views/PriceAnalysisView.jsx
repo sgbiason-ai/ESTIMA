@@ -113,8 +113,8 @@ const PriceAnalysisView = ({
         {/* Ordre : RAO (1) → Analyse financière (2)
             Les variantes sont désormais intégrées directement dans le tableau d'analyse. */}
         {[
-          { id: 'rao',     label: "📋 Rapport d'analyse (RAO)" },
-          { id: 'analyse', label: '📊 Analyse financière' },
+          { id: 'rao',     label: 'Rapport RAO' },
+          { id: 'analyse', label: 'Tableau des prix' },
         ].map(tab => {
           const isActive = activeMainTab === tab.id;
           return (
@@ -131,6 +131,33 @@ const PriceAnalysisView = ({
             </button>
           );
         })}
+      </div>
+
+      {/* ── Bandeau de contexte commun aux deux onglets (marché / tranche / phase) ──
+          Rend visible que « Rapport RAO » et « Tableau des prix » portent sur le même dossier
+          et matérialise les commutateurs globaux (tranche, phase de négociation). */}
+      <div className="shrink-0 flex items-center flex-wrap gap-2 px-4 py-2 bg-white/80 backdrop-blur-xl border-b border-gray-200/60">
+        {project?.name && (
+          <span className="text-xs font-bold text-slate-700 truncate max-w-xs" title={project.name}>
+            {project.name}
+          </span>
+        )}
+        {hasTranches && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wide bg-indigo-50 text-indigo-700 border border-indigo-100">
+            {activeTrancheId === 'global'
+              ? 'Global — toutes tranches'
+              : (tranches.find(t => t.id === activeTrancheId)?.name || activeTrancheId)}
+          </span>
+        )}
+        {(analysis.hasNego || analysis.negoActive) && (
+          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wide border ${
+            analysis.negoActive
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              : 'bg-slate-50 text-slate-500 border-slate-200'
+          }`}>
+            {analysis.negoActive ? 'Notation : après négociation' : 'Notation : offres initiales'}
+          </span>
+        )}
       </div>
 
       {activeMainTab === 'rao' && (
