@@ -31,7 +31,7 @@ export default function RotatingMapFrame({ rotation = 0, style, className, child
   const active = rotation !== 0 && diag != null;
 
   return (
-    <div ref={hostRef} className={`${cls} ${className || ''}`} style={{ ...style, overflow: 'hidden', position: 'relative' }}>
+    <div ref={hostRef} className={`${cls} ${className || ''}`} style={{ position: 'relative', ...style, overflow: 'hidden' }}>
       <div style={{
         position: 'absolute', left: '50%', top: '50%',
         width: active ? diag : '100%',
