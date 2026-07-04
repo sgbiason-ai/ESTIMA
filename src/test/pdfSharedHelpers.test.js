@@ -306,6 +306,7 @@ describe('drawMoeFooter', () => {
       setTextColor: () => {},
       line: () => {},
       text: (...args) => textCalls.push(args),
+      getTextWidth: () => 30,
       _textCalls: textCalls,
     };
   };
