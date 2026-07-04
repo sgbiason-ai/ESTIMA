@@ -13,6 +13,7 @@ import {
   X, ScrollText, Plus, Trash2, GitBranch, Building2, ChevronDown, ChevronRight, Check, AlertTriangle, Calendar
 } from 'lucide-react';
 import { generateId } from '../../utils/helpers';
+import { confirm } from '../../utils/globalUI';
 
 const VARIANT_REGIMES = [
   { value: 'forbidden', label: 'Interdites',   desc: 'Aucune variante ne sera examinée.',                       color: 'red' },
@@ -54,6 +55,8 @@ export default function DepouillementModal({
 }) {
   const [drafts, setDrafts] = useState([]);
   const [expanded, setExpanded] = useState({});
+  // Entreprises existantes retirées via la corbeille : supprimées réellement à la validation
+  const [removedIds, setRemovedIds] = useState([]);
   // Champs de consultation gérés par la modale (CCP R2151-1 + R2151-8)
   const [dateOpening, setDateOpening] = useState('');
   const [variantsRegime, setVariantsRegime] = useState('forbidden');
@@ -79,6 +82,7 @@ export default function DepouillementModal({
       setDrafts([newCompanyDraft()]);
     }
     setExpanded({});
+    setRemovedIds([]);
     // Charger les champs consultation existants
     setDateOpening(existingConsultation.dateOuverturePLis || existingConsultation.dateRemise || '');
     setVariantsRegime(existingConsultation.variantsAllowed || 'forbidden');
@@ -88,7 +92,21 @@ export default function DepouillementModal({
   if (!open) return null;
 
   const addCompany = () => setDrafts(d => [...d, newCompanyDraft()]);
-  const removeCompany = (id) => setDrafts(d => d.filter(c => c.draftId !== id));
+
+  const removeCompany = async (id) => {
+    const draft = drafts.find(c => c.draftId === id);
+    if (!draft) return;
+    // Entreprise déjà dans l'analyse : la retirer ici la supprime réellement à la validation
+    if (draft.existingId) {
+      const ok = await confirm(
+        `Supprimer « ${draft.name.trim() || 'cette entreprise'} » et toutes ses offres ? La suppression sera effective à la validation du dépouillement.`,
+        { title: "Supprimer l'entreprise", danger: true, confirmLabel: 'Supprimer' }
+      );
+      if (!ok) return;
+      setRemovedIds(ids => ids.includes(draft.existingId) ? ids : [...ids, draft.existingId]);
+    }
+    setDrafts(d => d.filter(c => c.draftId !== id));
+  };
   const updateCompany = (id, patch) =>
     setDrafts(d => d.map(c => c.draftId === id ? { ...c, ...patch } : c));
 
@@ -127,7 +145,8 @@ export default function DepouillementModal({
   const totalAe = validDrafts.reduce((s, c) => s + (parseAmount(c.aeAmount) || 0), 0);
   const nbVariants = validDrafts.reduce((s, c) => s + (c.variants || []).filter(v => (v.label || '').trim()).length, 0);
 
-  const canValidate = validDrafts.length > 0;
+  // Valider possible aussi quand la modale ne porte que des suppressions
+  const canValidate = validDrafts.length > 0 || removedIds.length > 0;
 
   const handleConfirm = () => {
     const entries = validDrafts.map(c => ({
@@ -149,6 +168,7 @@ export default function DepouillementModal({
         variantsRequirements: variantsRegime !== 'forbidden' ? variantsRequirements : '',
       },
       entries,
+      removedIds,
     });
   };
 
@@ -307,7 +327,7 @@ export default function DepouillementModal({
                     <button
                       onClick={() => removeCompany(c.draftId)}
                       className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all"
-                      title="Retirer cette entreprise"
+                      title={c.existingId ? 'Supprimer cette entreprise et ses offres' : 'Retirer cette ligne'}
                     >
                       <Trash2 size={14} />
                     </button>
@@ -378,6 +398,12 @@ export default function DepouillementModal({
             <span>
               Cumul AE : <strong className="text-gray-900 font-mono tabular-nums">{fmtEUR(totalAe)}</strong>
             </span>
+            {removedIds.length > 0 && (
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-red-50 text-red-600 font-bold">
+                <Trash2 size={11} />
+                {removedIds.length} suppression{removedIds.length > 1 ? 's' : ''} à la validation
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button
