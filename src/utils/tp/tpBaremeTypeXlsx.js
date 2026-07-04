@@ -8,7 +8,7 @@
 // Détection du type à l'import : nom d'onglet (Matériel, Main d'œuvre, …), puis nom de
 // fichier en secours, puis signature de colonnes pour le seul cas non ambigu (Transport).
 import { saveFileWithPicker, FILE_TYPES, PICKER_IDS } from '../fileSaver';
-import { stampExcelCredit } from '../estimaCredit';
+import { stampExcelCredit, ESTIMA_CREDIT } from '../estimaCredit';
 import { POSTES, ressourceDailyCost } from './tpPriceCompute';
 
 const EUR = '# ##0.00 "€"';
@@ -182,7 +182,7 @@ function parseSheet(ws, category) {
   ws.eachRow((row, rn) => {
     if (rn === 1) return; // en-tête
     const designation = String(getCellValue(row.getCell(1))).trim(); // colonne 1 = Désignation
-    if (!designation) return;
+    if (!designation || designation === ESTIMA_CREDIT) return;
     const r = blankResource(category);
     schema.forEach((c, i) => {
       if (c.calc || !c.key) return;          // colonne calculée → ignorée
