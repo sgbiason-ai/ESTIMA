@@ -1259,8 +1259,7 @@ REGLES
             items: [
               { color: 'blue', title: 'Mode rendu / client', description: "Le mode « Rendu » applique le pourcentage client (clientPercent) sur les quantités. Permet de basculer entre quantités MOE et quantités majorées client." },
               { color: 'emerald', title: 'Multi-tranches', description: "Si le projet a des tranches (TF, TC1, TC2...), un sélecteur permet de filtrer l'analyse par tranche ou de tout afficher (Global)." },
-              { color: 'amber', title: 'Pousser les moyennes vers le BPU', description: "Bouton « Pousser moyennes vers BPU » : copie les moyennes hors OAB dans les prix unitaires du BPU. Utile après l'analyse pour mettre à jour l'estimation MOE de référence." },
-              { color: 'purple', title: 'Observatoire des prix', description: "Bouton « Sauvegarder » : enregistre l'instantané dans l'observatoire (history) pour comparaison ultérieure. Undo possible (10 derniers)." },
+              { color: 'amber', title: 'Observatoire : Moy. → BPU', description: "Bouton « Moy. → BPU » : calcule la moyenne des prix hors OAB par article et met à jour le prix observé de la base de prix (avec historique des remontées par projet)." },
               { color: 'rose', title: 'Export JSON / Import JSON', description: "Sauvegarde locale au format JSON portable. Utile pour backup ou transfert entre projets." },
             ],
           },

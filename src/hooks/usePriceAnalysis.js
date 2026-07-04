@@ -28,7 +28,6 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
     } catch { return []; }
   });
 
-  const [history, setHistory] = useState([]);
   const [lastSaved, setLastSaved] = useState(null);
   const [scoringConfig, setScoringConfig] = useState({ maxScore: 40, mode: 'f1' });
   const [firestoreLoaded, setFirestoreLoaded] = useState(false);
@@ -1292,13 +1291,16 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
   // Applique les données du PV de dépouillement (entreprises + AE + variantes annoncées).
   // Crée les entreprises manquantes, met à jour les existantes (match par nom).
   // Les détails par article (offers) restent intacts pour les entreprises existantes.
+  // Les entreprises retirées via la corbeille (payload.removedIds) sont supprimées définitivement.
   // Met aussi à jour les champs de consultation (régime variantes, date plis).
   const applyDepouillement = (payload) => {
     // Compat : si on reçoit juste un array, c'est l'ancien format (entries only)
-    const { consultation, entries } = Array.isArray(payload)
-      ? { consultation: null, entries: payload }
+    const { consultation, entries, removedIds } = Array.isArray(payload)
+      ? { consultation: null, entries: payload, removedIds: [] }
       : (payload || {});
     if (!Array.isArray(entries)) return;
+    // Entreprises supprimées via la corbeille de la modale (confirmation déjà donnée)
+    const removedSet = new Set(Array.isArray(removedIds) ? removedIds : []);
 
     // 1. Mise à jour des champs consultation (variantes régime + exigences + date plis)
     if (consultation && typeof setProject === 'function') {
@@ -1319,13 +1321,15 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
     }
 
     setCompanies(prev => {
-      const byNameLower = new Map(prev.map(c => [c.name.toLowerCase().trim(), c]));
+      // Les entreprises supprimées sortent du jeu : ni matchées par nom, ni préservées
+      const alive = removedSet.size > 0 ? prev.filter(c => !removedSet.has(c.id)) : prev;
+      const byNameLower = new Map(alive.map(c => [c.name.toLowerCase().trim(), c]));
       const seenIds = new Set();
 
       const next = entries.map(entry => {
         const key = entry.name.toLowerCase().trim();
         const existing = entry.existingId
-          ? prev.find(c => c.id === entry.existingId)
+          ? alive.find(c => c.id === entry.existingId)
           : byNameLower.get(key);
 
         // Conserver les variantes existantes (avec leurs détails) et fusionner avec celles annoncées
@@ -1374,12 +1378,14 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
         };
       });
 
-      // Conserver les entreprises existantes non listées dans le dépouillement (sécurité)
-      const preserved = prev.filter(c => !next.find(n => n.id === c.id) && !seenIds.has(c.id));
+      // Conserver les entreprises existantes non listées dans le dépouillement (sécurité),
+      // sauf celles explicitement supprimées via la corbeille (removedSet)
+      const preserved = alive.filter(c => !next.find(n => n.id === c.id) && !seenIds.has(c.id));
       return [...next, ...preserved];
     });
 
-    toast.success(`Dépouillement enregistré : ${entries.length} entreprise(s).`);
+    const nbRemoved = removedSet.size;
+    toast.success(`Dépouillement enregistré : ${entries.length} entreprise(s)${nbRemoved > 0 ? `, ${nbRemoved} supprimée(s)` : ''}.`);
   };
 
   // Bascule le statut "retenue" d'une variante. Une variante retenue apparaît
@@ -1488,18 +1494,6 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
     toast.success("Analyse réinitialisée.");
   };
 
-  const handleSaveToObservatory = () => {
-    setHistory(prev => [...prev, { date: new Date(), data: JSON.parse(JSON.stringify(companies)) }]);
-    toast.success("État sauvegardé dans l'historique.");
-  };
-
-  const handleUndoObservatory = () => {
-    if (history.length === 0) return;
-    setCompanies(history[history.length - 1].data);
-    setHistory(prev => prev.slice(0, -1));
-    toast.info("Retour à l'état précédent.");
-  };
-
   // ─── MOYENNE HORS OAB PAR ITEM ─────────────────────────────────────────────
   const averagesHorsOAB = useMemo(() => {
     const result = {};
@@ -1597,10 +1591,9 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
     // Phase après négociation — commutateur + stats des deux phases (comparatif RAO)
     negoActive, hasNego, statsInitial, statsNego, handleClearNego, updateCompanyNegoRabais,
     firestoreLoaded,
-    canUndoObservatory: history.length > 0, lastSaved,
+    lastSaved,
     handleAddManualCompany, handleImportExcel, updateCompanyOffer,
     renameCompany, removeCompany, handleClearAll,
-    handleSaveToObservatory, handleUndoObservatory,
     averagesHorsOAB, handlePushAveragesToBpu, handleManualSave,
     handleExportJson, handleImportJson,
     // Variantes — CCP R2151-8 à R2151-11

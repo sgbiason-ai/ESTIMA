@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import {
-  FileSpreadsheet, FileText, Plus, Upload, Trash2, History, CheckCircle2, BarChart3,
+  FileSpreadsheet, FileText, Plus, Upload, Trash2, CheckCircle2, BarChart3,
   Calculator, Settings2, Thermometer, AlertTriangle, EyeOff, Layers, ChevronDown,
   FileDown, Database, Save, Download, FileUp, Handshake, Eraser
 } from 'lucide-react';
@@ -28,7 +28,7 @@ const AnalysisToolbar = ({
   activeTrancheId, setActiveTrancheId, tranches, lastSaved,
   scoringConfig, setScoringConfig,
   analysisMode, setAnalysisMode,
-  onAddManualCompany, onImportOffer, onClearAll, onUndoObservatory, canUndoObservatory, onExportPDF, onExportExcel,
+  onAddManualCompany, onImportOffer, onClearAll, onExportPDF, onExportExcel,
   onPushAveragesToBpu, averagesHorsOABCount = 0, onManualSave, companiesCount = 0,
   onExportJson, onImportJson,
   negoActive = false, hasNego = false, onClearNego = null,
@@ -193,9 +193,6 @@ const AnalysisToolbar = ({
               title={lastSaved ? 'Sauvegardé dans le projet' : 'Sauvegarder les offres dans le projet'}
               disabled={companiesCount === 0}
             />
-            {canUndoObservatory && (
-              <RibbonBtnSmall icon={History} label="Annuler" onClick={onUndoObservatory} accent="text-slate-500" title="Annuler la dernière action" />
-            )}
             <RibbonBtnSmall icon={Trash2} label="Effacer" onClick={onClearAll} accent="text-red-400" title="Tout effacer" />
           </div>
         </RibbonGroup>
