@@ -1,10 +1,8 @@
 // src/views/RaoView.jsx
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
-  FileDown, Loader2, Users, Save, CheckCircle2, FileSignature, 
-  FileText, ScrollText as ScrollIcon, CheckSquare, Brain, MessageSquare, 
-  BarChart2, CheckCircle2 as CheckIcon, Download, FileUp, ChevronDown, 
-  ChevronRight, Menu 
+  FileDown, Loader2, FileSignature,
+  CheckCircle2 as CheckIcon, Download, FileUp, ChevronDown,
 } from 'lucide-react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db as fireDb } from '../firebase';
@@ -13,6 +11,10 @@ import { useRao } from '../hooks/useRao';
 import { useRaoCompletion } from '../hooks/useRaoCompletion';
 import { toast } from '../utils/globalUI';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { flashAnchor } from '../utils/raoAnchors';
+import { RAO_STEPS } from '../components/rao/RaoConstants';
+import NextStepHint from '../components/rao/NextStepHint';
+import SaveStatusIndicator from '../components/rao/SaveStatusIndicator';
 import TabConsultation from '../components/rao/tabs/TabConsultation';
 import TabAdministrative from '../components/rao/tabs/TabAdministrative';
 import TabTechnique from '../components/rao/tabs/TabTechnique';
@@ -31,14 +33,8 @@ import {
   RibbonSpacer
 } from '../components/common/RibbonParts';
 
-const RAO_STEPS = [
-  { id: 'consultation',  label: 'Consultation',   icon: FileText },
-  { id: 'depouillement', label: 'Dépouillement',  icon: ScrollIcon },
-  { id: 'admin',         label: 'Administratif',  icon: CheckSquare },
-  { id: 'technique',     label: 'Technique',      icon: Brain },
-  { id: 'negociation',   label: 'Négociation',    icon: MessageSquare, optional: true },
-  { id: 'recap',         label: 'Récap',          icon: BarChart2 },
-];
+// Ordre canonique des étapes du RAO : source unique dans RaoConstants
+// (partagée avec NextStepHint, RaoOrientationPanel et la checklist pré-export).
 
 const RaoView = ({
   project,
@@ -82,6 +78,12 @@ const RaoView = ({
   const [selectedCompany, setSelectedCompany] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
+  // Le doc rao/data est chargé séparément (et en parallèle) de analysis/data :
+  // ce flag évite que l'atterrissage intelligent décide sur un project.rao vide.
+  const [raoLoaded, setRaoLoaded] = useState(false);
+  // État de sauvegarde affiché par SaveStatusIndicator :
+  // 'idle' | 'pending' (modif en attente) | 'saving' | 'saved' | 'error'.
+  const [saveStatus, setSaveStatus] = useState('idle');
   const [preExportOpen, setPreExportOpen] = useState(false);
   // Inclure ou non les annexes A (formules de notation) et B (références CCP).
   // Coché par défaut : préserve le PDF actuel ; l'utilisateur décoche pour alléger.
@@ -103,8 +105,8 @@ const RaoView = ({
   const [depouillementOpen, setDepouillementOpen] = useState(false);
   // État de la modale Dépouillement après négociation (PV des offres finales)
   const [depouillementNegoOpen, setDepouillementNegoOpen] = useState(false);
-  // Trace si la modale a déjà été présentée pour éviter la réouverture en boucle
-  const autoOpenedRef = useRef(false);
+  // Atterrissage intelligent : ne recale l'onglet initial qu'une seule fois par projet.
+  const landedForRef = useRef(null);
   // État de la modale Fiche affaire (identique au module ESTIMA)
   const [detailsOpen, setDetailsOpen] = useState(false);
   // Input fichier caché pour Import JSON
@@ -147,27 +149,32 @@ const RaoView = ({
     if (!projectId || !companyId) return;
     if (loadedForRef.current === projectId) return;
     loadedForRef.current = projectId;
+    setRaoLoaded(false); // (re)chargement d'un projet : on attend le doc rao/data
     const docRef = doc(fireDb, 'companies', companyId, 'projects', projectId, 'rao', 'data');
     getDoc(docRef).then(snap => {
       if (snap.exists() && snap.data().rao) {
         skipNextAutoSaveRef.current = true; // évite de re-sauver les données qu'on vient de charger
         setProject(prev => ({ ...prev, rao: snap.data().rao }));
       }
-    }).catch(e => console.error('[RAO] Erreur chargement:', e));
+      setRaoLoaded(true); // même si le doc n'existe pas : un projet sans rao doit pouvoir atterrir
+    }).catch(e => { console.error('[RAO] Erreur chargement:', e); setRaoLoaded(true); });
   }, [projectId, companyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Sauvegarde RAO dans Firestore (utilisée par auto-save + bouton manuel)
+  // Sauvegarde RAO dans Firestore (utilisée par auto-save + indicateur cliquable)
   const saveRaoToFirestore = useCallback((silent = false) => {
     if (!projectId || !companyId) return Promise.resolve();
+    setSaveStatus('saving');
     const docRef = doc(fireDb, 'companies', companyId, 'projects', projectId, 'rao', 'data');
     const payload = { rao: project?.rao || {}, lastSaved: new Date().toISOString() };
     return setDoc(docRef, payload)
       .then(() => {
         setLastSaved(new Date());
+        setSaveStatus('saved');
         if (!silent) toast.success('Rapport RAO sauvegardé.');
       })
       .catch(e => {
         console.error('[RAO] Erreur sauvegarde:', e);
+        setSaveStatus('error');
         if (!silent) toast.error('Erreur de sauvegarde.');
       });
   }, [projectId, companyId, project?.rao]);
@@ -175,9 +182,6 @@ const RaoView = ({
   // ─── AUTO-SAVE — déclenché 1.5s après toute modification de project.rao ──
   // Couvre : auto-flag irregulière à l'import, dépouillement, pièces admin/offre
   // réordonnées par drag&drop, critères, technique, négociation.
-  const raoRef = useRef(project?.rao);
-  useEffect(() => { raoRef.current = project?.rao; }, [project?.rao]);
-
   useEffect(() => {
     if (!projectId || !companyId) return;
     if (!project?.rao) return;
@@ -186,11 +190,21 @@ const RaoView = ({
       skipNextAutoSaveRef.current = false;
       return;
     }
+    // Une modification vient d'arriver : marquer « en attente » jusqu'à l'écriture.
+    setSaveStatus('pending');
     const handle = setTimeout(() => {
       saveRaoToFirestore(true); // silent : pas de toast pour l'auto-save
     }, 1500);
     return () => clearTimeout(handle);
   }, [project?.rao, projectId, companyId, saveRaoToFirestore]);
+
+  // Garde-fou de sortie : avertir si une sauvegarde est en attente/en cours.
+  useEffect(() => {
+    if (saveStatus !== 'pending' && saveStatus !== 'saving') return;
+    const handler = (e) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [saveStatus]);
 
   const ranking = rao.getRanking();
   const companyNames = analysisCompanies.map(c => c.name);
@@ -272,21 +286,25 @@ const RaoView = ({
     scoringConfig,
   });
 
-  // Auto-ouverture de la modale Dépouillement si aucune entreprise saisie
-  // (une seule fois par session, ne se réouvre pas après fermeture)
-  // Attend que les donnees Firestore soient chargees avant de decider :
-  // sinon on s'auto-ouvre toujours puisque analysisCompanies = [] au mount initial.
+  // ─── Atterrissage intelligent ───────────────────────────────────────────
+  // À l'ouverture d'un projet non vierge, se positionner sur la première étape
+  // incomplète (au lieu de toujours « Dépouillement »). Projet vierge → on reste
+  // sur « Dépouillement » qui affiche le panneau d'orientation.
   useEffect(() => {
-    if (autoOpenedRef.current) return;
-    if (!onApplyDepouillement) return;
-    if (!analysisLoaded) return; // attendre fin chargement Firestore
-    if (analysisCompanies.length === 0) {
-      autoOpenedRef.current = true;
-      setDepouillementOpen(true);
-    } else {
-      autoOpenedRef.current = true; // depouillement deja fait → ne pas auto-ouvrir
-    }
-  }, [analysisLoaded, analysisCompanies.length, onApplyDepouillement]);
+    // Attendre les DEUX documents (analysis/data ET rao/data) : sinon completion.tabStates
+    // est calculé sur un project.rao vide et l'atterrissage se verrouille sur la mauvaise étape.
+    if (!analysisLoaded || !raoLoaded) return;
+    if (!projectId) return;
+    if (landedForRef.current === projectId) return;
+    // Projet vierge : on ne verrouille pas encore (défaut « Dépouillement » +
+    // panneau d'orientation) — on laisse la chance d'atterrir quand les offres
+    // arriveront si le chargement Firestore précède la population des entreprises.
+    if (analysisCompanies.length === 0) return;
+    landedForRef.current = projectId;
+    const order = ['consultation', 'depouillement', 'admin', 'technique', 'recap'];
+    const firstIncomplete = order.find(id => !completion.tabStates[id]?.done);
+    if (firstIncomplete) setActiveTab(firstIncomplete);
+  }, [analysisLoaded, raoLoaded, projectId, analysisCompanies.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync selectedCompany avec la liste des entreprises
   useEffect(() => {
@@ -295,11 +313,20 @@ const RaoView = ({
     }
   }, [companyNames.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Navigation « checklist → champ précis » : bascule d'onglet puis surbrillance
+  // de l'ancre (l'élément peut ne pas être encore monté → flashAnchor gère les retries).
+  const handleNavigateToField = useCallback((tabId, anchorId, companyName) => {
+    if (companyName) setSelectedCompany(companyName);
+    if (tabId) setActiveTab(tabId);
+    setPreExportOpen(false);
+    flashAnchor(anchorId, { delay: 250 });
+  }, []);
+
   const handleExportPDF = async () => {
     setIsExporting(true);
     try {
       const { generateRaoPDF } = await import('../utils/pdfRaoGenerator');
-      
+
       // masterBranding est déjà résolu par useBranding dans App.jsx —
       // pas besoin de fallback local (project.branding et localStorage sont
       // déjà fusionnés en amont avec la priorité correcte).
@@ -338,9 +365,9 @@ const RaoView = ({
         adminPieces: rao.adminPieces,
         offerPieces: rao.offerPieces
       });
-    } catch (e) { 
-      console.error('PDF RAO error:', e); 
-      toast.error('Erreur lors de la génération du PDF.'); 
+    } catch (e) {
+      console.error('PDF RAO error:', e);
+      toast.error('Erreur lors de la génération du PDF.');
     }
     finally { setIsExporting(false); }
   };
@@ -363,17 +390,24 @@ const RaoView = ({
           <RibbonGroup label="Étapes">
             {RAO_STEPS.map(step => {
               const state = completion.tabStates[step.id];
+              const isActive = activeTab === step.id;
               const isDone = state?.done;
               const isOptional = state?.optional;
               const hasWarn = state?.items?.some(it => it.warn);
-              const accent = isOptional ? 'text-slate-300' : activeTab === step.id ? 'text-emerald-600' : isDone ? 'text-emerald-500' : hasWarn ? 'text-amber-500' : 'text-slate-500';
+              // Priorité : actif > complété > alerte > optionnel neutre > à faire.
+              // (l'onglet optionnel actif/complété doit refléter son état, pas rester gris)
+              const accent = isActive ? 'text-emerald-600'
+                : isDone ? 'text-emerald-500'
+                : hasWarn ? 'text-amber-500'
+                : isOptional ? 'text-slate-300'
+                : 'text-slate-500';
               return (
                 <RibbonBtnLarge
                   key={step.id}
                   icon={isDone && !isOptional ? CheckIcon : step.icon}
                   label={
                     <span className="flex flex-col items-center leading-none gap-0.5">
-                      <span>{step.label}</span>
+                      <span>{step.num}. {step.label}</span>
                       {state?.ratio && (
                         <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${isOptional ? 'bg-slate-100 text-slate-500' : isDone ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
                           {state.ratio}
@@ -382,7 +416,7 @@ const RaoView = ({
                     </span>
                   }
                   onClick={() => setActiveTab(step.id)}
-                  active={activeTab === step.id}
+                  active={isActive}
                   accent={accent}
                 />
               );
@@ -412,12 +446,15 @@ const RaoView = ({
           <RibbonSpacer />
 
           <RibbonGroup label="Sauvegarde">
-            <RibbonBtnLarge
-              icon={lastSaved ? CheckCircle2 : Save}
-              label={lastSaved ? 'Sauvegardé' : 'Sauvegarder'}
+            {/* Auto-save : indicateur passif, cliquable pour forcer l'enregistrement */}
+            <button
+              type="button"
               onClick={() => saveRaoToFirestore()}
-              accent={lastSaved ? 'text-emerald-500' : 'text-blue-500'}
-            />
+              title="Enregistrement automatique — cliquer pour forcer la sauvegarde"
+              className="rounded-xl hover:bg-gray-100 transition-colors"
+            >
+              <SaveStatusIndicator status={saveStatus} lastSaved={lastSaved} />
+            </button>
           </RibbonGroup>
 
           <RibbonGroup label="Export" noBorder>
@@ -426,7 +463,9 @@ const RaoView = ({
               label="PDF RAO"
               onClick={() => setPreExportOpen(true)}
               disabled={isExporting}
-              accent={completion.isReadyForExport ? 'text-emerald-600' : 'text-red-500'}
+              // Vert = prêt ; ambre = vérification recommandée (rien n'est interdit,
+              // la checklist reste accessible et propose « Générer quand même »).
+              accent={completion.isReadyForExport ? 'text-emerald-600' : 'text-amber-500'}
             />
             {(onExportJson || onImportJson) && (
               <div className="flex flex-col gap-[3px] justify-center">
@@ -462,13 +501,13 @@ const RaoView = ({
               <span className="text-[10px] font-black text-slate-400 uppercase">{completion.overallProgress}%</span>
             </div>
             <div className="relative mt-1">
-              <select 
+              <select
                 value={activeTab}
                 onChange={(e) => setActiveTab(e.target.value)}
                 className="appearance-none bg-transparent border-none font-black text-xs uppercase tracking-widest text-emerald-600 pr-6 focus:ring-0 outline-none"
               >
                 {RAO_STEPS.map(s => (
-                  <option key={s.id} value={s.id}>{s.label}</option>
+                  <option key={s.id} value={s.id}>{s.num}. {s.label}</option>
                 ))}
               </select>
               <ChevronDown size={12} className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
@@ -476,14 +515,16 @@ const RaoView = ({
           </div>
 
           <div className="flex items-center gap-2">
-            <button 
+            {/* Indicateur de sauvegarde auto — cliquable pour forcer l'enregistrement */}
+            <button
               onClick={() => saveRaoToFirestore()}
-              className={`p-2 rounded-lg border ${lastSaved ? 'bg-emerald-50 border-emerald-100 text-emerald-500' : 'bg-slate-50 border-slate-200 text-slate-400'}`}
+              title="Enregistrement automatique — cliquer pour forcer la sauvegarde"
+              className="rounded-lg border border-slate-200 bg-slate-50"
             >
-              <Save size={18} />
+              <SaveStatusIndicator status={saveStatus} lastSaved={lastSaved} compact />
             </button>
             {onExportJson && (
-               <button 
+               <button
                 onClick={onExportJson}
                 className="p-2 rounded-lg bg-amber-50 border border-amber-100 text-amber-600"
               >
@@ -491,14 +532,14 @@ const RaoView = ({
               </button>
             )}
             {onImportJson && (
-               <button 
+               <button
                 onClick={() => jsonInputRef.current?.click()}
                 className="p-2 rounded-lg bg-amber-50 border border-amber-100 text-amber-600"
               >
                 <FileUp size={18} />
               </button>
             )}
-            <button 
+            <button
               onClick={() => setPreExportOpen(true)}
               className="p-2 rounded-lg bg-emerald-600 text-white shadow-sm"
             >
@@ -506,6 +547,16 @@ const RaoView = ({
             </button>
           </div>
         </div>
+      )}
+
+      {/* Bandeau « Prochaine étape » — suggestion non bloquante sous le ribbon */}
+      {!isMobile && (
+        <NextStepHint
+          steps={RAO_STEPS}
+          tabStates={completion.tabStates}
+          activeTab={activeTab}
+          onGoToTab={setActiveTab}
+        />
       )}
 
       {/* Modale Dépouillement */}
@@ -544,7 +595,8 @@ const RaoView = ({
         pricesPaperSize={pricesPaperSize}
         onChangePricesPaperSize={setPricesPaperSize}
         onCancel={() => setPreExportOpen(false)}
-        onNavigate={(tabId) => setActiveTab(tabId)}
+        onNavigate={(tabId) => { setActiveTab(tabId); setPreExportOpen(false); }}
+        onNavigateToField={handleNavigateToField}
         onConfirm={async () => {
           setPreExportOpen(false);
           await handleExportPDF();
@@ -574,6 +626,9 @@ const RaoView = ({
               onImportVariant={onImportVariant}
               onGoToTechnique={(name) => { setSelectedCompany(name); setActiveTab('technique'); }}
               onGoToAdmin={(name) => { setSelectedCompany(name); setActiveTab('admin'); }}
+              onGoToConsultation={() => setActiveTab('consultation')}
+              tabStates={completion.tabStates}
+              analysisStats={analysisStats}
               companiesData={project?.rao?.companies || {}}
               criteria={rao.criteria}
               negoActive={negoActive}
@@ -589,10 +644,10 @@ const RaoView = ({
             <TabConsultation consultation={rao.consultation} updateConsultation={rao.updateConsultation} criteria={rao.criteria} updateCriteria={rao.updateCriteria} addCriterion={rao.addCriterion} removeCriterion={rao.removeCriterion} addSubCriterion={rao.addSubCriterion} removeSubCriterion={rao.removeSubCriterion} updateSubCriterion={rao.updateSubCriterion} scoringConfig={scoringConfig} hasTranches={rao.hasTranches} tranches={rao.tranches} raoTrancheId={rao.raoTrancheId} setRaoTrancheId={rao.setRaoTrancheId} />
           )}
           {activeTab === 'admin' && (
-            <TabAdministrative companyNames={companyNames} companiesData={project?.rao?.companies || {}} updateAdminPiece={rao.updateAdminPiece} updateAdminField={rao.updateAdminField} selectedCompany={selectedCompany} onSelectCompany={setSelectedCompany} adminPieces={rao.adminPieces} offerPieces={rao.offerPieces} setAdminPieces={rao.setAdminPieces} setOfferPieces={rao.setOfferPieces} analysisCompanies={analysisCompanies} consultation={rao.consultation} onImportVariant={onImportVariant} onRemoveVariant={onRemoveVariant} onToggleVariantRetained={onToggleVariantRetained} missing={completion.tabStates.admin?.missing || []} negoActive={negoActive} />
+            <TabAdministrative companyNames={companyNames} companiesData={project?.rao?.companies || {}} updateAdminPiece={rao.updateAdminPiece} updateAdminField={rao.updateAdminField} selectedCompany={selectedCompany} onSelectCompany={setSelectedCompany} adminPieces={rao.adminPieces} offerPieces={rao.offerPieces} setAdminPieces={rao.setAdminPieces} setOfferPieces={rao.setOfferPieces} analysisCompanies={analysisCompanies} consultation={rao.consultation} onImportVariant={onImportVariant} onRemoveVariant={onRemoveVariant} onToggleVariantRetained={onToggleVariantRetained} onGoToDepouillement={() => setActiveTab('depouillement')} missing={completion.tabStates.admin?.missing || []} negoActive={negoActive} />
           )}
           {activeTab === 'technique' && (
-            <TabTechnique companyNames={companyNames} companiesData={project?.rao?.companies || {}} criteria={rao.criteria} updateTechnical={rao.updateTechnical} analysisStats={rao.raoAnalysisStats} scoringConfig={scoringConfig} analysisCompanies={analysisCompanies} selectedCompany={selectedCompany} onSelectCompany={setSelectedCompany} onUpdateVariantJustification={onUpdateVariantJustification} missing={completion.tabStates.technique?.missing || []} />
+            <TabTechnique companyNames={companyNames} companiesData={project?.rao?.companies || {}} criteria={rao.criteria} updateTechnical={rao.updateTechnical} analysisStats={rao.raoAnalysisStats} scoringConfig={scoringConfig} analysisCompanies={analysisCompanies} selectedCompany={selectedCompany} onSelectCompany={setSelectedCompany} onUpdateVariantJustification={onUpdateVariantJustification} onGoToConsultation={() => setActiveTab('consultation')} onGoToDepouillement={() => setActiveTab('depouillement')} missing={completion.tabStates.technique?.missing || []} />
           )}
           {activeTab === 'negociation' && (
             <TabNegociation
@@ -615,10 +670,12 @@ const RaoView = ({
               scoringConfig={scoringConfig}
               onUpdateNegoRabais={onUpdateNegoRabais}
               onImportNegoOffer={onImportNegoOffer}
+              onSetNegoPhase={onSetNegoPhase}
+              onGoToDepouillement={() => setActiveTab('depouillement')}
             />
           )}
           {activeTab === 'recap' && (
-            <TabRecap criteria={rao.criteria} ranking={ranking} companyNames={companyNames} onExportPDF={handleExportPDF} isExporting={isExporting} scoringConfig={scoringConfig} hasTranches={rao.hasTranches} raoTrancheId={rao.raoTrancheId} tranches={rao.tranches} analysisCompanies={analysisCompanies} optionChapters={rao.optionChapters} includedOptions={rao.includedOptions} recommendation={rao.recommendation} updateRecommendation={rao.updateRecommendation} negoActive={negoActive} />
+            <TabRecap criteria={rao.criteria} ranking={ranking} companyNames={companyNames} onExportPDF={() => setPreExportOpen(true)} isExporting={isExporting} scoringConfig={scoringConfig} hasTranches={rao.hasTranches} raoTrancheId={rao.raoTrancheId} tranches={rao.tranches} analysisCompanies={analysisCompanies} optionChapters={rao.optionChapters} includedOptions={rao.includedOptions} recommendation={rao.recommendation} updateRecommendation={rao.updateRecommendation} negoActive={negoActive} />
           )}
         </div>
       </div>

@@ -7,7 +7,7 @@
 // par article tant qu'elles ne sont pas renégociées).
 
 import React, { useState } from 'react';
-import { Handshake, ChevronDown, ChevronUp, TrendingDown, TrendingUp, Info, FileUp, GitBranch } from 'lucide-react';
+import { Handshake, ChevronDown, ChevronUp, TrendingDown, TrendingUp, Info, FileUp, GitBranch, RotateCcw } from 'lucide-react';
 
 const fmtEur = (v) =>
   Number(v || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
@@ -21,6 +21,9 @@ const NegoComparisonPanel = ({
   // → offersNego de l'entreprise ; row.kind === 'variant' → offersNego de la
   // variante (row.companyId + row.variantId). Active la phase « Après négo ».
   onImportNegoOffer = null,
+  // (bool) → bascule la notation du RAO sur les offres initiales / négociées.
+  // Évite l'aller-retour vers l'onglet Analyse financière.
+  onSetNegoPhase = null,
 }) => {
   const [open, setOpen] = useState(negoActive);
   const maxScore = Number(scoringConfig?.maxScore || 40);
@@ -173,20 +176,38 @@ const NegoComparisonPanel = ({
               <Info size={15} className="shrink-0 mt-0.5 text-emerald-600" />
               <p>
                 La phase <strong>Après négociation</strong> est active mais aucun prix négocié n'a encore été saisi :
-                les offres initiales sont reprises telles quelles. Saisissez les nouveaux prix (ou ré-importez les
-                offres négociées) dans l'onglet <strong>Analyse financière</strong>.
+                les offres initiales sont reprises telles quelles. Importez les offres négociées via le bouton
+                <FileUp size={12} className="inline mx-1 -mt-0.5" /> sur chaque ligne du tableau.
               </p>
             </div>
           )}
 
-          {comparison && !negoActive && (
-            <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3 text-[12px] text-amber-900">
-              <Info size={15} className="shrink-0 mt-0.5 text-amber-600" />
-              <p>
+          {/* Bascule directe de la notation — évite l'aller-retour vers Analyse financière */}
+          {comparison && !negoActive && onSetNegoPhase && (
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3 text-[12px] text-amber-900">
+              <Info size={15} className="shrink-0 text-amber-600" />
+              <p className="flex-1">
                 Des prix négociés existent mais la notation du RAO utilise encore les <strong>offres initiales</strong>.
-                Pour noter sur les montants après négociation, basculez la phase sur « Après négo » dans
-                l'onglet <strong>Analyse financière</strong>.
               </p>
+              <button
+                onClick={() => onSetNegoPhase(true)}
+                className="shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-black uppercase tracking-wider shadow-sm transition-all active:scale-95"
+              >
+                <Handshake size={13} /> Noter sur les offres négociées
+              </button>
+            </div>
+          )}
+
+          {/* Retour possible vers les offres initiales */}
+          {comparison && negoActive && onSetNegoPhase && (
+            <div className="flex justify-end">
+              <button
+                onClick={() => onSetNegoPhase(false)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-all"
+                title="Revenir à la notation sur les offres initiales"
+              >
+                <RotateCcw size={12} /> Repasser sur les offres initiales
+              </button>
             </div>
           )}
         </div>

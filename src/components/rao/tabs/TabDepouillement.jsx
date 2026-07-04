@@ -13,6 +13,8 @@ import {
   CheckCircle2, AlertTriangle, Clock, RefreshCw, Plus, ChevronRight, FileText, Handshake
 } from 'lucide-react';
 import { getVariantEffectiveTotal, variantHasNego, getCompanyRabaisPct, getEffectiveConclusion } from '../../../utils/analysisCompute';
+import RaoOrientationPanel from '../RaoOrientationPanel';
+import RaoKpiBar from '../RaoKpiBar';
 
 const REGIME_LABELS = {
   forbidden: 'Variantes interdites',
@@ -64,6 +66,9 @@ export default function TabDepouillement({
   onImportVariant,   // (companyId, file, { label }) → Promise
   onGoToTechnique,   // (companyName) → void
   onGoToAdmin,       // (companyName) → void
+  onGoToConsultation, // () → void — depuis le panneau d'orientation
+  tabStates = {},    // état de complétion par étape (panneau d'orientation)
+  analysisStats = null, // pour le bandeau KPI de synthèse
   // Pour calculer si l'analyse admin/tech est complète par entreprise
   companiesData = {},
   criteria = [],
@@ -204,11 +209,13 @@ export default function TabDepouillement({
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-5">
             <InfoTile
+              id="depouill-date"
               icon={<Calendar size={14} />}
               label="Date d'ouverture des plis"
               value={fmtDate(consultation.dateOuverturePLis || consultation.dateRemise)}
             />
             <InfoTile
+              id="depouill-regime"
               icon={<GitBranch size={14} className={regimeStyle.icon} />}
               label="Régime des variantes"
               value={REGIME_LABELS[regime]}
@@ -237,6 +244,14 @@ export default function TabDepouillement({
           )}
         </section>
 
+        {/* ─── Bandeau KPI de synthèse (que voir en premier) ─────────────────── */}
+        <RaoKpiBar
+          analysisCompanies={analysisCompanies}
+          analysisStats={analysisStats}
+          companiesData={companiesData}
+          negoActive={negoActive}
+        />
+
         {/* ─── Liste des entreprises ─────────────────────────────────────────── */}
         <section>
           <div className="flex items-center justify-between mb-3 px-1">
@@ -251,21 +266,11 @@ export default function TabDepouillement({
           </div>
 
           {analysisCompanies.length === 0 ? (
-            <div className="bg-white border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center">
-              <Building2 size={32} className="text-slate-300 mx-auto mb-3" strokeWidth={1.5} />
-              <p className="text-sm text-slate-500 mb-3">
-                Aucune entreprise saisie pour le moment.
-              </p>
-              {onReopenDepouillement && (
-                <button
-                  onClick={onReopenDepouillement}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold transition-all"
-                >
-                  <Plus size={14} />
-                  Démarrer le dépouillement
-                </button>
-              )}
-            </div>
+            <RaoOrientationPanel
+              tabStates={tabStates}
+              onGoToConsultation={onGoToConsultation}
+              onStartDepouillement={onReopenDepouillement}
+            />
           ) : (
             <div className="space-y-3">
               {analysisCompanies.map((c, idx) => {
@@ -380,9 +385,9 @@ export default function TabDepouillement({
 }
 
 // ─── Tuile d'info simple ────────────────────────────────────────────────────
-function InfoTile({ icon, label, value, valueClass = 'text-slate-900', bg = 'bg-slate-50', border = 'border-slate-200' }) {
+function InfoTile({ id, icon, label, value, valueClass = 'text-slate-900', bg = 'bg-slate-50', border = 'border-slate-200' }) {
   return (
-    <div className={`px-4 py-3 ${bg} border ${border} rounded-xl`}>
+    <div id={id} className={`px-4 py-3 ${bg} border ${border} rounded-xl`}>
       <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1">
         {icon}
         {label}
@@ -434,7 +439,7 @@ function CompanyProgressCard({
   const illegalVariants = regime === 'forbidden' && variants.length > 0;
 
   return (
-    <article className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <article id={`depouill-ae-${company.id}`} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
       {/* Header entreprise */}
       <header className="flex items-center gap-3 px-5 py-3 bg-slate-50/70 border-b border-slate-200/70">
         <div className="w-9 h-9 rounded-xl bg-indigo-100 flex items-center justify-center font-black text-indigo-700 text-sm shrink-0">

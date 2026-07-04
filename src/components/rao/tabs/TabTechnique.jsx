@@ -1,11 +1,12 @@
 // src/components/rao/tabs/TabTechnique.jsx
 import React, { useRef, useEffect } from 'react';
-import { Brain, MessageSquare, AlertCircle, AlertTriangle, GitBranch, Check, X } from 'lucide-react';
-import { ScoreBadge } from '../RaoUI';
+import { Brain, MessageSquare, AlertCircle, AlertTriangle, GitBranch, Check, X, Building2, ListChecks, Info } from 'lucide-react';
+import { ScoreBadge, CalcHint } from '../RaoUI';
 import { COMPANY_UI_COLORS, FORMULA_LABELS_CONSULT, NON_REGULAR_STATUSES } from '../RaoConstants';
 import { getEffectiveConclusion } from '../../../utils/analysisCompute';
 import CompanySidebar from '../CompanySidebar';
 import TabAlertBanner from '../TabAlertBanner';
+import StepPrerequisiteState from '../StepPrerequisiteState';
 
 const AutoTextarea = ({ value, onChange, className, placeholder, rows, id }) => {
   const ref = useRef(null);
@@ -19,6 +20,8 @@ const TabTechnique = ({
   analysisStats, scoringConfig, analysisCompanies = [],
   selectedCompany, onSelectCompany,
   onUpdateVariantJustification = null,
+  onGoToConsultation = null,
+  onGoToDepouillement = null,
   missing = [], // items à compléter dans cet onglet (alimente le banner)
 }) => {
   const nonAuto = criteria.filter(c => !c.auto);
@@ -49,6 +52,29 @@ const TabTechnique = ({
     return 'empty';
   };
 
+  // Prérequis manquants : au lieu d'un écran blanc muet, on explique quoi faire.
+  if (companyNames.length === 0) {
+    return (
+      <StepPrerequisiteState
+        icon={Building2}
+        title="Aucune offre à noter pour l'instant"
+        explanation="La notation technique porte sur les entreprises consultées. Importez d'abord les offres à l'étape Dépouillement (2)."
+        ctaLabel="Aller au dépouillement"
+        onCta={onGoToDepouillement || undefined}
+      />
+    );
+  }
+  if (nonAuto.length === 0) {
+    return (
+      <StepPrerequisiteState
+        icon={ListChecks}
+        title="Aucun critère technique défini"
+        explanation="Ajoutez au moins un critère technique à l'étape Consultation (1) pour pouvoir noter les offres."
+        ctaLabel="Aller à la consultation"
+        onCta={onGoToConsultation || undefined}
+      />
+    );
+  }
   if (!selectedCompany || !companyNames.includes(selectedCompany)) return null;
 
   const ci = companyNames.indexOf(selectedCompany);
@@ -152,11 +178,20 @@ const TabTechnique = ({
                     <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest">Poids : {maxScoreAnalysis}%</span>
                   </div>
                   <p className="text-lg font-black text-slate-800 leading-snug mb-1">{autoCrit.label}</p>
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-slate-500 flex items-center gap-1.5 flex-wrap">
                     Calculé d'après l'analyse financière
                     {scoringConfig && (
                       <> — Formule <strong className="text-emerald-700">{FORMULA_LABELS_CONSULT[scoringConfig.mode] || scoringConfig.mode?.toUpperCase()}</strong></>
                     )}
+                    <CalcHint title={`Note prix (${(scoringConfig?.mode || 'f1').toUpperCase()})`}>
+                      La note prix est calculée automatiquement dans l'onglet <strong>Tableau des prix</strong> :
+                      chaque offre est comparée à la meilleure (Pmin), à la plus haute (Pmax) ou à la moyenne (Pmoy)
+                      selon la formule choisie, puis ramenée sur {maxScoreAnalysis} points.
+                      {priceHT > 0 && (
+                        <> Ici : montant HT {priceHT.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} € →
+                        <strong> {priceScoreRao !== null ? priceScoreRao.toFixed(2) : '—'} / {maxScoreAnalysis} pts</strong>.</>
+                      )}
+                    </CalcHint>
                   </p>
                 </div>
 
@@ -325,6 +360,17 @@ const TabTechnique = ({
                   </div>
 
                   <div className="p-6 space-y-4">
+                    {/* Guide de notation : rappel de la méthode d'évaluation (saisie en Consultation) */}
+                    {(crit.description || '').trim() && (
+                      <div className="flex items-start gap-2 px-4 py-3 bg-blue-50/60 border border-blue-100 rounded-xl">
+                        <Info size={14} className="text-blue-500 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="block text-[10px] font-black uppercase tracking-widest text-blue-500 mb-0.5">Méthode d'évaluation</span>
+                          <p className="text-xs text-slate-600 leading-relaxed">{crit.description}</p>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Sous-critères */}
                     {hasSubs && (
                       <div className="space-y-3">

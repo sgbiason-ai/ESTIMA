@@ -4,6 +4,7 @@
 
 import React, { useState } from 'react';
 import { AlertTriangle, ChevronRight, ChevronDown, ChevronUp, CheckCircle2 } from 'lucide-react';
+import { flashAnchor } from '../../utils/raoAnchors';
 
 const TabAlertBanner = ({ missing = [], onItemClick, label = 'éléments à compléter' }) => {
   const [collapsed, setCollapsed] = useState(false);
@@ -33,19 +34,11 @@ const TabAlertBanner = ({ missing = [], onItemClick, label = 'éléments à comp
   const groupedKeys = Object.keys(grouped);
 
   const handleItemClick = (item) => {
-    // Tente de scroller vers l'élément si un anchorId est fourni
-    if (item.anchorId) {
-      requestAnimationFrame(() => {
-        const el = document.getElementById(item.anchorId);
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          // Effet de surbrillance momentanée
-          el.classList.add('rao-highlight-pulse');
-          setTimeout(() => el.classList.remove('rao-highlight-pulse'), 2000);
-        }
-      });
-    }
+    // Si l'item concerne une autre entreprise, onItemClick bascule la sélection ;
+    // on laisse alors le temps au re-render avant de cibler l'ancre.
     if (onItemClick) onItemClick(item);
+    // Scroll + surbrillance vers le champ concerné (retries si pas encore monté).
+    if (item.anchorId) flashAnchor(item.anchorId, { delay: 50 });
   };
 
   return (

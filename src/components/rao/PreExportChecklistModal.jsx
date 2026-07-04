@@ -3,7 +3,7 @@
 // Affiche une checklist par onglet avec les items manquants cliquables.
 
 import React from 'react';
-import { CheckCircle2, AlertTriangle, X, FileDown, ArrowRight, Loader2, Files, Handshake, Printer } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, X, FileDown, ArrowRight, Loader2, Files, Handshake, Printer, ChevronRight } from 'lucide-react';
 
 const TAB_LABELS = {
   consultation: { num: 1, label: 'Consultation' },
@@ -19,6 +19,8 @@ const PreExportChecklistModal = ({
   onConfirm,
   onCancel,
   onNavigate,
+  // (tabId, anchorId, companyName) → bascule d'onglet + surbrillance du champ précis.
+  onNavigateToField,
   isExporting = false,
   includeAnnexes = true,
   onToggleIncludeAnnexes,
@@ -130,6 +132,23 @@ const PreExportChecklistModal = ({
                         <span className={item.ok ? '' : 'font-medium'}>{item.label}</span>
                       </div>
                     ))}
+
+                    {/* Items manquants cliquables → saut direct vers le champ à corriger */}
+                    {!groupOk && (group.missing || []).length > 0 && onNavigateToField && (
+                      <div className="mt-1.5 pt-1.5 border-t border-slate-100 space-y-0.5">
+                        {group.missing.map(m => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => onNavigateToField(group.tab, m.anchorId, m.companyName)}
+                            className="w-full flex items-center gap-1.5 text-[11px] text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded-lg px-2 py-1 transition-colors text-left"
+                          >
+                            <ChevronRight size={12} className="shrink-0 text-amber-400" />
+                            <span className="flex-1 truncate">Corriger : {m.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               );

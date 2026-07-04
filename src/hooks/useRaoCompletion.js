@@ -248,10 +248,10 @@ export const useRaoCompletion = ({
       overallProgress,
       isReadyForExport: recapDone,
       preExportChecks: [
-        { tab: 'consultation', label: 'Consultation', items: consultationItems },
-        { tab: 'depouillement', label: 'Dépouillement', items: depouillementItems },
-        { tab: 'admin', label: 'Administratif', items: adminItems },
-        { tab: 'technique', label: 'Technique', items: techItems },
+        { tab: 'consultation', label: 'Consultation', items: consultationItems, missing: consultationMissing },
+        { tab: 'depouillement', label: 'Dépouillement', items: depouillementItems, missing: depouillementMissing },
+        { tab: 'admin', label: 'Administratif', items: adminItems, missing: adminMissing },
+        { tab: 'technique', label: 'Technique', items: techItems, missing: techMissing },
       ],
     };
   }, [rao, consultation, criteria, analysisCompanies, companiesData, scoringConfig]);

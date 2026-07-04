@@ -1,6 +1,6 @@
 // src/components/rao/tabs/TabAdministrative.jsx
 import React, { useState } from 'react';
-import { FileText, Target, MessageSquare, Users, Plus, Trash2, Pencil, Check, X, AlertTriangle, ScrollText, GitBranch, Lock, FileSpreadsheet, Calendar, GripVertical } from 'lucide-react';
+import { FileText, Target, MessageSquare, Users, Plus, Trash2, Pencil, Check, X, AlertTriangle, ScrollText, GitBranch, Lock, FileSpreadsheet, Calendar, GripVertical, Building2 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Field, Textarea, OuiNonToggle } from '../RaoUI';
 import { COMPANY_UI_COLORS, CONCLUSION_OPTIONS, NON_REGULAR_STATUSES } from '../RaoConstants';
@@ -8,6 +8,7 @@ import { getEffectiveConclusion, isRegularizedAfterNego } from '../../../utils/a
 import CompanySidebar from '../CompanySidebar';
 import AddVariantModal from '../AddVariantModal';
 import TabAlertBanner from '../TabAlertBanner';
+import StepPrerequisiteState from '../StepPrerequisiteState';
 
 const ROLES = ['Mandataire', 'Cotraitant'];
 
@@ -83,6 +84,7 @@ const TabAdministrative = ({
   onImportVariant = null,
   onRemoveVariant = null,
   onToggleVariantRetained = null,
+  onGoToDepouillement = null,
   missing = [], // items à compléter dans cet onglet
   negoActive = false, // phase après négo → bloc « Statut après négociation »
 }) => {
@@ -150,6 +152,18 @@ const TabAdministrative = ({
     }
   };
 
+  // Prérequis manquant : aucune entreprise consultée → écran guidé plutôt que blanc.
+  if (companyNames.length === 0) {
+    return (
+      <StepPrerequisiteState
+        icon={Building2}
+        title="Aucune candidature à analyser"
+        explanation="L'analyse administrative porte sur les entreprises consultées. Importez d'abord les offres à l'étape Dépouillement (2)."
+        ctaLabel="Aller au dépouillement"
+        onCta={onGoToDepouillement || undefined}
+      />
+    );
+  }
   if (!selectedCompany || !companyNames.includes(selectedCompany)) return null;
 
   const ci = companyNames.indexOf(selectedCompany);
@@ -157,6 +171,8 @@ const TabAdministrative = ({
   const uiColor = COMPANY_UI_COLORS[ci % COMPANY_UI_COLORS.length];
   const admin = companiesData[name]?.admin || {};
   const pieces = admin.pieces || {};
+  // Conclusion réellement saisie (pas de fallback « régulière » trompeur dans l'en-tête).
+  const hasConclusion = !!admin.conclusion;
   const concl = admin.conclusion || 'reguliere';
   const conclOpt = CONCLUSION_OPTIONS.find(o => o.value === concl) || CONCLUSION_OPTIONS[0];
   const isGroupement = !!admin.isGroupement;
@@ -199,13 +215,19 @@ const TabAdministrative = ({
                 Groupement ({members.length})
               </span>
             )}
-            <span className={`text-[10px] font-black uppercase tracking-wider px-3 py-1.5 rounded-full border shadow-sm ml-auto ${
-              concl === 'reguliere' ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-              : concl === 'inappropriee' ? 'bg-orange-50 text-orange-700 border-orange-200'
-              : 'bg-red-50 text-red-600 border-red-200'
-            }`}>
-              {conclOpt.label}
-            </span>
+            {hasConclusion ? (
+              <span className={`text-[10px] font-black uppercase tracking-wider px-3 py-1.5 rounded-full border shadow-sm ml-auto ${
+                concl === 'reguliere' ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : concl === 'inappropriee' ? 'bg-orange-50 text-orange-700 border-orange-200'
+                : 'bg-red-50 text-red-600 border-red-200'
+              }`}>
+                {conclOpt.label}
+              </span>
+            ) : (
+              <span className="text-[10px] font-black uppercase tracking-wider px-3 py-1.5 rounded-full border shadow-sm ml-auto bg-slate-100 text-slate-500 border-slate-200">
+                Conclusion à saisir
+              </span>
+            )}
           </div>
 
           {/* ── Écart Acte d'Engagement vs total recalculé (CCP L2113-1) ── */}

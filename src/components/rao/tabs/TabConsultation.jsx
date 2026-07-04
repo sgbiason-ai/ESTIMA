@@ -246,7 +246,7 @@ const TabConsultation = ({
       </div>
       }
       right={
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm ml-1">
+      <div id="crit-tech" className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm ml-1">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
@@ -289,7 +289,7 @@ const TabConsultation = ({
             const subTotal = hasSubs ? crit.subCriteria.reduce((s, sc) => s + (Number(sc.weight) || 0), 0) : 0;
 
             return (
-            <div key={crit.id} className="group rounded-2xl border border-slate-200 hover:border-emerald-300 hover:shadow-md transition-all duration-300 relative overflow-hidden">
+            <div key={crit.id} id={crit.auto ? 'crit-prix' : undefined} className="group rounded-2xl border border-slate-200 hover:border-emerald-300 hover:shadow-md transition-all duration-300 relative overflow-hidden">
               {crit.auto && <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-500 z-10" />}
 
               {/* ── Ligne principale du critère (pleine largeur) ── */}

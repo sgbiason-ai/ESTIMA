@@ -12,13 +12,14 @@
 
 import React, { useState } from 'react';
 import {
-  CheckCircle2, FileOutput, Settings, ChevronDown, ChevronUp, RotateCcw, FileText,
+  CheckCircle2, FileOutput, Settings, ChevronDown, ChevronUp, RotateCcw, FileText, Building2,
 } from 'lucide-react';
 
 import { Textarea } from '../RaoUI';
 import RichTextField from '../../common/RichTextField';
 import { COMPANY_UI_COLORS } from '../RaoConstants';
 import CompanySidebar from '../CompanySidebar';
+import StepPrerequisiteState from '../StepPrerequisiteState';
 import { toast } from '../../../utils/globalUI';
 import { useNegoTemplate } from '../../../hooks/useNegoTemplate';
 import { useNegoLetter } from '../../../hooks/useNegoLetter';
@@ -51,6 +52,8 @@ const TabNegociation = ({
   scoringConfig = null,
   onUpdateNegoRabais = null,
   onImportNegoOffer = null,
+  onSetNegoPhase = null,
+  onGoToDepouillement = null,
 }) => {
   // Trame globale persistée au niveau utilisateur (users/{uid}/preferences/negotiation_template)
   const { template: masterTemplate, saveTemplate } = useNegoTemplate(DEFAULT_TEMPLATE);
@@ -144,6 +147,18 @@ const TabNegociation = ({
     }
   };
 
+  // Prérequis manquant : aucune entreprise → écran guidé au lieu d'un onglet blanc.
+  if (companyNames.length === 0) {
+    return (
+      <StepPrerequisiteState
+        icon={Building2}
+        title="Aucune entreprise à négocier"
+        explanation="La négociation s'adresse aux entreprises consultées. Importez d'abord les offres à l'étape Dépouillement (2). Cette étape reste facultative."
+        ctaLabel="Aller au dépouillement"
+        onCta={onGoToDepouillement || undefined}
+      />
+    );
+  }
   if (!selectedCompany || !companyNames.includes(selectedCompany)) return null;
 
   const ci = companyNames.indexOf(selectedCompany);
@@ -206,6 +221,7 @@ const TabNegociation = ({
                 scoringConfig={scoringConfig}
                 onUpdateRabais={onUpdateNegoRabais}
                 onImportNegoOffer={onImportNegoOffer}
+                onSetNegoPhase={onSetNegoPhase}
               />
 
               {/* ── Header entreprise ── */}
