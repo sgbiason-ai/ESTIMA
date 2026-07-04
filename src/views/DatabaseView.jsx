@@ -88,7 +88,6 @@ const DatabaseView = ({
 
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [isShiftPressed, setIsShiftPressed] = useState(false);
-  const [observatory, setObservatory] = useState({});
   const lastSelectedId = useRef(null);
   const fileInputRef = useRef(null);
   const parentRef = useRef(null);
@@ -145,11 +144,6 @@ const DatabaseView = ({
     estimateSize: () => 85, // Hauteur moyenne d'un élément + l'espacement (gap)
     overscan: 10, // Nombre d'éléments pré-chargés hors-champ pour la fluidité
   });
-
-  useEffect(() => {
-    const savedObs = localStorage.getItem('global_price_observatory');
-    if (savedObs) setObservatory(JSON.parse(savedObs));
-  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e) => { if(e.key === 'Shift') setIsShiftPressed(true); };
@@ -275,8 +269,7 @@ const DatabaseView = ({
       meta: { activeDbName, isLocal: isLocalMode },
       units,
       categories,
-      bpu: fullBpu,
-      observatory
+      bpu: fullBpu
     };
     const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
