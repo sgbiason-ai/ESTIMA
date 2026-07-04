@@ -23,6 +23,18 @@
       #splash .name{font-size:18px;font-weight:700;color:#1e293b;letter-spacing:-0.02em}
       #splash .spin{width:24px;height:24px;margin-top:24px;border:3px solid #e2e8f0;border-top-color:#3b82f6;border-radius:50%;animation:sp .7s linear infinite}
       @keyframes sp{to{transform:rotate(360deg)}}
+      /* Écran d'échec de démarrage (injecté par le script failsafe ci-dessous) */
+      #splash .err-title{display:flex;align-items:center;gap:7px;margin-top:22px;font-size:15px;font-weight:600;color:#1e293b}
+      #splash .err-title svg{width:18px;height:18px;flex:none}
+      #splash .err-sub{margin-top:8px;max-width:340px;padding:0 24px;font-size:13px;line-height:1.5;color:#6e6e73;text-align:center}
+      #splash .err-detail{margin-top:10px;max-width:360px;padding:0 24px;font-size:11px;color:#a1a1a6;text-align:center;word-break:break-word}
+      #splash .err-actions{display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:22px}
+      #splash .err-actions button{font-family:inherit;font-size:14px;font-weight:600;padding:10px 24px;border-radius:12px;cursor:pointer;transition:background .2s}
+      #splash .err-retry{background:#2563eb;border:none;color:#fff}
+      #splash .err-retry:hover{background:#1d4ed8}
+      #splash .err-wipe{background:#fff;border:1px solid #d2d2d7;color:#1e293b}
+      #splash .err-wipe:hover{background:#f0f0f2}
+      #splash .err-actions button:disabled{opacity:.6;cursor:default}
     </style>
   </head>
   <body>
@@ -37,6 +49,84 @@
       <div class="spin"></div>
     </div>
     <div id="root"></div>
+    <!-- Failsafe démarrage : si le bundle crashe à l'évaluation (ex. config Firebase
+         absente → auth/invalid-api-key) ou ne monte jamais, le splash resterait un
+         spinner infini. On remplace alors son contenu par un message + actions.
+         Complète /sw-heal.js, qui ne couvre que les échecs de chargement d'assets. -->
+    <script>
+      (function () {
+        var shown = false;
+        var firstErr = '';
+
+        function appMounted() {
+          var root = document.getElementById('root');
+          return !!(root && root.childElementCount > 0);
+        }
+
+        function wipeCachesAndReload(btn) {
+          if (btn) { btn.disabled = true; btn.textContent = 'Nettoyage…'; }
+          var tasks = [];
+          if ('serviceWorker' in navigator) {
+            tasks.push(navigator.serviceWorker.getRegistrations().then(function (rs) {
+              return Promise.all(rs.map(function (r) { return r.unregister(); }));
+            }).catch(function () {}));
+          }
+          if (typeof caches !== 'undefined') {
+            tasks.push(caches.keys().then(function (keys) {
+              return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+            }).catch(function () {}));
+          }
+          var reload = function () { location.reload(); };
+          Promise.all(tasks).then(reload, reload);
+          setTimeout(reload, 4000); // filet si une promesse ne rend jamais la main
+        }
+
+        function showFailure() {
+          if (shown || appMounted()) return;
+          var splash = document.getElementById('splash');
+          if (!splash || splash.style.display === 'none') return;
+          shown = true;
+          splash.innerHTML =
+            '<div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>' +
+            '<div class="name">Estima Suite</div>' +
+            '<div class="err-title"><svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>L’application n’a pas pu démarrer</div>' +
+            '<div class="err-sub">Une erreur est survenue au chargement. Réessayez, puis videz le cache si le problème persiste.</div>' +
+            '<div class="err-detail"></div>' +
+            '<div class="err-actions"><button type="button" class="err-retry">Réessayer</button><button type="button" class="err-wipe">Vider le cache et réessayer</button></div>';
+          if (firstErr) splash.querySelector('.err-detail').textContent = firstErr.slice(0, 200);
+          splash.querySelector('.err-retry').addEventListener('click', function () {
+            this.disabled = true;
+            this.textContent = 'Rechargement…';
+            location.reload();
+          });
+          splash.querySelector('.err-wipe').addEventListener('click', function () {
+            wipeCachesAndReload(this);
+          });
+        }
+
+        function checkSoon(delay) {
+          setTimeout(showFailure, delay);
+        }
+
+        // Crash runtime (ex. module d'entrée). Les erreurs de chargement de
+        // ressources n'ont pas de .message et restent du ressort de sw-heal.js.
+        window.addEventListener('error', function (e) {
+          if (!e || typeof e.message !== 'string') return;
+          if (e.message.indexOf('ResizeObserver') !== -1) return; // bruit bénin
+          if (!firstErr) firstErr = e.message;
+          checkSoon(3000);
+        });
+        window.addEventListener('unhandledrejection', function (e) {
+          var r = e && e.reason;
+          if (!firstErr) {
+            firstErr = r && (r.message || r.code) ? String(r.message || r.code) : (r ? String(r) : '');
+          }
+          checkSoon(6000);
+        });
+        // Filet : rien n'a monté après 15 s (bundle jamais exécuté, requête bloquée…)
+        checkSoon(15000);
+      })();
+    </script>
     <script src="/sw-heal.js"></script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
