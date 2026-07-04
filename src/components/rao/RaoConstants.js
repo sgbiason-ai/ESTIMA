@@ -1,5 +1,19 @@
 // src/components/rao/RaoConstants.js
 
+import { FileText, ScrollText, CheckSquare, Brain, MessageSquare, BarChart2 } from 'lucide-react';
+
+// Étapes du workflow RAO — ordre canonique du processus. Source unique pour le
+// stepper du ribbon (RaoView), le panneau d'orientation (TabDepouillement) et
+// le bandeau « Prochaine étape » (NextStepHint).
+export const RAO_STEPS = [
+  { id: 'consultation',  num: 1, label: 'Consultation',  icon: FileText,      hint: 'Critères de jugement et pondérations' },
+  { id: 'depouillement', num: 2, label: 'Dépouillement', icon: ScrollText,    hint: 'Ouverture des plis et import des offres' },
+  { id: 'admin',         num: 3, label: 'Administratif', icon: CheckSquare,   hint: 'Pièces et régularité des candidatures' },
+  { id: 'technique',     num: 4, label: 'Technique',     icon: Brain,         hint: 'Notation des critères techniques' },
+  { id: 'negociation',   num: 5, label: 'Négociation',   icon: MessageSquare, hint: 'Courriers et offres finales', optional: true },
+  { id: 'recap',         num: 6, label: 'Récap',         icon: BarChart2,     hint: 'Classement final et export du rapport' },
+];
+
 export const CONCLUSION_OPTIONS = [
   { value: 'reguliere',    label: 'Offre régulière',    color: 'emerald' },
   { value: 'irreguliere',  label: 'Offre irrégulière',  color: 'red' },

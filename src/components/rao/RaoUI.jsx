@@ -1,5 +1,76 @@
 // src/components/rao/RaoUI.jsx
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Info, X } from 'lucide-react';
+
+// Popover d'aide au calcul — déclenché au CLIC (compatible tablette, contrairement
+// aux tooltips `title` invisibles au tactile). Affiche une formule et son détail.
+// Le popover est rendu dans un PORTAL (position: fixed) pour échapper au clip des
+// ancêtres (`overflow-hidden` des cartes, `overflow-auto` des tableaux denses).
+// Usage : <CalcHint title="Note prix (F1)">Pmin / P × 40 = …</CalcHint>
+export const CalcHint = ({ title, children, className = '' }) => {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const btnRef = useRef(null);
+  const popRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => {
+      if (btnRef.current?.contains(e.target)) return;
+      if (popRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
+    const onScroll = () => setOpen(false);
+    document.addEventListener('mousedown', onDoc);
+    window.addEventListener('scroll', onScroll, true);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      window.removeEventListener('scroll', onScroll, true);
+    };
+  }, [open]);
+
+  const toggle = (e) => {
+    e.stopPropagation();
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 6, left: r.left + r.width / 2 });
+    }
+    setOpen(o => !o);
+  };
+
+  return (
+    <span className={`inline-flex ${className}`}>
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={toggle}
+        className="inline-flex items-center justify-center text-slate-400 hover:text-blue-500 transition-colors align-middle"
+        title="Comprendre le calcul"
+        aria-label="Comprendre le calcul"
+      >
+        <Info size={14} />
+      </button>
+      {open && createPortal(
+        <div
+          ref={popRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, transform: 'translateX(-50%)' }}
+          className="z-[100] w-72 max-w-[calc(100vw-24px)] bg-white rounded-xl border border-slate-200 shadow-xl p-3 text-left cursor-default"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="flex items-start justify-between gap-2 mb-1.5">
+            {title && <span className="text-[10px] font-black uppercase tracking-widest text-blue-600">{title}</span>}
+            <button type="button" onClick={() => setOpen(false)} className="p-0.5 -mt-0.5 -mr-0.5 text-slate-300 hover:text-slate-500 rounded">
+              <X size={12} />
+            </button>
+          </div>
+          <div className="text-[11px] text-slate-600 leading-relaxed break-words">{children}</div>
+        </div>,
+        document.body
+      )}
+    </span>
+  );
+};
 
 export const TabBtn = ({ id, active, onClick, label, count }) => (
   <button
