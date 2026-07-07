@@ -3,7 +3,7 @@
 // Export Word (.doc) d'un Compte Rendu de Reunion.
 // Genere un document HTML avec styles inline que Word ouvre nativement.
 
-import { MEETING_TYPES, computeObsStats } from '../data/crrData';
+import { MEETING_TYPES, GROUP_COLORS, computeObsStats } from '../data/crrData';
 import { obsTextToHtml } from './formatObsText.jsx';
 import { ESTIMA_CREDIT, isEstimaCreditEnabled } from './estimaCredit';
 
@@ -45,6 +45,7 @@ export const generateWordCrr = (meeting, crrConfig, projectName = '', branding =
 
   const primary = branding?.colors?.primary || '#286E55';
   const typeLabel = MEETING_TYPES.find((t) => t.value === meeting.type)?.label || 'Reunion';
+  const showLegalText = meeting.type === 'chantier' && !!crrConfig.legalText;
   const pdfProjectName = (projectName || 'PROJET').toUpperCase();
   const groups = crrConfig.participantGroups || [];
   const { sortDate, sortCat } = options || {};
@@ -112,29 +113,48 @@ export const generateWordCrr = (meeting, crrConfig, projectName = '', branding =
   html += `<div class="section-title">PARTICIPANTS</div>`;
   html += `<table><thead><tr>
     <th style="width:20%">ROLE / INTERVENANT</th>
-    <th style="width:14%">LABEL</th>
-    <th style="width:16%">CONTACT</th>
-    <th style="width:26%">EMAIL</th>
-    <th style="width:8%">CPR</th>
-    <th style="width:8%">PRES.</th>
-    <th style="width:8%">DIFF.</th>
+    <th style="width:12%">LABEL</th>
+    <th style="width:28%">CONTACT</th>
+    <th style="width:25%">EMAIL</th>
+    <th style="width:5%">CPR</th>
+    <th style="width:5%">PRES.</th>
+    <th style="width:5%">DIFF.</th>
   </tr></thead><tbody>`;
 
   for (let gi = 0; gi < groups.length; gi++) {
     const group = groups[gi];
     const rowBg = gi % 2 === 0 ? '#ffffff' : '#fafcfe';
-    if (group.contacts.length === 0) {
+    const gc = GROUP_COLORS[gi % GROUP_COLORS.length];
+    // Lignes du groupe : contacts directs, puis bandeau + contacts par sous-groupe
+    const rows = [
+      ...(group.contacts || []).map((c) => ({ type: 'contact', contact: c })),
+      ...(group.subGroups || []).flatMap((sg) => [
+        { type: 'sub', sg },
+        ...(sg.contacts || []).map((c) => ({ type: 'contact', contact: c })),
+      ]),
+    ];
+    if (rows.length === 0) {
       html += `<tr style="background:#f8fafb"><td colspan="7" style="font-weight:bold;color:${primary}">${group.name}${group.subLabel ? ` : ${group.subLabel}` : ''}</td></tr>`;
     } else {
-      group.contacts.forEach((contact, ci) => {
+      rows.forEach((row, ri) => {
+        html += `<tr style="background-color:${rowBg}">`;
+        if (ri === 0) {
+          // Case ROLE/INTERVENANT teintee a la couleur de la pastille du groupe
+          const roleTxt = `rgb(${gc.rgb.map((v) => Math.round(v * 0.75)).join(',')})`;
+          html += `<td rowspan="${rows.length}" style="font-weight:bold;vertical-align:middle;background:rgb(${gc.rgbBg.join(',')});color:${roleTxt}">${group.name}${group.subLabel ? `<br><span style="font-size:8pt;color:#64748b">${group.subLabel}</span>` : ''}</td>`;
+        }
+        // Bandeau sous-groupe : couleurs du groupe parent (identique au PDF)
+        if (row.type === 'sub') {
+          const n = (row.sg.contacts || []).length;
+          html += `<td colspan="6" style="background:rgb(${gc.rgbBg.join(',')});color:rgb(${gc.rgb.join(',')});font-weight:bold;font-size:8pt;padding-left:8px">&raquo; ${row.sg.name}${n > 0 ? ` (${n})` : ''}</td>`;
+          html += `</tr>`;
+          return;
+        }
+        const contact = row.contact;
         const att = meeting.attendance?.[contact.id] || 'absent';
         const diff = meeting.diffusion?.[contact.id] || false;
-        html += `<tr style="background-color:${rowBg}">`;
-        if (ci === 0) {
-          html += `<td rowspan="${group.contacts.length}" style="font-weight:bold;vertical-align:middle">${group.name}${group.subLabel ? `<br><span style="font-size:8pt;color:#64748b">${group.subLabel}</span>` : ''}</td>`;
-        }
         html += `<td style="font-size:8pt;color:#64748b">${contact.subLabel || ''}</td>`;
-        html += `<td>${contact.name || ''}</td>`;
+        html += `<td>${contact.name || ''}${contact.fonction ? `<br><span style="font-size:8pt;color:#64748b">${contact.fonction}</span>` : ''}</td>`;
         html += `<td style="color:#1e50a0;font-size:8pt">${contact.email || ''}${contact.phone ? `<br><span style="color:#94a3b8;font-size:7pt">${contact.phone}</span>` : ''}</td>`;
         html += `<td style="text-align:center">${contact.cpr ? `<span style="display:inline-block;padding:1px 4px;border-radius:3px;font-size:7pt;font-weight:bold;background:${primary}22;color:${primary}">C</span>` : ''}</td>`;
         const presColor = att === 'present' ? '#16823c' : att === 'excused' ? '#b47814' : att === 'not_summoned' ? '#a855f7' : '#a0aab4';
@@ -147,12 +167,16 @@ export const generateWordCrr = (meeting, crrConfig, projectName = '', branding =
         html += `</tr>`;
       });
     }
+    // Fine ligne d'espacement entre deux groupes
+    if (gi < groups.length - 1) {
+      html += `<tr><td colspan="8" style="border:none;padding:0;line-height:5px;font-size:5px">&nbsp;</td></tr>`;
+    }
   }
   html += `</tbody></table>`;
   html += `<div style="font-size:7pt;font-style:italic;color:#94a3b8;margin:3px 0 8px">P : Présent &nbsp;|&nbsp; E : Excusé &nbsp;|&nbsp; A : Absent &nbsp;|&nbsp; NC : Non convoqué &nbsp;|&nbsp; C : CPR &nbsp;|&nbsp; D : Diffusion</div>`;
 
   // Texte legal
-  if (crrConfig.legalText) {
+  if (showLegalText) {
     html += `<div class="legal">${crrConfig.legalText}</div>`;
   }
 

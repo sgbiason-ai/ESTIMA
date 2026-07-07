@@ -12,6 +12,8 @@ export const DEFAULT_CATEGORIES = [
 export const MEETING_TYPES = [
   { value: 'preparation', label: 'Réunion de Préparation' },
   { value: 'chantier',    label: 'Réunion de chantier' },
+  { value: 'concessionnaires', label: 'Réunion Concessionnaires' },
+  { value: 'reunion',     label: 'Réunion' },
 ];
 
 export const PRESENCE_OPTIONS = [

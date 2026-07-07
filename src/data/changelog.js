@@ -2,14 +2,22 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '3.5.1';
+export const APP_VERSION = '3.5.2';
 
 export const CHANGELOG = [
   {
-    version: '3.5.1',
-    date: '2026-06-29',
-    title: 'Estimation & RAO/Analyse — les totaux reprennent les quantités à valoir',
+    version: '3.5.2',
+    date: '2026-07-07',
+    title: 'Estimation, RAO/Analyse & CRC — ajustements terrain',
     highlights: [
+      'CRC — tableau participants densifié dans l’aperçu et les exports : colonnes CPR/PRES./DIFF. réduites et colonne Contact élargie',
+      'CRC — le bloc « Observations sur le compte-rendu » apparaît désormais dans l’aperçu et les exports uniquement pour les réunions de chantier',
+      'CRC — export PDF : les titres de projet longs reviennent automatiquement à la ligne, avec le contenu suivant décalé proprement pour éviter les débordements',
+      'CRC — le type de compte rendu propose désormais aussi « Réunion Concessionnaires » et « Réunion », en plus de « Réunion de chantier » et « Réunion de Préparation »',
+      'CRC — chaque participant peut désormais porter une FONCTION (ex: Conducteur de travaux, Chef de chantier) : un champ dédié dans la bibliothèque et le tableau des participants, affiché juste sous le nom partout (bibliothèque, tableau, aperçu, mobile) et repris dans les exports PDF et Word. La colonne « Fonction » est prise en charge à l\'import/export Excel de la bibliothèque',
+      'CRC — SOUS-GROUPES de participants : un groupe (ex: « Entreprises ») peut désormais contenir des sous-groupes (ex: « Lot 1 VRD », « Lot 2 Espaces verts »), chacun avec ses propres contacts et sa pastille colorée (héritée de la couleur du groupe parent, pour lire la filiation d\'un coup d\'œil). Création/renommage/suppression depuis le tableau des participants et la fenêtre « Gestion des participants » (bouton dossier +), glisser-déposer d\'un contact ou d\'une entrée de la bibliothèque directement dans un sous-groupe (déposé à l\'endroit exact du lâcher). Dans l\'export PDF, l\'export Word et l\'aperçu, chaque sous-groupe apparaît sous forme de bandeau indenté « » Lot 1 VRD (2) » aux couleurs du groupe parent, avec ses contacts en dessous — la case « Rôle / Intervenant » de chaque groupe est teintée à la couleur de sa pastille, avec un léger espace entre chaque groupe pour bien les détacher. Les rôles/intervenants au nom long reviennent à la ligne dans leur colonne (plus de débordement ni de troncature)',
+      'CRC — correctif : sur un chantier ne contenant encore AUCUN compte rendu, le bouton « Groupe » (ajouter un groupe de participants) restait sans effet. On peut désormais créer, renommer et supprimer des groupes de participants même avant d\'avoir créé le 1ᵉʳ CR — ils sont enregistrés comme modèle et repris automatiquement dès le premier compte rendu',
+      'CRC (bibliothèque de participants) — suppression multiple : une case à cocher par contact (+ « tout sélectionner ») fait apparaître une barre « Supprimer la sélection » pour retirer plusieurs contacts d\'un coup. L\'import Excel est aussi plus robuste : colonnes reconnues par leurs libellés (y compris synonymes FR : Contact, Courriel, Portable, Poste, Rôle…) quel que soit leur ordre, plus aucune ligne perdue ni téléphone/email inversés sur les fichiers sans en-tête',
       'Fiabilité — si l\'application ne parvient pas à démarrer (erreur au chargement, cache corrompu, configuration invalide), l\'écran de démarrage n\'affiche plus un rond de chargement infini : un message « L\'application n\'a pas pu démarrer » apparaît, avec le détail technique de l\'erreur et deux boutons « Réessayer » et « Vider le cache et réessayer »',
       'RAO — workflow plus clair : à l\'ouverture, le module se place directement sur la première étape à compléter ; les étapes du ruban sont numérotées 1 → 6, un bandeau « Prochaine étape » propose la suite dès qu\'un onglet est terminé, et les onglets qui étaient vides (aucune entreprise, aucun critère) affichent désormais un écran d\'explication avec un bouton pour aller au bon endroit — au lieu d\'une page blanche. À la toute première ouverture, un panneau d\'orientation présente les 6 étapes du processus',
       'RAO — sauvegarde plus lisible : l\'ancien bouton « Sauvegarder » (qui restait affiché « Sauvegardé » en permanence) est remplacé par un indicateur d\'état d\'enregistrement automatique « Enregistrement… / Enregistré à HH:MM » (comme un traitement de texte en ligne). Un avertissement s\'affiche si vous quittez la page pendant qu\'un enregistrement est en cours. Cliquer sur l\'indicateur force une sauvegarde immédiate',

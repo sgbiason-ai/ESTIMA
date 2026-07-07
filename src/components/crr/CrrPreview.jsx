@@ -63,6 +63,7 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
   const formatDate = formatDateFr;
 
   const typeLabel = MEETING_TYPES.find((t) => t.value === meeting.type)?.label || 'Reunion';
+  const showLegalText = meeting.type === 'chantier' && !!crrConfig.legalText;
   const groups = crrConfig.participantGroups || [];
   const rawCategories = crrConfig.categories || [];
   const categories = sortCat
@@ -179,65 +180,92 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
         </div>
 
         {/* Tableau */}
-        <table className="w-full text-[10px] border-collapse mt-0">
+        <table className="w-full text-[10px] border-collapse mt-0" style={{ tableLayout: 'fixed' }}>
           <thead>
             <tr style={{ backgroundColor: lightenHex(primary, 0.78) }}>
-              <th className="text-center px-1 py-2 border border-slate-200 font-bold w-10" style={{ color: primary }}></th>
+              <th className="text-center px-1 py-2 border border-slate-200 font-bold" style={{ color: primary, width: '6%' }}></th>
               <th className="text-center px-2 py-2 border border-slate-200 font-bold" style={{ color: primary, width: '18%' }}>ROLE / INTERVENANT</th>
-              <th className="text-center px-2 py-2 border border-slate-200 font-bold" style={{ color: primary, width: '13%' }}>LABEL</th>
-              <th className="text-center px-2 py-2 border border-slate-200 font-bold" style={{ color: primary, width: '15%' }}>CONTACT</th>
-              <th className="text-center px-2 py-2 border border-slate-200 font-bold" style={{ color: primary, width: '24%' }}>EMAIL</th>
-              <th className="text-center px-1 py-2 border border-slate-200 font-bold w-10" style={{ color: primary }}>CPR</th>
-              <th className="text-center px-1 py-2 border border-slate-200 font-bold w-12" style={{ color: primary }}>PRES.</th>
-              <th className="text-center px-1 py-2 border border-slate-200 font-bold w-12" style={{ color: primary }}>DIFF.</th>
+              <th className="text-center px-2 py-2 border border-slate-200 font-bold" style={{ color: primary, width: '12%' }}>LABEL</th>
+              <th className="text-center px-2 py-2 border border-slate-200 font-bold" style={{ color: primary, width: '23%' }}>CONTACT</th>
+              <th className="text-center px-2 py-2 border border-slate-200 font-bold" style={{ color: primary, width: '25%' }}>EMAIL</th>
+              <th className="text-center px-1 py-2 border border-slate-200 font-bold" style={{ color: primary, width: '5%' }}>CPR</th>
+              <th className="text-center px-1 py-2 border border-slate-200 font-bold" style={{ color: primary, width: '5%' }}>PRES.</th>
+              <th className="text-center px-1 py-2 border border-slate-200 font-bold" style={{ color: primary, width: '6%' }}>DIFF.</th>
             </tr>
           </thead>
           <tbody>
-            {groups.map((group, gi) => (
+            {groups.map((group, gi) => {
+              const gc = GROUP_COLORS[gi % GROUP_COLORS.length];
+              const rgbStr = `rgb(${gc.rgb.join(',')})`;
+              // Lignes du groupe : contacts directs, puis bandeau + contacts par sous-groupe
+              const rows = [
+                ...(group.contacts || []).map((c) => ({ type: 'contact', contact: c })),
+                ...(group.subGroups || []).flatMap((sg) => [
+                  { type: 'sub', sg },
+                  ...(sg.contacts || []).map((c) => ({ type: 'contact', contact: c })),
+                ]),
+              ];
+              return (
               <React.Fragment key={group.id}>
-                {group.contacts.length === 0 && (
+                {rows.length === 0 && (
                   <tr style={{ backgroundColor: lightenHex(primary, 0.96) }}>
                     <td className="px-2 py-1.5 font-bold border border-slate-200" colSpan={8} style={{ color: primary }}>
                       {group.name}{group.subLabel ? ` : ${group.subLabel}` : ''}
                     </td>
                   </tr>
                 )}
-                {group.contacts.map((contact, ci) => {
+                {rows.map((row, ri) => {
+                  // Cols pastille + role : rowSpan sur TOUTES les lignes du groupe,
+                  // fond a la couleur de la pastille du groupe
+                  const groupCells = ri === 0 && (
+                    <>
+                      <td className="text-center border border-slate-200 align-middle" rowSpan={rows.length}
+                        style={{ backgroundColor: `rgb(${gc.rgbBg.join(',')})` }}>
+                        <span
+                          className="inline-flex items-center justify-center gap-0.5 px-1 py-0.5 rounded text-[7px] font-bold"
+                          style={{ minWidth: '40px', backgroundColor: 'white', color: rgbStr }}
+                        >
+                          <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ backgroundColor: rgbStr }} />
+                          {abbreviateGroup(group.name)}
+                        </span>
+                      </td>
+                      <td className="px-2 py-1.5 border border-slate-200 align-middle font-bold text-[10px]" rowSpan={rows.length}
+                        style={{ backgroundColor: `rgb(${gc.rgbBg.join(',')})`, color: `rgb(${gc.rgb.map((v) => Math.round(v * 0.75)).join(',')})` }}>
+                        {group.name}
+                        {group.subLabel && <div className="text-[9px] font-normal text-slate-500">{group.subLabel}</div>}
+                      </td>
+                    </>
+                  );
+
+                  // Bandeau sous-groupe : couleurs du groupe parent (fidele au PDF)
+                  if (row.type === 'sub') {
+                    const n = (row.sg.contacts || []).length;
+                    return (
+                      <tr key={`sub-${row.sg.id}`}>
+                        {groupCells}
+                        <td
+                          colSpan={6}
+                          className="px-2 py-1 border border-slate-200 font-bold text-[9px]"
+                          style={{ backgroundColor: `rgb(${gc.rgbBg.join(',')})`, color: rgbStr }}
+                        >
+                          <span className="inline-block w-1.5 h-1.5 rounded-full mr-1.5" style={{ backgroundColor: rgbStr }} />
+                          {row.sg.name}{n > 0 ? ` (${n})` : ''}
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  const contact = row.contact;
                   const att = meeting.attendance?.[contact.id] || 'absent';
                   const diff = meeting.diffusion?.[contact.id] || false;
                   return (
                     <tr key={contact.id} style={{ backgroundColor: gi % 2 === 0 ? 'white' : 'rgb(250,252,254)' }}>
-                      {ci === 0 && (
-                        <>
-                          <td
-                            className="text-center border border-slate-200 align-middle"
-                            rowSpan={group.contacts.length}
-                          >
-                            {(() => {
-                              const gc = GROUP_COLORS[gi % GROUP_COLORS.length];
-                              const abbr = abbreviateGroup(group.name);
-                              return (
-                                <span
-                                  className="inline-flex items-center justify-center gap-0.5 px-1 py-0.5 rounded text-[7px] font-bold"
-                                  style={{ minWidth: '40px', backgroundColor: `rgb(${gc.rgbBg.join(',')})`, color: `rgb(${gc.rgb.join(',')})` }}
-                                >
-                                  <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ backgroundColor: `rgb(${gc.rgb.join(',')})` }} />
-                                  {abbr}
-                                </span>
-                              );
-                            })()}
-                          </td>
-                          <td
-                            className="px-2 py-1.5 border border-slate-200 align-middle font-bold text-[10px]"
-                            rowSpan={group.contacts.length}
-                          >
-                            {group.name}
-                            {group.subLabel && <div className="text-[9px] font-normal text-slate-500">{group.subLabel}</div>}
-                          </td>
-                        </>
-                      )}
+                      {groupCells}
                       <td className="px-2 py-1.5 border border-slate-200 text-[9px] text-slate-500">{contact.subLabel || ''}</td>
-                      <td className="px-2 py-1.5 border border-slate-200">{contact.name}</td>
+                      <td className="px-2 py-1.5 border border-slate-200">
+                        <div>{contact.name}</div>
+                        {contact.fonction && <div className="text-[8px] text-slate-400">{contact.fonction}</div>}
+                      </td>
                       <td className="px-2 py-1.5 border border-slate-200">
                         <div className="text-blue-600 text-[9px]">{contact.email}</div>
                         {contact.phone && <div className="text-[8px] text-slate-400">{contact.phone}</div>}
@@ -264,8 +292,14 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
                     </tr>
                   );
                 })}
+                {gi < groups.length - 1 && (
+                  <tr aria-hidden="true">
+                    <td colSpan={8} style={{ height: '5px', border: 'none', padding: 0 }} />
+                  </tr>
+                )}
               </React.Fragment>
-            ))}
+              );
+            })}
           </tbody>
         </table>
         <p className="text-[8px] italic mt-1" style={{ color: '#94a3b8' }}>
@@ -274,7 +308,7 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
       </div>
 
       {/* ── TEXTE LEGAL ── */}
-      {crrConfig.legalText && (
+      {showLegalText && (
         <div className="mx-6 mt-4">
           <div className="rounded-lg border px-4 py-3" style={{ backgroundColor: 'rgb(248,249,252)', borderColor: 'rgb(210,218,226)' }}>
             <p className="text-[9px] italic leading-relaxed" style={{ color: '#64748b' }}>

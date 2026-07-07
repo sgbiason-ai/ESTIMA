@@ -862,7 +862,8 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
                     addContact={manager.addContact} updateContact={manager.updateContact} deleteContact={manager.deleteContact}
                     addParticipantGroup={manager.addParticipantGroup} updateParticipantGroup={manager.updateParticipantGroup}
                     deleteParticipantGroup={manager.deleteParticipantGroup} showManagement={true}
-                    reorderParticipantGroups={manager.reorderParticipantGroups} />
+                    reorderParticipantGroups={manager.reorderParticipantGroups}
+                    addSubGroup={manager.addSubGroup} updateSubGroup={manager.updateSubGroup} deleteSubGroup={manager.deleteSubGroup} />
                   <CrrObservations meeting={manager.activeMeeting} categories={manager.crrConfig.categories}
                     categoryCodes={manager.crrConfig.categoryCodes}
                     observationsByCategory={manager.observationsByCategory} addObservation={manager.addObservation}
@@ -908,6 +909,9 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
         updateParticipantGroup={manager.updateParticipantGroup}
         deleteParticipantGroup={manager.deleteParticipantGroup}
         reorderParticipantGroups={manager.reorderParticipantGroups}
+        addSubGroup={manager.addSubGroup}
+        updateSubGroup={manager.updateSubGroup}
+        deleteSubGroup={manager.deleteSubGroup}
         importContactsFromLibrary={manager.importContactsFromLibrary}
         moveContactBetweenGroups={manager.moveContactBetweenGroups}
         libraryContacts={participantLibrary}

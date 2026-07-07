@@ -680,15 +680,19 @@ const CrrObservations = ({
 
   if (!meeting) return null;
 
+  const showLegalText = meeting.type === 'chantier' && !!legalText;
+
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
     <div className="space-y-3">
       {/* Texte legal */}
-      <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-        <p className="text-[11px] text-amber-800 leading-relaxed italic">
-          {legalText}
-        </p>
-      </div>
+      {showLegalText && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+          <p className="text-[11px] text-amber-800 leading-relaxed italic">
+            {legalText}
+          </p>
+        </div>
+      )}
 
       {/* En-tete tableau */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden sticky top-0 z-30">

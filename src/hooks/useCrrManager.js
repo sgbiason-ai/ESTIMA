@@ -14,6 +14,16 @@ import {
   defaultCategoryCode,
 } from '../data/crrData';
 import { migrateCrrData } from '../utils/crrMigration';
+import {
+  flattenAllContacts,
+  addContactToTree,
+  updateContactInTree,
+  deleteContactFromTree,
+  addSubGroupToTree,
+  updateSubGroupInTree,
+  deleteSubGroupFromTree,
+  moveContactInTree,
+} from '../utils/crrParticipantTree';
 import { useRobustSave } from './useRobustSave';
 import { useStableHash } from './useStableHash';
 import { reoptimizeDataUrl } from '../utils/imageCompressor';
@@ -358,10 +368,16 @@ export const useCrrManager = ({
 
   const updateMeetingParticipantGroups = useCallback(
     (newGroups) => {
-      if (!activeMeetingId) return;
-      updateActiveMeeting({ participantGroups: newGroups });
+      if (activeMeetingId) {
+        updateActiveMeeting({ participantGroups: newGroups });
+      } else {
+        // Aucune reunion (CR) active — cas d'un CRC neuf sans CR encore cree :
+        // on ecrit dans le template global crrConfig, repris automatiquement
+        // par le 1er CR cree. Sinon la creation de groupe serait un no-op muet.
+        updateConfig({ ...crrConfig, participantGroups: newGroups });
+      }
     },
-    [activeMeetingId, updateActiveMeeting]
+    [activeMeetingId, updateActiveMeeting, updateConfig, crrConfig]
   );
 
   const addParticipantGroup = useCallback(
@@ -387,11 +403,14 @@ export const useCrrManager = ({
         g.id === groupId ? { ...g, ...patch } : g
       );
 
+      // Sans reunion active : ecrire le template global (pas d'observations a patcher).
+      if (!activeMeeting) { updateMeetingParticipantGroups(groups); return; }
+
       // Construire le patch complet en une seule mise à jour (évite stale closure)
       const meetingPatch = { participantGroups: groups };
 
       // Si le nom a changé, propager dans emitter/actionBy des observations
-      if (newName && oldName && newName !== oldName && activeMeeting) {
+      if (newName && oldName && newName !== oldName) {
         const replaceGroupName = (fieldValue) => {
           if (!fieldValue) return fieldValue;
           const names = fieldValue.split(',').map((s) => s.trim());
@@ -407,7 +426,22 @@ export const useCrrManager = ({
 
       updateActiveMeeting(meetingPatch);
     },
-    [activeParticipantGroups, activeMeeting, updateActiveMeeting]
+    [activeParticipantGroups, activeMeeting, updateActiveMeeting, updateMeetingParticipantGroups]
+  );
+
+  // Purge attendance/diffusion des contacts supprimes. Sans cela, les cles
+  // orphelines s'accumulent et sont recopiees a chaque duplication de CR
+  // (poids mort vers le plafond Firestore 1 Mo). Retourne null si rien a purger.
+  const scrubbedPresence = useCallback(
+    (removedIds) => {
+      if (!activeMeeting || removedIds.length === 0) return null;
+      const ids = new Set(removedIds);
+      const hasOrphan = (obj) => obj && Object.keys(obj).some((k) => ids.has(k));
+      if (!hasOrphan(activeMeeting.attendance) && !hasOrphan(activeMeeting.diffusion)) return null;
+      const strip = (obj) => Object.fromEntries(Object.entries(obj || {}).filter(([k]) => !ids.has(k)));
+      return { attendance: strip(activeMeeting.attendance), diffusion: strip(activeMeeting.diffusion) };
+    },
+    [activeMeeting]
   );
 
   const deleteParticipantGroup = useCallback(
@@ -417,11 +451,18 @@ export const useCrrManager = ({
 
       const groups = activeParticipantGroups.filter((g) => g.id !== groupId);
 
+      // Sans reunion active : ecrire le template global (pas d'observations a patcher).
+      if (!activeMeeting) { updateMeetingParticipantGroups(groups); return; }
+
       // Construire le patch complet en une seule mise à jour (évite stale closure)
       const meetingPatch = { participantGroups: groups };
 
+      // Purger attendance/diffusion des contacts du groupe supprime
+      const scrub = scrubbedPresence(flattenAllContacts([deletedGroup].filter(Boolean)).map((c) => c.id));
+      if (scrub) Object.assign(meetingPatch, scrub);
+
       // Nettoyer les références dans emitter/actionBy des observations
-      if (deletedName && activeMeeting) {
+      if (deletedName) {
         const removeGroupName = (fieldValue) => {
           if (!fieldValue) return fieldValue;
           const names = fieldValue.split(',').map((s) => s.trim()).filter((n) => n !== deletedName);
@@ -436,7 +477,7 @@ export const useCrrManager = ({
 
       updateActiveMeeting(meetingPatch);
     },
-    [activeParticipantGroups, activeMeeting, updateActiveMeeting]
+    [activeParticipantGroups, activeMeeting, updateActiveMeeting, updateMeetingParticipantGroups, scrubbedPresence]
   );
 
   const reorderParticipantGroups = useCallback(
@@ -449,131 +490,147 @@ export const useCrrManager = ({
     [activeParticipantGroups, updateMeetingParticipantGroups]
   );
 
+  // subGroupId optionnel : ajoute le contact dans un sous-groupe plutot que
+  // directement dans le groupe.
   const addContact = useCallback(
-    (groupId) => {
+    (groupId, subGroupId = null) => {
       const newContact = {
         id: generateCrrId(),
         name: '',
+        fonction: '',
         email: '',
         phone: '',
         cpr: false,
       };
-      const groups = activeParticipantGroups.map((g) => {
-        if (g.id === groupId) {
-          return { ...g, contacts: [...g.contacts, newContact] };
-        }
-        return g;
-      });
-      updateMeetingParticipantGroups(groups);
+      updateMeetingParticipantGroups(
+        addContactToTree(activeParticipantGroups, groupId, subGroupId, newContact)
+      );
       return newContact.id;
     },
     [activeParticipantGroups, updateMeetingParticipantGroups]
   );
 
+  // Le contact est retrouve par son id (groupe direct OU sous-groupe).
   const updateContact = useCallback(
-    (groupId, contactId, patch) => {
-      const groups = activeParticipantGroups.map((g) => {
-        if (g.id === groupId) {
-          return {
-            ...g,
-            contacts: g.contacts.map((c) =>
-              c.id === contactId ? { ...c, ...patch } : c
-            ),
-          };
-        }
-        return g;
-      });
-      updateMeetingParticipantGroups(groups);
+    (_groupId, contactId, patch) => {
+      updateMeetingParticipantGroups(
+        updateContactInTree(activeParticipantGroups, contactId, patch)
+      );
     },
     [activeParticipantGroups, updateMeetingParticipantGroups]
   );
 
   const deleteContact = useCallback(
-    (groupId, contactId) => {
-      const groups = activeParticipantGroups.map((g) => {
-        if (g.id === groupId) {
-          return { ...g, contacts: g.contacts.filter((c) => c.id !== contactId) };
-        }
-        return g;
-      });
-      updateMeetingParticipantGroups(groups);
+    (_groupId, contactId) => {
+      const groups = deleteContactFromTree(activeParticipantGroups, contactId);
+      const scrub = scrubbedPresence([contactId]);
+      if (scrub) updateActiveMeeting({ participantGroups: groups, ...scrub });
+      else updateMeetingParticipantGroups(groups);
+    },
+    [activeParticipantGroups, updateMeetingParticipantGroups, updateActiveMeeting, scrubbedPresence]
+  );
+
+  // ── SOUS-GROUPES ───────────────────────────────────────────────────────
+
+  const addSubGroup = useCallback(
+    (groupId, name = 'Sous-groupe') => {
+      const newSub = { id: generateCrrId(), name, subLabel: '', contacts: [] };
+      updateMeetingParticipantGroups(
+        addSubGroupToTree(activeParticipantGroups, groupId, newSub)
+      );
+      return newSub.id;
     },
     [activeParticipantGroups, updateMeetingParticipantGroups]
   );
 
+  const updateSubGroup = useCallback(
+    (groupId, subGroupId, patch) => {
+      updateMeetingParticipantGroups(
+        updateSubGroupInTree(activeParticipantGroups, groupId, subGroupId, patch)
+      );
+    },
+    [activeParticipantGroups, updateMeetingParticipantGroups]
+  );
+
+  const deleteSubGroup = useCallback(
+    (groupId, subGroupId) => {
+      const parent = activeParticipantGroups.find((g) => g.id === groupId);
+      const removedIds = ((parent?.subGroups || []).find((sg) => sg.id === subGroupId)?.contacts || []).map((c) => c.id);
+      const groups = deleteSubGroupFromTree(activeParticipantGroups, groupId, subGroupId);
+      const scrub = scrubbedPresence(removedIds);
+      if (scrub) updateActiveMeeting({ participantGroups: groups, ...scrub });
+      else updateMeetingParticipantGroups(groups);
+    },
+    [activeParticipantGroups, updateMeetingParticipantGroups, updateActiveMeeting, scrubbedPresence]
+  );
+
   // ── IMPORT DEPUIS BIBLIOTHEQUE ─────────────────────────────────────────
 
+  // Retourne le nombre de contacts REELLEMENT ajoutes (doublons ignores) pour
+  // que l'UI puisse afficher un feedback honnete.
   const importContactsFromLibrary = useCallback(
     (contactsWithGroup) => {
-      // contactsWithGroup : [{ contact, targetGroupId }]
-      const newGroups = activeParticipantGroups.map((g) => ({
-        ...g,
-        contacts: [...g.contacts],
-      }));
-
-      // Collecter tous les contacts existants (cross-groupes) pour dedup
+      // contactsWithGroup : [{ contact, targetGroupId, targetSubGroupId?, targetIndex? }]
       const norm = (s) => (s || '').trim().toLowerCase();
-      const allEmails = new Set();
-      const allNames = new Set();
-      for (const g of newGroups) {
-        for (const c of g.contacts) {
-          if (c.email) allEmails.add(norm(c.email));
-          else if (c.name) allNames.add(norm(c.name));
-        }
-      }
+      // Dedup sur l'ensemble des contacts existants (groupes + sous-groupes).
+      const existing = flattenAllContacts(activeParticipantGroups);
+      const allEmails = new Set(existing.filter((c) => c.email).map((c) => norm(c.email)));
+      const allNames = new Set(existing.filter((c) => !c.email && c.name).map((c) => norm(c.name)));
 
-      for (const { contact: lc, targetGroupId } of contactsWithGroup) {
-        let group = newGroups.find((g) => g.id === targetGroupId);
+      let groups = activeParticipantGroups;
+      let addedCount = 0;
 
-        if (!group) {
-          group = { id: generateCrrId(), name: lc.subLabel || 'Participants', subLabel: '', contacts: [] };
-          newGroups.push(group);
-        }
+      for (const item of contactsWithGroup) {
+        const lc = item.contact;
+        const targetSubGroupId = item.targetSubGroupId || null;
 
         const lcEmail = norm(lc.email);
         const lcName = norm(lc.name);
         const isDuplicate =
           (lcEmail && allEmails.has(lcEmail)) ||
           (!lcEmail && lcName && allNames.has(lcName));
+        if (isDuplicate) continue;
 
-        if (!isDuplicate) {
-          group.contacts.push({
-            id: generateCrrId(),
-            name: lc.name || '',
-            email: lc.email || '',
-            phone: lc.phone || '',
-            subLabel: lc.subLabel || '',
-            cpr: false,
-          });
-          if (lcEmail) allEmails.add(lcEmail);
-          else if (lcName) allNames.add(lcName);
+        // Groupe cible manquant : le creer a la volee.
+        let targetGroupId = item.targetGroupId;
+        if (!targetGroupId || !groups.some((g) => g.id === targetGroupId)) {
+          targetGroupId = targetGroupId || generateCrrId();
+          groups = [...groups, { id: targetGroupId, name: lc.subLabel || 'Participants', subLabel: '', contacts: [], subGroups: [] }];
         }
+
+        const newContact = {
+          id: generateCrrId(),
+          name: lc.name || '',
+          fonction: lc.fonction || '',
+          email: lc.email || '',
+          phone: lc.phone || '',
+          subLabel: lc.subLabel || '',
+          cpr: false,
+        };
+        groups = addContactToTree(groups, targetGroupId, targetSubGroupId, newContact, item.targetIndex ?? null);
+        addedCount += 1;
+        if (lcEmail) allEmails.add(lcEmail);
+        else if (lcName) allNames.add(lcName);
       }
 
-      updateMeetingParticipantGroups(newGroups);
+      if (addedCount > 0) updateMeetingParticipantGroups(groups);
+      return addedCount;
     },
     [activeParticipantGroups, updateMeetingParticipantGroups]
   );
 
-  // ── DEPLACEMENT CONTACT ENTRE GROUPES ─────────────────────────────────
+  // ── DEPLACEMENT CONTACT (groupes / sous-groupes) ───────────────────────
 
   const moveContactBetweenGroups = useCallback(
-    (fromGroupId, toGroupId, contactId, toIndex) => {
-      const newGroups = activeParticipantGroups.map((g) => ({
-        ...g,
-        contacts: [...g.contacts],
-      }));
-      const fromGroup = newGroups.find((g) => g.id === fromGroupId);
-      const toGroup = newGroups.find((g) => g.id === toGroupId);
-      if (!fromGroup || !toGroup) return;
-
-      const contactIdx = fromGroup.contacts.findIndex((c) => c.id === contactId);
-      if (contactIdx === -1) return;
-
-      const [contact] = fromGroup.contacts.splice(contactIdx, 1);
-      toGroup.contacts.splice(toIndex, 0, contact);
-
-      updateMeetingParticipantGroups(newGroups);
+    (contactId, destGroupId, destSubGroupId, toIndex) => {
+      updateMeetingParticipantGroups(
+        moveContactInTree(
+          activeParticipantGroups,
+          contactId,
+          { groupId: destGroupId, subGroupId: destSubGroupId || null },
+          toIndex
+        )
+      );
     },
     [activeParticipantGroups, updateMeetingParticipantGroups]
   );
@@ -805,15 +862,10 @@ export const useCrrManager = ({
 
   // ── LISTE DES CONTACTS FLAT (pour les selects emetteur) ───────────────
 
-  const allContacts = useMemo(() => {
-    const contacts = [];
-    for (const group of activeParticipantGroups) {
-      for (const contact of group.contacts) {
-        contacts.push({ ...contact, groupName: group.name, groupId: group.id });
-      }
-    }
-    return contacts;
-  }, [activeParticipantGroups]);
+  const allContacts = useMemo(
+    () => flattenAllContacts(activeParticipantGroups),
+    [activeParticipantGroups]
+  );
 
   // Liste des emails pour la diffusion
   const diffusionEmails = useMemo(() => {
@@ -1032,6 +1084,9 @@ export const useCrrManager = ({
     addContact,
     updateContact,
     deleteContact,
+    addSubGroup,
+    updateSubGroup,
+    deleteSubGroup,
 
     // Import bibliotheque
     importContactsFromLibrary,

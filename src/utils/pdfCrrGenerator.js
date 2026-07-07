@@ -13,6 +13,7 @@ import autoTable from 'jspdf-autotable';
 import { DEFAULT_BRANDING } from '../data/branding';
 import { MEETING_TYPES, GROUP_COLORS, abbreviateGroup, computeObsStats, obsDisplayNumber, obsAge } from '../data/crrData';
 import { parseObsHtml, stripHtml } from './formatObsText.jsx';
+import { flattenGroupContacts } from './crrParticipantTree';
 import { lightenRgb, darkenRgb, loadImage, formatDateFr, formatDateLong, sanitizeFilename, loadLogos, fitTextToWidth } from './pdf/pdfSharedHelpers';
 import { buildTheme as _buildTheme } from './pdf/buildTheme';
 
@@ -179,6 +180,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
   (crrConfig.participantGroups || []).forEach((g, i) => { groupIndexMap[g.name] = i; });
 
   const typeLabel = MEETING_TYPES.find((t) => t.value === meeting.type)?.label || 'Reunion';
+  const showLegalText = meeting.type === 'chantier' && !!crrConfig.legalText;
   const pdfProjectName = (projectName || 'PROJET').toUpperCase();
 
   // Logos
@@ -271,16 +273,22 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
   doc.setFont(fontH, 'bold');
   doc.setFontSize(14);
   doc.setTextColor(...THEME.primary);
-  doc.text(pdfProjectName, PW / 2, cursor.y + 5, { align: 'center' });
+  const titleLines = doc.splitTextToSize(pdfProjectName, CW - 20);
+  const titleLineHeight = 5.5;
+  doc.text(titleLines, PW / 2, cursor.y + 5, { align: 'center', lineHeightFactor: 1.1 });
 
   // Ligne decorative sous le titre
-  const titleW = Math.min(doc.getTextWidth(pdfProjectName), CW - 20);
+  const titleW = Math.min(
+    Math.max(...titleLines.map((line) => doc.getTextWidth(line))),
+    CW - 20
+  );
   const lineX = (PW - titleW) / 2;
+  const titleLineY = cursor.y + 5 + (titleLines.length - 1) * titleLineHeight;
   doc.setDrawColor(...THEME.accent);
   doc.setLineWidth(0.5);
-  doc.line(lineX, cursor.y + 8, lineX + titleW, cursor.y + 8);
+  doc.line(lineX, titleLineY + 3, lineX + titleW, titleLineY + 3);
 
-  cursor.y += 14;
+  cursor.y += 14 + (titleLines.length - 1) * titleLineHeight;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // 2. PROCHAINE REUNION
@@ -330,63 +338,98 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
 
   cursor.y += 10;
 
-  // Construire les donnees du tableau participants
+  // Construire les donnees du tableau participants.
+  // Ordre par groupe : contacts directs, puis chaque sous-groupe (bandeau
+  // indente « » Nom (n) » aux couleurs du groupe parent + ses contacts).
   const participantRows = [];
   const groups = crrConfig.participantGroups || [];
 
   for (let gi = 0; gi < groups.length; gi++) {
+    // Fine ligne d'espacement entre deux groupes (invisible, sans bordure)
+    if (gi > 0) participantRows.push({ isSpacer: true, groupIdx: `__sp${gi}__` });
+
     const group = groups[gi];
-    if (group.contacts.length === 0) {
+    const subGroups = group.subGroups || [];
+    const roleLabel = `${group.name}${group.subLabel ? ` : ${group.subLabel}` : ''}`;
+
+    if (flattenGroupContacts(group).length === 0 && subGroups.length === 0) {
       participantRows.push({
-        role: `${group.name}${group.subLabel ? ` : ${group.subLabel}` : ''}`,
+        role: roleLabel,
         subLabel: '', contact: '', email: '', cpr: false, att: 'absent', diff: false,
         isGroupHeader: true, groupName: group.name, groupIdx: gi,
       });
-    } else {
-      group.contacts.forEach((contact, ci) => {
-        const att = meeting.attendance?.[contact.id] || 'absent';
-        const diff = meeting.diffusion?.[contact.id] || false;
-        participantRows.push({
-          role: ci === 0
-            ? `${group.name}${group.subLabel ? ` : ${group.subLabel}` : ''}`
-            : '',
-          subLabel: contact.subLabel || '',
-          contact: contact.name || '',
-          email: (contact.email || '') + (contact.phone ? '\n' + contact.phone : ''),
-          cpr: !!contact.cpr,
-          att,
-          diff,
-          isGroupHeader: false,
-          groupName: ci === 0 ? group.name : '',
-          groupIdx: gi,
-        });
+      continue;
+    }
+
+    let firstRowOfGroup = true;
+    const pushContact = (contact) => {
+      const att = meeting.attendance?.[contact.id] || 'absent';
+      const diff = meeting.diffusion?.[contact.id] || false;
+      participantRows.push({
+        role: firstRowOfGroup ? roleLabel : '',
+        subLabel: contact.subLabel || '',
+        contact: (contact.name || '') + (contact.fonction ? '\n' + contact.fonction : ''),
+        email: (contact.email || '') + (contact.phone ? '\n' + contact.phone : ''),
+        cpr: !!contact.cpr,
+        att,
+        diff,
+        isGroupHeader: false,
+        groupName: firstRowOfGroup ? group.name : '',
+        groupIdx: gi,
       });
+      firstRowOfGroup = false;
+    };
+
+    (group.contacts || []).forEach(pushContact);
+    for (const sg of subGroups) {
+      const n = (sg.contacts || []).length;
+      participantRows.push({
+        // « » » = 0xBB, WinAnsi-safe (jamais de fleches Unicode dans le PDF)
+        role: firstRowOfGroup ? roleLabel : '',
+        subGroupLabel: `» ${sg.name}${n > 0 ? ` (${n})` : ''}`,
+        cpr: false, att: 'absent', diff: false,
+        isGroupHeader: false, isSubGroupHeader: true,
+        groupName: firstRowOfGroup ? group.name : '',
+        groupIdx: gi,
+      });
+      firstRowOfGroup = false;
+      (sg.contacts || []).forEach(pushContact);
     }
   }
 
-  // Corps du tableau : col 0 (pastille) et col 1 (role) avec rowSpan par groupe
+  // Corps du tableau : col 0 (pastille) et col 1 (role) avec rowSpan par groupe.
+  // Bandeau sous-groupe = 1 cellule colSpan 6 sur les colonnes restantes.
   const partBody = [];
   for (let i = 0; i < participantRows.length; i++) {
     const r = participantRows[i];
+    if (r.isSpacer) {
+      partBody.push([{ content: '', colSpan: 8, styles: { fillColor: [255, 255, 255], lineWidth: 0, minCellHeight: 1.6, cellPadding: 0 } }]);
+      continue;
+    }
     if (r.isGroupHeader) {
       partBody.push([
         '', r.role, r.subLabel, r.contact, r.email, '', '', '',
       ]);
     } else {
+      const rest = r.isSubGroupHeader
+        ? [{
+            content: r.subGroupLabel,
+            colSpan: 6,
+            styles: { fontStyle: 'bold', fontSize: 6, cellPadding: { top: 1.5, bottom: 1.5, left: 7, right: 1.5 } },
+          }]
+        : [r.subLabel, r.contact, r.email, '', '', ''];
       const isFirstOfGroup = (i === 0 || participantRows[i - 1].groupIdx !== r.groupIdx || participantRows[i - 1].isGroupHeader);
       if (isFirstOfGroup) {
         let span = 1;
         for (let j = i + 1; j < participantRows.length && !participantRows[j].isGroupHeader && participantRows[j].groupIdx === r.groupIdx; j++) span++;
         const badgeCell = { content: '', rowSpan: span, styles: { valign: 'middle' } };
-        const roleCell = { content: r.role, rowSpan: span, styles: { valign: 'middle', fontStyle: 'bold', fontSize: 6.5 } };
-        partBody.push([
-          badgeCell, roleCell, r.subLabel, r.contact, r.email, '', '', '',
-        ]);
+        // overflow linebreak explicite : un role/intervenant long revient a la
+        // ligne dans sa colonne (30 mm) au lieu de deborder ou d'etre tronque.
+        const roleCell = { content: r.role, rowSpan: span, styles: { valign: 'middle', fontStyle: 'bold', fontSize: 6.5, overflow: 'linebreak' } };
+        partBody.push([badgeCell, roleCell, ...rest]);
       } else {
         // Lignes absorbees : pas de col 0 ni col 1 (couvertes par rowSpan)
-        partBody.push([
-          r.subLabel, r.contact, r.email, '', '', '',
-        ]);
+        partBody.push(rest);
       }
     }
   }
@@ -421,20 +464,40 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
       0: { cellWidth: 12, halign: 'center' },
       1: { cellWidth: 30, fontStyle: 'bold', fontSize: 6.5 },
       2: { cellWidth: 22, fontSize: 6.5, textColor: [100, 116, 139] },
-      3: { cellWidth: 28 },
+      3: { cellWidth: 40 },
       4: { cellWidth: 44, textColor: [30, 80, 160], fontSize: 6.5 },
-      5: { cellWidth: 14, halign: 'center' },
-      6: { cellWidth: 15, halign: 'center' },
-      7: { cellWidth: 15, halign: 'center' },
+      5: { cellWidth: 10, halign: 'center' },
+      6: { cellWidth: 11, halign: 'center' },
+      7: { cellWidth: 11, halign: 'center' },
     },
     didParseCell: (data) => {
       if (data.section === 'body') {
         const row = participantRows[data.row.index];
         if (!row) return;
+        if (row.isSpacer) {
+          data.cell.styles.fillColor = [255, 255, 255];
+          data.cell.styles.lineWidth = 0;
+          return;
+        }
         if (row.isGroupHeader) {
           data.cell.styles.fillColor = THEME.lightBg;
           data.cell.styles.fontStyle = 'bold';
           data.cell.styles.textColor = THEME.primary;
+          return;
+        }
+        // Bandeau sous-groupe : fond/texte aux couleurs du groupe parent
+        if (row.isSubGroupHeader && data.column.index >= 2) {
+          const c = GROUP_COLORS[row.groupIdx % GROUP_COLORS.length];
+          data.cell.styles.fillColor = c.rgbBg;
+          data.cell.styles.textColor = darkenRgb(c.rgb, 0.25);
+          return;
+        }
+        // Cols 0-1 (pastille + ROLE/INTERVENANT, rowSpan sur tout le groupe) :
+        // fond a la couleur de la pastille du groupe
+        if (data.column.index <= 1) {
+          const c = GROUP_COLORS[row.groupIdx % GROUP_COLORS.length];
+          data.cell.styles.fillColor = c.rgbBg;
+          if (data.column.index === 1) data.cell.styles.textColor = darkenRgb(c.rgb, 0.25);
           return;
         }
         // Alternance par groupe (pair = blanc, impair = gris clair)
@@ -444,7 +507,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
     didDrawCell: (data) => {
       if (data.section !== 'body') return;
       const row = participantRows[data.row.index];
-      if (!row) return;
+      if (!row || row.isSpacer) return;
 
       // Col 0 : pastille coloree du groupe
       if (data.column.index === 0 && row.groupName) {
@@ -459,7 +522,9 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
         const bx = data.cell.x + (data.cell.width - bw) / 2;
         const by = data.cell.y + (data.cell.height - bh) / 2;
 
-        doc.setFillColor(...c.rgbBg);
+        // Fond blanc : la case porte desormais la couleur du groupe (rgbBg),
+        // la pastille doit s'en detacher
+        doc.setFillColor(255, 255, 255);
         roundedRect(doc, bx, by, bw, bh, 1, 'F');
         doc.setFillColor(...c.rgb);
         doc.circle(bx + 1.5, by + bh / 2, 0.6, 'F');
@@ -468,6 +533,16 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
       }
 
       if (row.isGroupHeader) return;
+
+      // Bandeau sous-groupe : point colore avant le libelle (col 2 = cellule colSpan)
+      if (row.isSubGroupHeader) {
+        if (data.column.index === 2) {
+          const c = GROUP_COLORS[row.groupIdx % GROUP_COLORS.length];
+          doc.setFillColor(...c.rgb);
+          doc.circle(data.cell.x + 3.5, data.cell.y + data.cell.height / 2, 0.8, 'F');
+        }
+        return;
+      }
 
       // Col 5 : CPR badge
       if (data.column.index === 5) {
@@ -511,7 +586,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
   // 4. TEXTE LEGAL
   // ═══════════════════════════════════════════════════════════════════════════
 
-  if (crrConfig.legalText) {
+  if (showLegalText) {
     ensureSpace(doc, cursor, 16);
 
     doc.setFont(fontB, 'italic');
@@ -528,27 +603,6 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
     doc.text(legalLines, M.left + 5, cursor.y + 3.5);
     cursor.y += legalH + 4;
   }
-
-  // Encadre "Observations sur le compte rendu" avant saut de page
-  const obsNoticeText = 'OBSERVATIONS SUR LE COMPTE-RENDU : Il est rappelé aux entreprises que les observations portées sur les comptes rendus ne sont que la confirmation des ordres donnés soit au cours de visites de chantier, soit au cours des rendez-vous de chantier et qu\'il leur appartient de les appliquer immédiatement. La date de réception du présent compte rendu ne peut en aucun cas être une excuse aux retards apportés dans la réalisation des travaux. Le présent compte rendu est considéré comme définitivement approuvé s\'il n\'a fait l\'objet d\'observations écrites dans un délai qui expire 48 heures après la date de diffusion.';
-
-  doc.setFont(fontB, 'normal');
-  doc.setFontSize(6.5);
-  const noticeLines = doc.splitTextToSize(obsNoticeText, CW - 8);
-  const noticeH = noticeLines.length * 3 + 6;
-
-  ensureSpace(doc, cursor, noticeH);
-
-  // Fond + bordure
-  doc.setFillColor(255, 251, 235); // amber-50
-  doc.setDrawColor(253, 186, 116); // amber-300
-  doc.setLineWidth(0.2);
-  roundedRect(doc, M.left, cursor.y, CW, noticeH, 1.5, 'FD');
-
-  // Texte
-  doc.setTextColor(146, 64, 14); // amber-800
-  doc.text(noticeLines, M.left + 4, cursor.y + 4);
-  cursor.y += noticeH + 4;
 
   // Saut de page apres la liste des intervenants
   doc.addPage();

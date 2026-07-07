@@ -7,11 +7,14 @@ import React, { useState, useRef, useCallback } from 'react';
 import {
   X, Plus, Trash2, Check, Edit2, Edit3, ChevronDown, ChevronRight,
   Users, BookUser, Upload, Download, Info, UserPlus, GripVertical, Copy, AlertTriangle,
+  FolderPlus, CornerDownRight,
 } from 'lucide-react';
+import { countGroupContacts } from '../../utils/crrParticipantTree';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import * as XLSX from 'xlsx';
 import { toast } from '../../utils/globalUI';
 import { nameEmailMismatch } from '../../utils/crrTextQa';
+import { parseParticipantRows } from '../../utils/crrContactImport';
 import GroupBadge from './GroupBadge';
 import { confirm } from '../../utils/globalUI';
 
@@ -25,11 +28,15 @@ const GroupTree = ({
   addParticipantGroup,
   updateParticipantGroup,
   deleteParticipantGroup,
+  addSubGroup,
+  updateSubGroup,
+  deleteSubGroup,
 }) => {
   const [expandedGroups, setExpandedGroups] = useState(
     new Set((participantGroups || []).map((g) => g.id))
   );
   const [editingGroup, setEditingGroup] = useState(null);
+  const [editingSubGroup, setEditingSubGroup] = useState(null);
   const [editingContact, setEditingContact] = useState(null);
   const [editData, setEditData] = useState({});
 
@@ -45,6 +52,11 @@ const GroupTree = ({
     if (ok) deleteParticipantGroup(gid);
   };
 
+  const handleDeleteSubGroup = async (gid, sgid) => {
+    const ok = await confirm('Supprimer ce sous-groupe et ses contacts ?', { danger: true });
+    if (ok) deleteSubGroup(gid, sgid);
+  };
+
   const handleDeleteContact = async (gid, cid) => {
     const ok = await confirm('Supprimer ce contact ?', { danger: true });
     if (ok) deleteContact(gid, cid);
@@ -52,7 +64,7 @@ const GroupTree = ({
 
   const startEditContact = (contact) => {
     setEditingContact(contact.id);
-    setEditData({ name: contact.name, email: contact.email, phone: contact.phone || '' });
+    setEditData({ name: contact.name, fonction: contact.fonction || '', email: contact.email, phone: contact.phone || '' });
   };
 
   const saveEditContact = (groupId, contactId) => {
@@ -60,7 +72,6 @@ const GroupTree = ({
     setEditingContact(null);
   };
 
-  // Extracted handlers for .map() rows
   const handleGroupNameChange = useCallback((groupId, e) => {
     updateParticipantGroup(groupId, { name: e.target.value });
   }, [updateParticipantGroup]);
@@ -68,6 +79,10 @@ const GroupTree = ({
   const handleGroupSubLabelChange = useCallback((groupId, e) => {
     updateParticipantGroup(groupId, { subLabel: e.target.value });
   }, [updateParticipantGroup]);
+
+  const handleSubGroupNameChange = useCallback((groupId, subGroupId, e) => {
+    updateSubGroup(groupId, subGroupId, { name: e.target.value });
+  }, [updateSubGroup]);
 
   const handleEditDataChange = useCallback((field, e) => {
     setEditData((prev) => ({ ...prev, [field]: e.target.value }));
@@ -78,7 +93,111 @@ const GroupTree = ({
     setEditData((prev) => ({ ...prev, phone: raw.replace(/(\d{2})(?=\d)/g, '$1 ').trim() }));
   }, []);
 
-  const totalContacts = (participantGroups || []).reduce((n, g) => n + (g.contacts?.length || 0), 0);
+  const totalContacts = (participantGroups || []).reduce((n, g) => n + countGroupContacts(g), 0);
+
+  // Ligne contact (draggable). deep = indentation renforcee (sous-groupe).
+  const renderContact = (contact, contactIdx, groupId, deep = false) => {
+    const isEditingC = editingContact === contact.id;
+    return (
+      <Draggable draggableId={`chantier-${contact.id}`} index={contactIdx} key={contact.id}>
+        {(dragProvided, dragSnapshot) => (
+          <div
+            ref={dragProvided.innerRef}
+            {...dragProvided.draggableProps}
+            className={`flex items-center gap-1.5 ${deep ? 'pl-10' : 'pl-7'} pr-3 py-1.5 hover:bg-slate-50 transition-colors group/row text-[11px] ${
+              dragSnapshot.isDragging ? 'bg-emerald-50 shadow-md rounded-lg' : ''
+            }`}
+          >
+            <div {...dragProvided.dragHandleProps} className="text-slate-200 hover:text-slate-400 cursor-grab shrink-0">
+              <GripVertical size={12} />
+            </div>
+            {isEditingC ? (
+              <div className="flex items-center gap-1 flex-1 min-w-0 flex-wrap">
+                <input type="text" value={editData.name || ''} onChange={(e) => handleEditDataChange('name', e)}
+                  placeholder="NOM Prenom" autoFocus onKeyDown={(e) => e.key === 'Enter' && saveEditContact(groupId, contact.id)}
+                  className="text-[11px] px-1.5 py-0.5 border border-emerald-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 w-24 text-slate-800" />
+                <input type="text" value={editData.fonction || ''} onChange={(e) => handleEditDataChange('fonction', e)}
+                  placeholder="Fonction" onKeyDown={(e) => e.key === 'Enter' && saveEditContact(groupId, contact.id)}
+                  className="text-[11px] px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 w-24 text-slate-800" />
+                <input type="text" value={editData.email || ''} onChange={(e) => handleEditDataChange('email', e)}
+                  placeholder="email" onKeyDown={(e) => e.key === 'Enter' && saveEditContact(groupId, contact.id)}
+                  className="text-[11px] px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 w-32 text-slate-800" />
+                <input type="tel" value={editData.phone || ''} onChange={handlePhoneChange}
+                  placeholder="06 00 00 00 00" onKeyDown={(e) => e.key === 'Enter' && saveEditContact(groupId, contact.id)}
+                  className="text-[11px] px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 w-28 text-slate-800" />
+                <button onClick={() => saveEditContact(groupId, contact.id)} className="p-0.5 text-emerald-600 hover:bg-emerald-100 rounded"><Check size={11} /></button>
+                <button onClick={() => setEditingContact(null)} className="p-0.5 text-slate-400 hover:bg-slate-100 rounded"><X size={11} /></button>
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-col min-w-[80px] max-w-[110px] leading-tight">
+                  <span className="font-medium text-slate-700 truncate">{contact.name || '—'}</span>
+                  {contact.fonction && <span className="text-[9px] text-slate-400 truncate">{contact.fonction}</span>}
+                </div>
+                <span className={`truncate flex-1 ${nameEmailMismatch(contact.name, contact.email) ? 'text-red-500 font-medium' : 'text-slate-400'}`}>{contact.email || ''}</span>
+                {nameEmailMismatch(contact.name, contact.email) && (
+                  <span className="shrink-0 text-red-500" title="L'e-mail semble incoherent avec le nom — a verifier">
+                    <AlertTriangle size={11} />
+                  </span>
+                )}
+                {contact.phone && <span className="text-[10px] text-slate-300 shrink-0">{contact.phone}</span>}
+                <div className="flex items-center gap-0.5 opacity-0 group-hover/row:opacity-100 transition-all shrink-0">
+                  <button onClick={() => startEditContact(contact)} className="p-0.5 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded"><Edit2 size={10} /></button>
+                  <button onClick={() => handleDeleteContact(groupId, contact.id)} className="p-0.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded"><Trash2 size={10} /></button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </Draggable>
+    );
+  };
+
+  // Sous-groupe : bandeau indente + zone de drop propre + contacts + ajouter.
+  // La pastille reprend la couleur du groupe PARENT (groupIdx) → filiation lisible.
+  const renderSubGroup = (group, groupIdx, sg) => {
+    const isEditingSG = editingSubGroup === sg.id;
+    return (
+      <div key={sg.id} className="border-t border-slate-100">
+        <div className="flex items-center gap-1.5 pl-7 pr-3 py-1.5 bg-slate-50/60">
+          <CornerDownRight size={11} className="text-slate-300 shrink-0" />
+          {isEditingSG ? (
+            <div className="flex items-center gap-1 flex-1">
+              <input type="text" value={sg.name}
+                onChange={(e) => handleSubGroupNameChange(group.id, sg.id, e)}
+                className="text-[11px] font-semibold px-1.5 py-0.5 border border-emerald-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 w-36 text-slate-800"
+                autoFocus onKeyDown={(e) => e.key === 'Enter' && setEditingSubGroup(null)} />
+              <button onClick={() => setEditingSubGroup(null)} className="p-0.5 text-emerald-600 hover:bg-emerald-100 rounded"><Check size={11} /></button>
+            </div>
+          ) : (
+            <>
+              <GroupBadge name={sg.name} colorIndex={groupIdx} />
+              <span className="text-[11px] font-semibold text-slate-600 truncate">{sg.name}</span>
+              <span className="text-[9px] text-slate-400">({(sg.contacts || []).length})</span>
+              <div className="flex items-center gap-0.5 ml-auto shrink-0">
+                <button onClick={() => setEditingSubGroup(sg.id)} className="p-0.5 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded" title="Renommer"><Edit2 size={10} /></button>
+                <button onClick={() => handleDeleteSubGroup(group.id, sg.id)} className="p-0.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded" title="Supprimer"><Trash2 size={10} /></button>
+              </div>
+            </>
+          )}
+        </div>
+        <Droppable droppableId={`sub-${group.id}::${sg.id}`}>
+          {(prov, snap) => (
+            <div ref={prov.innerRef} {...prov.droppableProps} className={`transition-colors ${snap.isDraggingOver ? 'bg-emerald-50/70' : ''}`}>
+              {(sg.contacts || []).map((contact, i) => renderContact(contact, i, group.id, true))}
+              {prov.placeholder}
+              <div className="pl-10 pr-3 py-1">
+                <button onClick={() => addContact(group.id, sg.id)}
+                  className="flex items-center gap-1 text-[10px] text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 px-1.5 py-0.5 rounded transition-all">
+                  <UserPlus size={10} /> Ajouter
+                </button>
+              </div>
+            </div>
+          )}
+        </Droppable>
+      </div>
+    );
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -102,131 +221,65 @@ const GroupTree = ({
         {(participantGroups || []).map((group, groupIdx) => {
           const isExpanded = expandedGroups.has(group.id);
           const isEditingG = editingGroup === group.id;
+          const subGroups = group.subGroups || [];
           return (
-            <Droppable droppableId={`group-${group.id}`} key={group.id}>
-              {(provided, snapshot) => (
-                <div
-                  ref={provided.innerRef}
-                  {...provided.droppableProps}
-                  className={`border-b border-slate-100 last:border-b-0 transition-colors ${
-                    snapshot.isDraggingOver ? 'bg-emerald-50/70' : ''
-                  }`}
-                >
-                  {/* Header groupe */}
-                  <div
-                    className="flex items-center gap-1.5 px-3 py-2 bg-slate-50/80 cursor-pointer hover:bg-slate-100 transition-colors"
-                    onClick={() => toggleGroup(group.id)}
-                  >
-                    {isExpanded ? <ChevronDown size={12} className="text-slate-400 shrink-0" /> : <ChevronRight size={12} className="text-slate-400 shrink-0" />}
+            <div key={group.id} className="border-b border-slate-100 last:border-b-0">
+              <div
+                className="flex items-center gap-1.5 px-3 py-2 bg-slate-50/80 cursor-pointer hover:bg-slate-100 transition-colors"
+                onClick={() => toggleGroup(group.id)}
+              >
+                {isExpanded ? <ChevronDown size={12} className="text-slate-400 shrink-0" /> : <ChevronRight size={12} className="text-slate-400 shrink-0" />}
+                {isEditingG ? (
+                  <div className="flex items-center gap-1 flex-1" onClick={(e) => e.stopPropagation()}>
+                    <input type="text" value={group.name} onChange={(e) => handleGroupNameChange(group.id, e)}
+                      className="text-[11px] font-bold px-1.5 py-0.5 border border-emerald-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 w-28 text-slate-800"
+                      autoFocus onKeyDown={(e) => e.key === 'Enter' && setEditingGroup(null)} />
+                    <input type="text" value={group.subLabel || ''} onChange={(e) => handleGroupSubLabelChange(group.id, e)}
+                      placeholder="Sous-label..."
+                      className="text-[11px] px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 w-36 text-slate-800"
+                      onKeyDown={(e) => e.key === 'Enter' && setEditingGroup(null)} />
+                    <button onClick={() => setEditingGroup(null)} className="p-0.5 text-emerald-600 hover:bg-emerald-100 rounded"><Check size={11} /></button>
+                  </div>
+                ) : (
+                  <>
+                    <GroupBadge name={group.name} colorIndex={groupIdx} />
+                    <span className="text-[11px] font-bold text-slate-700 uppercase truncate">{group.name}</span>
+                    {group.subLabel && <span className="text-[10px] text-slate-400 truncate">{group.subLabel}</span>}
+                    <span className="text-[9px] text-slate-400">({countGroupContacts(group)})</span>
+                    <div className="flex items-center gap-0.5 ml-auto shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <button onClick={() => addSubGroup(group.id)} className="p-0.5 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded" title="Ajouter un sous-groupe"><FolderPlus size={11} /></button>
+                      <button onClick={() => setEditingGroup(group.id)} className="p-0.5 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded" title="Modifier"><Edit2 size={10} /></button>
+                      <button onClick={() => handleDeleteGroup(group.id)} className="p-0.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded" title="Supprimer"><Trash2 size={10} /></button>
+                    </div>
+                  </>
+                )}
+              </div>
 
-                    {isEditingG ? (
-                      <div className="flex items-center gap-1 flex-1" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="text" value={group.name}
-                          onChange={(e) => handleGroupNameChange(group.id, e)}
-                          className="text-[11px] font-bold px-1.5 py-0.5 border border-emerald-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 w-28 text-slate-800"
-                          autoFocus onKeyDown={(e) => e.key === 'Enter' && setEditingGroup(null)}
-                        />
-                        <input
-                          type="text" value={group.subLabel || ''}
-                          onChange={(e) => handleGroupSubLabelChange(group.id, e)}
-                          placeholder="Sous-label..."
-                          className="text-[11px] px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 w-36 text-slate-800"
-                          onKeyDown={(e) => e.key === 'Enter' && setEditingGroup(null)}
-                        />
-                        <button onClick={() => setEditingGroup(null)} className="p-0.5 text-emerald-600 hover:bg-emerald-100 rounded">
-                          <Check size={11} />
-                        </button>
-                      </div>
-                    ) : (
-                      <>
-                        <GroupBadge name={group.name} colorIndex={groupIdx} />
-                        <span className="text-[11px] font-bold text-slate-700 uppercase truncate">{group.name}</span>
-                        {group.subLabel && <span className="text-[10px] text-slate-400 truncate">{group.subLabel}</span>}
-                        <span className="text-[9px] text-slate-400">({group.contacts.length})</span>
-                        <div className="flex items-center gap-0.5 ml-auto shrink-0" onClick={(e) => e.stopPropagation()}>
-                          <button onClick={() => setEditingGroup(group.id)} className="p-0.5 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded" title="Modifier">
-                            <Edit2 size={10} />
+              {isExpanded && (
+                <>
+                  <Droppable droppableId={`group-${group.id}`}>
+                    {(prov, snap) => (
+                      <div ref={prov.innerRef} {...prov.droppableProps} className={`transition-colors ${snap.isDraggingOver ? 'bg-emerald-50/70' : ''}`}>
+                        {(group.contacts || []).map((contact, i) => renderContact(contact, i, group.id, false))}
+                        {prov.placeholder}
+                        <div className="pl-7 pr-3 py-1 flex items-center gap-2">
+                          <button onClick={() => addContact(group.id)}
+                            className="flex items-center gap-1 text-[10px] text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 px-1.5 py-0.5 rounded transition-all">
+                            <UserPlus size={10} /> Ajouter
                           </button>
-                          <button onClick={() => handleDeleteGroup(group.id)} className="p-0.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded" title="Supprimer">
-                            <Trash2 size={10} />
+                          <button onClick={() => addSubGroup(group.id)}
+                            className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 px-1.5 py-0.5 rounded transition-all">
+                            <FolderPlus size={10} /> Sous-groupe
                           </button>
                         </div>
-                      </>
+                      </div>
                     )}
-                  </div>
+                  </Droppable>
 
-                  {/* Contacts */}
-                  {isExpanded && group.contacts.map((contact, contactIdx) => {
-                    const isEditingC = editingContact === contact.id;
-
-                    return (
-                      <Draggable draggableId={`chantier-${contact.id}`} index={contactIdx} key={contact.id}>
-                        {(dragProvided, dragSnapshot) => (
-                          <div
-                            ref={dragProvided.innerRef}
-                            {...dragProvided.draggableProps}
-                            className={`flex items-center gap-1.5 pl-7 pr-3 py-1.5 hover:bg-slate-50 transition-colors group/row text-[11px] ${
-                              dragSnapshot.isDragging ? 'bg-emerald-50 shadow-md rounded-lg' : ''
-                            }`}
-                          >
-                            <div {...dragProvided.dragHandleProps} className="text-slate-200 hover:text-slate-400 cursor-grab shrink-0">
-                              <GripVertical size={12} />
-                            </div>
-
-                            {isEditingC ? (
-                              <div className="flex items-center gap-1 flex-1 min-w-0">
-                                <input type="text" value={editData.name || ''} onChange={(e) => handleEditDataChange('name', e)}
-                                  placeholder="NOM Prenom" autoFocus onKeyDown={(e) => e.key === 'Enter' && saveEditContact(group.id, contact.id)}
-                                  className="text-[11px] px-1.5 py-0.5 border border-emerald-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 w-28 text-slate-800" />
-                                <input type="text" value={editData.email || ''} onChange={(e) => handleEditDataChange('email', e)}
-                                  placeholder="email" onKeyDown={(e) => e.key === 'Enter' && saveEditContact(group.id, contact.id)}
-                                  className="text-[11px] px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 w-32 text-slate-800" />
-                                <input type="tel" value={editData.phone || ''} onChange={handlePhoneChange}
-                                  placeholder="06 00 00 00 00" onKeyDown={(e) => e.key === 'Enter' && saveEditContact(group.id, contact.id)}
-                                  className="text-[11px] px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 w-28 text-slate-800" />
-                                <button onClick={() => saveEditContact(group.id, contact.id)} className="p-0.5 text-emerald-600 hover:bg-emerald-100 rounded"><Check size={11} /></button>
-                                <button onClick={() => setEditingContact(null)} className="p-0.5 text-slate-400 hover:bg-slate-100 rounded"><X size={11} /></button>
-                              </div>
-                            ) : (
-                              <>
-                                <span className="font-medium text-slate-700 truncate min-w-[80px]">{contact.name || '—'}</span>
-                                <span className={`truncate flex-1 ${nameEmailMismatch(contact.name, contact.email) ? 'text-red-500 font-medium' : 'text-slate-400'}`}>{contact.email || ''}</span>
-                                {nameEmailMismatch(contact.name, contact.email) && (
-                                  <span className="shrink-0 text-red-500" title="L'e-mail semble incohérent avec le nom — à vérifier">
-                                    <AlertTriangle size={11} />
-                                  </span>
-                                )}
-                                {contact.phone && <span className="text-[10px] text-slate-300 shrink-0">{contact.phone}</span>}
-                                <div className="flex items-center gap-0.5 opacity-0 group-hover/row:opacity-100 transition-all shrink-0">
-                                  <button onClick={() => startEditContact(contact)} className="p-0.5 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded"><Edit2 size={10} /></button>
-                                  <button onClick={() => handleDeleteContact(group.id, contact.id)} className="p-0.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded"><Trash2 size={10} /></button>
-                                </div>
-
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </Draggable>
-                    );
-                  })}
-
-                  {provided.placeholder}
-
-                  {/* Ajouter contact */}
-                  {isExpanded && (
-                    <div className="pl-7 pr-3 py-1">
-                      <button
-                        onClick={() => addContact(group.id)}
-                        className="flex items-center gap-1 text-[10px] text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 px-1.5 py-0.5 rounded transition-all"
-                      >
-                        <UserPlus size={10} /> Ajouter
-                      </button>
-                    </div>
-                  )}
-                </div>
+                  {subGroups.map((sg) => renderSubGroup(group, groupIdx, sg))}
+                </>
               )}
-            </Droppable>
+            </div>
           );
         })}
 
@@ -253,6 +306,7 @@ const LibraryPanel = ({ contacts, onSave }) => {
   const [sortCol, setSortCol] = useState(null);
   const [sortDir, setSortDir] = useState('asc');
   const [showHelp, setShowHelp] = useState(false);
+  const [selected, setSelected] = useState(() => new Set());
   const fileRef = useRef(null);
 
   const toggleSort = (col) => {
@@ -262,7 +316,7 @@ const LibraryPanel = ({ contacts, onSave }) => {
 
   const filtered = (() => {
     let list = filter
-      ? contacts.filter((c) => [c.subLabel, c.name, c.email, c.phone].join(' ').toLowerCase().includes(filter.toLowerCase()))
+      ? contacts.filter((c) => [c.subLabel, c.name, c.fonction, c.email, c.phone].join(' ').toLowerCase().includes(filter.toLowerCase()))
       : [...contacts];
     if (sortCol) {
       list.sort((a, b) => {
@@ -277,7 +331,7 @@ const LibraryPanel = ({ contacts, onSave }) => {
   const handleAdd = () => {
     const newContact = {
       id: `lib_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-      subLabel: '', name: '', email: '', phone: '',
+      subLabel: '', name: '', fonction: '', email: '', phone: '',
     };
     onSave([...contacts, newContact]);
     setEditingId(newContact.id);
@@ -291,17 +345,43 @@ const LibraryPanel = ({ contacts, onSave }) => {
 
   const handleDelete = async (id) => {
     const ok = await confirm('Supprimer ce contact ?', { danger: true });
-    if (ok) onSave(contacts.filter((c) => c.id !== id));
+    if (ok) {
+      onSave(contacts.filter((c) => c.id !== id));
+      setSelected((prev) => { const n = new Set(prev); n.delete(id); return n; });
+    }
   };
 
-  const findCol = (row, ...candidates) => {
-    const keys = Object.keys(row);
-    for (const cand of candidates) {
-      const norm = cand.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-      const found = keys.find((k) => k.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase() === norm);
-      if (found && row[found] !== undefined && row[found] !== null) return String(row[found]);
+  // ── Multi-selection / suppression groupée ──
+  const toggleSelect = (id) => setSelected((prev) => {
+    const n = new Set(prev);
+    n.has(id) ? n.delete(id) : n.add(id);
+    return n;
+  });
+
+  const allFilteredSelected = filtered.length > 0 && filtered.every((c) => selected.has(c.id));
+
+  const toggleSelectAll = () => setSelected((prev) => {
+    const n = new Set(prev);
+    if (filtered.length > 0 && filtered.every((c) => n.has(c.id))) {
+      filtered.forEach((c) => n.delete(c.id));
+    } else {
+      filtered.forEach((c) => n.add(c.id));
     }
-    return '';
+    return n;
+  });
+
+  const handleDeleteSelected = async () => {
+    const ids = new Set([...selected].filter((id) => contacts.some((c) => c.id === id)));
+    const n = ids.size;
+    if (n === 0) return;
+    const ok = await confirm(
+      `Supprimer ${n} contact${n > 1 ? 's' : ''} de la bibliotheque ?`,
+      { danger: true }
+    );
+    if (!ok) return;
+    onSave(contacts.filter((c) => !ids.has(c.id)));
+    setSelected(new Set());
+    toast.success(`${n} contact${n > 1 ? 's' : ''} supprime${n > 1 ? 's' : ''}.`);
   };
 
   const handleExcelImport = (e) => {
@@ -319,29 +399,13 @@ const LibraryPanel = ({ contacts, onSave }) => {
         const wb = XLSX.read(ev.target.result, { type: 'array' });
         if (!wb.SheetNames.length) { toast.error('Aucune feuille.'); return; }
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const data = XLSX.utils.sheet_to_json(ws);
-        if (data.length === 0) { toast.warning('Fichier vide.'); return; }
+        // Lignes brutes (aucune ligne consommee comme en-tete) → gere aussi les
+        // fichiers positionnels sans en-tete sans perdre la 1re ligne.
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, blankrows: false, defval: '' });
+        if (!rows.length) { toast.warning('Fichier vide.'); return; }
 
-        const firstRowKeys = Object.keys(data[0]);
-        const usePositional = firstRowKeys.every(
-          (k) => k.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().search(/sous|label|nom|prenom|mail|email|tel|phone/) === -1
-        );
-
-        const imported = data.map((row, i) => {
-          if (usePositional) {
-            const vals = firstRowKeys.map((k) => String(row[k] || ''));
-            return { id: `lib_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 4)}`, subLabel: vals[0] || '', name: vals[1] || '', email: vals[2] || '', phone: vals[3] || '' };
-          }
-          return {
-            id: `lib_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 4)}`,
-            subLabel: findCol(row, 'Sous-label', 'Sous label', 'SubLabel', 'Label'),
-            name: findCol(row, 'NOM Prenom', 'NOM Prénom', 'Nom Prenom', 'Nom Prénom', 'Nom', 'Name', 'Contact'),
-            phone: findCol(row, 'Telephone', 'Téléphone', 'Tel', 'Phone'),
-            email: findCol(row, 'Email', 'Mail', 'E-mail'),
-          };
-        }).filter((c) => c.name || c.email);
-
-        const skipped = data.length - imported.length;
+        const { contacts: imported, skipped } = parseParticipantRows(rows);
+        if (imported.length === 0 && skipped === 0) { toast.warning('Fichier vide.'); return; }
 
         // Dedup
         const norm = (s) => (s || '').trim().toLowerCase();
@@ -376,10 +440,10 @@ const LibraryPanel = ({ contacts, onSave }) => {
   const handleExcelExport = () => {
     const data = contacts.map((c) => ({
       'Sous-label': c.subLabel || '', 'NOM Prenom': c.name || '',
-      'Telephone': c.phone || '', 'Email': c.email || '',
+      'Telephone': c.phone || '', 'Email': c.email || '', 'Fonction': c.fonction || '',
     }));
     const ws = XLSX.utils.json_to_sheet(data);
-    ws['!cols'] = [{ wch: 25 }, { wch: 25 }, { wch: 16 }, { wch: 30 }];
+    ws['!cols'] = [{ wch: 25 }, { wch: 25 }, { wch: 16 }, { wch: 30 }, { wch: 22 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Participants');
     XLSX.writeFile(wb, 'bibliotheque_participants.xlsx');
@@ -452,10 +516,31 @@ const LibraryPanel = ({ contacts, onSave }) => {
         </div>
       </div>
 
+      {/* Barre de selection multiple */}
+      {selected.size > 0 && (
+        <div className="flex items-center gap-2 px-3 py-1.5 border-b border-red-200 bg-red-50 shrink-0">
+          <span className="text-[11px] font-bold text-red-700">
+            {selected.size} contact{selected.size > 1 ? 's' : ''} sélectionné{selected.size > 1 ? 's' : ''}
+          </span>
+          <button
+            onClick={handleDeleteSelected}
+            className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium bg-red-500 text-white rounded-md hover:bg-red-600 transition-all ml-auto"
+          >
+            <Trash2 size={11} /> Supprimer la sélection
+          </button>
+          <button
+            onClick={() => setSelected(new Set())}
+            className="px-2 py-1 text-[11px] text-slate-500 hover:bg-slate-100 rounded-md transition-all"
+          >
+            Annuler
+          </button>
+        </div>
+      )}
+
       {/* Aide */}
       {showHelp && (
         <div className="px-3 py-2 border-b border-slate-200 bg-amber-50 text-[10px] text-slate-600 shrink-0">
-          <p className="font-bold text-slate-700 mb-1">Format Excel : Sous-label | NOM Prenom | Telephone | Email</p>
+          <p className="font-bold text-slate-700 mb-1">Format Excel : Sous-label | NOM Prenom | Telephone | Email | Fonction</p>
           <p>Glissez un contact de la bibliotheque vers un groupe a gauche pour l'ajouter au chantier.</p>
         </div>
       )}
@@ -465,12 +550,19 @@ const LibraryPanel = ({ contacts, onSave }) => {
         {(provided) => (
           <div ref={provided.innerRef} {...provided.droppableProps} className="flex-1 overflow-y-auto">
             {/* En-tete colonnes */}
-            <div className="grid grid-cols-[1fr_1.5fr_1.5fr_40px] gap-1 px-3 py-1.5 bg-slate-100 border-b border-slate-200 text-[9px] font-bold text-slate-400 uppercase tracking-wider sticky top-0 z-10">
+            <div className="grid grid-cols-[24px_1fr_1.5fr_1.5fr_40px] gap-1 px-3 py-1.5 bg-slate-100 border-b border-slate-200 text-[9px] font-bold text-slate-400 uppercase tracking-wider sticky top-0 z-10 items-center">
+              <input
+                type="checkbox"
+                checked={allFilteredSelected}
+                onChange={toggleSelectAll}
+                title="Tout sélectionner"
+                className="w-3.5 h-3.5 rounded border-slate-300 text-red-500 focus:ring-red-400 cursor-pointer"
+              />
               <span className="cursor-pointer hover:text-violet-600" onClick={() => toggleSort('subLabel')}>
                 Label {sortCol === 'subLabel' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
               </span>
               <span className="cursor-pointer hover:text-violet-600" onClick={() => toggleSort('name')}>
-                Nom {sortCol === 'name' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
+                Nom / Fonction {sortCol === 'name' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
               </span>
               <span>Email / Tel</span>
               <span />
@@ -493,17 +585,25 @@ const LibraryPanel = ({ contacts, onSave }) => {
                       ref={dragProvided.innerRef}
                       {...dragProvided.draggableProps}
                       {...dragProvided.dragHandleProps}
-                      className={`grid grid-cols-[1fr_1.5fr_1.5fr_40px] gap-1 px-3 py-1.5 border-b border-slate-50 hover:bg-violet-50/40 transition-colors group/lib text-[11px] cursor-grab ${
+                      className={`grid grid-cols-[24px_1fr_1.5fr_1.5fr_40px] gap-1 px-3 py-1.5 border-b border-slate-50 hover:bg-violet-50/40 transition-colors group/lib text-[11px] cursor-grab ${
+                        selected.has(c.id) ? 'bg-red-50/60' : ''
+                      } ${
                         dragSnapshot.isDragging ? 'bg-violet-100 shadow-lg rounded-lg' : ''
                       }`}
                     >
                       {isEditing ? (
                         <>
+                          <span />
                           <input type="text" value={editData.subLabel || ''} onChange={(e) => handleLibEditDataChange('subLabel', e)}
                             placeholder="Label" className="text-[11px] px-1.5 py-0.5 border border-violet-300 rounded focus:outline-none text-slate-800 w-full" autoFocus />
-                          <input type="text" value={editData.name || ''} onChange={(e) => handleLibEditDataChange('name', e)}
-                            placeholder="NOM Prenom" className="text-[11px] px-1.5 py-0.5 border border-violet-300 rounded focus:outline-none text-slate-800 w-full"
-                            onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit()} />
+                          <div className="flex flex-col gap-0.5">
+                            <input type="text" value={editData.name || ''} onChange={(e) => handleLibEditDataChange('name', e)}
+                              placeholder="NOM Prenom" className="text-[11px] px-1.5 py-0.5 border border-violet-300 rounded focus:outline-none text-slate-800 w-full"
+                              onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit()} />
+                            <input type="text" value={editData.fonction || ''} onChange={(e) => handleLibEditDataChange('fonction', e)}
+                              placeholder="Fonction" className="text-[10px] px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none text-slate-800 w-full"
+                              onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit()} />
+                          </div>
                           <div className="flex flex-col gap-0.5">
                             <input type="text" value={editData.email || ''} onChange={(e) => handleLibEditDataChange('email', e)}
                               placeholder="email" className="text-[11px] px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none text-slate-800 w-full"
@@ -519,8 +619,18 @@ const LibraryPanel = ({ contacts, onSave }) => {
                         </>
                       ) : (
                         <>
+                          <input
+                            type="checkbox"
+                            checked={selected.has(c.id)}
+                            onChange={() => toggleSelect(c.id)}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            className="w-3.5 h-3.5 mt-0.5 rounded border-slate-300 text-red-500 focus:ring-red-400 cursor-pointer"
+                          />
                           <span className="text-slate-500 truncate">{c.subLabel || '—'}</span>
-                          <span className="font-medium text-slate-700 truncate">{c.name || '—'}</span>
+                          <div className="flex flex-col min-w-0 leading-tight">
+                            <span className="font-medium text-slate-700 truncate">{c.name || '—'}</span>
+                            {c.fonction && <span className="text-[10px] text-slate-400 truncate">{c.fonction}</span>}
+                          </div>
                           <div className="flex flex-col min-w-0">
                             <span className="text-blue-600 truncate text-[11px]">{c.email || ''}</span>
                             {c.phone && <span className="text-[10px] text-slate-400">{c.phone}</span>}
@@ -557,6 +667,9 @@ const UnifiedParticipantsModal = ({
   addParticipantGroup,
   updateParticipantGroup,
   deleteParticipantGroup,
+  addSubGroup,
+  updateSubGroup,
+  deleteSubGroup,
   importContactsFromLibrary,
   moveContactBetweenGroups,
   // Library
@@ -565,37 +678,50 @@ const UnifiedParticipantsModal = ({
 }) => {
   if (!isOpen) return null;
 
+  // Decode un droppableId : "library" → null, "group-{gid}" → {groupId, null},
+  // "sub-{gid}::{sgid}" → {groupId, subGroupId}.
+  const parseDrop = (id) => {
+    if (id.startsWith('sub-')) {
+      const [gid, sgid] = id.slice(4).split('::');
+      return { groupId: gid, subGroupId: sgid };
+    }
+    if (id.startsWith('group-')) return { groupId: id.slice(6), subGroupId: null };
+    return null;
+  };
+
   const onDragEnd = (result) => {
     const { source, destination, draggableId } = result;
     if (!destination) return;
 
     const srcId = source.droppableId;
     const dstId = destination.droppableId;
+    if (dstId === 'library') return;
 
-    // Biblio → groupe chantier
-    if (srcId === 'library' && dstId.startsWith('group-')) {
-      // Retrouver le contact par son ID (draggableId = "lib-{contactId}")
+    const dest = parseDrop(dstId);
+    if (!dest) return;
+
+    // Biblio → groupe ou sous-groupe (draggableId = "lib-{contactId}")
+    if (srcId === 'library') {
       const contactId = draggableId.replace('lib-', '');
       const contact = libraryContacts.find((c) => c.id === contactId);
       if (!contact) return;
-      const targetGroupId = dstId.replace('group-', '');
-      importContactsFromLibrary([{ contact, targetGroupId }]);
-      toast.success(`${contact.name || contact.email} ajoute au groupe.`);
+      const added = importContactsFromLibrary([{
+        contact,
+        targetGroupId: dest.groupId,
+        targetSubGroupId: dest.subGroupId,
+        targetIndex: destination.index,
+      }]);
+      if (added > 0) toast.success(`${contact.name || contact.email} ajoute.`);
+      else toast.info(`${contact.name || contact.email} est deja dans les participants.`);
       return;
     }
 
-    // Drop dans library = ignore
-    if (dstId === 'library') return;
-
-    // Contact chantier → autre groupe (draggableId = "chantier-{contactId}")
-    if (srcId.startsWith('group-') && dstId.startsWith('group-')) {
-      const fromGroupId = srcId.replace('group-', '');
-      const toGroupId = dstId.replace('group-', '');
-
-      if (fromGroupId === toGroupId && source.index === destination.index) return;
-
+    // Contact chantier → groupe/sous-groupe (draggableId = "chantier-{contactId}")
+    if (srcId.startsWith('group-') || srcId.startsWith('sub-')) {
+      const src = parseDrop(srcId);
+      if (src && src.groupId === dest.groupId && src.subGroupId === dest.subGroupId && source.index === destination.index) return;
       const contactId = draggableId.replace('chantier-', '');
-      moveContactBetweenGroups(fromGroupId, toGroupId, contactId, destination.index);
+      moveContactBetweenGroups(contactId, dest.groupId, dest.subGroupId, destination.index);
     }
   };
 
@@ -633,6 +759,9 @@ const UnifiedParticipantsModal = ({
                 addParticipantGroup={addParticipantGroup}
                 updateParticipantGroup={updateParticipantGroup}
                 deleteParticipantGroup={deleteParticipantGroup}
+                addSubGroup={addSubGroup}
+                updateSubGroup={updateSubGroup}
+                deleteSubGroup={deleteSubGroup}
               />
             </div>
 

@@ -1,9 +1,12 @@
 // src/components/crr/CrrParticipants.jsx
 import React, { useState, useRef, useCallback } from 'react';
-import { Plus, Trash2, UserPlus, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Users, Check, X, Minus, Edit2, GripVertical } from 'lucide-react';
+import { Plus, Trash2, UserPlus, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Users, Check, X, Minus, Edit2, GripVertical, FolderPlus, CornerDownRight } from 'lucide-react';
 import { PRESENCE_OPTIONS } from '../../data/crrData';
 import { confirm } from '../../utils/globalUI';
+import { countGroupContacts } from '../../utils/crrParticipantTree';
 import GroupBadge from './GroupBadge';
+
+const GRID = 'grid grid-cols-[1.5fr_1.2fr_1.5fr_2fr_50px_50px_50px] gap-1';
 
 const PresenceButton = ({ value, onChange }) => {
   const cycle = () => {
@@ -58,6 +61,9 @@ const CrrParticipants = ({
   updateParticipantGroup,
   deleteParticipantGroup,
   reorderParticipantGroups,
+  addSubGroup,
+  updateSubGroup,
+  deleteSubGroup,
   showManagement = false,
 }) => {
   const [collapsed, setCollapsed] = useState(false);
@@ -65,6 +71,7 @@ const CrrParticipants = ({
   // mais pas la liste des contacts). Meilleur scan visuel a l'ouverture d'un CRC.
   const [expandedGroups, setExpandedGroups] = useState(new Set());
   const [editingGroup, setEditingGroup] = useState(null);
+  const [editingSubGroup, setEditingSubGroup] = useState(null);
   const [editingContact] = useState(null);
 
   // Drag & drop state pour reordonner les groupes
@@ -74,7 +81,6 @@ const CrrParticipants = ({
   const handleDragStart = (e, idx) => {
     dragIdx.current = idx;
     e.dataTransfer.effectAllowed = 'move';
-    // Rendre l'element semi-transparent
     e.currentTarget.style.opacity = '0.4';
   };
 
@@ -112,6 +118,11 @@ const CrrParticipants = ({
     if (ok) deleteParticipantGroup(gid);
   };
 
+  const handleDeleteSubGroup = async (gid, sgid) => {
+    const ok = await confirm('Supprimer ce sous-groupe et ses contacts ?', { danger: true });
+    if (ok) deleteSubGroup(gid, sgid);
+  };
+
   const handleDeleteContact = async (gid, cid) => {
     const ok = await confirm('Supprimer ce contact ?', { danger: true });
     if (ok) deleteContact(gid, cid);
@@ -135,9 +146,195 @@ const CrrParticipants = ({
   if (!meeting) return null;
 
   // Les groupes sont stockes par reunion (fallback config globale pour anciens CR).
-  // Doit refleter la meme source que useCrrManager.activeParticipantGroups,
-  // sinon addParticipantGroup ecrit dans meeting mais l'UI lit crrConfig → rien ne s'affiche.
   const participantGroups = meeting.participantGroups || crrConfig.participantGroups;
+
+  // Ligne contact (reutilisee pour les contacts directs et ceux des sous-groupes).
+  const renderContactRow = (contact, groupId, deep = false) => {
+    const isEditingC = editingContact === contact.id;
+    return (
+      <div
+        key={contact.id}
+        className={`${GRID} px-4 py-1.5 hover:bg-slate-50 transition-colors items-center group/row`}
+      >
+        {/* Role (vide) + suppression */}
+        <div className={`${deep ? 'pl-9' : 'pl-5'} flex items-center gap-1`}>
+          {showManagement && (
+            <button
+              onClick={() => handleDeleteContact(groupId, contact.id)}
+              className="opacity-0 group-hover/row:opacity-100 p-0.5 text-slate-300 hover:text-red-500 rounded transition-all"
+            >
+              <Trash2 size={10} />
+            </button>
+          )}
+        </div>
+
+        {/* Label */}
+        {showManagement || isEditingC ? (
+          <input
+            type="text"
+            value={contact.subLabel || ''}
+            onChange={handleContactFieldChange(groupId, contact.id, 'subLabel')}
+            placeholder="Label"
+            spellCheck
+            lang="fr"
+            className="text-[11px] px-2 py-1 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 text-slate-800"
+          />
+        ) : (
+          <span className="text-[11px] text-slate-500 truncate">{contact.subLabel || ''}</span>
+        )}
+
+        {/* Contact name + fonction */}
+        {showManagement || isEditingC ? (
+          <div className="flex flex-col gap-0.5">
+            <input
+              type="text"
+              value={contact.name}
+              onChange={handleContactFieldChange(groupId, contact.id, 'name')}
+              placeholder="NOM Prenom"
+              spellCheck
+              lang="fr"
+              className="text-xs px-2 py-1 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 text-slate-800"
+            />
+            <input
+              type="text"
+              value={contact.fonction || ''}
+              onChange={handleContactFieldChange(groupId, contact.id, 'fonction')}
+              placeholder="Fonction"
+              spellCheck
+              lang="fr"
+              className="text-[10px] px-2 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 text-slate-600"
+            />
+          </div>
+        ) : (
+          <div className="flex flex-col leading-tight">
+            <span className="text-xs text-slate-700">{contact.name}</span>
+            {contact.fonction && (
+              <span className="text-[10px] text-slate-400">{contact.fonction}</span>
+            )}
+          </div>
+        )}
+
+        {/* Email + Telephone */}
+        {showManagement || isEditingC ? (
+          <div className="flex flex-col gap-0.5">
+            <input
+              type="email"
+              value={contact.email}
+              onChange={handleContactFieldChange(groupId, contact.id, 'email')}
+              placeholder="email@exemple.fr"
+              className="text-xs px-2 py-1 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 text-slate-800"
+            />
+            <input
+              type="tel"
+              value={contact.phone || ''}
+              onChange={handleContactPhoneChange(groupId, contact.id)}
+              placeholder="06 00 00 00 00"
+              className="text-[10px] px-2 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 text-slate-700"
+            />
+          </div>
+        ) : (
+          <div className="flex flex-col">
+            <span className="text-xs text-blue-600 truncate">{contact.email}</span>
+            {contact.phone && (
+              <span className="text-[10px] text-slate-400">{contact.phone}</span>
+            )}
+          </div>
+        )}
+
+        {/* CPR */}
+        <div className="flex justify-center">
+          <DiffusionCheckbox
+            checked={contact.cpr}
+            onChange={handleContactCprChange(groupId, contact.id)}
+          />
+        </div>
+
+        {/* Presence */}
+        <div className="flex justify-center">
+          <PresenceButton
+            value={meeting.attendance?.[contact.id] || 'absent'}
+            onChange={(v) => setAttendance(contact.id, v)}
+          />
+        </div>
+
+        {/* Diffusion */}
+        <div className="flex justify-center">
+          <DiffusionCheckbox
+            checked={meeting.diffusion?.[contact.id] || false}
+            onChange={(v) => setDiffusion(contact.id, v)}
+          />
+        </div>
+      </div>
+    );
+  };
+
+  // Bloc sous-groupe : bandeau indente + contacts + ajouter.
+  // La pastille reprend la couleur du groupe PARENT (groupIdx) → filiation lisible.
+  const renderSubGroup = (group, groupIdx, sg) => {
+    const isEditingSG = editingSubGroup === sg.id;
+    return (
+      <div key={sg.id}>
+        {/* Bandeau sous-groupe */}
+        <div className={`${GRID} px-4 py-1.5 bg-slate-50 border-t border-slate-100 items-center`}>
+          <div className="flex items-center gap-1.5 col-span-4 pl-6">
+            <CornerDownRight size={12} className="text-slate-300 shrink-0" />
+            {isEditingSG ? (
+              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                <input
+                  type="text"
+                  value={sg.name}
+                  onChange={(e) => updateSubGroup(group.id, sg.id, { name: e.target.value })}
+                  spellCheck
+                  lang="fr"
+                  className="text-xs font-semibold px-2 py-1 border border-emerald-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 w-48 text-slate-800"
+                  autoFocus
+                  onKeyDown={(e) => e.key === 'Enter' && setEditingSubGroup(null)}
+                />
+                <button onClick={() => setEditingSubGroup(null)} className="p-1 text-emerald-600 hover:bg-emerald-100 rounded">
+                  <Check size={12} />
+                </button>
+              </div>
+            ) : (
+              <>
+                <GroupBadge name={sg.name} colorIndex={groupIdx} />
+                <span className="text-[11px] font-semibold text-slate-600 uppercase truncate">{sg.name}</span>
+                <span className="text-[10px] text-slate-400">({(sg.contacts || []).length})</span>
+                {showManagement && (
+                  <div className="flex items-center gap-0.5 ml-auto" onClick={(e) => e.stopPropagation()}>
+                    <button onClick={() => setEditingSubGroup(sg.id)} className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded" title="Renommer le sous-groupe">
+                      <Edit2 size={10} />
+                    </button>
+                    <button onClick={() => handleDeleteSubGroup(group.id, sg.id)} className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded" title="Supprimer le sous-groupe">
+                      <Trash2 size={10} />
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          <span />
+          <span />
+          <span />
+        </div>
+
+        {/* Contacts du sous-groupe */}
+        {(sg.contacts || []).map((contact) => renderContactRow(contact, group.id, true))}
+
+        {/* Ajouter contact dans le sous-groupe */}
+        {showManagement && (
+          <div className="px-4 py-1.5 pl-14">
+            <button
+              onClick={() => addContact(group.id, sg.id)}
+              className="flex items-center gap-1 text-[11px] text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 px-2 py-1 rounded transition-all"
+            >
+              <UserPlus size={10} />
+              Ajouter un contact
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -149,7 +346,7 @@ const CrrParticipants = ({
           <Users size={14} className="text-emerald-500" />
           PARTICIPANTS
           <span className="text-[10px] font-normal text-slate-400">
-            ({participantGroups.reduce((n, g) => n + (g.contacts?.length || 0), 0)})
+            ({participantGroups.reduce((n, g) => n + countGroupContacts(g), 0)})
           </span>
         </button>
 
@@ -186,7 +383,7 @@ const CrrParticipants = ({
       {!collapsed && (
         <>
           {/* En-tete tableau */}
-          <div className="grid grid-cols-[1.5fr_1.2fr_1.5fr_2fr_50px_50px_50px] gap-1 px-4 py-2 bg-slate-100 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+          <div className={`${GRID} px-4 py-2 bg-slate-100 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider`}>
             <span>Role</span>
             <span>Label</span>
             <span>Contact</span>
@@ -201,6 +398,7 @@ const CrrParticipants = ({
         const isExpanded = expandedGroups.has(group.id);
         const isEditing = editingGroup === group.id;
         const isDragOver = dragOverIdx === groupIdx;
+        const subGroups = group.subGroups || [];
 
         return (
           <div
@@ -211,7 +409,7 @@ const CrrParticipants = ({
           >
             {/* Ligne groupe */}
             <div
-              className="grid grid-cols-[1.5fr_1.2fr_1.5fr_2fr_50px_50px_50px] gap-1 px-4 py-2 bg-emerald-50/50 cursor-pointer hover:bg-emerald-50 transition-colors items-center"
+              className={`${GRID} px-4 py-2 bg-emerald-50/50 cursor-pointer hover:bg-emerald-50 transition-colors items-center`}
               onClick={() => toggleGroup(group.id)}
             >
               <div className="flex items-center gap-1 col-span-4">
@@ -280,13 +478,20 @@ const CrrParticipants = ({
                       </span>
                     )}
                     <span className="text-[10px] text-slate-400">
-                      ({group.contacts.length})
+                      ({countGroupContacts(group)})
                     </span>
                   </div>
                 )}
 
                 {showManagement && !isEditing && (
                   <div className="flex items-center gap-0.5 ml-auto" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => { setExpandedGroups((s) => new Set(s).add(group.id)); addSubGroup(group.id); }}
+                      className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded"
+                      title="Ajouter un sous-groupe"
+                    >
+                      <FolderPlus size={11} />
+                    </button>
                     <button
                       onClick={() => setEditingGroup(group.id)}
                       className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded"
@@ -309,115 +514,12 @@ const CrrParticipants = ({
               <span />
             </div>
 
-            {/* Contacts */}
-            {isExpanded &&
-              group.contacts.map((contact) => {
-                const isEditingC = editingContact === contact.id;
+            {/* Contacts directs */}
+            {isExpanded && group.contacts.map((contact) => renderContactRow(contact, group.id, false))}
 
-                return (
-                  <div
-                    key={contact.id}
-                    className="grid grid-cols-[1.5fr_1.2fr_1.5fr_2fr_50px_50px_50px] gap-1 px-4 py-1.5 hover:bg-slate-50 transition-colors items-center group/row"
-                  >
-                    {/* Role (vide, herite du groupe) */}
-                    <div className="pl-5 flex items-center gap-1">
-                      {showManagement && (
-                        <button
-                          onClick={() => handleDeleteContact(group.id, contact.id)}
-                          className="opacity-0 group-hover/row:opacity-100 p-0.5 text-slate-300 hover:text-red-500 rounded transition-all"
-                        >
-                          <Trash2 size={10} />
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Label */}
-                    {showManagement || isEditingC ? (
-                      <input
-                        type="text"
-                        value={contact.subLabel || ''}
-                        onChange={handleContactFieldChange(group.id, contact.id, 'subLabel')}
-                        placeholder="Label"
-                        spellCheck
-                        lang="fr"
-                        className="text-[11px] px-2 py-1 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 text-slate-800"
-                      />
-                    ) : (
-                      <span className="text-[11px] text-slate-500 truncate">{contact.subLabel || ''}</span>
-                    )}
-
-                    {/* Contact name */}
-                    {showManagement || isEditingC ? (
-                      <input
-                        type="text"
-                        value={contact.name}
-                        onChange={handleContactFieldChange(group.id, contact.id, 'name')}
-                        placeholder="NOM Prenom"
-                        spellCheck
-                        lang="fr"
-                        className="text-xs px-2 py-1 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 text-slate-800"
-                      />
-                    ) : (
-                      <span className="text-xs text-slate-700">{contact.name}</span>
-                    )}
-
-                    {/* Email + Telephone */}
-                    {showManagement || isEditingC ? (
-                      <div className="flex flex-col gap-0.5">
-                        <input
-                          type="email"
-                          value={contact.email}
-                          onChange={handleContactFieldChange(group.id, contact.id, 'email')}
-                          placeholder="email@exemple.fr"
-                          className="text-xs px-2 py-1 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 text-slate-800"
-                        />
-                        <input
-                          type="tel"
-                          value={contact.phone || ''}
-                          onChange={handleContactPhoneChange(group.id, contact.id)}
-                          placeholder="06 00 00 00 00"
-                          className="text-[10px] px-2 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 text-slate-700"
-                        />
-                      </div>
-                    ) : (
-                      <div className="flex flex-col">
-                        <span className="text-xs text-blue-600 truncate">{contact.email}</span>
-                        {contact.phone && (
-                          <span className="text-[10px] text-slate-400">{contact.phone}</span>
-                        )}
-                      </div>
-                    )}
-
-                    {/* CPR */}
-                    <div className="flex justify-center">
-                      <DiffusionCheckbox
-                        checked={contact.cpr}
-                        onChange={handleContactCprChange(group.id, contact.id)}
-                      />
-                    </div>
-
-                    {/* Presence */}
-                    <div className="flex justify-center">
-                      <PresenceButton
-                        value={meeting.attendance?.[contact.id] || 'absent'}
-                        onChange={(v) => setAttendance(contact.id, v)}
-                      />
-                    </div>
-
-                    {/* Diffusion */}
-                    <div className="flex justify-center">
-                      <DiffusionCheckbox
-                        checked={meeting.diffusion?.[contact.id] || false}
-                        onChange={(v) => setDiffusion(contact.id, v)}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-
-            {/* Ajouter contact */}
+            {/* Ajouter contact direct + sous-groupe */}
             {isExpanded && showManagement && (
-              <div className="px-4 py-1.5 pl-10">
+              <div className="px-4 py-1.5 pl-10 flex items-center gap-3">
                 <button
                   onClick={() => addContact(group.id)}
                   className="flex items-center gap-1 text-[11px] text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 px-2 py-1 rounded transition-all"
@@ -425,8 +527,18 @@ const CrrParticipants = ({
                   <UserPlus size={10} />
                   Ajouter un contact
                 </button>
+                <button
+                  onClick={() => addSubGroup(group.id)}
+                  className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 px-2 py-1 rounded transition-all"
+                >
+                  <FolderPlus size={10} />
+                  Ajouter un sous-groupe
+                </button>
               </div>
             )}
+
+            {/* Sous-groupes */}
+            {isExpanded && subGroups.map((sg) => renderSubGroup(group, groupIdx, sg))}
           </div>
         );
       })}

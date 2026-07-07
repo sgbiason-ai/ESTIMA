@@ -10,6 +10,7 @@ import Icon from './Icon';
 import { dateFr } from './formatters';
 import { OBSERVATION_STATUSES, PRESENCE_OPTIONS, MEETING_TYPES, GROUP_COLORS, getGroupColor, abbreviateGroup, obsDisplayNumber, obsAge, obsValidation } from '../../data/crrData';
 import { normalizeObsText, stripHtml } from '../../utils/formatObsText';
+import { flattenGroupContacts } from '../../utils/crrParticipantTree';
 import { sanitizeHtml } from '../../utils/helpers';
 // fileSaver non utilisé — export PDF direct par téléchargement
 // exportHelpers chargé dynamiquement pour le code-splitting
@@ -1016,7 +1017,7 @@ function ParticipantsSection({ groups, attendance, diffusion, canEdit, onSetAtte
       )}
       {groups.map((group, gi) => {
         const color = getGroupColor(gi);
-        const contacts = group.contacts || [];
+        const contacts = flattenGroupContacts(group);
         if (contacts.length === 0) return null;
 
         return (
@@ -1042,8 +1043,8 @@ function ParticipantsSection({ groups, attendance, diffusion, canEdit, onSetAtte
                 <div key={c.id} className="flex items-center gap-2 px-3 py-2 border-t border-white/[0.03]">
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-semibold text-gray-600 truncate">{fullName}</div>
-                    {(c.subLabel || c.fonction) && (
-                      <div className="text-[10px] text-gray-700 truncate">{c.subLabel || c.fonction}</div>
+                    {(c.fonction || c.subLabel) && (
+                      <div className="text-[10px] text-gray-700 truncate">{c.fonction || c.subLabel}</div>
                     )}
                   </div>
                   {/* Diffusion toggle */}

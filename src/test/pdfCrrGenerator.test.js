@@ -47,4 +47,42 @@ describe('generatePdfCrr (fumee)', () => {
     expect(res.blob.size).toBeGreaterThan(800);
     expect(res.filename).toMatch(/\.pdf$/);
   });
+
+  it('rend les sous-groupes (bandeau + contacts, rowSpan mixte) sans planter', async () => {
+    const cfg = {
+      ...crrConfig,
+      participantGroups: [
+        // Groupe avec contacts directs ET sous-groupes (cas le plus complexe)
+        {
+          id: 'g_ent', name: 'Entreprises', subLabel: '',
+          contacts: [{ id: 'c0', name: 'DIRECT Marc', fonction: 'Coordinateur', email: 'm@e.fr', phone: '', cpr: true }],
+          subGroups: [
+            {
+              id: 's1', name: 'Lot 1 VRD',
+              contacts: [
+                { id: 'c1', name: 'DUPONT Jean', fonction: 'Conducteur de travaux', email: 'j@e.fr', phone: '0611', cpr: false },
+                { id: 'c2', name: 'MARTIN Paul', fonction: '', email: 'p@e.fr', phone: '', cpr: false },
+              ],
+            },
+            { id: 's2', name: 'Lot 2 Espaces verts', contacts: [] },
+          ],
+        },
+        // Groupe SANS sous-groupes (retro-compat : pas de champ subGroups)
+        { id: 'g_moe', name: 'MOE', contacts: [{ id: 'c3', name: 'BER Luc', email: 'l@m.fr', cpr: false }] },
+        // Titre TRES long → doit revenir a la ligne dans la colonne role (30 mm)
+        {
+          id: 'g_long',
+          name: "Maitrise d'ouvrage deleguee de la communaute de communes du Grand Bassin Sud-Ouest",
+          subLabel: 'Direction des services techniques et de l amenagement du territoire',
+          contacts: [{ id: 'c4', name: 'VERYLONGSURNAME Jean-Christophe', fonction: 'Directeur general adjoint des services techniques', email: 'jc@x.fr', phone: '0611', cpr: true }],
+        },
+        // Groupe vide
+        { id: 'g_sps', name: 'SPS', contacts: [] },
+      ],
+    };
+    const m = { ...meeting, attendance: { c1: 'present' }, diffusion: { c2: true } };
+    const res = await generatePdfCrr(m, cfg, 'Projet Sous-Groupes', branding, { returnBlob: true });
+    expect(res.blob).toBeInstanceOf(Blob);
+    expect(res.blob.size).toBeGreaterThan(800);
+  });
 });
