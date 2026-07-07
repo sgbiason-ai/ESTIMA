@@ -406,10 +406,10 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
 
                       return (
                         <tr key={obs.id} style={{ backgroundColor: rowBg }}>
-                          <td className="px-1 py-1.5 border border-slate-200 w-[11%] align-top">
+                          <td className="px-1 py-1.5 border border-slate-200 w-[11%] align-middle">
                             {renderBadges(obs.emitter)}
                           </td>
-                          <td className="text-center px-2 py-1.5 border border-slate-200 w-[10%] align-top" style={{ color: '#64748b' }}>
+                          <td className="text-center px-2 py-1.5 border border-slate-200 w-[10%] align-middle" style={{ color: '#64748b' }}>
                             {formatDate(obs.date)}
                           </td>
                           <td className="px-2 py-1.5 border border-slate-200 whitespace-pre-wrap break-words align-top" style={{
@@ -452,19 +452,19 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
                           </td>
                           <td className="text-center px-1 py-1.5 border border-slate-200 w-[10%] align-middle">
                             {isDone && (
-                              <span className="inline-block px-2 py-0.5 rounded text-[9px] font-bold" style={{ backgroundColor: 'rgb(212,240,224)', color: 'rgb(22,120,70)' }}>FAIT</span>
+                              <span className="inline-flex items-center justify-center px-2 py-0.5 rounded text-[9px] font-bold leading-none" style={{ backgroundColor: 'rgb(212,240,224)', color: 'rgb(22,120,70)' }}>FAIT</span>
                             )}
                             {isProgress && (
-                              <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold" style={{ backgroundColor: 'rgb(210,230,255)', color: 'rgb(30,90,170)' }}>En cours</span>
+                              <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[9px] font-bold leading-none" style={{ backgroundColor: 'rgb(210,230,255)', color: 'rgb(30,90,170)' }}>En cours</span>
                             )}
                             {!isDone && !isProgress && !isEmpty && (
-                              <span className="inline-block px-2 py-0.5 rounded text-[9px] font-bold" style={{ backgroundColor: 'rgb(245,227,210)', color: 'rgb(146,64,14)' }}>Ouvert</span>
+                              <span className="inline-flex items-center justify-center px-2 py-0.5 rounded text-[9px] font-bold leading-none" style={{ backgroundColor: 'rgb(245,227,210)', color: 'rgb(146,64,14)' }}>Ouvert</span>
                             )}
                           </td>
-                          <td className="px-1 py-1.5 border border-slate-200 w-[13%] align-top">
+                          <td className="px-1 py-1.5 border border-slate-200 w-[13%] align-middle">
                             {renderBadges(obs.actionBy)}
                           </td>
-                          <td className="text-center px-2 py-1.5 border border-slate-200 w-[11%] align-top" style={{ color: '#64748b' }}>
+                          <td className="text-center px-2 py-1.5 border border-slate-200 w-[11%] align-middle" style={{ color: '#64748b' }}>
                             {formatDate(obs.actionDeadline)}
                           </td>
                         </tr>

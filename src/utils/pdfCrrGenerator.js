@@ -97,7 +97,7 @@ const drawBadge = (doc, cell, text, bgColor, txtColor, font) => {
   doc.setFont(font, 'bold');
   doc.setFontSize(5.5);
   doc.setTextColor(...txtColor);
-  doc.text(text, cell.x + cell.width / 2, by + 3, { align: 'center' });
+  doc.text(text, cell.x + cell.width / 2, by + badgeH / 2, { align: 'center', baseline: 'middle' });
 };
 
 // Badge lettre arrondi (P, E, A, D, C) centre dans la cellule
@@ -626,8 +626,8 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
   const statsText = `${totalObs} obs.  |  ${openObs} ouvertes  |  ${progObs} en cours  |  ${doneObs} faites`;
 
   // Largeurs colonnes observations (partagees : header manuel ET corps autoTable)
-  const OBS_COL_W = CW - 20 - 18 - 18 - 24 - 20;
-  const OBS_COL_W_ARR = [20, 18, OBS_COL_W, 18, 24, 20];
+  const OBS_COL_W = CW - 20 - 18 - 14 - 18 - 16;
+  const OBS_COL_W_ARR = [20, 18, OBS_COL_W, 14, 18, 16];
   const OBS_HEAD_LABELS = ['EMETTEUR', 'DATE', 'OBSERVATIONS', 'STATUT', 'PAR', 'POUR LE'];
   const HEAD_H = 6.5;
 
@@ -750,9 +750,9 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
     0: { cellWidth: 20 },
     1: { cellWidth: 18 },
     2: { cellWidth: OBS_COL_W },
-    3: { cellWidth: 18 },
-    4: { cellWidth: 24 },
-    5: { cellWidth: 20 },
+    3: { cellWidth: 14 },
+    4: { cellWidth: 18 },
+    5: { cellWidth: 16 },
   };
 
   for (let ci = 0; ci < categories.length; ci++) {
@@ -887,12 +887,12 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
       },
       headStyles: obsHeadStyles,
       columnStyles: {
-        0: { cellWidth: OBS_COL_STYLES[0].cellWidth, halign: 'center', fontStyle: 'bold', textColor: catColor },
-        1: { cellWidth: OBS_COL_STYLES[1].cellWidth, halign: 'center', textColor: THEME.lightText },
+        0: { cellWidth: OBS_COL_STYLES[0].cellWidth, halign: 'center', valign: 'middle', fontStyle: 'bold', textColor: catColor },
+        1: { cellWidth: OBS_COL_STYLES[1].cellWidth, halign: 'center', valign: 'middle', textColor: THEME.lightText },
         2: { cellWidth: OBS_COL_STYLES[2].cellWidth },
-        3: { cellWidth: OBS_COL_STYLES[3].cellWidth, halign: 'center' },
-        4: { cellWidth: OBS_COL_STYLES[4].cellWidth, halign: 'center', fontStyle: 'bold' },
-        5: { cellWidth: OBS_COL_STYLES[5].cellWidth, halign: 'center', textColor: THEME.lightText },
+        3: { cellWidth: OBS_COL_STYLES[3].cellWidth, halign: 'center', valign: 'middle' },
+        4: { cellWidth: OBS_COL_STYLES[4].cellWidth, halign: 'center', valign: 'middle', fontStyle: 'bold' },
+        5: { cellWidth: OBS_COL_STYLES[5].cellWidth, halign: 'center', valign: 'middle', textColor: THEME.lightText },
       },
       alternateRowStyles: {
         fillColor: [250, 252, 254],

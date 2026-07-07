@@ -10,6 +10,9 @@ export const CHANGELOG = [
     date: '2026-07-07',
     title: 'Estimation, RAO/Analyse & CRC — ajustements terrain',
     highlights: [
+      'CRC — aperçu et exports : les dates des observations sont alignées verticalement au même niveau que les pastilles de statut et de groupe',
+      'CRC — export PDF : les colonnes Statut, Par et Pour le sont resserrées pour donner plus de largeur au texte des observations',
+      'CRC — les libellés des pastilles de statut sont centrés verticalement dans l’aperçu, l’édition et l’export PDF',
       'CRC — tableau participants densifié dans l’aperçu et les exports : colonnes CPR/PRES./DIFF. réduites et colonne Contact élargie',
       'CRC — le bloc « Observations sur le compte-rendu » apparaît désormais dans l’aperçu et les exports uniquement pour les réunions de chantier',
       'CRC — export PDF : les titres de projet longs reviennent automatiquement à la ligne, avec le contenu suivant décalé proprement pour éviter les débordements',

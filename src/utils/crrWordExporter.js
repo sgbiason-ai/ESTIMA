@@ -221,12 +221,12 @@ export const generateWordCrr = (meeting, crrConfig, projectName = '', branding =
       }
 
       html += `<tr class="${rowClass}">`;
-      html += `<td style="width:11%;text-align:center;font-weight:bold;color:${primary}">${obs.emitter || ''}</td>`;
-      html += `<td style="width:10%;text-align:center;color:#64748b">${formatDate(obs.date)}</td>`;
+      html += `<td style="width:11%;text-align:center;vertical-align:middle;font-weight:bold;color:${primary}">${obs.emitter || ''}</td>`;
+      html += `<td style="width:10%;text-align:center;vertical-align:middle;color:#64748b">${formatDate(obs.date)}</td>`;
       html += `<td>${obsTextToHtml(obs.text)}${imgHtml}</td>`;
-      html += `<td style="width:10%;text-align:center"><span class="status-badge" style="background:${statusBg(obs.status)};color:${statusColor(obs.status)}">${statusLabel(obs.status)}</span></td>`;
-      html += `<td style="width:13%;text-align:center;font-weight:bold">${obs.actionBy || ''}</td>`;
-      html += `<td style="width:11%;text-align:center;color:#64748b">${formatDate(obs.actionDeadline)}</td>`;
+      html += `<td style="width:10%;text-align:center;vertical-align:middle"><span class="status-badge" style="background:${statusBg(obs.status)};color:${statusColor(obs.status)}">${statusLabel(obs.status)}</span></td>`;
+      html += `<td style="width:13%;text-align:center;vertical-align:middle;font-weight:bold">${obs.actionBy || ''}</td>`;
+      html += `<td style="width:11%;text-align:center;vertical-align:middle;color:#64748b">${formatDate(obs.actionDeadline)}</td>`;
       html += `</tr>`;
     }
     html += `</tbody></table>`;

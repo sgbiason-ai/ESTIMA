@@ -169,7 +169,7 @@ const StatusBadge = memo(({ status, onChange }) => {
   return (
     <button
       onClick={cycle}
-      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-extrabold transition-all duration-300 hover:scale-105 shadow-sm hover:shadow ${st.bg} ${st.color} border border-current/30 backdrop-blur-sm`}
+      className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-extrabold leading-none transition-all duration-300 hover:scale-105 shadow-sm hover:shadow ${st.bg} ${st.color} border border-current/30 backdrop-blur-sm`}
       title={`Statut: ${st.label} — Cliquez pour changer`}
     >
       {icons[st.icon]}
