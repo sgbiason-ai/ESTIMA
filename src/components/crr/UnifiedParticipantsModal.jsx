@@ -10,6 +10,7 @@ import {
   FolderPlus, CornerDownRight,
 } from 'lucide-react';
 import { countGroupContacts } from '../../utils/crrParticipantTree';
+import { normalizeGroupBadgeName } from '../../data/crrData';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import * as XLSX from 'xlsx';
 import { toast } from '../../utils/globalUI';
@@ -36,8 +37,16 @@ const GroupTree = ({
     new Set((participantGroups || []).map((g) => g.id))
   );
   const [editingGroup, setEditingGroup] = useState(null);
+  const [editingGroupName, setEditingGroupName] = useState('');
+  const [editingGroupBadge, setEditingGroupBadge] = useState(null);
+  const [editingGroupBadgeName, setEditingGroupBadgeName] = useState('');
   const [editingSubGroup, setEditingSubGroup] = useState(null);
+  const [editingSubGroupName, setEditingSubGroupName] = useState('');
+  const [editingSubGroupBadge, setEditingSubGroupBadge] = useState(null);
+  const [editingSubGroupBadgeName, setEditingSubGroupBadgeName] = useState('');
   const [editingContact, setEditingContact] = useState(null);
+  const [editingContactBadge, setEditingContactBadge] = useState(null);
+  const [editingContactBadgeName, setEditingContactBadgeName] = useState('');
   const [editData, setEditData] = useState({});
 
   const toggleGroup = (gid) => {
@@ -64,7 +73,68 @@ const GroupTree = ({
 
   const startEditContact = (contact) => {
     setEditingContact(contact.id);
-    setEditData({ name: contact.name, fonction: contact.fonction || '', email: contact.email, phone: contact.phone || '' });
+    setEditData({
+      subLabel: contact.subLabel || '',
+      name: contact.name,
+      fonction: contact.fonction || '',
+      email: contact.email,
+      phone: contact.phone || '',
+    });
+  };
+
+  const startEditContactBadge = (contact) => {
+    setEditingContactBadge(contact.id);
+    setEditingContactBadgeName(normalizeGroupBadgeName(contact.badgeName || contact.subLabel || contact.name));
+  };
+
+  const saveEditContactBadge = (groupId, contactId) => {
+    if (editingContactBadgeName) updateContact(groupId, contactId, { badgeName: editingContactBadgeName });
+    setEditingContactBadge(null);
+    setEditingContactBadgeName('');
+  };
+
+  const startEditGroup = (group) => {
+    setEditingGroup(group.id);
+    setEditingGroupName(group.name || '');
+  };
+
+  const saveEditGroup = (groupId) => {
+    if (editingGroupName.trim()) updateParticipantGroup(groupId, { name: editingGroupName.trim() });
+    setEditingGroup(null);
+    setEditingGroupName('');
+  };
+
+  const startEditGroupBadge = (group) => {
+    setEditingGroupBadge(group.id);
+    setEditingGroupBadgeName(normalizeGroupBadgeName(group.badgeName || group.name));
+  };
+
+  const saveEditGroupBadge = (groupId) => {
+    if (editingGroupBadgeName) updateParticipantGroup(groupId, { badgeName: editingGroupBadgeName });
+    setEditingGroupBadge(null);
+    setEditingGroupBadgeName('');
+  };
+
+  const startEditSubGroup = (sg) => {
+    setEditingSubGroup(sg.id);
+    setEditingSubGroupName(sg.name || '');
+  };
+
+  const saveEditSubGroup = (groupId, subGroupId) => {
+    if (editingSubGroupName.trim()) updateSubGroup(groupId, subGroupId, { name: editingSubGroupName.trim() });
+    setEditingSubGroup(null);
+    setEditingSubGroupName('');
+  };
+
+  const startEditSubGroupBadge = (sg) => {
+    setEditingSubGroupBadge(sg.id);
+    setEditingSubGroupBadgeName(normalizeGroupBadgeName(sg.badgeName || sg.name));
+  };
+
+  const saveEditSubGroupBadge = (groupId, subGroupId) => {
+    if (editingSubGroupBadgeName) updateSubGroup(groupId, subGroupId, { badgeName: editingSubGroupBadgeName });
+    setEditingSubGroupBadge(null);
+    setEditingSubGroupBadgeName('');
   };
 
   const saveEditContact = (groupId, contactId) => {
@@ -72,17 +142,9 @@ const GroupTree = ({
     setEditingContact(null);
   };
 
-  const handleGroupNameChange = useCallback((groupId, e) => {
-    updateParticipantGroup(groupId, { name: e.target.value });
-  }, [updateParticipantGroup]);
-
   const handleGroupSubLabelChange = useCallback((groupId, e) => {
     updateParticipantGroup(groupId, { subLabel: e.target.value });
   }, [updateParticipantGroup]);
-
-  const handleSubGroupNameChange = useCallback((groupId, subGroupId, e) => {
-    updateSubGroup(groupId, subGroupId, { name: e.target.value });
-  }, [updateSubGroup]);
 
   const handleEditDataChange = useCallback((field, e) => {
     setEditData((prev) => ({ ...prev, [field]: e.target.value }));
@@ -96,7 +158,7 @@ const GroupTree = ({
   const totalContacts = (participantGroups || []).reduce((n, g) => n + countGroupContacts(g), 0);
 
   // Ligne contact (draggable). deep = indentation renforcee (sous-groupe).
-  const renderContact = (contact, contactIdx, groupId, deep = false) => {
+  const renderContact = (contact, contactIdx, groupId, groupIdx = 0, groupName = '', deep = false) => {
     const isEditingC = editingContact === contact.id;
     return (
       <Draggable draggableId={`chantier-${contact.id}`} index={contactIdx} key={contact.id}>
@@ -111,7 +173,22 @@ const GroupTree = ({
             <div {...dragProvided.dragHandleProps} className="text-slate-200 hover:text-slate-400 cursor-grab shrink-0">
               <GripVertical size={12} />
             </div>
-            {isEditingC ? (
+            {/* Pastille PAR LABEL (abrev. du label, couleur du groupe parent) */}
+            <GroupBadge
+              name={(contact.subLabel || '').trim() || groupName}
+              badgeName={contact.badgeName}
+              colorIndex={groupIdx}
+              onDoubleClick={() => startEditContactBadge(contact)}
+              className="shrink-0"
+            />
+            {editingContactBadge === contact.id ? (
+              <div className="flex items-center gap-1 flex-1 min-w-0">
+                <input type="text" value={editingContactBadgeName} onChange={(e) => setEditingContactBadgeName(normalizeGroupBadgeName(e.target.value))}
+                  placeholder="Pastille" maxLength={5} autoFocus onKeyDown={(e) => e.key === 'Enter' && saveEditContactBadge(groupId, contact.id)}
+                  className="text-[11px] font-bold uppercase px-1.5 py-0.5 border border-emerald-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 w-16 text-slate-800" />
+                <button onClick={() => saveEditContactBadge(groupId, contact.id)} className="p-0.5 text-emerald-600 hover:bg-emerald-100 rounded"><Check size={11} /></button>
+              </div>
+            ) : isEditingC ? (
               <div className="flex items-center gap-1 flex-1 min-w-0 flex-wrap">
                 <input type="text" value={editData.name || ''} onChange={(e) => handleEditDataChange('name', e)}
                   placeholder="NOM Prenom" autoFocus onKeyDown={(e) => e.key === 'Enter' && saveEditContact(groupId, contact.id)}
@@ -161,21 +238,30 @@ const GroupTree = ({
       <div key={sg.id} className="border-t border-slate-100">
         <div className="flex items-center gap-1.5 pl-7 pr-3 py-1.5 bg-slate-50/60">
           <CornerDownRight size={11} className="text-slate-300 shrink-0" />
-          {isEditingSG ? (
+          {editingSubGroupBadge === sg.id ? (
             <div className="flex items-center gap-1 flex-1">
-              <input type="text" value={sg.name}
-                onChange={(e) => handleSubGroupNameChange(group.id, sg.id, e)}
+              <input type="text" value={editingSubGroupBadgeName}
+                onChange={(e) => setEditingSubGroupBadgeName(normalizeGroupBadgeName(e.target.value))}
+                maxLength={5}
                 className="text-[11px] font-semibold px-1.5 py-0.5 border border-emerald-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 w-36 text-slate-800"
-                autoFocus onKeyDown={(e) => e.key === 'Enter' && setEditingSubGroup(null)} />
-              <button onClick={() => setEditingSubGroup(null)} className="p-0.5 text-emerald-600 hover:bg-emerald-100 rounded"><Check size={11} /></button>
+                autoFocus onKeyDown={(e) => e.key === 'Enter' && saveEditSubGroupBadge(group.id, sg.id)} />
+              <button onClick={() => saveEditSubGroupBadge(group.id, sg.id)} className="p-0.5 text-emerald-600 hover:bg-emerald-100 rounded"><Check size={11} /></button>
+            </div>
+          ) : isEditingSG ? (
+            <div className="flex items-center gap-1 flex-1">
+              <input type="text" value={editingSubGroupName}
+                onChange={(e) => setEditingSubGroupName(e.target.value)}
+                className="text-[11px] font-semibold px-1.5 py-0.5 border border-emerald-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 w-56 text-slate-800"
+                autoFocus onKeyDown={(e) => e.key === 'Enter' && saveEditSubGroup(group.id, sg.id)} />
+              <button onClick={() => saveEditSubGroup(group.id, sg.id)} className="p-0.5 text-emerald-600 hover:bg-emerald-100 rounded"><Check size={11} /></button>
             </div>
           ) : (
             <>
-              <GroupBadge name={sg.name} colorIndex={groupIdx} />
               <span className="text-[11px] font-semibold text-slate-600 truncate">{sg.name}</span>
+              <GroupBadge name={sg.name} badgeName={sg.badgeName} colorIndex={groupIdx} onDoubleClick={() => startEditSubGroupBadge(sg)} />
               <span className="text-[9px] text-slate-400">({(sg.contacts || []).length})</span>
               <div className="flex items-center gap-0.5 ml-auto shrink-0">
-                <button onClick={() => setEditingSubGroup(sg.id)} className="p-0.5 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded" title="Renommer"><Edit2 size={10} /></button>
+                <button onClick={() => startEditSubGroup(sg)} className="p-0.5 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded" title="Renommer"><Edit2 size={10} /></button>
                 <button onClick={() => handleDeleteSubGroup(group.id, sg.id)} className="p-0.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded" title="Supprimer"><Trash2 size={10} /></button>
               </div>
             </>
@@ -184,7 +270,7 @@ const GroupTree = ({
         <Droppable droppableId={`sub-${group.id}::${sg.id}`}>
           {(prov, snap) => (
             <div ref={prov.innerRef} {...prov.droppableProps} className={`transition-colors ${snap.isDraggingOver ? 'bg-emerald-50/70' : ''}`}>
-              {(sg.contacts || []).map((contact, i) => renderContact(contact, i, group.id, true))}
+              {(sg.contacts || []).map((contact, i) => renderContact(contact, i, group.id, groupIdx, group.name, true))}
               {prov.placeholder}
               <div className="pl-10 pr-3 py-1">
                 <button onClick={() => addContact(group.id, sg.id)}
@@ -229,26 +315,34 @@ const GroupTree = ({
                 onClick={() => toggleGroup(group.id)}
               >
                 {isExpanded ? <ChevronDown size={12} className="text-slate-400 shrink-0" /> : <ChevronRight size={12} className="text-slate-400 shrink-0" />}
-                {isEditingG ? (
+                {editingGroupBadge === group.id ? (
                   <div className="flex items-center gap-1 flex-1" onClick={(e) => e.stopPropagation()}>
-                    <input type="text" value={group.name} onChange={(e) => handleGroupNameChange(group.id, e)}
+                    <input type="text" value={editingGroupBadgeName} onChange={(e) => setEditingGroupBadgeName(normalizeGroupBadgeName(e.target.value))}
+                      maxLength={5}
                       className="text-[11px] font-bold px-1.5 py-0.5 border border-emerald-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 w-28 text-slate-800"
-                      autoFocus onKeyDown={(e) => e.key === 'Enter' && setEditingGroup(null)} />
+                      autoFocus onKeyDown={(e) => e.key === 'Enter' && saveEditGroupBadge(group.id)} />
+                    <button onClick={() => saveEditGroupBadge(group.id)} className="p-0.5 text-emerald-600 hover:bg-emerald-100 rounded"><Check size={11} /></button>
+                  </div>
+                ) : isEditingG ? (
+                  <div className="flex items-center gap-1 flex-1" onClick={(e) => e.stopPropagation()}>
+                    <input type="text" value={editingGroupName} onChange={(e) => setEditingGroupName(e.target.value)}
+                      className="text-[11px] font-bold px-1.5 py-0.5 border border-emerald-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 w-44 text-slate-800"
+                      autoFocus onKeyDown={(e) => e.key === 'Enter' && saveEditGroup(group.id)} />
                     <input type="text" value={group.subLabel || ''} onChange={(e) => handleGroupSubLabelChange(group.id, e)}
                       placeholder="Sous-label..."
                       className="text-[11px] px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400 w-36 text-slate-800"
                       onKeyDown={(e) => e.key === 'Enter' && setEditingGroup(null)} />
-                    <button onClick={() => setEditingGroup(null)} className="p-0.5 text-emerald-600 hover:bg-emerald-100 rounded"><Check size={11} /></button>
+                    <button onClick={() => saveEditGroup(group.id)} className="p-0.5 text-emerald-600 hover:bg-emerald-100 rounded"><Check size={11} /></button>
                   </div>
                 ) : (
                   <>
-                    <GroupBadge name={group.name} colorIndex={groupIdx} />
+                    <GroupBadge name={group.name} badgeName={group.badgeName} colorIndex={groupIdx} onDoubleClick={() => startEditGroupBadge(group)} />
                     <span className="text-[11px] font-bold text-slate-700 uppercase truncate">{group.name}</span>
                     {group.subLabel && <span className="text-[10px] text-slate-400 truncate">{group.subLabel}</span>}
                     <span className="text-[9px] text-slate-400">({countGroupContacts(group)})</span>
                     <div className="flex items-center gap-0.5 ml-auto shrink-0" onClick={(e) => e.stopPropagation()}>
                       <button onClick={() => addSubGroup(group.id)} className="p-0.5 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded" title="Ajouter un sous-groupe"><FolderPlus size={11} /></button>
-                      <button onClick={() => setEditingGroup(group.id)} className="p-0.5 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded" title="Modifier"><Edit2 size={10} /></button>
+                      <button onClick={() => startEditGroup(group)} className="p-0.5 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded" title="Modifier"><Edit2 size={10} /></button>
                       <button onClick={() => handleDeleteGroup(group.id)} className="p-0.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded" title="Supprimer"><Trash2 size={10} /></button>
                     </div>
                   </>
@@ -260,7 +354,7 @@ const GroupTree = ({
                   <Droppable droppableId={`group-${group.id}`}>
                     {(prov, snap) => (
                       <div ref={prov.innerRef} {...prov.droppableProps} className={`transition-colors ${snap.isDraggingOver ? 'bg-emerald-50/70' : ''}`}>
-                        {(group.contacts || []).map((contact, i) => renderContact(contact, i, group.id, false))}
+                        {(group.contacts || []).map((contact, i) => renderContact(contact, i, group.id, groupIdx, group.name, false))}
                         {prov.placeholder}
                         <div className="pl-7 pr-3 py-1 flex items-center gap-2">
                           <button onClick={() => addContact(group.id)}

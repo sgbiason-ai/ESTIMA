@@ -13,6 +13,7 @@ import { confirm, toast } from '../../utils/globalUI';
 import { normalizeObsText } from '../../utils/formatObsText.jsx';
 import { uploadCrrImage, deleteCrrImage } from '../../utils/crrImageStorage';
 import GroupBadge from './GroupBadge';
+import { groupBadgeOptions, groupBadgeNameMap } from '../../utils/crrParticipantTree';
 import ImageLightbox from '../../views/siteVisits/ImageLightbox';
 
 // ── Selecteur multi-groupes avec pastilles (Emetteur / PAR) ─────────────────
@@ -21,15 +22,18 @@ const GroupPicker = ({ value, onChange, groups, placeholder, className = '', inv
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const btnRef = useRef(null);
+  const menuRef = useRef(null); // le menu est rendu en PORTAIL (hors de `ref`)
   const [dropPos, setDropPos] = useState({ top: 0, left: 0, openUp: false });
 
   // value = "MOE, Entreprises" → Set {"MOE", "Entreprises"}
   const selected = new Set((value || '').split(',').map((s) => s.trim()).filter(Boolean));
 
-  // Map nom groupe → index pour couleur stable
+  // Options = groupes ET sous-groupes (pastille heritant de la couleur parent).
+  const options = groupBadgeOptions(groups);
   const groupIndexMap = {};
+  const badgeNameMap = groupBadgeNameMap(groups);
   const validNames = new Set();
-  groups.forEach((g, i) => { groupIndexMap[g.name] = i; validNames.add(g.name); });
+  options.forEach((o) => { if (!(o.name in groupIndexMap)) groupIndexMap[o.name] = o.colorIndex; validNames.add(o.name); });
 
   // Séparer pastilles valides et orphelines (groupe supprimé)
   const orphanNames = [...selected].filter((n) => !validNames.has(n));
@@ -49,13 +53,21 @@ const GroupPicker = ({ value, onChange, groups, placeholder, className = '', inv
       const rect = btnRef.current.getBoundingClientRect();
       const ITEM_HEIGHT = 36; // px-3 py-2 text-xs ≈ 36px
       const PADDING = 8;      // py-1 container
-      const estimatedHeight = groups.length * ITEM_HEIGHT + PADDING;
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const openUp = spaceBelow < estimatedHeight + 16 && rect.top > spaceBelow;
+      const desired = options.length * ITEM_HEIGHT + PADDING;
+      const spaceBelow = window.innerHeight - rect.bottom - 8;
+      const spaceAbove = rect.top - 8;
+      // Ouvre du cote qui offre le PLUS d'espace (pas seulement "assez") →
+      // evite un calage sur un espace minimal qui coupe trop tot la liste.
+      const openUp = spaceAbove > spaceBelow && spaceBelow < desired;
+      const avail = Math.max(openUp ? spaceAbove : spaceBelow, 160);
       setDropPos({
         top: openUp ? null : rect.bottom + 4,
         bottom: openUp ? window.innerHeight - rect.top + 4 : null,
         left: rect.left,
+        // Hauteur bornee a l'espace dispo → la liste DEFILE si beaucoup de
+        // groupes/sous-groupes (sinon les dernieres entrees partent hors ecran)
+        maxHeight: Math.min(desired, avail),
+        scrollable: desired > avail,
         openUp,
       });
     }
@@ -65,7 +77,10 @@ const GroupPicker = ({ value, onChange, groups, placeholder, className = '', inv
   React.useEffect(() => {
     if (!open) return;
     const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+      // Ne pas fermer si le clic est dans le declencheur OU dans le menu portail
+      if (ref.current?.contains(e.target)) return;
+      if (menuRef.current?.contains(e.target)) return;
+      setOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -101,7 +116,7 @@ const GroupPicker = ({ value, onChange, groups, placeholder, className = '', inv
                 </button>
               </span>
             ) : (
-              <GroupBadge key={name} name={name} colorIndex={groupIndexMap[name] ?? 0} />
+              <GroupBadge key={name} name={name} badgeName={badgeNameMap[name]} colorIndex={groupIndexMap[name] ?? 0} />
             );
           })
         ) : (
@@ -109,41 +124,59 @@ const GroupPicker = ({ value, onChange, groups, placeholder, className = '', inv
         )}
       </button>
 
-      {/* Dropdown rendu en fixed pour échapper au overflow-hidden du parent */}
+      {/* Dropdown rendu en fixed pour échapper au overflow-hidden du parent.
+          Scrollbar rendue VISIBLE (au lieu de l'overlay invisible Windows/Mac)
+          pour que la liste tronquee soit reconnaissable comme defilable. */}
       {open && ReactDOM.createPortal(
         <div
-          className="w-52 bg-white border border-slate-200 rounded-lg shadow-2xl py-1"
+          ref={menuRef}
+          className="w-52 bg-white border border-slate-200 rounded-lg shadow-2xl flex flex-col overflow-hidden"
           style={{
             position: 'fixed',
             left: dropPos.left,
             zIndex: 99999,
+            maxHeight: dropPos.maxHeight,
             ...(dropPos.openUp
               ? { bottom: dropPos.bottom }
               : { top: dropPos.top }),
           }}
-          onMouseDown={(e) => e.stopPropagation()}
         >
-          {groups.map((group, idx) => {
-            const isSelected = selected.has(group.name);
-            const c = getGroupColor(idx);
-            return (
-              <button
-                key={group.id}
-                onClick={() => toggle(group.name)}
-                className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 transition-colors
-                  ${isSelected ? `${c.bg} font-semibold` : 'text-slate-700 hover:bg-slate-50'}`}
-              >
-                <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 text-[10px]
-                  ${isSelected ? `${c.dot} border-transparent text-white` : 'border-slate-300'}`}>
-                  {isSelected ? '✓' : ''}
-                </span>
-                <GroupBadge name={group.name} colorIndex={idx} />
-                <span className="truncate text-slate-700">
-                  {group.name}
-                </span>
-              </button>
-            );
-          })}
+          <div
+            className="flex-1 min-h-0 overflow-y-auto overscroll-contain py-1
+              [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-slate-50
+              [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-thumb]:rounded-full
+              [&::-webkit-scrollbar-thumb]:hover:bg-slate-400"
+            style={{ scrollbarWidth: 'thin', scrollbarColor: '#cbd5e1 #f8fafc' }}
+          >
+            {options.map((opt) => {
+              const isSelected = selected.has(opt.name);
+              const c = getGroupColor(opt.colorIndex);
+              return (
+                <button
+                  key={opt.key}
+                  onClick={() => toggle(opt.name)}
+                  className={`w-full text-left py-2 text-xs flex items-center gap-2 transition-colors
+                    ${opt.isSub ? 'pl-6 pr-3' : 'px-3'}
+                    ${isSelected ? `${c.bg} font-semibold` : 'text-slate-700 hover:bg-slate-50'}`}
+                >
+                  <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 text-[10px]
+                    ${isSelected ? `${c.dot} border-transparent text-white` : 'border-slate-300'}`}>
+                    {isSelected ? '✓' : ''}
+                  </span>
+                  {opt.isSub && <span className="text-slate-300 shrink-0">↳</span>}
+                  <GroupBadge name={opt.name} badgeName={opt.badgeName} colorIndex={opt.colorIndex} />
+                  <span className="truncate text-slate-700">
+                    {opt.name}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {dropPos.scrollable && (
+            <div className="shrink-0 text-center text-[9px] text-slate-400 italic border-t border-slate-100 py-1 bg-slate-50/80">
+              ↕ Faites défiler pour voir plus
+            </div>
+          )}
         </div>,
         document.body
       )}

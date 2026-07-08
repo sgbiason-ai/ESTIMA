@@ -13,7 +13,7 @@ import autoTable from 'jspdf-autotable';
 import { DEFAULT_BRANDING } from '../data/branding';
 import { MEETING_TYPES, GROUP_COLORS, abbreviateGroup, computeObsStats, obsDisplayNumber, obsAge } from '../data/crrData';
 import { parseObsHtml, stripHtml } from './formatObsText.jsx';
-import { flattenGroupContacts } from './crrParticipantTree';
+import { flattenGroupContacts, groupColorIndexMap, groupBadgeNameMap } from './crrParticipantTree';
 import { lightenRgb, darkenRgb, loadImage, formatDateFr, formatDateLong, sanitizeFilename, loadLogos, fitTextToWidth } from './pdf/pdfSharedHelpers';
 import { buildTheme as _buildTheme } from './pdf/buildTheme';
 
@@ -66,13 +66,15 @@ const ensureSpace = (doc, cursor, need) => {
   }
 };
 
-// Dessine la bande decorative a gauche sur toutes les pages
+// Dessine la bande decorative a gauche sur toutes les pages.
+// Primaire sur TOUTE la hauteur puis accent par-dessus le dernier tiers :
+// garantit une bande continue sans raccord (pas de segment manquant).
 const drawPageDecor = (doc, theme) => {
   const n = doc.internal.getNumberOfPages();
   for (let p = 1; p <= n; p++) {
     doc.setPage(p);
     doc.setFillColor(...theme.primary);
-    doc.rect(0, 0, STRIPE_W, PH * 0.6, 'F');
+    doc.rect(0, 0, STRIPE_W, PH, 'F');
     doc.setFillColor(...theme.accent);
     doc.rect(0, PH * 0.6, STRIPE_W, PH * 0.4, 'F');
   }
@@ -100,9 +102,12 @@ const drawBadge = (doc, cell, text, bgColor, txtColor, font) => {
   doc.text(text, cell.x + cell.width / 2, by + badgeH / 2, { align: 'center', baseline: 'middle' });
 };
 
-// Badge lettre arrondi (P, E, A, D, C) centre dans la cellule
+// Badge lettre arrondi (P, E, A, NC, D, C) centre dans la cellule.
+// Largeur adaptative : « NC » tient dans sa pastille comme les lettres seules.
 const drawBadgeLabel = (doc, cell, letter, txtColor, bgColor, font) => {
-  const bw = 5;
+  doc.setFont(font, 'bold');
+  doc.setFontSize(6);
+  const bw = Math.max(5, doc.getTextWidth(letter) + 2.4);
   const bh = 3.5;
   const bx = cell.x + (cell.width - bw) / 2;
   const by = cell.y + (cell.height - bh) / 2;
@@ -128,7 +133,7 @@ const parseBadgeNames = (value) =>
   (value || '').split(',').map((s) => s.trim()).filter(Boolean);
 
 // Dessine des pastilles de groupes (emetteur/actionBy) dans une cellule PDF
-const drawGroupBadges = (doc, cell, value, groupIndexMap, font) => {
+const drawGroupBadges = (doc, cell, value, groupIndexMap, badgeNameMap, font) => {
   const names = parseBadgeNames(value);
   if (names.length === 0) return;
 
@@ -141,7 +146,7 @@ const drawGroupBadges = (doc, cell, value, groupIndexMap, font) => {
 
     const idx = groupIndexMap[name] ?? 0;
     const c = GROUP_COLORS[idx % GROUP_COLORS.length];
-    const abbr = abbreviateGroup(name);
+    const abbr = abbreviateGroup(badgeNameMap?.[name] || name);
 
     doc.setFont(font, 'bold');
     doc.setFontSize(5);
@@ -175,9 +180,9 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const cursor = { y: M.top };
 
-  // Map nom de groupe → index pour couleurs pastilles
-  const groupIndexMap = {};
-  (crrConfig.participantGroups || []).forEach((g, i) => { groupIndexMap[g.name] = i; });
+  // Map nom (groupe OU sous-groupe) → index couleur pour les pastilles
+  const groupIndexMap = groupColorIndexMap(crrConfig.participantGroups);
+  const badgeNameMap = groupBadgeNameMap(crrConfig.participantGroups);
 
   const typeLabel = MEETING_TYPES.find((t) => t.value === meeting.type)?.label || 'Reunion';
   const showLegalText = meeting.type === 'chantier' && !!crrConfig.legalText;
@@ -211,70 +216,68 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
   doc.setFillColor(...THEME.primary);
   roundedRect(doc, M.left, cursor.y, 1.5, 28, 0.75, 'F');
 
-  // Logos MOA (commune + 2e MOA) centres cote a cote dans la bande header.
-  // Taille reduite a 18mm chacun si deux logos (evite le chevauchement a droite).
-  if (logoCommune || logoCommune2) {
-    const both = !!(logoCommune && logoCommune2);
-    const fit = (img) => {
-      const mxW = both ? 18 : 22, mxH = 18, r = img.width / img.height;
-      let w = mxW, h = w / r;
-      if (h > mxH) { h = mxH; w = h * r; }
-      return { w, h };
-    };
-    const l1 = logoCommune ? fit(logoCommune) : null;
-    const l2 = logoCommune2 ? fit(logoCommune2) : null;
-    const gap = both ? 4 : 0;
-    const totalW = (l1 ? l1.w : 0) + gap + (l2 ? l2.w : 0);
-    let lx = PW / 2 - totalW / 2;
-    if (l1) { doc.addImage(logoCommune, 'JPEG', lx, cursor.y + (28 - l1.h) / 2, l1.w, l1.h); lx += l1.w + gap; }
-    if (l2) { doc.addImage(logoCommune2, 'JPEG', lx, cursor.y + (28 - l2.h) / 2, l2.w, l2.h); }
+  // Rangee de logos UNIFIEE, alignee a droite du cartouche : hauteur commune,
+  // espacement constant, ordre protocolaire MOA (commune) → cotraitant → MOE,
+  // le tout pose sur une bande blanche unique (fini les cadres depareilles).
+  {
+    const LOGO_H = 13;
+    const LOGO_GAP = 6;
+    let entries = [logoCommune, logoCommune2, logoCotraitant, logoMoe]
+      .filter(Boolean)
+      .map((img) => {
+        const r = img.width / img.height;
+        let h = LOGO_H, w = h * r;
+        if (w > 30) { w = 30; h = w / r; } // logo tres large : plafonner
+        return { img, w, h };
+      });
+    if (entries.length) {
+      let totalW = entries.reduce((s, e) => s + e.w, 0) + LOGO_GAP * (entries.length - 1);
+      // Laisser ~78mm au bloc texte a gauche : retrecir la rangee si besoin
+      const maxRow = PW - M.right - 4 - (M.left + 78) - 8;
+      if (totalW > maxRow) {
+        const k = maxRow / totalW;
+        entries = entries.map((e) => ({ img: e.img, w: e.w * k, h: e.h * k }));
+        totalW = maxRow;
+      }
+      const bandH = LOGO_H + 4;
+      const bandW = totalW + 8;
+      const bx = PW - M.right - 4 - bandW;
+      const by = cursor.y + (28 - bandH) / 2;
+      doc.setFillColor(255, 255, 255);
+      roundedRect(doc, bx, by, bandW, bandH, 1.5, 'F');
+      let lx = bx + 4;
+      for (const e of entries) {
+        doc.addImage(e.img, 'JPEG', lx, cursor.y + (28 - e.h) / 2, e.w, e.h);
+        lx += e.w + LOGO_GAP;
+      }
+    }
   }
 
-  // Logo MOE en haut a droite, centre verticalement dans la bande (28mm)
-  let moeWidth = 0;
-  if (logoMoe) {
-    const mxW = 30, mxH = 18, r = logoMoe.width / logoMoe.height;
-    let w = mxW, h = w / r;
-    if (h > mxH) { h = mxH; w = h * r; }
-    moeWidth = w;
-    const my = cursor.y + (28 - h) / 2;
-    doc.addImage(logoMoe, 'JPEG', PW - M.right - w - 4, my, w, h);
-  }
-
-  // Logo Cotraitant en haut a droite, a cote du logo MOE
-  if (logoCotraitant) {
-    const mxW = 30, mxH = 18, r = logoCotraitant.width / logoCotraitant.height;
-    let w = mxW, h = w / r;
-    if (h > mxH) { h = mxH; w = h * r; }
-    const my = cursor.y + (28 - h) / 2;
-    const offset = moeWidth > 0 ? moeWidth + 8 : 4;
-    doc.addImage(logoCotraitant, 'JPEG', PW - M.right - w - offset, my, w, h);
-  }
-
-  // Type de reunion + numero
+  // Hierarchie inversee : le type/N°/date ne sont que des METADONNEES,
+  // le titre du projet (plus bas) est l'element dominant de la page.
   doc.setFont(fontH, 'bold');
-  doc.setFontSize(10);
+  doc.setFontSize(8);
   doc.setTextColor(...THEME.lightText);
-  doc.text(typeLabel.toUpperCase(), M.left + 6, cursor.y + 7);
+  doc.text(typeLabel.toUpperCase(), M.left + 6, cursor.y + 9);
 
-  doc.setFontSize(22);
+  doc.setFontSize(15);
   doc.setTextColor(...THEME.primary);
-  doc.text(`N° ${meeting.number}`, M.left + 6, cursor.y + 16);
-
-  // Date
+  const numTxt = `N° ${meeting.number}`;
+  doc.text(numTxt, M.left + 6, cursor.y + 17.5);
+  const numW = doc.getTextWidth(numTxt);
   doc.setFont(fontB, 'normal');
   doc.setFontSize(9);
   doc.setTextColor(...THEME.lightText);
-  doc.text(`Date : ${formatDateFr(meeting.date)}`, M.left + 6, cursor.y + 22);
+  doc.text(`—  ${formatDateFr(meeting.date)}`, M.left + 9 + numW, cursor.y + 17.5);
 
   cursor.y += 31;
 
-  // Nom du projet
+  // Nom du projet — element dominant (16pt)
   doc.setFont(fontH, 'bold');
-  doc.setFontSize(14);
+  doc.setFontSize(16);
   doc.setTextColor(...THEME.primary);
-  const titleLines = doc.splitTextToSize(pdfProjectName, CW - 20);
-  const titleLineHeight = 5.5;
+  const titleLines = doc.splitTextToSize(pdfProjectName, CW - 16);
+  const titleLineHeight = 6.2;
   doc.text(titleLines, PW / 2, cursor.y + 5, { align: 'center', lineHeightFactor: 1.1 });
 
   // Ligne decorative sous le titre
@@ -368,11 +371,14 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
       participantRows.push({
         role: firstRowOfGroup ? roleLabel : '',
         subLabel: contact.subLabel || '',
+        // Une pastille par label (abrev.) ; fallback sur le groupe si pas de label
+        pastilleLabel: (contact.subLabel || '').trim() || group.name,
         contact: (contact.name || '') + (contact.fonction ? '\n' + contact.fonction : ''),
         email: (contact.email || '') + (contact.phone ? '\n' + contact.phone : ''),
         cpr: !!contact.cpr,
         att,
         diff,
+        isContact: true,
         isGroupHeader: false,
         groupName: firstRowOfGroup ? group.name : '',
         groupIdx: gi,
@@ -380,71 +386,124 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
       firstRowOfGroup = false;
     };
 
-    (group.contacts || []).forEach(pushContact);
+    (group.contacts || []).forEach((c) => pushContact(c));
     for (const sg of subGroups) {
       const n = (sg.contacts || []).length;
       participantRows.push({
-        // « » » = 0xBB, WinAnsi-safe (jamais de fleches Unicode dans le PDF)
         role: firstRowOfGroup ? roleLabel : '',
-        subGroupLabel: `» ${sg.name}${n > 0 ? ` (${n})` : ''}`,
+        subGroupLabel: `${sg.name}${n > 0 ? ` (${n})` : ''}`,
+        sgName: sg.name,
         cpr: false, att: 'absent', diff: false,
         isGroupHeader: false, isSubGroupHeader: true,
         groupName: firstRowOfGroup ? group.name : '',
         groupIdx: gi,
       });
       firstRowOfGroup = false;
-      (sg.contacts || []).forEach(pushContact);
+      (sg.contacts || []).forEach((c) => pushContact(c));
     }
   }
 
-  // Corps du tableau : col 0 (pastille) et col 1 (role) avec rowSpan par groupe.
-  // Bandeau sous-groupe = 1 cellule colSpan 6 sur les colonnes restantes.
+  // Blocs de label : chaque suite de contacts consecutifs du meme groupe et du
+  // meme label reçoit UNE pastille fusionnee (rowSpan). Un bandeau/header casse
+  // le bloc. On marque le 1er contact du bloc + sa hauteur (nb de lignes).
+  for (let i = 0; i < participantRows.length; i++) {
+    const r = participantRows[i];
+    if (!r.isContact) continue;
+    const prev = participantRows[i - 1];
+    const sameBlock = prev && prev.isContact && prev.groupIdx === r.groupIdx && (prev.subLabel || '') === (r.subLabel || '');
+    if (!sameBlock) {
+      r.labelBlockStart = true;
+      let span = 1;
+      for (let j = i + 1; j < participantRows.length; j++) {
+        const nx = participantRows[j];
+        if (nx.isContact && nx.groupIdx === r.groupIdx && (nx.subLabel || '') === (r.subLabel || '')) span++;
+        else break;
+      }
+      r.labelBlockSpan = span;
+    }
+  }
+
+  // Colonnes conditionnelles : LABEL et CPR ne s'impriment que s'ils portent
+  // au moins une information sur ce CR (une colonne vide mine la credibilite).
+  const hasLabel = participantRows.some((r) => r.isContact && r.subLabel);
+  const hasCpr = participantRows.some((r) => r.cpr);
+  // Ordre demande : ROLE | pastille(label) | LABEL | CONTACT | EMAIL | [CPR] | PRES | DIFF
+  const FIXED = 30 + 14 + (hasLabel ? 20 : 0) + 44 + (hasCpr ? 8 : 0) + 8 + 8;
+  const partColDefs = [
+    { key: 'role', w: 30, style: { fontStyle: 'bold', fontSize: 6.5 } },
+    { key: 'pastille', w: 14, style: { halign: 'center' } },
+    ...(hasLabel ? [{ key: 'label', w: 20, style: { fontSize: 6.5, textColor: [100, 116, 139] } }] : []),
+    { key: 'contact', w: CW - FIXED, style: {} },
+    { key: 'email', w: 44, style: { textColor: [75, 85, 99], fontSize: 6.5 } },
+    ...(hasCpr ? [{ key: 'cpr', w: 8, style: { halign: 'center' } }] : []),
+    { key: 'pres', w: 8, style: { halign: 'center' } },
+    { key: 'diff', w: 8, style: { halign: 'center' } },
+  ];
+  const partColKeys = partColDefs.map((c) => c.key);
+  const partHead = [
+    'ROLE / INTERVENANT', '',
+    ...(hasLabel ? ['LABEL'] : []),
+    'CONTACT', 'EMAIL',
+    ...(hasCpr ? ['CPR'] : []),
+    'PRES.', 'DIFF.',
+  ];
+
+  // Corps : col 0 (ROLE) rowSpan par GROUPE ; col 1 (pastille) rowSpan par BLOC
+  // de label ; bandeau sous-groupe = colSpan sur toutes les colonnes sauf ROLE.
   const partBody = [];
+  const nCols = partColKeys.length;
   for (let i = 0; i < participantRows.length; i++) {
     const r = participantRows[i];
     if (r.isSpacer) {
-      partBody.push([{ content: '', colSpan: 8, styles: { fillColor: [255, 255, 255], lineWidth: 0, minCellHeight: 1.6, cellPadding: 0 } }]);
+      partBody.push([{ content: '', colSpan: nCols, styles: { fillColor: [255, 255, 255], lineWidth: 0, minCellHeight: 1.6, cellPadding: 0 } }]);
       continue;
     }
     if (r.isGroupHeader) {
-      partBody.push([
-        '', r.role, r.subLabel, r.contact, r.email, '', '', '',
-      ]);
-    } else {
-      const rest = r.isSubGroupHeader
-        ? [{
-            content: r.subGroupLabel,
-            colSpan: 6,
-            styles: { fontStyle: 'bold', fontSize: 6, cellPadding: { top: 1.5, bottom: 1.5, left: 7, right: 1.5 } },
-          }]
-        : [r.subLabel, r.contact, r.email, '', '', ''];
-      const isFirstOfGroup = (i === 0 || participantRows[i - 1].groupIdx !== r.groupIdx || participantRows[i - 1].isGroupHeader);
-      if (isFirstOfGroup) {
-        let span = 1;
-        for (let j = i + 1; j < participantRows.length && !participantRows[j].isGroupHeader && participantRows[j].groupIdx === r.groupIdx; j++) span++;
-        const badgeCell = { content: '', rowSpan: span, styles: { valign: 'middle' } };
-        // overflow linebreak explicite : un role/intervenant long revient a la
-        // ligne dans sa colonne (30 mm) au lieu de deborder ou d'etre tronque.
-        const roleCell = { content: r.role, rowSpan: span, styles: { valign: 'middle', fontStyle: 'bold', fontSize: 6.5, overflow: 'linebreak' } };
-        partBody.push([badgeCell, roleCell, ...rest]);
-      } else {
-        // Lignes absorbees : pas de col 0 ni col 1 (couvertes par rowSpan)
-        partBody.push(rest);
-      }
+      partBody.push([r.role, ...Array(nCols - 1).fill('')]);
+      continue;
     }
+
+    const isFirstOfGroup = (i === 0 || participantRows[i - 1].groupIdx !== r.groupIdx || participantRows[i - 1].isGroupHeader);
+    const cells = [];
+    if (isFirstOfGroup) {
+      let span = 1;
+      for (let j = i + 1; j < participantRows.length && !participantRows[j].isGroupHeader && participantRows[j].groupIdx === r.groupIdx; j++) span++;
+      cells.push({ content: r.role, rowSpan: span, styles: { valign: 'middle', fontStyle: 'bold', fontSize: 6.5, overflow: 'linebreak' } });
+    }
+
+    if (r.isSubGroupHeader) {
+      // Bandeau : toutes les colonnes a droite de ROLE (pastille incluse)
+      cells.push({
+        content: r.subGroupLabel,
+        colSpan: nCols - 1,
+        styles: { fontStyle: 'bold', fontSize: 6, halign: 'left', cellPadding: { top: 1, bottom: 1, left: 7, right: 1.5 } },
+      });
+    } else {
+      // Contact : pastille (rowSpan bloc) uniquement en tete de bloc, puis data
+      if (r.labelBlockStart) {
+        cells.push({ content: '', rowSpan: r.labelBlockSpan, styles: { valign: 'middle' } });
+      }
+      cells.push(
+        ...(hasLabel ? [r.subLabel] : []),
+        r.contact, r.email,
+        ...(hasCpr ? [''] : []),
+        '', '',
+      );
+    }
+    partBody.push(cells);
   }
 
   autoTable(doc, {
     startY: cursor.y,
     margin: { left: M.left, right: M.right, top: M.top, bottom: M.bottom },
     tableWidth: CW,
-    head: [['', 'ROLE / INTERVENANT', 'LABEL', 'CONTACT', 'EMAIL', 'CPR', 'PRES.', 'DIFF.']],
+    head: [partHead],
     body: partBody,
     theme: 'grid',
     styles: {
       font: fontB,
       fontSize: 7,
-      cellPadding: { top: 2, bottom: 2, left: 2, right: 1.5 },
+      cellPadding: { top: 1.2, bottom: 1.2, left: 2, right: 1.5 },
       overflow: 'linebreak',
       textColor: THEME.text,
       lineColor: THEME.borders,
@@ -458,19 +517,17 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
       font: fontH,
       halign: 'center',
       fontSize: 6.5,
-      cellPadding: { top: 2.5, bottom: 2.5, left: 1.5, right: 1.5 },
+      cellPadding: { top: 1.6, bottom: 1.6, left: 1.5, right: 1.5 },
     },
-    columnStyles: {
-      0: { cellWidth: 12, halign: 'center' },
-      1: { cellWidth: 30, fontStyle: 'bold', fontSize: 6.5 },
-      2: { cellWidth: 22, fontSize: 6.5, textColor: [100, 116, 139] },
-      3: { cellWidth: 40 },
-      4: { cellWidth: 44, textColor: [30, 80, 160], fontSize: 6.5 },
-      5: { cellWidth: 10, halign: 'center' },
-      6: { cellWidth: 11, halign: 'center' },
-      7: { cellWidth: 11, halign: 'center' },
-    },
+    columnStyles: Object.fromEntries(
+      partColDefs.map((c, i) => [i, { cellWidth: c.w, ...c.style }])
+    ),
     didParseCell: (data) => {
+      // En-tetes CPR/PRES/DIFF : police reduite pour tenir dans les colonnes minimales
+      if (data.section === 'head' && ['cpr', 'pres', 'diff'].includes(partColKeys[data.column.index])) {
+        data.cell.styles.fontSize = 5;
+        data.cell.styles.cellPadding = { top: 1.6, bottom: 1.6, left: 0.5, right: 0.5 };
+      }
       if (data.section === 'body') {
         const row = participantRows[data.row.index];
         if (!row) return;
@@ -486,18 +543,18 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
           return;
         }
         // Bandeau sous-groupe : fond/texte aux couleurs du groupe parent
-        if (row.isSubGroupHeader && data.column.index >= 2) {
+        // (col 1+ ; la col 0 ROLE est couverte par le rowSpan de groupe)
+        if (row.isSubGroupHeader && data.column.index >= 1) {
           const c = GROUP_COLORS[row.groupIdx % GROUP_COLORS.length];
           data.cell.styles.fillColor = c.rgbBg;
           data.cell.styles.textColor = darkenRgb(c.rgb, 0.25);
           return;
         }
-        // Cols 0-1 (pastille + ROLE/INTERVENANT, rowSpan sur tout le groupe) :
-        // fond a la couleur de la pastille du groupe
+        // Cols 0-1 (ROLE + pastille label, fond couleur du groupe)
         if (data.column.index <= 1) {
           const c = GROUP_COLORS[row.groupIdx % GROUP_COLORS.length];
           data.cell.styles.fillColor = c.rgbBg;
-          if (data.column.index === 1) data.cell.styles.textColor = darkenRgb(c.rgb, 0.25);
+          if (data.column.index === 0) data.cell.styles.textColor = darkenRgb(c.rgb, 0.25);
           return;
         }
         // Alternance par groupe (pair = blanc, impair = gris clair)
@@ -509,21 +566,19 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
       const row = participantRows[data.row.index];
       if (!row || row.isSpacer) return;
 
-      // Col 0 : pastille coloree du groupe
-      if (data.column.index === 0 && row.groupName) {
-        const gIdx = row.groupIdx;
-        const c = GROUP_COLORS[gIdx % GROUP_COLORS.length];
-        const abbr = abbreviateGroup(row.groupName);
+      if (row.isGroupHeader) return;
 
+      // Pastille PAR LABEL (col 1) : abreviation du label, couleur du groupe
+      // parent, fond blanc. Dessinee en tete de bloc (cellule rowSpan).
+      if (partColKeys[data.column.index] === 'pastille' && row.isContact) {
+        const c = GROUP_COLORS[row.groupIdx % GROUP_COLORS.length];
+        const abbr = abbreviateGroup(row.pastilleLabel || '');
         doc.setFont(fontH, 'bold');
         doc.setFontSize(4.5);
         const bw = Math.min(BADGE_W, data.cell.width - 1);
         const bh = 3;
         const bx = data.cell.x + (data.cell.width - bw) / 2;
         const by = data.cell.y + (data.cell.height - bh) / 2;
-
-        // Fond blanc : la case porte desormais la couleur du groupe (rgbBg),
-        // la pastille doit s'en detacher
         doc.setFillColor(255, 255, 255);
         roundedRect(doc, bx, by, bw, bh, 1, 'F');
         doc.setFillColor(...c.rgb);
@@ -532,54 +587,46 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
         doc.text(abbr, bx + 2.8, by + 2.2);
       }
 
-      if (row.isGroupHeader) return;
+      // Bandeau sous-groupe : plus de pastille propre (la pastille par label des
+      // contacts en-dessous porte deja l'abreviation → evite le doublon)
+      if (row.isSubGroupHeader) return;
 
-      // Bandeau sous-groupe : point colore avant le libelle (col 2 = cellule colSpan)
-      if (row.isSubGroupHeader) {
-        if (data.column.index === 2) {
-          const c = GROUP_COLORS[row.groupIdx % GROUP_COLORS.length];
-          doc.setFillColor(...c.rgb);
-          doc.circle(data.cell.x + 3.5, data.cell.y + data.cell.height / 2, 0.8, 'F');
-        }
-        return;
-      }
+      const colKey = partColKeys[data.column.index];
 
-      // Col 5 : CPR badge
-      if (data.column.index === 5) {
-        if (row.cpr) {
-          drawBadgeLabel(doc, data.cell, 'C', THEME.primary, lightenRgb(THEME.primary, 0.82), fontH);
-        }
+      // CPR badge (colonne presente uniquement si au moins un CPR coche)
+      if (colKey === 'cpr' && row.cpr) {
+        drawBadgeLabel(doc, data.cell, 'C', THEME.primary, lightenRgb(THEME.primary, 0.82), fontH);
       }
-      // Col 6 : Presence — lettre seule (legende en bas du tableau).
-      // Absent : pastille rouge pleine (lettre blanche) pour bien marquer l'absence.
-      if (data.column.index === 6) {
-        if (row.att === 'absent') {
-          drawBadgeLabel(doc, data.cell, 'A', [255, 255, 255], [220, 38, 38], fontH);
-        } else {
-          const presMap = { present: 'P', excused: 'E', not_summoned: 'NC' };
-          const colorMap = { present: THEME.presentTxt, excused: THEME.excusedTxt, not_summoned: [168, 85, 247] };
-          doc.setFont(fontH, 'bold');
-          doc.setFontSize(6.5);
-          doc.setTextColor(...(colorMap[row.att] || THEME.presentTxt));
-          doc.text(presMap[row.att] || 'A', data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2 + 1, { align: 'center' });
-        }
+      // Presence : traitement UNIFIE — pastille pour les 4 etats (lisible N&B,
+      // l'Absent reste le seul fond plein pour marquer l'alerte).
+      if (colKey === 'pres') {
+        const presPill = {
+          present:      { l: 'P',  txt: [22, 130, 76],   bg: [212, 240, 224] },
+          excused:      { l: 'E',  txt: [71, 85, 105],   bg: [226, 232, 240] },
+          absent:       { l: 'A',  txt: [255, 255, 255], bg: [220, 38, 38] },
+          not_summoned: { l: 'NC', txt: [107, 33, 168],  bg: [243, 232, 255] },
+        };
+        const p = presPill[row.att] || presPill.absent;
+        drawBadgeLabel(doc, data.cell, p.l, p.txt, p.bg, fontH);
       }
-      // Col 7 : Diffusion badge
-      if (data.column.index === 7) {
-        if (row.diff) {
-          drawBadgeLabel(doc, data.cell, 'D', [30, 90, 170], [230, 242, 255], fontH);
-        }
+      // Diffusion badge
+      if (colKey === 'diff' && row.diff) {
+        drawBadgeLabel(doc, data.cell, 'D', [30, 90, 170], [230, 242, 255], fontH);
       }
     },
   });
 
   cursor.y = doc.lastAutoTable.finalY + 2;
 
-  // Legende presence / diffusion (italique, discret)
+  // Legende presence / diffusion — construite d'apres les colonnes reellement
+  // affichees (pas de code orphelin si CPR est masquee)
   doc.setFont(fontB, 'italic');
   doc.setFontSize(6);
   doc.setTextColor(...THEME.lightText);
-  doc.text('P : Présent  |  E : Excusé  |  A : Absent  |  NC : Non convoqué  |  C : CPR  |  D : Diffusion', M.left, cursor.y);
+  const legendParts = ['P : Présent', 'E : Excusé', 'A : Absent', 'NC : Non convoqué'];
+  if (hasCpr) legendParts.push('C : CPR');
+  legendParts.push('D : Diffusion');
+  doc.text(legendParts.join('  |  '), M.left, cursor.y);
   cursor.y += 5;
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -625,10 +672,15 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
   const { total: totalObs, open: openObs, inProgress: progObs, done: doneObs } = computeObsStats(observations);
   const statsText = `${totalObs} obs.  |  ${openObs} ouvertes  |  ${progObs} en cours  |  ${doneObs} faites`;
 
+  // Colonne POUR LE conditionnelle : masquee si aucune observation ne porte
+  // d'echeance sur ce CR → sa largeur est reversee a la colonne OBSERVATIONS.
+  const hasDeadline = observations.some((o) => (o.actionDeadline || '').trim());
+  const DEADLINE_W = 16;
+
   // Largeurs colonnes observations (partagees : header manuel ET corps autoTable)
-  const OBS_COL_W = CW - 20 - 18 - 14 - 18 - 16;
-  const OBS_COL_W_ARR = [20, 18, OBS_COL_W, 14, 18, 16];
-  const OBS_HEAD_LABELS = ['EMETTEUR', 'DATE', 'OBSERVATIONS', 'STATUT', 'PAR', 'POUR LE'];
+  const OBS_COL_W = CW - 20 - 18 - 14 - 18 - (hasDeadline ? DEADLINE_W : 0);
+  const OBS_COL_W_ARR = [20, 18, OBS_COL_W, 14, 18, ...(hasDeadline ? [DEADLINE_W] : [])];
+  const OBS_HEAD_LABELS = ['EMETTEUR', 'DATE', 'OBSERVATIONS', 'STATUT', 'PAR', ...(hasDeadline ? ['POUR LE'] : [])];
   const HEAD_H = 6.5;
 
   // Bandeau principal OBSERVATIONS + stats (repete en haut de chaque page)
@@ -752,7 +804,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
     2: { cellWidth: OBS_COL_W },
     3: { cellWidth: 14 },
     4: { cellWidth: 18 },
-    5: { cellWidth: 16 },
+    ...(hasDeadline ? { 5: { cellWidth: DEADLINE_W } } : {}),
   };
 
   for (let ci = 0; ci < categories.length; ci++) {
@@ -823,11 +875,11 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
       const obsBody = [];
       const obsRowMeta = [];
 
-      obsBody.push(['', formatDateFr(obs.date), cellText, '', '', formatDateFr(obs.actionDeadline)]);
+      obsBody.push(['', formatDateFr(obs.date), cellText, '', '', ...(hasDeadline ? [formatDateFr(obs.actionDeadline)] : [])]);
       obsRowMeta.push({ obs, type: 'text', rawText, hasFormatting, emitter: obs.emitter || '', actionBy: obs.actionBy || '' });
 
       if (imgs.length > 0) {
-        obsBody.push(['', '', '', '', '', '']);
+        obsBody.push(['', '', '', '', '', ...(hasDeadline ? [''] : [])]);
         obsRowMeta.push({ obs, type: 'images', imgs });
       }
 
@@ -892,7 +944,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
         2: { cellWidth: OBS_COL_STYLES[2].cellWidth },
         3: { cellWidth: OBS_COL_STYLES[3].cellWidth, halign: 'center', valign: 'middle' },
         4: { cellWidth: OBS_COL_STYLES[4].cellWidth, halign: 'center', valign: 'middle', fontStyle: 'bold' },
-        5: { cellWidth: OBS_COL_STYLES[5].cellWidth, halign: 'center', valign: 'middle', textColor: THEME.lightText },
+        ...(hasDeadline ? { 5: { cellWidth: OBS_COL_STYLES[5].cellWidth, halign: 'center', valign: 'middle', textColor: THEME.lightText } } : {}),
       },
       alternateRowStyles: {
         fillColor: [250, 252, 254],
@@ -902,6 +954,14 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
         const meta = obsRowMeta[data.row.index];
         if (!meta) return;
         const obs = meta.obs;
+
+        // Date : grise quand elle egale la date de la reunion (valeur constante,
+        // pas une donnee) ; noire et grasse quand l'observation vient d'un CR
+        // anterieur → le contraste redevient un signal.
+        if (meta.type === 'text' && data.column.index === 1 && obs.date && meeting.date && obs.date !== meeting.date) {
+          data.cell.styles.textColor = THEME.text;
+          data.cell.styles.fontStyle = 'bold';
+        }
 
         // Reserve une bande haute dans la cellule observation pour le numero.
         // Fait AVANT la mesure de hauteur du texte formate (qui relit padTop).
@@ -1208,10 +1268,10 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
 
         // Pastilles groupes emetteur (col 0) et actionBy (col 4)
         if (meta.type === 'text' && data.column.index === 0) {
-          drawGroupBadges(doc, data.cell, meta.emitter, groupIndexMap, fontH);
+          drawGroupBadges(doc, data.cell, meta.emitter, groupIndexMap, badgeNameMap, fontH);
         }
         if (meta.type === 'text' && data.column.index === 4) {
-          drawGroupBadges(doc, data.cell, meta.actionBy, groupIndexMap, fontH);
+          drawGroupBadges(doc, data.cell, meta.actionBy, groupIndexMap, badgeNameMap, fontH);
         }
 
         // Badge statut (lignes texte uniquement)
@@ -1222,7 +1282,12 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
           } else if (obs.status === 'in_progress') {
             drawBadge(doc, data.cell, 'En cours', [185, 215, 250], [20, 70, 150], fontH);
           } else if (obs.status !== 'empty') {
-            drawBadge(doc, data.cell, 'Ouvert', [240, 215, 185], [146, 64, 14], fontH);
+            // Etat par defaut : encre minimale (texte gris sans pastille) —
+            // la couleur signale ce qui a change (En cours / FAIT), pas la norme
+            doc.setFont(fontB, 'normal');
+            doc.setFontSize(6.5);
+            doc.setTextColor(120, 128, 140);
+            doc.text('Ouvert', data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2 + 1, { align: 'center' });
           }
         }
       },
@@ -1264,19 +1329,23 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
       doc.text(fitTextToWidth(doc, branding.companyName, CW / 2 - 5), M.left, footY + 1);
     }
 
-    // Centre : projet + pagination
+    // Centre : titre du projet seul (tronque a la largeur disponible)
     doc.setFont(fontB, 'normal');
     doc.setFontSize(6);
     doc.setTextColor(...THEME.lightText);
-    doc.text(fitTextToWidth(doc, `${pdfProjectName}  --  Page ${p}/${totalPages}`, CW - 10), PW / 2, footY + 1, { align: 'center' });
+    doc.text(fitTextToWidth(doc, pdfProjectName, CW - 76), PW / 2, footY + 1, { align: 'center' });
 
-    // Droite : date d'edition
-    doc.text(
-      `Édité le ${new Date().toLocaleDateString('fr-FR')}`,
-      PW - M.right,
-      footY + 1,
-      { align: 'right' },
-    );
+    // Droite : pagination en gras (la ou l'oeil la cherche) + date d'edition discrete
+    doc.setFont(fontH, 'bold');
+    doc.setFontSize(6.5);
+    doc.setTextColor(...THEME.text);
+    const pageTxt = `Page ${p}/${totalPages}`;
+    const pageW = doc.getTextWidth(pageTxt);
+    doc.text(pageTxt, PW - M.right, footY + 1, { align: 'right' });
+    doc.setFont(fontB, 'normal');
+    doc.setFontSize(5.5);
+    doc.setTextColor(...THEME.lightText);
+    doc.text(`Édité le ${new Date().toLocaleDateString('fr-FR')}  ·`, PW - M.right - pageW - 2, footY + 1, { align: 'right' });
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

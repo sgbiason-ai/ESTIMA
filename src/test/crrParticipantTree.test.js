@@ -4,7 +4,7 @@ import {
   flattenGroupContacts, countGroupContacts, flattenAllContacts,
   addContactToTree, updateContactInTree, deleteContactFromTree,
   addSubGroupToTree, updateSubGroupInTree, deleteSubGroupFromTree,
-  moveContactInTree,
+  moveContactInTree, groupBadgeOptions, groupColorIndexMap, renameBadgeNameInTree,
 } from '../utils/crrParticipantTree';
 
 const c = (id, name) => ({ id, name, email: `${name}@x.fr`, cpr: false });
@@ -131,5 +131,78 @@ describe('crrParticipantTree — insertion à l\'index (drop biblio)', () => {
   it('addContactToTree sans index ajoute en fin (comportement historique)', () => {
     const out = addContactToTree(makeGroups(), 'g2', 's1', c('x', 'X'));
     expect(out[1].subGroups[0].contacts.map((k) => k.id)).toEqual(['b', 'x']);
+  });
+});
+
+describe('crrParticipantTree — pastilles observations (groupes + sous-groupes)', () => {
+  const groups = [
+    { id: 'g1', name: 'MOE', contacts: [{ ...c('a', 'Alice'), subLabel: 'Bureau etudes' }] },
+    {
+      id: 'g2', name: 'Entreprises', contacts: [{ ...c('x', 'Xavier'), subLabel: 'Lot 2 EV' }],
+      subGroups: [
+        { id: 's1', name: 'Lot 1 VRD', contacts: [{ ...c('b', 'Bob'), subLabel: 'Terrassement' }] },
+        { id: 's2', name: 'Lot 2 EV', contacts: [{ ...c('d', 'Dan'), subLabel: 'Espaces verts' }] },
+      ],
+    },
+  ];
+
+  it('groupBadgeOptions liste groupes + sous-groupes, sous-groupe hérite de l\'index parent', () => {
+    const opts = groupBadgeOptions(groups);
+    expect(opts.map((o) => o.name)).toEqual([
+      'MOE',
+      'Bureau etudes',
+      'Entreprises',
+      'Lot 1 VRD',
+      'Lot 2 EV',
+      'Terrassement',
+      'Espaces verts',
+    ]);
+    expect(opts.map((o) => o.colorIndex)).toEqual([0, 0, 1, 1, 1, 1, 1]);
+    expect(opts.map((o) => o.isSub)).toEqual([false, true, false, true, true, true, true]);
+    expect(opts[3].parentName).toBe('Entreprises');
+  });
+
+  it('groupColorIndexMap mappe groupes ET sous-groupes vers l\'index couleur (parent pour les sous-groupes)', () => {
+    const map = groupColorIndexMap(groups);
+    expect(map).toEqual({
+      MOE: 0,
+      'Bureau etudes': 0,
+      Entreprises: 1,
+      'Lot 1 VRD': 1,
+      'Lot 2 EV': 1,
+      Terrassement: 1,
+      'Espaces verts': 1,
+    });
+  });
+
+  it('gère l\'absence de subGroups et les entrées vides', () => {
+    expect(groupBadgeOptions([])).toEqual([]);
+    expect(groupBadgeOptions(null)).toEqual([]);
+    expect(groupColorIndexMap([{ id: 'g', name: 'Seul', contacts: [] }])).toEqual({ Seul: 0 });
+  });
+
+  it('renameBadgeNameInTree renomme toutes les pastilles identiques', () => {
+    const source = [
+      {
+        id: 'g1',
+        name: 'Papyrus VRD',
+        badgeName: 'PAPYR',
+        contacts: [{ id: 'c1', subLabel: 'Papyrus VRD', badgeName: 'PAPYR' }, { id: 'c2', subLabel: 'MOE' }],
+        subGroups: [{ id: 's1', name: 'Lot Papyrus', badgeName: 'PAPYR', contacts: [{ id: 'c3', subLabel: 'Papyrus VRD', badgeName: 'PAPYR' }] }],
+      },
+      { id: 'g2', name: 'Entreprises', contacts: [{ id: 'c4', subLabel: 'Papyrus VRD', badgeName: 'PAPYR' }], subGroups: [] },
+    ];
+
+    const out = renameBadgeNameInTree(source, 'PAPYR', 'PAPY2');
+
+    expect(out[0].name).toBe('Papyrus VRD');
+    expect(out[0].badgeName).toBe('PAPY2');
+    expect(out[0].contacts.map((c) => c.subLabel)).toEqual(['Papyrus VRD', 'MOE']);
+    expect(out[0].contacts[0].badgeName).toBe('PAPY2');
+    expect(out[0].subGroups[0].name).toBe('Lot Papyrus');
+    expect(out[0].subGroups[0].badgeName).toBe('PAPY2');
+    expect(out[0].subGroups[0].contacts[0].badgeName).toBe('PAPY2');
+    expect(out[1].contacts[0].subLabel).toBe('Papyrus VRD');
+    expect(out[1].contacts[0].badgeName).toBe('PAPY2');
   });
 });

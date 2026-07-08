@@ -1,6 +1,7 @@
 // src/utils/crrParticipantTree.js
 //
 // Manipulation pure (sans React) de l'arborescence des participants CRC.
+import { abbreviateGroup, normalizeGroupBadgeName } from '../data/crrData';
 //
 // Modele : participantGroups[] ; chaque groupe = { id, name, subLabel,
 //   contacts: [], subGroups?: [] }. Un sous-groupe = { id, name, subLabel,
@@ -16,6 +17,81 @@ export const flattenGroupContacts = (group) => [
 
 // Nombre total de contacts d'un groupe (directs + sous-groupes).
 export const countGroupContacts = (group) => flattenGroupContacts(group).length;
+
+// Options de pastilles pour les observations (emetteur / PAR) : liste ordonnee
+// des groupes, de leurs sous-groupes ET des labels portes par les contacts.
+// Chaque sous-groupe / label contact HERITE de l'index couleur de son groupe
+// parent (pastille de la meme couleur).
+// → [{ name, colorIndex, isSub, parentName, key }]
+export const groupBadgeOptions = (groups) => {
+  const out = [];
+  const seen = new Set();
+  const pushOption = (option) => {
+    const name = (option.name || '').trim();
+    if (!name || seen.has(name)) return;
+    seen.add(name);
+    out.push({ ...option, name });
+  };
+
+  (groups || []).forEach((g, gi) => {
+    pushOption({ name: g.name, badgeName: g.badgeName, colorIndex: gi, isSub: false, parentName: null, key: g.id || `g${gi}` });
+    (g.subGroups || []).forEach((sg, si) => {
+      pushOption({ name: sg.name, badgeName: sg.badgeName, colorIndex: gi, isSub: true, parentName: g.name, key: sg.id || `g${gi}s${si}` });
+    });
+    flattenGroupContacts(g).forEach((contact, ci) => {
+      pushOption({
+        name: contact.subLabel,
+        badgeName: contact.badgeName,
+        colorIndex: gi,
+        isSub: true,
+        parentName: g.name,
+        key: contact.id ? `label-${contact.id}` : `g${gi}l${ci}`,
+      });
+    });
+  });
+  return out;
+};
+
+// Map nom (groupe ou sous-groupe) → index couleur. En cas de collision de nom,
+// la 1re occurrence (groupe avant ses sous-groupes) gagne.
+export const groupColorIndexMap = (groups) => {
+  const map = {};
+  for (const o of groupBadgeOptions(groups)) {
+    if (!(o.name in map)) map[o.name] = o.colorIndex;
+  }
+  return map;
+};
+
+export const groupBadgeNameMap = (groups) => {
+  const map = {};
+  for (const o of groupBadgeOptions(groups)) {
+    if (!(o.name in map)) map[o.name] = o.badgeName;
+  }
+  return map;
+};
+
+const effectiveBadgeName = (fallbackName, badgeName) =>
+  normalizeGroupBadgeName(badgeName) || abbreviateGroup(fallbackName);
+
+// Renomme un code pastille partout dans l'arborescence participants, sans
+// toucher aux noms metier (groupe.name / sous-groupe.name / contact.subLabel).
+export const renameBadgeNameInTree = (groups, oldName, newName) => {
+  if (!oldName || oldName === newName) return groups;
+  const oldBadge = normalizeGroupBadgeName(oldName);
+  const newBadge = normalizeGroupBadgeName(newName);
+  const patchBadge = (fallbackName, badgeName) =>
+    effectiveBadgeName(fallbackName, badgeName) === oldBadge ? newBadge : badgeName;
+  return (groups || []).map((g) => ({
+    ...g,
+    badgeName: patchBadge(g.name, g.badgeName),
+    contacts: (g.contacts || []).map((c) => ({ ...c, badgeName: patchBadge(c.subLabel || g.name, c.badgeName) })),
+    subGroups: (g.subGroups || []).map((sg) => ({
+      ...sg,
+      badgeName: patchBadge(sg.name, sg.badgeName),
+      contacts: (sg.contacts || []).map((c) => ({ ...c, badgeName: patchBadge(c.subLabel || sg.name, c.badgeName) })),
+    })),
+  }));
+};
 
 // Liste plate de tous les contacts de tous les groupes, avec le contexte
 // (groupId/groupName, et subGroupId/subGroupName si le contact est dans un

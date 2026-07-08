@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_CATEGORIES, MEETING_TYPES, PRESENCE_OPTIONS, OBSERVATION_STATUSES,
-  LEGAL_TEXT, GROUP_COLORS, getGroupColor, abbreviateGroup,
+  LEGAL_TEXT, GROUP_COLORS, getGroupColor, normalizeGroupBadgeName, abbreviateGroup,
   DEFAULT_PARTICIPANT_GROUPS, generateCrrId, createEmptyMeeting, createEmptyObservation,
   generateObsKey, defaultCategoryCode, formatObsNumber, computeObsStats, obsDisplayNumber, obsAge, obsValidation,
 } from '../data/crrData';
@@ -73,6 +73,20 @@ describe('getGroupColor', () => {
 });
 
 // ─── abbreviateGroup ────────────────────────────────────────────────────────
+
+describe('normalizeGroupBadgeName', () => {
+  it('produit un code pastille en majuscules limite a 5 caracteres', () => {
+    expect(normalizeGroupBadgeName('Papyrus')).toBe('PAPYR');
+    expect(normalizeGroupBadgeName('Lot 1 VRD')).toBe('LOT1V');
+    expect(normalizeGroupBadgeName('éàçôû')).toBe('EACOU');
+  });
+
+  it('retire les ponctuations et gere le vide', () => {
+    expect(normalizeGroupBadgeName('MOE-01')).toBe('MOE01');
+    expect(normalizeGroupBadgeName('')).toBe('');
+    expect(normalizeGroupBadgeName(null)).toBe('');
+  });
+});
 
 describe('abbreviateGroup', () => {
   it('retourne les abbreviations du dictionnaire', () => {

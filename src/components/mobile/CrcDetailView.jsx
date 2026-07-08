@@ -10,7 +10,7 @@ import Icon from './Icon';
 import { dateFr } from './formatters';
 import { OBSERVATION_STATUSES, PRESENCE_OPTIONS, MEETING_TYPES, GROUP_COLORS, getGroupColor, abbreviateGroup, obsDisplayNumber, obsAge, obsValidation } from '../../data/crrData';
 import { normalizeObsText, stripHtml } from '../../utils/formatObsText';
-import { flattenGroupContacts } from '../../utils/crrParticipantTree';
+import { flattenGroupContacts, groupColorIndexMap, groupBadgeNameMap } from '../../utils/crrParticipantTree';
 import { sanitizeHtml } from '../../utils/helpers';
 // fileSaver non utilisé — export PDF direct par téléchargement
 // exportHelpers chargé dynamiquement pour le code-splitting
@@ -236,12 +236,9 @@ export default function CrcDetailView({ chantier, branding, onToast, manager, is
     return list;
   }, [meetingGroups]);
 
-  // ── Map nom de groupe → index couleur ──
-  const groupColorMap = useMemo(() => {
-    const map = {};
-    (meetingGroups || []).forEach((g, i) => { map[g.name] = i; });
-    return map;
-  }, [meetingGroups]);
+  // ── Map nom (groupe OU sous-groupe) → index couleur ──
+  const groupColorMap = useMemo(() => groupColorIndexMap(meetingGroups), [meetingGroups]);
+  const badgeNameMap = useMemo(() => groupBadgeNameMap(meetingGroups), [meetingGroups]);
 
   if (meetings.length === 0) {
     return (
@@ -596,12 +593,12 @@ function DuplicateModal({ meeting, onConfirm, onClose }) {
 
 // ─── BADGE GROUPE COLORÉ ────────────────────────────────────────────────────
 
-function GroupBadgeMobile({ name, colorIndex }) {
+function GroupBadgeMobile({ name, badgeName, colorIndex }) {
   if (!name) return null;
   const c = getGroupColor(colorIndex ?? 0);
-  const abbr = abbreviateGroup(name);
+  const abbr = abbreviateGroup(badgeName || name);
   return (
-    <span className={`inline-flex items-center justify-center rounded-full border font-bold leading-none whitespace-nowrap text-[9px] px-1 py-0.5 gap-1 w-[52px] shrink-0 ${c.bg} ${c.text} ${c.border}`}>
+    <span className={`inline-flex items-center justify-center rounded-full border font-bold leading-none whitespace-nowrap text-[9px] px-1.5 py-0.5 gap-1 min-w-[52px] shrink-0 ${c.bg} ${c.text} ${c.border}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${c.dot} shrink-0`} />
       {abbr}
     </span>
@@ -716,7 +713,7 @@ function ObservationCard({ obs, groupColorMap, categoryCodes = {}, meetingNumber
           {st.label}
         </span>
         {obs.emitter && (
-          <GroupBadgeMobile name={obs.emitter} colorIndex={groupColorMap[obs.emitter]} />
+          <GroupBadgeMobile name={obs.emitter} badgeName={badgeNameMap[obs.emitter]} colorIndex={groupColorMap[obs.emitter]} />
         )}
         {age >= 1 && (
           <span className="text-[10px] text-gray-600 ml-auto shrink-0" title="Nombre de réunions depuis l'émission">depuis CR n°{obs.originMeetingNumber}</span>
@@ -739,7 +736,7 @@ function ObservationCard({ obs, groupColorMap, categoryCodes = {}, meetingNumber
           {obs.actionBy && (
             <span className="flex items-center gap-1">
               <span className="font-semibold">Action :</span>
-              <GroupBadgeMobile name={obs.actionBy} colorIndex={groupColorMap[obs.actionBy]} />
+              <GroupBadgeMobile name={obs.actionBy} badgeName={badgeNameMap[obs.actionBy]} colorIndex={groupColorMap[obs.actionBy]} />
             </span>
           )}
           {obs.actionDeadline && (
@@ -807,7 +804,7 @@ function SwiperSlide({ obs, groupColorMap, categoryCodes = {}, meetingNumber, on
         <span className={`px-2.5 py-1 rounded-lg text-[12px] font-bold uppercase border ${statusColorMobile(obs.status)}`}>
           {st.label}
         </span>
-        {obs.emitter && <GroupBadgeMobile name={obs.emitter} colorIndex={groupColorMap?.[obs.emitter]} />}
+        {obs.emitter && <GroupBadgeMobile name={obs.emitter} badgeName={badgeNameMap?.[obs.emitter]} colorIndex={groupColorMap?.[obs.emitter]} />}
         {obs.date && <span className="text-[13px] text-gray-400 ml-auto">{dateFr(obs.date)}</span>}
       </div>
 
@@ -841,7 +838,7 @@ function SwiperSlide({ obs, groupColorMap, categoryCodes = {}, meetingNumber, on
 
       {(obs.actionBy || obs.actionDeadline) && (
         <div className="bg-gray-50 rounded-xl p-3 space-y-1 mb-4">
-          {obs.actionBy && <div className="text-xs text-gray-700 flex items-center gap-1"><span className="font-bold">Action par :</span> <GroupBadgeMobile name={obs.actionBy} colorIndex={groupColorMap?.[obs.actionBy]} /></div>}
+          {obs.actionBy && <div className="text-xs text-gray-700 flex items-center gap-1"><span className="font-bold">Action par :</span> <GroupBadgeMobile name={obs.actionBy} badgeName={badgeNameMap?.[obs.actionBy]} colorIndex={groupColorMap?.[obs.actionBy]} /></div>}
           {obs.actionDeadline && <div className="text-xs text-gray-700"><span className="font-bold">Échéance :</span> {dateFr(obs.actionDeadline)}</div>}
         </div>
       )}

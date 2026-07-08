@@ -149,23 +149,24 @@ const CrrParticipants = ({
   const participantGroups = meeting.participantGroups || crrConfig.participantGroups;
 
   // Ligne contact (reutilisee pour les contacts directs et ceux des sous-groupes).
-  const renderContactRow = (contact, groupId, deep = false) => {
+  const renderContactRow = (contact, groupId, groupIdx = 0, groupName = '', deep = false) => {
     const isEditingC = editingContact === contact.id;
     return (
       <div
         key={contact.id}
         className={`${GRID} px-4 py-1.5 hover:bg-slate-50 transition-colors items-center group/row`}
       >
-        {/* Role (vide) + suppression */}
-        <div className={`${deep ? 'pl-9' : 'pl-5'} flex items-center gap-1`}>
+        {/* Pastille PAR LABEL (abrev. du label, couleur du groupe) + suppression */}
+        <div className={`${deep ? 'pl-6' : 'pl-2'} flex items-center gap-1 min-w-0`}>
           {showManagement && (
             <button
               onClick={() => handleDeleteContact(groupId, contact.id)}
-              className="opacity-0 group-hover/row:opacity-100 p-0.5 text-slate-300 hover:text-red-500 rounded transition-all"
+              className="opacity-0 group-hover/row:opacity-100 p-0.5 text-slate-300 hover:text-red-500 rounded transition-all shrink-0"
             >
               <Trash2 size={10} />
             </button>
           )}
+          <GroupBadge name={(contact.subLabel || '').trim() || groupName} badgeName={contact.badgeName} colorIndex={groupIdx} />
         </div>
 
         {/* Label */}
@@ -296,8 +297,8 @@ const CrrParticipants = ({
               </div>
             ) : (
               <>
-                <GroupBadge name={sg.name} colorIndex={groupIdx} />
                 <span className="text-[11px] font-semibold text-slate-600 uppercase truncate">{sg.name}</span>
+                <GroupBadge name={sg.name} badgeName={sg.badgeName} colorIndex={groupIdx} />
                 <span className="text-[10px] text-slate-400">({(sg.contacts || []).length})</span>
                 {showManagement && (
                   <div className="flex items-center gap-0.5 ml-auto" onClick={(e) => e.stopPropagation()}>
@@ -318,7 +319,7 @@ const CrrParticipants = ({
         </div>
 
         {/* Contacts du sous-groupe */}
-        {(sg.contacts || []).map((contact) => renderContactRow(contact, group.id, true))}
+        {(sg.contacts || []).map((contact) => renderContactRow(contact, group.id, groupIdx, group.name, true))}
 
         {/* Ajouter contact dans le sous-groupe */}
         {showManagement && (
@@ -468,7 +469,7 @@ const CrrParticipants = ({
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <GroupBadge name={group.name} colorIndex={groupIdx} />
+                    <GroupBadge name={group.name} badgeName={group.badgeName} colorIndex={groupIdx} />
                     <span className="text-xs font-bold text-slate-700 uppercase">
                       {group.name}
                     </span>
@@ -515,7 +516,7 @@ const CrrParticipants = ({
             </div>
 
             {/* Contacts directs */}
-            {isExpanded && group.contacts.map((contact) => renderContactRow(contact, group.id, false))}
+            {isExpanded && group.contacts.map((contact) => renderContactRow(contact, group.id, groupIdx, group.name, false))}
 
             {/* Ajouter contact direct + sous-groupe */}
             {isExpanded && showManagement && (

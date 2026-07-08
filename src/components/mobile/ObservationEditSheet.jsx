@@ -10,6 +10,7 @@ import { useOrientation } from '../../hooks/useOrientation';
 import { sanitizeHtml } from '../../utils/helpers';
 import { toast } from '../../utils/globalUI';
 import { getGroupColor, obsValidation } from '../../data/crrData';
+import { groupBadgeOptions } from '../../utils/crrParticipantTree';
 
 // ─── STATUS CONFIG ─────────────────────────────────────────────────────────
 const STATUSES = [
@@ -100,8 +101,10 @@ export default function ObservationEditSheet({
     onClose();
   }, [update, onClose]);
 
-  // ── Group names for selects ──
-  const groupNames = participantGroups.map((g) => g.name).filter(Boolean);
+  // ── Options emetteur/PAR : groupes + sous-groupes (indentes) ──
+  const groupOptions = groupBadgeOptions(participantGroups)
+    .filter((o) => o.name)
+    .map((o) => ({ value: o.name, label: o.isSub ? `↳ ${o.name}` : o.name }));
 
   if (!obs) return null;
 
@@ -145,7 +148,7 @@ export default function ObservationEditSheet({
           </div>
 
           <div className="grid grid-cols-2 gap-2 pb-2 shrink-0">
-            <ColoredSelect value={obs.emitter || ''} onChange={(v) => update({ emitter: v })} placeholder="Émetteur…" options={groupNames} groupColorMap={groupColorMap} />
+            <ColoredSelect value={obs.emitter || ''} onChange={(v) => update({ emitter: v })} placeholder="Émetteur…" options={groupOptions} groupColorMap={groupColorMap} />
             <input type="date" value={obs.date || ''} onChange={(e) => update({ date: e.target.value })} className={`${inputClass} text-xs py-2`} />
           </div>
 
@@ -180,7 +183,7 @@ export default function ObservationEditSheet({
           <div className="shrink-0 space-y-3 pt-3">
             {/* Action par + Échéance */}
             <div className="grid grid-cols-2 gap-2">
-              <ColoredSelect value={obs.actionBy || ''} onChange={(v) => update({ actionBy: v })} placeholder="Action par…" options={groupNames} groupColorMap={groupColorMap} invalid={missingResponsable} />
+              <ColoredSelect value={obs.actionBy || ''} onChange={(v) => update({ actionBy: v })} placeholder="Action par…" options={groupOptions} groupColorMap={groupColorMap} invalid={missingResponsable} />
               <input type="date" value={obs.actionDeadline || ''} onChange={(e) => update({ actionDeadline: e.target.value })} className={`${inputClass} text-xs py-2`} placeholder="Échéance" />
             </div>
             {missingResponsable && (
@@ -272,7 +275,7 @@ function ColoredSelect({ value, onChange, placeholder, options, groupColorMap, i
         className={`${selectClass} text-xs py-2 ${c ? `pl-7 ${c.border} ${c.bg}` : ''} ${invalid ? 'border-red-300 bg-red-50' : ''}`}
       >
         <option value="">{placeholder}</option>
-        {options.map((g) => (<option key={g} value={g}>{g}</option>))}
+        {options.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
       </select>
     </div>
   );

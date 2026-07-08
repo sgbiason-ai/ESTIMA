@@ -12,6 +12,8 @@ import {
   createEmptyObservation,
   generateCrrId,
   defaultCategoryCode,
+  abbreviateGroup,
+  normalizeGroupBadgeName,
 } from '../data/crrData';
 import { migrateCrrData } from '../utils/crrMigration';
 import {
@@ -23,6 +25,7 @@ import {
   updateSubGroupInTree,
   deleteSubGroupFromTree,
   moveContactInTree,
+  renameBadgeNameInTree,
 } from '../utils/crrParticipantTree';
 import { useRobustSave } from './useRobustSave';
 import { useStableHash } from './useStableHash';
@@ -385,6 +388,7 @@ export const useCrrManager = ({
       const newGroup = {
         id: generateCrrId(),
         name: groupName,
+        badgeName: normalizeGroupBadgeName(groupName),
         subLabel: '',
         contacts: [],
       };
@@ -397,11 +401,19 @@ export const useCrrManager = ({
     (groupId, patch) => {
       const oldGroup = activeParticipantGroups.find((g) => g.id === groupId);
       const oldName = oldGroup?.name;
-      const newName = patch.name;
+      const oldBadge = normalizeGroupBadgeName(oldGroup?.badgeName) || abbreviateGroup(oldGroup?.name);
+      const safePatch = patch.badgeName !== undefined
+        ? { ...patch, badgeName: normalizeGroupBadgeName(patch.badgeName) }
+        : patch;
+      const newName = safePatch.name;
+      const newBadge = safePatch.badgeName;
 
-      const groups = activeParticipantGroups.map((g) =>
-        g.id === groupId ? { ...g, ...patch } : g
+      let groups = activeParticipantGroups.map((g) =>
+        g.id === groupId ? { ...g, ...safePatch } : g
       );
+      if (safePatch.badgeName !== undefined && oldBadge && newBadge !== oldBadge) {
+        groups = renameBadgeNameInTree(groups, oldBadge, newBadge);
+      }
 
       // Sans reunion active : ecrire le template global (pas d'observations a patcher).
       if (!activeMeeting) { updateMeetingParticipantGroups(groups); return; }
@@ -440,6 +452,30 @@ export const useCrrManager = ({
       if (!hasOrphan(activeMeeting.attendance) && !hasOrphan(activeMeeting.diffusion)) return null;
       const strip = (obj) => Object.fromEntries(Object.entries(obj || {}).filter(([k]) => !ids.has(k)));
       return { attendance: strip(activeMeeting.attendance), diffusion: strip(activeMeeting.diffusion) };
+    },
+    [activeMeeting]
+  );
+
+  // Renomme (newName) ou retire (newName=null) un nom de groupe/sous-groupe dans
+  // les pastilles emetteur/actionBy des observations de la reunion active.
+  // Retourne { observations } ou null (pas de reunion / rien a faire).
+  const remapObsBadgeName = useCallback(
+    (oldName, newName) => {
+      if (!activeMeeting || !oldName) return null;
+      const remap = (v) => {
+        if (!v) return v;
+        const out = [];
+        for (const n of v.split(',').map((s) => s.trim()).filter(Boolean)) {
+          if (n !== oldName) out.push(n);
+          else if (newName) out.push(newName); // sinon on retire la pastille
+        }
+        return out.join(', ');
+      };
+      return {
+        observations: (activeMeeting.observations || []).map((o) => ({
+          ...o, emitter: remap(o.emitter), actionBy: remap(o.actionBy),
+        })),
+      };
     },
     [activeMeeting]
   );
@@ -513,11 +549,24 @@ export const useCrrManager = ({
   // Le contact est retrouve par son id (groupe direct OU sous-groupe).
   const updateContact = useCallback(
     (_groupId, contactId, patch) => {
-      updateMeetingParticipantGroups(
-        updateContactInTree(activeParticipantGroups, contactId, patch)
-      );
+      const oldContact = flattenAllContacts(activeParticipantGroups).find((c) => c.id === contactId);
+      const oldLabel = (oldContact?.subLabel || '').trim();
+      const oldBadge = normalizeGroupBadgeName(oldContact?.badgeName) || abbreviateGroup(oldLabel);
+      const safePatch = patch.badgeName !== undefined
+        ? { ...patch, badgeName: normalizeGroupBadgeName(patch.badgeName) }
+        : patch;
+      let groups = updateContactInTree(activeParticipantGroups, contactId, safePatch);
+      const newBadge = safePatch.badgeName;
+      if (safePatch.badgeName !== undefined && oldBadge && newBadge !== oldBadge) {
+        groups = renameBadgeNameInTree(groups, oldBadge, newBadge || '');
+      }
+      const obsPatch = (safePatch.subLabel !== undefined && oldLabel && safePatch.subLabel !== oldLabel)
+        ? remapObsBadgeName(oldLabel, safePatch.subLabel || null)
+        : null;
+      if (obsPatch) updateActiveMeeting({ participantGroups: groups, ...obsPatch });
+      else updateMeetingParticipantGroups(groups);
     },
-    [activeParticipantGroups, updateMeetingParticipantGroups]
+    [activeParticipantGroups, updateMeetingParticipantGroups, updateActiveMeeting, remapObsBadgeName]
   );
 
   const deleteContact = useCallback(
@@ -534,7 +583,7 @@ export const useCrrManager = ({
 
   const addSubGroup = useCallback(
     (groupId, name = 'Sous-groupe') => {
-      const newSub = { id: generateCrrId(), name, subLabel: '', contacts: [] };
+      const newSub = { id: generateCrrId(), name, badgeName: normalizeGroupBadgeName(name), subLabel: '', contacts: [] };
       updateMeetingParticipantGroups(
         addSubGroupToTree(activeParticipantGroups, groupId, newSub)
       );
@@ -545,23 +594,39 @@ export const useCrrManager = ({
 
   const updateSubGroup = useCallback(
     (groupId, subGroupId, patch) => {
-      updateMeetingParticipantGroups(
-        updateSubGroupInTree(activeParticipantGroups, groupId, subGroupId, patch)
-      );
+      const parent = activeParticipantGroups.find((g) => g.id === groupId);
+      const oldName = (parent?.subGroups || []).find((sg) => sg.id === subGroupId)?.name;
+      const oldSubGroup = (parent?.subGroups || []).find((sg) => sg.id === subGroupId);
+      const oldBadge = normalizeGroupBadgeName(oldSubGroup?.badgeName) || abbreviateGroup(oldSubGroup?.name);
+      const safePatch = patch.badgeName !== undefined
+        ? { ...patch, badgeName: normalizeGroupBadgeName(patch.badgeName) }
+        : patch;
+      let groups = updateSubGroupInTree(activeParticipantGroups, groupId, subGroupId, safePatch);
+      if (safePatch.badgeName !== undefined && oldBadge && safePatch.badgeName !== oldBadge) {
+        groups = renameBadgeNameInTree(groups, oldBadge, safePatch.badgeName || '');
+      }
+      // Propager un renommage aux pastilles des observations (comme un groupe)
+      const obsPatch = (safePatch.name !== undefined && oldName && safePatch.name !== oldName)
+        ? remapObsBadgeName(oldName, safePatch.name || null) : null;
+      if (obsPatch) updateActiveMeeting({ participantGroups: groups, ...obsPatch });
+      else updateMeetingParticipantGroups(groups);
     },
-    [activeParticipantGroups, updateMeetingParticipantGroups]
+    [activeParticipantGroups, updateMeetingParticipantGroups, updateActiveMeeting, remapObsBadgeName]
   );
 
   const deleteSubGroup = useCallback(
     (groupId, subGroupId) => {
       const parent = activeParticipantGroups.find((g) => g.id === groupId);
-      const removedIds = ((parent?.subGroups || []).find((sg) => sg.id === subGroupId)?.contacts || []).map((c) => c.id);
+      const sg = (parent?.subGroups || []).find((s) => s.id === subGroupId);
+      const removedIds = (sg?.contacts || []).map((c) => c.id);
       const groups = deleteSubGroupFromTree(activeParticipantGroups, groupId, subGroupId);
+      // Retirer la pastille du sous-groupe des observations + purger presence
       const scrub = scrubbedPresence(removedIds);
-      if (scrub) updateActiveMeeting({ participantGroups: groups, ...scrub });
+      const obsPatch = remapObsBadgeName(sg?.name, null);
+      if (scrub || obsPatch) updateActiveMeeting({ participantGroups: groups, ...scrub, ...obsPatch });
       else updateMeetingParticipantGroups(groups);
     },
-    [activeParticipantGroups, updateMeetingParticipantGroups, updateActiveMeeting, scrubbedPresence]
+    [activeParticipantGroups, updateMeetingParticipantGroups, updateActiveMeeting, scrubbedPresence, remapObsBadgeName]
   );
 
   // ── IMPORT DEPUIS BIBLIOTHEQUE ─────────────────────────────────────────
@@ -595,7 +660,7 @@ export const useCrrManager = ({
         let targetGroupId = item.targetGroupId;
         if (!targetGroupId || !groups.some((g) => g.id === targetGroupId)) {
           targetGroupId = targetGroupId || generateCrrId();
-          groups = [...groups, { id: targetGroupId, name: lc.subLabel || 'Participants', subLabel: '', contacts: [], subGroups: [] }];
+          groups = [...groups, { id: targetGroupId, name: lc.subLabel || 'Participants', badgeName: normalizeGroupBadgeName(lc.subLabel || 'PART'), subLabel: '', contacts: [], subGroups: [] }];
         }
 
         const newContact = {
@@ -605,6 +670,7 @@ export const useCrrManager = ({
           email: lc.email || '',
           phone: lc.phone || '',
           subLabel: lc.subLabel || '',
+          badgeName: normalizeGroupBadgeName(lc.subLabel || ''),
           cpr: false,
         };
         groups = addContactToTree(groups, targetGroupId, targetSubGroupId, newContact, item.targetIndex ?? null);

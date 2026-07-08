@@ -3,7 +3,7 @@
 // Export Word (.doc) d'un Compte Rendu de Reunion.
 // Genere un document HTML avec styles inline que Word ouvre nativement.
 
-import { MEETING_TYPES, GROUP_COLORS, computeObsStats } from '../data/crrData';
+import { MEETING_TYPES, GROUP_COLORS, abbreviateGroup, computeObsStats } from '../data/crrData';
 import { obsTextToHtml } from './formatObsText.jsx';
 import { ESTIMA_CREDIT, isEstimaCreditEnabled } from './estimaCredit';
 
@@ -112,13 +112,14 @@ export const generateWordCrr = (meeting, crrConfig, projectName = '', branding =
   // Participants
   html += `<div class="section-title">PARTICIPANTS</div>`;
   html += `<table><thead><tr>
-    <th style="width:20%">ROLE / INTERVENANT</th>
-    <th style="width:12%">LABEL</th>
-    <th style="width:28%">CONTACT</th>
+    <th style="width:18%">ROLE / INTERVENANT</th>
+    <th style="width:6%"></th>
+    <th style="width:11%">LABEL</th>
+    <th style="width:27%">CONTACT</th>
     <th style="width:25%">EMAIL</th>
-    <th style="width:5%">CPR</th>
-    <th style="width:5%">PRES.</th>
-    <th style="width:5%">DIFF.</th>
+    <th style="width:4%">CPR</th>
+    <th style="width:4.5%">PRES.</th>
+    <th style="width:4.5%">DIFF.</th>
   </tr></thead><tbody>`;
 
   for (let gi = 0; gi < groups.length; gi++) {
@@ -133,24 +134,47 @@ export const generateWordCrr = (meeting, crrConfig, projectName = '', branding =
         ...(sg.contacts || []).map((c) => ({ type: 'contact', contact: c })),
       ]),
     ];
+    // Blocs de label : contacts consecutifs de meme label → 1 pastille fusionnee
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      if (r.type !== 'contact') continue;
+      const prev = rows[i - 1];
+      const same = prev && prev.type === 'contact' && (prev.contact.subLabel || '') === (r.contact.subLabel || '');
+      if (!same) {
+        r.blockStart = true;
+        let span = 1;
+        for (let j = i + 1; j < rows.length; j++) {
+          const nx = rows[j];
+          if (nx.type === 'contact' && (nx.contact.subLabel || '') === (r.contact.subLabel || '')) span++;
+          else break;
+        }
+        r.blockSpan = span;
+      }
+    }
     if (rows.length === 0) {
-      html += `<tr style="background:#f8fafb"><td colspan="7" style="font-weight:bold;color:${primary}">${group.name}${group.subLabel ? ` : ${group.subLabel}` : ''}</td></tr>`;
+      html += `<tr style="background:#f8fafb"><td colspan="8" style="font-weight:bold;color:${primary}">${group.name}${group.subLabel ? ` : ${group.subLabel}` : ''}</td></tr>`;
     } else {
       rows.forEach((row, ri) => {
         html += `<tr style="background-color:${rowBg}">`;
         if (ri === 0) {
-          // Case ROLE/INTERVENANT teintee a la couleur de la pastille du groupe
+          // Case ROLE/INTERVENANT teintee a la couleur du groupe (rowSpan groupe)
           const roleTxt = `rgb(${gc.rgb.map((v) => Math.round(v * 0.75)).join(',')})`;
           html += `<td rowspan="${rows.length}" style="font-weight:bold;vertical-align:middle;background:rgb(${gc.rgbBg.join(',')});color:${roleTxt}">${group.name}${group.subLabel ? `<br><span style="font-size:8pt;color:#64748b">${group.subLabel}</span>` : ''}</td>`;
         }
-        // Bandeau sous-groupe : couleurs du groupe parent (identique au PDF)
+        // Bandeau sous-groupe : nom + compteur (plus de pastille propre → la
+        // pastille par label des contacts en-dessous porte l'abreviation)
         if (row.type === 'sub') {
           const n = (row.sg.contacts || []).length;
-          html += `<td colspan="6" style="background:rgb(${gc.rgbBg.join(',')});color:rgb(${gc.rgb.join(',')});font-weight:bold;font-size:8pt;padding-left:8px">&raquo; ${row.sg.name}${n > 0 ? ` (${n})` : ''}</td>`;
+          html += `<td colspan="7" style="background:rgb(${gc.rgbBg.join(',')});color:rgb(${gc.rgb.join(',')});font-weight:bold;font-size:8pt;padding-left:8px;text-align:left">${row.sg.name}${n > 0 ? ` (${n})` : ''}</td>`;
           html += `</tr>`;
           return;
         }
         const contact = row.contact;
+        // Pastille PAR LABEL (abrev.), couleur du groupe, fusionnee sur le bloc
+        if (row.blockStart) {
+          const abbr = abbreviateGroup((contact.subLabel || '').trim() || group.name);
+          html += `<td rowspan="${row.blockSpan}" style="text-align:center;vertical-align:middle;background:rgb(${gc.rgbBg.join(',')})"><span style="display:inline-block;background:#ffffff;color:rgb(${gc.rgb.join(',')});border-radius:6px;padding:0 4px;font-size:6pt;font-weight:bold">${abbr}</span></td>`;
+        }
         const att = meeting.attendance?.[contact.id] || 'absent';
         const diff = meeting.diffusion?.[contact.id] || false;
         html += `<td style="font-size:8pt;color:#64748b">${contact.subLabel || ''}</td>`;

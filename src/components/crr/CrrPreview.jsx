@@ -7,6 +7,7 @@ import { MEETING_TYPES, OBSERVATION_STATUSES, GROUP_COLORS, abbreviateGroup, com
 import { renderFormattedText } from '../../utils/formatObsText.jsx';
 import { formatDateFr, formatDateLong } from '../../utils/dateHelpers';
 import { lightenHex } from '../../utils/colorHelpers';
+import { groupColorIndexMap, groupBadgeNameMap } from '../../utils/crrParticipantTree';
 
 const CAT_COLORS = [
   { r: 40, g: 110, b: 85 },   // emerald
@@ -30,9 +31,9 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
     );
   }
 
-  // Map nom de groupe → index pour les couleurs des pastilles
-  const groupIndexMap = {};
-  (crrConfig.participantGroups || []).forEach((g, i) => { groupIndexMap[g.name] = i; });
+  // Map nom (groupe OU sous-groupe) → index couleur pour les pastilles
+  const groupIndexMap = groupColorIndexMap(crrConfig.participantGroups);
+  const badgeNameMap = groupBadgeNameMap(crrConfig.participantGroups);
 
   // Rendre les pastilles pour un champ emitter/actionBy (valeur = "MOE, Entreprises")
   const renderBadges = (val) => {
@@ -43,7 +44,7 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
         {names.map((name) => {
           const idx = groupIndexMap[name] ?? 0;
           const c = GROUP_COLORS[idx % GROUP_COLORS.length];
-          const abbr = abbreviateGroup(name);
+          const abbr = abbreviateGroup(badgeNameMap[name] || name);
           return (
             <span key={name} className="inline-flex items-center justify-center gap-0.5 rounded-full px-1 py-px text-[7px] font-bold leading-none whitespace-nowrap"
               style={{ minWidth: '40px', backgroundColor: `rgb(${c.rgbBg.join(',')})`, color: `rgb(${c.rgb.join(',')})`, border: `0.5px solid rgb(${c.rgb.map((v) => Math.min(255, v + 60)).join(',')})` }}>
@@ -70,6 +71,8 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
     ? [...rawCategories].sort((a, b) => sortCat === 'asc' ? a.localeCompare(b) : b.localeCompare(a))
     : rawCategories;
   const observations = meeting.observations || [];
+  // Colonne POUR LE masquee si aucune echeance → la largeur va a OBSERVATIONS
+  const hasDeadline = observations.some((o) => (o.actionDeadline || '').trim());
   const pdfProjectName = (projectName || 'NOM DU PROJET').toUpperCase();
 
   // Stats — total = ouvertes + en cours + faites (obs 'empty' exclues). Source unique.
@@ -183,20 +186,22 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
         <table className="w-full text-[10px] border-collapse mt-0" style={{ tableLayout: 'fixed' }}>
           <thead>
             <tr style={{ backgroundColor: lightenHex(primary, 0.78) }}>
-              <th className="text-center px-1 py-2 border border-slate-200 font-bold" style={{ color: primary, width: '6%' }}></th>
-              <th className="text-center px-2 py-2 border border-slate-200 font-bold" style={{ color: primary, width: '18%' }}>ROLE / INTERVENANT</th>
-              <th className="text-center px-2 py-2 border border-slate-200 font-bold" style={{ color: primary, width: '12%' }}>LABEL</th>
-              <th className="text-center px-2 py-2 border border-slate-200 font-bold" style={{ color: primary, width: '23%' }}>CONTACT</th>
-              <th className="text-center px-2 py-2 border border-slate-200 font-bold" style={{ color: primary, width: '25%' }}>EMAIL</th>
-              <th className="text-center px-1 py-2 border border-slate-200 font-bold" style={{ color: primary, width: '5%' }}>CPR</th>
-              <th className="text-center px-1 py-2 border border-slate-200 font-bold" style={{ color: primary, width: '5%' }}>PRES.</th>
-              <th className="text-center px-1 py-2 border border-slate-200 font-bold" style={{ color: primary, width: '6%' }}>DIFF.</th>
+              <th className="text-center px-2 py-1 border border-slate-200 font-bold" style={{ color: primary, width: '18%' }}>ROLE / INTERVENANT</th>
+              <th className="text-center px-1 py-1 border border-slate-200 font-bold" style={{ color: primary, width: '6%' }}></th>
+              <th className="text-center px-2 py-1 border border-slate-200 font-bold" style={{ color: primary, width: '11%' }}>LABEL</th>
+              <th className="text-center px-2 py-1 border border-slate-200 font-bold" style={{ color: primary, width: '31%' }}>CONTACT</th>
+              <th className="text-center px-2 py-1 border border-slate-200 font-bold" style={{ color: primary, width: '24%' }}>EMAIL</th>
+              <th className="text-center px-0.5 py-1 border border-slate-200 font-bold text-[7px]" style={{ color: primary, width: '3.3%' }}>CPR</th>
+              <th className="text-center px-0.5 py-1 border border-slate-200 font-bold text-[7px]" style={{ color: primary, width: '3.3%' }}>PRES.</th>
+              <th className="text-center px-0.5 py-1 border border-slate-200 font-bold text-[7px]" style={{ color: primary, width: '3.4%' }}>DIFF.</th>
             </tr>
           </thead>
           <tbody>
             {groups.map((group, gi) => {
               const gc = GROUP_COLORS[gi % GROUP_COLORS.length];
               const rgbStr = `rgb(${gc.rgb.join(',')})`;
+              const rgbBgStr = `rgb(${gc.rgbBg.join(',')})`;
+              const roleColor = `rgb(${gc.rgb.map((v) => Math.round(v * 0.75)).join(',')})`;
               // Lignes du groupe : contacts directs, puis bandeau + contacts par sous-groupe
               const rows = [
                 ...(group.contacts || []).map((c) => ({ type: 'contact', contact: c })),
@@ -205,6 +210,23 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
                   ...(sg.contacts || []).map((c) => ({ type: 'contact', contact: c })),
                 ]),
               ];
+              // Blocs de label : contacts consecutifs de meme label → 1 pastille fusionnee
+              for (let i = 0; i < rows.length; i++) {
+                const r = rows[i];
+                if (r.type !== 'contact') continue;
+                const prev = rows[i - 1];
+                const same = prev && prev.type === 'contact' && (prev.contact.subLabel || '') === (r.contact.subLabel || '');
+                if (!same) {
+                  r.blockStart = true;
+                  let span = 1;
+                  for (let j = i + 1; j < rows.length; j++) {
+                    const nx = rows[j];
+                    if (nx.type === 'contact' && (nx.contact.subLabel || '') === (r.contact.subLabel || '')) span++;
+                    else break;
+                  }
+                  r.blockSpan = span;
+                }
+              }
               return (
               <React.Fragment key={group.id}>
                 {rows.length === 0 && (
@@ -215,40 +237,23 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
                   </tr>
                 )}
                 {rows.map((row, ri) => {
-                  // Cols pastille + role : rowSpan sur TOUTES les lignes du groupe,
-                  // fond a la couleur de la pastille du groupe
-                  const groupCells = ri === 0 && (
-                    <>
-                      <td className="text-center border border-slate-200 align-middle" rowSpan={rows.length}
-                        style={{ backgroundColor: `rgb(${gc.rgbBg.join(',')})` }}>
-                        <span
-                          className="inline-flex items-center justify-center gap-0.5 px-1 py-0.5 rounded text-[7px] font-bold"
-                          style={{ minWidth: '40px', backgroundColor: 'white', color: rgbStr }}
-                        >
-                          <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ backgroundColor: rgbStr }} />
-                          {abbreviateGroup(group.name)}
-                        </span>
-                      </td>
-                      <td className="px-2 py-1.5 border border-slate-200 align-middle font-bold text-[10px]" rowSpan={rows.length}
-                        style={{ backgroundColor: `rgb(${gc.rgbBg.join(',')})`, color: `rgb(${gc.rgb.map((v) => Math.round(v * 0.75)).join(',')})` }}>
-                        {group.name}
-                        {group.subLabel && <div className="text-[9px] font-normal text-slate-500">{group.subLabel}</div>}
-                      </td>
-                    </>
+                  // Col ROLE : rowSpan sur TOUT le groupe, fond couleur du groupe
+                  const roleCell = ri === 0 && (
+                    <td className="px-2 py-0.5 border border-slate-200 align-middle font-bold text-[10px] leading-tight" rowSpan={rows.length}
+                      style={{ backgroundColor: rgbBgStr, color: roleColor }}>
+                      {group.name}
+                      {group.subLabel && <div className="text-[9px] font-normal text-slate-500">{group.subLabel}</div>}
+                    </td>
                   );
 
-                  // Bandeau sous-groupe : couleurs du groupe parent (fidele au PDF)
+                  // Bandeau sous-groupe : nom + compteur, aligne a gauche (plus de pastille propre)
                   if (row.type === 'sub') {
                     const n = (row.sg.contacts || []).length;
                     return (
                       <tr key={`sub-${row.sg.id}`}>
-                        {groupCells}
-                        <td
-                          colSpan={6}
-                          className="px-2 py-1 border border-slate-200 font-bold text-[9px]"
-                          style={{ backgroundColor: `rgb(${gc.rgbBg.join(',')})`, color: rgbStr }}
-                        >
-                          <span className="inline-block w-1.5 h-1.5 rounded-full mr-1.5" style={{ backgroundColor: rgbStr }} />
+                        {roleCell}
+                        <td colSpan={7} className="px-2 py-1 border border-slate-200 font-bold text-[9px] text-left"
+                          style={{ backgroundColor: rgbBgStr, color: rgbStr }}>
                           {row.sg.name}{n > 0 ? ` (${n})` : ''}
                         </td>
                       </tr>
@@ -258,15 +263,27 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
                   const contact = row.contact;
                   const att = meeting.attendance?.[contact.id] || 'absent';
                   const diff = meeting.diffusion?.[contact.id] || false;
+                  // Pastille PAR LABEL : abrev. du label, couleur du groupe, fusionnee sur le bloc
+                  const pastilleCell = row.blockStart && (
+                    <td className="text-center border border-slate-200 align-middle" rowSpan={row.blockSpan}
+                      style={{ backgroundColor: rgbBgStr }}>
+                      <span className="inline-flex items-center justify-center gap-0.5 px-1 py-0.5 rounded text-[7px] font-bold"
+                        style={{ minWidth: '34px', backgroundColor: 'white', color: rgbStr }}>
+                        <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ backgroundColor: rgbStr }} />
+                        {abbreviateGroup(contact.badgeName || (contact.subLabel || '').trim() || group.name)}
+                      </span>
+                    </td>
+                  );
                   return (
                     <tr key={contact.id} style={{ backgroundColor: gi % 2 === 0 ? 'white' : 'rgb(250,252,254)' }}>
-                      {groupCells}
-                      <td className="px-2 py-1.5 border border-slate-200 text-[9px] text-slate-500">{contact.subLabel || ''}</td>
-                      <td className="px-2 py-1.5 border border-slate-200">
+                      {roleCell}
+                      {pastilleCell}
+                      <td className="px-2 py-0.5 border border-slate-200 text-[9px] text-slate-500">{contact.subLabel || ''}</td>
+                      <td className="px-2 py-0.5 border border-slate-200 leading-tight">
                         <div>{contact.name}</div>
                         {contact.fonction && <div className="text-[8px] text-slate-400">{contact.fonction}</div>}
                       </td>
-                      <td className="px-2 py-1.5 border border-slate-200">
+                      <td className="px-2 py-0.5 border border-slate-200 leading-tight">
                         <div className="text-blue-600 text-[9px]">{contact.email}</div>
                         {contact.phone && <div className="text-[8px] text-slate-400">{contact.phone}</div>}
                       </td>
@@ -337,7 +354,7 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
             <col />
             <col style={{ width: '10%' }} />
             <col style={{ width: '13%' }} />
-            <col style={{ width: '11%' }} />
+            {hasDeadline && <col style={{ width: '11%' }} />}
           </colgroup>
           <thead>
             <tr style={{ backgroundColor: lightenHex(primary, 0.78) }}>
@@ -346,7 +363,7 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
               <th className="text-left px-2 py-2 border border-slate-200 font-bold" style={{ color: primary }}>OBSERVATIONS</th>
               <th className="text-center px-2 py-2 border border-slate-200 font-bold" style={{ color: primary }}>STATUT</th>
               <th className="text-center px-2 py-2 border border-slate-200 font-bold" style={{ color: primary }}>PAR</th>
-              <th className="text-center px-2 py-2 border border-slate-200 font-bold" style={{ color: primary }}>POUR LE</th>
+              {hasDeadline && <th className="text-center px-2 py-2 border border-slate-200 font-bold" style={{ color: primary }}>POUR LE</th>}
             </tr>
           </thead>
         </table>
@@ -388,7 +405,7 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
                     <col />
                     <col style={{ width: '10%' }} />
                     <col style={{ width: '13%' }} />
-                    <col style={{ width: '11%' }} />
+                    {hasDeadline && <col style={{ width: '11%' }} />}
                   </colgroup>
                   <tbody>
                     {catObs.map((obs, oi) => {
@@ -464,9 +481,11 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
                           <td className="px-1 py-1.5 border border-slate-200 w-[13%] align-middle">
                             {renderBadges(obs.actionBy)}
                           </td>
-                          <td className="text-center px-2 py-1.5 border border-slate-200 w-[11%] align-middle" style={{ color: '#64748b' }}>
-                            {formatDate(obs.actionDeadline)}
-                          </td>
+                          {hasDeadline && (
+                            <td className="text-center px-2 py-1.5 border border-slate-200 w-[11%] align-middle" style={{ color: '#64748b' }}>
+                              {formatDate(obs.actionDeadline)}
+                            </td>
+                          )}
                         </tr>
                       );
                     })}

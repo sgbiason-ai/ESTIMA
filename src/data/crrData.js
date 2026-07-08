@@ -47,6 +47,16 @@ export const GROUP_COLORS = [
 
 export const getGroupColor = (index) => GROUP_COLORS[index % GROUP_COLORS.length];
 
+export const normalizeGroupBadgeName = (name) => {
+  if (!name) return '';
+  return String(name)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .slice(0, 5);
+};
+
 // Abbreviations courtes (5 car max) pour les noms de groupes
 const GROUP_ABBREVS = {
   "maitre d'ouvrage": 'MOA',
@@ -68,15 +78,15 @@ export const abbreviateGroup = (name) => {
   const key = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[']/g, "'");
   if (GROUP_ABBREVS[key]) return GROUP_ABBREVS[key];
   // Deja court → tel quel
-  if (name.length <= 5) return name.toUpperCase();
+  if (name.length <= 5) return normalizeGroupBadgeName(name);
   // Prendre les initiales des mots (ex: "IMS Networks" → "IMSN")
   const words = name.trim().split(/\s+/);
   if (words.length > 1) {
-    const initials = words.map((w) => w[0]).join('').toUpperCase();
+    const initials = normalizeGroupBadgeName(words.map((w) => w[0]).join(''));
     if (initials.length <= 5) return initials;
   }
   // Dernier recours : tronquer a 5 caracteres
-  return name.slice(0, 5).toUpperCase();
+  return normalizeGroupBadgeName(name);
 };
 
 export const DEFAULT_PARTICIPANT_GROUPS = [

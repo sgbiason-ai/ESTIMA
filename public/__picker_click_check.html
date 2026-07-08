@@ -1,0 +1,48 @@
+<!doctype html><html><head><meta charset="utf-8">
+<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head><body style="padding:40px">
+<div id="root"></div>
+<div id="log" style="margin-top:20px;font-family:monospace;white-space:pre"></div>
+<script type="text/babel">
+const { useState, useRef, useEffect } = React;
+const log = (m) => { document.getElementById('log').textContent += m + "\n"; };
+
+// Reproduit EXACTEMENT le motif de GroupPicker (portail + doc mousedown + menuRef)
+function Picker() {
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState(new Set());
+  const ref = useRef(null);
+  const menuRef = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (ref.current?.contains(e.target)) return;
+      if (menuRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+  const toggle = (name) => setSelected((prev) => { const n = new Set(prev); n.has(name)?n.delete(name):n.add(name); return n; });
+  const opts = ['MDF','MOE','DDV','ORANG','R3','ENEDI'];
+  return (
+    <div ref={ref}>
+      <button id="trigger" onClick={() => setOpen(o=>!o)}>Ouvrir ({[...selected].join(',')||'vide'})</button>
+      {open && ReactDOM.createPortal(
+        <div ref={menuRef} id="menu" style={{position:'fixed',top:80,left:40,background:'#fff',border:'1px solid #ccc',padding:4}}>
+          {opts.map((o)=>(
+            <button key={o} className="opt" data-name={o} onClick={()=>toggle(o)}
+              style={{display:'block',width:160,textAlign:'left',padding:'6px',background:selected.has(o)?'#dbeafe':'#fff'}}>
+              {selected.has(o)?'✓ ':''}{o}
+            </button>
+          ))}
+        </div>, document.body)}
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<Picker/>);
+window.__ready = true;
+</script>
+</body></html>
