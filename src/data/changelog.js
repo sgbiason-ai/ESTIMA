@@ -2,9 +2,17 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '3.5.4';
+export const APP_VERSION = '3.5.5';
 
 export const CHANGELOG = [
+  {
+    version: '3.5.5',
+    date: '2026-07-08',
+    title: 'Estimation, RAO/Analyse & CRC — rubans défilants',
+    highlights: [
+      'Interface — tous les rubans partagés du logiciel adoptent maintenant le comportement du module CRC : une seule ligne avec défilement horizontal sur les écrans plus étroits, pour éviter les retours à la ligne et les boutons coupés',
+    ],
+  },
   {
     version: '3.5.4',
     date: '2026-07-07',
