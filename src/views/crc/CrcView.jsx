@@ -711,7 +711,13 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
         </div>
 
         {/* Ruban principal — wrap multi-lignes sous xl (tablette/laptop), single-line + scroll en xl+ */}
-        <div className="flex items-end flex-wrap xl:flex-nowrap gap-x-1 gap-y-2 xl:gap-x-0.5 xl:gap-y-0 px-2 py-1 xl:overflow-x-auto max-w-full" style={{ scrollbarWidth: 'none' }}>
+        <div
+          className="flex items-end flex-nowrap gap-x-0.5 px-2 py-1 overflow-x-auto overflow-y-hidden max-w-full overscroll-x-contain
+            [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent
+            [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300/70
+            [&::-webkit-scrollbar-thumb]:hover:bg-slate-400/80"
+          style={{ scrollbarWidth: 'thin', scrollbarColor: '#cbd5e1 transparent' }}
+        >
 
           {/* ── GROUPE : CHANTIER ── */}
           <RibbonGroup label="Chantier" dataTour="chantier">

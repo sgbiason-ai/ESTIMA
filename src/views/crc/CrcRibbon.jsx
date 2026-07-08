@@ -14,14 +14,13 @@ export const RibbonButton = ({ icon: Icon, label, onClick, disabled, variant = '
     <button onClick={onClick} disabled={disabled} title={title || label} className={active ? variants.active : variants[variant]}>
       <Icon size={16} className="xl:hidden" />
       <Icon size={18} className="hidden xl:block" />
-      <span className={`text-[8px] xl:text-[9px] font-semibold leading-tight ${wrap ? 'whitespace-normal break-words line-clamp-2 max-w-[88px] xl:max-w-[120px]' : 'whitespace-nowrap'}`}>{label}</span>
+      <span className={`text-[8px] xl:text-[9px] font-semibold leading-tight ${wrap ? 'max-w-[112px] xl:max-w-[140px] truncate' : 'whitespace-nowrap'}`}>{label}</span>
     </button>
   );
 };
 
 export const RibbonDivider = () => (
-  // Masque sous xl (ribbon wrap : les dividers seraient mal places)
-  <div className="hidden xl:block w-px bg-gray-200/60 mx-1 xl:mx-1.5 self-stretch my-1 shrink-0" />
+  <div className="w-px bg-gray-200/60 mx-1 xl:mx-1.5 self-stretch my-1 shrink-0" />
 );
 
 export const RibbonGroup = ({ label, children, dataTour }) => (
