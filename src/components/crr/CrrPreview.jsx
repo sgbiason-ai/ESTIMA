@@ -22,6 +22,11 @@ const rgb = (c) => `rgb(${c.r},${c.g},${c.b})`;
 const rgbLight = (c, f = 0.88) =>
   `rgb(${Math.round(c.r + (255 - c.r) * f)},${Math.round(c.g + (255 - c.g) * f)},${Math.round(c.b + (255 - c.b) * f)})`;
 
+const flattenContacts = (group) => [
+  ...(group.contacts || []),
+  ...(group.subGroups || []).flatMap((sg) => sg.contacts || []),
+];
+
 const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortCat }) => {
   if (!meeting) {
     return (
@@ -74,6 +79,28 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
   // Colonne POUR LE masquee si aucune echeance → la largeur va a OBSERVATIONS
   const hasDeadline = observations.some((o) => (o.actionDeadline || '').trim());
   const pdfProjectName = (projectName || 'NOM DU PROJET').toUpperCase();
+  const allContacts = groups.flatMap(flattenContacts);
+  const hasParticipantLabel = allContacts.some((contact) => (contact.subLabel || '').trim());
+  const hasParticipantCpr = allContacts.some((contact) => contact.cpr);
+  const participantColumnCount = 6 + (hasParticipantLabel ? 1 : 0) + (hasParticipantCpr ? 1 : 0);
+  const participantWidths = {
+    role: '16.5%',
+    badge: '7.6%',
+    label: hasParticipantLabel ? '10.9%' : '0%',
+    email: '24%',
+    cpr: hasParticipantCpr ? '4.4%' : '0%',
+    pres: '4.4%',
+    diff: '4.4%',
+  };
+  const fixedParticipantWidth =
+    16.5 + 7.6 + (hasParticipantLabel ? 10.9 : 0) + 24 + (hasParticipantCpr ? 4.4 : 0) + 4.4 + 4.4;
+  participantWidths.contact = `${Math.max(24, 100 - fixedParticipantWidth)}%`;
+  const logoEntries = [
+    crrConfig.chantierInfo?.communeLogo && { src: crrConfig.chantierInfo.communeLogo, alt: 'Logo commune' },
+    crrConfig.chantierInfo?.communeLogo2 && { src: crrConfig.chantierInfo.communeLogo2, alt: 'Logo MOA 2' },
+    crrConfig.chantierInfo?.cotraitantLogo && { src: crrConfig.chantierInfo.cotraitantLogo, alt: 'Logo cotraitant' },
+    branding?.logo && { src: branding.logo, alt: 'Logo MOE' },
+  ].filter(Boolean);
 
   // Stats — total = ouvertes + en cours + faites (obs 'empty' exclues). Source unique.
   const { total: totalObs, open: openObs, inProgress: progObs, done: doneObs } = computeObsStats(observations);
@@ -98,62 +125,39 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
             <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#64748b' }}>
               {typeLabel.toUpperCase()}
             </div>
-            <div className="text-3xl font-black mt-1" style={{ color: primary }}>
-              N° {meeting.number}
-            </div>
-            <div className="text-xs mt-1" style={{ color: '#64748b' }}>
-              Date : {formatDate(meeting.date)}
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="text-3xl font-black" style={{ color: primary }}>
+                N° {meeting.number}
+              </span>
+              <span className="text-xs" style={{ color: '#64748b' }}>
+                - {formatDate(meeting.date)}
+              </span>
             </div>
           </div>
 
-          {/* Logos MOA (commune + 2e MOA) — centrés, côte à côte */}
-          {(crrConfig.chantierInfo?.communeLogo || crrConfig.chantierInfo?.communeLogo2) && (
-            <div className="flex items-center gap-3">
-              {crrConfig.chantierInfo?.communeLogo && (
+          {logoEntries.length > 0 && (
+            <div className="ml-4 flex max-w-[330px] shrink-0 items-center gap-4 rounded-md bg-white px-4 py-2">
+              {logoEntries.map((logo) => (
                 <img
-                  src={crrConfig.chantierInfo.communeLogo}
-                  alt="Logo commune"
-                  className="h-14 object-contain"
+                  key={logo.alt}
+                  src={logo.src}
+                  alt={logo.alt}
+                  className="max-h-12 max-w-[82px] object-contain"
                 />
-              )}
-              {crrConfig.chantierInfo?.communeLogo2 && (
-                <img
-                  src={crrConfig.chantierInfo.communeLogo2}
-                  alt="Logo MOA 2"
-                  className="h-14 object-contain"
-                />
-              )}
+              ))}
             </div>
           )}
-
-          <div className="flex items-center gap-4">
-            {/* Logo Cotraitant — a cote de MOE */}
-            {crrConfig.chantierInfo?.cotraitantLogo && (
-              <img
-                src={crrConfig.chantierInfo.cotraitantLogo}
-                alt="Logo cotraitant"
-                className="h-12 object-contain"
-              />
-            )}
-
-            {/* Logo MOE — droite */}
-            {branding?.logo && (
-              <img
-                src={branding.logo}
-                alt="Logo MOE"
-                className="h-12 object-contain"
-              />
-            )}
-          </div>
         </div>
       </div>
 
       {/* Nom du projet */}
       <div className="text-center mt-5 px-6">
-        <div className="text-xl font-black tracking-wide uppercase" style={{ color: primary }}>
-          {pdfProjectName}
+        <div className="inline-block max-w-full">
+          <div className="text-xl font-black tracking-wide uppercase break-words" style={{ color: primary }}>
+            {pdfProjectName}
+          </div>
+          <div className="mt-2 h-[2px] rounded-full" style={{ backgroundColor: secondary }} />
         </div>
-        <div className="mx-auto mt-2 h-[2px] rounded-full" style={{ backgroundColor: secondary, width: '60%' }} />
       </div>
 
       {/* ── PROCHAINE REUNION ── */}
@@ -184,16 +188,30 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
 
         {/* Tableau */}
         <table className="w-full text-[10px] border-collapse mt-0" style={{ tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: participantWidths.role }} />
+            <col style={{ width: participantWidths.badge }} />
+            {hasParticipantLabel && <col style={{ width: participantWidths.label }} />}
+            <col style={{ width: participantWidths.contact }} />
+            <col style={{ width: participantWidths.email }} />
+            {hasParticipantCpr && <col style={{ width: participantWidths.cpr }} />}
+            <col style={{ width: participantWidths.pres }} />
+            <col style={{ width: participantWidths.diff }} />
+          </colgroup>
           <thead>
             <tr style={{ backgroundColor: lightenHex(primary, 0.78) }}>
-              <th className="text-center px-2 py-1 border border-slate-200 font-bold" style={{ color: primary, width: '18%' }}>ROLE / INTERVENANT</th>
-              <th className="text-center px-1 py-1 border border-slate-200 font-bold" style={{ color: primary, width: '6%' }}></th>
-              <th className="text-center px-2 py-1 border border-slate-200 font-bold" style={{ color: primary, width: '11%' }}>LABEL</th>
-              <th className="text-center px-2 py-1 border border-slate-200 font-bold" style={{ color: primary, width: '31%' }}>CONTACT</th>
-              <th className="text-center px-2 py-1 border border-slate-200 font-bold" style={{ color: primary, width: '24%' }}>EMAIL</th>
-              <th className="text-center px-0.5 py-1 border border-slate-200 font-bold text-[7px]" style={{ color: primary, width: '3.3%' }}>CPR</th>
-              <th className="text-center px-0.5 py-1 border border-slate-200 font-bold text-[7px]" style={{ color: primary, width: '3.3%' }}>PRES.</th>
-              <th className="text-center px-0.5 py-1 border border-slate-200 font-bold text-[7px]" style={{ color: primary, width: '3.4%' }}>DIFF.</th>
+              <th className="text-center px-2 py-1 border border-slate-200 font-bold" style={{ color: primary }}>ROLE / INTERVENANT</th>
+              <th className="text-center px-1 py-1 border border-slate-200 font-bold" style={{ color: primary }}></th>
+              {hasParticipantLabel && (
+                <th className="text-center px-2 py-1 border border-slate-200 font-bold" style={{ color: primary }}>LABEL</th>
+              )}
+              <th className="text-center px-2 py-1 border border-slate-200 font-bold" style={{ color: primary }}>CONTACT</th>
+              <th className="text-center px-2 py-1 border border-slate-200 font-bold" style={{ color: primary }}>EMAIL</th>
+              {hasParticipantCpr && (
+                <th className="text-center px-0.5 py-1 border border-slate-200 font-bold text-[7px]" style={{ color: primary }}>CPR</th>
+              )}
+              <th className="text-center px-0.5 py-1 border border-slate-200 font-bold text-[7px]" style={{ color: primary }}>PRES.</th>
+              <th className="text-center px-0.5 py-1 border border-slate-200 font-bold text-[7px]" style={{ color: primary }}>DIFF.</th>
             </tr>
           </thead>
           <tbody>
@@ -231,7 +249,7 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
               <React.Fragment key={group.id}>
                 {rows.length === 0 && (
                   <tr style={{ backgroundColor: lightenHex(primary, 0.96) }}>
-                    <td className="px-2 py-1.5 font-bold border border-slate-200" colSpan={8} style={{ color: primary }}>
+                    <td className="px-2 py-1.5 font-bold border border-slate-200" colSpan={participantColumnCount} style={{ color: primary }}>
                       {group.name}{group.subLabel ? ` : ${group.subLabel}` : ''}
                     </td>
                   </tr>
@@ -252,7 +270,7 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
                     return (
                       <tr key={`sub-${row.sg.id}`}>
                         {roleCell}
-                        <td colSpan={7} className="px-2 py-1 border border-slate-200 font-bold text-[9px] text-left"
+                        <td colSpan={participantColumnCount - 1} className="px-2 py-1 border border-slate-200 font-bold text-[9px] text-left"
                           style={{ backgroundColor: rgbBgStr, color: rgbStr }}>
                           {row.sg.name}{n > 0 ? ` (${n})` : ''}
                         </td>
@@ -278,7 +296,9 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
                     <tr key={contact.id} style={{ backgroundColor: gi % 2 === 0 ? 'white' : 'rgb(250,252,254)' }}>
                       {roleCell}
                       {pastilleCell}
-                      <td className="px-2 py-0.5 border border-slate-200 text-[9px] text-slate-500">{contact.subLabel || ''}</td>
+                      {hasParticipantLabel && (
+                        <td className="px-2 py-0.5 border border-slate-200 text-[9px] text-slate-500">{contact.subLabel || ''}</td>
+                      )}
                       <td className="px-2 py-0.5 border border-slate-200 leading-tight">
                         <div>{contact.name}</div>
                         {contact.fonction && <div className="text-[8px] text-slate-400">{contact.fonction}</div>}
@@ -287,11 +307,13 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
                         <div className="text-blue-600 text-[9px]">{contact.email}</div>
                         {contact.phone && <div className="text-[8px] text-slate-400">{contact.phone}</div>}
                       </td>
-                      <td className="text-center border border-slate-200">
-                        {contact.cpr && (
-                          <span className="inline-block px-1.5 py-0.5 rounded text-[8px] font-bold" style={{ backgroundColor: `${primary}22`, color: primary }}>C</span>
-                        )}
-                      </td>
+                      {hasParticipantCpr && (
+                        <td className="text-center border border-slate-200">
+                          {contact.cpr && (
+                            <span className="inline-block px-1.5 py-0.5 rounded text-[8px] font-bold" style={{ backgroundColor: `${primary}22`, color: primary }}>C</span>
+                          )}
+                        </td>
+                      )}
                       <td className="text-center border border-slate-200 font-bold text-[9px]">
                         {att === 'absent' ? (
                           <span className="inline-block px-1.5 py-0.5 rounded text-[8px] font-bold" style={{ backgroundColor: 'rgb(239,68,68)', color: 'white' }}>A</span>
@@ -311,7 +333,7 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
                 })}
                 {gi < groups.length - 1 && (
                   <tr aria-hidden="true">
-                    <td colSpan={8} style={{ height: '5px', border: 'none', padding: 0 }} />
+                    <td colSpan={participantColumnCount} style={{ height: '5px', border: 'none', padding: 0 }} />
                   </tr>
                 )}
               </React.Fragment>
@@ -320,7 +342,9 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
           </tbody>
         </table>
         <p className="text-[8px] italic mt-1" style={{ color: '#94a3b8' }}>
-          P : Présent &nbsp;|&nbsp; E : Excusé &nbsp;|&nbsp; A : Absent &nbsp;|&nbsp; NC : Non convoqué &nbsp;|&nbsp; C : CPR &nbsp;|&nbsp; D : Diffusion
+          P : Présent &nbsp;|&nbsp; E : Excusé &nbsp;|&nbsp; A : Absent &nbsp;|&nbsp; NC : Non convoqué
+          {hasParticipantCpr && <>&nbsp;|&nbsp; C : CPR</>}
+          &nbsp;|&nbsp; D : Diffusion
         </p>
       </div>
 
@@ -427,7 +451,9 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
                             {renderBadges(obs.emitter)}
                           </td>
                           <td className="text-center px-2 py-1.5 border border-slate-200 w-[10%] align-middle" style={{ color: '#64748b' }}>
-                            {formatDate(obs.date)}
+                            <span className={obs.date && meeting.date && obs.date !== meeting.date ? 'font-bold text-slate-800' : ''}>
+                              {formatDate(obs.date)}
+                            </span>
                           </td>
                           <td className="px-2 py-1.5 border border-slate-200 whitespace-pre-wrap break-words align-top" style={{
                             color: isDone ? 'rgb(22,120,70)' : isProgress ? 'rgb(30,90,170)' : '#282828',
@@ -475,7 +501,7 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
                               <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[9px] font-bold leading-none" style={{ backgroundColor: 'rgb(210,230,255)', color: 'rgb(30,90,170)' }}>En cours</span>
                             )}
                             {!isDone && !isProgress && !isEmpty && (
-                              <span className="inline-flex items-center justify-center px-2 py-0.5 rounded text-[9px] font-bold leading-none" style={{ backgroundColor: 'rgb(245,227,210)', color: 'rgb(146,64,14)' }}>Ouvert</span>
+                              <span className="text-[9px] font-normal leading-none" style={{ color: 'rgb(120,128,140)' }}>Ouvert</span>
                             )}
                           </td>
                           <td className="px-1 py-1.5 border border-slate-200 w-[13%] align-middle">
@@ -502,8 +528,11 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
         {branding?.companyName && (
           <span className="font-bold" style={{ color: primary }}>{branding.companyName}</span>
         )}
-        <span style={{ color: '#64748b' }}>{pdfProjectName}  --  Apercu</span>
-        <span style={{ color: '#64748b' }}>Edite le {new Date().toLocaleDateString('fr-FR')}</span>
+        <span style={{ color: '#64748b' }}>{pdfProjectName}</span>
+        <span>
+          <span style={{ color: '#64748b' }}>Edite le {new Date().toLocaleDateString('fr-FR')} · </span>
+          <span className="font-bold" style={{ color: '#282828' }}>Page 1/1</span>
+        </span>
       </div>
     </div>
   );

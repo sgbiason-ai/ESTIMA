@@ -372,7 +372,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
         role: firstRowOfGroup ? roleLabel : '',
         subLabel: contact.subLabel || '',
         // Une pastille par label (abrev.) ; fallback sur le groupe si pas de label
-        pastilleLabel: (contact.subLabel || '').trim() || group.name,
+        pastilleLabel: contact.badgeName || (contact.subLabel || '').trim() || group.name,
         contact: (contact.name || '') + (contact.fonction ? '\n' + contact.fonction : ''),
         email: (contact.email || '') + (contact.phone ? '\n' + contact.phone : ''),
         cpr: !!contact.cpr,
