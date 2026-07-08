@@ -3,9 +3,10 @@
 // Export Word (.doc) d'un Compte Rendu de Reunion.
 // Genere un document HTML avec styles inline que Word ouvre nativement.
 
-import { MEETING_TYPES, GROUP_COLORS, abbreviateGroup, computeObsStats } from '../data/crrData';
+import { MEETING_TYPES, GROUP_COLORS, abbreviateGroup, computeObsStats, obsDisplayNumber, obsAge } from '../data/crrData';
 import { obsTextToHtml } from './formatObsText.jsx';
 import { ESTIMA_CREDIT, isEstimaCreditEnabled } from './estimaCredit';
+import { groupColorIndexMap, groupBadgeNameMap } from './crrParticipantTree';
 
 const formatDate = (dateStr) => {
   if (!dateStr) return '';
@@ -34,11 +35,56 @@ const sanitizeFilename = (name) => {
 const statusLabel = (s) =>
   s === 'done' ? 'FAIT' : s === 'in_progress' ? 'En cours' : s === 'empty' ? '' : 'Ouvert';
 
+// Teintes de statut alignees sur les pastilles du PDF (pdfCrrGenerator.js)
 const statusColor = (s) =>
-  s === 'done' ? '#16783c' : s === 'in_progress' ? '#1e5aaa' : '#be6e14';
+  s === 'done' ? '#0f6437' : s === 'in_progress' ? '#144696' : '#be6e14';
 
 const statusBg = (s) =>
-  s === 'done' ? '#e8faf0' : s === 'in_progress' ? '#e6f2ff' : '#fff7e6';
+  s === 'done' ? '#b4e6c8' : s === 'in_progress' ? '#b9d7fa' : '#fff7e6';
+
+const rgb = (values) => `rgb(${values.join(',')})`;
+
+const darken = (values, factor = 0.75) => values.map((v) => Math.round(v * factor));
+
+const lighten = (values, factor = 0.88) => values.map((v) => Math.round(v + (255 - v) * factor));
+
+// Couleurs tournantes par categorie — identiques au PDF (pdfCrrGenerator.js)
+const CAT_COLORS = [
+  [40, 110, 85],   // emerald (primary)
+  [37, 99, 175],   // blue
+  [124, 58, 170],  // purple
+  [210, 120, 20],  // orange
+  [71, 85, 105],   // slate
+  [170, 140, 20],  // amber
+];
+
+const parseBadgeNames = (value) =>
+  (value || '').split(',').map((s) => s.trim()).filter(Boolean);
+
+const flattenContacts = (group) => [
+  ...(group.contacts || []),
+  ...(group.subGroups || []).flatMap((sg) => sg.contacts || []),
+];
+
+const renderGroupBadges = (value, groupIndexMap, badgeNameMap) => {
+  const names = parseBadgeNames(value);
+  if (names.length === 0) return '';
+
+  return names.map((name) => {
+    const idx = groupIndexMap[name] ?? 0;
+    const c = GROUP_COLORS[idx % GROUP_COLORS.length];
+    const abbr = abbreviateGroup(badgeNameMap?.[name] || name);
+    return `<span style="display:inline-block;min-width:28px;margin:1px 0;padding:1px 5px;border-radius:7px;background:${rgb(c.rgbBg)};color:${rgb(c.rgb)};font-size:6pt;font-weight:bold;white-space:nowrap"><span style="font-size:6pt;color:${rgb(c.rgb)}">&#9679;</span>&nbsp;${abbr}</span>`;
+  }).join('<br>');
+};
+
+const renderStatus = (status) => {
+  if (status === 'empty') return '';
+  if (status === 'done' || status === 'in_progress') {
+    return `<span class="status-badge" style="background:${statusBg(status)};color:${statusColor(status)}">${statusLabel(status)}</span>`;
+  }
+  return '<span style="font-size:8pt;color:#78808c">Ouvert</span>';
+};
 
 export const generateWordCrr = (meeting, crrConfig, projectName = '', branding = {}, options = {}) => {
   if (!meeting) return;
@@ -54,6 +100,13 @@ export const generateWordCrr = (meeting, crrConfig, projectName = '', branding =
     ? [...rawCategories].sort((a, b) => sortCat === 'asc' ? a.localeCompare(b) : b.localeCompare(a))
     : rawCategories;
   const observations = meeting.observations || [];
+  const groupIndexMap = groupColorIndexMap(groups);
+  const badgeNameMap = groupBadgeNameMap(groups);
+  const participantContacts = groups.flatMap(flattenContacts);
+  const hasLabel = participantContacts.some((c) => (c.subLabel || '').trim());
+  const hasCpr = participantContacts.some((c) => c.cpr);
+  const partColCount = 6 + (hasLabel ? 1 : 0) + (hasCpr ? 1 : 0);
+  const hasDeadline = observations.some((o) => (o.actionDeadline || '').trim());
 
   // ── Construction du HTML ──
   let html = `
@@ -63,17 +116,18 @@ export const generateWordCrr = (meeting, crrConfig, projectName = '', branding =
 <head>
 <meta charset="utf-8">
 <style>
-  body { font-family: Calibri, Arial, sans-serif; font-size: 10pt; color: #282828; margin: 40px; }
-  table { border-collapse: collapse; width: 100%; }
-  td, th { border: 1px solid #d2dae2; padding: 4px 6px; font-size: 9pt; }
+  @page { size: A4; margin: 0.7cm 1cm; mso-header-margin: 0.3cm; mso-footer-margin: 0.3cm; }
+  body { font-family: Calibri, Arial, sans-serif; font-size: 10pt; color: #282828; margin: 0; }
+  table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+  td, th { border: 1px solid #d2dae2; padding: 4px 6px; font-size: 9pt; word-break: break-word; overflow-wrap: anywhere; }
   th { background-color: #e8f5ee; color: ${primary}; font-weight: bold; text-align: center; font-size: 8pt; }
   .header { background-color: #f0f7f3; padding: 12px 16px; border-left: 4px solid ${primary}; margin-bottom: 8px; }
   .project { text-align: center; font-size: 16pt; font-weight: bold; color: ${primary}; margin: 16px 0 8px; }
   .separator { border: none; border-top: 2px solid ${primary}; width: 60%; margin: 4px auto 16px; }
-  .next-meeting { background-color: #fff5e6; border-left: 4px solid #e68214; padding: 8px 14px; margin: 10px 0; }
-  .section-title { background-color: ${primary}; color: white; padding: 6px 14px; font-weight: bold; font-size: 10pt; margin: 14px 0 0; }
-  .cat-banner { background-color: #e8f5ee; border-left: 4px solid ${primary}; padding: 4px 12px; font-weight: bold; color: ${primary}; margin: 8px 0 2px; }
-  .status-badge { padding: 2px 6px; border-radius: 3px; font-size: 8pt; font-weight: bold; }
+  .next-meeting { background-color: #fff5e6; border-left: 4px solid #e68214; padding: 8px 14px; margin: 10px 0; border-radius: 4px; }
+  .section-title { background-color: ${primary}; color: white; padding: 6px 14px; font-weight: bold; font-size: 10pt; margin: 14px 0 0; border-radius: 4px; }
+  .cat-banner { background-color: #e8f5ee; border-left: 4px solid ${primary}; padding: 4px 12px; font-weight: bold; color: ${primary}; margin: 8px 0 2px; border-radius: 4px; }
+  .status-badge { padding: 2px 7px; border-radius: 7px; font-size: 8pt; font-weight: bold; }
   .legal { background-color: #f8f9fc; border: 1px solid #d2dae2; padding: 8px 12px; font-size: 7pt; font-style: italic; color: #64748b; margin: 10px 0; border-radius: 4px; }
   .footer { border-top: 1px solid #d2dae2; padding-top: 8px; margin-top: 20px; font-size: 8pt; color: #64748b; }
   .present { background-color: #e8faf0; }
@@ -81,17 +135,27 @@ export const generateWordCrr = (meeting, crrConfig, projectName = '', branding =
   .done-row { background-color: #edfcf4; }
   .progress-row { background-color: #ebf5ff; }
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
-  .obs-img { max-width: 45%; max-height: 120px; margin: 4px 2px 0 0; }
+  .obs-img { max-width: 100%; height: auto; margin: 4px 2px 0 0; }
+  .obs-text { font-size: 10.5pt; line-height: 1.25; }
+  .logo-band { float: right; background: #ffffff; border-radius: 4px; padding: 6px 10px; text-align: right; }
+  .logo-band img { height: 28px; width: auto; max-width: 100px; margin-left: 10px; vertical-align: middle; }
 </style>
 </head>
 <body>`;
 
   // En-tete
+  const logos = [
+    crrConfig.chantierInfo?.communeLogo,
+    crrConfig.chantierInfo?.communeLogo2,
+    crrConfig.chantierInfo?.cotraitantLogo,
+    branding?.logo,
+  ].filter(Boolean);
   html += `
 <div class="header">
-  <div style="font-size: 9pt; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">${typeLabel.toUpperCase()}</div>
-  <div style="font-size: 20pt; font-weight: bold; color: ${primary};">N ${meeting.number}</div>
-  <div style="font-size: 9pt; color: #64748b;">Date : ${formatDate(meeting.date)}</div>
+  ${logos.length > 0 ? `<div class="logo-band">${logos.map((src) => `<img src="${src}" height="28" alt="" style="height:28px;width:auto;max-width:100px;vertical-align:middle">`).join('')}</div>` : ''}
+  <div style="font-size: 8pt; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.5px; font-weight: bold;">${typeLabel.toUpperCase()}</div>
+  <div style="margin-top: 3px;"><span style="font-size: 16pt; font-weight: bold; color: ${primary};">N&deg; ${meeting.number}</span> <span style="font-size: 10pt; color: #94a3b8;">&mdash;&nbsp;${formatDate(meeting.date)}</span></div>
+  <div style="clear:both"></div>
 </div>
 <div class="project">${pdfProjectName}</div>
 <hr class="separator">`;
@@ -114,10 +178,10 @@ export const generateWordCrr = (meeting, crrConfig, projectName = '', branding =
   html += `<table><thead><tr>
     <th style="width:18%">ROLE / INTERVENANT</th>
     <th style="width:6%"></th>
-    <th style="width:11%">LABEL</th>
-    <th style="width:27%">CONTACT</th>
+    ${hasLabel ? '<th style="width:11%">LABEL</th>' : ''}
+    <th style="width:30%">CONTACT</th>
     <th style="width:25%">EMAIL</th>
-    <th style="width:4%">CPR</th>
+    ${hasCpr ? '<th style="width:4%">CPR</th>' : ''}
     <th style="width:4.5%">PRES.</th>
     <th style="width:4.5%">DIFF.</th>
   </tr></thead><tbody>`;
@@ -152,52 +216,55 @@ export const generateWordCrr = (meeting, crrConfig, projectName = '', branding =
       }
     }
     if (rows.length === 0) {
-      html += `<tr style="background:#f8fafb"><td colspan="8" style="font-weight:bold;color:${primary}">${group.name}${group.subLabel ? ` : ${group.subLabel}` : ''}</td></tr>`;
+      html += `<tr style="background:#f8fafb"><td colspan="${partColCount}" style="font-weight:bold;color:${primary}">${group.name}${group.subLabel ? ` : ${group.subLabel}` : ''}</td></tr>`;
     } else {
       rows.forEach((row, ri) => {
         html += `<tr style="background-color:${rowBg}">`;
         if (ri === 0) {
           // Case ROLE/INTERVENANT teintee a la couleur du groupe (rowSpan groupe)
-          const roleTxt = `rgb(${gc.rgb.map((v) => Math.round(v * 0.75)).join(',')})`;
-          html += `<td rowspan="${rows.length}" style="font-weight:bold;vertical-align:middle;background:rgb(${gc.rgbBg.join(',')});color:${roleTxt}">${group.name}${group.subLabel ? `<br><span style="font-size:8pt;color:#64748b">${group.subLabel}</span>` : ''}</td>`;
+          const roleTxt = rgb(darken(gc.rgb));
+          html += `<td rowspan="${rows.length}" style="font-weight:bold;vertical-align:middle;background:${rgb(gc.rgbBg)};color:${roleTxt}">${group.name}${group.subLabel ? `<br><span style="font-size:8pt;color:#64748b">${group.subLabel}</span>` : ''}</td>`;
         }
         // Bandeau sous-groupe : nom + compteur (plus de pastille propre → la
         // pastille par label des contacts en-dessous porte l'abreviation)
         if (row.type === 'sub') {
           const n = (row.sg.contacts || []).length;
-          html += `<td colspan="7" style="background:rgb(${gc.rgbBg.join(',')});color:rgb(${gc.rgb.join(',')});font-weight:bold;font-size:8pt;padding-left:8px;text-align:left">${row.sg.name}${n > 0 ? ` (${n})` : ''}</td>`;
+          html += `<td colspan="${partColCount - 1}" style="background:${rgb(gc.rgbBg)};color:${rgb(gc.rgb)};font-weight:bold;font-size:8pt;padding-left:8px;text-align:left">${row.sg.name}${n > 0 ? ` (${n})` : ''}</td>`;
           html += `</tr>`;
           return;
         }
         const contact = row.contact;
         // Pastille PAR LABEL (abrev.), couleur du groupe, fusionnee sur le bloc
         if (row.blockStart) {
-          const abbr = abbreviateGroup((contact.subLabel || '').trim() || group.name);
-          html += `<td rowspan="${row.blockSpan}" style="text-align:center;vertical-align:middle;background:rgb(${gc.rgbBg.join(',')})"><span style="display:inline-block;background:#ffffff;color:rgb(${gc.rgb.join(',')});border-radius:6px;padding:0 4px;font-size:6pt;font-weight:bold">${abbr}</span></td>`;
+          const abbr = abbreviateGroup(contact.badgeName || (contact.subLabel || '').trim() || group.name);
+          html += `<td rowspan="${row.blockSpan}" style="text-align:center;vertical-align:middle;background:${rgb(gc.rgbBg)}"><span style="display:inline-block;background:#ffffff;color:${rgb(gc.rgb)};border-radius:6px;padding:1px 5px;font-size:6pt;font-weight:bold;white-space:nowrap"><span style="font-size:6pt;color:${rgb(gc.rgb)}">&#9679;</span>&nbsp;${abbr}</span></td>`;
         }
         const att = meeting.attendance?.[contact.id] || 'absent';
         const diff = meeting.diffusion?.[contact.id] || false;
-        html += `<td style="font-size:8pt;color:#64748b">${contact.subLabel || ''}</td>`;
+        if (hasLabel) html += `<td style="font-size:8pt;color:#64748b">${contact.subLabel || ''}</td>`;
         html += `<td>${contact.name || ''}${contact.fonction ? `<br><span style="font-size:8pt;color:#64748b">${contact.fonction}</span>` : ''}</td>`;
         html += `<td style="color:#1e50a0;font-size:8pt">${contact.email || ''}${contact.phone ? `<br><span style="color:#94a3b8;font-size:7pt">${contact.phone}</span>` : ''}</td>`;
-        html += `<td style="text-align:center">${contact.cpr ? `<span style="display:inline-block;padding:1px 4px;border-radius:3px;font-size:7pt;font-weight:bold;background:${primary}22;color:${primary}">C</span>` : ''}</td>`;
-        const presColor = att === 'present' ? '#16823c' : att === 'excused' ? '#b47814' : att === 'not_summoned' ? '#a855f7' : '#a0aab4';
-        const presLetter = att === 'present' ? 'P' : att === 'excused' ? 'E' : att === 'not_summoned' ? 'NC' : 'A';
-        const presCell = att === 'absent'
-          ? `<span style="display:inline-block;padding:1px 5px;border-radius:3px;font-size:8pt;font-weight:bold;background:#dc2626;color:#ffffff">A</span>`
-          : `<span style="color:${presColor}">${presLetter}</span>`;
-        html += `<td style="text-align:center;font-weight:bold;font-size:8pt">${presCell}</td>`;
+        if (hasCpr) html += `<td style="text-align:center">${contact.cpr ? `<span style="display:inline-block;padding:1px 4px;border-radius:3px;font-size:7pt;font-weight:bold;background:${primary}22;color:${primary}">C</span>` : ''}</td>`;
+        // Pastilles uniformes pour les 4 etats (aligne sur le PDF)
+        const presPill = ({
+          present:      { l: 'P',  txt: '#16824c', bg: '#d4f0e0' },
+          excused:      { l: 'E',  txt: '#475569', bg: '#e2e8f0' },
+          absent:       { l: 'A',  txt: '#ffffff', bg: '#dc2626' },
+          not_summoned: { l: 'NC', txt: '#6b21a8', bg: '#f3e8ff' },
+        })[att] || { l: 'A', txt: '#ffffff', bg: '#dc2626' };
+        const presCell = `<span style="display:inline-block;min-width:12px;padding:1px 5px;border-radius:7px;font-size:8pt;font-weight:bold;background:${presPill.bg};color:${presPill.txt}">${presPill.l}</span>`;
+        html += `<td style="text-align:center">${presCell}</td>`;
         html += `<td style="text-align:center">${diff ? '<span style="display:inline-block;padding:1px 4px;border-radius:3px;font-size:7pt;font-weight:bold;background:#e6f2ff;color:#1e5aaa">D</span>' : ''}</td>`;
         html += `</tr>`;
       });
     }
     // Fine ligne d'espacement entre deux groupes
     if (gi < groups.length - 1) {
-      html += `<tr><td colspan="8" style="border:none;padding:0;line-height:5px;font-size:5px">&nbsp;</td></tr>`;
+      html += `<tr><td colspan="${partColCount}" style="border:none;padding:0;line-height:5px;font-size:5px">&nbsp;</td></tr>`;
     }
   }
   html += `</tbody></table>`;
-  html += `<div style="font-size:7pt;font-style:italic;color:#94a3b8;margin:3px 0 8px">P : Présent &nbsp;|&nbsp; E : Excusé &nbsp;|&nbsp; A : Absent &nbsp;|&nbsp; NC : Non convoqué &nbsp;|&nbsp; C : CPR &nbsp;|&nbsp; D : Diffusion</div>`;
+  html += `<div style="font-size:7pt;font-style:italic;color:#94a3b8;margin:3px 0 8px">P : Présent &nbsp;|&nbsp; E : Excusé &nbsp;|&nbsp; A : Absent &nbsp;|&nbsp; NC : Non convoqué${hasCpr ? ' &nbsp;|&nbsp; C : CPR' : ''} &nbsp;|&nbsp; D : Diffusion</div>`;
 
   // Texte legal
   if (showLegalText) {
@@ -219,16 +286,20 @@ export const generateWordCrr = (meeting, crrConfig, projectName = '', branding =
     <th>OBSERVATIONS</th>
     <th style="width:10%">STATUT</th>
     <th style="width:13%">PAR</th>
-    <th style="width:11%">POUR LE</th>
+    ${hasDeadline ? '<th style="width:11%">POUR LE</th>' : ''}
   </tr></thead></table>`;
 
-  for (const cat of categories) {
+  for (let ci = 0; ci < categories.length; ci++) {
+    const cat = categories[ci];
     const rawCatObs = observations.filter((o) => o.category === cat);
     const dateDir = sortDate?.[cat];
     const catObs = dateDir
       ? [...rawCatObs].sort((a, b) => { const da = a.date || ''; const db = b.date || ''; return dateDir === 'asc' ? da.localeCompare(db) : db.localeCompare(da); })
       : rawCatObs;
-    html += `<div class="cat-banner">${cat.toUpperCase()} <span style="float:right;font-weight:normal;font-size:8pt">${catObs.length} observation${catObs.length > 1 ? 's' : ''}</span></div>`;
+    const catColor = CAT_COLORS[ci % CAT_COLORS.length];
+    const catRgb = rgb(catColor);
+    const catBgRgb = rgb(lighten(catColor));
+    html += `<div class="cat-banner" style="background:${catBgRgb};border-left-color:${catRgb};color:${catRgb}">${cat.toUpperCase()} <span style="float:right;font-weight:normal;font-size:8pt">${catObs.length} observation${catObs.length > 1 ? 's' : ''}</span></div>`;
 
     if (catObs.length === 0) {
       html += `<div style="text-align:center;color:#94a3b8;font-style:italic;padding:6px;font-size:8pt">Aucune observation</div>`;
@@ -241,16 +312,34 @@ export const generateWordCrr = (meeting, crrConfig, projectName = '', branding =
       const images = obs.images || [];
       let imgHtml = '';
       if (images.length > 0) {
-        imgHtml = '<br>' + images.map(src => `<img src="${src}" class="obs-img">`).join('');
+        // Largeur fixe (px) : Word ignore les max-width CSS et affiche les images
+        // a leur resolution native → on impose une largeur via l'attribut HTML.
+        // 1 image = plus large ; 2+ images = plus etroit pour tenir cote a cote.
+        const imgW = images.length === 1 ? 230 : 150;
+        imgHtml = '<br>' + images.map((entry) => {
+          const src = typeof entry === 'string' ? entry : entry.src;
+          const gps = typeof entry === 'object' && entry.lat != null && entry.lng != null
+            ? `<br><span style="font-size:7pt;color:#64748b">GPS : ${Number(entry.lat).toFixed(6)}, ${Number(entry.lng).toFixed(6)}</span>`
+            : '';
+          return src ? `<img src="${src}" width="${imgW}" class="obs-img" style="width:${imgW}px;height:auto">${gps}` : '';
+        }).join('');
       }
+      const obsNum = obsDisplayNumber(obs, crrConfig.categoryCodes);
+      const age = obsAge(obs, meeting.number);
+      const numHtml = obsNum
+        ? `<div style="font-size:7pt;font-weight:bold;color:${catRgb};margin-bottom:3px">${obsNum}${age >= 1 ? ` <span style="font-weight:normal;font-style:italic;color:#94a3b8">depuis CR n&deg;${obs.originMeetingNumber ?? (meeting.number - age)}</span>` : ''}</div>`
+        : '';
+      const dateStyle = obs.date && meeting.date && obs.date !== meeting.date
+        ? 'color:#1f2937;font-weight:bold'
+        : 'color:#64748b';
 
       html += `<tr class="${rowClass}">`;
-      html += `<td style="width:11%;text-align:center;vertical-align:middle;font-weight:bold;color:${primary}">${obs.emitter || ''}</td>`;
-      html += `<td style="width:10%;text-align:center;vertical-align:middle;color:#64748b">${formatDate(obs.date)}</td>`;
-      html += `<td>${obsTextToHtml(obs.text)}${imgHtml}</td>`;
-      html += `<td style="width:10%;text-align:center;vertical-align:middle"><span class="status-badge" style="background:${statusBg(obs.status)};color:${statusColor(obs.status)}">${statusLabel(obs.status)}</span></td>`;
-      html += `<td style="width:13%;text-align:center;vertical-align:middle;font-weight:bold">${obs.actionBy || ''}</td>`;
-      html += `<td style="width:11%;text-align:center;vertical-align:middle;color:#64748b">${formatDate(obs.actionDeadline)}</td>`;
+      html += `<td style="width:11%;text-align:center;vertical-align:middle">${renderGroupBadges(obs.emitter, groupIndexMap, badgeNameMap)}</td>`;
+      html += `<td style="width:10%;text-align:center;vertical-align:middle;${dateStyle}">${formatDate(obs.date)}</td>`;
+      html += `<td class="obs-text">${numHtml}${obsTextToHtml(obs.text)}${imgHtml}</td>`;
+      html += `<td style="width:10%;text-align:center;vertical-align:middle">${renderStatus(obs.status)}</td>`;
+      html += `<td style="width:13%;text-align:center;vertical-align:middle">${renderGroupBadges(obs.actionBy, groupIndexMap, badgeNameMap)}</td>`;
+      if (hasDeadline) html += `<td style="width:11%;text-align:center;vertical-align:middle;color:#64748b">${formatDate(obs.actionDeadline)}</td>`;
       html += `</tr>`;
     }
     html += `</tbody></table>`;

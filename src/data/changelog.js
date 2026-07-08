@@ -10,6 +10,9 @@ export const CHANGELOG = [
     date: '2026-07-07',
     title: 'Estimation, RAO/Analyse & CRC — ajustements terrain',
     highlights: [
+      'CRC — export Word : rendu davantage aligné sur le PDF (bandeaux de catégories en couleurs tournantes, pastilles de présence P/E/A/NC uniformes, statuts aux mêmes teintes, en-tête N° — date épuré et numéros d’observations à la couleur de leur catégorie)',
+      'CRC — export Word : le rendu est rapproché de l’export PDF avec cartouche logos, colonnes participants/observations conditionnelles, pastilles Émetteur/PAR, statut Ouvert discret, numéros d’observations et images compatibles avec les métadonnées GPS',
+      'CRC — ribbon desktop : le ruban reste compact sur ordinateur portable avec une seule ligne défilable horizontalement et les noms d’affaires longs sont tronqués proprement',
       'CRC — observations : le texte des observations est agrandi dans la vue CRC, l’aperçu et l’export PDF pour une meilleure lisibilité',
       'CRC — aperçu : le mode aperçu reprend davantage la mise en page de l’export PDF (cartouche logos unifié, colonnes participants conditionnelles, statut ouvert discret, date d’observation antérieure en gras et pied de page avec pagination)',
       'CRC — modale participants : double-clic sur une pastille pour éditer son code court (5 caractères max) sans changer le nom métier du groupe/sous-groupe/contact, avec propagation aux pastilles identiques et aux affichages Émetteur/PAR',
