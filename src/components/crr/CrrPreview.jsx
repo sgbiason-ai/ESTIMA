@@ -455,7 +455,7 @@ const CrrPreview = ({ meeting, crrConfig, projectName, branding, sortDate, sortC
                               {formatDate(obs.date)}
                             </span>
                           </td>
-                          <td className="px-2 py-1.5 border border-slate-200 whitespace-pre-wrap break-words align-top" style={{
+                          <td className="px-2 py-1.5 border border-slate-200 whitespace-pre-wrap break-words align-top text-[11px] leading-snug" style={{
                             color: isDone ? 'rgb(22,120,70)' : isProgress ? 'rgb(30,90,170)' : '#282828',
                             wordBreak: 'break-word',
                           }}>

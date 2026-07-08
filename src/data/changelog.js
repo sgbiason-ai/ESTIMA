@@ -10,6 +10,7 @@ export const CHANGELOG = [
     date: '2026-07-07',
     title: 'Estimation, RAO/Analyse & CRC — ajustements terrain',
     highlights: [
+      'CRC — observations : le texte des observations est agrandi dans la vue CRC, l’aperçu et l’export PDF pour une meilleure lisibilité',
       'CRC — aperçu : le mode aperçu reprend davantage la mise en page de l’export PDF (cartouche logos unifié, colonnes participants conditionnelles, statut ouvert discret, date d’observation antérieure en gras et pied de page avec pagination)',
       'CRC — modale participants : double-clic sur une pastille pour éditer son code court (5 caractères max) sans changer le nom métier du groupe/sous-groupe/contact, avec propagation aux pastilles identiques et aux affichages Émetteur/PAR',
       'CRC — observations : les sélecteurs Émetteur et PAR affichent désormais aussi les pastilles issues des labels de participants, comme dans la modale de gestion des participants',

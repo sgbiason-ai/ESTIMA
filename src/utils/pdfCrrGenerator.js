@@ -787,6 +787,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
   }
 
   const IMG_ROW_H = 25; // mm par rangee d'images
+  const OBS_TEXT_FONT_SIZE = 7.4;
 
   // Style d'en-tete (conserve pour le corps autoTable, showHead never)
   const obsHeadStyles = {
@@ -843,7 +844,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
 
     if (catObs.length === 0) {
       doc.setFont(fontB, 'italic');
-      doc.setFontSize(6.5);
+      doc.setFontSize(OBS_TEXT_FONT_SIZE);
       doc.setTextColor(...THEME.lightText);
       doc.text('Aucune observation', PW / 2, cursor.y + 1, { align: 'center' });
       cursor.y += 5;
@@ -889,7 +890,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
       const obsColUsable = OBS_COL_W - 3.5; // padding left+right
       const splitLines = doc.splitTextToSize(plainText, obsColUsable);
       // Hauteur de ligne jsPDF : fontSize(pt) / 72 * 25.4 * lineHeightFactor(1.15) ≈ 2.63mm
-      const lineH = (6.5 / 72) * 25.4 * 1.15;
+      const lineH = (OBS_TEXT_FONT_SIZE / 72) * 25.4 * 1.15;
       // cellPadding top:2 + bottom:2 = 4mm + marge securite (+ bande numero)
       const textH = Math.max(12, splitLines.length * lineH + 6) + (obsNum ? NUM_BAND : 0);
       let imgH = 0;
@@ -941,7 +942,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
       columnStyles: {
         0: { cellWidth: OBS_COL_STYLES[0].cellWidth, halign: 'center', valign: 'middle', fontStyle: 'bold', textColor: catColor },
         1: { cellWidth: OBS_COL_STYLES[1].cellWidth, halign: 'center', valign: 'middle', textColor: THEME.lightText },
-        2: { cellWidth: OBS_COL_STYLES[2].cellWidth },
+        2: { cellWidth: OBS_COL_STYLES[2].cellWidth, fontSize: OBS_TEXT_FONT_SIZE },
         3: { cellWidth: OBS_COL_STYLES[3].cellWidth, halign: 'center', valign: 'middle' },
         4: { cellWidth: OBS_COL_STYLES[4].cellWidth, halign: 'center', valign: 'middle', fontStyle: 'bold' },
         ...(hasDeadline ? { 5: { cellWidth: OBS_COL_STYLES[5].cellWidth, halign: 'center', valign: 'middle', textColor: THEME.lightText } } : {}),
