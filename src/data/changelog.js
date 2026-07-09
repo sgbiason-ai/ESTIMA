@@ -16,6 +16,7 @@ export const CHANGELOG = [
       'Bibliothèque — comportement de type bascule (toggle) sur les filtres de dossiers et d\'audit (re-cliquer pour désactiver), avec persistance automatique du filtre sélectionné dans le stockage local (localStorage)',
       'Bibliothèque — repositionnement de la pastille de tendance des prix observés (plus grande et plus lisible) directement à gauche du prix catalogue',
       'Bibliothèque — restriction du bouton "RAZ Prix Obs." au rôle de Super-Administrateur (au lieu de simple administrateur)',
+      'Estimation — les prix unitaires affichent désormais toujours deux décimales dans le tableau (ex. « 12,50 » au repos), la valeur restant brute pendant la saisie',
     ],
   },
   {
