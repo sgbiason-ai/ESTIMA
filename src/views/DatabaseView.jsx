@@ -73,7 +73,7 @@ const DatabaseView = ({
   const [isRefreshing, setIsRefreshing] = useState(false); // État pour l'animation du bouton
   const { confirm } = useDialog();
   
-  const { error: toastError, info: toastInfo } = useToast();
+  const { error: toastError, info: toastInfo, success: toastSuccess } = useToast();
 
   // --- Lookup CCTP : id → titre ---
   const cctpTitleMap = useMemo(() => {
@@ -332,6 +332,17 @@ const DatabaseView = ({
     link.click();
   };
 
+  const handleExportExcel = async () => {
+    try {
+      const { exportLibraryToExcel } = await import('../utils/excelLibraryHelper');
+      await exportLibraryToExcel(fullBpu, categories, isLocalMode ? (localLibraryName || "base_locale") : "complet");
+      toastSuccess("Export Excel généré avec succès.");
+    } catch (err) {
+      console.error(err);
+      toastError("Erreur lors de la génération de l'export Excel.");
+    }
+  };
+
   // Réordonnancement des articles d'un bloc : délégué à BlocsPanel (qui détient le brouillon),
   // car hello-pangea n'autorise qu'un seul DragDropContext (celui-ci).
   const blocDragEndRef = useRef(null);
@@ -407,24 +418,38 @@ const DatabaseView = ({
         </div>
       )}
 
-      <input type="file" ref={fileInputRef} onChange={(e) => {
+      <input type="file" ref={fileInputRef} onChange={async (e) => {
           const file = e.target.files[0];
           if (!file) return;
-          // Nom de la biblio par défaut = nom du fichier sans extension
-          const fileName = file.name.replace(/\.json$/i, '');
-          const reader = new FileReader();
-          reader.onload = (ev) => {
+          const isXlsx = file.name.endsWith('.xlsx');
+          const fileName = file.name.replace(/\.(json|xlsx)$/i, '');
+          
+          if (isXlsx) {
               try {
-                  const json = JSON.parse(ev.target.result);
-                  if (Array.isArray(json)) {
-                    onImportData({ bpu: json }, { name: fileName });
-                  } else {
-                    onImportData(json, { name: fileName });
-                  }
-              } catch { toastError("Fichier JSON invalide."); }
-          };
-          reader.readAsText(file);
-      }} className="hidden" accept=".json" />
+                  const { parseLibraryExcel } = await import('../utils/excelLibraryHelper');
+                  const result = await parseLibraryExcel(file);
+                  onImportData(result, { name: fileName });
+                  toastSuccess("Importation Excel réussie.");
+              } catch (err) {
+                  console.error(err);
+                  toastError(err.message || "Erreur lors de l'importation Excel.");
+              }
+          } else {
+              const reader = new FileReader();
+              reader.onload = (ev) => {
+                  try {
+                      const json = JSON.parse(ev.target.result);
+                      if (Array.isArray(json)) {
+                        onImportData({ bpu: json }, { name: fileName });
+                      } else {
+                        onImportData(json, { name: fileName });
+                      }
+                  } catch { toastError("Fichier JSON invalide."); }
+              };
+              reader.readAsText(file);
+          }
+          e.target.value = '';
+      }} className="hidden" accept=".json,.xlsx" />
       
       <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="database" />
 
@@ -598,8 +623,9 @@ const DatabaseView = ({
                                     )}
                                 </div>
                                 <div className="p-2 border-t border-gray-100 space-y-0.5">
-                                    <button onClick={() => { fileInputRef.current?.click(); setSourceMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition-colors"><Upload size={14} className="text-gray-400" strokeWidth={1.5} /> Charger une base externe…</button>
-                                    <button onClick={() => { handleExport(); setSourceMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition-colors"><Download size={14} className="text-gray-400" strokeWidth={1.5} /> Sauvegarder (backup)</button>
+                                    <button onClick={() => { fileInputRef.current?.click(); setSourceMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition-colors"><Upload size={14} className="text-gray-400" strokeWidth={1.5} /> Importer base (.xlsx, .json)…</button>
+                                    <button onClick={() => { handleExportExcel(); setSourceMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition-colors"><Download size={14} className="text-blue-500" strokeWidth={1.5} /> Exporter vers Excel (.xlsx)</button>
+                                    <button onClick={() => { handleExport(); setSourceMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition-colors"><Download size={14} className="text-gray-400" strokeWidth={1.5} /> Sauvegarde complète (.json)</button>
                                     {isLocalMode && (
                                       <button
                                           onClick={async () => { setSourceMenuOpen(false); const ok = await confirm('Voulez-vous vraiment vider totalement la base locale ? Cette action est irréversible.', { title: 'Vider la base', danger: true }); if (ok) onFullResetLocal?.(); }}
