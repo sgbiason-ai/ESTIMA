@@ -4,7 +4,7 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { 
   Search, Plus, Trash2, Folder, FolderOpen, LayoutGrid, FileText, 
   Edit2, GripVertical, Download, Upload, Check, X, MoreVertical, 
-  Calendar, Copy, ArrowDownAZ, ArrowUpAZ, ArrowUp, ArrowDown, Euro, Hash,
+  Calendar, Copy, ArrowDownAZ, ArrowUpAZ, ArrowUp, ArrowDown, Euro, Hash, Coins,
   FileWarning, CheckSquare, Square, FolderInput, TrendingUp, TrendingDown,
   Info, History, BarChart2, RefreshCw, BookOpen, Cloud, Monitor, AlertCircle,
   HelpCircle, AlignLeft, Boxes, LayoutList, ChevronDown, Briefcase
@@ -50,7 +50,21 @@ const DatabaseView = ({
 }) => {
   const [mode, setMode] = useState('articles'); // 'articles' | 'blocs'
   const [sourceMenuOpen, setSourceMenuOpen] = useState(false); // popover source de données
-  const [selectedCatId, setSelectedCatId] = useState(null);
+  const [selectedCatId, setSelectedCatId] = useState(() => {
+    return localStorage.getItem('estima_selected_bpu_filter') || null;
+  });
+
+  useEffect(() => {
+    if (selectedCatId) {
+      localStorage.setItem('estima_selected_bpu_filter', selectedCatId);
+    } else {
+      localStorage.removeItem('estima_selected_bpu_filter');
+    }
+  }, [selectedCatId]);
+
+  const toggleCategoryFilter = (catId) => {
+    setSelectedCatId(prev => prev === catId ? null : catId);
+  };
   const [isCreatingCat, setIsCreatingCat] = useState(false);
   const [newCatName, setNewCatName] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' }); 
@@ -113,6 +127,7 @@ const DatabaseView = ({
       if (selectedCatId === 'uncategorized') return itemCatIds.length === 0;
       if (selectedCatId === 'nodescription') return !item.description || item.description.trim() === '' || item.description === '<p><br></p>';
       if (selectedCatId === 'observed') return !!item.observedPrice;
+      if (selectedCatId === 'zeroprice') return !item.price || Number(item.price) === 0;
       return itemCatIds.map(String).includes(String(selectedCatId));
     });
 
@@ -211,17 +226,30 @@ const DatabaseView = ({
   };
   // ----------------------------------------------------
 
-  const renderPriceTrend = (item) => {
+  const renderPriceTrend = (item, isLarge = false) => {
     if (!item.observedPrice || !item.price) return null;
     const diff = ((item.observedPrice - item.price) / item.price) * 100;
-    if (Math.abs(diff) < 2) return <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1 rounded" title={`Prix réel: ${formatPrice(item.observedPrice)}`}>Aligné</span>;
+    const sizeClass = isLarge ? 'text-[11px] px-2 py-0.5 rounded-lg' : 'text-[9px] px-1 rounded';
+    const iconSize = isLarge ? 12 : 10;
+    
+    if (Math.abs(diff) < 2) {
+      return (
+        <span 
+          className={`font-bold text-slate-400 bg-slate-100 ${sizeClass}`} 
+          title={`Prix réel: ${formatPrice(item.observedPrice)} €`}
+        >
+          Aligné
+        </span>
+      );
+    }
+    
     return (
         <div 
-          className={`flex items-center gap-0.5 text-[9px] font-bold px-1 rounded cursor-help ${diff > 0 ? 'text-red-600 bg-red-50 border border-red-100' : 'text-emerald-600 bg-emerald-50 border border-emerald-100'}`}
-          title={`Prix réel observé: ${formatPrice(item.observedPrice)}`}
+          className={`flex items-center gap-0.5 font-bold cursor-help ${sizeClass} ${diff > 0 ? 'text-red-600 bg-red-50 border border-red-100' : 'text-emerald-600 bg-emerald-50 border border-emerald-100'}`}
+          title={`Prix réel observé: ${formatPrice(item.observedPrice)} €`}
         >
-            {diff > 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-            {Math.abs(diff).toFixed(0)}%
+            {diff > 0 ? <TrendingUp size={iconSize} /> : <TrendingDown size={iconSize} />}
+            {diff > 0 ? '+' : ''}{diff.toFixed(0)}%
         </div>
     );
   };
@@ -440,7 +468,7 @@ const DatabaseView = ({
                                             <div
                                                 ref={(el) => { provided.innerRef(el); providedDrop.innerRef(el); }}
                                                 {...provided.draggableProps} {...provided.dragHandleProps} {...providedDrop.droppableProps}
-                                                onClick={() => setSelectedCatId(cat.id)}
+                                                onClick={() => toggleCategoryFilter(cat.id)}
                                                 className={`group flex items-center gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-all duration-150 border border-transparent
                                                     ${snapshot.isDragging ? 'shadow-lg scale-102 bg-white z-50 border-gray-200' : ''}
                                                     ${snapshotDrop.isDraggingOver ? 'scale-[1.02] shadow-sm' : ''}`}
@@ -484,7 +512,7 @@ const DatabaseView = ({
               <Droppable droppableId="folder-uncategorized" type="ITEM">
                 {(provided, snapshot) => (
                     <div ref={provided.innerRef} {...provided.droppableProps}
-                        onClick={() => setSelectedCatId('uncategorized')}
+                        onClick={() => toggleCategoryFilter('uncategorized')}
                         className={`flex items-center gap-3 px-3.5 py-2 rounded-xl cursor-pointer transition-all duration-200 border border-transparent
                             ${snapshot.isDraggingOver ? 'bg-blue-50 border-blue-200 scale-[1.01] shadow-sm' : ''}
                             ${!snapshot.isDraggingOver && selectedCatId === 'uncategorized' ? 'bg-gray-100 text-gray-800 font-bold' : 'text-gray-500 hover:bg-gray-100/70'}`}
@@ -500,8 +528,9 @@ const DatabaseView = ({
                     </div>
                 )}
               </Droppable>
-              <div onClick={() => setSelectedCatId('nodescription')} className={`flex items-center gap-3 px-3.5 py-2 rounded-xl cursor-pointer transition-all duration-200 ${selectedCatId === 'nodescription' ? 'bg-red-50 text-red-700 font-bold' : 'text-gray-500 hover:bg-gray-100/70'}`}><div className="w-4"></div><FileWarning size={15} strokeWidth={1.5} className="text-red-500" /><span className="text-xs font-medium">Sans description</span><span className="ml-auto text-[10px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded-lg">{fullBpu.filter(i => !i.description || i.description.trim() === '' || i.description === '<p><br></p>').length}</span></div>
-              <div onClick={() => setSelectedCatId('observed')} className={`flex items-center gap-3 px-3.5 py-2 rounded-xl cursor-pointer transition-all duration-200 ${selectedCatId === 'observed' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-gray-500 hover:bg-gray-100/70'}`}><div className="w-4"></div><TrendingUp size={15} strokeWidth={1.5} className="text-blue-500" /><span className="text-xs font-medium">Prix observés</span><span className="ml-auto text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-lg">{fullBpu.filter(i => i.observedPrice).length}</span></div>
+              <div onClick={() => toggleCategoryFilter('nodescription')} className={`flex items-center gap-3 px-3.5 py-2 rounded-xl cursor-pointer transition-all duration-200 ${selectedCatId === 'nodescription' ? 'bg-red-50 text-red-700 font-bold' : 'text-gray-500 hover:bg-gray-100/70'}`}><div className="w-4"></div><FileWarning size={15} strokeWidth={1.5} className="text-red-500" /><span className="text-xs font-medium">Sans description</span><span className="ml-auto text-[10px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded-lg">{fullBpu.filter(i => !i.description || i.description.trim() === '' || i.description === '<p><br></p>').length}</span></div>
+              <div onClick={() => toggleCategoryFilter('observed')} className={`flex items-center gap-3 px-3.5 py-2 rounded-xl cursor-pointer transition-all duration-200 ${selectedCatId === 'observed' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-gray-500 hover:bg-gray-100/70'}`}><div className="w-4"></div><TrendingUp size={15} strokeWidth={1.5} className="text-blue-500" /><span className="text-xs font-medium">Prix observés</span><span className="ml-auto text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-lg">{fullBpu.filter(i => i.observedPrice).length}</span></div>
+              <div onClick={() => toggleCategoryFilter('zeroprice')} className={`flex items-center gap-3 px-3.5 py-2 rounded-xl cursor-pointer transition-all duration-200 ${selectedCatId === 'zeroprice' ? 'bg-amber-50 text-amber-700 font-bold' : 'text-gray-500 hover:bg-gray-100/70'}`}><div className="w-4"></div><Coins size={15} strokeWidth={1.5} className="text-amber-500" /><span className="text-xs font-medium">Prix à 0</span><span className="ml-auto text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-lg">{fullBpu.filter(i => !i.price || Number(i.price) === 0).length}</span></div>
             </div>
           </div>
           )}
@@ -803,22 +832,28 @@ const DatabaseView = ({
                                                             )}
                                                         </div>
                                                     </div>
-                                                    <div className="text-right min-w-[110px] pr-2 shrink-0 select-none">
-                                                        <span className="block font-black text-sm text-gray-900 tracking-tight">{formatPrice(item.price)} €</span>
-                                                        <span className="block text-[8px] uppercase font-bold text-gray-400 tracking-wider">Catalogue</span>
+                                                    <div className="flex items-center gap-3 pr-2 shrink-0 select-none">
                                                         {item.observedPrice && (
-                                                            <div className="flex flex-col items-end gap-1 mt-1">
-                                                                <button
-                                                                    onClick={(e) => { e.stopPropagation(); setPriceHistoryItem(item); }}
-                                                                    className="flex items-center gap-1 font-bold text-[9px] text-blue-600 hover:text-blue-700 hover:bg-blue-50/50 px-1.5 py-0.5 rounded-lg border border-transparent hover:border-blue-100 transition-all cursor-pointer"
-                                                                    title={`Prix réel moyen: ${formatPrice(item.observedPrice)} € — Cliquez pour voir l'historique`}
-                                                                >
-                                                                    <History size={9} strokeWidth={1.5} />
-                                                                    Réel: {formatPrice(item.observedPrice)} €
-                                                                </button>
-                                                                {renderPriceTrend(item)}
+                                                            <div className="shrink-0 flex items-center justify-end">
+                                                                {renderPriceTrend(item, true)}
                                                             </div>
                                                         )}
+                                                        <div className="text-right min-w-[100px]">
+                                                            <span className="block font-black text-sm text-gray-900 tracking-tight">{formatPrice(item.price)} €</span>
+                                                            <span className="block text-[8px] uppercase font-bold text-gray-400 tracking-wider">Catalogue</span>
+                                                            {item.observedPrice && (
+                                                                <div className="flex justify-end mt-1">
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); setPriceHistoryItem(item); }}
+                                                                        className="flex items-center gap-1 font-bold text-[9px] text-blue-600 hover:text-blue-700 hover:bg-blue-50/50 px-1.5 py-0.5 rounded-lg border border-transparent hover:border-blue-100 transition-all cursor-pointer"
+                                                                        title={`Prix réel moyen: ${formatPrice(item.observedPrice)} € — Cliquez pour voir l'historique`}
+                                                                    >
+                                                                        <History size={9} strokeWidth={1.5} />
+                                                                        Réel: {formatPrice(item.observedPrice)} €
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200 shrink-0">
                                                         <button 
