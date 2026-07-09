@@ -40,7 +40,7 @@ export const FormattedInput = ({ value, onChange, onBlur, onFocus, className, pl
 };
 // ------------------------------------------
 
-export const EditableTitle = ({ value, onSave, className, disabled }) => {
+export const EditableTitle = ({ value, onSave, className, disabled, cursor = 'cursor-text' }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [tempValue, setTempValue] = useState(value);
 
@@ -61,7 +61,7 @@ export const EditableTitle = ({ value, onSave, className, disabled }) => {
       </div>
     );
   }
-  return <span onDoubleClick={(e) => { e.stopPropagation(); !disabled && setIsEditing(true); }} className={`cursor-text ${className} ${disabled ? 'cursor-default' : ''}`} title={!disabled ? "Double-cliquer pour éditer" : ""}>{value}</span>;
+  return <span onDoubleClick={(e) => { e.stopPropagation(); !disabled && setIsEditing(true); }} className={`${cursor} ${className} ${disabled ? 'cursor-default' : ''}`} title={!disabled ? "Double-cliquer pour éditer" : ""}>{value}</span>;
 };
 
 /**

@@ -37,7 +37,7 @@ export const RibbonBtnLarge = ({ icon: Icon, label, onClick, title, active, acce
       disabled={disabled}
       title={title || (typeof label === 'string' ? label : '')}
       className={`
-        ribbon-btn-lg group relative flex flex-col items-center justify-center gap-1 px-3 py-1.5 rounded min-w-[52px]
+        ribbon-btn-lg group relative flex flex-col items-center justify-center gap-1 px-3 py-1 rounded min-w-[48px]
         transition-all duration-100
         ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-default'}
         ${
@@ -61,10 +61,10 @@ export const RibbonBtnLarge = ({ icon: Icon, label, onClick, title, active, acce
           !disabled && !active ? (dark ? 'group-hover:text-slate-100' : 'group-hover:text-slate-800') : ''
         }`}
       >
-        <Icon size={22} strokeWidth={1.6} />
+        <Icon size={20} strokeWidth={1.6} />
       </div>
       <span
-        className={`ribbon-lbl-lg text-[10.5px] leading-tight text-center font-normal transition-colors
+        className={`ribbon-lbl-lg text-[10px] leading-tight text-center font-normal transition-colors
         ${
           dark
             ? active
@@ -91,7 +91,7 @@ export const RibbonBtnSmall = ({ icon: Icon, label, onClick, title, active, acce
       disabled={disabled}
       title={title || (typeof label === 'string' ? label : '')}
       className={`
-        group flex items-center gap-2 px-2.5 py-[5px] rounded w-full
+        group flex items-center gap-1.5 px-2.5 py-[4px] rounded w-full
         transition-all duration-100
         ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-default'}
         ${
@@ -110,11 +110,11 @@ export const RibbonBtnSmall = ({ icon: Icon, label, onClick, title, active, acce
           !disabled && !active ? (dark ? 'group-hover:text-slate-300' : 'group-hover:text-slate-700') : ''
         }`}
       >
-        <Icon size={16} strokeWidth={1.6} />
+        <Icon size={15} strokeWidth={1.6} />
       </div>
       {label && (
         <span
-          className={`text-[11px] leading-none whitespace-nowrap font-normal transition-colors
+          className={`text-[10.5px] leading-none whitespace-nowrap font-normal transition-colors
           ${
             dark
               ? active
@@ -183,7 +183,7 @@ export const RibbonHeader = ({ title, tabs, activeTab, onTabChange, rightContent
 export const RibbonContainer = ({ children, dark }) => (
   <RibbonThemeCtx.Provider value={!!dark}>
     <div
-      className={`flex items-stretch flex-nowrap border-b min-h-[78px] overflow-x-auto overflow-y-hidden overscroll-x-contain
+      className={`flex items-stretch flex-nowrap border-b min-h-[68px] overflow-x-auto overflow-y-hidden overscroll-x-contain
         [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent
         [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300/70
         [&::-webkit-scrollbar-thumb]:hover:bg-slate-400/80 ${

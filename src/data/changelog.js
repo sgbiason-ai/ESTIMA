@@ -2,9 +2,27 @@
 // Version courante et historique des nouveautés.
 // Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
 
-export const APP_VERSION = '3.5.5';
+export const APP_VERSION = '3.5.7';
 
 export const CHANGELOG = [
+  {
+    version: '3.5.7',
+    date: '2026-07-09',
+    title: 'Bibliothèque — refonte graphique BPU / Catalogue, bandeau Bento & toggle agrandi',
+    highlights: [
+      'Bibliothèque — refonte graphique de la vue articles aux standards Apple-style Light : sidebar en glassmorphism, articles à double arrondi, et intégration du bandeau Bento de statistiques au cœur de l\'en-tête (entre recherche et création) accompagné d\'un toggle Articles / Blocs agrandi pour un confort de clic accru',
+    ],
+  },
+  {
+    version: '3.5.6',
+    date: '2026-07-08',
+    title: 'Interface — réduction de la hauteur des rubans, ergonomie des tranches & correctifs CCTP',
+    highlights: [
+      'Interface — réduction uniforme de la hauteur minimale des rubans à 68px avec adaptation homothétique des icônes et polices de caractères pour maximiser l\'espace de travail',
+      'Tranches — le survol d\'un onglet de tranche conserve désormais un pointeur de navigation classique (cursor-pointer), tout en préservant le double-clic pour renommer la tranche',
+      'Bibliothèque — la bulle d\'info des articles liés à un chapitre CCTP affiche désormais le numéro de chapitre nettoyé (ex: "Chapitre 1.1") au lieu de l\'identifiant technique UUID incompréhensible si le titre du chapitre ne peut pas être résolu',
+    ],
+  },
   {
     version: '3.5.5',
     date: '2026-07-08',

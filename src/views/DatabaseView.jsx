@@ -78,7 +78,21 @@ const DatabaseView = ({
     const refs = item.cctpRefs || (item.cctpRef ? [item.cctpRef] : []);
     const titles = refs.map(r => cctpTitleMap[String(r)]).filter(Boolean);
     if (titles.length > 0) return titles.join(', ');
-    return refs.join(', ') || 'CCTP Lié';
+    
+    const cleanRefs = refs.map(r => {
+      let s = String(r);
+      if (s.startsWith('imported_')) s = s.substring('imported_'.length);
+      if (s.startsWith('custom_')) s = s.substring('custom_'.length);
+      return s;
+    }).filter(Boolean);
+    
+    if (cleanRefs.length > 0) {
+      return cleanRefs.map(r => {
+        if (r.length > 15 && !r.includes('.')) return 'CCTP Lié';
+        return `Chapitre ${r}`;
+      }).join(', ');
+    }
+    return 'CCTP Lié';
   };
 
   // --- État pour la modale de modification du lien CCTP ---
@@ -137,11 +151,21 @@ const DatabaseView = ({
     return result;
   }, [filteredBpu, selectedCatId, sortConfig]);
 
+  // --- Statistiques de la bibliothèque (Bento) ---
+  const stats = useMemo(() => {
+    const total = fullBpu.length;
+    const value = fullBpu.reduce((acc, i) => acc + (i.price || 0), 0);
+    const withCctp = fullBpu.filter(item => item.cctpRef || (item.cctpRefs && item.cctpRefs.length > 0)).length;
+    const cctpPct = total > 0 ? Math.round((withCctp / total) * 100) : 0;
+    const observed = fullBpu.filter(i => i.observedPrice).length;
+    return { total, value, cctpPct, observed };
+  }, [fullBpu]);
+
   // --- Configuration de la virtualisation ---
   const rowVirtualizer = useVirtualizer({
     count: itemsToDisplay.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 85, // Hauteur moyenne d'un élément + l'espacement (gap)
+    estimateSize: () => 92, // Hauteur moyenne d'un élément + l'espacement (gap)
     overscan: 10, // Nombre d'éléments pré-chargés hors-champ pour la fluidité
   });
 
@@ -304,7 +328,7 @@ const DatabaseView = ({
   };
 
   return (
-    <div className="flex-1 flex h-full bg-slate-50 overflow-hidden relative font-sans text-slate-900">
+    <div className="flex-1 flex h-full bg-[#f5f5f7] overflow-hidden relative font-sans text-slate-900">
       
       {/* MODALE DE LIEN CCTP */}
       {cctpLinkModal.isOpen && (
@@ -377,27 +401,27 @@ const DatabaseView = ({
 
       <DragDropContext onDragEnd={handleDragEnd}>
           {mode === 'articles' && (
-          <div className="w-80 bg-white border-r border-slate-200 flex flex-col shrink-0 z-30">
-            <div className="p-4 border-b border-slate-100 bg-slate-50">
+          <div className="w-80 bg-white/85 backdrop-blur-xl border-r border-gray-200/60 flex flex-col shrink-0 z-30">
+            <div className="p-5 border-b border-gray-200/40 bg-gray-50/40">
 
-              <h3 className="font-black text-xs uppercase text-slate-500 tracking-widest mb-3 flex items-center gap-2"><Folder size={14} /> Dossiers</h3>
+              <h3 className="font-bold text-[10px] uppercase text-gray-400 tracking-widest mb-4 flex items-center gap-2 select-none"><Folder size={13} strokeWidth={2} className="text-gray-400" /> Dossiers</h3>
               {!isCreatingCat ? (
-                <button onClick={() => setIsCreatingCat(true)} className={`w-full flex items-center justify-center gap-2 bg-white border border-slate-200 hover:border-emerald-500 text-slate-700 hover:text-emerald-600 py-2 rounded-lg text-xs font-bold uppercase transition-all shadow-sm active:scale-95 ${isLocalMode ? 'hover:border-amber-500 hover:text-amber-600' : ''}`}><Plus size={14} /> Nouveau Dossier</button>
+                <button onClick={() => setIsCreatingCat(true)} className={`w-full flex items-center justify-center gap-2 bg-white border border-gray-200/80 hover:border-emerald-500 text-gray-700 hover:text-emerald-600 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm hover:shadow active:scale-95 ${isLocalMode ? 'hover:border-amber-500 hover:text-amber-600' : ''}`}><Plus size={14} strokeWidth={1.5} /> Nouveau Dossier</button>
               ) : (
                 <div className="flex items-center gap-1 animate-in fade-in zoom-in duration-200">
-                    <input autoFocus type="text" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (addCategory(newCatName), setNewCatName(""), setIsCreatingCat(false))} placeholder="Nom..." className={`flex-1 min-w-0 py-1.5 px-2 text-xs border rounded focus:outline-none ${isLocalMode ? 'border-amber-500' : 'border-emerald-500'}`} />
-                    <button onClick={() => (addCategory(newCatName), setNewCatName(""), setIsCreatingCat(false))} className={`p-1.5 text-white rounded ${isLocalMode ? 'bg-amber-500 hover:bg-amber-600' : 'bg-emerald-500 hover:bg-emerald-600'}`}><Check size={14} /></button>
-                    <button onClick={() => setIsCreatingCat(false)} className="p-1.5 bg-slate-200 text-slate-600 rounded hover:bg-slate-300"><X size={14} /></button>
+                    <input autoFocus type="text" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (addCategory(newCatName), setNewCatName(""), setIsCreatingCat(false))} placeholder="Nom..." className={`flex-1 min-w-0 py-1.5 px-3 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 ${isLocalMode ? 'focus:ring-amber-500/10 focus:border-amber-500' : ''}`} />
+                    <button onClick={() => (addCategory(newCatName), setNewCatName(""), setIsCreatingCat(false))} className={`p-2 text-white rounded-xl active:scale-95 transition-all ${isLocalMode ? 'bg-amber-500 hover:bg-amber-600' : 'bg-emerald-500 hover:bg-emerald-600'}`}><Check size={14} /></button>
+                    <button onClick={() => setIsCreatingCat(false)} className="p-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 active:scale-95 transition-all"><X size={14} /></button>
                 </div>
               )}
             </div>
             
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              <div onClick={() => setSelectedCatId(null)} className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${selectedCatId === null ? (isLocalMode ? 'bg-amber-600 text-white shadow-md' : 'bg-emerald-600 text-white shadow-md') : 'text-slate-700 hover:bg-slate-100'}`}><div className="w-4"></div><LayoutGrid size={16} /><span className="text-xs font-bold uppercase tracking-tight">Tous les articles</span><span className="ml-auto text-[10px] opacity-70 bg-black/10 px-1.5 rounded-full">{filteredBpu.length}</span></div>
+            <div className="flex-1 overflow-y-auto p-3 space-y-1">
+              <div onClick={() => setSelectedCatId(null)} className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl cursor-pointer transition-all duration-200 ${selectedCatId === null ? (isLocalMode ? 'bg-amber-600 text-white shadow-sm font-bold' : 'bg-emerald-600 text-white shadow-sm font-bold') : 'text-gray-700 hover:bg-gray-100/70'}`}><div className="w-4"></div><LayoutGrid size={16} strokeWidth={1.5} /><span className="text-xs font-bold tracking-tight">Tous les articles</span><span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full ${selectedCatId === null ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'}`}>{filteredBpu.length}</span></div>
               
               <Droppable droppableId="categories-list" type="CATEGORY">
                 {(providedDropCat) => (
-                    <div ref={providedDropCat.innerRef} {...providedDropCat.droppableProps}>
+                    <div ref={providedDropCat.innerRef} {...providedDropCat.droppableProps} className="space-y-0.5">
                         {(() => {
                             const CAT_FALLBACK = ['#3b82f6','#f59e0b','#8b5cf6','#10b981','#ef4444','#06b6d4','#ec4899','#84cc16','#f97316','#6366f1','#14b8a6','#92400e','#0ea5e9','#d946ef','#64748b','#059669'];
                             const isValidHex = (c) => /^#[0-9a-fA-F]{6}$/.test(c);
@@ -407,6 +431,7 @@ const DatabaseView = ({
                             let fbIdx = 0;
                             return sorted.map((cat, index) => {
                             const catColor = (cat.color && isValidHex(cat.color)) ? cat.color : (fbIdx < available.length ? available[fbIdx++] : CAT_FALLBACK[(fbIdx++) % CAT_FALLBACK.length]);
+                            const isSelected = selectedCatId === cat.id;
                             return (
                             <Draggable key={cat.id} draggableId={cat.id} index={index} isDragDisabled={isLocalMode}>
                                 {(provided, snapshot) => (
@@ -416,31 +441,31 @@ const DatabaseView = ({
                                                 ref={(el) => { provided.innerRef(el); providedDrop.innerRef(el); }}
                                                 {...provided.draggableProps} {...provided.dragHandleProps} {...providedDrop.droppableProps}
                                                 onClick={() => setSelectedCatId(cat.id)}
-                                                className={`group flex items-center gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-all duration-150
-                                                    ${snapshot.isDragging ? 'shadow-xl scale-105 z-50' : ''}
-                                                    ${snapshotDrop.isDraggingOver ? 'scale-[1.03] shadow-lg ring-2' : ''}`}
+                                                className={`group flex items-center gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-all duration-150 border border-transparent
+                                                    ${snapshot.isDragging ? 'shadow-lg scale-102 bg-white z-50 border-gray-200' : ''}
+                                                    ${snapshotDrop.isDraggingOver ? 'scale-[1.02] shadow-sm' : ''}`}
                                                 style={{
-                                                    backgroundColor: snapshotDrop.isDraggingOver ? catColor + '40'
-                                                        : selectedCatId === cat.id ? catColor + '30'
-                                                        : catColor + '18',
-                                                    borderLeft: `4px solid ${selectedCatId === cat.id || snapshotDrop.isDraggingOver ? catColor : catColor + '90'}`,
-                                                    ...(snapshotDrop.isDraggingOver ? { ringColor: catColor, boxShadow: `0 4px 16px ${catColor}40` } : {})
+                                                    backgroundColor: snapshotDrop.isDraggingOver ? catColor + '20'
+                                                        : isSelected ? catColor + '10'
+                                                        : 'transparent',
+                                                    borderLeft: `3px solid ${isSelected || snapshotDrop.isDraggingOver ? catColor : 'transparent'}`,
+                                                    ...((isSelected || snapshotDrop.isDraggingOver) ? { color: catColor } : {})
                                                 }}
                                             >
-                                                <div className="text-slate-300 group-hover:text-slate-400"><GripVertical size={13} /></div>
-                                                <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: catColor + '30' }}>
-                                                    {snapshotDrop.isDraggingOver || selectedCatId === cat.id
-                                                        ? <FolderOpen size={16} style={{ color: catColor }} />
-                                                        : <Folder size={16} style={{ color: catColor }} />
+                                                <div className="text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity"><GripVertical size={13} /></div>
+                                                <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: isSelected || snapshotDrop.isDraggingOver ? catColor + '20' : catColor + '10' }}>
+                                                    {snapshotDrop.isDraggingOver || isSelected
+                                                        ? <FolderOpen size={15} style={{ color: catColor }} strokeWidth={1.5} />
+                                                        : <Folder size={15} style={{ color: catColor }} strokeWidth={1.5} />
                                                     }
                                                 </div>
-                                                <span className="text-[11px] truncate font-bold" style={{ color: selectedCatId === cat.id || snapshotDrop.isDraggingOver ? catColor : '#334155' }}>{cat.name}</span>
-                                                <span className="ml-auto text-[10px] font-black min-w-[22px] h-[22px] flex items-center justify-center rounded-full shrink-0" style={{ color: '#fff', backgroundColor: catColor }}>{fullBpu.filter(i => { const ids = (i.categoryIds || (i.categoryId ? [i.categoryId] : [])).map(String); return ids.includes(String(cat.id)); }).length}</span>
+                                                <span className="text-xs truncate font-semibold flex-1" style={{ color: isSelected || snapshotDrop.isDraggingOver ? catColor : '#374151' }}>{cat.name}</span>
+                                                <span className="text-[10px] font-bold min-w-[20px] h-[20px] flex items-center justify-center rounded-lg shrink-0 transition-colors" style={{ color: catColor, backgroundColor: catColor + '15' }}>{fullBpu.filter(i => { const ids = (i.categoryIds || (i.categoryId ? [i.categoryId] : [])).map(String); return ids.includes(String(cat.id)); }).length}</span>
                                                 {providedDrop.placeholder}
-                                                {selectedCatId === cat.id && !snapshotDrop.isDraggingOver && (
-                                                    <div className="flex items-center gap-1">
-                                                        <button onClick={(e) => { e.stopPropagation(); const newName = prompt("Nouveau nom :", cat.name); if(newName) renameCategory(cat.id, newName); }} className="p-1 hover:bg-white rounded text-slate-400 hover:text-blue-500"><Edit2 size={12} /></button>
-                                                        <button onClick={async (e) => { e.stopPropagation(); const ok = await confirm("Supprimer ce dossier ?", { danger: true }); if(ok) deleteCategory(cat.id); }} className="p-1 hover:bg-white rounded text-slate-400 hover:text-red-500"><Trash2 size={12} /></button>
+                                                {isSelected && !snapshotDrop.isDraggingOver && (
+                                                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                                        <button onClick={(e) => { e.stopPropagation(); const newName = prompt("Nouveau nom :", cat.name); if(newName) renameCategory(cat.id, newName); }} className="p-1 hover:bg-white rounded-lg text-gray-400 hover:text-blue-500 transition-colors"><Edit2 size={12} /></button>
+                                                        <button onClick={async (e) => { e.stopPropagation(); const ok = await confirm("Supprimer ce dossier ?", { danger: true }); if(ok) deleteCategory(cat.id); }} className="p-1 hover:bg-white rounded-lg text-gray-400 hover:text-red-500 transition-colors"><Trash2 size={12} /></button>
                                                     </div>
                                                 )}
                                             </div>
@@ -449,7 +474,7 @@ const DatabaseView = ({
                                 )}
                             </Draggable>
                             );
-                        });
+                            });
                         })()}
                         {providedDropCat.placeholder}
                     </div>
@@ -460,24 +485,23 @@ const DatabaseView = ({
                 {(provided, snapshot) => (
                     <div ref={provided.innerRef} {...provided.droppableProps}
                         onClick={() => setSelectedCatId('uncategorized')}
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-150
-                            ${snapshot.isDraggingOver ? 'bg-blue-100 ring-2 ring-blue-400 scale-[1.02] shadow-md' : ''}
-                            ${!snapshot.isDraggingOver && selectedCatId === 'uncategorized' ? 'bg-slate-200 text-slate-800 font-bold' : ''}
-                            ${!snapshot.isDraggingOver && selectedCatId !== 'uncategorized' ? 'text-slate-500 hover:bg-slate-100' : ''}`}
+                        className={`flex items-center gap-3 px-3.5 py-2 rounded-xl cursor-pointer transition-all duration-200 border border-transparent
+                            ${snapshot.isDraggingOver ? 'bg-blue-50 border-blue-200 scale-[1.01] shadow-sm' : ''}
+                            ${!snapshot.isDraggingOver && selectedCatId === 'uncategorized' ? 'bg-gray-100 text-gray-800 font-bold' : 'text-gray-500 hover:bg-gray-100/70'}`}
                     >
                         <div className="w-4"></div>
-                        {snapshot.isDraggingOver ? <FolderOpen size={16} className="text-blue-600" /> : <Folder size={16} />}
-                        <span className={`text-xs italic ${snapshot.isDraggingOver ? 'text-blue-700 font-bold not-italic' : ''}`}>Non classés</span>
+                        {snapshot.isDraggingOver ? <FolderOpen size={15} className="text-blue-600" strokeWidth={1.5} /> : <Folder size={15} strokeWidth={1.5} />}
+                        <span className={`text-xs ${snapshot.isDraggingOver ? 'text-blue-700 font-semibold' : 'font-medium'}`}>Non classés</span>
                         {snapshot.isDraggingOver
-                            ? <span className="ml-auto text-[9px] font-bold text-blue-600 bg-blue-200 px-1.5 py-0.5 rounded-full">Non classés</span>
-                            : <span className="ml-auto text-[10px] bg-slate-200 px-1.5 rounded-full">{fullBpu.filter(i => { const ids = i.categoryIds || (i.categoryId ? [i.categoryId] : []); return ids.length === 0; }).length}</span>
+                            ? <span className="ml-auto text-[9px] font-bold text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded-lg">Déposer</span>
+                            : <span className="ml-auto text-[10px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-lg">{fullBpu.filter(i => { const ids = i.categoryIds || (i.categoryId ? [i.categoryId] : []); return ids.length === 0; }).length}</span>
                         }
                         {provided.placeholder}
                     </div>
                 )}
               </Droppable>
-              <div onClick={() => setSelectedCatId('nodescription')} className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${selectedCatId === 'nodescription' ? 'bg-red-50 text-red-800 font-bold' : 'text-slate-500 hover:bg-slate-100'}`}><div className="w-4"></div><FileWarning size={16} /><span className="text-xs italic">Sans description</span><span className="ml-auto text-[10px] bg-red-100 text-red-600 px-1.5 rounded-full">{fullBpu.filter(i => !i.description || i.description.trim() === '' || i.description === '<p><br></p>').length}</span></div>
-              <div onClick={() => setSelectedCatId('observed')} className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${selectedCatId === 'observed' ? 'bg-blue-50 text-blue-800 font-bold' : 'text-slate-500 hover:bg-slate-100'}`}><div className="w-4"></div><TrendingUp size={16} /><span className="text-xs italic">Prix observés</span><span className="ml-auto text-[10px] bg-blue-100 text-blue-600 px-1.5 rounded-full">{fullBpu.filter(i => i.observedPrice).length}</span></div>
+              <div onClick={() => setSelectedCatId('nodescription')} className={`flex items-center gap-3 px-3.5 py-2 rounded-xl cursor-pointer transition-all duration-200 ${selectedCatId === 'nodescription' ? 'bg-red-50 text-red-700 font-bold' : 'text-gray-500 hover:bg-gray-100/70'}`}><div className="w-4"></div><FileWarning size={15} strokeWidth={1.5} className="text-red-500" /><span className="text-xs font-medium">Sans description</span><span className="ml-auto text-[10px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded-lg">{fullBpu.filter(i => !i.description || i.description.trim() === '' || i.description === '<p><br></p>').length}</span></div>
+              <div onClick={() => setSelectedCatId('observed')} className={`flex items-center gap-3 px-3.5 py-2 rounded-xl cursor-pointer transition-all duration-200 ${selectedCatId === 'observed' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-gray-500 hover:bg-gray-100/70'}`}><div className="w-4"></div><TrendingUp size={15} strokeWidth={1.5} className="text-blue-500" /><span className="text-xs font-medium">Prix observés</span><span className="ml-auto text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-lg">{fullBpu.filter(i => i.observedPrice).length}</span></div>
             </div>
           </div>
           )}
@@ -491,12 +515,12 @@ const DatabaseView = ({
                 </div>
             )}
 
-            <div className="bg-white px-6 py-2 border-b border-slate-100 flex items-center justify-between shadow-sm z-30 relative">
+            <div className="bg-white px-6 py-3.5 border-b border-gray-200/60 flex items-center justify-between shadow-sm z-30 relative">
                 <div className="flex items-center gap-6">
                     {/* Toggle Articles / Blocs */}
-                    <div className="flex items-center bg-slate-100 p-1 rounded-2xl shadow-inner shrink-0">
-                        <button onClick={() => setMode('articles')} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-wider transition-all active:scale-95 ${mode === 'articles' ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><LayoutList size={18} /> Articles</button>
-                        <button onClick={() => setMode('blocs')} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-wider transition-all active:scale-95 ${mode === 'blocs' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}><Boxes size={18} /> Blocs</button>
+                    <div className="flex items-center bg-gray-100 p-1 rounded-2xl shrink-0">
+                        <button onClick={() => setMode('articles')} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold transition-all active:scale-95 ${mode === 'articles' ? 'bg-white text-slate-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}><LayoutList size={17} strokeWidth={1.5} /> Articles</button>
+                        <button onClick={() => setMode('blocs')} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold transition-all active:scale-95 ${mode === 'blocs' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}><Boxes size={17} strokeWidth={1.5} /> Blocs</button>
                     </div>
 
                     {/* Source de données (Cloud / Local) — visible dans les deux modes */}
@@ -504,70 +528,59 @@ const DatabaseView = ({
                         <button
                             onClick={() => setSourceMenuOpen(o => !o)}
                             title="Source de données"
-                            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wide border transition-all active:scale-95 ${isLocalMode ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'}`}
+                            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border transition-all active:scale-95 ${isLocalMode ? 'bg-amber-50 text-amber-700 border-amber-200/50 hover:bg-amber-100/70' : 'bg-blue-50 text-blue-700 border-blue-200/50 hover:bg-blue-100/70'}`}
                         >
-                            {isLocalMode ? <Monitor size={16} /> : <Cloud size={16} />}
+                            {isLocalMode ? <Monitor size={15} strokeWidth={1.5} /> : <Cloud size={15} strokeWidth={1.5} />}
                             <span className="max-w-[160px] truncate normal-case tracking-normal font-bold">{isLocalMode ? (localLibraryName || 'Travail Local') : 'Cloud Sync'}</span>
-                            <ChevronDown size={14} className={`transition-transform ${sourceMenuOpen ? 'rotate-180' : ''}`} />
+                            <ChevronDown size={13} className={`transition-transform ${sourceMenuOpen ? 'rotate-180' : ''}`} />
                         </button>
 
                         {sourceMenuOpen && (
                           <>
                             <div className="fixed inset-0 z-40" onClick={() => setSourceMenuOpen(false)} />
-                            <div className="absolute left-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-                                <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Source de données</p>
+                            <div className="absolute left-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-gray-200/60 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                                <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50/50">
+                                    <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Source de données</p>
                                 </div>
                                 <div className="p-2 space-y-1">
                                     {/* Cloud Sync */}
                                     <button
                                         onClick={() => { if (isLocalMode) onExitLocalMode?.(); setSourceMenuOpen(false); }}
-                                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors ${!isLocalMode ? 'bg-blue-50' : 'hover:bg-slate-50'}`}
+                                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors ${!isLocalMode ? 'bg-blue-50/60' : 'hover:bg-gray-50'}`}
                                     >
-                                        <div className={`p-1.5 rounded-lg ${!isLocalMode ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-400'}`}><Cloud size={16} /></div>
+                                        <div className={`p-1.5 rounded-lg ${!isLocalMode ? 'bg-blue-100/80 text-blue-600' : 'bg-gray-100 text-gray-400'}`}><Cloud size={15} strokeWidth={1.5} /></div>
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-xs font-bold text-slate-800">Cloud Sync</p>
-                                            <p className="text-[10px] text-slate-400">Bibliothèque partagée</p>
+                                            <p className="text-xs font-bold text-gray-800">Cloud Sync</p>
+                                            <p className="text-[10px] text-gray-400">Bibliothèque partagée</p>
                                         </div>
-                                        {!isLocalMode && <Check size={16} className="text-blue-600 shrink-0" />}
+                                        {!isLocalMode && <Check size={15} className="text-blue-600 shrink-0" strokeWidth={2} />}
                                     </button>
                                     {/* Base externe locale (active uniquement) */}
                                     {isLocalMode && (
-                                      <div className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-amber-50">
-                                          <div className="p-1.5 rounded-lg bg-amber-100 text-amber-600"><Monitor size={16} /></div>
+                                      <div className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-amber-50/60">
+                                          <div className="p-1.5 rounded-lg bg-amber-100/80 text-amber-600"><Monitor size={15} strokeWidth={1.5} /></div>
                                           <div className="flex-1 min-w-0">
                                               <p className="text-xs font-bold text-amber-800 truncate">{localLibraryName || 'Travail Local'}</p>
                                               <p className="text-[10px] text-amber-500">Base externe (locale)</p>
                                           </div>
-                                          <Check size={16} className="text-amber-600 shrink-0" />
+                                          <Check size={15} className="text-amber-600 shrink-0" strokeWidth={2} />
                                       </div>
                                     )}
                                 </div>
-                                <div className="p-2 border-t border-slate-100 space-y-1">
-                                    <button onClick={() => { fileInputRef.current?.click(); setSourceMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"><Upload size={14} className="text-slate-400" /> Charger une base externe…</button>
-                                    <button onClick={() => { handleExport(); setSourceMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"><Download size={14} className="text-slate-400" /> Sauvegarder (backup)</button>
+                                <div className="p-2 border-t border-gray-100 space-y-0.5">
+                                    <button onClick={() => { fileInputRef.current?.click(); setSourceMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition-colors"><Upload size={14} className="text-gray-400" strokeWidth={1.5} /> Charger une base externe…</button>
+                                    <button onClick={() => { handleExport(); setSourceMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition-colors"><Download size={14} className="text-gray-400" strokeWidth={1.5} /> Sauvegarder (backup)</button>
                                     {isLocalMode && (
                                       <button
                                           onClick={async () => { setSourceMenuOpen(false); const ok = await confirm('Voulez-vous vraiment vider totalement la base locale ? Cette action est irréversible.', { title: 'Vider la base', danger: true }); if (ok) onFullResetLocal?.(); }}
-                                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 transition-colors"><Trash2 size={14} /> Vider la base locale</button>
+                                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 transition-colors"><Trash2 size={14} strokeWidth={1.5} /> Vider la base locale</button>
                                     )}
                                 </div>
                             </div>
                           </>
                         )}
                     </div>
-
-                    {mode === 'articles' && (
-                    <div className="flex items-center gap-2">
-                        <div className={`p-1.5 rounded-lg ${isLocalMode ? 'bg-amber-50 text-amber-600' : 'bg-indigo-50 text-indigo-600'}`}><BarChart2 size={16} /></div>
-                        <div>
-                            <p className="text-[8px] uppercase font-black text-slate-400 tracking-wider">Valeur Catalogue</p>
-                            <p className="text-xs font-bold text-slate-700">{formatPrice(itemsToDisplay.reduce((acc, i) => acc + (i.price || 0), 0))}</p>
-                        </div>
-                    </div>
-                    )}
                 </div>
-                
                 <div className="flex items-center gap-2">
                     {/* BOUTON RAFRAICHIR AJOUTÉ ICI */}
                     {!isLocalMode && (
@@ -575,9 +588,9 @@ const DatabaseView = ({
                         onClick={handleForceRefresh} 
                         disabled={isRefreshing}
                         title="Actualiser depuis le serveur"
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:bg-emerald-50 rounded-lg border border-emerald-100 transition-all disabled:opacity-50"
+                        className="flex items-center gap-1.5 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-emerald-600 hover:bg-emerald-50 rounded-xl border border-emerald-200/40 transition-all disabled:opacity-50 active:scale-95"
                       >
-                        <RefreshCw size={14} className={isRefreshing ? "animate-spin" : ""} />
+                        <RefreshCw size={13} className={isRefreshing ? "animate-spin" : ""} />
                         <span>Actualiser</span>
                       </button>
                     )}
@@ -590,75 +603,112 @@ const DatabaseView = ({
                           if (ok) await onClearObservedPrices();
                         }}
                         title="Action Administrateur : Réinitialiser tous les prix observés"
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-red-600 hover:bg-red-50 rounded-lg border border-red-100 transition-all"
+                        className="flex items-center gap-1.5 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-red-600 hover:bg-red-50 rounded-xl border border-red-200/40 transition-all active:scale-95"
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={13} strokeWidth={1.5} />
                         <span>RAZ Prix Obs.</span>
                       </button>
                     )}
-                    <button onClick={() => setShowHelp(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-100 transition-all"><HelpCircle size={14} /> Aide</button>
+                    <button onClick={() => setShowHelp(true)} className="flex items-center gap-1.5 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-blue-600 hover:bg-blue-50 rounded-xl border border-blue-200/40 transition-all active:scale-95"><HelpCircle size={13} strokeWidth={1.5} /> Aide</button>
                 </div>
             </div>
 
             {mode === 'articles' && (<>
-            <header className="bg-white p-4 border-b border-slate-200 flex justify-between items-center z-20 relative">
-              <div className="relative flex-1 mr-4 flex items-center gap-4">
-                <div className="relative w-96">
-                    <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
-                    <input type="text" className={`w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white transition-all shadow-inner ${isLocalMode ? 'focus:border-amber-500' : 'focus:border-emerald-500'}`} placeholder="Rechercher..." value={bpuSearch} onChange={(e) => setBpuSearch(e.target.value)} />
+            <header className="bg-white px-6 py-4 border-b border-gray-200/60 flex justify-between items-center z-20 relative gap-6">
+              <div className="relative w-80 shrink-0">
+                  <Search className="absolute left-3.5 top-2.5 text-gray-400" size={15} strokeWidth={1.5} />
+                  <input type="text" className={`w-full pl-10 pr-4 py-2 bg-gray-100/70 border border-gray-200/50 rounded-xl text-xs outline-none focus:bg-white focus:ring-2 transition-all ${isLocalMode ? 'focus:border-amber-400 focus:ring-amber-100' : 'focus:border-blue-400 focus:ring-blue-100'}`} placeholder="Rechercher un article..." value={bpuSearch} onChange={(e) => setBpuSearch(e.target.value)} />
+              </div>
+
+              {/* Bento miniatures au milieu */}
+              <div className="hidden lg:flex items-center gap-4 select-none">
+                {/* Stat 1 : Total Articles */}
+                <div className="bg-gray-50 border border-gray-200/40 rounded-[14px] px-3.5 py-1.5 flex items-center gap-3 transition-all duration-200 hover:shadow-sm">
+                  <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                    <Hash size={14} strokeWidth={1.5} />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="block text-[8px] font-bold uppercase text-gray-400 tracking-wider leading-none">Total Articles</span>
+                    <span className="block text-xs font-bold text-gray-800 tracking-tight mt-0.5 leading-none">{stats.total}</span>
+                  </div>
+                </div>
+
+                {/* Stat 2 : Couverture CCTP */}
+                <div className="bg-gray-50 border border-gray-200/40 rounded-[14px] px-3.5 py-1.5 flex items-center gap-3 transition-all duration-200 hover:shadow-sm">
+                  <div className="w-7 h-7 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center shrink-0">
+                    <BookOpen size={14} strokeWidth={1.5} />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="block text-[8px] font-bold uppercase text-gray-400 tracking-wider leading-none">Couverture CCTP</span>
+                    <span className="block text-xs font-bold text-gray-800 tracking-tight mt-0.5 leading-none">{stats.cctpPct}%</span>
+                  </div>
+                </div>
+
+                {/* Stat 3 : Prix Observés */}
+                <div className="bg-gray-50 border border-gray-200/40 rounded-[14px] px-3.5 py-1.5 flex items-center gap-3 transition-all duration-200 hover:shadow-sm">
+                  <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                    <TrendingUp size={14} strokeWidth={1.5} />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="block text-[8px] font-bold uppercase text-gray-400 tracking-wider leading-none">Prix Observés</span>
+                    <span className="block text-xs font-bold text-gray-800 tracking-tight mt-0.5 leading-none">{stats.observed}</span>
+                  </div>
                 </div>
               </div>
-              <div className="flex gap-2">
-                <button onClick={() => setShowAddBpuModal(true)} className={`${isLocalMode ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'} text-white px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest flex items-center gap-2 shadow-md active:scale-95 transition-all`}><Plus size={14} /> Créer Article</button>
+
+              <div className="flex gap-2 shrink-0">
+                <button onClick={() => setShowAddBpuModal(true)} className={`${isLocalMode ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-600/10' : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/10'} text-white px-4 py-2 rounded-xl text-xs font-bold tracking-wider flex items-center gap-1.5 shadow-md active:scale-95 transition-all`}><Plus size={14} strokeWidth={1.5} /> Créer Article</button>
               </div>
             </header>
 
-            <div className="flex items-center gap-3 px-6 py-2.5 bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm">
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 shrink-0">Trier par</span>
-                <div className="flex items-center bg-slate-100 p-1 rounded-xl shrink-0">
+            <div className="flex items-center gap-3 px-6 py-2 bg-white border-b border-gray-200/60 sticky top-0 z-10 shadow-sm/5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 shrink-0 select-none">Trier par</span>
+                <div className="flex items-center bg-gray-100 p-0.5 rounded-xl shrink-0">
                     <button
                         onClick={() => handleSort('designation')}
-                        className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wide transition-all active:scale-95 ${sortConfig.key === 'designation' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                        className={`flex items-center gap-1 px-3 py-1 rounded-lg text-[11px] font-bold transition-all active:scale-95 ${sortConfig.key === 'designation' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
                     >
                         Nom
-                        {sortConfig.key === 'designation' && (sortConfig.direction === 'asc' ? <ArrowDownAZ size={13} /> : <ArrowUpAZ size={13} />)}
+                        {sortConfig.key === 'designation' && (sortConfig.direction === 'asc' ? <ArrowDownAZ size={13} strokeWidth={1.5} /> : <ArrowUpAZ size={13} strokeWidth={1.5} />)}
                     </button>
                     <button
                         onClick={() => handleSort('cctp')}
-                        className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wide transition-all active:scale-95 ${sortConfig.key === 'cctp' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                        className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-bold transition-all active:scale-95 ${sortConfig.key === 'cctp' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
                     >
-                        <BookOpen size={13} /> CCTP
-                        {sortConfig.key === 'cctp' && (sortConfig.direction === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />)}
+                        <BookOpen size={13} strokeWidth={1.5} /> CCTP
+                        {sortConfig.key === 'cctp' && (sortConfig.direction === 'asc' ? <ArrowUp size={13} strokeWidth={1.5} /> : <ArrowDown size={13} strokeWidth={1.5} />)}
                     </button>
                     {bpuConfig?.numberingMode === 'manual' && (
                         <button
                             onClick={() => handleSort('bpuNum')}
-                            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wide transition-all active:scale-95 ${sortConfig.key === 'bpuNum' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-bold transition-all active:scale-95 ${sortConfig.key === 'bpuNum' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
                         >
                             N°
-                            {sortConfig.key === 'bpuNum' && (sortConfig.direction === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />)}
+                            {sortConfig.key === 'bpuNum' && (sortConfig.direction === 'asc' ? <ArrowUp size={13} strokeWidth={1.5} /> : <ArrowDown size={13} strokeWidth={1.5} />)}
                         </button>
                     )}
                     <button
                         onClick={() => handleSort('price')}
-                        className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wide transition-all active:scale-95 ${sortConfig.key === 'price' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                        className={`flex items-center gap-1 px-3 py-1 rounded-lg text-[11px] font-bold transition-all active:scale-95 ${sortConfig.key === 'price' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
                     >
-                        <Euro size={13} /> Prix
-                        {sortConfig.key === 'price' && (sortConfig.direction === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />)}
+                        <Euro size={13} strokeWidth={1.5} /> Prix
+                        {sortConfig.key === 'price' && (sortConfig.direction === 'asc' ? <ArrowUp size={13} strokeWidth={1.5} /> : <ArrowDown size={13} strokeWidth={1.5} />)}
                     </button>
                 </div>
                 {sortConfig.key && (
                     <button
                         onClick={() => setSortConfig({ key: null, direction: 'asc' })}
                         title="Annuler le tri"
-                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all shrink-0"
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wide text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all shrink-0 active:scale-95"
                     >
-                        <X size={12} /> Réinit.
+                        <X size={12} strokeWidth={1.5} /> Réinit.
                     </button>
                 )}
             </div>
 
-            <div ref={parentRef} className="flex-1 overflow-y-auto p-4 bg-slate-50 pb-32">
+            <div ref={parentRef} className="flex-1 overflow-y-auto p-6 md:p-8 bg-[#f5f5f7] pb-32">
+
+
                 <Droppable droppableId="bpu-items-list" type="ITEM" isDropDisabled={bpuSearch.length > 0 || sortConfig.key !== null}>
                     {(provided) => (
                         <div 
@@ -680,7 +730,7 @@ const DatabaseView = ({
                                             left: 0,
                                             width: '100%',
                                             height: `${virtualRow.size}px`,
-                                            paddingBottom: '12px' // Équivalent de ton ancien gap-3
+                                            paddingBottom: '16px'
                                         }}
                                     >
                                         <Draggable key={item.id} draggableId={String(item.id)} index={virtualRow.index} isDragDisabled={sortConfig.key !== null}>
@@ -691,23 +741,23 @@ const DatabaseView = ({
                                                     {...providedDrag.dragHandleProps} 
                                                     onDoubleClick={() => onEditItem(item)} 
                                                     onClick={() => toggleSelection(item.id)} 
-                                                    className={`relative group flex items-center gap-4 p-3 rounded-xl border transition-all duration-200 h-full ${selectedIds.has(item.id) ? 'bg-blue-50 border-blue-300 ring-2 ring-blue-100' : 'bg-white border-slate-200 hover:shadow-lg'} ${snapshot.isDragging ? 'border-blue-500 shadow-2xl scale-[1.03] z-50 ring-4 ring-blue-100 bg-white' : ''} ${!selectedIds.has(item.id) && (isLocalMode ? 'hover:border-amber-300' : 'hover:border-emerald-300')}`}
+                                                    className={`relative group flex items-center gap-4 px-6 py-5 rounded-2xl border transition-all duration-200 h-full ${selectedIds.has(item.id) ? 'bg-blue-50/50 border-blue-200 ring-2 ring-blue-100/50' : 'bg-white border-gray-200/60 hover:shadow-[0_8px_30px_rgb(0,0,0,0.03)] hover:-translate-y-0.5'} ${snapshot.isDragging ? 'border-blue-400 shadow-2xl scale-[1.02] z-50 ring-4 ring-blue-100 bg-white' : ''} ${!selectedIds.has(item.id) && (isLocalMode ? 'hover:border-amber-300' : 'hover:border-emerald-300')}`}
                                                     style={{ ...providedDrag.draggableProps.style }}
                                                 >
-                                                    <div className="cursor-pointer text-slate-300 hover:text-blue-500 transition-colors">{selectedIds.has(item.id) ? <CheckSquare size={20} className="text-blue-500" /> : <Square size={20} />}</div>
-                                                    <div className="text-slate-300 group-hover:text-slate-400 cursor-grab"><GripVertical size={16} /></div>
-                                                    <div className={`w-10 h-10 bg-slate-50 rounded-lg flex items-center justify-center shrink-0 text-slate-400 group-hover:bg-slate-100 transition-colors ${isLocalMode ? 'group-hover:text-amber-500' : 'group-hover:text-emerald-500'}`}><FileText size={20} /></div>
+                                                    <div className="cursor-pointer text-gray-300 hover:text-blue-500 transition-colors">{selectedIds.has(item.id) ? <CheckSquare size={19} className="text-blue-500 animate-in zoom-in-75 duration-100" strokeWidth={2} /> : <Square size={19} className="text-gray-300 group-hover:text-gray-400" strokeWidth={1.5} />}</div>
+                                                    <div className="text-gray-200 group-hover:text-gray-300 cursor-grab shrink-0"><GripVertical size={15} strokeWidth={1.5} /></div>
+                                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-gray-400 transition-all ${selectedIds.has(item.id) ? 'bg-blue-100/50 text-blue-500' : isLocalMode ? 'bg-amber-50/40 text-amber-500 group-hover:bg-amber-50/70' : 'bg-emerald-50/40 text-emerald-500 group-hover:bg-emerald-50/70'}`}><FileText size={18} strokeWidth={1.5} /></div>
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2">
                                                             {(bpuConfig?.numberingMode === 'manual' || item.bpuNum) && (
-                                                                <span className="text-[10px] font-black text-white bg-slate-900 px-1.5 py-0.5 rounded shadow-sm">
+                                                                <span className="text-[10px] font-bold text-white bg-gray-800 px-2 py-0.5 rounded-lg shadow-sm font-mono select-all">
                                                                     {item.bpuNum || "#"}
                                                                 </span>
                                                             )}
-                                                            <h4 className="font-bold text-xs text-slate-800 uppercase truncate tracking-tight">{cleanText(item.designation)}</h4>
+                                                            <h4 className="font-bold text-[13px] text-gray-800 uppercase truncate tracking-tight select-all">{cleanText(item.designation)}</h4>
                                                         </div>
                                                         <div className="flex items-center gap-4 mt-1.5">
-                                                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase tracking-widest ${isLocalMode ? 'text-amber-600 bg-amber-50 border-amber-100' : 'text-emerald-600 bg-emerald-50 border-emerald-100'}`}>{normalizeUnitSymbol(item.unit)}</span>
+                                                            <span className={`text-[9px] font-bold px-2 py-0.5 rounded-lg border uppercase tracking-widest ${isLocalMode ? 'text-amber-600 bg-amber-50 border-amber-100/50' : 'text-emerald-600 bg-emerald-50 border-emerald-100/50'}`}>{normalizeUnitSymbol(item.unit)}</span>
                                                             
                                                             {/* --- BADGES CATÉGORIE --- */}
                                                             {(() => {
@@ -721,7 +771,7 @@ const DatabaseView = ({
                                                                         <span
                                                                             key={cat.id}
                                                                             onClick={(e) => { e.stopPropagation(); setSelectedCatId(cat.id); }}
-                                                                            className="flex items-center gap-1 text-[9px] font-black px-1.5 py-0.5 rounded-lg border uppercase tracking-widest cursor-pointer transition-colors hover:opacity-80"
+                                                                            className="flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-lg border uppercase tracking-widest cursor-pointer transition-all hover:opacity-80"
                                                                             style={{ color, backgroundColor: color + '20', borderColor: color + '50' }}
                                                                             title={`Filtrer par : ${cat.name}`}
                                                                         >
@@ -731,46 +781,53 @@ const DatabaseView = ({
                                                                     );
                                                                 });
                                                             })()}
-
+ 
                                                             {/* --- BADGE CCTP AJOUTÉ ICI --- */}
                                                             {hasCctp ? (
                                                                 <button
                                                                     onClick={(e) => { e.stopPropagation(); handleEditCctpLink(item); }}
-                                                                    className="flex items-center gap-1 text-[9px] font-black px-1.5 py-0.5 rounded border tracking-wide text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-100 transition-colors shadow-sm max-w-[200px]"
+                                                                    className="flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-lg border tracking-wide text-blue-600 bg-blue-50 border-blue-200/50 hover:bg-blue-100/70 transition-colors max-w-[200px] shadow-sm shrink-0"
                                                                     title={`CCTP : ${resolveCctpLabel(item)}`}
                                                                 >
-                                                                    <BookOpen size={10} className="shrink-0" />
+                                                                    <BookOpen size={10} className="shrink-0" strokeWidth={1.5} />
                                                                     <span className="truncate">{resolveCctpLabel(item)}</span>
                                                                 </button>
                                                             ) : (
                                                                 <button
                                                                     onClick={(e) => { e.stopPropagation(); handleEditCctpLink(item); }}
-                                                                    className="flex items-center gap-1 text-[9px] font-black px-1.5 py-0.5 rounded border border-dashed uppercase tracking-widest text-slate-400 bg-slate-50 border-slate-200 hover:bg-slate-100 hover:text-blue-500 transition-colors opacity-0 group-hover:opacity-100"
+                                                                    className="flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-lg border border-dashed uppercase tracking-widest text-gray-400 bg-gray-50 border-gray-200 hover:bg-gray-100 hover:text-blue-500 transition-colors opacity-0 group-hover:opacity-100 shrink-0"
                                                                     title="Lier au CCTP"
                                                                 >
-                                                                    <BookOpen size={10} /> + CCTP
+                                                                    <BookOpen size={10} strokeWidth={1.5} /> + CCTP
                                                                 </button>
                                                             )}
                                                         </div>
                                                     </div>
-                                                    <div className="text-right min-w-[100px] pr-2">
-                                                        <span className="block font-black text-sm text-slate-900">{formatPrice(item.price)}</span>
-                                                        <span className="block text-[8px] uppercase font-black text-slate-400 tracking-tighter">Prix Catalogue</span>
+                                                    <div className="text-right min-w-[110px] pr-2 shrink-0 select-none">
+                                                        <span className="block font-black text-sm text-gray-900 tracking-tight">{formatPrice(item.price)} €</span>
+                                                        <span className="block text-[8px] uppercase font-bold text-gray-400 tracking-wider">Catalogue</span>
                                                         {item.observedPrice && (
-                                                            <div className="flex items-center justify-end gap-1.5 mt-1">
+                                                            <div className="flex flex-col items-end gap-1 mt-1">
                                                                 <button
                                                                     onClick={(e) => { e.stopPropagation(); setPriceHistoryItem(item); }}
-                                                                    className="flex items-center gap-1 font-bold text-[10px] text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-1 py-0.5 rounded transition-colors cursor-pointer"
-                                                                    title={`Prix réel: ${formatPrice(item.observedPrice)} — Cliquez pour voir l'historique`}
+                                                                    className="flex items-center gap-1 font-bold text-[9px] text-blue-600 hover:text-blue-700 hover:bg-blue-50/50 px-1.5 py-0.5 rounded-lg border border-transparent hover:border-blue-100 transition-all cursor-pointer"
+                                                                    title={`Prix réel moyen: ${formatPrice(item.observedPrice)} € — Cliquez pour voir l'historique`}
                                                                 >
-                                                                    <History size={9} />
-                                                                    Réel: {formatPrice(item.observedPrice)}
+                                                                    <History size={9} strokeWidth={1.5} />
+                                                                    Réel: {formatPrice(item.observedPrice)} €
                                                                 </button>
                                                                 {renderPriceTrend(item)}
                                                             </div>
                                                         )}
                                                     </div>
-                                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={(e) => { e.stopPropagation(); deleteFromBpu(item.id); }} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"><Trash2 size={16} /></button></div>
+                                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200 shrink-0">
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); deleteFromBpu(item.id); }} 
+                                                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all active:scale-95"
+                                                        >
+                                                            <Trash2 size={16} strokeWidth={1.5} />
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             )}
                                         </Draggable>
