@@ -1,6 +1,93 @@
 // src/utils/excelLibraryHelper.js
 // Service d'import et export Excel propre pour la bibliothèque d'articles (BPU / Catalogue)
-import { cleanText, formatPrice } from './helpers';
+import { cleanText } from './helpers';
+import { htmlToRichBlocks } from './richText';
+
+/**
+ * Convertit le HTML riche d'Estima en tableau richText utilisable par ExcelJS
+ */
+function htmlToExcelRichText(html) {
+  if (!html) return '';
+  const blocks = htmlToRichBlocks(html);
+  if (!blocks.length) return '';
+
+  const baseFont = { name: 'Segoe UI', size: 9, color: { argb: 'FF1F2937' } };
+  const richText = [];
+
+  blocks.forEach((b, i) => {
+    if (i > 0) richText.push({ font: baseFont, text: '\n' });
+    if (b.type === 'li') richText.push({ font: baseFont, text: '• ' });
+    b.runs.forEach((r) => {
+      richText.push({
+        font: {
+          ...baseFont,
+          bold: !!r.bold,
+          underline: !!r.underline,
+          italic: !!r.italic
+        },
+        text: r.text || ''
+      });
+    });
+  });
+
+  return { richText };
+}
+
+/**
+ * Reconstruit du HTML propre (balises <p>, <strong>, <em>, <u>) à partir du richText d'un fichier Excel
+ */
+function richTextToHtml(cell) {
+  if (!cell) return null;
+  const val = cell.value;
+  if (val === null || val === undefined) return null;
+
+  // Si c'est du texte brut simple sans richText
+  if (typeof val === 'string') {
+    if (!val.trim()) return null;
+    return val
+      .split('\n')
+      .map(line => `<p>${line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>`)
+      .join('');
+  }
+
+  // Si c'est du richText d'ExcelJS
+  if (typeof val === 'object' && val.richText) {
+    let html = '';
+    let currentParagraph = '';
+
+    const closeParagraph = () => {
+      if (currentParagraph) {
+        html += `<p>${currentParagraph}</p>`;
+        currentParagraph = '';
+      }
+    };
+
+    val.richText.forEach((run) => {
+      const text = run.text || '';
+      const font = run.font || {};
+
+      const parts = text.split('\n');
+      parts.forEach((part, index) => {
+        if (index > 0) {
+          closeParagraph();
+        }
+
+        if (part) {
+          let escapedPart = part.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+          if (font.bold) escapedPart = `<strong>${escapPart}</strong>`;
+          if (font.italic) escapedPart = `<em>${escapPart}</em>`;
+          if (font.underline) escapedPart = `<u>${escapPart}</u>`;
+          currentParagraph += escapedPart;
+        }
+      });
+    });
+
+    closeParagraph();
+    return html || null;
+  }
+
+  return String(val).trim() ? `<p>${String(val).trim()}</p>` : null;
+}
 
 /**
  * Exporte la bibliothèque d'articles BPU au format Excel (.xlsx) propre
@@ -17,7 +104,7 @@ export async function exportLibraryToExcel(bpu, categories, activeDbName = "base
     { header: 'Unité', key: 'unit', width: 10 },
     { header: 'Prix Catalogue (€)', key: 'price', width: 18 },
     { header: 'Dossier / Catégorie', key: 'category', width: 25 },
-    { header: 'Description', key: 'description', width: 50 },
+    { header: 'Description (Stylisée)', key: 'description', width: 50 },
     { header: 'Référence CCTP', key: 'cctpRef', width: 20 },
     { header: 'Label CCTP', key: 'cctpLabel', width: 20 },
     { header: 'Prix Observé (€)', key: 'observedPrice', width: 18 }
@@ -67,16 +154,8 @@ export async function exportLibraryToExcel(bpu, categories, activeDbName = "base
     // Réf CCTP
     const cctpRef = item.cctpRefs ? item.cctpRefs.join(', ') : (item.cctpRef || '');
 
-    // Nettoyage de la description HTML pour avoir du texte brut propre
-    let cleanDesc = item.description || '';
-    if (cleanDesc.includes('<')) {
-      // Retrait des balises HTML en préservant les retours à la ligne
-      cleanDesc = cleanDesc
-        .replace(/<\/p>/gi, '\n')
-        .replace(/<br\s*\/?>/gi, '\n')
-        .replace(/<[^>]+>/g, '')
-        .trim();
-    }
+    // Conversion de la description HTML riche en richText pour Excel
+    const richDesc = htmlToExcelRichText(item.description);
 
     const row = ws.addRow({
       code: item.code || '',
@@ -84,16 +163,22 @@ export async function exportLibraryToExcel(bpu, categories, activeDbName = "base
       unit: item.unit || '',
       price: item.price ? Number(item.price) : 0,
       category: categoryName,
-      description: cleanDesc,
+      description: '', // Écrit manuellement ci-dessous pour le richText
       cctpRef: cctpRef,
       cctpLabel: item.cctpLabel || '',
       observedPrice: item.observedPrice ? Number(item.observedPrice) : ''
     });
 
-    row.height = 22;
+    row.height = 36; // Un peu plus grand pour supporter le multi-lignes sans gêne
+    
+    // Assigner le richText à la colonne description
+    if (richDesc) {
+      row.getCell(6).value = richDesc;
+    }
+
     row.eachCell((cell, colNumber) => {
       cell.font = { name: 'Segoe UI', size: 9, color: { argb: 'FF1F2937' } };
-      cell.alignment = { vertical: 'middle' };
+      cell.alignment = { vertical: 'middle', wrapText: true };
       cell.border = {
         bottom: { style: 'thin', color: { argb: 'FFF1F5F9' } }
       };
@@ -105,7 +190,7 @@ export async function exportLibraryToExcel(bpu, categories, activeDbName = "base
       } else if (colNumber === 4 || colNumber === 9) {
         // Prix catalogue et prix observé à droite au format monétaire
         cell.alignment = { vertical: 'middle', horizontal: 'right' };
-        if (cell.value !== '') {
+        if (cell.value !== '' && cell.value !== 0) {
           cell.numFmt = '#,##0.00" €"';
         }
       }
@@ -206,7 +291,10 @@ export async function parseLibraryExcel(file) {
     const unit = getVal(row.getCell(colIndex.unit)).trim();
     const price = getNum(row.getCell(colIndex.price));
     const catStr = getVal(row.getCell(colIndex.category)).trim();
-    const description = getVal(row.getCell(colIndex.description)).trim();
+    
+    // Lecture de la description en tant que texte riche reconstitué
+    const descriptionHtml = richTextToHtml(row.getCell(colIndex.description));
+    
     const cctpRefStr = getVal(row.getCell(colIndex.cctpRef)).trim();
     const cctpLabel = getVal(row.getCell(colIndex.cctpLabel)).trim();
     const observedPrice = getNum(row.getCell(colIndex.observedPrice));
@@ -241,15 +329,6 @@ export async function parseLibraryExcel(file) {
       }
     }
 
-    // Formatage HTML simple pour Quill
-    let formattedDesc = description;
-    if (description && !description.startsWith('<p>')) {
-      formattedDesc = description
-        .split('\n')
-        .map(line => `<p>${line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>`)
-        .join('');
-    }
-
     const item = {
       id: `art_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       code,
@@ -258,7 +337,7 @@ export async function parseLibraryExcel(file) {
       price,
       categoryIds,
       categoryId: categoryIds[0] || null, // Rétrocompatibilité
-      description: formattedDesc || null,
+      description: descriptionHtml,
       cctpRef,
       cctpRefs,
       cctpLabel: cctpLabel || null,

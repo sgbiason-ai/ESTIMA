@@ -11,7 +11,7 @@ export const CHANGELOG = [
     title: 'Bibliothèque — refonte graphique, import/export Excel, Bento en-tête et filtres',
     highlights: [
       'Bibliothèque — refonte graphique de la vue articles aux standards Apple-style Light : sidebar en glassmorphism, articles à double arrondi, et intégration du bandeau Bento de statistiques au cœur de l\'en-tête (entre recherche et création) accompagné d\'un toggle Articles / Blocs agrandi',
-      'Bibliothèque — import/export Excel (.xlsx) propre et complet (champs code, désignation, unité, prix catalogue, dossiers, description brute, références/labels CCTP et prix observés réels) avec création automatique des dossiers manquants',
+      'Bibliothèque — import/export Excel (.xlsx) propre et complet (code, désignation, unité, prix catalogue, dossiers, références/labels CCTP et prix observés réels) avec conservation intégrale de la mise en forme du texte riche (gras, italique, souligné, listes à puces) dans les descriptions (aller-retour préservé)',
       'Bibliothèque — ajout d\'un filtre rapide "Prix à 0" dans le volet latéral gauche pour repérer et compléter en un clic les articles sans tarif saisi',
       'Bibliothèque — comportement de type bascule (toggle) sur les filtres de dossiers et d\'audit (re-cliquer pour désactiver), avec persistance automatique du filtre sélectionné dans le stockage local (localStorage)',
       'Bibliothèque — repositionnement de la pastille de tendance des prix observés (plus grande et plus lisible) directement à gauche du prix catalogue',
