@@ -18,6 +18,7 @@ import { useDeviceMode }    from './hooks/useDeviceMode';
 import { useIsTesla }       from './hooks/useIsTesla';
 import { useProjectArchives } from './hooks/useProjectArchives';
 import { useProjectUndo }     from './hooks/useProjectUndo';
+import { isSuperAdmin } from './config/superAdmin';
 
 // ─── COMPOSANTS GLOBAUX (toujours chargés) ───────────────────────────────────
 import Sidebar              from './components/common/Sidebar';
@@ -788,6 +789,7 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNav
                 onUpdateItem={localMode.handleUpdateBpuItem}
                 setItemToDuplicate={(item) => modals.openAddBpuModal(item)}
                 isAdmin={isAdmin}
+                isSuperAdmin={isSuperAdmin(user?.email)}
                 onForceRefresh={db.forceRefresh}
                 masterCctp={resources.masterCctp}
                 blocs={db.blocs}

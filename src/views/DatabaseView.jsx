@@ -38,6 +38,7 @@ const DatabaseView = ({
   onForceRefresh = null,
   localLibraryName = null,
   isAdmin = false,
+  isSuperAdmin = false,
   onClearObservedPrices = null,
   bpuSearch,
   setBpuSearch,
@@ -623,7 +624,7 @@ const DatabaseView = ({
                         <span>Actualiser</span>
                       </button>
                     )}
-                    {isAdmin && onClearObservedPrices && (
+                    {isSuperAdmin && onClearObservedPrices && (
                       <button
                         onClick={async () => {
                           const count = fullBpu.filter(i => i.observedPrice).length;

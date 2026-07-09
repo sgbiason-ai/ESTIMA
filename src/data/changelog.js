@@ -14,6 +14,7 @@ export const CHANGELOG = [
       'Bibliothèque — ajout d\'un filtre rapide "Prix à 0" dans le volet latéral gauche pour repérer et compléter en un clic les articles sans tarif saisi',
       'Bibliothèque — comportement de type bascule (toggle) sur les filtres de dossiers et d\'audit (re-cliquer pour désactiver), avec persistance automatique du filtre sélectionné dans le stockage local (localStorage)',
       'Bibliothèque — repositionnement de la pastille de tendance des prix observés (plus grande et plus lisible) directement à gauche du prix catalogue',
+      'Bibliothèque — restriction du bouton "RAZ Prix Obs." au rôle de Super-Administrateur (au lieu de simple administrateur)',
     ],
   },
   {
