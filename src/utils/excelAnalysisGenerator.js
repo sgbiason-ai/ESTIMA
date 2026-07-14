@@ -324,7 +324,12 @@ function buildSheet(wb, sheetLabel, trancheLabel, {
         applyBorder(ecCell);
       }
 
-      subtotalRows.push(r);
+      // Le TOTAL GÉNÉRAL et les totaux entreprise ne comptent QUE la base de
+      // notation : les chapitres option (PSE) sont affichés mais exclus de la
+      // somme, en cohérence avec stats.totalEstimation / companiesTotals
+      // (computeAnalysisStats ignore chap.isOption). Sinon le recalcul Excel
+      // gonflerait le total au-delà de la base scorée.
+      if (!chapter.isOption) subtotalRows.push(r);
       r++;
     }
   });
