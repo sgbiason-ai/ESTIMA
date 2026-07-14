@@ -870,6 +870,7 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNav
             {activeTab === 'settings' && (
               <SettingsView
                 units={db.units}
+                bpu={db.bpu}
                 saveUnit={db.saveUnit}
                 deleteUnit={db.deleteUnit}
                 importFromExcel={db.importFromExcel}

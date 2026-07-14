@@ -3,17 +3,19 @@ import { confirm, toast } from '../utils/globalUI';
 import { useDialog } from '../contexts/DialogContext';
 import * as XLSX from 'xlsx';
 import {
-  Settings, Ruler, Trash2, Upload, FileSpreadsheet,
-  AlertTriangle, Edit2, X, Check, ListOrdered, ListTree, Hash,
+  Settings, Trash2, Upload, FileSpreadsheet,
+  AlertTriangle, Check, ListOrdered, ListTree, Hash,
   HelpCircle, Info, AlertCircle, FileJson, FileText, ArrowRight, Save,
-  MousePointer2, Loader2
+  Loader2
 } from 'lucide-react';
 import { parsePdfBpu } from '../utils/parsePdfBpu';
 import HelpPanel from '../components/help/HelpPanel';
+import UnitManager from '../components/settings/UnitManager';
 import { APP_VERSION } from '../data/changelog';
 
 const SettingsView = ({
   units,
+  bpu = [],
   saveUnit,
   deleteUnit,
   importFromExcel,
@@ -24,12 +26,9 @@ const SettingsView = ({
 }) => {
   const { choose } = useDialog();
   // --- ÉTATS LOCAUX ---
-  const [symb, setSymb] = useState("");
-  const [lab, setLab] = useState("");
-  const [originalSymb, setOriginalSymb] = useState(null);
-  const [isEditing, setIsEditing] = useState(false);
+  // (La gestion des unités vit désormais dans <UnitManager/>.)
   const [showHelp, setShowHelp] = useState(false);
-  
+
   // --- ÉTATS POUR LA CONVERSION JSON & MAPPING ---
   const [pendingJsonData, setPendingJsonData] = useState(null);
   const [showUnitMapModal, setShowUnitMapModal] = useState(false);
@@ -42,33 +41,6 @@ const SettingsView = ({
   const jsonInputRef = useRef(null);
   const pdfInputRef = useRef(null);
   const jsonImportRef = useRef(null);
-
-  // --- ACTIONS ---
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (symb && lab) {
-      if (isEditing && originalSymb && originalSymb !== symb) {
-        deleteUnit(originalSymb);
-      }
-      saveUnit(symb, lab);
-      resetForm();
-    }
-  };
-
-  const startEdit = (unit) => {
-    setSymb(unit.symbol);
-    setLab(unit.label);
-    setOriginalSymb(unit.symbol);
-    setIsEditing(true);
-    document.querySelector('form')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  };
-
-  const resetForm = () => {
-    setSymb(""); 
-    setLab(""); 
-    setIsEditing(false);
-    setOriginalSymb(null);
-  };
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -477,92 +449,14 @@ const SettingsView = ({
             </div>
           </section>
 
-          {/* SECTION 3 : UNITÉS */}
+          {/* SECTION 3 : UNITÉS — gestionnaire complet (dimensions, conversions, usage) */}
           <section className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm">
-            <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                 <Ruler size={20} className="text-emerald-600" />
-                 <h3 className="font-black uppercase text-xs tracking-widest text-slate-700">Dictionnaire des Unités</h3>
-              </div>
-              <div className="text-[10px] text-slate-500 bg-slate-50 px-3 py-1 rounded-full border border-slate-100 flex items-center gap-2">
-                 <MousePointer2 size={12} />
-                 Utilisées dans les menus déroulants lors de la création d'articles
-              </div>
-            </div>
-
-            <form onSubmit={handleSubmit} className={`grid grid-cols-1 md:grid-cols-3 gap-4 mb-10 p-6 rounded-lg border transition-colors ${isEditing ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
-              <div className="relative group">
-                <input 
-                  type="text" 
-                  value={symb} 
-                  onChange={(e) => setSymb(e.target.value)} 
-                  className="w-full bg-white border border-slate-200 rounded px-4 py-2 text-sm font-bold focus:border-emerald-500 outline-none" 
-                  placeholder="Symbole (ex: m²)"
-                  title="Ce symbole sera affiché dans les devis (ex: ml, m², u)"
-                  required 
-                />
-                <span className="hidden group-hover:block absolute -bottom-5 left-0 text-[9px] text-slate-500 bg-white border px-1 rounded shadow-sm z-10">Court (ex: m²)</span>
-                {isEditing && <span className="absolute -top-2 left-2 text-[8px] bg-amber-200 text-amber-800 px-1 rounded font-bold">ÉDITION</span>}
-              </div>
-              
-              <div className="relative group">
-                <input 
-                  type="text" 
-                  value={lab} 
-                  onChange={(e) => setLab(e.target.value)} 
-                  className="bg-white border border-slate-200 rounded px-4 py-2 text-sm font-medium focus:border-emerald-500 outline-none" 
-                  placeholder="Libellé complet"
-                  title="Description complète pour votre information (ex: Mètre Carré)"
-                  required 
-                />
-                <span className="hidden group-hover:block absolute -bottom-5 left-0 text-[9px] text-slate-500 bg-white border px-1 rounded shadow-sm z-10">Long (ex: Mètre Carré)</span>
-              </div>
-              
-              <div className="flex gap-2">
-                {isEditing && (
-                  <button type="button" onClick={resetForm} className="bg-white text-slate-500 border border-slate-200 py-2 px-3 rounded hover:bg-slate-100 transition-colors" title="Annuler l'édition">
-                    <X size={16} />
-                  </button>
-                )}
-                <button 
-                  type="submit" 
-                  title={isEditing ? "Enregistrer les modifications" : "Ajouter cette nouvelle unité"}
-                  className={`flex-1 text-white py-2 rounded font-black text-[10px] uppercase tracking-widest shadow-md flex items-center justify-center gap-2 transition-colors ${isEditing ? 'bg-amber-500 hover:bg-amber-600' : 'bg-emerald-600 hover:bg-emerald-700'}`}
-                >
-                   {isEditing ? <><Check size={14}/> Mettre à jour</> : 'Enregistrer'}
-                </button>
-              </div>
-            </form>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {units.map((u) => (
-                <div key={u.symbol} className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded group hover:border-emerald-200 shadow-sm transition-all">
-                  <div className="flex items-center gap-4">
-                    <span className="text-sm font-black text-emerald-600 min-w-[40px]">{u.symbol}</span>
-                    <span className="text-xs font-bold text-slate-600">{u.label}</span>
-                  </div>
-                  
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button 
-                      type="button"
-                      onClick={() => startEdit(u)} 
-                      className="p-1.5 text-slate-300 hover:text-amber-500 hover:bg-amber-50 rounded transition-colors"
-                      title="Modifier cette unité"
-                    >
-                      <Edit2 size={16} />
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={async () => { const ok = await confirm("Supprimer cette unité ?", { danger: true }); if (ok) deleteUnit(u.symbol); }} 
-                      className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
-                      title="Supprimer définitivement"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <UnitManager
+              units={units}
+              bpu={bpu}
+              saveUnit={saveUnit}
+              deleteUnit={deleteUnit}
+            />
           </section>
 
           {/* ZONE DE DANGER */}

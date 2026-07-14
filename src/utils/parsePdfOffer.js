@@ -15,12 +15,18 @@
 
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import pdfWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.mjs?url';
+import { recognizedUnitTokens } from '../data/units';
 
 // Configuration du worker pour Vite
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
-// Unités reconnues (case-insensitive)
-const UNITS = ['ft', 'm', 'ml', 'm2', 'm²', 'm3', 'm³', 'u', 'unit', 't', 'tonne', 'kg', 'l', 'h', 'j', 'ens', 'forfait'];
+// Unités reconnues (case-insensitive) — dérivées du catalogue central (symboles
+// + alias), source unique. On ajoute les formes ASCII des exposants (m2/m3).
+const UNITS = (() => {
+  const set = new Set(recognizedUnitTokens());
+  set.add('m2'); set.add('m3');
+  return [...set];
+})();
 
 // Pattern de référence DQE : "1 005", "1.005", "1-005", "P.01", "P01", "100", etc.
 const REF_PATTERNS = [

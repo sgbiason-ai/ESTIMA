@@ -1,0 +1,129 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import {
+  DIMENSIONS, dimensionOf, factorOf, sameDimension, convert,
+  enrichUnit, enrichUnits, defaultUnits, commonUnitSymbols, recognizedUnitTokens,
+  lookupUnit, setRuntimeUnits, resetRuntimeUnits, MATERIAL_DENSITIES, densityOf,
+} from '../data/units';
+
+describe('units — dimensions & lookup', () => {
+  beforeEach(() => resetRuntimeUnits());
+
+  it('résout les symboles standard (casse / exposants indifférents)', () => {
+    expect(dimensionOf('m²')).toBe('area');
+    expect(dimensionOf('M2')).toBe('area');   // exposant ASCII + majuscule
+    expect(dimensionOf('m³')).toBe('volume');
+    expect(dimensionOf('ML')).toBe('length');
+    expect(dimensionOf('t')).toBe('mass');
+    expect(dimensionOf('TONNE')).toBe('mass'); // alias
+    expect(dimensionOf('u')).toBe('count');
+    expect(dimensionOf('forfait')).toBe('lumpsum'); // alias de 'f'
+  });
+
+  it('retourne null pour une unité inconnue', () => {
+    expect(dimensionOf('zzz')).toBeNull();
+    expect(lookupUnit('zzz')).toBeNull();
+  });
+
+  it('expose les 7 familles de dimensions', () => {
+    expect(DIMENSIONS.map((d) => d.key)).toEqual(
+      ['length', 'area', 'volume', 'mass', 'count', 'time', 'lumpsum'],
+    );
+  });
+});
+
+describe('units — conversion', () => {
+  beforeEach(() => resetRuntimeUnits());
+
+  it('facteur vers unité de base', () => {
+    expect(factorOf('t')).toBe(1000);
+    expect(factorOf('kg')).toBe(1);
+    expect(factorOf('cm')).toBe(0.01);
+    expect(factorOf('inconnu')).toBe(1); // défaut neutre
+  });
+
+  it('convertit dans une même dimension', () => {
+    expect(convert(2, 't', 'kg')).toBe(2000);
+    expect(convert(500, 'kg', 't')).toBe(0.5);
+    expect(convert(1, 'km', 'ml')).toBe(1000);
+    expect(convert(1, 'ha', 'm²')).toBe(10000);
+  });
+
+  it('refuse les dimensions incompatibles', () => {
+    expect(convert(1, 't', 'm²')).toBeNull();
+    expect(sameDimension('t', 'm²')).toBe(false);
+    expect(sameDimension('m²', 'ha')).toBe(true);
+  });
+
+  it('refuse une quantité non numérique', () => {
+    expect(convert('abc', 't', 'kg')).toBeNull();
+  });
+});
+
+describe('units — enrichissement / migration', () => {
+  beforeEach(() => resetRuntimeUnits());
+
+  it('complète un ancien {symbol,label} depuis le canonique', () => {
+    const e = enrichUnit({ symbol: 'm²', label: 'Mètre carré' });
+    expect(e.dimension).toBe('area');
+    expect(e.factor).toBe(1);
+    expect(e.aliases).toContain('m2');
+  });
+
+  it('préserve les valeurs déjà fournies', () => {
+    const e = enrichUnit({ symbol: 'palette', label: 'Palette', dimension: 'count', factor: 1, aliases: ['pal'] });
+    expect(e.dimension).toBe('count');
+    expect(e.aliases).toEqual(['pal']);
+  });
+
+  it('inconnu sans dimension → count par défaut', () => {
+    expect(enrichUnit({ symbol: 'zzz', label: 'Truc' }).dimension).toBe('count');
+  });
+
+  it('enrichUnits mappe une liste', () => {
+    expect(enrichUnits([{ symbol: 't', label: 'Tonne' }])[0].dimension).toBe('mass');
+    expect(enrichUnits(null)).toEqual([]);
+  });
+});
+
+describe('units — registre runtime (unités personnalisées)', () => {
+  beforeEach(() => resetRuntimeUnits());
+
+  it('une unité personnalisée participe aux dimensions', () => {
+    expect(dimensionOf('palette')).toBeNull();
+    setRuntimeUnits([{ symbol: 'palette', label: 'Palette', dimension: 'volume', factor: 1, aliases: [] }]);
+    expect(dimensionOf('palette')).toBe('volume');
+    // le canonique reste disponible
+    expect(dimensionOf('t')).toBe('mass');
+    resetRuntimeUnits();
+    expect(dimensionOf('palette')).toBeNull();
+  });
+});
+
+describe('units — helpers de listes & densités', () => {
+  it('defaultUnits est le set canonique sans le flag interne', () => {
+    const list = defaultUnits();
+    expect(list.length).toBeGreaterThanOrEqual(14);
+    expect(list[0]).not.toHaveProperty('common');
+    expect(list.every((u) => u.symbol && u.dimension)).toBe(true);
+  });
+
+  it('commonUnitSymbols contient les usuels', () => {
+    const c = commonUnitSymbols();
+    expect(c).toContain('m²');
+    expect(c).toContain('ml');
+    expect(c).toContain('u');
+  });
+
+  it('recognizedUnitTokens couvre symboles + alias en minuscules', () => {
+    const t = recognizedUnitTokens();
+    expect(t).toContain('tonne');
+    expect(t).toContain('m2');
+    expect(t).toContain('forfait');
+  });
+
+  it('densités matériaux accessibles', () => {
+    expect(MATERIAL_DENSITIES.length).toBeGreaterThan(0);
+    expect(densityOf('enrobe')).toBe(2.4);
+    expect(densityOf('inconnu')).toBeNull();
+  });
+});

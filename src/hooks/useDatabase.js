@@ -4,8 +4,17 @@ import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, writeBatch, del
 import { db } from '../firebase';
 // XLSX chargé dynamiquement dans importFromExcel() pour éviter 425 KB au démarrage
 import { generateId } from '../utils/helpers';
+import { enrichUnit, enrichUnits, defaultUnits, setRuntimeUnits } from '../data/units';
 import { useDialog } from '../contexts/DialogContext';
 import { useToast } from '../contexts/ToastContext';
+
+// Enrichit + publie les unités dans le registre runtime (conversions de blocs)
+// à chaque mise à jour de l'état. Source unique : tout passe par ce point.
+const publishUnits = (list) => {
+  const enriched = enrichUnits(list);
+  setRuntimeUnits(enriched);
+  return enriched;
+};
 
 // ─── Helpers chemins ─────────────────────────────────────────────────────────
 // Toutes les données sont isolées sous /companies/{companyId}/...
@@ -102,18 +111,13 @@ export const useDatabase = (user, companyId) => {
       const unitSnap = await getDocs(col(companyId, 'units'));
       const unitData = unitSnap.docs.map(d => d.data());
       if (unitData.length > 0) {
-        if (!cancelled) setUnits(unitData);
+        // Migration douce : les anciens {symbol,label} sont enrichis en mémoire
+        // (dimension/factor/aliases) sans réécriture Cloud forcée.
+        if (!cancelled) setUnits(publishUnits(unitData));
       } else {
-        const defaultUnits = [
-          { symbol: 'u',   label: 'Unité' },
-          { symbol: 'm³',  label: 'Mètre cube' },
-          { symbol: 'ml',  label: 'Mètre linéaire' },
-          { symbol: 'm²',  label: 'Mètre carré' },
-          { symbol: 't',   label: 'Tonne' },
-          { symbol: 'ens', label: 'Ensemble' },
-        ];
-        await Promise.all(defaultUnits.map(u => setDoc(dref(companyId, 'units', u.symbol), u)));
-        if (!cancelled) setUnits(defaultUnits);
+        const seedUnits = defaultUnits();
+        await Promise.all(seedUnits.map(u => setDoc(dref(companyId, 'units', unitDocId(u.symbol)), u)));
+        if (!cancelled) setUnits(publishUnits(seedUnits));
       }
 
       const blocSnap = await getDocs(col(companyId, 'blocs'));
@@ -194,7 +198,7 @@ export const useDatabase = (user, companyId) => {
       setBpu(bpuSnap.docs.map(d => d.data()));
       const catData = catSnap.docs.map(d => d.data());
       setCategories(await ensureCategoryColors(catData));
-      setUnits(unitSnap.docs.map(d => d.data()));
+      setUnits(publishUnits(unitSnap.docs.map(d => d.data())));
       setBlocs(blocSnap.docs.map(d => d.data()));
       setIsBpuLoaded(true);
       setDatabaseVersion(v => v + 1);
@@ -403,20 +407,27 @@ export const useDatabase = (user, companyId) => {
 
   // ─── ACTIONS UNITÉS ───────────────────────────────────────────────────────
 
-  const saveUnit = async (symb, lab) => {
+  // Accepte soit un descripteur complet `{symbol,label,dimension,factor,aliases}`,
+  // soit l'ancienne signature `(symbol, label)` (rétro-compat des appels existants).
+  // Dans tous les cas on persiste un descripteur ENRICHI (dimension/factor déduits
+  // si absents) → source unique cohérente.
+  const saveUnit = async (arg, lab) => {
     if (!companyId) return;
-    const newItem = { symbol: symb, label: lab };
+    const raw = (arg && typeof arg === 'object') ? arg : { symbol: arg, label: lab };
+    if (!raw.symbol) return;
+    const newItem = enrichUnit(raw);
     const prevUnits = units;
-    setUnits(prev => {
-      const exists = prev.find(u => u.symbol === newItem.symbol);
-      return exists ? prev.map(u => u.symbol === newItem.symbol ? newItem : u) : [...prev, newItem];
-    });
+    const next = (() => {
+      const exists = units.find(u => u.symbol === newItem.symbol);
+      return exists ? units.map(u => u.symbol === newItem.symbol ? newItem : u) : [...units, newItem];
+    })();
+    setUnits(publishUnits(next));
     try {
       await setDoc(dref(companyId, 'units', unitDocId(newItem.symbol)), newItem);
-      toast.success(`Unité "${symb}" sauvegardée.`);
+      toast.success(`Unité "${newItem.symbol}" sauvegardée.`);
     } catch (e) {
       console.error('[saveUnit] erreur Firestore:', e);
-      setUnits(prevUnits);
+      setUnits(publishUnits(prevUnits));
       toast.error('Unité non sauvegardée sur le Cloud.', { title: 'Erreur' });
     }
   };
@@ -424,12 +435,12 @@ export const useDatabase = (user, companyId) => {
   const deleteUnit = async (symbol) => {
     if (!companyId) return;
     const prevUnits = units;
-    setUnits(prev => prev.filter(u => u.symbol !== symbol));
+    setUnits(publishUnits(units.filter(u => u.symbol !== symbol)));
     try {
       await deleteDoc(dref(companyId, 'units', unitDocId(symbol)));
       toast.success(`Unité "${symbol}" supprimée.`);
     } catch {
-      setUnits(prevUnits);
+      setUnits(publishUnits(prevUnits));
       toast.error('Suppression non synchronisée.', { title: 'Erreur' });
     }
   };
@@ -642,7 +653,7 @@ export const useDatabase = (user, companyId) => {
 
       // ── UNITÉS (toujours fusionnées, jamais supprimées) ───────────────────
       if (Array.isArray(importedData.units) && importedData.units.length) {
-        await Promise.all(importedData.units.map(u => setDoc(dref(companyId, 'units', unitDocId(u.symbol)), u)));
+        await Promise.all(importedData.units.map(u => setDoc(dref(companyId, 'units', unitDocId(u.symbol)), enrichUnit(u))));
       }
 
       // ── CATÉGORIES : écrire d'abord, supprimer ensuite (replace) ──────────
