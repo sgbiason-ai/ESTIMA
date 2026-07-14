@@ -36,6 +36,12 @@ permissions:
 jobs:
   build_and_preview:
     runs-on: ubuntu-latest
+    # On expose le secret comme variable d'env au niveau du job pour pouvoir
+    # tester sa présence dans les conditions `if:` (le contexte `secrets` n'est
+    # pas utilisable directement dans un `if:`). Tant qu'il est absent, on build
+    # quand même (vrai signal CI) mais on saute le déploiement → check au vert.
+    env:
+      FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ESTIMAVRD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -64,6 +70,7 @@ jobs:
       # Nom de channel sûr, dérivé du nom de branche (slashes/caractères → tirets,
       # minuscules, tronqué). Ex: "claude/unit-manager-proposal" → "claude-unit-manager-proposal".
       - name: Compute channel id
+        if: env.FIREBASE_SA != ''
         id: channel
         run: |
           raw="${GITHUB_REF_NAME}"
@@ -71,6 +78,7 @@ jobs:
           echo "id=$safe" >> "$GITHUB_OUTPUT"
 
       - name: Deploy to Firebase preview channel
+        if: env.FIREBASE_SA != ''
         id: deploy
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
@@ -80,8 +88,20 @@ jobs:
           channelId: ${{ steps.channel.outputs.id }}
           expires: 7d
 
+      # Secret Firebase pas encore configuré → on l'explique clairement, sans faire
+      # échouer le check (le build a déjà validé que l'app compile).
+      - name: Déploiement sauté (secret manquant)
+        if: env.FIREBASE_SA == ''
+        run: |
+          {
+            echo "## ⏭️ Déploiement preview sauté"
+            echo ""
+            echo "Le build a réussi, mais le secret \`FIREBASE_SERVICE_ACCOUNT_ESTIMAVRD\` n'est pas configuré."
+            echo "Ajoute-le (Settings → Secrets and variables → Actions) pour activer le déploiement automatique."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Publier l'URL dans le résumé du run
-        if: always() && steps.deploy.outputs.details_url != ''
+        if: steps.deploy.outputs.details_url != ''
         run: |
           {
             echo "## 🔗 Preview déployé"
