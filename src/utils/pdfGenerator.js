@@ -566,6 +566,9 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
 
     // Pages PSE — une page numérotée par PSE (racine option), avec son propre total.
     if (project.chapters) {
+      // Taux de TVA configurable par projet (défaut 20 %), aligné sur le total
+      // général. TTC = HT + TVA (jamais HT × 1,2 recalculé — audit F1/F2).
+      const pseTvaRate = Number(project?.tauxTVA ?? 20) / 100;
       // Deltas PSE substitution pour CE tranche/export (aligné sur l'écran).
       const pseDeltas = computePseDeltas(project.chapters, qtyFromMap(currentMap));
       const pseNodeIndex = buildNodeIndex(project.chapters);
@@ -678,11 +681,11 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
               });
               doc.setFont('Helvetica', 'bold'); doc.setTextColor(...THEME.pse);
               totalLine(motHT, `${isPlus ? '+' : ''}${cleanFormat(valeur)} €`, pY + 1);
-              totalLine(motTTC, `${isPlus ? '+' : ''}${cleanFormat(valeur * 1.2)} €`, pY + 9);
+              totalLine(motTTC, `${isPlus ? '+' : ''}${cleanFormat(computeVatBreakdown(valeur, pseTvaRate).ttc)} €`, pY + 9);
               doc.setFont('Helvetica', 'normal');
             } else {
               totalLine('TOTAL HT PSE', `${cleanFormat(pseData.total)} €`, pY);
-              totalLine('TOTAL TTC PSE', `${cleanFormat(pseData.total * 1.2)} €`, pY + 8);
+              totalLine('TOTAL TTC PSE', `${cleanFormat(computeVatBreakdown(pseData.total, pseTvaRate).ttc)} €`, pY + 8);
             }
           }
         }
