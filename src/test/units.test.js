@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   DIMENSIONS, dimensionOf, factorOf, sameDimension, convert,
-  enrichUnit, enrichUnits, defaultUnits, commonUnitSymbols, recognizedUnitTokens,
+  enrichUnit, enrichUnits, dedupeUnits, defaultUnits, commonUnitSymbols, recognizedUnitTokens,
+  canonicalSymbol, isUpperCanonical,
   lookupUnit, setRuntimeUnits, resetRuntimeUnits, MATERIAL_DENSITIES, densityOf,
 } from '../data/units';
 
@@ -62,8 +63,9 @@ describe('units — conversion', () => {
 describe('units — enrichissement / migration', () => {
   beforeEach(() => resetRuntimeUnits());
 
-  it('complète un ancien {symbol,label} depuis le canonique', () => {
+  it('complète un ancien {symbol,label} depuis le canonique et force le symbole en MAJUSCULES', () => {
     const e = enrichUnit({ symbol: 'm²', label: 'Mètre carré' });
+    expect(e.symbol).toBe('M2');
     expect(e.dimension).toBe('area');
     expect(e.factor).toBe(1);
     expect(e.aliases).toContain('m2');
@@ -107,11 +109,12 @@ describe('units — helpers de listes & densités', () => {
     expect(list.every((u) => u.symbol && u.dimension)).toBe(true);
   });
 
-  it('commonUnitSymbols contient les usuels', () => {
+  it('commonUnitSymbols est en majuscules', () => {
     const c = commonUnitSymbols();
-    expect(c).toContain('m²');
-    expect(c).toContain('ml');
-    expect(c).toContain('u');
+    expect(c).toContain('M2');
+    expect(c).toContain('ML');
+    expect(c).toContain('U');
+    expect(c).not.toContain('m²');
   });
 
   it('recognizedUnitTokens couvre symboles + alias en minuscules', () => {
@@ -125,5 +128,39 @@ describe('units — helpers de listes & densités', () => {
     expect(MATERIAL_DENSITIES.length).toBeGreaterThan(0);
     expect(densityOf('enrobe')).toBe(2.4);
     expect(densityOf('inconnu')).toBeNull();
+  });
+});
+
+describe('units — normalisation MAJUSCULES', () => {
+  it('canonicalSymbol ramène tout en majuscules canoniques', () => {
+    expect(canonicalSymbol('m²')).toBe('M2');
+    expect(canonicalSymbol('m³')).toBe('M3');
+    expect(canonicalSymbol('ml')).toBe('ML');
+    expect(canonicalSymbol('t')).toBe('T');
+    expect(canonicalSymbol('forfait')).toBe('F');   // via alias
+    expect(canonicalSymbol('tonne')).toBe('T');      // via alias
+    expect(canonicalSymbol('palette')).toBe('PALETTE'); // inconnu → normalisé
+    expect(canonicalSymbol('')).toBe('');
+  });
+
+  it('isUpperCanonical distingue les formes déjà en majuscules', () => {
+    expect(isUpperCanonical('M2')).toBe(true);
+    expect(isUpperCanonical('m²')).toBe(false);
+    expect(isUpperCanonical('ml')).toBe(false);
+  });
+
+  it('le catalogue par défaut est entièrement en majuscules', () => {
+    expect(defaultUnits().every((u) => u.symbol === u.symbol.toUpperCase())).toBe(true);
+    expect(defaultUnits().map((u) => u.symbol)).toEqual(expect.arrayContaining(['M2', 'M3', 'ML', 'T', 'U']));
+  });
+
+  it('dedupeUnits fusionne les doublons par symbole normalisé', () => {
+    const list = dedupeUnits([
+      { symbol: 'M2', label: 'A' },
+      { symbol: 'm²', label: 'B' },  // doublon de M2
+      { symbol: 'ML', label: 'C' },
+    ]);
+    expect(list).toHaveLength(2);
+    expect(list[0].label).toBe('A'); // 1re occurrence conservée
   });
 });

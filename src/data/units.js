@@ -40,29 +40,32 @@ export const dimensionLabel = (key) => dimensionMeta(key)?.label || 'Autre';
 // factor : quantité exprimée dans l'unité de base de la dimension.
 //   masse → kg (T = 1000), longueur → ml (cm = 0.01), etc.
 // aliases : orthographes équivalentes (normalisées à la comparaison).
+// Symboles affichés/stockés en MAJUSCULES ASCII (choix métier : « que des
+// majuscules dans les unités »). Les anciennes formes (m², m³, ml, minuscules)
+// deviennent des alias → aucune donnée existante n'est perdue, tout reste reconnu.
 // `common: true` = unité proposée par défaut dans les menus déroulants (picker).
 export const CANONICAL_UNITS = [
   // Longueur
-  { symbol: 'ml', label: 'Mètre linéaire', dimension: 'length', factor: 1,     aliases: ['m', 'mètre', 'metre'], common: true },
-  { symbol: 'cm', label: 'Centimètre',     dimension: 'length', factor: 0.01,  aliases: [] },
-  { symbol: 'km', label: 'Kilomètre',      dimension: 'length', factor: 1000,  aliases: [] },
+  { symbol: 'ML', label: 'Mètre linéaire', dimension: 'length', factor: 1,     aliases: ['ml', 'm', 'mètre', 'metre'], common: true },
+  { symbol: 'CM', label: 'Centimètre',     dimension: 'length', factor: 0.01,  aliases: ['cm'] },
+  { symbol: 'KM', label: 'Kilomètre',      dimension: 'length', factor: 1000,  aliases: ['km'] },
   // Surface
-  { symbol: 'm²', label: 'Mètre carré',    dimension: 'area',   factor: 1,     aliases: ['m2'], common: true },
-  { symbol: 'ha', label: 'Hectare',        dimension: 'area',   factor: 10000, aliases: [] },
+  { symbol: 'M2', label: 'Mètre carré',    dimension: 'area',   factor: 1,     aliases: ['m²', 'm2'], common: true },
+  { symbol: 'HA', label: 'Hectare',        dimension: 'area',   factor: 10000, aliases: ['ha'] },
   // Volume
-  { symbol: 'm³', label: 'Mètre cube',     dimension: 'volume', factor: 1,     aliases: ['m3'], common: true },
-  { symbol: 'l',  label: 'Litre',          dimension: 'volume', factor: 0.001, aliases: ['litre'] },
+  { symbol: 'M3', label: 'Mètre cube',     dimension: 'volume', factor: 1,     aliases: ['m³', 'm3'], common: true },
+  { symbol: 'L',  label: 'Litre',          dimension: 'volume', factor: 0.001, aliases: ['l', 'litre'] },
   // Masse
-  { symbol: 't',  label: 'Tonne',          dimension: 'mass',   factor: 1000,  aliases: ['tonne', 'tonnes'], common: true },
-  { symbol: 'kg', label: 'Kilogramme',     dimension: 'mass',   factor: 1,     aliases: [] },
+  { symbol: 'T',  label: 'Tonne',          dimension: 'mass',   factor: 1000,  aliases: ['t', 'tonne', 'tonnes'], common: true },
+  { symbol: 'KG', label: 'Kilogramme',     dimension: 'mass',   factor: 1,     aliases: ['kg'] },
   // Comptage
-  { symbol: 'u',  label: 'Unité',          dimension: 'count',  factor: 1,     aliases: ['un', 'unit', 'pce', 'p', 'pièce', 'piece'], common: true },
+  { symbol: 'U',  label: 'Unité',          dimension: 'count',  factor: 1,     aliases: ['u', 'un', 'unit', 'pce', 'p', 'pièce', 'piece'], common: true },
   // Temps
-  { symbol: 'h',  label: 'Heure',          dimension: 'time',   factor: 1,     aliases: ['hr'] },
-  { symbol: 'j',  label: 'Jour',           dimension: 'time',   factor: 8,     aliases: ['jour'] },
+  { symbol: 'H',  label: 'Heure',          dimension: 'time',   factor: 1,     aliases: ['h', 'hr'] },
+  { symbol: 'J',  label: 'Jour',           dimension: 'time',   factor: 8,     aliases: ['j', 'jour'] },
   // Forfait
-  { symbol: 'ens', label: 'Ensemble',      dimension: 'lumpsum', factor: 1,    aliases: [], common: true },
-  { symbol: 'f',   label: 'Forfait',       dimension: 'lumpsum', factor: 1,    aliases: ['forfait', 'ft', 'global'], common: true },
+  { symbol: 'ENS', label: 'Ensemble',      dimension: 'lumpsum', factor: 1,    aliases: ['ens'], common: true },
+  { symbol: 'F',   label: 'Forfait',       dimension: 'lumpsum', factor: 1,    aliases: ['f', 'forfait', 'ft', 'global'], common: true },
 ];
 
 // ─── INDEX & REGISTRE RUNTIME ────────────────────────────────────────────────
@@ -109,6 +112,22 @@ export const resetRuntimeUnits = () => { runtimeIndex = CANONICAL_INDEX; };
 /** Descripteur d'une unité (symbole ou alias, casse/exposants indifférents). */
 export const lookupUnit = (symbol) => runtimeIndex.get(normalizeUnitSymbol(symbol)) || null;
 
+/**
+ * Forme d'affichage/stockage CANONIQUE d'un symbole, toujours en MAJUSCULES.
+ *   'm²' → 'M2', 'ml' → 'ML', 'forfait' → 'F', 'palette' → 'PALETTE'.
+ * Si le symbole correspond (par alias) à une unité canonique, on renvoie SON
+ * symbole ; sinon on renvoie simplement la forme normalisée (majuscules ASCII).
+ */
+export const canonicalSymbol = (symbol) => {
+  const norm = normalizeUnitSymbol(symbol);
+  if (!norm) return '';
+  const canon = CANONICAL_INDEX.get(norm);
+  return canon ? canon.symbol : norm;
+};
+
+/** Le symbole est-il déjà sous sa forme majuscule canonique ? */
+export const isUpperCanonical = (symbol) => !!symbol && symbol === canonicalSymbol(symbol);
+
 // ─── MOTEUR DE CONVERSION ────────────────────────────────────────────────────
 
 /** Dimension d'une unité ('length'|'area'|…), ou null si inconnue. */
@@ -153,8 +172,9 @@ export const enrichUnit = (unit) => {
   if (!unit || !unit.symbol) return unit;
   const canon = CANONICAL_INDEX.get(normalizeUnitSymbol(unit.symbol));
   return {
-    symbol: unit.symbol,
-    label: unit.label || canon?.label || unit.symbol,
+    // Symbole toujours ramené à sa forme MAJUSCULE canonique (m² → M2, ml → ML).
+    symbol: canonicalSymbol(unit.symbol),
+    label: unit.label || canon?.label || canonicalSymbol(unit.symbol),
     dimension: unit.dimension || canon?.dimension || 'count',
     factor: Number.isFinite(unit.factor) ? unit.factor : (canon?.factor ?? 1),
     aliases: Array.isArray(unit.aliases) && unit.aliases.length ? unit.aliases : (canon?.aliases || []),
@@ -165,6 +185,20 @@ export const enrichUnit = (unit) => {
 /** Enrichit une liste d'unités (migration à la lecture Cloud). */
 export const enrichUnits = (units) =>
   Array.isArray(units) ? units.map(enrichUnit) : [];
+
+/** Déduplique une liste d'unités par symbole normalisé (garde la 1re occurrence). */
+export const dedupeUnits = (units) => {
+  const seen = new Set();
+  const out = [];
+  (units || []).forEach((u) => {
+    if (!u || !u.symbol) return;
+    const key = normalizeUnitSymbol(u.symbol);
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(u);
+  });
+  return out;
+};
 
 /** Set canonique complet, prêt à écrire comme défaut d'une nouvelle société. */
 export const defaultUnits = () => CANONICAL_UNITS.map((u) => ({

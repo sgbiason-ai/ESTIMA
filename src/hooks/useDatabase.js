@@ -3,17 +3,78 @@ import { useState, useEffect, useCallback } from 'react';
 import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, writeBatch, deleteField } from 'firebase/firestore';
 import { db } from '../firebase';
 // XLSX chargé dynamiquement dans importFromExcel() pour éviter 425 KB au démarrage
-import { generateId } from '../utils/helpers';
-import { enrichUnit, enrichUnits, defaultUnits, setRuntimeUnits } from '../data/units';
+import { generateId, normalizeUnitSymbol } from '../utils/helpers';
+import { enrichUnit, enrichUnits, dedupeUnits, defaultUnits, setRuntimeUnits, canonicalSymbol } from '../data/units';
 import { useDialog } from '../contexts/DialogContext';
 import { useToast } from '../contexts/ToastContext';
 
-// Enrichit + publie les unités dans le registre runtime (conversions de blocs)
-// à chaque mise à jour de l'état. Source unique : tout passe par ce point.
+// Enrichit (symboles en MAJUSCULES) + déduplique + publie les unités dans le
+// registre runtime (conversions de blocs). Source unique : tout passe par ici.
 const publishUnits = (list) => {
-  const enriched = enrichUnits(list);
+  const enriched = dedupeUnits(enrichUnits(list));
   setRuntimeUnits(enriched);
   return enriched;
+};
+
+// ─── MIGRATION « MAJUSCULES » (automatique, idempotente, best-effort) ─────────
+// Ramène tous les symboles d'unités à leur forme majuscule canonique (m²→M2…).
+// Ne réécrit le Cloud QUE si quelque chose change ; les valeurs/prix ne bougent
+// jamais (seul le libellé du symbole est normalisé). Un échec d'écriture n'empêche
+// pas le chargement (l'UI reste cohérente grâce à la normalisation d'affichage).
+
+// Dictionnaire d'unités : réécrit les docs en majuscules + supprime les doublons/obsolètes.
+const migrateUnitsToUpper = async (companyId, rawUnits) => {
+  const keep = new Map();          // symbole normalisé → doc retenu (symbole en majuscules)
+  const obsolete = new Set();      // ids de docs à supprimer (ancienne casse / doublons)
+  (rawUnits || []).forEach((u) => {
+    if (!u || !u.symbol) return;
+    const key = normalizeUnitSymbol(u.symbol);
+    const target = canonicalSymbol(u.symbol);
+    if (!keep.has(key)) keep.set(key, { ...u, symbol: target });
+    else obsolete.add(unitDocId(u.symbol));           // doublon (ex. m² ET M2)
+    if (u.symbol !== target) obsolete.add(unitDocId(u.symbol));
+  });
+  const cleaned = [...keep.values()];
+  const keptIds = new Set(cleaned.map((u) => unitDocId(u.symbol)));
+  const toDelete = [...obsolete].filter((id) => !keptIds.has(id));
+  const dirty = toDelete.length > 0 || cleaned.length !== (rawUnits || []).length;
+  if (dirty && companyId) {
+    try {
+      await Promise.all(cleaned.map((u) => setDoc(dref(companyId, 'units', unitDocId(u.symbol)), enrichUnit(u))));
+      await Promise.all(toDelete.map((id) => deleteDoc(dref(companyId, 'units', id))));
+    } catch (e) {
+      console.warn('[units] migration majuscules (dictionnaire) partielle :', e);
+    }
+  }
+  return cleaned;
+};
+
+// Réécrit le champ `unit` d'une collection (bpu/blocs) en majuscules, par batch.
+const migrateDocUnitsToUpper = async (companyId, colName, items) => {
+  const changed = [];
+  const out = (items || []).map((it) => {
+    if (it && it.unit) {
+      const target = canonicalSymbol(it.unit);
+      if (target !== it.unit) {
+        const next = { ...it, unit: target };
+        if (it.id) changed.push(next);   // seuls les docs identifiables sont réécrits
+        return next;
+      }
+    }
+    return it;
+  });
+  if (changed.length && companyId) {
+    try {
+      for (let i = 0; i < changed.length; i += 450) {
+        const batch = writeBatch(db);
+        changed.slice(i, i + 450).forEach((it) => batch.update(dref(companyId, colName, it.id), { unit: it.unit }));
+        await batch.commit();
+      }
+    } catch (e) {
+      console.warn(`[units] migration majuscules (${colName}) partielle :`, e);
+    }
+  }
+  return out;
 };
 
 // ─── Helpers chemins ─────────────────────────────────────────────────────────
@@ -111,9 +172,9 @@ export const useDatabase = (user, companyId) => {
       const unitSnap = await getDocs(col(companyId, 'units'));
       const unitData = unitSnap.docs.map(d => d.data());
       if (unitData.length > 0) {
-        // Migration douce : les anciens {symbol,label} sont enrichis en mémoire
-        // (dimension/factor/aliases) sans réécriture Cloud forcée.
-        if (!cancelled) setUnits(publishUnits(unitData));
+        // Migration auto : symboles ramenés en MAJUSCULES (m²→M2), doublons fusionnés.
+        const cleanUnits = await migrateUnitsToUpper(companyId, unitData);
+        if (!cancelled) setUnits(publishUnits(cleanUnits));
       } else {
         const seedUnits = defaultUnits();
         await Promise.all(seedUnits.map(u => setDoc(dref(companyId, 'units', unitDocId(u.symbol)), u)));
@@ -121,7 +182,8 @@ export const useDatabase = (user, companyId) => {
       }
 
       const blocSnap = await getDocs(col(companyId, 'blocs'));
-      if (!cancelled) setBlocs(blocSnap.docs.map(d => d.data()));
+      const blocData = await migrateDocUnitsToUpper(companyId, 'blocs', blocSnap.docs.map(d => d.data()));
+      if (!cancelled) setBlocs(blocData);
     };
 
     // Retry silencieux : un getDocs « one-shot » échoue parfois une seule fois
@@ -175,7 +237,8 @@ export const useDatabase = (user, companyId) => {
     try {
       setIsLoading(true);
       const bpuSnap = await getDocs(col(companyId, 'bpu'));
-      setBpu(bpuSnap.docs.map(d => d.data()));
+      // Migration auto : unités des articles ramenées en MAJUSCULES (m²→M2).
+      setBpu(await migrateDocUnitsToUpper(companyId, 'bpu', bpuSnap.docs.map(d => d.data())));
       setIsBpuLoaded(true);
     } catch (error) {
       console.error('Erreur chargement BPU :', error);
@@ -195,11 +258,13 @@ export const useDatabase = (user, companyId) => {
         getDocs(col(companyId, 'units')),
         getDocs(col(companyId, 'blocs')),
       ]);
-      setBpu(bpuSnap.docs.map(d => d.data()));
       const catData = catSnap.docs.map(d => d.data());
       setCategories(await ensureCategoryColors(catData));
-      setUnits(publishUnits(unitSnap.docs.map(d => d.data())));
-      setBlocs(blocSnap.docs.map(d => d.data()));
+      // Migration auto « majuscules » sur les 3 collections concernées.
+      const cleanUnits = await migrateUnitsToUpper(companyId, unitSnap.docs.map(d => d.data()));
+      setUnits(publishUnits(cleanUnits));
+      setBpu(await migrateDocUnitsToUpper(companyId, 'bpu', bpuSnap.docs.map(d => d.data())));
+      setBlocs(await migrateDocUnitsToUpper(companyId, 'blocs', blocSnap.docs.map(d => d.data())));
       setIsBpuLoaded(true);
       setDatabaseVersion(v => v + 1);
     } catch (error) {

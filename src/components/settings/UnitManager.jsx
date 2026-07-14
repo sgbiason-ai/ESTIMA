@@ -180,8 +180,8 @@ const UnitManager = ({ units = [], bpu = [], saveUnit, deleteUnit }) => {
           <label className="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Symbole</label>
           <input
             value={draft.symbol}
-            onChange={(e) => setDraft((d) => ({ ...d, symbol: e.target.value }))}
-            placeholder="m²"
+            onChange={(e) => setDraft((d) => ({ ...d, symbol: e.target.value.toUpperCase() }))}
+            placeholder="M2"
             className="w-full bg-white border border-slate-200 rounded px-3 py-2 text-sm font-bold focus:border-emerald-500 outline-none"
             required
           />
