@@ -415,11 +415,13 @@ export const generateWordCCTP = async (selectedNodes, variables, masterData, bra
   if (branding.logo) {
       const logoBytes = base64DataURLToUint8Array(branding.logo);
       if (logoBytes) {
+          const logoType = detectImageType(logoBytes) || "png";
           headerRightChildren.push(
             new Paragraph({
                 alignment: AlignmentType.RIGHT,
                 children: [
                     new ImageRun({
+                        type: logoType,
                         data: logoBytes,
                         transformation: { width: 80, height: 50 },
                     })
