@@ -872,7 +872,12 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNav
                 units={db.units}
                 bpu={db.bpu}
                 saveUnit={db.saveUnit}
+                saveUnits={db.saveUnits}
                 deleteUnit={db.deleteUnit}
+                unitDimensions={db.unitDimensions}
+                saveUnitDimensions={db.saveUnitDimensions}
+                materialDensities={db.materialDensities}
+                saveMaterialDensities={db.saveMaterialDensities}
                 importFromExcel={db.importFromExcel}
                 handleImportDatabase={db.handleImportDatabase}
                 clearBpu={db.clearBpu}

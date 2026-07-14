@@ -4,7 +4,14 @@ import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, writeBatch, del
 import { db } from '../firebase';
 // XLSX chargé dynamiquement dans importFromExcel() pour éviter 425 KB au démarrage
 import { generateId, normalizeUnitSymbol } from '../utils/helpers';
-import { enrichUnit, enrichUnits, dedupeUnits, defaultUnits, setRuntimeUnits, canonicalSymbol } from '../data/units';
+import { enrichUnit, enrichUnits, dedupeUnits, defaultUnits, setRuntimeUnits, canonicalSymbol, mergeDimensions, MATERIAL_DENSITIES } from '../data/units';
+
+// Docs de configuration stockés DANS la collection `units` (règles Firestore
+// déjà ouvertes → aucun déploiement de règles requis). Ids réservés préfixés
+// `__`, toujours filtrés des lectures d'unités.
+const DIM_DOC_ID = '__dimensions__';   // catégories (renommages + custom)
+const DENS_DOC_ID = '__densities__';   // densités matériaux éditables
+const isConfigDoc = (id) => String(id).startsWith('__');
 import { useDialog } from '../contexts/DialogContext';
 import { useToast } from '../contexts/ToastContext';
 
@@ -95,6 +102,10 @@ export const useDatabase = (user, companyId) => {
   const [categories, setCategories] = useState([]);
   const [units, setUnits]           = useState([]);
   const [blocs, setBlocs]           = useState([]);
+  // Catégories d'unités (dimensions) : intégrées + renommages/custom de la société.
+  const [unitDimensions, setUnitDimensions] = useState(() => mergeDimensions([]));
+  // Densités matériaux (T/M3) éditables ; défauts du catalogue si rien en Cloud.
+  const [materialDensities, setMaterialDensities] = useState(() => MATERIAL_DENSITIES.map(m => ({ ...m })));
 
   // 16 couleurs bien distinctes (couvre 5-15 dossiers sans doublon)
   const CAT_COLORS = [
@@ -170,7 +181,14 @@ export const useDatabase = (user, companyId) => {
       }
 
       const unitSnap = await getDocs(col(companyId, 'units'));
-      const unitData = unitSnap.docs.map(d => d.data());
+      // Les docs de config (catégories, densités) vivent dans la même collection → séparés.
+      const dimDoc = unitSnap.docs.find(d => d.id === DIM_DOC_ID);
+      if (!cancelled) setUnitDimensions(mergeDimensions(dimDoc?.data()?.list || []));
+      const densDoc = unitSnap.docs.find(d => d.id === DENS_DOC_ID);
+      if (!cancelled && Array.isArray(densDoc?.data()?.list) && densDoc.data().list.length) {
+        setMaterialDensities(densDoc.data().list);
+      }
+      const unitData = unitSnap.docs.filter(d => !isConfigDoc(d.id)).map(d => d.data());
       if (unitData.length > 0) {
         // Migration auto : symboles ramenés en MAJUSCULES (m²→M2), doublons fusionnés.
         const cleanUnits = await migrateUnitsToUpper(companyId, unitData);
@@ -260,8 +278,15 @@ export const useDatabase = (user, companyId) => {
       ]);
       const catData = catSnap.docs.map(d => d.data());
       setCategories(await ensureCategoryColors(catData));
+      // Configs (catégories, densités) : docs réservés, filtrés des unités.
+      const dimDoc = unitSnap.docs.find(d => d.id === DIM_DOC_ID);
+      setUnitDimensions(mergeDimensions(dimDoc?.data()?.list || []));
+      const densDoc = unitSnap.docs.find(d => d.id === DENS_DOC_ID);
+      if (Array.isArray(densDoc?.data()?.list) && densDoc.data().list.length) {
+        setMaterialDensities(densDoc.data().list);
+      }
       // Migration auto « majuscules » sur les 3 collections concernées.
-      const cleanUnits = await migrateUnitsToUpper(companyId, unitSnap.docs.map(d => d.data()));
+      const cleanUnits = await migrateUnitsToUpper(companyId, unitSnap.docs.filter(d => !isConfigDoc(d.id)).map(d => d.data()));
       setUnits(publishUnits(cleanUnits));
       setBpu(await migrateDocUnitsToUpper(companyId, 'bpu', bpuSnap.docs.map(d => d.data())));
       setBlocs(await migrateDocUnitsToUpper(companyId, 'blocs', blocSnap.docs.map(d => d.data())));
@@ -507,6 +532,60 @@ export const useDatabase = (user, companyId) => {
     } catch {
       setUnits(publishUnits(prevUnits));
       toast.error('Suppression non synchronisée.', { title: 'Erreur' });
+    }
+  };
+
+  // Sauvegarde EN MASSE d'unités (drag & drop : changement de catégorie et/ou
+  // réordonnancement → plusieurs docs touchés d'un coup). Optimiste + batch.
+  const saveUnits = async (changedUnits) => {
+    if (!companyId || !Array.isArray(changedUnits) || changedUnits.length === 0) return;
+    const enriched = changedUnits.map(u => ({ ...enrichUnit(u), ...(u.order != null ? { order: u.order } : {}) }));
+    const bySymbol = new Map(enriched.map(u => [u.symbol, u]));
+    const prevUnits = units;
+    setUnits(publishUnits(units.map(u => bySymbol.get(u.symbol) || u)));
+    try {
+      const batch = writeBatch(db);
+      enriched.forEach(u => batch.set(dref(companyId, 'units', unitDocId(u.symbol)), u));
+      await batch.commit();
+    } catch (e) {
+      console.error('[saveUnits] erreur Firestore:', e);
+      setUnits(publishUnits(prevUnits));
+      toast.error('Déplacement non sauvegardé sur le Cloud.', { title: 'Erreur' });
+    }
+  };
+
+  // Sauvegarde des densités matériaux (liste complète remplacée, optimiste).
+  const saveMaterialDensities = async (list) => {
+    if (!companyId || !Array.isArray(list)) return;
+    const cleaned = list
+      .filter(m => m && m.label && Number.isFinite(Number(m.density)))
+      .map(m => ({ key: m.key || generateId(), label: String(m.label).trim(), density: Number(m.density) }));
+    const prev = materialDensities;
+    setMaterialDensities(cleaned);
+    try {
+      await setDoc(dref(companyId, 'units', DENS_DOC_ID), { list: cleaned });
+    } catch (e) {
+      console.error('[saveMaterialDensities] erreur Firestore:', e);
+      setMaterialDensities(prev);
+      toast.error('Densités non sauvegardées sur le Cloud.', { title: 'Erreur' });
+    }
+  };
+
+  // Sauvegarde de la config des catégories d'unités (renommages + custom).
+  // On ne persiste que les écarts : libellés modifiés des intégrées + catégories custom.
+  const saveUnitDimensions = async (dimensions) => {
+    if (!companyId) return;
+    const overrides = (dimensions || [])
+      .filter(d => d.custom || d.label !== (mergeDimensions([]).find(b => b.key === d.key)?.label))
+      .map(({ key, label, color, order, custom }) => ({ key, label, ...(color ? { color } : {}), ...(order != null ? { order } : {}), ...(custom ? { custom: true } : {}) }));
+    const prev = unitDimensions;
+    setUnitDimensions(mergeDimensions(overrides));
+    try {
+      await setDoc(dref(companyId, 'units', DIM_DOC_ID), { list: overrides });
+    } catch (e) {
+      console.error('[saveUnitDimensions] erreur Firestore:', e);
+      setUnitDimensions(prev);
+      toast.error('Catégories non sauvegardées sur le Cloud.', { title: 'Erreur' });
     }
   };
 
@@ -768,7 +847,9 @@ export const useDatabase = (user, companyId) => {
     loadBpu, isBpuLoaded, forceRefresh,
     addToBpu, updateBpuItem, deleteFromBpu, clearBpu, clearObservedPrices,
     addCategory, deleteCategory, renameCategory, assignCategoryToItem,
-    saveUnit, deleteUnit,
+    saveUnit, deleteUnit, saveUnits,
+    unitDimensions, saveUnitDimensions,
+    materialDensities, saveMaterialDensities,
     importFromExcel, handleImportDatabase,
   };
 };

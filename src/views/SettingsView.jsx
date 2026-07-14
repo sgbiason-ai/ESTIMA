@@ -17,7 +17,12 @@ const SettingsView = ({
   units,
   bpu = [],
   saveUnit,
+  saveUnits,
   deleteUnit,
+  unitDimensions,
+  saveUnitDimensions,
+  materialDensities,
+  saveMaterialDensities,
   importFromExcel,
   handleImportDatabase,
   clearBpu,
@@ -454,8 +459,13 @@ const SettingsView = ({
             <UnitManager
               units={units}
               bpu={bpu}
+              dimensions={unitDimensions}
+              densities={materialDensities}
               saveUnit={saveUnit}
+              saveUnits={saveUnits}
               deleteUnit={deleteUnit}
+              saveDimensions={saveUnitDimensions}
+              saveDensities={saveMaterialDensities}
             />
           </section>
 

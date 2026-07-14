@@ -36,6 +36,35 @@ export const DIMENSION_KEYS = DIMENSIONS.map((d) => d.key);
 export const dimensionMeta = (key) => DIMENSIONS.find((d) => d.key === key) || null;
 export const dimensionLabel = (key) => dimensionMeta(key)?.label || 'Autre';
 
+// Couleurs disponibles pour les catégories personnalisées (cycle).
+export const DIMENSION_COLORS = ['sky', 'emerald', 'indigo', 'amber', 'rose', 'violet', 'slate', 'teal', 'orange', 'cyan'];
+
+/**
+ * Fusionne les dimensions intégrées avec la config utilisateur (renommages +
+ * catégories personnalisées). Les 7 dimensions physiques sont toujours présentes
+ * (leurs clés pilotent les conversions de blocs) mais leur LIBELLÉ est éditable ;
+ * les catégories personnalisées (`custom: true`) s'ajoutent à la suite.
+ * @param {Array<{key:string,label?:string,color?:string,order?:number,custom?:boolean}>} overrides
+ */
+export const mergeDimensions = (overrides) => {
+  const byKey = new Map((overrides || []).filter((o) => o && o.key).map((o) => [o.key, o]));
+  const builtins = DIMENSIONS.map((d, i) => {
+    const o = byKey.get(d.key);
+    return { ...d, label: o?.label || d.label, order: o?.order ?? i, custom: false };
+  });
+  const customs = (overrides || [])
+    .filter((o) => o && o.key && o.custom && !DIMENSIONS.some((d) => d.key === o.key))
+    .map((o, i) => ({
+      key: o.key,
+      label: o.label || o.key,
+      base: null,
+      color: o.color || DIMENSION_COLORS[(DIMENSIONS.length + i) % DIMENSION_COLORS.length],
+      order: o.order ?? (DIMENSIONS.length + i),
+      custom: true,
+    }));
+  return [...builtins, ...customs].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+};
+
 // ─── UNITÉS CANONIQUES ───────────────────────────────────────────────────────
 // factor : quantité exprimée dans l'unité de base de la dimension.
 //   masse → kg (T = 1000), longueur → ml (cm = 0.01), etc.

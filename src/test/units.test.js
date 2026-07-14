@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   DIMENSIONS, dimensionOf, factorOf, sameDimension, convert,
   enrichUnit, enrichUnits, dedupeUnits, defaultUnits, commonUnitSymbols, recognizedUnitTokens,
-  canonicalSymbol, isUpperCanonical,
+  canonicalSymbol, isUpperCanonical, mergeDimensions,
   lookupUnit, setRuntimeUnits, resetRuntimeUnits, MATERIAL_DENSITIES, densityOf,
 } from '../data/units';
 
@@ -162,5 +162,36 @@ describe('units — normalisation MAJUSCULES', () => {
     ]);
     expect(list).toHaveLength(2);
     expect(list[0].label).toBe('A'); // 1re occurrence conservée
+  });
+});
+
+describe('units — catégories éditables (mergeDimensions)', () => {
+  it('sans override : les 7 dimensions intégrées, dans l’ordre', () => {
+    const merged = mergeDimensions([]);
+    expect(merged.map((d) => d.key)).toEqual(DIMENSIONS.map((d) => d.key));
+    expect(merged.every((d) => d.custom === false)).toBe(true);
+  });
+
+  it('renomme une dimension intégrée sans changer sa clé', () => {
+    const merged = mergeDimensions([{ key: 'area', label: 'Surfaces VRD' }]);
+    const area = merged.find((d) => d.key === 'area');
+    expect(area.label).toBe('Surfaces VRD');
+    expect(area.custom).toBe(false);
+  });
+
+  it('ajoute une catégorie personnalisée à la suite', () => {
+    const merged = mergeDimensions([{ key: 'signalisation', label: 'Signalisation', custom: true }]);
+    const custom = merged.find((d) => d.key === 'signalisation');
+    expect(custom).toBeTruthy();
+    expect(custom.custom).toBe(true);
+    expect(custom.base).toBeNull();
+    expect(merged).toHaveLength(DIMENSIONS.length + 1);
+  });
+
+  it('une override custom ne peut pas écraser une clé intégrée', () => {
+    const merged = mergeDimensions([{ key: 'mass', label: 'Fake', custom: true }]);
+    // 'mass' reste intégrée (custom:false), le label custom s'applique comme renommage
+    expect(merged.filter((d) => d.key === 'mass')).toHaveLength(1);
+    expect(merged.find((d) => d.key === 'mass').custom).toBe(false);
   });
 });
