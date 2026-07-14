@@ -218,7 +218,7 @@ export const useDevisMoe = (user, companyId) => {
       toast.success('Devis créé');
       return d;
     } catch (e) { console.error(e); toast.error('Erreur lors de la création'); return null; }
-  }, [companyId]);
+  }, [companyId, devisList]);
 
   const saveDevis = useCallback(async (data) => {
     if (!companyId || !data?.id) return false;
