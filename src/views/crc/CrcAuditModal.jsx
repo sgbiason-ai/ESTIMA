@@ -3,6 +3,7 @@
 import React from 'react';
 import { ArrowLeftRight } from 'lucide-react';
 import { renderFormattedText, stripHtml } from '../../utils/formatObsText';
+import { flattenGroupContacts } from '../../utils/crrParticipantTree';
 
 const statusLabel = (s) => s === 'done' ? 'FAIT' : s === 'in_progress' ? 'En cours' : 'Ouvert';
 const statusColor = (s) => s === 'done' ? 'text-emerald-700 bg-emerald-50' : s === 'in_progress' ? 'text-blue-700 bg-blue-50' : 'text-amber-700 bg-amber-50';
@@ -19,7 +20,9 @@ export default function CrcAuditModal({ isOpen, onClose, currentMeeting, previou
 
   const allContacts = [];
   for (const group of (participantGroups || [])) {
-    for (const contact of group.contacts) {
+    // flattenGroupContacts descend dans les sous-groupes ET tolère l'absence
+    // de tableau contacts (données legacy / archives importées).
+    for (const contact of flattenGroupContacts(group)) {
       allContacts.push({ id: contact.id, name: contact.name || '(sans nom)', group: group.name });
     }
   }
