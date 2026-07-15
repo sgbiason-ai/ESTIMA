@@ -14,7 +14,7 @@ const PapyrusCoverPreview = ({ branding, activeDocType, project }) => {
   const today = new Date().toLocaleDateString('fr-FR');
   const clientAddress = [project?.clientAddress, [project?.clientZip, project?.clientCity].filter(Boolean).join(' ')].filter(Boolean);
   return (
-    <div className="relative w-full overflow-hidden bg-white shadow-2xl border border-black" style={{ aspectRatio: '210 / 297', fontFamily: 'Arial, sans-serif' }}>
+    <div className="relative w-full overflow-hidden bg-white shadow-2xl" style={{ aspectRatio: '210 / 297', fontFamily: 'Arial, sans-serif' }}>
       <div className="absolute left-[3%] top-[2%] right-[3%] flex items-start gap-[3%]">
         {project?.clientLogo && <img src={project.clientLogo} alt="logo MOA" className="w-[16%] h-auto max-h-20 object-contain" />}
         <div className="pt-[1%] min-w-0">

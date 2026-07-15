@@ -8,6 +8,14 @@ export { APP_VERSION } from './appVersion';
 
 export const CHANGELOG = [
   {
+    version: '3.6.1',
+    date: '2026-07-15',
+    title: 'Cartouche Papyrus — finition de la couverture',
+    highlights: [
+      'Page de garde « CARTOUCHE PAPYRUS STANDART » — suppression du cadre noir extérieur dans l’aperçu et les exports PDF, Word et Excel ; les bordures utiles des cartouches internes et du tableau des indices sont conservées',
+    ],
+  },
+  {
     version: '3.6.0',
     date: '2026-07-15',
     title: 'Pages de garde — cartouche Papyrus standard',

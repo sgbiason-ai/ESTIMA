@@ -91,9 +91,6 @@ const drawImageContain = (ctx, image, x, y, maxW, maxH) => {
 const drawPapyrusCanvas = (ctx, project, docLabel, branding, logos, values) => {
   const { logoMoe, logoClient, logoCoTraitants } = logos;
   const { phaseLabel, clientName, clientStreet, clientCityZip, locationRaw, codeAffaire, subtitle1, subtitle2, today } = values;
-  ctx.strokeStyle = '#000000'; ctx.lineWidth = px(0.35);
-  ctx.strokeRect(px(0.5), px(0.5), px(PW - 1), px(PH - 1));
-
   drawImageContain(ctx, logoClient, 6, 6, 30, 32);
   const moaX = logoClient ? 41 : 8;
   ctx.fillStyle = '#000000'; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';

@@ -313,7 +313,6 @@ export const drawMoeFooter = (doc, branding, theme, today) => {
  */
 const drawPapyrusCoverPage = (doc, config, theme, logos) => {
   const pageWidth = doc.internal.pageSize.width;
-  const pageHeight = doc.internal.pageSize.height;
   const {
     docType = '', title: rawTitle, subtitle1 = '', subtitle2 = '', phaseLabel = '',
     clientName = '', clientStreet = '', clientCityZip = '', locationRaw = '',
@@ -322,10 +321,6 @@ const drawPapyrusCoverPage = (doc, config, theme, logos) => {
   } = config;
   const { logoMoe, logoClient, logoCoTraitants = [] } = logos;
   const margin = 6;
-
-  doc.setDrawColor(0, 0, 0);
-  doc.setLineWidth(0.35);
-  doc.rect(0.5, 0.5, pageWidth - 1, pageHeight - 1);
 
   // Identité du maître d'ouvrage, calée comme le cartouche de référence.
   if (logoClient) renderLogo(doc, logoClient, margin, 6, 30, 32);
