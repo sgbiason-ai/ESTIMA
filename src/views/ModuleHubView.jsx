@@ -7,8 +7,11 @@ import {
   Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudDrizzle, CloudFog, MapPin, ChevronRight, Sparkles,
   HardHat, Coins
 } from 'lucide-react';
-import { APP_VERSION } from '../data/changelog';
-import ChangelogModal from '../components/ChangelogModal';
+import { APP_VERSION } from '../data/appVersion';
+import lazyWithReload from '../utils/lazyWithReload';
+// Lazy : la modale « Nouveautés » embarque tout le changelog (~160 KB de texte),
+// inutile de le charger au démarrage du hub.
+const ChangelogModal = lazyWithReload(() => import('../components/ChangelogModal'));
 import HelpPanel from '../components/help/HelpPanel';
 import HelpButton from '../components/help/HelpButton';
 import { isSuperAdmin } from '../config/superAdmin';
@@ -397,7 +400,11 @@ export default function ModuleHubView({ isAdmin, userEmail, userModules, onSelec
       </footer>
 
       {/* ── Changelog modal ── */}
-      {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
+      {showChangelog && (
+        <React.Suspense fallback={null}>
+          <ChangelogModal onClose={() => setShowChangelog(false)} />
+        </React.Suspense>
+      )}
     </div>
   );
 }

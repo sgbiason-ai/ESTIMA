@@ -19,16 +19,16 @@
 // largeur ne sert qu'aux blocs ml (section = largeur×épaisseur ; m² = largeur développée).
 // Un bloc sans unité explicite est traité comme m² (défaut historique).
 import { normalizeUnitSymbol, generateId } from './helpers';
+import { dimensionOf } from '../data/units';
 
-const MASS_UNITS = ['T', 'TONNE', 'TONNES'];
-const VOLUME_UNITS = ['M3'];
-const AREA_UNITS = ['M2'];
-const LENGTH_UNITS = ['ML'];
-
-const isMass = (u) => MASS_UNITS.includes(u);
-const isVolume = (u) => VOLUME_UNITS.includes(u);
-const isArea = (u) => AREA_UNITS.includes(u);
-const isLength = (u) => LENGTH_UNITS.includes(u);
+// La famille physique d'une unité provient désormais du catalogue central
+// (src/data/units.js) : dimensionOf('T')→'mass', 'M3'→'volume', 'M2'→'area',
+// 'ML'→'length'. Les unités personnalisées déclarant une dimension participent
+// donc automatiquement aux conversions de blocs (avant : listes figées ici).
+const isMass = (u) => dimensionOf(u) === 'mass';
+const isVolume = (u) => dimensionOf(u) === 'volume';
+const isArea = (u) => dimensionOf(u) === 'area';
+const isLength = (u) => dimensionOf(u) === 'length';
 // Unité de bloc normalisée, m² par défaut (rétro-compat des blocs sans unité).
 const blocU = (blocUnit) => normalizeUnitSymbol(blocUnit || '') || 'M2';
 

@@ -1,0 +1,70 @@
+# Déploiement des RÈGLES FIRESTORE en production.
+#
+# ⚠️ Les règles sont GLOBALES au projet Firebase (une seule base pour tous les
+# utilisateurs) : on ne les déploie donc QUE depuis la branche par défaut
+# (= production), après merge, et UNIQUEMENT quand firestore.rules change.
+# Jamais depuis une branche de feature (cela écraserait la prod pour tout le monde).
+#
+# ── SECRET REQUIS ────────────────────────────────────────────────────────────
+#   FIREBASE_SERVICE_ACCOUNT_ESTIMAVRD  (même JSON que le workflow de preview)
+# Le compte de service doit posséder le rôle IAM « Firebase Rules Admin »
+# (roles/firebaserules.admin). Le compte créé par `firebase init hosting:github`
+# n'a que les droits Hosting → ajoute ce rôle dans Google Cloud → IAM, ou utilise
+# un compte de service dédié.
+
+name: Deploy Firestore Rules
+
+on:
+  push:
+    branches:
+      - feature/estima-tp # branche par défaut = production
+    paths:
+      - firestore.rules
+  workflow_dispatch: {} # déclenchement manuel possible depuis l'onglet Actions
+
+# Un seul déploiement de règles à la fois (évite les courses).
+concurrency:
+  group: deploy-rules
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy_rules:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Écrire les credentials du compte de service
+        env:
+          FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ESTIMAVRD }}
+        run: |
+          if [ -z "$FIREBASE_SA" ]; then
+            echo "::error::Secret FIREBASE_SERVICE_ACCOUNT_ESTIMAVRD manquant." >&2
+            exit 1
+          fi
+          printf '%s' "$FIREBASE_SA" > "$RUNNER_TEMP/sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+
+      - name: Déployer les règles Firestore
+        run: npx --yes firebase-tools deploy --only firestore:rules --project estimavrd-app --non-interactive
+
+      - name: Nettoyer les credentials
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sa.json"
+
+      - name: Résumé
+        if: success()
+        run: |
+          {
+            echo "## ✅ Règles Firestore déployées"
+            echo ""
+            echo "Fichier : \`firestore.rules\` → projet \`estimavrd-app\` (production)."
+          } >> "$GITHUB_STEP_SUMMARY"

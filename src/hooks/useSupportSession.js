@@ -15,7 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { RTC_CONFIG } from '../config/webrtc';
-import { APP_VERSION } from '../data/changelog';
+import { APP_VERSION } from '../data/appVersion';
 import { moduleLabel } from '../components/feedback/feedbackConstants';
 
 const COL = 'supportSessions';

@@ -3,9 +3,86 @@ import { useState, useEffect, useCallback } from 'react';
 import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, writeBatch, deleteField } from 'firebase/firestore';
 import { db } from '../firebase';
 // XLSX chargé dynamiquement dans importFromExcel() pour éviter 425 KB au démarrage
-import { generateId } from '../utils/helpers';
+import { generateId, normalizeUnitSymbol } from '../utils/helpers';
+import { enrichUnit, enrichUnits, dedupeUnits, defaultUnits, setRuntimeUnits, canonicalSymbol, mergeDimensions, MATERIAL_DENSITIES } from '../data/units';
+
+// Docs de configuration stockés DANS la collection `units` (règles Firestore
+// déjà ouvertes → aucun déploiement de règles requis). Ids réservés préfixés
+// `__`, toujours filtrés des lectures d'unités.
+const DIM_DOC_ID = '__dimensions__';   // catégories (renommages + custom)
+const DENS_DOC_ID = '__densities__';   // densités matériaux éditables
+const isConfigDoc = (id) => String(id).startsWith('__');
 import { useDialog } from '../contexts/DialogContext';
 import { useToast } from '../contexts/ToastContext';
+
+// Enrichit (symboles en MAJUSCULES) + déduplique + publie les unités dans le
+// registre runtime (conversions de blocs). Source unique : tout passe par ici.
+const publishUnits = (list) => {
+  const enriched = dedupeUnits(enrichUnits(list));
+  setRuntimeUnits(enriched);
+  return enriched;
+};
+
+// ─── MIGRATION « MAJUSCULES » (automatique, idempotente, best-effort) ─────────
+// Ramène tous les symboles d'unités à leur forme majuscule canonique (m²→M2…).
+// Ne réécrit le Cloud QUE si quelque chose change ; les valeurs/prix ne bougent
+// jamais (seul le libellé du symbole est normalisé). Un échec d'écriture n'empêche
+// pas le chargement (l'UI reste cohérente grâce à la normalisation d'affichage).
+
+// Dictionnaire d'unités : réécrit les docs en majuscules + supprime les doublons/obsolètes.
+const migrateUnitsToUpper = async (companyId, rawUnits) => {
+  const keep = new Map();          // symbole normalisé → doc retenu (symbole en majuscules)
+  const obsolete = new Set();      // ids de docs à supprimer (ancienne casse / doublons)
+  (rawUnits || []).forEach((u) => {
+    if (!u || !u.symbol) return;
+    const key = normalizeUnitSymbol(u.symbol);
+    const target = canonicalSymbol(u.symbol);
+    if (!keep.has(key)) keep.set(key, { ...u, symbol: target });
+    else obsolete.add(unitDocId(u.symbol));           // doublon (ex. m² ET M2)
+    if (u.symbol !== target) obsolete.add(unitDocId(u.symbol));
+  });
+  const cleaned = [...keep.values()];
+  const keptIds = new Set(cleaned.map((u) => unitDocId(u.symbol)));
+  const toDelete = [...obsolete].filter((id) => !keptIds.has(id));
+  const dirty = toDelete.length > 0 || cleaned.length !== (rawUnits || []).length;
+  if (dirty && companyId) {
+    try {
+      await Promise.all(cleaned.map((u) => setDoc(dref(companyId, 'units', unitDocId(u.symbol)), enrichUnit(u))));
+      await Promise.all(toDelete.map((id) => deleteDoc(dref(companyId, 'units', id))));
+    } catch (e) {
+      console.warn('[units] migration majuscules (dictionnaire) partielle :', e);
+    }
+  }
+  return cleaned;
+};
+
+// Réécrit le champ `unit` d'une collection (bpu/blocs) en majuscules, par batch.
+const migrateDocUnitsToUpper = async (companyId, colName, items) => {
+  const changed = [];
+  const out = (items || []).map((it) => {
+    if (it && it.unit) {
+      const target = canonicalSymbol(it.unit);
+      if (target !== it.unit) {
+        const next = { ...it, unit: target };
+        if (it.id) changed.push(next);   // seuls les docs identifiables sont réécrits
+        return next;
+      }
+    }
+    return it;
+  });
+  if (changed.length && companyId) {
+    try {
+      for (let i = 0; i < changed.length; i += 450) {
+        const batch = writeBatch(db);
+        changed.slice(i, i + 450).forEach((it) => batch.update(dref(companyId, colName, it.id), { unit: it.unit }));
+        await batch.commit();
+      }
+    } catch (e) {
+      console.warn(`[units] migration majuscules (${colName}) partielle :`, e);
+    }
+  }
+  return out;
+};
 
 // ─── Helpers chemins ─────────────────────────────────────────────────────────
 // Toutes les données sont isolées sous /companies/{companyId}/...
@@ -25,6 +102,10 @@ export const useDatabase = (user, companyId) => {
   const [categories, setCategories] = useState([]);
   const [units, setUnits]           = useState([]);
   const [blocs, setBlocs]           = useState([]);
+  // Catégories d'unités (dimensions) : intégrées + renommages/custom de la société.
+  const [unitDimensions, setUnitDimensions] = useState(() => mergeDimensions([]));
+  // Densités matériaux (T/M3) éditables ; défauts du catalogue si rien en Cloud.
+  const [materialDensities, setMaterialDensities] = useState(() => MATERIAL_DENSITIES.map(m => ({ ...m })));
 
   // 16 couleurs bien distinctes (couvre 5-15 dossiers sans doublon)
   const CAT_COLORS = [
@@ -100,24 +181,27 @@ export const useDatabase = (user, companyId) => {
       }
 
       const unitSnap = await getDocs(col(companyId, 'units'));
-      const unitData = unitSnap.docs.map(d => d.data());
+      // Les docs de config (catégories, densités) vivent dans la même collection → séparés.
+      const dimDoc = unitSnap.docs.find(d => d.id === DIM_DOC_ID);
+      if (!cancelled) setUnitDimensions(mergeDimensions(dimDoc?.data()?.list || []));
+      const densDoc = unitSnap.docs.find(d => d.id === DENS_DOC_ID);
+      if (!cancelled && Array.isArray(densDoc?.data()?.list) && densDoc.data().list.length) {
+        setMaterialDensities(densDoc.data().list);
+      }
+      const unitData = unitSnap.docs.filter(d => !isConfigDoc(d.id)).map(d => d.data());
       if (unitData.length > 0) {
-        if (!cancelled) setUnits(unitData);
+        // Migration auto : symboles ramenés en MAJUSCULES (m²→M2), doublons fusionnés.
+        const cleanUnits = await migrateUnitsToUpper(companyId, unitData);
+        if (!cancelled) setUnits(publishUnits(cleanUnits));
       } else {
-        const defaultUnits = [
-          { symbol: 'u',   label: 'Unité' },
-          { symbol: 'm³',  label: 'Mètre cube' },
-          { symbol: 'ml',  label: 'Mètre linéaire' },
-          { symbol: 'm²',  label: 'Mètre carré' },
-          { symbol: 't',   label: 'Tonne' },
-          { symbol: 'ens', label: 'Ensemble' },
-        ];
-        await Promise.all(defaultUnits.map(u => setDoc(dref(companyId, 'units', u.symbol), u)));
-        if (!cancelled) setUnits(defaultUnits);
+        const seedUnits = defaultUnits();
+        await Promise.all(seedUnits.map(u => setDoc(dref(companyId, 'units', unitDocId(u.symbol)), u)));
+        if (!cancelled) setUnits(publishUnits(seedUnits));
       }
 
       const blocSnap = await getDocs(col(companyId, 'blocs'));
-      if (!cancelled) setBlocs(blocSnap.docs.map(d => d.data()));
+      const blocData = await migrateDocUnitsToUpper(companyId, 'blocs', blocSnap.docs.map(d => d.data()));
+      if (!cancelled) setBlocs(blocData);
     };
 
     // Retry silencieux : un getDocs « one-shot » échoue parfois une seule fois
@@ -171,7 +255,8 @@ export const useDatabase = (user, companyId) => {
     try {
       setIsLoading(true);
       const bpuSnap = await getDocs(col(companyId, 'bpu'));
-      setBpu(bpuSnap.docs.map(d => d.data()));
+      // Migration auto : unités des articles ramenées en MAJUSCULES (m²→M2).
+      setBpu(await migrateDocUnitsToUpper(companyId, 'bpu', bpuSnap.docs.map(d => d.data())));
       setIsBpuLoaded(true);
     } catch (error) {
       console.error('Erreur chargement BPU :', error);
@@ -191,11 +276,20 @@ export const useDatabase = (user, companyId) => {
         getDocs(col(companyId, 'units')),
         getDocs(col(companyId, 'blocs')),
       ]);
-      setBpu(bpuSnap.docs.map(d => d.data()));
       const catData = catSnap.docs.map(d => d.data());
       setCategories(await ensureCategoryColors(catData));
-      setUnits(unitSnap.docs.map(d => d.data()));
-      setBlocs(blocSnap.docs.map(d => d.data()));
+      // Configs (catégories, densités) : docs réservés, filtrés des unités.
+      const dimDoc = unitSnap.docs.find(d => d.id === DIM_DOC_ID);
+      setUnitDimensions(mergeDimensions(dimDoc?.data()?.list || []));
+      const densDoc = unitSnap.docs.find(d => d.id === DENS_DOC_ID);
+      if (Array.isArray(densDoc?.data()?.list) && densDoc.data().list.length) {
+        setMaterialDensities(densDoc.data().list);
+      }
+      // Migration auto « majuscules » sur les 3 collections concernées.
+      const cleanUnits = await migrateUnitsToUpper(companyId, unitSnap.docs.filter(d => !isConfigDoc(d.id)).map(d => d.data()));
+      setUnits(publishUnits(cleanUnits));
+      setBpu(await migrateDocUnitsToUpper(companyId, 'bpu', bpuSnap.docs.map(d => d.data())));
+      setBlocs(await migrateDocUnitsToUpper(companyId, 'blocs', blocSnap.docs.map(d => d.data())));
       setIsBpuLoaded(true);
       setDatabaseVersion(v => v + 1);
     } catch (error) {
@@ -403,20 +497,27 @@ export const useDatabase = (user, companyId) => {
 
   // ─── ACTIONS UNITÉS ───────────────────────────────────────────────────────
 
-  const saveUnit = async (symb, lab) => {
+  // Accepte soit un descripteur complet `{symbol,label,dimension,factor,aliases}`,
+  // soit l'ancienne signature `(symbol, label)` (rétro-compat des appels existants).
+  // Dans tous les cas on persiste un descripteur ENRICHI (dimension/factor déduits
+  // si absents) → source unique cohérente.
+  const saveUnit = async (arg, lab) => {
     if (!companyId) return;
-    const newItem = { symbol: symb, label: lab };
+    const raw = (arg && typeof arg === 'object') ? arg : { symbol: arg, label: lab };
+    if (!raw.symbol) return;
+    const newItem = enrichUnit(raw);
     const prevUnits = units;
-    setUnits(prev => {
-      const exists = prev.find(u => u.symbol === newItem.symbol);
-      return exists ? prev.map(u => u.symbol === newItem.symbol ? newItem : u) : [...prev, newItem];
-    });
+    const next = (() => {
+      const exists = units.find(u => u.symbol === newItem.symbol);
+      return exists ? units.map(u => u.symbol === newItem.symbol ? newItem : u) : [...units, newItem];
+    })();
+    setUnits(publishUnits(next));
     try {
       await setDoc(dref(companyId, 'units', unitDocId(newItem.symbol)), newItem);
-      toast.success(`Unité "${symb}" sauvegardée.`);
+      toast.success(`Unité "${newItem.symbol}" sauvegardée.`);
     } catch (e) {
       console.error('[saveUnit] erreur Firestore:', e);
-      setUnits(prevUnits);
+      setUnits(publishUnits(prevUnits));
       toast.error('Unité non sauvegardée sur le Cloud.', { title: 'Erreur' });
     }
   };
@@ -424,13 +525,67 @@ export const useDatabase = (user, companyId) => {
   const deleteUnit = async (symbol) => {
     if (!companyId) return;
     const prevUnits = units;
-    setUnits(prev => prev.filter(u => u.symbol !== symbol));
+    setUnits(publishUnits(units.filter(u => u.symbol !== symbol)));
     try {
       await deleteDoc(dref(companyId, 'units', unitDocId(symbol)));
       toast.success(`Unité "${symbol}" supprimée.`);
     } catch {
-      setUnits(prevUnits);
+      setUnits(publishUnits(prevUnits));
       toast.error('Suppression non synchronisée.', { title: 'Erreur' });
+    }
+  };
+
+  // Sauvegarde EN MASSE d'unités (drag & drop : changement de catégorie et/ou
+  // réordonnancement → plusieurs docs touchés d'un coup). Optimiste + batch.
+  const saveUnits = async (changedUnits) => {
+    if (!companyId || !Array.isArray(changedUnits) || changedUnits.length === 0) return;
+    const enriched = changedUnits.map(u => ({ ...enrichUnit(u), ...(u.order != null ? { order: u.order } : {}) }));
+    const bySymbol = new Map(enriched.map(u => [u.symbol, u]));
+    const prevUnits = units;
+    setUnits(publishUnits(units.map(u => bySymbol.get(u.symbol) || u)));
+    try {
+      const batch = writeBatch(db);
+      enriched.forEach(u => batch.set(dref(companyId, 'units', unitDocId(u.symbol)), u));
+      await batch.commit();
+    } catch (e) {
+      console.error('[saveUnits] erreur Firestore:', e);
+      setUnits(publishUnits(prevUnits));
+      toast.error('Déplacement non sauvegardé sur le Cloud.', { title: 'Erreur' });
+    }
+  };
+
+  // Sauvegarde des densités matériaux (liste complète remplacée, optimiste).
+  const saveMaterialDensities = async (list) => {
+    if (!companyId || !Array.isArray(list)) return;
+    const cleaned = list
+      .filter(m => m && m.label && Number.isFinite(Number(m.density)))
+      .map(m => ({ key: m.key || generateId(), label: String(m.label).trim(), density: Number(m.density) }));
+    const prev = materialDensities;
+    setMaterialDensities(cleaned);
+    try {
+      await setDoc(dref(companyId, 'units', DENS_DOC_ID), { list: cleaned });
+    } catch (e) {
+      console.error('[saveMaterialDensities] erreur Firestore:', e);
+      setMaterialDensities(prev);
+      toast.error('Densités non sauvegardées sur le Cloud.', { title: 'Erreur' });
+    }
+  };
+
+  // Sauvegarde de la config des catégories d'unités (renommages + custom).
+  // On ne persiste que les écarts : libellés modifiés des intégrées + catégories custom.
+  const saveUnitDimensions = async (dimensions) => {
+    if (!companyId) return;
+    const overrides = (dimensions || [])
+      .filter(d => d.custom || d.label !== (mergeDimensions([]).find(b => b.key === d.key)?.label))
+      .map(({ key, label, color, order, custom }) => ({ key, label, ...(color ? { color } : {}), ...(order != null ? { order } : {}), ...(custom ? { custom: true } : {}) }));
+    const prev = unitDimensions;
+    setUnitDimensions(mergeDimensions(overrides));
+    try {
+      await setDoc(dref(companyId, 'units', DIM_DOC_ID), { list: overrides });
+    } catch (e) {
+      console.error('[saveUnitDimensions] erreur Firestore:', e);
+      setUnitDimensions(prev);
+      toast.error('Catégories non sauvegardées sur le Cloud.', { title: 'Erreur' });
     }
   };
 
@@ -642,7 +797,7 @@ export const useDatabase = (user, companyId) => {
 
       // ── UNITÉS (toujours fusionnées, jamais supprimées) ───────────────────
       if (Array.isArray(importedData.units) && importedData.units.length) {
-        await Promise.all(importedData.units.map(u => setDoc(dref(companyId, 'units', unitDocId(u.symbol)), u)));
+        await Promise.all(importedData.units.map(u => setDoc(dref(companyId, 'units', unitDocId(u.symbol)), enrichUnit(u))));
       }
 
       // ── CATÉGORIES : écrire d'abord, supprimer ensuite (replace) ──────────
@@ -692,7 +847,9 @@ export const useDatabase = (user, companyId) => {
     loadBpu, isBpuLoaded, forceRefresh,
     addToBpu, updateBpuItem, deleteFromBpu, clearBpu, clearObservedPrices,
     addCategory, deleteCategory, renameCategory, assignCategoryToItem,
-    saveUnit, deleteUnit,
+    saveUnit, deleteUnit, saveUnits,
+    unitDimensions, saveUnitDimensions,
+    materialDensities, saveMaterialDensities,
     importFromExcel, handleImportDatabase,
   };
 };

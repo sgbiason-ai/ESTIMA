@@ -3,7 +3,7 @@ import {
   Layers, PlusCircle, HelpCircle, Upload, RefreshCw, CheckCheck,
   FolderOpen, Save, Copy, ChevronDown, CheckCircle2,
 } from 'lucide-react';
-import { APP_VERSION } from '../../data/changelog';
+import { APP_VERSION } from '../../data/appVersion';
 import { formatRelativeDate } from './relativeDate';
 
 const MenuItem = ({ icon: Icon, accent, label, hint, onClick }) => (

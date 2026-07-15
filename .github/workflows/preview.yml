@@ -1,0 +1,114 @@
+# Déploiement automatique d'un « preview channel » Firebase Hosting à chaque push
+# sur une branche de travail. Chaque branche obtient sa propre URL temporaire
+# (ex: https://estimavrd-app--claude-unit-manager-xxxx.web.app), sans jamais
+# toucher la prod. Idéal pour tester sur tablette (Wi-Fi ou 4G).
+#
+# ── SECRETS À CRÉER (Settings → Secrets and variables → Actions) ──────────────
+#   FIREBASE_SERVICE_ACCOUNT_ESTIMAVRD  (JSON du compte de service Firebase)
+#   VITE_FIREBASE_API_KEY
+#   VITE_FIREBASE_AUTH_DOMAIN
+#   VITE_FIREBASE_PROJECT_ID
+#   VITE_FIREBASE_STORAGE_BUCKET
+#   VITE_FIREBASE_MESSAGING_SENDER_ID
+#   VITE_FIREBASE_APP_ID
+#   VITE_SENTRY_DSN                     (optionnel)
+# Voir README ou les instructions ci-dessous pour générer le compte de service.
+
+name: Firebase Preview
+
+on:
+  push:
+    branches:
+      - 'claude/**'
+      - 'feature/**'
+  workflow_dispatch: {} # permet aussi un lancement manuel depuis l'onglet Actions
+
+# Un seul déploiement à la fois par branche : un nouveau push annule le run en cours.
+concurrency:
+  group: preview-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  checks: write
+  contents: read
+  pull-requests: write # laisse l'action commenter l'URL si un jour un push est lié à une PR
+
+jobs:
+  build_and_preview:
+    runs-on: ubuntu-latest
+    # On expose le secret comme variable d'env au niveau du job pour pouvoir
+    # tester sa présence dans les conditions `if:` (le contexte `secrets` n'est
+    # pas utilisable directement dans un `if:`). Tant qu'il est absent, on build
+    # quand même (vrai signal CI) mais on saute le déploiement → check au vert.
+    env:
+      FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ESTIMAVRD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_APP_ENV: preview
+        run: npm run build
+
+      # Nom de channel sûr, dérivé du nom de branche (slashes/caractères → tirets,
+      # minuscules, tronqué). Ex: "claude/unit-manager-proposal" → "claude-unit-manager-proposal".
+      - name: Compute channel id
+        if: env.FIREBASE_SA != ''
+        id: channel
+        run: |
+          raw="${GITHUB_REF_NAME}"
+          safe=$(echo "$raw" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/-\{2,\}/-/g' | cut -c1-40 | sed 's/-$//')
+          echo "id=$safe" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to Firebase preview channel
+        if: env.FIREBASE_SA != ''
+        id: deploy
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ESTIMAVRD }}
+          projectId: estimavrd-app
+          channelId: ${{ steps.channel.outputs.id }}
+          expires: 7d
+
+      # Secret Firebase pas encore configuré → on l'explique clairement, sans faire
+      # échouer le check (le build a déjà validé que l'app compile).
+      - name: Déploiement sauté (secret manquant)
+        if: env.FIREBASE_SA == ''
+        run: |
+          {
+            echo "## ⏭️ Déploiement preview sauté"
+            echo ""
+            echo "Le build a réussi, mais le secret \`FIREBASE_SERVICE_ACCOUNT_ESTIMAVRD\` n'est pas configuré."
+            echo "Ajoute-le (Settings → Secrets and variables → Actions) pour activer le déploiement automatique."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publier l'URL dans le résumé du run
+        if: steps.deploy.outputs.details_url != ''
+        run: |
+          {
+            echo "## 🔗 Preview déployé"
+            echo ""
+            echo "Branche : \`${GITHUB_REF_NAME}\`"
+            echo ""
+            echo "**URL (ouvrable sur tablette) :** ${{ steps.deploy.outputs.details_url }}"
+            echo ""
+            echo "_Expire dans 7 jours._"
+          } >> "$GITHUB_STEP_SUMMARY"

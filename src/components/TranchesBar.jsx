@@ -42,6 +42,7 @@ const TranchesBar = ({
               value={t.name}
               onSave={(val) => updateProjectItem('root', 'root', 'tranche_rename', { id: t.id, name: val })}
               disabled={isReadOnly}
+              cursor="cursor-pointer"
               className={`bg-transparent hover:bg-black/5 rounded px-1 -ml-1 ${activeTrancheId === t.id ? 'text-blue-700' : 'text-slate-400'}`}
             />
           </div>

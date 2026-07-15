@@ -3,15 +3,32 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, BookOpen } from 'lucide-react';
-import { helpContent } from '../../data/helpContent';
 import HelpSections, { getIcon } from './HelpSections';
+
+// Registre d'aide central (~140 KB de texte) chargé à la demande : HelpPanel est
+// importé par des vues eager (App, hub), le contenu ne doit pas alourdir le
+// bundle initial. Le module est mis en cache après le premier chargement.
+let helpRegistry = null;
 
 const HelpPanel = ({ isOpen, onClose, moduleId, content: contentProp, headerActions }) => {
   const [activeTab, setActiveTab] = useState(0);
+  const [registry, setRegistry] = useState(helpRegistry);
+
+  // Charge le registre central au premier affichage (sauf si le contenu est
+  // fourni en prop — aide co-localisée dans un module).
+  useEffect(() => {
+    if (!isOpen || contentProp || registry) return;
+    let cancelled = false;
+    import('../../data/helpContent').then((m) => {
+      helpRegistry = m.helpContent;
+      if (!cancelled) setRegistry(m.helpContent);
+    });
+    return () => { cancelled = true; };
+  }, [isOpen, contentProp, registry]);
 
   // Le contenu peut être fourni en prop (aide co-localisée dans un module)
   // ou résolu depuis le registre central via moduleId.
-  const content = contentProp || helpContent[moduleId];
+  const content = contentProp || (registry ? registry[moduleId] : null);
 
   // Reset tab quand on change de module
   useEffect(() => { setActiveTab(0); }, [moduleId, contentProp]);

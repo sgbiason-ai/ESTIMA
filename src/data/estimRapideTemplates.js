@@ -5,9 +5,10 @@
 // Aucune dépendance React/Firebase — données + petites factories.
 
 import { generateId } from '../utils/helpers';
+import { commonUnitSymbols } from './units';
 
-// Unités proposées dans l'éditeur
-export const UNITS = ['forfait', 'm²', 'm³', 'ml', 'u'];
+// Unités proposées dans l'éditeur — dérivées du catalogue central (source unique).
+export const UNITS = commonUnitSymbols();
 
 // ─── Catalogue des grands lots VRD ──────────────────────────────────────────
 // Chaque lot regroupe quelques macro-postes (logique « rapide »). `ratio` = prix

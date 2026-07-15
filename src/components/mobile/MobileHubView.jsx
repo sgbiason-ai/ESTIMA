@@ -2,8 +2,10 @@
 // Hub mobile — Bento Box Apple-style, fond clair
 import React, { useState, useEffect } from 'react';
 import Icon from './Icon';
-import { APP_VERSION } from '../../data/changelog';
-import ChangelogModal from '../ChangelogModal';
+import { APP_VERSION } from '../../data/appVersion';
+import lazyWithReload from '../../utils/lazyWithReload';
+// Lazy : la modale « Nouveautés » embarque tout le changelog (~160 KB de texte).
+const ChangelogModal = lazyWithReload(() => import('../ChangelogModal'));
 import { satisfiesDesktopGate, isSuperAdmin } from '../../config/superAdmin';
 import { useNewFeedbackCount } from '../../hooks/useFeedback';
 
@@ -207,7 +209,11 @@ export default function MobileHubView({ userEmail, userModules, userMobileModule
         </div>
       </div>
 
-      {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
+      {showChangelog && (
+        <React.Suspense fallback={null}>
+          <ChangelogModal onClose={() => setShowChangelog(false)} />
+        </React.Suspense>
+      )}
     </div>
   );
 }
