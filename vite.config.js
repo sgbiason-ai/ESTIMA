@@ -55,6 +55,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Le moteur CAO est chargé uniquement à l'ouverture du métré DXF.
+        // Ne pas le télécharger lors de l'installation initiale de la PWA.
+        globIgnores: ['**/vendor-cad-*.js', '**/dxfTakeoff.worker-*.js'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 Mo
         skipWaiting: true,
         clientsClaim: true,
@@ -121,6 +124,8 @@ export default defineConfig({
           // On l'ancre dans vendor-react, déjà toujours en chemin critique.
           if (id.includes('vite/preload-helper')) return 'vendor-react';
           if (id.includes('node_modules')) {
+            if (id.includes('dxf-viewer') || id.includes('/three/') || id.includes('\\three\\') ||
+                id.includes('opentype.js') || id.includes('earcut')) return 'vendor-cad';
             if (id.includes('xlsx')) return 'vendor-xlsx';
             // DOMPurify isolé : importé statiquement par helpers.js (chemin eager),
             // il ne doit PAS embarquer jspdf/html2canvas dans le préchargement initial.

@@ -14,13 +14,14 @@
 //   v1            – tranches, scoringConfig
 //   v2            – rao.includedOptions, rao.raoTrancheId
 //   v3            – subtitle1/subtitle2, signatories, branding
-//   v4  (current) – champs RC : lotName, moeAddress, spsLevel, startDate,
+//   v4            – champs RC : lotName, moeAddress, spsLevel, startDate,
 //                   validityDays, platformUrl
+//   v5  (current) – historique léger des imports de métrés DXF
 //
 // À chaque évolution du schéma, incrémenter CURRENT_SCHEMA_VERSION
 // et ajouter un bloc de migration numéroté ci-dessous.
 
-export const CURRENT_SCHEMA_VERSION = 4;
+export const CURRENT_SCHEMA_VERSION = 5;
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
@@ -211,6 +212,15 @@ const migrations = [
       platformUrl:  str(p.platformUrl),
     }),
   },
+  // v4 → v5 : traçabilité des imports de métrés DXF
+  {
+    from: 4,
+    description: 'Métré DXF — historique des imports appliqués',
+    run: (p) => ({
+      ...p,
+      takeoffImports: arr(p.takeoffImports),
+    }),
+  },
 ];
 
 // ─── FONCTION PRINCIPALE ──────────────────────────────────────────────────────
@@ -281,6 +291,7 @@ export function normalizeProject(raw) {
     chapters:  arr(raw.chapters).map(normalizeNode).filter(Boolean),
     tranches:  arr(raw.tranches).map(normalizeTranche).filter(Boolean),
     sourceIds: arr(raw.sourceIds),
+    takeoffImports: arr(raw.takeoffImports).slice(-20),
 
     // Modules imbriqués
     rao:      normalizeRao(raw.rao),

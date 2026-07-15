@@ -8,10 +8,11 @@ export { APP_VERSION } from './appVersion';
 
 export const CHANGELOG = [
   {
-    version: '3.6.1',
+    version: '3.7.0',
     date: '2026-07-15',
-    title: 'Cartouche Papyrus — finition de la couverture',
+    title: 'Métré DXF et finition de la couverture',
     highlights: [
+      'Estimation — nouveau POC « Métré DXF » : ouverture locale d’un plan 2D, visualisation WebGL, isolation des calques, calcul automatique des longueurs, surfaces fermées et comptages, association aux articles du projet avec coefficient, contrôle des unités et application sécurisée aux quantités globales ou par tranche. Les objets proxy Covadis/AutoCAD non interprétés sont signalés et chaque import appliqué reste tracé dans le projet',
       'Page de garde « CARTOUCHE PAPYRUS STANDARD » — suppression du cadre noir extérieur dans l’aperçu et les exports PDF, Word et Excel ; les bordures utiles des cartouches internes et du tableau des indices sont conservées',
     ],
   },

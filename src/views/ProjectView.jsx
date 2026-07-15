@@ -39,6 +39,10 @@ import { checkPriceConsistency } from '../utils/projectCalculations';
 import { useBpuData } from './bpu/hooks/useBpuData';
 import { useBpuAudit } from './bpu/hooks/useBpuAudit';
 import { saveFileWithPicker, openFileWithPicker, FILE_TYPES, PICKER_IDS } from '../utils/fileSaver';
+import lazyWithReload from '../utils/lazyWithReload';
+import { applyTakeoffToProject } from '../utils/takeoff/applyTakeoff';
+
+const DxfTakeoffModal = lazyWithReload(() => import('../components/takeoff/DxfTakeoffModal'));
 
 const ProjectView = ({
   project,
@@ -98,6 +102,7 @@ const ProjectView = ({
   const [showPriceCheck, setShowPriceCheck] = useState(false);
   const [showCloudPicker, setShowCloudPicker] = useState(false);
   const [showBpuAudit, setShowBpuAudit] = useState(false);
+  const [showDxfTakeoff, setShowDxfTakeoff] = useState(false);
 
   // ── Audit Bordereau (panneau latéral) ──
   // Adaptateur : onReplaceProject prend une valeur, useBpuAudit/useBpuData attendent un functional updater
@@ -106,6 +111,11 @@ const ProjectView = ({
   const setProjectForBpuAudit = useCallback((updater) => {
     const next = typeof updater === 'function' ? updater(projectRef.current) : updater;
     if (onReplaceProject) onReplaceProject(next);
+  }, [onReplaceProject]);
+
+  const handleApplyTakeoff = useCallback((mappings, options) => {
+    const nextProject = applyTakeoffToProject(projectRef.current, mappings, options);
+    if (nextProject !== projectRef.current) onReplaceProject(nextProject);
   }, [onReplaceProject]);
 
   const { sortedCatalog: bpuSortedCatalog } = useBpuData({
@@ -895,6 +905,7 @@ const ProjectView = ({
             priceCheckCount={priceCheck.anomalyCount}
             onOpenBpuAudit={() => { refreshBpuAudit(); setShowBpuAudit(v => !v); }}
             bpuAuditActive={showBpuAudit}
+            onOpenTakeoff={() => setShowDxfTakeoff(true)}
             onUndo={onUndo}
             canUndo={canUndo}
             archives={archives}
@@ -1102,6 +1113,16 @@ const ProjectView = ({
       <ExportModal isOpen={exportModalState.show} onClose={() => setExportModalState(prev => ({ ...prev, show: false }))} onConfirm={handleConfirmExport} onPreviewPdf={handlePreviewPdf} format={exportModalState.format} type={exportModalState.type} hasTranches={hasTranches} tranches={tranches} activeTrancheId={activeTrancheId} />
       <ConfirmDeleteModal isOpen={deleteConfirm.show} onClose={() => setDeleteConfirm({ show: false, itemId: null })} onConfirm={() => { if(deleteConfirm.itemId) { handleRemoveItem(deleteConfirm.itemId); setDeleteConfirm({ show: false, itemId: null }); } }} />
       <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="estimation" />
+      {showDxfTakeoff && (
+        <React.Suspense fallback={null}>
+          <DxfTakeoffModal
+            project={project}
+            activeTrancheId={activeTrancheId}
+            onApply={handleApplyTakeoff}
+            onClose={() => setShowDxfTakeoff(false)}
+          />
+        </React.Suspense>
+      )}
       <PriceAuditModal
         show={showPriceAudit}
         onClose={() => setShowPriceAudit(false)}

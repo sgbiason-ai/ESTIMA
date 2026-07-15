@@ -5,7 +5,7 @@ import {
   CheckCircle2, CloudOff, FileSignature, Bookmark, ListOrdered, ListTree, Hash,
   FolderOpen, Save, Upload, PlusCircle, Lock, Unlock,
   Download, Info, Table2, FileOutput,
-  Cloud, PanelLeftOpen, FileDown, ShieldCheck, ClipboardCheck, Undo2, ScanSearch, HelpCircle, FilePlus
+  Cloud, PanelLeftOpen, FileDown, ShieldCheck, ClipboardCheck, Undo2, ScanSearch, HelpCircle, FilePlus, Ruler
 } from 'lucide-react';
 
 import { RibbonGroup, RibbonBtnLarge, RibbonBtnSmall, RibbonContainer, RibbonSpacer } from './common/RibbonParts';
@@ -40,6 +40,7 @@ const ProjectToolbar = ({
   priceCheckCount = 0,
   onOpenBpuAudit,
   bpuAuditActive = false,
+  onOpenTakeoff,
   onUndo,
   canUndo = false,
   archives = [],
@@ -256,6 +257,15 @@ const ProjectToolbar = ({
                   active={bpuAuditActive}
                   accent="text-cyan-500"
                   title="Auditer le bordereau (prix, unités, désignations, descriptions) vs la base BPU"
+                />
+              )}
+              {!isReadOnly && currentMode === 'study' && onOpenTakeoff && (
+                <RibbonBtnLarge
+                  icon={Ruler}
+                  label="Métré DXF"
+                  onClick={onOpenTakeoff}
+                  accent="text-blue-600"
+                  title="Mesurer les calques d’un plan DXF et appliquer les quantités au DQE"
                 />
               )}
               {!isReadOnly && currentMode === 'study' && (

@@ -38,8 +38,17 @@ describe('normalizeProject — champs de base', () => {
     expect(p.subtitle2).toBe('');
     expect(p.showSignatures).toBe(false);
     expect(p.hasPSE).toBe(false);
+    expect(p.takeoffImports).toEqual([]);
     expect(p.marketType).toBe('Public');
     expect(p.phase).toBe('DCE');
+  });
+
+  it('conserve les traces légères des métrés DXF', () => {
+    const p = normalizeProject({
+      takeoffImports: [{ id: 'takeoff_1', fileName: 'plan.dxf', mappings: [] }],
+    });
+    expect(p.takeoffImports).toHaveLength(1);
+    expect(p.takeoffImports[0].fileName).toBe('plan.dxf');
   });
 
   it('initialise scoringConfig avec les valeurs par défaut', () => {
