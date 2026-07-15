@@ -106,7 +106,7 @@ export default function DxfTakeoffModal({ project, activeTrancheId, onApply, onC
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex bg-black/25 p-3 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Métré DXF">
+    <div className="fixed inset-0 z-modal flex bg-black/25 p-3 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Métré DXF">
       <div className="mx-auto flex h-full w-full max-w-[1800px] flex-col overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-2xl">
         <header className="flex shrink-0 items-center justify-between border-b border-gray-200 bg-white/95 px-5 py-3 backdrop-blur-xl">
           <div className="flex min-w-0 items-center gap-3">
@@ -159,7 +159,8 @@ export default function DxfTakeoffModal({ project, activeTrancheId, onApply, onC
           />
         </main>
 
-        <footer className="flex shrink-0 items-center justify-between gap-4 border-t border-gray-200 bg-gray-50 px-5 py-3">
+        {/* pr-20 : dégage le coin bas-droite occupé par le FAB feedback (z-9998, fixe viewport) */}
+        <footer className="flex shrink-0 items-center justify-between gap-4 border-t border-gray-200 bg-gray-50 py-3 pl-5 pr-20">
           <div className="flex items-center gap-3">
             <div className="inline-flex rounded-xl bg-gray-200/70 p-0.5">
               <button type="button" onClick={() => setApplyMode('replace')} className={`rounded-[10px] px-3 py-1.5 text-[11px] font-semibold ${applyMode === 'replace' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>Remplacer</button>
@@ -176,7 +177,7 @@ export default function DxfTakeoffModal({ project, activeTrancheId, onApply, onC
             <button
               type="button"
               onClick={handleApply}
-              disabled={!summary || selectedMappings.length === 0 || trancheMissing}
+              disabled={!summary}
               className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Layers3 size={15} /> Appliquer au DQE

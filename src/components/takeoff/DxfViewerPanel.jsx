@@ -5,9 +5,7 @@ import PropTypes from 'prop-types';
 import {
   AlertTriangle, Crosshair, Eye, Loader2, MousePointer2, X,
 } from 'lucide-react';
-import {
-  Color, Raycaster, Vector2, Vector3,
-} from 'three';
+import { Color, Vector3 } from 'three';
 import { DxfViewer } from 'dxf-viewer';
 import dxfFontUrl from 'dejavu-fonts-ttf/ttf/DejaVuSans.ttf?url';
 import {
@@ -325,8 +323,6 @@ export default function DxfViewerPanel({
       return undefined;
     }
 
-    const raycaster = new Raycaster();
-    const ndc = new Vector2();
     let frame = null;
     let pending = null;
     let down = null;
@@ -352,9 +348,22 @@ export default function DxfViewerPanel({
       return Math.hypot(px - qx, py - qy);
     };
 
-    // Picking : lignes/points par projection écran (fiable sur traits fins ; le seuil
-    // raycaster de Three.js ne les capte pas ici), surfaces pleines en repli via raycaster.
-    const pickAt = (clientX, clientY, searchLines) => {
+    const pointInTri = (px, py, ax, ay, bx, by, cx, cy) => {
+      if (!Number.isFinite(ax) || !Number.isFinite(ay) || !Number.isFinite(bx)
+        || !Number.isFinite(by) || !Number.isFinite(cx) || !Number.isFinite(cy)) return false;
+      const d1 = (px - bx) * (ay - by) - (ax - bx) * (py - by);
+      const d2 = (px - cx) * (by - cy) - (bx - cx) * (py - cy);
+      const d3 = (px - ax) * (cy - ay) - (cx - ax) * (py - ay);
+      const hasNeg = d1 < 0 || d2 < 0 || d3 < 0;
+      const hasPos = d1 > 0 || d2 > 0 || d3 > 0;
+      return !(hasNeg && hasPos);
+    };
+
+    // Picking 100 % projection écran (le raycaster de Three.js ne capte pas les traits de
+    // dxf-viewer et déclenche computeBoundingSphere sur des positions NaN → warnings en boucle).
+    // Lignes/points = distance au segment ; surfaces pleines = point-dans-triangle.
+    // Blocs instanciés et triangles NaN ignorés.
+    const pickAt = (clientX, clientY, doLines, doMeshes) => {
       const camera = modelViewer.GetCamera();
       const scene = modelViewer.GetScene();
       if (!camera || !scene) return null;
@@ -364,8 +373,10 @@ export default function DxfViewerPanel({
       const py = clientY - rect.top;
       const width = rect.width;
       const height = rect.height;
+      const toPxX = (v) => (v * 0.5 + 0.5) * width;
+      const toPxY = (v) => (-v * 0.5 + 0.5) * height;
 
-      if (searchLines) {
+      if (doLines) {
         let bestLayer = null;
         let bestDist = PICK_TOLERANCE_PX;
         for (const obj of scene.children) {
@@ -384,20 +395,16 @@ export default function DxfViewerPanel({
               const i0 = idx ? idx.getX(i) : i;
               const i1 = idx ? idx.getX(i + 1) : i + 1;
               scratch.set(pos.getX(i0), pos.getY(i0), 0).project(camera);
-              const ax = (scratch.x * 0.5 + 0.5) * width;
-              const ay = (-scratch.y * 0.5 + 0.5) * height;
+              const ax = toPxX(scratch.x);
+              const ay = toPxY(scratch.y);
               scratch.set(pos.getX(i1), pos.getY(i1), 0).project(camera);
-              const bx = (scratch.x * 0.5 + 0.5) * width;
-              const by = (-scratch.y * 0.5 + 0.5) * height;
-              const d = distSegPx(px, py, ax, ay, bx, by);
+              const d = distSegPx(px, py, ax, ay, toPxX(scratch.x), toPxY(scratch.y));
               if (d < bestDist) { bestDist = d; bestLayer = layer; }
             }
           } else {
             for (let i = 0; i < pos.count; i += 1) {
               scratch.set(pos.getX(i), pos.getY(i), 0).project(camera);
-              const ax = (scratch.x * 0.5 + 0.5) * width;
-              const ay = (-scratch.y * 0.5 + 0.5) * height;
-              const d = Math.hypot(px - ax, py - ay);
+              const d = Math.hypot(px - toPxX(scratch.x), py - toPxY(scratch.y));
               if (d < bestDist) { bestDist = d; bestLayer = layer; }
             }
           }
@@ -405,14 +412,31 @@ export default function DxfViewerPanel({
         if (bestLayer) return { layer: bestLayer, px, py };
       }
 
-      // Repli : surfaces pleines (Mesh) via raycaster
-      ndc.set((px / width) * 2 - 1, -(py / height) * 2 + 1);
-      raycaster.setFromCamera(ndc, camera);
-      const hits = raycaster.intersectObjects(scene.children, true);
-      for (const hit of hits) {
-        if (hit.object?.type !== 'Mesh') continue;
-        const layer = hit.object?.userData?.dxfLayer;
-        if (layer) return { layer, px, py };
+      if (doMeshes) {
+        for (const obj of scene.children) {
+          if (!obj.visible || obj.type !== 'Mesh') continue;
+          const geo = obj.geometry;
+          const pos = geo?.attributes?.position;
+          const layer = obj.userData?.dxfLayer;
+          if (!pos || !layer || geo.isInstancedBufferGeometry) continue;
+          const idx = geo.index;
+          const count = idx ? idx.count : pos.count;
+          for (let i = 0; i + 2 < count; i += 3) {
+            const i0 = idx ? idx.getX(i) : i;
+            const i1 = idx ? idx.getX(i + 1) : i + 1;
+            const i2 = idx ? idx.getX(i + 2) : i + 2;
+            scratch.set(pos.getX(i0), pos.getY(i0), 0).project(camera);
+            const ax = toPxX(scratch.x);
+            const ay = toPxY(scratch.y);
+            scratch.set(pos.getX(i1), pos.getY(i1), 0).project(camera);
+            const bx = toPxX(scratch.x);
+            const by = toPxY(scratch.y);
+            scratch.set(pos.getX(i2), pos.getY(i2), 0).project(camera);
+            if (pointInTri(px, py, ax, ay, bx, by, toPxX(scratch.x), toPxY(scratch.y))) {
+              return { layer, px, py };
+            }
+          }
+        }
       }
       return null;
     };
@@ -420,7 +444,7 @@ export default function DxfViewerPanel({
     const runHover = () => {
       frame = null;
       if (!pending) return;
-      const found = pickAt(pending.x, pending.y, !heavyScene);
+      const found = pickAt(pending.x, pending.y, !heavyScene, false);
       pending = null;
       setHover(found);
       canvas.style.cursor = found ? 'pointer' : 'crosshair';
@@ -443,7 +467,7 @@ export default function DxfViewerPanel({
       const moved = Math.hypot(event.clientX - down.x, event.clientY - down.y);
       down = null;
       if (moved > 4) return; // c'était un déplacement, pas un clic
-      const found = pickAt(event.clientX, event.clientY, true);
+      const found = pickAt(event.clientX, event.clientY, true, true);
       onPickLayer(found ? found.layer : '');
     };
 

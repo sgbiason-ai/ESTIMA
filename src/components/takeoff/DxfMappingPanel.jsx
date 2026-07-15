@@ -32,7 +32,7 @@ function ProjectItemOptions({ items, metric }) {
       <option value="">Choisir un article du projet…</option>
       {sorted.map((item) => (
         <option key={item.id} value={item.id}>
-          {isUnitCompatible(metric, item.unit) ? '✓ ' : ''}{item.designation} [{item.unit || '—'}]
+          {isUnitCompatible(metric, item.unit) ? '✓ ' : ''}{item.isBloc ? '▦ Bloc — ' : ''}{item.designation} [{item.unit || '—'}]
         </option>
       ))}
     </>

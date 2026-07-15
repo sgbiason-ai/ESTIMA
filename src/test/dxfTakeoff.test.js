@@ -290,4 +290,33 @@ describe('métré DXF — application au projet', () => {
     expect(isUnitCompatible('area', 'm²')).toBe(true);
     expect(isUnitCompatible('count', 'ml')).toBe(false);
   });
+
+  it('expose les blocs pilotes (enfants masqués) et propage le métré aux articles', () => {
+    const withBloc = {
+      id: 'p2',
+      tranches: [],
+      sourceIds: [],
+      chapters: [{
+        id: 'c1', type: 'chapter', title: 'VOIRIE', children: [
+          {
+            id: 'b1', type: 'chapter', isBloc: true, title: 'Chaussée', unit: 'm²',
+            qty: 0, quantities: {}, quantitiesFormula: {}, children: [
+              { id: 'l1', uid: 'bpuA', type: 'item', designation: 'GNT', unit: 'm³', price: 30, qty: 0, formula: '={b1}*0.3', quantities: {}, quantitiesFormula: {} },
+            ],
+          },
+        ],
+      }],
+    };
+    // Le bloc est exposé comme cible ; son article piloté est masqué de la liste.
+    const items = flattenProjectItems(withBloc.chapters);
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ id: 'b1', unit: 'm²', isBloc: true });
+    // Appliquer une surface au bloc pose sa quantité pilote et propage à l'enfant.
+    const result = applyTakeoffToProject(withBloc, [
+      { itemId: 'b1', layer: 'CHAUSSEE', metric: 'area', coefficient: 1, appliedQuantity: 100 },
+    ], { fileName: 'plan.dxf' });
+    const bloc = result.chapters[0].children[0];
+    expect(bloc.qty).toBe(100);
+    expect(bloc.children[0].qty).toBe(30); // 100 m² × 0,3
+  });
 });

@@ -21,6 +21,22 @@ export function flattenProjectItems(chapters, parents = []) {
         quantities: node.quantities || {},
         quantitiesFormula: node.quantitiesFormula || {},
       });
+    } else if (node.isBloc) {
+      // Bloc pilote (ouvrage composite) : cible d'association à part entière — sa
+      // quantité pilote propage aux articles enfants (formule ={bloc}×facteur). On
+      // expose donc le bloc et on NE descend PAS dans ses enfants (pilotés, masqués).
+      result.push({
+        id: node.id,
+        uid: node.id,
+        designation: node.title || 'Bloc',
+        unit: node.unit || '',
+        chapterPath: parents.join(' › '),
+        qty: finite(node.qty),
+        formula: '',
+        quantities: node.quantities || {},
+        quantitiesFormula: node.quantitiesFormula || {},
+        isBloc: true,
+      });
     } else if (node.children) {
       result.push(...flattenProjectItems(node.children, [...parents, node.title || 'Chapitre']));
     }
@@ -45,7 +61,9 @@ export function isUnitCompatible(metric, unit) {
 
 function updateTargetItems(nodes, targets, trancheId, mode) {
   return (nodes || []).map((node) => {
-    if (node?.type === 'item' && targets.has(String(node.id))) {
+    // Articles ET blocs pilotes exposent une quantité référençable (cf. projectCalculations).
+    const isTargetable = node?.type === 'item' || node?.isBloc;
+    if (isTargetable && targets.has(String(node.id))) {
       const quantity = targets.get(String(node.id));
       if (trancheId) {
         const previous = finite(node.quantities?.[trancheId]);
@@ -68,7 +86,10 @@ function updateTargetItems(nodes, targets, trancheId, mode) {
         formula: '',
       };
     }
-    if (node?.children) return { ...node, children: updateTargetItems(node.children, targets, trancheId, mode) };
+    // Ne pas descendre dans les enfants d'un bloc : ils sont pilotés par sa formule.
+    if (node?.children && !node?.isBloc) {
+      return { ...node, children: updateTargetItems(node.children, targets, trancheId, mode) };
+    }
     return node;
   });
 }
