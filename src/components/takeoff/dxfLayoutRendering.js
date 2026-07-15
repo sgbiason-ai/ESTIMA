@@ -119,10 +119,18 @@ export function paperRectToCanvas(
   if (clippedRight <= clippedLeft || clippedTop <= clippedBottom) return null;
 
   return {
-    x: clippedLeft,
-    y: clippedBottom,
-    width: clippedRight - clippedLeft,
-    height: clippedTop - clippedBottom,
+    viewport: {
+      x,
+      y,
+      width,
+      height,
+    },
+    scissor: {
+      x: clippedLeft,
+      y: clippedBottom,
+      width: clippedRight - clippedLeft,
+      height: clippedTop - clippedBottom,
+    },
   };
 }
 
@@ -190,8 +198,30 @@ export function renderLayoutViewports(modelViewer, paperViewer, layout, isolated
     camera.updateMatrix();
     camera.updateProjectionMatrix();
 
-    renderer.setViewport(rect.x, rect.y, rect.width, rect.height);
-    renderer.setScissor(rect.x, rect.y, rect.width, rect.height);
+    const offsetX = rect.scissor.x - rect.viewport.x;
+    const offsetY = rect.viewport.y + rect.viewport.height
+      - rect.scissor.y - rect.scissor.height;
+    camera.setViewOffset(
+      rect.viewport.width,
+      rect.viewport.height,
+      offsetX,
+      offsetY,
+      rect.scissor.width,
+      rect.scissor.height,
+    );
+
+    renderer.setViewport(
+      rect.scissor.x,
+      rect.scissor.y,
+      rect.scissor.width,
+      rect.scissor.height,
+    );
+    renderer.setScissor(
+      rect.scissor.x,
+      rect.scissor.y,
+      rect.scissor.width,
+      rect.scissor.height,
+    );
     renderer.render(modelScene, camera);
   }
 

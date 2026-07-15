@@ -8,10 +8,11 @@ export { APP_VERSION } from './appVersion';
 
 export const CHANGELOG = [
   {
-    version: '3.8.0',
+    version: '3.8.1',
     date: '2026-07-15',
     title: 'Métré DXF avec présentations AutoCAD',
     highlights: [
+      'Métré DXF — correction du zoom et du déplacement dans les présentations : les fenêtres partiellement hors écran sont désormais découpées sans étirer ni déformer le dessin',
       'Métré DXF — les onglets de présentation du dessin sont désormais listés à côté de « Modèle » et visualisables avec leur cartouche, leurs fenêtres de vue, leurs calques gelés et leur cadrage papier ; la molette zoome sous la souris, le clic milieu déplace la feuille et « Cadrer » rétablit la vue complète. Les fenêtres détourées ou 3D sont clairement signalées comme aperçu simplifié',
       'Estimation — nouveau POC « Métré DXF » : ouverture locale d’un plan 2D, visualisation WebGL, isolation des calques, calcul automatique des longueurs, surfaces fermées et comptages, association aux articles du projet avec coefficient, contrôle des unités et application sécurisée aux quantités globales ou par tranche. Les objets proxy Covadis/AutoCAD non interprétés sont signalés et chaque import appliqué reste tracé dans le projet',
       'Page de garde « CARTOUCHE PAPYRUS STANDARD » — suppression du cadre noir extérieur dans l’aperçu et les exports PDF, Word et Excel ; les bordures utiles des cartouches internes et du tableau des indices sont conservées',

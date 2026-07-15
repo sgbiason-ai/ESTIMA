@@ -174,7 +174,8 @@ describe('métré DXF — présentations', () => {
     }, {
       minX: 0, maxX: 100, minY: 0, maxY: 50,
     }, 1000, 500)).toEqual({
-      x: 300, y: 150, width: 400, height: 200,
+      viewport: { x: 300, y: 150, width: 400, height: 200 },
+      scissor: { x: 300, y: 150, width: 400, height: 200 },
     });
     expect(paperRectToCanvas({
       paperCenter: { x: 1050, y: 2025 },
@@ -182,8 +183,24 @@ describe('métré DXF — présentations', () => {
     }, {
       minX: 0, maxX: 100, minY: 0, maxY: 50,
     }, 1000, 500, { x: 1000, y: 2000 })).toEqual({
-      x: 300, y: 150, width: 400, height: 200,
+      viewport: { x: 300, y: 150, width: 400, height: 200 },
+      scissor: { x: 300, y: 150, width: 400, height: 200 },
     });
+  });
+
+  it('découpe une fenêtre hors écran sans modifier ses proportions', () => {
+    const rect = paperRectToCanvas({
+      paperCenter: { x: 0, y: 25 },
+      paperSize: { width: 40, height: 20 },
+    }, {
+      minX: 0, maxX: 100, minY: 0, maxY: 50,
+    }, 1000, 500);
+
+    expect(rect).toEqual({
+      viewport: { x: -200, y: 150, width: 400, height: 200 },
+      scissor: { x: 0, y: 150, width: 200, height: 200 },
+    });
+    expect(rect.viewport.width / rect.viewport.height).toBe(2);
   });
 
   it('cadre ensemble le cartouche et toutes les fenêtres papier', () => {
