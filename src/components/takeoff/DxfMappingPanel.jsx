@@ -128,32 +128,27 @@ export default function DxfMappingPanel({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-white">
-      <div className="shrink-0 border-b border-gray-200 p-4">
-        <div className="grid grid-cols-3 gap-2">
-          <div className="rounded-xl bg-gray-50 p-2.5">
-            <p className="text-[9px] font-bold uppercase tracking-wide text-gray-400">Calques</p>
-            <p className="mt-0.5 text-lg font-bold text-gray-900">{summary.layers?.length || 0}</p>
-          </div>
-          <div className="rounded-xl bg-gray-50 p-2.5">
-            <p className="text-[9px] font-bold uppercase tracking-wide text-gray-400">Entités</p>
-            <p className="mt-0.5 text-lg font-bold text-gray-900">{metadata.parsedEntityTotal || 0}</p>
-          </div>
-          <div className="rounded-xl bg-gray-50 p-2.5">
-            <p className="text-[9px] font-bold uppercase tracking-wide text-gray-400">Objets proxy</p>
-            <p className={`mt-0.5 text-lg font-bold ${metadata.proxyEntityCount ? 'text-amber-600' : 'text-gray-900'}`}>
-              {metadata.proxyEntityCount || 0}
-            </p>
-          </div>
+      <div className="shrink-0 border-b border-gray-200 p-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-gray-50 px-3 py-1.5 text-[11px] text-gray-500">
+          <span><span className="font-bold text-gray-900">{summary.layers?.length || 0}</span> calques</span>
+          <span className="text-gray-300">·</span>
+          <span><span className="font-bold text-gray-900">{Number(metadata.parsedEntityTotal || 0).toLocaleString('fr-FR')}</span> entités</span>
+          {metadata.proxyEntityCount > 0 && (
+            <>
+              <span className="text-gray-300">·</span>
+              <span className="text-amber-600"><span className="font-bold">{Number(metadata.proxyEntityCount).toLocaleString('fr-FR')}</span> proxy</span>
+            </>
+          )}
         </div>
 
         {metadata.proxyEntityCount > 0 && (
-          <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-[11px] leading-relaxed text-amber-800">
-            <AlertTriangle size={15} className="mt-0.5 shrink-0" />
-            {metadata.proxyEntityCount} objet(s) propriétaire(s) Covadis/AutoCAD ne sont pas métrés automatiquement.
+          <div className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[10px] leading-snug text-amber-800">
+            <AlertTriangle size={13} className="mt-px shrink-0" />
+            <span>{metadata.proxyEntityCount} objet(s) Covadis/AutoCAD (proxy) non métrés automatiquement.</span>
           </div>
         )}
 
-        <div className="mt-3 flex items-center gap-2">
+        <div className="mt-2 flex items-center gap-2">
           <label htmlFor="dxf-unit" className="text-[11px] font-semibold text-gray-600">Unité du dessin</label>
           <select
             id="dxf-unit"
@@ -165,7 +160,7 @@ export default function DxfMappingPanel({
           </select>
         </div>
 
-        <div className="mt-3 flex gap-2">
+        <div className="mt-2 flex gap-2">
           <div className="relative flex-1">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input

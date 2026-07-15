@@ -1124,6 +1124,7 @@ const ProjectView = ({
         <React.Suspense fallback={null}>
           <DxfTakeoffModal
             project={project}
+            companyId={companyId}
             activeTrancheId={activeTrancheId}
             onApply={handleApplyTakeoff}
             visible={showDxfTakeoff}

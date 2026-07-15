@@ -10,17 +10,20 @@ import DxfMappingPanel from './DxfMappingPanel';
 import { buildMeasurementRows } from '../../utils/takeoff/dxfTakeoff';
 import { flattenProjectItems } from '../../utils/takeoff/applyTakeoff';
 import {
-  loadDxfSession, saveDxfFile, saveDxfWork, clearDxfSession,
+  loadDxfSession, saveDxfFile, clearDxfSession,
 } from '../../utils/takeoff/dxfPersistence';
+import { useTakeoffAssociations, dxfFileKey } from '../../hooks/useTakeoffAssociations';
 import { confirm, toast } from '../../utils/globalUI';
 
 export default function DxfTakeoffModal({
-  project, activeTrancheId, onApply, onClose, visible = true, onUnload,
+  project, companyId, activeTrancheId, onApply, onClose, visible = true, onUnload,
 }) {
   const projectId = project?.id;
   const inputRef = useRef(null);
   const skipFileSaveRef = useRef(false);
-  const restoredScaleRef = useRef(null);
+  const restoredKeyRef = useRef(null);
+  const skipCloudSaveRef = useRef(false);
+  const { associations, saveAssociations } = useTakeoffAssociations(companyId, projectId);
   const [file, setFile] = useState(null);
   const [summary, setSummary] = useState(null);
   const [viewerLayers, setViewerLayers] = useState([]);
@@ -51,6 +54,7 @@ export default function DxfTakeoffModal({
   const hasTranches = (project?.tranches || []).length > 0;
   const targetTrancheId = hasTranches && activeTrancheId !== 'global' ? activeTrancheId : null;
   const trancheMissing = hasTranches && !targetTrancheId;
+  const dxfKey = dxfFileKey(file);
 
   const selectFile = (selectedFile) => {
     if (!selectedFile) return;
@@ -69,9 +73,7 @@ export default function DxfTakeoffModal({
   const handleLoaded = useCallback((nextSummary, layers) => {
     setSummary(nextSummary);
     setViewerLayers(layers);
-    // Après un rechargement de session, garder l'échelle mémorisée plutôt que la détectée.
-    setScaleToMeters(restoredScaleRef.current || Number(nextSummary?.metadata?.detectedScaleToMeters) || 1);
-    restoredScaleRef.current = null;
+    setScaleToMeters(Number(nextSummary?.metadata?.detectedScaleToMeters) || 1);
     setLoadError('');
   }, []);
 
@@ -83,19 +85,14 @@ export default function DxfTakeoffModal({
     if (layer) setPick((previous) => ({ layer, nonce: previous.nonce + 1 }));
   }, []);
 
-  // Rechargement de la session au montage (survit au rafraîchissement, par projet).
+  // Rechargement du FICHIER au montage (IndexedDB local → réouverture instantanée + F5).
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const saved = await loadDxfSession(projectId);
       if (cancelled || !saved?.file) return;
-      const work = saved.work || {};
-      restoredScaleRef.current = Number(work.scaleToMeters) || null;
       skipFileSaveRef.current = true;
       setFile(saved.file);
-      if (work.mappings) setMappings(work.mappings);
-      if (work.isolatedLayer) setIsolatedLayer(work.isolatedLayer);
-      if (work.applyMode) setApplyMode(work.applyMode);
     })();
     return () => { cancelled = true; };
   }, [projectId]);
@@ -107,16 +104,31 @@ export default function DxfTakeoffModal({
     if (file) saveDxfFile(projectId, file.name, file);
   }, [file, projectId]);
 
-  // Persistance du travail léger (associations, échelle, calque isolé, mode) — débounce.
+  // Restaure les associations CLOUD rattachées à CE fichier (une fois par fichier), dès que
+  // le plan est analysé et le doc cloud lu. Recharger le même DXF = retrouver son travail.
   useEffect(() => {
-    if (!projectId || !file) return undefined;
+    if (!dxfKey || !summary || associations === null) return;
+    if (restoredKeyRef.current === dxfKey) return;
+    restoredKeyRef.current = dxfKey;
+    const saved = associations[dxfKey];
+    if (saved) {
+      skipCloudSaveRef.current = true;
+      if (saved.mappings) setMappings(saved.mappings);
+      if (saved.scaleToMeters) setScaleToMeters(saved.scaleToMeters);
+      if (saved.applyMode) setApplyMode(saved.applyMode);
+    }
+  }, [dxfKey, summary, associations]);
+
+  // Sauvegarde CLOUD des associations (débounce), uniquement après restauration pour ce
+  // fichier → ne jamais écraser le cloud avec un état vide au chargement.
+  useEffect(() => {
+    if (!dxfKey || restoredKeyRef.current !== dxfKey) return undefined;
+    if (skipCloudSaveRef.current) { skipCloudSaveRef.current = false; return undefined; }
     const timer = setTimeout(() => {
-      saveDxfWork(projectId, {
-        mappings, scaleToMeters, isolatedLayer, applyMode,
-      });
-    }, 800);
+      saveAssociations(dxfKey, { mappings, scaleToMeters, applyMode });
+    }, 1000);
     return () => clearTimeout(timer);
-  }, [projectId, file, mappings, scaleToMeters, isolatedLayer, applyMode]);
+  }, [dxfKey, mappings, scaleToMeters, applyMode, saveAssociations]);
 
   const handleUnload = () => {
     clearDxfSession(projectId);
@@ -158,8 +170,8 @@ export default function DxfTakeoffModal({
   };
 
   return (
-    <div className={`fixed inset-0 z-modal flex bg-black/25 p-3 backdrop-blur-sm ${visible ? '' : 'invisible pointer-events-none'}`} role="dialog" aria-modal="true" aria-label="Métré DXF">
-      <div className="mx-auto flex h-full w-full max-w-[1800px] flex-col overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-2xl">
+    <div className={`fixed inset-0 z-modal flex ${visible ? '' : 'invisible pointer-events-none'}`} role="dialog" aria-modal="true" aria-label="Métré DXF">
+      <div className="flex h-full w-full flex-col overflow-hidden bg-white">
         <header className="flex shrink-0 items-center justify-between border-b border-gray-200 bg-white/95 px-5 py-3 backdrop-blur-xl">
           <div className="flex min-w-0 items-center gap-3">
             <div className="rounded-xl bg-blue-50 p-2.5 text-blue-600"><Ruler size={21} /></div>
@@ -187,7 +199,7 @@ export default function DxfTakeoffModal({
               <button
                 type="button"
                 onClick={handleUnload}
-                title="Décharger le DXF de la mémoire et effacer la session enregistrée"
+                title="Décharger le DXF de la mémoire (les associations restent enregistrées et reviendront en rechargeant ce fichier)"
                 className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100"
               >
                 <Power size={15} /> Décharger
@@ -253,6 +265,7 @@ export default function DxfTakeoffModal({
 
 DxfTakeoffModal.propTypes = {
   project: PropTypes.object.isRequired,
+  companyId: PropTypes.string,
   activeTrancheId: PropTypes.string,
   onApply: PropTypes.func.isRequired,
   onClose: PropTypes.func.isRequired,

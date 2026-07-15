@@ -151,6 +151,11 @@ service cloud.firestore {
         match /ccap/{docId} {
           allow read, write: if isCompanyMember(companyId);
         }
+
+        // Associations du métré DXF (par fichier) — document dédié
+        match /takeoff/{docId} {
+          allow read, write: if isCompanyMember(companyId);
+        }
       }
 
       match /bpu/{itemId} {

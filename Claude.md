@@ -21,7 +21,7 @@ React 18 + Vite · Tailwind (Apple light, **pas de dark mode**) · Firebase (Aut
 ## Firestore
 ```
 projects/{id}/ → metadata·estimation·branding (docs) · bpu/ · analysis/data (auto) · rao/data (manuel)
-                 · cctp|rc|ccap/data · ged/ · crc/{id}/history/ · admin-docs/ · history/
+                 · cctp|rc|ccap/data · takeoff/data (assoc. métré DXF par fichier) · ged/ · crc/{id}/history/ · admin-docs/ · history/
 users/{id}/    → metadata·preferences
 ```
 Ownership `user_id==auth.uid`, isolation multi-tenant (jamais croiser `projectId`), `history/` read-only.
