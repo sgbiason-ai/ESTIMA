@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { RefreshCw, X, Wifi } from 'lucide-react';
-import { APP_VERSION } from '../../data/changelog';
+import { APP_VERSION } from '../../data/appVersion';
 
 const LS_VERSION_KEY = 'estima_last_app_version';
 

@@ -7,7 +7,7 @@
 import React, { useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { MessageSquarePlus, X, Camera, Loader2, Check } from 'lucide-react';
-import { APP_VERSION } from '../../data/changelog';
+import { APP_VERSION } from '../../data/appVersion';
 import { toast } from '../../utils/globalUI';
 import { reoptimizeDataUrl } from '../../utils/imageCompressor';
 import { submitFeedback } from '../../hooks/useFeedback';

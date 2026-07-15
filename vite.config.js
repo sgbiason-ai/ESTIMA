@@ -131,6 +131,19 @@ export default defineConfig({
             // react-quill seraient captés par `react` et préchargés au démarrage).
             if (id.includes('leaflet')) return 'vendor-leaflet';
             if (id.includes('quill')) return 'vendor-quill';
+            // Sentry chargé en dynamique (voir src/sentry.js) : chunk dédié AVANT
+            // la règle react, sinon `@sentry/react` retomberait dans vendor-react
+            // et serait re-préchargé au démarrage malgré l'import dynamique.
+            if (id.includes('@sentry')) return 'vendor-sentry';
+            // Icônes lucide : PAS de chunk manuel. Rollup les répartit par usage,
+            // les icônes utilisées uniquement par des vues lazy sortent ainsi du
+            // chemin critique (la règle react les capterait via « lucide-react »).
+            if (id.includes('lucide-react')) return undefined;
+            // Éditeur riche (tiptap + prosemirror) et import Word (mammoth) :
+            // gros modules lazy-only, isolés pour ne pas gonfler le chunk partagé
+            // des vues (chaque module ne télécharge que ce qu'il utilise).
+            if (id.includes('@tiptap') || id.includes('prosemirror')) return 'vendor-editor';
+            if (id.includes('mammoth')) return 'vendor-mammoth';
             if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler') || id.includes('prop-types') || id.includes('object-assign') || id.includes('loose-envify'))
               return 'vendor-react';
             if (id.includes('firebase'))

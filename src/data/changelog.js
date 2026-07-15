@@ -1,8 +1,10 @@
 // src/data/changelog.js
-// Version courante et historique des nouveautés.
-// Pour ajouter une version : ajouter une entrée en haut du tableau, bumper APP_VERSION.
+// Historique des nouveautés. La version courante vit dans appVersion.js
+// (module léger pour le chemin critique) — bumper APP_VERSION là-bas.
+// Ce fichier (~160 KB) ne doit être importé que par la modale « Nouveautés »
+// (chargée en lazy), jamais par du code eager.
 
-export const APP_VERSION = '3.5.5';
+export { APP_VERSION } from './appVersion';
 
 export const CHANGELOG = [
   {
@@ -10,6 +12,7 @@ export const CHANGELOG = [
     date: '2026-07-15',
     title: 'Estimation, RAO/Analyse & CRC — ajustements terrain',
     highlights: [
+      'Performance — démarrage accéléré : le poids du chargement initial est réduit d’environ 40 % (l’aide, l’historique des nouveautés et le monitoring d’erreurs sont désormais chargés à la demande)',
       'Paramètres — gestion des unités : interface Simple/Expert, filtres par catégorie/statut, audit des unités inconnues ou à normaliser, protection des unités système et remplacement obligatoire avant suppression d’une unité utilisée dans la bibliothèque BPU',
       'CRC — export Word : rendu davantage aligné sur le PDF (bandeaux de catégories en couleurs tournantes, pastilles de présence P/E/A/NC uniformes, statuts aux mêmes teintes, en-tête N° — date épuré et numéros d’observations à la couleur de leur catégorie)',
       'CRC — export Word : le rendu est rapproché de l’export PDF avec cartouche logos, colonnes participants/observations conditionnelles, pastilles Émetteur/PAR, statut Ouvert discret, numéros d’observations et images compatibles avec les métadonnées GPS',

@@ -11,7 +11,7 @@ import {
 import { parsePdfBpu } from '../utils/parsePdfBpu';
 import HelpPanel from '../components/help/HelpPanel';
 import UnitManager from '../components/settings/UnitManager';
-import { APP_VERSION } from '../data/changelog';
+import { APP_VERSION } from '../data/appVersion';
 
 const SettingsView = ({
   units,
