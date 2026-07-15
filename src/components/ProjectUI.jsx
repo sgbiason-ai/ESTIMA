@@ -4,7 +4,7 @@ import { Check, X, ArrowLeftRight, ChevronDown, Search, AlertTriangle, FileText,
 import RichTextEditor from './common/RichTextEditor';
 
 // --- LE COMPOSANT MANQUANT (A AJOUTER) ---
-export const FormattedInput = ({ value, onChange, onBlur, onFocus, className, placeholder, ...props }) => {
+export const FormattedInput = ({ value, onChange, onBlur, onFocus, className, placeholder, decimals, ...props }) => {
   const [localValue, setLocalValue] = useState(value);
   const [focused, setFocused] = useState(false);
 
@@ -19,11 +19,15 @@ export const FormattedInput = ({ value, onChange, onBlur, onFocus, className, pl
   };
 
   // Au repos : séparateur de milliers (fr-FR). En édition : valeur brute saisissable.
+  // `decimals` (optionnel) fige le nombre de décimales au repos (ex. prix unitaires → toujours 2).
   const formatDisplay = (v) => {
     if (v === '' || v === null || v === undefined) return '';
     const num = Number(v);
     if (isNaN(num)) return String(v);
-    return num.toLocaleString('fr-FR', { maximumFractionDigits: 2 });
+    const opts = decimals != null
+      ? { minimumFractionDigits: decimals, maximumFractionDigits: decimals }
+      : { maximumFractionDigits: 2 };
+    return num.toLocaleString('fr-FR', opts);
   };
 
   return (
@@ -40,7 +44,7 @@ export const FormattedInput = ({ value, onChange, onBlur, onFocus, className, pl
 };
 // ------------------------------------------
 
-export const EditableTitle = ({ value, onSave, className, disabled }) => {
+export const EditableTitle = ({ value, onSave, className, disabled, cursor = 'cursor-text' }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [tempValue, setTempValue] = useState(value);
 
@@ -61,7 +65,7 @@ export const EditableTitle = ({ value, onSave, className, disabled }) => {
       </div>
     );
   }
-  return <span onDoubleClick={(e) => { e.stopPropagation(); !disabled && setIsEditing(true); }} className={`cursor-text ${className} ${disabled ? 'cursor-default' : ''}`} title={!disabled ? "Double-cliquer pour éditer" : ""}>{value}</span>;
+  return <span onDoubleClick={(e) => { e.stopPropagation(); !disabled && setIsEditing(true); }} className={`${cursor} ${className} ${disabled ? 'cursor-default' : ''}`} title={!disabled ? "Double-cliquer pour éditer" : ""}>{value}</span>;
 };
 
 /**

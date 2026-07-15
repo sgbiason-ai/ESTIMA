@@ -8,7 +8,7 @@ export { APP_VERSION } from './appVersion';
 
 export const CHANGELOG = [
   {
-    version: '3.5.5',
+    version: '3.5.8',
     date: '2026-07-15',
     title: 'Estimation, RAO/Analyse & CRC — ajustements terrain',
     highlights: [
@@ -87,6 +87,38 @@ export const CHANGELOG = [
       'RAO (Administratif) — lorsqu\'une offre est jugée non régulière (irrégulière, inacceptable ou inappropriée), un champ « Commentaire sur la conformité » apparaît sous la conclusion pour en motiver le caractère. Ce commentaire est obligatoire : tant qu\'il est vide, l\'onglet Administratif reste « à compléter » (badge sidebar + bandeau d\'alerte). Il est repris dans le PDF du RAO, au chapitre 5.bis « Conformité et anomalies », sous l\'entreprise concernée',
       'RAO (Analyse technique) — les offres jugées non régulières (irrégulière, inacceptable, inappropriée) restent visibles et modifiables dans l\'onglet Technique, sur ordinateur comme sur mobile, mais leur nom est désormais grisé et un avertissement rappelle qu\'elles sont écartées de l\'analyse. Dans l\'export PDF du RAO, ces entreprises n\'apparaissent plus du tout dans la section « Analyse technique » (§8)',
       'Tous les exports PDF — fiabilisation contre les débordements horizontaux : les noms d\'entreprise, de projet, adresses et coordonnées trop longs (pieds de page, en-têtes, pages de garde) sont désormais ajustés automatiquement avec « … » au lieu de sortir de la page. Concerne les rapports RAO, l\'analyse des prix, les visites de site, les comptes rendus de chantier, le module TP, les annexes réserves et les pages de garde',
+    ],
+  },
+  {
+    version: '3.5.7',
+    date: '2026-07-09',
+    title: 'Bibliothèque — refonte graphique, import/export Excel, Bento en-tête et filtres',
+    highlights: [
+      'Bibliothèque — refonte graphique de la vue articles aux standards Apple-style Light : sidebar en glassmorphism, articles à double arrondi, et intégration du bandeau Bento de statistiques au cœur de l\'en-tête (entre recherche et création) accompagné d\'un toggle Articles / Blocs agrandi',
+      'Bibliothèque — import/export Excel (.xlsx) propre et complet (code, désignation, unité, prix catalogue, dossiers, références/labels CCTP et prix observés réels) avec conservation intégrale de la mise en forme du texte riche (gras, italique, souligné, listes à puces) dans les descriptions (aller-retour préservé)',
+      'Bibliothèque — ajout d\'un filtre rapide "Prix à 0" dans le volet latéral gauche pour repérer et compléter en un clic les articles sans tarif saisi',
+      'Bibliothèque — comportement de type bascule (toggle) sur les filtres de dossiers et d\'audit (re-cliquer pour désactiver), avec persistance automatique du filtre sélectionné dans le stockage local (localStorage)',
+      'Bibliothèque — repositionnement de la pastille de tendance des prix observés (plus grande et plus lisible) directement à gauche du prix catalogue',
+      'Bibliothèque — restriction du bouton "RAZ Prix Obs." au rôle de Super-Administrateur (au lieu de simple administrateur)',
+      'Estimation — les prix unitaires affichent désormais toujours deux décimales dans le tableau (ex. « 12,50 » au repos), la valeur restant brute pendant la saisie',
+    ],
+  },
+  {
+    version: '3.5.6',
+    date: '2026-07-08',
+    title: 'Interface — réduction de la hauteur des rubans, ergonomie des tranches & correctifs CCTP',
+    highlights: [
+      'Interface — réduction uniforme de la hauteur minimale des rubans à 68px avec adaptation homothétique des icônes et polices de caractères pour maximiser l\'espace de travail',
+      'Tranches — le survol d\'un onglet de tranche conserve désormais un pointeur de navigation classique (cursor-pointer), tout en préservant le double-clic pour renommer la tranche',
+      'Bibliothèque — la bulle d\'info des articles liés à un chapitre CCTP affiche désormais le numéro de chapitre nettoyé (ex: "Chapitre 1.1") au lieu de l\'identifiant technique UUID incompréhensible si le titre du chapitre ne peut pas être résolu',
+    ],
+  },
+  {
+    version: '3.5.5',
+    date: '2026-07-08',
+    title: 'Estimation, RAO/Analyse & CRC — rubans défilants',
+    highlights: [
+      'Interface — tous les rubans partagés du logiciel adoptent maintenant le comportement du module CRC : une seule ligne avec défilement horizontal sur les écrans plus étroits, pour éviter les retours à la ligne et les boutons coupés',
     ],
   },
   {

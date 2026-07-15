@@ -629,6 +629,7 @@ const ItemRow = memo(
                   onChange={(val) => setLocalPrice(val)}
                   onBlur={commitPrice}
                   onKeyDown={handlePriceKeyDown}
+                  decimals={2}
                   disabled={isReadOnly}
                   className={`w-full rounded py-0.5 px-1 pr-4 text-right text-xs font-mono font-bold outline-none transition-colors
                     ${
