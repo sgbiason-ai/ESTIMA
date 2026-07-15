@@ -7,11 +7,15 @@ import { generateId, normalizeUnitSymbol } from '../utils/helpers';
 import { enrichUnit, enrichUnits, dedupeUnits, defaultUnits, setRuntimeUnits, canonicalSymbol, mergeDimensions, MATERIAL_DENSITIES } from '../data/units';
 
 // Docs de configuration stockés DANS la collection `units` (règles Firestore
-// déjà ouvertes → aucun déploiement de règles requis). Ids réservés préfixés
-// `__`, toujours filtrés des lectures d'unités.
-const DIM_DOC_ID = '__dimensions__';   // catégories (renommages + custom)
-const DENS_DOC_ID = '__densities__';   // densités matériaux éditables
-const isConfigDoc = (id) => String(id).startsWith('__');
+// déjà ouvertes → aucun déploiement de règles requis). Ids préfixés `_cfg_`,
+// toujours filtrés des lectures d'unités.
+// ⚠️ Firestore RÉSERVE les ids de documents de la forme `__x__` (regex __.*__) :
+// les anciens ids `__dimensions__`/`__densities__` faisaient échouer setDoc en
+// invalid-argument (« non sauvegardé sur le Cloud ») — aucun doc n'a donc pu
+// exister sous ces ids, pas de migration nécessaire.
+const DIM_DOC_ID = '_cfg_dimensions';   // catégories (renommages + custom)
+const DENS_DOC_ID = '_cfg_densities';   // densités matériaux éditables
+const isConfigDoc = (id) => String(id).startsWith('_cfg_') || String(id).startsWith('__');
 import { useDialog } from '../contexts/DialogContext';
 import { useToast } from '../contexts/ToastContext';
 
