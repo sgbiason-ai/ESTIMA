@@ -70,7 +70,7 @@ const getImageDimensions = (buffer) => {
 // ─── FONCTION PRINCIPALE ──────────────────────────────────────────────────────
 
 export const generateProfessionalExcel = async (project, clientQtyMaps, type = 'ESTIMATION', bpuConfig = {}, options = {}, branding = null) => {
-  const { selectedExports = ['global'], includeSummary = false, includePM = true, tranches = [], lockPrices = false } = options;
+  const { selectedExports = ['global'], includeSummary = false, includePM = true, tranches = [], lockPrices = false, uniquePrices = false } = options;
   const workbook = new ExcelJS.Workbook();
   // Feuilles à protéger en fin de génération (option « verrouiller tout sauf les P.U. ») :
   // toutes les cellules restent verrouillées sauf les P.U. des articles, déverrouillées
@@ -85,6 +85,13 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
   // Label du total général : on ne précise « (Hors PSE) » que s'il existe des PSE.
   const hasPse = collectPseRoots(project?.chapters || []).length > 0;
   const totalHtLabel = hasPse ? 'TOTAL GÉNÉRAL HT (Hors PSE)' : 'TOTAL GÉNÉRAL HT';
+
+  // Option « prix uniques par numéro » (DQE uniquement) : la 1re occurrence de chaque
+  // numéro de prix — toutes feuilles confondues — est la seule cellule P.U. saisissable ;
+  // les répétitions (autre chapitre, autre tranche) la recopient par formule. Un numéro
+  // = un prix : l'entreprise ne peut pas saisir deux montants différents pour un même n°.
+  const linkDuplicates = uniquePrices && type === 'DQE';
+  const priceMasters = new Map(); // référence → { sheetName, row } de la cellule maître
 
   const getTrancheName = (id) => id === 'global' ? 'GLOBAL' : tranches.find(t => t.id === id)?.name || id;
 
@@ -144,7 +151,8 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
     subTotalSub: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } },
     total: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } },
     totalPse: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFBEB' } },
-    editable: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF9C3' } } // jaune clair : cellule P.U. à saisir
+    editable: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF9C3' } }, // jaune clair : cellule P.U. à saisir
+    linked: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } } // gris clair : P.U. repris par formule (prix unique)
   };
 
   const borders = {
@@ -321,10 +329,34 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
         rowItem.getCell(1).alignment = { horizontal: 'center' };
         rowItem.getCell(5).numFmt = '#,##0.00 €';
         rowItem.eachCell(cell => cell.border = borders.dotted);
+        // Prix uniques par numéro (DQE) : si ce numéro a déjà une cellule maître, la
+        // P.U. devient une formule qui la recopie (fond gris, note explicative) — sinon
+        // cette cellule DEVIENT le maître. Les articles sans numéro ne sont jamais liés.
+        let isLinkedPrice = false;
+        if (linkDuplicates && reference) {
+          const master = priceMasters.get(reference);
+          if (!master) {
+            priceMasters.set(reference, { sheetName: ws.name, row: currentRowNum });
+          } else {
+            isLinkedPrice = true;
+            const priceCell = rowItem.getCell(5);
+            const sameSheet = master.sheetName === ws.name;
+            const masterRef = sameSheet ? `E${master.row}` : `'${master.sheetName.replace(/'/g, "''")}'!E${master.row}`;
+            // IF(...="","",...) : tant que le maître n'est pas saisi, la cellule reste
+            // vide (et le total F, qui teste E="", reste vide lui aussi).
+            priceCell.value = { formula: `IF(${masterRef}="","",${masterRef})` };
+            priceCell.font = fonts.info;
+            priceCell.fill = fills.linked;
+            priceCell.note = sameSheet
+              ? `Prix n° ${reference} repris automatiquement : il se saisit une seule fois, à sa première occurrence.`
+              : `Prix n° ${reference} repris automatiquement de la feuille « ${master.sheetName} » : il se saisit une seule fois.`;
+          }
+        }
         // Option « verrouiller tout sauf les P.U. » : seule la cellule P.U. (col. E) reste
         // éditable (déverrouillée), repérée par un fond jaune + contour ambre. Posé APRÈS
         // borders.dotted pour ne pas être écrasé. La feuille est protégée en fin de génération.
-        if (lockPrices) {
+        // Les P.U. repris par formule restent verrouillés : la saisie se fait sur le maître.
+        if (lockPrices && !isLinkedPrice) {
           const priceCell = rowItem.getCell(5);
           priceCell.protection = { locked: false };
           priceCell.fill = fills.editable;

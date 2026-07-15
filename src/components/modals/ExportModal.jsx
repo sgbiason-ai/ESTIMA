@@ -3,7 +3,7 @@ import { FileText, FileSpreadsheet, X, Check, Eye, Download, ArrowLeft, Loader2,
 import { toast } from '../../utils/globalUI';
 
 // Étape 1 : Options d'export
-const OptionsStep = ({ isPdf, hasTranches, tranches, includeCover, setIncludeCover, includeSummary, setIncludeSummary, includePM, setIncludePM, lockPrices, setLockPrices, selectedExports, handleToggleExport, onClose, onGenerate, isGenerating }) => {
+const OptionsStep = ({ isPdf, type, hasTranches, tranches, includeCover, setIncludeCover, includeSummary, setIncludeSummary, includePM, setIncludePM, lockPrices, setLockPrices, uniquePrices, setUniquePrices, selectedExports, handleToggleExport, onClose, onGenerate, isGenerating }) => {
   const allOptions = [{ id: 'global', name: 'Global' }, ...(tranches || [])];
   const canGenerate = !hasTranches || selectedExports.length > 0;
 
@@ -74,6 +74,17 @@ const OptionsStep = ({ isPdf, hasTranches, tranches, includeCover, setIncludeCov
             color="yellow"
             label="Verrouiller tout sauf les prix unitaires"
             desc="Bordereau entreprises : seules les cellules P.U. (en jaune) restent saisissables, le reste est protégé"
+          />
+        )}
+
+        {/* Prix uniques par numéro — Excel DQE uniquement (unicité des P.U. entreprises) */}
+        {!isPdf && type === 'DQE' && (
+          <OptionRow
+            checked={uniquePrices}
+            onChange={setUniquePrices}
+            color="sky"
+            label="Prix uniques par numéro"
+            desc="Chaque numéro de prix se saisit une seule fois : ses répétitions (autres chapitres ou tranches) sont reprises automatiquement par formule (en gris)"
           />
         )}
       </div>
@@ -227,6 +238,7 @@ const OptionRow = ({ checked, onChange, color, label, desc }) => {
     indigo:  'border-indigo-300  bg-indigo-50',
     amber:   'border-amber-300   bg-amber-50',
     yellow:  'border-yellow-300  bg-yellow-50',
+    sky:     'border-sky-300     bg-sky-50',
   };
   return (
     <div
@@ -255,6 +267,7 @@ const ExportModal = ({
   const [includeSummary, setIncludeSummary] = useState(false);
   const [includePM, setIncludePM]         = useState(true);
   const [lockPrices, setLockPrices]       = useState(false); // Excel : verrouiller tout sauf les P.U.
+  const [uniquePrices, setUniquePrices]   = useState(true);  // Excel DQE : un numéro de prix = une seule saisie
   const [selectedExports, setSelectedExports] = useState([]);
 
   const [step, setStep]             = useState('options'); // 'options' | 'preview'
@@ -270,6 +283,7 @@ const ExportModal = ({
       setIncludeCover(true);
       setIncludePM(true);
       setLockPrices(false);
+      setUniquePrices(true);
       setStep('options');
       setPreviewData(null);
     }
@@ -284,7 +298,7 @@ const ExportModal = ({
 
   if (!isOpen) return null;
 
-  const currentOptions = { includeCover, selectedExports, includeSummary, includePM, lockPrices };
+  const currentOptions = { includeCover, selectedExports, includeSummary, includePM, lockPrices, uniquePrices };
 
   const handleToggleExport = (id) => {
     setSelectedExports(prev =>
@@ -375,6 +389,8 @@ const ExportModal = ({
             setIncludePM={setIncludePM}
             lockPrices={lockPrices}
             setLockPrices={setLockPrices}
+            uniquePrices={uniquePrices}
+            setUniquePrices={setUniquePrices}
             selectedExports={selectedExports}
             handleToggleExport={handleToggleExport}
             onClose={onClose}
