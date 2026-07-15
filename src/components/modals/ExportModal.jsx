@@ -84,7 +84,7 @@ const OptionsStep = ({ isPdf, type, hasTranches, tranches, includeCover, setIncl
             onChange={setUniquePrices}
             color="sky"
             label="Prix uniques par numéro"
-            desc="Chaque numéro de prix se saisit une seule fois : ses répétitions (autres chapitres ou tranches) sont reprises automatiquement par formule (en gris)"
+            desc="Chaque numéro de prix se saisit une seule fois : ses répétitions (autres chapitres ou tranches) sont reprises par formule (en gris). Combiner avec le verrouillage pour empêcher d'écraser ces formules"
           />
         )}
       </div>

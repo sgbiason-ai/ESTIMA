@@ -86,12 +86,18 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
   const hasPse = collectPseRoots(project?.chapters || []).length > 0;
   const totalHtLabel = hasPse ? 'TOTAL GÉNÉRAL HT (Hors PSE)' : 'TOTAL GÉNÉRAL HT';
 
-  // Option « prix uniques par numéro » (DQE uniquement) : la 1re occurrence de chaque
-  // numéro de prix — toutes feuilles confondues — est la seule cellule P.U. saisissable ;
-  // les répétitions (autre chapitre, autre tranche) la recopient par formule. Un numéro
-  // = un prix : l'entreprise ne peut pas saisir deux montants différents pour un même n°.
+  // Option « prix uniques par numéro » (DQE uniquement) : chaque numéro de prix a une
+  // seule cellule P.U. saisissable (le « maître ») — toutes feuilles confondues ; les
+  // répétitions (autre chapitre, autre tranche) la recopient par formule. Un numéro
+  // = un prix : l'entreprise ne saisit qu'une fois. Garde-fous :
+  //  - deux articles DIFFÉRENTS (désignation ou unité distincte) partageant un numéro
+  //    par erreur ne sont jamais liés (chaque ligne reste saisissable, comme avant) ;
+  //  - le maître privilégie une ligne de base à quantité réelle : base réelle (rang 0)
+  //    > base PM (1) > PSE réelle (2) > PSE PM (3). Si une meilleure occurrence arrive
+  //    plus tard, elle est promue maître et l'ancienne devient une reprise en chaîne.
   const linkDuplicates = uniquePrices && type === 'DQE';
-  const priceMasters = new Map(); // référence → { sheetName, row } de la cellule maître
+  const priceMasters = new Map(); // référence → { sheetName, row, desigKey, unitKey, rank }
+  const masterRank = (isPM, isOption) => (isOption ? 2 : 0) + (isPM ? 1 : 0);
 
   const getTrancheName = (id) => id === 'global' ? 'GLOBAL' : tranches.find(t => t.id === id)?.name || id;
 
@@ -204,6 +210,28 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
     // Récap entièrement verrouillé (formules inter-feuilles) si l'option est active.
     if (lockPrices) sheetsToProtect.push(summarySheet);
   }
+
+  // ── PRIX UNIQUES : reprise du maître ──
+  // Réf. Excel de la cellule maître vue depuis la feuille `fromSheetName`.
+  const masterCellRef = (master, fromSheetName) => master.sheetName === fromSheetName
+    ? `E${master.row}`
+    : `'${master.sheetName.replace(/'/g, "''")}'!E${master.row}`;
+  // Transforme une cellule P.U. en « reprise du maître » : formule, fond gris, note,
+  // et verrouillage (une cellule liée ne doit jamais rester saisissable). Sert aussi
+  // à rétrograder un ancien maître promu (d'où la remise à plat des styles).
+  const applyLinkedPrice = (cell, master, reference, fromSheetName) => {
+    const ref = masterCellRef(master, fromSheetName);
+    // IF(...="","",...) : tant que le maître n'est pas saisi, la cellule reste vide
+    // (et le total F, qui teste E="", reste vide lui aussi).
+    cell.value = { formula: `IF(${ref}="","",${ref})` };
+    cell.font = fonts.info;
+    cell.fill = fills.linked;
+    cell.border = borders.dotted;
+    if (lockPrices) cell.protection = { locked: true };
+    cell.note = master.sheetName === fromSheetName
+      ? `Prix n° ${reference} repris automatiquement : il se saisit une seule fois, en cellule E${master.row}.`
+      : `Prix n° ${reference} repris automatiquement de la feuille « ${master.sheetName} » (cellule E${master.row}) : il se saisit une seule fois.`;
+  };
 
   // ── TRAITEMENT NŒUDS ──
   const processNodes = (nodes, ws, qtyMap, level = 0, mode = 'base', parentIsOption = false, subTotalCollector = null, _includePM = true, cellRefMap = null) => {
@@ -329,27 +357,30 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
         rowItem.getCell(1).alignment = { horizontal: 'center' };
         rowItem.getCell(5).numFmt = '#,##0.00 €';
         rowItem.eachCell(cell => cell.border = borders.dotted);
-        // Prix uniques par numéro (DQE) : si ce numéro a déjà une cellule maître, la
-        // P.U. devient une formule qui la recopie (fond gris, note explicative) — sinon
-        // cette cellule DEVIENT le maître. Les articles sans numéro ne sont jamais liés.
+        // Prix uniques par numéro (DQE) : si ce numéro a déjà un maître, la P.U. le
+        // recopie par formule — sinon cette cellule DEVIENT le maître, avec promotion
+        // possible (une base à quantité réelle détrône une ligne PM ou une PSE).
+        // Les articles sans numéro ne sont jamais liés ; un numéro porté par un article
+        // DIFFÉRENT (désignation/unité) n'est pas lié non plus (collision de numérotation).
         let isLinkedPrice = false;
         if (linkDuplicates && reference) {
+          const unitKey = normalizeUnitSymbol(node.unit) || '';
+          const rank = masterRank(isPM, mode === 'option');
+          const candidate = { sheetName: ws.name, row: currentRowNum, desigKey: key, unitKey, rank };
           const master = priceMasters.get(reference);
           if (!master) {
-            priceMasters.set(reference, { sheetName: ws.name, row: currentRowNum });
+            priceMasters.set(reference, candidate);
+          } else if (master.desigKey !== key || master.unitKey !== unitKey) {
+            // Même numéro mais article différent : pas de liaison, la ligne reste saisissable.
+          } else if (rank < master.rank) {
+            // Promotion : l'ancien maître devient une reprise du nouveau ; les cellules
+            // déjà liées à l'ancien suivent par formules en chaîne (E_old → E_new).
+            const oldWs = workbook.getWorksheet(master.sheetName);
+            if (oldWs) applyLinkedPrice(oldWs.getRow(master.row).getCell(5), candidate, reference, master.sheetName);
+            priceMasters.set(reference, candidate);
           } else {
             isLinkedPrice = true;
-            const priceCell = rowItem.getCell(5);
-            const sameSheet = master.sheetName === ws.name;
-            const masterRef = sameSheet ? `E${master.row}` : `'${master.sheetName.replace(/'/g, "''")}'!E${master.row}`;
-            // IF(...="","",...) : tant que le maître n'est pas saisi, la cellule reste
-            // vide (et le total F, qui teste E="", reste vide lui aussi).
-            priceCell.value = { formula: `IF(${masterRef}="","",${masterRef})` };
-            priceCell.font = fonts.info;
-            priceCell.fill = fills.linked;
-            priceCell.note = sameSheet
-              ? `Prix n° ${reference} repris automatiquement : il se saisit une seule fois, à sa première occurrence.`
-              : `Prix n° ${reference} repris automatiquement de la feuille « ${master.sheetName} » : il se saisit une seule fois.`;
+            applyLinkedPrice(rowItem.getCell(5), master, reference, ws.name);
           }
         }
         // Option « verrouiller tout sauf les P.U. » : seule la cellule P.U. (col. E) reste

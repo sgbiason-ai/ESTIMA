@@ -64,7 +64,7 @@ export const previewArchivePdf = async (snapshot, { type, includeCover, selected
 export const exportArchive = async (
   snapshot,
   format,
-  { type, includeCover, selectedExports, includeSummary, includePM, _previewBlob, _suggestedName },
+  { type, includeCover, selectedExports, includeSummary, includePM, lockPrices, uniquePrices, _previewBlob, _suggestedName },
   branding = null
 ) => {
   const { tranches, bpuConfig, clientQtyMaps, projectForExport } = buildExportContext(snapshot);
@@ -84,9 +84,11 @@ export const exportArchive = async (
     }
   } else {
     const { generateProfessionalExcel } = await import('../../utils/excelGenerator');
+    // lockPrices/uniquePrices : options du modal partagé (bordereau entreprises) —
+    // sans elles, l'export d'une version figée ignorait silencieusement les cases cochées.
     await generateProfessionalExcel(
       projectForExport, clientQtyMaps, type, bpuConfig,
-      { selectedExports, includeSummary, includePM, tranches },
+      { selectedExports, includeSummary, includePM, lockPrices, uniquePrices, tranches },
       branding
     );
   }
