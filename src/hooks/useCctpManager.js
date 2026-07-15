@@ -471,6 +471,34 @@ export const useCctpManager = ({
     return selectedIds;
   };
 
+  // Statistiques par article pour le panneau d'apprentissage :
+  //   { id, designation, bpuNum, description, targetCount, isLearned }
+  // Recalculé seulement quand le devis, l'arbre CCTP ou les liens appris changent.
+  const articleStats = useMemo(() => {
+    const learnedSigs = new Set(
+      (learnedLinks || [])
+        .filter((l) => (l.add?.length || l.remove?.length))
+        .map((l) => l.sig)
+    );
+    return devisItems.map((it) => ({
+      id: it.id,
+      designation: it.designation || 'Article sans nom',
+      bpuNum: it.bpuNum || it.bpuUid || '',
+      description: it.description || '',
+      targetCount: getArticleTargets(it).size,
+      isLearned: learnedSigs.has(articleSignature(it)),
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [devisItems, cctpData, learnedLinks]);
+
+  // Efface l'apprentissage mémorisé pour un article (bouton « Réinitialiser »).
+  const resetArticleLearning = (article) => {
+    if (!article) return;
+    const sig = articleSignature(article);
+    setLearnedLinks((prev) => prev.filter((l) => l.sig !== sig));
+    toast.success('Apprentissage réinitialisé pour cet article.');
+  };
+
   // L'écrasement du gabarit est protégé en amont par la modale « tapez GABARIT »
   // (DocRibbon) ; ici on applique directement.
   const saveToCloud = () => {
@@ -498,6 +526,7 @@ export const useCctpManager = ({
     autoSelectChapters, toggleExpand, expandAll, collapseAll, selectAll, deselectAll,
     handleExportMaster, handleFileUpload, handlePdfUpload, handlePreviewScroll,
     openEditor, handleSaveNode, addChapter, deleteNode, toggleSelection, saveToCloud,
-    provenance, learnLink, devisItems, getArticleTargets, learnedLinks
+    provenance, learnLink, devisItems, getArticleTargets, learnedLinks,
+    articleStats, resetArticleLearning
   };
 };

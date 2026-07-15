@@ -1,9 +1,10 @@
 import React from 'react';
 import {
   Search, X, Minimize2, Maximize2, RefreshCw, CheckSquare,
-  Plus, Crosshair,
+  Plus,
   ChevronRight, ChevronDown, Square, Edit3, Trash2, Star
 } from 'lucide-react';
+import CctpFocusPanel from './CctpFocusPanel';
 
 const CctpSidebar = ({
   searchQuery, setSearchQuery,
@@ -13,7 +14,7 @@ const CctpSidebar = ({
   expandedIds, selectedIds, activeNodeId,
   toggleExpand, toggleSelection, openEditor, deleteNode,
   isFavorite, toggleFavorite, favoritesCount = 0, onOpenFavorites,
-  provenance, devisItems = [], focusArticleId, setFocusArticleId, focusTargets, onLearnToggle,
+  provenance, articleStats = [], focusArticleId, setFocusArticleId, focusTargets, onLearnToggle, onResetArticle,
 }) => {
 
   const renderTree = (nodes, parentPrefix = "") => (
@@ -196,38 +197,13 @@ const CctpSidebar = ({
       </div>
 
       {/* ═══ FOCUS ARTICLE (apprentissage) ═══ */}
-      {devisItems.length > 0 && (
-        <div className="px-3 py-2 border-b border-slate-200 bg-amber-50/40 shrink-0">
-          <div className="flex items-center gap-2">
-            <Crosshair size={13} className={`shrink-0 ${focusArticleId ? 'text-amber-600' : 'text-slate-400'}`} />
-            <select
-              value={focusArticleId || ''}
-              onChange={(e) => setFocusArticleId?.(e.target.value || null)}
-              className="flex-1 min-w-0 text-[11px] bg-white border border-amber-200/80 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-100"
-              title="Focaliser un article du devis pour voir/ajuster les chapitres qu'il déclenche"
-            >
-              <option value="">Focus article… (apprentissage)</option>
-              {devisItems.map((it) => (
-                <option key={it.id} value={it.id}>{(it.designation || 'Article sans nom').slice(0, 70)}</option>
-              ))}
-            </select>
-            {focusArticleId && (
-              <button onClick={() => setFocusArticleId?.(null)} className="p-1 rounded hover:bg-amber-100 text-amber-600 shrink-0" title="Quitter le focus">
-                <X size={14} />
-              </button>
-            )}
-          </div>
-          {focusArticleId ? (
-            <p className="text-[10px] text-amber-700 mt-1 leading-tight">
-              Chapitres surlignés = déclenchés par cet article. Cochez/décochez : la correspondance est mémorisée et rejouée à chaque AUTO.
-            </p>
-          ) : (
-            <div className="flex items-center gap-3 mt-1 text-[9px] text-slate-400">
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" /> certain</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-violet-400" /> déduit</span>
-            </div>
-          )}
-        </div>
+      {articleStats.length > 0 && (
+        <CctpFocusPanel
+          articleStats={articleStats}
+          focusArticleId={focusArticleId}
+          setFocusArticleId={setFocusArticleId}
+          onResetArticle={onResetArticle}
+        />
       )}
 
       {/* ═══ ARBRE ═══ */}

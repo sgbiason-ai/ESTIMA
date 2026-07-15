@@ -93,11 +93,12 @@ const CctpGeneratorView = ({
         favoritesCount={favorites.filter(f => f.type === 'cctp').length}
         onOpenFavorites={() => setIsFavoritesPanelOpen(true)}
         provenance={manager.provenance}
-        devisItems={manager.devisItems}
+        articleStats={manager.articleStats}
         focusArticleId={focusArticleId}
         setFocusArticleId={setFocusArticleId}
         focusTargets={focusTargets}
         onLearnToggle={handleLearnToggle}
+        onResetArticle={() => manager.resetArticleLearning(focusArticle)}
       />
 
       <CctpPreview
