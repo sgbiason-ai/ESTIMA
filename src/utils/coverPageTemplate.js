@@ -3,7 +3,7 @@ export const COVER_TEMPLATE_PAPYRUS_STANDARD = 'papyrus_standard';
 
 export const COVER_TEMPLATE_OPTIONS = [
   { value: COVER_TEMPLATE_ESTIMA, label: 'ESTIMA STANDARD' },
-  { value: COVER_TEMPLATE_PAPYRUS_STANDARD, label: 'CARTOUCHE PAPYRUS STANDART' },
+  { value: COVER_TEMPLATE_PAPYRUS_STANDARD, label: 'CARTOUCHE PAPYRUS STANDARD' },
 ];
 
 export const resolveCoverTemplate = (branding) =>

@@ -12,7 +12,7 @@ export const CHANGELOG = [
     date: '2026-07-15',
     title: 'Cartouche Papyrus — finition de la couverture',
     highlights: [
-      'Page de garde « CARTOUCHE PAPYRUS STANDART » — suppression du cadre noir extérieur dans l’aperçu et les exports PDF, Word et Excel ; les bordures utiles des cartouches internes et du tableau des indices sont conservées',
+      'Page de garde « CARTOUCHE PAPYRUS STANDARD » — suppression du cadre noir extérieur dans l’aperçu et les exports PDF, Word et Excel ; les bordures utiles des cartouches internes et du tableau des indices sont conservées',
     ],
   },
   {
@@ -20,7 +20,7 @@ export const CHANGELOG = [
     date: '2026-07-15',
     title: 'Pages de garde — cartouche Papyrus standard',
     highlights: [
-      'Identité et charte graphique — nouveau modèle « CARTOUCHE PAPYRUS STANDART », inspiré du cartouche DCE Papyrus : identité MOA, titre d’opération, bandeau document, cases Phase/N°/Échelle, tableau des indices et identité MOE. Le choix est sauvegardé pour l’entreprise et s’applique aux pages de garde PDF, Word et Excel existantes (Estimation/DQE, BPU, CCTP/RC/CCAP, Analyse/RAO, visite de chantier et page de garde seule), tandis que le modèle Estima reste sélectionné par défaut pour les configurations existantes',
+      'Identité et charte graphique — nouveau modèle « CARTOUCHE PAPYRUS STANDARD », inspiré du cartouche DCE Papyrus : identité MOA, titre d’opération, bandeau document, cases Phase/N°/Échelle, tableau des indices et identité MOE. Le choix est sauvegardé pour l’entreprise et s’applique aux pages de garde PDF, Word et Excel existantes (Estimation/DQE, BPU, CCTP/RC/CCAP, Analyse/RAO, visite de chantier et page de garde seule), tandis que le modèle Estima reste sélectionné par défaut pour les configurations existantes',
     ],
   },
   {
