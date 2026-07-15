@@ -3,9 +3,11 @@ import React, {
 } from 'react';
 import PropTypes from 'prop-types';
 import {
-  AlertTriangle, Crosshair, Eye, Loader2, MousePointer2,
+  AlertTriangle, Crosshair, Eye, Loader2, MousePointer2, X,
 } from 'lucide-react';
-import { Color } from 'three';
+import {
+  Color, Raycaster, Vector2, Vector3,
+} from 'three';
 import { DxfViewer } from 'dxf-viewer';
 import dxfFontUrl from 'dejavu-fonts-ttf/ttf/DejaVuSans.ttf?url';
 import {
@@ -16,6 +18,9 @@ import {
   renderModelView,
   zoomViewAtCanvasPoint,
 } from './dxfLayoutRendering';
+
+// Rayon de capture du clic/survol, en pixels écran (converti en unités monde selon le zoom)
+const PICK_TOLERANCE_PX = 12;
 
 const PHASE_LABELS = {
   fetch: 'Lecture du fichier',
@@ -37,7 +42,9 @@ function fitViewer(viewer, bounds, padding = 0.06) {
   );
 }
 
-export default function DxfViewerPanel({ file, isolatedLayer, onLoaded, onError }) {
+export default function DxfViewerPanel({
+  file, isolatedLayer, onLoaded, onError, onPickLayer,
+}) {
   const modelContainerRef = useRef(null);
   const paperContainerRef = useRef(null);
   const modelViewerRef = useRef(null);
@@ -54,6 +61,7 @@ export default function DxfViewerPanel({ file, isolatedLayer, onLoaded, onError 
   const [layouts, setLayouts] = useState([]);
   const [activeLayoutId, setActiveLayoutId] = useState('model');
   const [isPanning, setIsPanning] = useState(false);
+  const [hover, setHover] = useState(null);
 
   const activeLayout = useMemo(
     () => layouts.find((layout) => layout.id === activeLayoutId) || null,
@@ -145,6 +153,12 @@ export default function DxfViewerPanel({ file, isolatedLayer, onLoaded, onError 
         });
         if (cancelled) return;
         const layers = Array.from(viewer.GetLayers(true));
+        // Tampon du calque sur chaque objet rendu → picking au clic/survol (vue Modèle)
+        for (const [name, layer] of viewer.layers || []) {
+          for (const object of layer.objects || []) {
+            if (object.userData) object.userData.dxfLayer = name;
+          }
+        }
         const takeoffSummary = viewer.GetDxf?.() || null;
         fitBoundsRef.current = takeoffSummary?.metadata?.fitBounds || viewer.GetBounds();
         fitViewer(viewer, fitBoundsRef.current, 0.08);
@@ -302,6 +316,153 @@ export default function DxfViewerPanel({ file, isolatedLayer, onLoaded, onError 
     };
   }, [activeLayout, paperLoading]);
 
+  // Clic pour isoler le calque + survol du nom (vue Modèle uniquement)
+  useEffect(() => {
+    const modelViewer = modelViewerRef.current;
+    const canvas = modelViewer?.GetCanvas();
+    if (!modelViewer || !canvas || activeLayout || loading || paperLoading) {
+      setHover(null);
+      return undefined;
+    }
+
+    const raycaster = new Raycaster();
+    const ndc = new Vector2();
+    let frame = null;
+    let pending = null;
+    let down = null;
+    const scratch = new Vector3();
+
+    // Coût d'une recherche écran complète : au survol on l'évite si la scène est lourde
+    let lineVertexTotal = 0;
+    for (const obj of modelViewer.GetScene().children) {
+      if ((obj.type === 'LineSegments' || obj.type === 'Points') && !obj.geometry?.isInstancedBufferGeometry) {
+        lineVertexTotal += obj.geometry?.attributes?.position?.count || 0;
+      }
+    }
+    const heavyScene = lineVertexTotal > 120000;
+
+    const distSegPx = (px, py, ax, ay, bx, by) => {
+      const dx = bx - ax;
+      const dy = by - ay;
+      const len2 = dx * dx + dy * dy;
+      let t = len2 > 0 ? ((px - ax) * dx + (py - ay) * dy) / len2 : 0;
+      if (t < 0) t = 0; else if (t > 1) t = 1;
+      const qx = ax + t * dx;
+      const qy = ay + t * dy;
+      return Math.hypot(px - qx, py - qy);
+    };
+
+    // Picking : lignes/points par projection écran (fiable sur traits fins ; le seuil
+    // raycaster de Three.js ne les capte pas ici), surfaces pleines en repli via raycaster.
+    const pickAt = (clientX, clientY, searchLines) => {
+      const camera = modelViewer.GetCamera();
+      const scene = modelViewer.GetScene();
+      if (!camera || !scene) return null;
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return null;
+      const px = clientX - rect.left;
+      const py = clientY - rect.top;
+      const width = rect.width;
+      const height = rect.height;
+
+      if (searchLines) {
+        let bestLayer = null;
+        let bestDist = PICK_TOLERANCE_PX;
+        for (const obj of scene.children) {
+          if (!obj.visible) continue;
+          const geo = obj.geometry;
+          const pos = geo?.attributes?.position;
+          const layer = obj.userData?.dxfLayer;
+          if (!pos || !layer || geo.isInstancedBufferGeometry) continue;
+          const isLine = obj.type === 'LineSegments';
+          const isPoints = obj.type === 'Points';
+          if (!isLine && !isPoints) continue;
+          const idx = geo.index;
+          if (isLine) {
+            const count = idx ? idx.count : pos.count;
+            for (let i = 0; i + 1 < count; i += 2) {
+              const i0 = idx ? idx.getX(i) : i;
+              const i1 = idx ? idx.getX(i + 1) : i + 1;
+              scratch.set(pos.getX(i0), pos.getY(i0), 0).project(camera);
+              const ax = (scratch.x * 0.5 + 0.5) * width;
+              const ay = (-scratch.y * 0.5 + 0.5) * height;
+              scratch.set(pos.getX(i1), pos.getY(i1), 0).project(camera);
+              const bx = (scratch.x * 0.5 + 0.5) * width;
+              const by = (-scratch.y * 0.5 + 0.5) * height;
+              const d = distSegPx(px, py, ax, ay, bx, by);
+              if (d < bestDist) { bestDist = d; bestLayer = layer; }
+            }
+          } else {
+            for (let i = 0; i < pos.count; i += 1) {
+              scratch.set(pos.getX(i), pos.getY(i), 0).project(camera);
+              const ax = (scratch.x * 0.5 + 0.5) * width;
+              const ay = (-scratch.y * 0.5 + 0.5) * height;
+              const d = Math.hypot(px - ax, py - ay);
+              if (d < bestDist) { bestDist = d; bestLayer = layer; }
+            }
+          }
+        }
+        if (bestLayer) return { layer: bestLayer, px, py };
+      }
+
+      // Repli : surfaces pleines (Mesh) via raycaster
+      ndc.set((px / width) * 2 - 1, -(py / height) * 2 + 1);
+      raycaster.setFromCamera(ndc, camera);
+      const hits = raycaster.intersectObjects(scene.children, true);
+      for (const hit of hits) {
+        if (hit.object?.type !== 'Mesh') continue;
+        const layer = hit.object?.userData?.dxfLayer;
+        if (layer) return { layer, px, py };
+      }
+      return null;
+    };
+
+    const runHover = () => {
+      frame = null;
+      if (!pending) return;
+      const found = pickAt(pending.x, pending.y, !heavyScene);
+      pending = null;
+      setHover(found);
+      canvas.style.cursor = found ? 'pointer' : 'crosshair';
+    };
+
+    const handleMove = (event) => {
+      pending = { x: event.clientX, y: event.clientY };
+      if (frame == null) frame = requestAnimationFrame(runHover);
+    };
+    const handleLeave = () => {
+      pending = null;
+      setHover(null);
+      canvas.style.cursor = '';
+    };
+    const handleDown = (event) => {
+      if (event.button === 0) down = { x: event.clientX, y: event.clientY };
+    };
+    const handleUp = (event) => {
+      if (event.button !== 0 || !down) return;
+      const moved = Math.hypot(event.clientX - down.x, event.clientY - down.y);
+      down = null;
+      if (moved > 4) return; // c'était un déplacement, pas un clic
+      const found = pickAt(event.clientX, event.clientY, true);
+      onPickLayer(found ? found.layer : '');
+    };
+
+    canvas.addEventListener('pointermove', handleMove);
+    canvas.addEventListener('pointerleave', handleLeave);
+    canvas.addEventListener('pointerdown', handleDown);
+    canvas.addEventListener('pointerup', handleUp);
+    canvas.style.cursor = 'crosshair';
+    return () => {
+      if (frame != null) cancelAnimationFrame(frame);
+      canvas.removeEventListener('pointermove', handleMove);
+      canvas.removeEventListener('pointerleave', handleLeave);
+      canvas.removeEventListener('pointerdown', handleDown);
+      canvas.removeEventListener('pointerup', handleUp);
+      canvas.style.cursor = '';
+      setHover(null);
+    };
+  }, [activeLayout, loading, paperLoading, onPickLayer]);
+
   const fitDrawing = () => {
     if (activeLayout) {
       const paperViewer = paperViewerRef.current;
@@ -384,9 +545,16 @@ export default function DxfViewerPanel({ file, isolatedLayer, onLoaded, onError 
             <Crosshair size={15} /> Cadrer
           </button>
           {isolatedLayer && (
-            <span className="inline-flex max-w-[360px] items-center gap-2 truncate rounded-xl border border-blue-200 bg-blue-50/95 px-3 py-2 text-xs font-semibold text-blue-700">
-              <Eye size={15} /> {isolatedLayer}
-            </span>
+            <button
+              type="button"
+              onClick={() => onPickLayer('')}
+              title="Afficher tous les calques"
+              className="inline-flex max-w-[360px] items-center gap-2 rounded-xl border border-blue-200 bg-blue-50/95 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+            >
+              <Eye size={15} className="shrink-0" />
+              <span className="truncate">{isolatedLayer}</span>
+              <X size={15} className="shrink-0" />
+            </button>
           )}
           {activeLayout?.simplified && (
             <span className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50/95 px-3 py-2 text-xs font-semibold text-amber-700">
@@ -396,10 +564,19 @@ export default function DxfViewerPanel({ file, isolatedLayer, onLoaded, onError 
         </div>
       )}
 
+
       {file && !loading && !error && (
         <>
+          {hover && !activeLayout && (
+            <div
+              className="pointer-events-none absolute z-30 max-w-[280px] -translate-y-full truncate rounded-lg bg-blue-600 px-2 py-1 text-[11px] font-semibold text-white shadow-lg"
+              style={{ left: hover.px + 12, top: hover.py }}
+            >
+              {hover.layer}
+            </div>
+          )}
           <div className="absolute bottom-14 left-1/2 z-10 -translate-x-1/2 rounded-xl bg-gray-900/85 px-3 py-1.5 text-[10px] text-white backdrop-blur">
-            {activeLayout ? 'Molette : zoom · Clic milieu : déplacer · Présentation en lecture seule' : 'Molette : zoom · Clic milieu : déplacer'}
+            {activeLayout ? 'Molette : zoom · Clic milieu : déplacer · Présentation en lecture seule' : 'Molette : zoom · Clic : isoler le calque · Survol : nom du calque'}
           </div>
           <div className="absolute inset-x-0 bottom-0 z-10 border-t border-gray-200 bg-white/95 px-2 py-2 backdrop-blur-xl">
             <div className="flex gap-1 overflow-x-auto">
@@ -434,4 +611,5 @@ DxfViewerPanel.propTypes = {
   isolatedLayer: PropTypes.string,
   onLoaded: PropTypes.func.isRequired,
   onError: PropTypes.func.isRequired,
+  onPickLayer: PropTypes.func.isRequired,
 };

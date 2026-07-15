@@ -1,10 +1,13 @@
-import React, { useMemo, useState } from 'react';
+import React, {
+  useEffect, useMemo, useRef, useState,
+} from 'react';
 import PropTypes from 'prop-types';
 import {
   AlertTriangle, Eye, EyeOff, Link2, Plus, Search, Trash2,
 } from 'lucide-react';
 import { buildMeasurementRows, METRIC_LABELS } from '../../utils/takeoff/dxfTakeoff';
 import { isUnitCompatible } from '../../utils/takeoff/applyTakeoff';
+import { toast } from '../../utils/globalUI';
 
 const formatQuantity = (value) => Number(value || 0).toLocaleString('fr-FR', {
   maximumFractionDigits: 3,
@@ -50,10 +53,15 @@ export default function DxfMappingPanel({
   onScaleChange,
   isolatedLayer,
   onIsolateLayer,
+  pick,
 }) {
   const [search, setSearch] = useState('');
   const [mappedOnly, setMappedOnly] = useState(false);
+  const [flashLayer, setFlashLayer] = useState('');
+  const listRef = useRef(null);
   const rows = useMemo(() => buildMeasurementRows(summary, scaleToMeters), [summary, scaleToMeters]);
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
   const visibleRows = useMemo(() => {
     const query = search.trim().toLowerCase();
     return rows.filter((row) => {
@@ -61,6 +69,26 @@ export default function DxfMappingPanel({
       return !query || row.layer.toLowerCase().includes(query) || row.metric.includes(query);
     });
   }, [mappedOnly, mappings, rows, search]);
+
+  // Objet cliqué dans l'aperçu → réinitialise les filtres, surligne et défile jusqu'au calque
+  useEffect(() => {
+    if (!pick?.layer) return undefined;
+    setSearch('');
+    setMappedOnly(false);
+    setFlashLayer(pick.layer);
+    if (!rowsRef.current.some((row) => row.layer === pick.layer)) {
+      toast.info(`Calque « ${pick.layer} » isolé — aucun métré mesurable sur ce calque.`);
+    }
+    const timer = setTimeout(() => setFlashLayer(''), 1400);
+    return () => clearTimeout(timer);
+  }, [pick]);
+
+  useEffect(() => {
+    if (flashLayer && listRef.current) {
+      const target = listRef.current.querySelector(`[data-dxf-row-layer="${CSS.escape(flashLayer)}"]`);
+      target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [flashLayer]);
 
   const updateMapping = (rowId, patch) => {
     onMappingsChange((previous) => ({
@@ -147,7 +175,7 @@ export default function DxfMappingPanel({
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto p-3">
+      <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto p-3">
         <div className="space-y-2">
           {displayedRows.map((row) => {
             const mapping = mappings[row.id];
@@ -156,9 +184,11 @@ export default function DxfMappingPanel({
             const appliedQuantity = row.quantity * (Number.isFinite(coefficient) ? coefficient : 0);
             const selectedItem = projectItems.find((item) => String(item.id) === String(mapping?.itemId));
             const incompatible = selectedItem && !isUnitCompatible(row.metric, selectedItem.unit);
+            let rowTone = mapping ? 'border-blue-200 bg-blue-50/40' : 'border-gray-200 bg-white';
+            if (flashLayer === row.layer) rowTone = 'border-amber-400 bg-amber-50 ring-2 ring-amber-300';
 
             return (
-              <div key={row.id} className={`rounded-2xl border p-3 transition-colors ${mapping ? 'border-blue-200 bg-blue-50/40' : 'border-gray-200 bg-white'}`}>
+              <div key={row.id} data-dxf-row-layer={row.layer} className={`rounded-2xl border p-3 transition-colors ${rowTone}`}>
                 <div className="flex items-start gap-2">
                   <button
                     type="button"
@@ -245,4 +275,5 @@ DxfMappingPanel.propTypes = {
   onScaleChange: PropTypes.func.isRequired,
   isolatedLayer: PropTypes.string,
   onIsolateLayer: PropTypes.func.isRequired,
+  pick: PropTypes.shape({ layer: PropTypes.string, nonce: PropTypes.number }),
 };

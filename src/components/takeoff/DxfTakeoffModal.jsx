@@ -17,6 +17,7 @@ export default function DxfTakeoffModal({ project, activeTrancheId, onApply, onC
   const [mappings, setMappings] = useState({});
   const [scaleToMeters, setScaleToMeters] = useState(1);
   const [isolatedLayer, setIsolatedLayer] = useState('');
+  const [pick, setPick] = useState({ layer: '', nonce: 0 });
   const [applyMode, setApplyMode] = useState('replace');
   const [loadError, setLoadError] = useState('');
 
@@ -63,6 +64,12 @@ export default function DxfTakeoffModal({ project, activeTrancheId, onApply, onC
   }, []);
 
   const handleError = useCallback((message) => setLoadError(message), []);
+
+  // Clic sur un objet de l'aperçu : isole son calque (vide = affiche tout) et cible la liste
+  const handlePickLayer = useCallback((layer) => {
+    setIsolatedLayer(layer || '');
+    if (layer) setPick((previous) => ({ layer, nonce: previous.nonce + 1 }));
+  }, []);
 
   const handleApply = async () => {
     if (selectedMappings.length === 0) {
@@ -138,7 +145,7 @@ export default function DxfTakeoffModal({ project, activeTrancheId, onApply, onC
         )}
 
         <main className="grid flex-1 min-h-0 grid-cols-[minmax(0,1fr)_minmax(360px,34%)]">
-          <DxfViewerPanel file={file} isolatedLayer={isolatedLayer} onLoaded={handleLoaded} onError={handleError} />
+          <DxfViewerPanel file={file} isolatedLayer={isolatedLayer} onLoaded={handleLoaded} onError={handleError} onPickLayer={handlePickLayer} />
           <DxfMappingPanel
             summary={summary}
             projectItems={projectItems}
@@ -148,6 +155,7 @@ export default function DxfTakeoffModal({ project, activeTrancheId, onApply, onC
             onScaleChange={setScaleToMeters}
             isolatedLayer={isolatedLayer}
             onIsolateLayer={setIsolatedLayer}
+            pick={pick}
           />
         </main>
 

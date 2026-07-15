@@ -12,6 +12,7 @@ export const CHANGELOG = [
     date: '2026-07-15',
     title: 'Métré DXF avec présentations AutoCAD',
     highlights: [
+      'Métré DXF — sélection par le dessin : dans la vue « Modèle », le survol affiche le nom du calque sous le curseur et un clic sur une ligne, un point ou une surface isole son calque dans l’aperçu tout en faisant défiler et en surlignant sa ligne dans la liste de droite. Une croix « Afficher tous les calques » (ou un clic dans le vide) rétablit l’affichage complet. Le pointage vise la géométrie directe (polylignes, contours, surfaces, hachures) ; les symboles de blocs répétés ne sont pas encore pointables',
       'Métré DXF — correction du zoom et du déplacement dans les présentations : les fenêtres partiellement hors écran sont désormais découpées sans étirer ni déformer le dessin',
       'Métré DXF — les onglets de présentation du dessin sont désormais listés à côté de « Modèle » et visualisables avec leur cartouche, leurs fenêtres de vue, leurs calques gelés et leur cadrage papier ; la molette zoome sous la souris, le clic milieu déplace la feuille et « Cadrer » rétablit la vue complète. Les fenêtres détourées ou 3D sont clairement signalées comme aperçu simplifié',
       'Estimation — nouveau POC « Métré DXF » : ouverture locale d’un plan 2D, visualisation WebGL, isolation des calques, calcul automatique des longueurs, surfaces fermées et comptages, association aux articles du projet avec coefficient, contrôle des unités et application sécurisée aux quantités globales ou par tranche. Les objets proxy Covadis/AutoCAD non interprétés sont signalés et chaque import appliqué reste tracé dans le projet',
@@ -23,6 +24,7 @@ export const CHANGELOG = [
     date: '2026-07-15',
     title: 'Pages de garde — cartouche Papyrus standard',
     highlights: [
+      'Cartouche Papyrus — amélioration structurelle : alignement rigoureux de la colonne de droite (cases Phase/N°/Échelle, logo et adresse MOE), ligne séparatrice noire traversante et ajustement des proportions du bandeau gris pour correspondre fidèlement à la maquette de référence',
       'Identité et charte graphique — nouveau modèle « CARTOUCHE PAPYRUS STANDARD », inspiré du cartouche DCE Papyrus : identité MOA, titre d’opération, bandeau document, cases Phase/N°/Échelle, tableau des indices et identité MOE. Le choix est sauvegardé pour l’entreprise et s’applique aux pages de garde PDF, Word et Excel existantes (Estimation/DQE, BPU, CCTP/RC/CCAP, Analyse/RAO, visite de chantier et page de garde seule), tandis que le modèle Estima reste sélectionné par défaut pour les configurations existantes',
     ],
   },
