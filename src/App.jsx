@@ -874,6 +874,7 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNav
                 saveUnit={db.saveUnit}
                 saveUnits={db.saveUnits}
                 deleteUnit={db.deleteUnit}
+                updateBpuItem={db.updateBpuItem}
                 unitDimensions={db.unitDimensions}
                 saveUnitDimensions={db.saveUnitDimensions}
                 materialDensities={db.materialDensities}

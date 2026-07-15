@@ -97,6 +97,8 @@ export const CANONICAL_UNITS = [
   { symbol: 'F',   label: 'Forfait',       dimension: 'lumpsum', factor: 1,    aliases: ['f', 'forfait', 'ft', 'global'], common: true },
 ];
 
+export const CANONICAL_SYMBOLS = CANONICAL_UNITS.map((u) => u.symbol);
+
 // ─── INDEX & REGISTRE RUNTIME ────────────────────────────────────────────────
 // L'index associe un symbole NORMALISÉ (et chaque alias normalisé) à son
 // descripteur. Construit une fois sur le catalogue canonique, puis étendu par
@@ -248,6 +250,105 @@ export const recognizedUnitTokens = () => {
     (u.aliases || []).forEach((a) => set.add(String(a).toLowerCase()));
   });
   return [...set];
+};
+
+const buildUnitAuditIndex = (units) => {
+  const byToken = new Map();
+  const aliasOwners = new Map();
+  const symbolOwners = new Map();
+
+  (units || []).forEach((raw) => {
+    const u = enrichUnit(raw);
+    if (!u?.symbol) return;
+    const symbolKey = normalizeUnitSymbol(u.symbol);
+    if (!symbolOwners.has(symbolKey)) symbolOwners.set(symbolKey, []);
+    symbolOwners.get(symbolKey).push(u);
+
+    const tokens = [u.symbol, ...(u.aliases || [])];
+    tokens.forEach((token) => {
+      const key = normalizeUnitSymbol(token);
+      if (!key) return;
+      if (!byToken.has(key)) byToken.set(key, u);
+      if (!aliasOwners.has(key)) aliasOwners.set(key, new Set());
+      aliasOwners.get(key).add(u.symbol);
+    });
+  });
+
+  CANONICAL_UNITS.forEach((u) => {
+    [u.symbol, ...(u.aliases || [])].forEach((token) => {
+      const key = normalizeUnitSymbol(token);
+      if (key && !byToken.has(key)) byToken.set(key, u);
+    });
+  });
+
+  return { byToken, aliasOwners, symbolOwners };
+};
+
+/**
+ * Audit non destructif du catalogue d'unites et des articles BPU.
+ * Sert a l'UI pour proposer des corrections explicites, jamais automatiques.
+ */
+export const auditUnits = ({ units = [], bpu = [] } = {}) => {
+  const { byToken, aliasOwners, symbolOwners } = buildUnitAuditIndex(units);
+  const usage = new Map();
+  const rawUsage = new Map();
+
+  (bpu || []).forEach((item) => {
+    const raw = String(item?.unit || '').trim();
+    const key = normalizeUnitSymbol(raw);
+    if (!key) return;
+    const entry = usage.get(key) || { symbol: raw, normalized: key, count: 0, itemIds: [] };
+    entry.count += 1;
+    if (item?.id) entry.itemIds.push(item.id);
+    usage.set(key, entry);
+
+    const rawEntry = rawUsage.get(raw) || { symbol: raw, normalized: key, count: 0, itemIds: [] };
+    rawEntry.count += 1;
+    if (item?.id) rawEntry.itemIds.push(item.id);
+    rawUsage.set(raw, rawEntry);
+  });
+
+  const unknownUsages = [];
+  const legacyUsages = [];
+  rawUsage.forEach((entry) => {
+    const known = byToken.get(entry.normalized);
+    if (!known) {
+      unknownUsages.push({ ...entry, suggestion: canonicalSymbol(entry.symbol) });
+      return;
+    }
+    if (entry.symbol !== known.symbol) {
+      legacyUsages.push({ ...entry, canonical: known.symbol, label: known.label });
+    }
+  });
+
+  const duplicateSymbols = [...symbolOwners.entries()]
+    .filter(([, owners]) => owners.length > 1)
+    .map(([symbol, owners]) => ({ symbol, units: owners.map((u) => u.symbol) }));
+
+  const aliasConflicts = [...aliasOwners.entries()]
+    .map(([alias, owners]) => ({ alias, units: [...owners] }))
+    .filter((conflict) => conflict.units.length > 1);
+
+  const usedSymbols = new Set([...usage.keys()].map((key) => byToken.get(key)?.symbol || key));
+  const unusedCustomUnits = (units || [])
+    .map(enrichUnit)
+    .filter((u) => u?.symbol && !CANONICAL_SYMBOLS.includes(u.symbol) && !usedSymbols.has(u.symbol));
+
+  const nonCanonicalUnits = (units || [])
+    .map(enrichUnit)
+    .filter((u) => u?.symbol && u.symbol !== canonicalSymbol(u.symbol))
+    .map((u) => ({ ...u, canonical: canonicalSymbol(u.symbol) }));
+
+  return {
+    usage,
+    unknownUsages,
+    legacyUsages,
+    duplicateSymbols,
+    aliasConflicts,
+    unusedCustomUnits,
+    nonCanonicalUnits,
+    issueCount: unknownUsages.length + legacyUsages.length + duplicateSymbols.length + aliasConflicts.length + nonCanonicalUnits.length,
+  };
 };
 
 // ─── DENSITÉS MATÉRIAUX (réutilisables dans les blocs) ───────────────────────

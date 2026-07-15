@@ -19,6 +19,7 @@ const SettingsView = ({
   saveUnit,
   saveUnits,
   deleteUnit,
+  updateBpuItem,
   unitDimensions,
   saveUnitDimensions,
   materialDensities,
@@ -464,6 +465,7 @@ const SettingsView = ({
               saveUnit={saveUnit}
               saveUnits={saveUnits}
               deleteUnit={deleteUnit}
+              updateBpuItem={updateBpuItem}
               saveDimensions={saveUnitDimensions}
               saveDensities={saveMaterialDensities}
             />

@@ -16,13 +16,15 @@ import PropTypes from 'prop-types';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import {
   Ruler, Plus, Edit2, Trash2, X, Check, Search, Scale, AlertTriangle,
-  GripVertical, FolderPlus,
+  GripVertical, FolderPlus, SlidersHorizontal, ShieldCheck, Wand2, Filter,
+  RotateCcw, Tag,
 } from 'lucide-react';
 import { confirm, toast } from '../../utils/globalUI';
 import { normalizeUnitSymbol } from '../../utils/helpers';
 import {
   mergeDimensions, enrichUnit, convert, sameDimension,
-  MATERIAL_DENSITIES, DIMENSION_COLORS,
+  MATERIAL_DENSITIES, DIMENSION_COLORS, CANONICAL_SYMBOLS,
+  auditUnits, canonicalSymbol,
 } from '../../data/units';
 
 // Teintes des badges par couleur de catégorie. Classes statiques → pas de purge Tailwind.
@@ -47,13 +49,18 @@ const slugify = (name) => name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g
 
 const UnitManager = ({
   units = [], bpu = [], dimensions, densities,
-  saveUnit, saveUnits, deleteUnit, saveDimensions, saveDensities,
+  saveUnit, saveUnits, deleteUnit, updateBpuItem, saveDimensions, saveDensities,
 }) => {
   const dims = useMemo(() => (dimensions?.length ? dimensions : mergeDimensions([])), [dimensions]);
   const densList = densities?.length ? densities : MATERIAL_DENSITIES;
   const [search, setSearch] = useState('');
+  const [mode, setMode] = useState('simple');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [draft, setDraft] = useState(EMPTY_DRAFT);
   const [editingSymbol, setEditingSymbol] = useState(null); // null = mode ajout
+  const [replaceTarget, setReplaceTarget] = useState(null);
+  const [replacementSymbol, setReplacementSymbol] = useState('');
   const [editingDim, setEditingDim] = useState(null);       // key de la catégorie en cours de renommage
   const [dimName, setDimName] = useState('');
   const [addingDim, setAddingDim] = useState(false);
@@ -64,6 +71,7 @@ const UnitManager = ({
 
   const isEditing = editingSymbol !== null;
   const searching = search.trim() !== '';
+  const expertMode = mode === 'expert';
 
   const dimLabel = (key) => dims.find((d) => d.key === key)?.label || 'Autre';
   const dimColor = (key) => dims.find((d) => d.key === key)?.color || 'slate';
@@ -78,17 +86,31 @@ const UnitManager = ({
     return map;
   }, [bpu]);
   const usageOf = (symbol) => usageBySymbol.get(normalizeUnitSymbol(symbol)) || 0;
+  const isSystemUnit = (symbol) => CANONICAL_SYMBOLS.includes(canonicalSymbol(symbol));
+  const audit = useMemo(() => auditUnits({ units, bpu }), [units, bpu]);
 
   // Filtre recherche (symbole, libellé, catégorie, alias).
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return units;
     return units.filter((u) => {
+      if (categoryFilter !== 'all' && (u.dimension || 'count') !== categoryFilter) return false;
+      const uses = usageOf(u.symbol);
+      if (statusFilter === 'used' && uses === 0) return false;
+      if (statusFilter === 'unused' && uses > 0) return false;
+      if (statusFilter === 'issues') {
+        const key = normalizeUnitSymbol(u.symbol);
+        const hasIssue =
+          u.symbol !== canonicalSymbol(u.symbol)
+          || audit.duplicateSymbols.some((d) => d.symbol === key)
+          || audit.aliasConflicts.some((c) => c.units.includes(u.symbol));
+        if (!hasIssue) return false;
+      }
+      if (!q) return true;
       const hay = [u.symbol, u.label, dimLabel(u.dimension), ...(u.aliases || [])].join(' ').toLowerCase();
       return hay.includes(q);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [units, search, dims]);
+  }, [units, search, dims, categoryFilter, statusFilter, audit]);
 
   // Groupes par catégorie, dans l'ordre de la config. Les groupes vides restent
   // visibles hors recherche : ils servent de cible de drop.
@@ -143,6 +165,10 @@ const UnitManager = ({
     });
   };
   const cancel = () => { setEditingSymbol(null); setDraft(EMPTY_DRAFT); };
+  const draftAliases = useMemo(
+    () => draft.aliases.split(',').map((a) => a.trim()).filter(Boolean),
+    [draft.aliases],
+  );
 
   const submit = (e) => {
     e.preventDefault();
@@ -157,6 +183,10 @@ const UnitManager = ({
     );
     if (clash) {
       toast.error(`Le symbole « ${symbol} » existe déjà (${clash.label}).`, { title: 'Doublon' });
+      return;
+    }
+    if (isEditing && isSystemUnit(editingSymbol) && normalizeUnitSymbol(symbol) !== normalizeUnitSymbol(editingSymbol)) {
+      toast.error('Cette unité système peut être enrichie, mais son symbole ne peut pas être renommé.', { title: 'Unité protégée' });
       return;
     }
     const factor = Number(draft.factor);
@@ -175,13 +205,78 @@ const UnitManager = ({
   };
 
   const askDelete = async (u) => {
+    if (isSystemUnit(u.symbol)) {
+      toast.error(`"${u.symbol}" est une unité système protégée.`, { title: 'Suppression bloquée' });
+      return;
+    }
     const uses = usageOf(u.symbol);
+    if (uses > 0) {
+      const candidates = units.filter((candidate) =>
+        candidate.symbol !== u.symbol && (candidate.dimension || 'count') === (u.dimension || 'count'));
+      setReplaceTarget(u);
+      setReplacementSymbol(candidates[0]?.symbol || '');
+      return;
+    }
     const msg = uses > 0
       ? `L'unité « ${u.symbol} » est utilisée par ${uses} article(s) de la bibliothèque. `
         + `Les supprimer laissera ces articles sans unité reconnue. Supprimer quand même ?`
       : `Supprimer l'unité « ${u.symbol} » ?`;
     const ok = await confirm(msg, { danger: true });
     if (ok) deleteUnit(u.symbol);
+  };
+
+  const replaceBpuUnit = async (fromSymbol, toSymbol) => {
+    if (!updateBpuItem) return 0;
+    const fromKey = normalizeUnitSymbol(fromSymbol);
+    const affected = (bpu || []).filter((item) => normalizeUnitSymbol(item?.unit || '') === fromKey);
+    await Promise.all(affected.map((item) => updateBpuItem(item.id, { unit: toSymbol })));
+    return affected.length;
+  };
+
+  const commitReplaceAndDelete = async () => {
+    if (!replaceTarget || !replacementSymbol) {
+      toast.error('Choisissez une unité de remplacement.', { title: 'Remplacement requis' });
+      return;
+    }
+    if (normalizeUnitSymbol(replaceTarget.symbol) === normalizeUnitSymbol(replacementSymbol)) {
+      toast.error('Choisissez une unité différente.', { title: 'Remplacement invalide' });
+      return;
+    }
+    const uses = usageOf(replaceTarget.symbol);
+    const ok = await confirm(
+      `Remplacer "${replaceTarget.symbol}" par "${replacementSymbol}" dans ${uses} article(s), puis supprimer l'unité ?`,
+      { danger: true },
+    );
+    if (!ok) return;
+    const count = await replaceBpuUnit(replaceTarget.symbol, replacementSymbol);
+    await deleteUnit(replaceTarget.symbol);
+    setReplaceTarget(null);
+    setReplacementSymbol('');
+    toast.success(`${count} article(s) mis à jour.`, { title: 'Unité remplacée' });
+  };
+
+  const applyBpuNormalization = async () => {
+    if (!updateBpuItem || audit.legacyUsages.length === 0) return;
+    const total = audit.legacyUsages.reduce((sum, entry) => sum + entry.count, 0);
+    const ok = await confirm(`Normaliser ${total} article(s) vers les symboles canoniques ?`);
+    if (!ok) return;
+    let count = 0;
+    for (const entry of audit.legacyUsages) {
+      count += await replaceBpuUnit(entry.symbol, entry.canonical);
+    }
+    toast.success(`${count} article(s) normalisé(s).`, { title: 'Audit des unités' });
+  };
+
+  const prepareUnknownUnit = (entry) => {
+    const symbol = entry.suggestion || normalizeUnitSymbol(entry.symbol);
+    setEditingSymbol(null);
+    setDraft({
+      symbol,
+      label: symbol,
+      dimension: 'count',
+      factor: 1,
+      aliases: normalizeUnitSymbol(entry.symbol) !== symbol ? entry.symbol : '',
+    });
   };
 
   // ─── Actions catégories ───────────────────────────────────────────────────
@@ -268,6 +363,50 @@ const UnitManager = ({
       </div>
 
       {/* Ajout de catégorie (inline) */}
+      <div className="flex flex-col lg:flex-row lg:items-center gap-3 justify-between bg-white border border-slate-200 rounded-xl p-3">
+        <div className="flex items-center gap-2">
+          <SlidersHorizontal size={14} className="text-slate-400" />
+          <div className="bg-slate-100 p-0.5 rounded-xl flex">
+            {['simple', 'expert'].map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setMode(value)}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${mode === value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                {value === 'simple' ? 'Simple' : 'Expert'}
+              </button>
+            ))}
+          </div>
+          {audit.issueCount > 0 && (
+            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg flex items-center gap-1">
+              <AlertTriangle size={12} /> {audit.issueCount} point(s) à vérifier
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Filter size={14} className="text-slate-400" />
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-600 focus:border-emerald-500 outline-none"
+          >
+            <option value="all">Toutes catégories</option>
+            {dims.map((dim) => <option key={dim.key} value={dim.key}>{dim.label}</option>)}
+          </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-600 focus:border-emerald-500 outline-none"
+          >
+            <option value="all">Tous statuts</option>
+            <option value="used">Utilisées</option>
+            <option value="unused">Non utilisées</option>
+            <option value="issues">À vérifier</option>
+          </select>
+        </div>
+      </div>
+
       {addingDim && (
         <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg p-3">
           <FolderPlus size={14} className="text-slate-400" />
@@ -285,6 +424,79 @@ const UnitManager = ({
       )}
 
       {/* Formulaire ajout / édition d'unité */}
+      {replaceTarget && (
+        <section className="bg-red-50 border border-red-200 rounded-xl p-4 flex flex-col md:flex-row md:items-center gap-3 md:justify-between">
+          <div className="flex items-start gap-3">
+            <ShieldCheck size={18} className="text-red-500 mt-0.5" />
+            <div>
+              <h4 className="text-xs font-black uppercase tracking-widest text-red-700">Remplacement requis avant suppression</h4>
+              <p className="text-xs text-red-700 mt-1">
+                {replaceTarget.symbol} est utilisée par {usageOf(replaceTarget.symbol)} article(s). Choisissez l’unité qui la remplacera dans la bibliothèque.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <UnitSelect
+              units={units.filter((u) => u.symbol !== replaceTarget.symbol && (u.dimension || 'count') === (replaceTarget.dimension || 'count'))}
+              value={replacementSymbol}
+              onChange={setReplacementSymbol}
+              placeholder="remplacer par..."
+            />
+            <button type="button" onClick={commitReplaceAndDelete} className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-1.5">
+              <RotateCcw size={14} /> Remplacer
+            </button>
+            <button type="button" onClick={() => setReplaceTarget(null)} className="bg-white border border-red-200 text-red-600 px-3 py-2 rounded-xl font-bold text-xs hover:bg-red-100">
+              Annuler
+            </button>
+          </div>
+        </section>
+      )}
+
+      <section className="bg-white border border-slate-200 rounded-xl p-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+          <div className="flex items-center gap-2">
+            <Wand2 size={15} className="text-amber-500" />
+            <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Audit des unités</h4>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${audit.issueCount ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
+              {audit.issueCount ? `${audit.issueCount} point(s)` : 'OK'}
+            </span>
+          </div>
+          {audit.legacyUsages.length > 0 && updateBpuItem && (
+            <button type="button" onClick={applyBpuNormalization} className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-1.5">
+              <Wand2 size={14} /> Normaliser les articles
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-2 text-xs">
+          <AuditBox title="Inconnues" value={audit.unknownUsages.length} tone={audit.unknownUsages.length ? 'amber' : 'slate'} />
+          <AuditBox title="À normaliser" value={audit.legacyUsages.length} tone={audit.legacyUsages.length ? 'amber' : 'slate'} />
+          <AuditBox title="Conflits alias" value={audit.aliasConflicts.length} tone={audit.aliasConflicts.length ? 'red' : 'slate'} />
+          <AuditBox title="Custom inutilisées" value={audit.unusedCustomUnits.length} tone="slate" />
+        </div>
+        {(audit.unknownUsages.length > 0 || audit.legacyUsages.length > 0 || audit.aliasConflicts.length > 0) && (
+          <div className="mt-3 space-y-2">
+            {audit.unknownUsages.slice(0, 4).map((entry) => (
+              <div key={entry.normalized} className="flex items-center justify-between gap-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                <span className="text-xs text-amber-800"><b>{entry.symbol}</b> inconnue dans {entry.count} article(s)</span>
+                <button type="button" onClick={() => prepareUnknownUnit(entry)} className="text-[10px] font-black uppercase tracking-widest text-amber-700 hover:text-amber-900">
+                  Ajouter
+                </button>
+              </div>
+            ))}
+            {audit.legacyUsages.slice(0, 4).map((entry) => (
+              <div key={`${entry.normalized}-${entry.canonical}`} className="flex items-center justify-between gap-2 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
+                <span className="text-xs text-slate-600"><b>{entry.symbol}</b> sera normalisée en <b>{entry.canonical}</b> ({entry.count} article(s))</span>
+              </div>
+            ))}
+            {audit.aliasConflicts.slice(0, 3).map((entry) => (
+              <div key={entry.alias} className="bg-red-50 border border-red-100 rounded-lg px-3 py-2 text-xs text-red-700">
+                Alias <b>{entry.alias}</b> partage par {entry.units.join(', ')}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
       <form onSubmit={submit} className="bg-slate-50 border border-slate-200 rounded-xl p-4 grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
         <div className="md:col-span-1">
           <label className="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Symbole</label>
@@ -316,6 +528,7 @@ const UnitManager = ({
             {dims.map((dim) => <option key={dim.key} value={dim.key}>{dim.label}</option>)}
           </select>
         </div>
+        {expertMode && (
         <div className="md:col-span-1">
           <label className="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1" title="Quantité en unité de base de la catégorie (ex: 1 T = 1000 KG)">Facteur</label>
           <input
@@ -327,6 +540,8 @@ const UnitManager = ({
             className="w-full bg-white border border-slate-200 rounded px-3 py-2 text-sm focus:border-emerald-500 outline-none"
           />
         </div>
+        )}
+        {expertMode && (
         <div className="md:col-span-6">
           <label className="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Alias (séparés par des virgules)</label>
           <input
@@ -335,7 +550,17 @@ const UnitManager = ({
             placeholder="m2, mètre carré"
             className="w-full bg-white border border-slate-200 rounded px-3 py-2 text-sm focus:border-emerald-500 outline-none"
           />
+          {draftAliases.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {draftAliases.map((alias) => (
+                <span key={alias} className="text-[10px] font-bold text-slate-500 bg-white border border-slate-200 rounded-lg px-2 py-0.5 flex items-center gap-1">
+                  <Tag size={10} /> {alias}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
+        )}
         <div className="md:col-span-6 flex gap-2 justify-end">
           {isEditing && (
             <button type="button" onClick={cancel} className="bg-white text-slate-500 border border-slate-200 py-2 px-4 rounded hover:bg-slate-100 flex items-center gap-1.5 text-sm">
@@ -437,6 +662,16 @@ const UnitManager = ({
                                 {u.factor != null && u.factor !== 1 && (
                                   <span className="text-[9px] text-slate-400 font-bold" title="Facteur vers l'unité de base">×{u.factor}</span>
                                 )}
+                                {isSystemUnit(u.symbol) && (
+                                  <span className="text-[8px] font-black text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                    système
+                                  </span>
+                                )}
+                                {expertMode && (u.aliases || []).slice(0, 3).map((alias) => (
+                                  <span key={`${u.symbol}-${alias}`} className="text-[9px] font-bold text-slate-400 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded">
+                                    {alias}
+                                  </span>
+                                ))}
                               </div>
                               <div className="flex items-center gap-2 shrink-0">
                                 {uses > 0 && (
@@ -624,8 +859,29 @@ UnitManager.propTypes = {
   saveUnit: PropTypes.func.isRequired,
   saveUnits: PropTypes.func.isRequired,
   deleteUnit: PropTypes.func.isRequired,
+  updateBpuItem: PropTypes.func,
   saveDimensions: PropTypes.func.isRequired,
   saveDensities: PropTypes.func.isRequired,
 };
 
 export default UnitManager;
+
+const AuditBox = ({ title, value, tone = 'slate' }) => {
+  const classes = {
+    slate: 'bg-slate-50 text-slate-600 border-slate-200',
+    amber: 'bg-amber-50 text-amber-700 border-amber-200',
+    red: 'bg-red-50 text-red-700 border-red-200',
+  };
+  return (
+    <div className={`border rounded-xl px-3 py-2 ${classes[tone] || classes.slate}`}>
+      <div className="text-[9px] font-black uppercase tracking-widest opacity-70">{title}</div>
+      <div className="text-lg font-black leading-tight">{value}</div>
+    </div>
+  );
+};
+
+AuditBox.propTypes = {
+  title: PropTypes.string.isRequired,
+  value: PropTypes.number.isRequired,
+  tone: PropTypes.string,
+};

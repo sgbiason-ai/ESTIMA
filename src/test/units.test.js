@@ -4,6 +4,7 @@ import {
   enrichUnit, enrichUnits, dedupeUnits, defaultUnits, commonUnitSymbols, recognizedUnitTokens,
   canonicalSymbol, isUpperCanonical, mergeDimensions,
   lookupUnit, setRuntimeUnits, resetRuntimeUnits, MATERIAL_DENSITIES, densityOf,
+  auditUnits,
 } from '../data/units';
 
 describe('units — dimensions & lookup', () => {
@@ -193,5 +194,40 @@ describe('units — catégories éditables (mergeDimensions)', () => {
     // 'mass' reste intégrée (custom:false), le label custom s'applique comme renommage
     expect(merged.filter((d) => d.key === 'mass')).toHaveLength(1);
     expect(merged.find((d) => d.key === 'mass').custom).toBe(false);
+  });
+});
+
+describe('units - audit catalogue/BPU', () => {
+  it('detecte les usages inconnus et les ecritures a normaliser', () => {
+    const audit = auditUnits({
+      units: defaultUnits(),
+      bpu: [
+        { id: 'a', unit: 'm²' },
+        { id: 'b', unit: 'M2' },
+        { id: 'c', unit: 'palette' },
+      ],
+    });
+
+    expect(audit.legacyUsages).toEqual(expect.arrayContaining([
+      expect.objectContaining({ symbol: 'm²', canonical: 'M2', count: 1 }),
+    ]));
+    expect(audit.unknownUsages).toEqual(expect.arrayContaining([
+      expect.objectContaining({ symbol: 'palette', suggestion: 'PALETTE', count: 1 }),
+    ]));
+  });
+
+  it('signale les conflits alias entre unites personnalisees', () => {
+    const audit = auditUnits({
+      units: [
+        ...defaultUnits(),
+        { symbol: 'PAL', label: 'Palette', dimension: 'count', aliases: ['palette'] },
+        { symbol: 'PLT', label: 'Palette chantier', dimension: 'count', aliases: ['palette'] },
+      ],
+      bpu: [],
+    });
+
+    expect(audit.aliasConflicts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ alias: 'PALETTE', units: expect.arrayContaining(['PAL', 'PLT']) }),
+    ]));
   });
 });
