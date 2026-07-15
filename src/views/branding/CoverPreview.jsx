@@ -26,7 +26,7 @@ const PapyrusCoverPreview = ({ branding, activeDocType, project }) => {
         {project?.name || 'NOM DU PROJET'}
         {project?.location && <div className="mt-2 text-[clamp(5px,1.1vw,9px)] font-normal">{project.location}</div>}
       </div>
-      <div className="absolute left-[2.5%] right-[2.5%] top-[51%] h-[20%] bg-[#dedede] flex items-center justify-center pr-[21%]">
+      <div className="absolute left-[2.5%] right-[2.5%] top-[51%] h-[20%] bg-[#dedede] flex items-center justify-center pr-[23%]">
         <div className="px-3 text-center uppercase text-[clamp(7px,2.4vw,19px)] leading-tight">{labels[activeDocType] || 'DOCUMENT DE MARCHÉ'}</div>
       </div>
       <div className="absolute right-[9.5%] top-[47.5%] w-[15%] space-y-[13%]">
@@ -43,9 +43,13 @@ const PapyrusCoverPreview = ({ branding, activeDocType, project }) => {
         {[0, 1, 2, 3].map(row => <div key={row} className="h-2 border-t border-black" />)}
         <div className="border-t border-black text-right px-2">Affaire N° : {project?.code || '—'}</div>
       </div>
-      <div className="absolute right-[6%] bottom-[4.5%] w-[23%] text-[clamp(3px,0.8vw,6px)] leading-tight">
+      <div className="absolute left-[75.5%] right-[9.5%] bottom-[4.5%] text-[clamp(3px,0.8vw,6px)] leading-tight">
         {branding.logo && <img src={branding.logo} alt="logo MOE" className="w-full h-12 object-contain object-left mb-1" />}
-        <div>{branding.companyName}</div><div>{branding.address}</div><div>{branding.zip} {branding.city}</div><div>{branding.phone}</div><div>{branding.email}</div>
+        {!branding.logo && <div>{branding.companyName}</div>}
+        <div>{branding.address}</div>
+        <div>{branding.zip} {branding.city}</div>
+        {branding.phone && <div>Tél : {branding.phone}</div>}
+        {branding.email && <div>Mail : {branding.email}</div>}
       </div>
     </div>
   );

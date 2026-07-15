@@ -345,29 +345,30 @@ const drawPapyrusCoverPage = (doc, config, theme, logos) => {
   // Bandeau document et cartouches verticaux Phase / N° / Échelle.
   const bandX = 5;
   const bandY = 151;
-  const bandW = pageWidth - 10;
+  const cardsW = 32;
+  const cardsX = pageWidth - 15 - cardsW; // Alignement droit à X = 195 (les cases vont de 163 à 195)
+  const bandW = pageWidth - 10; // Traverse toute la page de 5 à 205 (déborde à droite des cases)
   const bandH = 60;
-  const cardsW = 31;
-  const cardsX = pageWidth - margin - cardsW - 14;
   doc.setFillColor(222, 222, 222);
   doc.rect(bandX, bandY, bandW, bandH, 'F');
   doc.setFont('Helvetica', 'normal'); doc.setFontSize(18); doc.setTextColor(0, 0, 0);
   const documentLines = doc.splitTextToSize((docType || 'DOCUMENT DE MARCHÉ').toUpperCase(), cardsX - bandX - 14);
   doc.text(documentLines, (bandX + cardsX) / 2, bandY + 31 - (documentLines.length - 1) * 4, { align: 'center' });
 
-  const drawCard = (label, value, y, height = 21) => {
+  const drawCard = (label, value, y, height = 23) => {
     doc.setFillColor(255, 255, 255); doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.8);
     doc.rect(cardsX, y, cardsW, height, 'FD');
     doc.setFont('Helvetica', 'normal'); doc.setFontSize(7); doc.text(label, cardsX + 1.5, y + 4.5);
-    doc.line(cardsX + 1.5, y + 5.5, cardsX + 7, y + 5.5);
+    doc.setLineWidth(0.3);
+    doc.line(cardsX, y + 6.5, cardsX + cardsW, y + 6.5); // Ligne traversante complète
     if (value) {
       doc.setFont('Helvetica', 'bold'); doc.setFontSize(15);
-      doc.text(fitTextToWidth(doc, String(value).toUpperCase(), cardsW - 4), cardsX + cardsW / 2, y + 14.5, { align: 'center' });
+      doc.text(fitTextToWidth(doc, String(value).toUpperCase(), cardsW - 4), cardsX + cardsW / 2, y + 16, { align: 'center' });
     }
   };
-  drawCard('Phase:', phaseLabel, bandY - 10, 21);
-  drawCard('N°:', documentNumber || codeAffaire, bandY + 25, 21);
-  drawCard('Échelle:', scale, bandY + 55, 21);
+  drawCard('Phase:', phaseLabel, bandY - 10, 23);
+  drawCard('N°:', documentNumber || codeAffaire, bandY + 20, 23);
+  drawCard('Échelle:', scale, bandY + 50, 23);
 
   // Données complémentaires propres à certains documents (RAO notamment).
   let extraY = bandY + bandH + 8;
@@ -402,22 +403,22 @@ const drawPapyrusCoverPage = (doc, config, theme, logos) => {
   doc.text(`Affaire N° : ${codeAffaire || '—'}`, tableX + tableW - 2, tableY + 7 * rowH - 1.5, { align: 'right' });
 
   // Identité de la maîtrise d'œuvre en bas à droite.
-  const moeX = pageWidth - 57;
-  if (logoMoe) renderLogo(doc, logoMoe, moeX, 238, 43, 24);
-  let coY = 263;
+  const moeX = cardsX; // Parfaitement aligné sur le bord gauche des cases
+  if (logoMoe) renderLogo(doc, logoMoe, moeX, 230, 32, 22);
+  let coY = 255;
   logoCoTraitants.slice(0, 2).forEach((logo) => {
-    if (logo) { renderLogo(doc, logo, moeX, coY, 43, 10); coY += 10; }
+    if (logo) { renderLogo(doc, logo, moeX, coY, 32, 10); coY += 10; }
   });
   doc.setFont('Helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...(theme.text || [0, 0, 0]));
   const contactLines = [
-    branding?.companyName,
+    // branding?.companyName, // Retiré pour éviter la répétition textuelle sous le logo PAPYRUS
     branding?.address,
     [branding?.zip, branding?.city].filter(Boolean).join(' '),
     branding?.phone ? `Tél : ${branding.phone}` : '',
     branding?.email ? `Mail : ${branding.email}` : '',
     branding?.website,
   ].filter(Boolean);
-  contactLines.slice(0, 6).forEach((line, index) => doc.text(fitTextToWidth(doc, line, 49), moeX, 265 + index * 4.2));
+  contactLines.slice(0, 6).forEach((line, index) => doc.text(fitTextToWidth(doc, line, 32), moeX, 256 + index * 4.2));
 
   return { blockEndY: bandY + bandH };
 };

@@ -111,27 +111,32 @@ const drawPapyrusCanvas = (ctx, project, docLabel, branding, logos, values) => {
     ctx.fillText(fitCanvasText(ctx, locationRaw.toUpperCase(), px(PW - 70)), px(PW / 2), px(titleY + titleLines.length * 9 + 3));
   }
 
+  const bandX = 5;
   const bandY = 151;
-  const cardsX = PW - 6 - 31 - 14;
-  ctx.fillStyle = '#DEDEDE'; ctx.fillRect(px(5), px(bandY), px(PW - 10), px(60));
+  const cardsW = 32;
+  const cardsX = PW - 15 - cardsW; // Alignement droit à X = 195 (les cases vont de 163 à 195)
+  const bandW = PW - 10; // Traverse toute la page de 5 à 205 (déborde à droite des cases)
+  const bandH = 60;
+  ctx.fillStyle = '#DEDEDE'; ctx.fillRect(px(bandX), px(bandY), px(bandW), px(bandH));
   ctx.fillStyle = '#000000'; ctx.font = `normal ${ptpx(18)}px Helvetica, Arial, sans-serif`;
-  const docLines = splitTextToSize(ctx, (docLabel || 'DOCUMENT DE MARCHÉ').toUpperCase(), cardsX - 19);
-  docLines.forEach((line, index) => ctx.fillText(line, px((5 + cardsX) / 2), px(bandY + 31 - (docLines.length - 1) * 4 + index * 8)));
+  const docLines = splitTextToSize(ctx, (docLabel || 'DOCUMENT DE MARCHÉ').toUpperCase(), cardsX - bandX - 14);
+  docLines.forEach((line, index) => ctx.fillText(line, px((bandX + cardsX) / 2), px(bandY + 31 - (docLines.length - 1) * 4 + index * 8)));
 
-  const drawCard = (label, value, y) => {
+  const drawCard = (label, value, y, height = 23) => {
     ctx.fillStyle = '#FFFFFF'; ctx.strokeStyle = '#000000'; ctx.lineWidth = px(0.8);
-    ctx.fillRect(px(cardsX), px(y), px(31), px(21)); ctx.strokeRect(px(cardsX), px(y), px(31), px(21));
+    ctx.fillRect(px(cardsX), px(y), px(cardsW), px(height)); ctx.strokeRect(px(cardsX), px(y), px(cardsW), px(height));
     ctx.textAlign = 'left'; ctx.fillStyle = '#000000'; ctx.font = `normal ${ptpx(7)}px Helvetica, Arial, sans-serif`;
     ctx.fillText(label, px(cardsX + 1.5), px(y + 4.5));
-    ctx.beginPath(); ctx.moveTo(px(cardsX + 1.5), px(y + 5.5)); ctx.lineTo(px(cardsX + 7), px(y + 5.5)); ctx.stroke();
+    ctx.strokeStyle = '#000000'; ctx.lineWidth = px(0.3);
+    ctx.beginPath(); ctx.moveTo(px(cardsX), px(y + 6.5)); ctx.lineTo(px(cardsX + cardsW), px(y + 6.5)); ctx.stroke(); // Ligne traversante complète
     if (value) {
       ctx.textAlign = 'center'; ctx.font = `bold ${ptpx(15)}px Helvetica, Arial, sans-serif`;
-      ctx.fillText(fitCanvasText(ctx, String(value).toUpperCase(), px(27)), px(cardsX + 15.5), px(y + 14.5));
+      ctx.fillText(fitCanvasText(ctx, String(value).toUpperCase(), px(cardsW - 4)), px(cardsX + cardsW / 2), px(y + 16));
     }
   };
-  drawCard('Phase:', phaseLabel, bandY - 10);
-  drawCard('N°:', codeAffaire, bandY + 25);
-  drawCard('Échelle:', project?.scale || '', bandY + 55);
+  drawCard('Phase:', phaseLabel, bandY - 10, 23);
+  drawCard('N°:', codeAffaire, bandY + 20, 23);
+  drawCard('Échelle:', project?.scale || '', bandY + 50, 23);
 
   const tableX = 15, tableY = 243, tableW = 130, rowH = 5, dateW = 22, indexW = 12;
   ctx.strokeStyle = '#000000'; ctx.lineWidth = px(0.25);
@@ -147,11 +152,22 @@ const drawPapyrusCanvas = (ctx, project, docLabel, branding, logos, values) => {
   ctx.textAlign = 'right'; ctx.font = `normal ${ptpx(7.5)}px Helvetica, Arial, sans-serif`;
   ctx.fillText(`Affaire N° : ${codeAffaire || '—'}`, px(tableX + tableW - 2), px(tableY + 7 * rowH - 1.5));
 
-  drawImageContain(ctx, logoMoe, PW - 57, 238, 43, 24);
-  logoCoTraitants.slice(0, 2).forEach((logo, index) => drawImageContain(ctx, logo, PW - 57, 263 + index * 10, 43, 9));
+  const moeX = cardsX; // Parfaitement aligné sur le bord gauche des cases
+  drawImageContain(ctx, logoMoe, moeX, 230, 32, 22);
+  let coY = 255;
+  logoCoTraitants.slice(0, 2).forEach((logo) => {
+    if (logo) { drawImageContain(ctx, logo, moeX, coY, 32, 10); coY += 10; }
+  });
   ctx.textAlign = 'left'; ctx.fillStyle = '#000000'; ctx.font = `normal ${ptpx(7)}px Helvetica, Arial, sans-serif`;
-  const contactLines = [branding?.companyName, branding?.address, [branding?.zip, branding?.city].filter(Boolean).join(' '), branding?.phone ? `Tél : ${branding.phone}` : '', branding?.email ? `Mail : ${branding.email}` : '', branding?.website].filter(Boolean);
-  contactLines.slice(0, 6).forEach((line, index) => ctx.fillText(fitCanvasText(ctx, line, px(49)), px(PW - 57), px(265 + index * 4.2)));
+  const contactLines = [
+    // branding?.companyName, // Retiré pour éviter la répétition textuelle sous le logo PAPYRUS
+    branding?.address,
+    [branding?.zip, branding?.city].filter(Boolean).join(' '),
+    branding?.phone ? `Tél : ${branding.phone}` : '',
+    branding?.email ? `Mail : ${branding.email}` : '',
+    branding?.website
+  ].filter(Boolean);
+  contactLines.slice(0, 6).forEach((line, index) => ctx.fillText(fitCanvasText(ctx, line, px(32)), px(moeX), px(256 + index * 4.2)));
 };
 
 // ─── RENDU PRINCIPAL ──────────────────────────────────────────────────────────
