@@ -57,24 +57,33 @@ export default function DxfMappingPanel({
 }) {
   const [search, setSearch] = useState('');
   const [mappedOnly, setMappedOnly] = useState(false);
+  const [metricFilters, setMetricFilters] = useState({ length: false, area: false, count: false });
   const [flashLayer, setFlashLayer] = useState('');
   const listRef = useRef(null);
   const rows = useMemo(() => buildMeasurementRows(summary, scaleToMeters), [summary, scaleToMeters]);
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
+  const metricCounts = useMemo(() => {
+    const counts = { length: 0, area: 0, count: 0 };
+    for (const row of rows) { if (counts[row.metric] != null) counts[row.metric] += 1; }
+    return counts;
+  }, [rows]);
   const visibleRows = useMemo(() => {
     const query = search.trim().toLowerCase();
+    const activeMetrics = Object.keys(metricFilters).filter((m) => metricFilters[m]);
     return rows.filter((row) => {
       if (mappedOnly && !mappings[row.id]) return false;
+      if (activeMetrics.length && !metricFilters[row.metric]) return false;
       return !query || row.layer.toLowerCase().includes(query) || row.metric.includes(query);
     });
-  }, [mappedOnly, mappings, rows, search]);
+  }, [mappedOnly, mappings, metricFilters, rows, search]);
 
   // Objet cliqué dans l'aperçu → réinitialise les filtres, surligne et défile jusqu'au calque
   useEffect(() => {
     if (!pick?.layer) return undefined;
     setSearch('');
     setMappedOnly(false);
+    setMetricFilters({ length: false, area: false, count: false });
     setFlashLayer(pick.layer);
     if (!rowsRef.current.some((row) => row.layer === pick.layer)) {
       toast.info(`Calque « ${pick.layer} » isolé — aucun métré mesurable sur ce calque.`);
@@ -115,6 +124,7 @@ export default function DxfMappingPanel({
 
   const metadata = summary.metadata || {};
   const displayedRows = visibleRows.slice(0, 150);
+  const presentMetrics = ['length', 'area', 'count'].filter((m) => metricCounts[m] > 0);
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-white">
@@ -173,6 +183,23 @@ export default function DxfMappingPanel({
             Associés
           </button>
         </div>
+
+        {presentMetrics.length > 1 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <span className="self-center text-[10px] font-semibold text-gray-400">Type :</span>
+            {presentMetrics.map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMetricFilters((previous) => ({ ...previous, [m]: !previous[m] }))}
+                title={`Filtrer sur ${METRIC_LABELS[m].label.toLowerCase()} (${METRIC_LABELS[m].unit})`}
+                className={`rounded-lg border px-2.5 py-1 text-[10px] font-semibold ${metricFilters[m] ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+              >
+                {METRIC_LABELS[m].label} · {metricCounts[m]}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto p-3">

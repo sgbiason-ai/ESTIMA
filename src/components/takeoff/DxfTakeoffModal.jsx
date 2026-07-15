@@ -1,16 +1,26 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback, useEffect, useMemo, useRef, useState,
+} from 'react';
 import PropTypes from 'prop-types';
 import {
-  AlertTriangle, FileUp, Layers3, LockKeyhole, Ruler, X,
+  AlertTriangle, FileUp, Layers3, LockKeyhole, Power, Ruler, X,
 } from 'lucide-react';
 import DxfViewerPanel from './DxfViewerPanel';
 import DxfMappingPanel from './DxfMappingPanel';
 import { buildMeasurementRows } from '../../utils/takeoff/dxfTakeoff';
 import { flattenProjectItems } from '../../utils/takeoff/applyTakeoff';
+import {
+  loadDxfSession, saveDxfFile, saveDxfWork, clearDxfSession,
+} from '../../utils/takeoff/dxfPersistence';
 import { confirm, toast } from '../../utils/globalUI';
 
-export default function DxfTakeoffModal({ project, activeTrancheId, onApply, onClose }) {
+export default function DxfTakeoffModal({
+  project, activeTrancheId, onApply, onClose, visible = true, onUnload,
+}) {
+  const projectId = project?.id;
   const inputRef = useRef(null);
+  const skipFileSaveRef = useRef(false);
+  const restoredScaleRef = useRef(null);
   const [file, setFile] = useState(null);
   const [summary, setSummary] = useState(null);
   const [viewerLayers, setViewerLayers] = useState([]);
@@ -59,7 +69,9 @@ export default function DxfTakeoffModal({ project, activeTrancheId, onApply, onC
   const handleLoaded = useCallback((nextSummary, layers) => {
     setSummary(nextSummary);
     setViewerLayers(layers);
-    setScaleToMeters(Number(nextSummary?.metadata?.detectedScaleToMeters) || 1);
+    // Après un rechargement de session, garder l'échelle mémorisée plutôt que la détectée.
+    setScaleToMeters(restoredScaleRef.current || Number(nextSummary?.metadata?.detectedScaleToMeters) || 1);
+    restoredScaleRef.current = null;
     setLoadError('');
   }, []);
 
@@ -70,6 +82,46 @@ export default function DxfTakeoffModal({ project, activeTrancheId, onApply, onC
     setIsolatedLayer(layer || '');
     if (layer) setPick((previous) => ({ layer, nonce: previous.nonce + 1 }));
   }, []);
+
+  // Rechargement de la session au montage (survit au rafraîchissement, par projet).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const saved = await loadDxfSession(projectId);
+      if (cancelled || !saved?.file) return;
+      const work = saved.work || {};
+      restoredScaleRef.current = Number(work.scaleToMeters) || null;
+      skipFileSaveRef.current = true;
+      setFile(saved.file);
+      if (work.mappings) setMappings(work.mappings);
+      if (work.isolatedLayer) setIsolatedLayer(work.isolatedLayer);
+      if (work.applyMode) setApplyMode(work.applyMode);
+    })();
+    return () => { cancelled = true; };
+  }, [projectId]);
+
+  // Persistance du fichier : une écriture par changement de fichier (pas à chaque édition).
+  useEffect(() => {
+    if (!projectId) return;
+    if (skipFileSaveRef.current) { skipFileSaveRef.current = false; return; }
+    if (file) saveDxfFile(projectId, file.name, file);
+  }, [file, projectId]);
+
+  // Persistance du travail léger (associations, échelle, calque isolé, mode) — débounce.
+  useEffect(() => {
+    if (!projectId || !file) return undefined;
+    const timer = setTimeout(() => {
+      saveDxfWork(projectId, {
+        mappings, scaleToMeters, isolatedLayer, applyMode,
+      });
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [projectId, file, mappings, scaleToMeters, isolatedLayer, applyMode]);
+
+  const handleUnload = () => {
+    clearDxfSession(projectId);
+    onUnload?.();
+  };
 
   const handleApply = async () => {
     if (selectedMappings.length === 0) {
@@ -106,7 +158,7 @@ export default function DxfTakeoffModal({ project, activeTrancheId, onApply, onC
   };
 
   return (
-    <div className="fixed inset-0 z-modal flex bg-black/25 p-3 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Métré DXF">
+    <div className={`fixed inset-0 z-modal flex bg-black/25 p-3 backdrop-blur-sm ${visible ? '' : 'invisible pointer-events-none'}`} role="dialog" aria-modal="true" aria-label="Métré DXF">
       <div className="mx-auto flex h-full w-full max-w-[1800px] flex-col overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-2xl">
         <header className="flex shrink-0 items-center justify-between border-b border-gray-200 bg-white/95 px-5 py-3 backdrop-blur-xl">
           <div className="flex min-w-0 items-center gap-3">
@@ -131,6 +183,16 @@ export default function DxfTakeoffModal({ project, activeTrancheId, onApply, onC
             >
               <FileUp size={15} /> {file ? 'Changer de DXF' : 'Ouvrir un DXF'}
             </button>
+            {file && (
+              <button
+                type="button"
+                onClick={handleUnload}
+                title="Décharger le DXF de la mémoire et effacer la session enregistrée"
+                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100"
+              >
+                <Power size={15} /> Décharger
+              </button>
+            )}
             <button type="button" onClick={onClose} className="rounded-xl p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700" aria-label="Fermer">
               <X size={20} />
             </button>
@@ -194,4 +256,6 @@ DxfTakeoffModal.propTypes = {
   activeTrancheId: PropTypes.string,
   onApply: PropTypes.func.isRequired,
   onClose: PropTypes.func.isRequired,
+  visible: PropTypes.bool,
+  onUnload: PropTypes.func,
 };

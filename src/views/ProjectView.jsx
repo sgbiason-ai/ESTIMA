@@ -103,6 +103,13 @@ const ProjectView = ({
   const [showCloudPicker, setShowCloudPicker] = useState(false);
   const [showBpuAudit, setShowBpuAudit] = useState(false);
   const [showDxfTakeoff, setShowDxfTakeoff] = useState(false);
+  // Monté (rendu WebGL vivant) tant qu'on ne décharge pas / ne change pas de projet ;
+  // showDxfTakeoff ne fait que basculer sa visibilité → réouverture instantanée.
+  const [dxfMounted, setDxfMounted] = useState(false);
+  useEffect(() => {
+    setShowDxfTakeoff(false);
+    setDxfMounted(false);
+  }, [project?.id]);
 
   // ── Audit Bordereau (panneau latéral) ──
   // Adaptateur : onReplaceProject prend une valeur, useBpuAudit/useBpuData attendent un functional updater
@@ -905,7 +912,7 @@ const ProjectView = ({
             priceCheckCount={priceCheck.anomalyCount}
             onOpenBpuAudit={() => { refreshBpuAudit(); setShowBpuAudit(v => !v); }}
             bpuAuditActive={showBpuAudit}
-            onOpenTakeoff={() => setShowDxfTakeoff(true)}
+            onOpenTakeoff={() => { setDxfMounted(true); setShowDxfTakeoff(true); }}
             onUndo={onUndo}
             canUndo={canUndo}
             archives={archives}
@@ -1113,13 +1120,15 @@ const ProjectView = ({
       <ExportModal isOpen={exportModalState.show} onClose={() => setExportModalState(prev => ({ ...prev, show: false }))} onConfirm={handleConfirmExport} onPreviewPdf={handlePreviewPdf} format={exportModalState.format} type={exportModalState.type} hasTranches={hasTranches} tranches={tranches} activeTrancheId={activeTrancheId} />
       <ConfirmDeleteModal isOpen={deleteConfirm.show} onClose={() => setDeleteConfirm({ show: false, itemId: null })} onConfirm={() => { if(deleteConfirm.itemId) { handleRemoveItem(deleteConfirm.itemId); setDeleteConfirm({ show: false, itemId: null }); } }} />
       <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="estimation" />
-      {showDxfTakeoff && (
+      {dxfMounted && (
         <React.Suspense fallback={null}>
           <DxfTakeoffModal
             project={project}
             activeTrancheId={activeTrancheId}
             onApply={handleApplyTakeoff}
+            visible={showDxfTakeoff}
             onClose={() => setShowDxfTakeoff(false)}
+            onUnload={() => { setShowDxfTakeoff(false); setDxfMounted(false); }}
           />
         </React.Suspense>
       )}
