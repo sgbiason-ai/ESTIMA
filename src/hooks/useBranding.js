@@ -22,6 +22,7 @@ import { useMemo } from 'react';
 // Copie locale pour éviter une dépendance circulaire avec BrandingView.
 // Si DEFAULT_BRANDING évolue dans BrandingView, synchroniser ici.
 export const DEFAULT_BRANDING = {
+  coverTemplate: 'estima',
   logo:        null,
   companyName: '',
   tagline:     '',

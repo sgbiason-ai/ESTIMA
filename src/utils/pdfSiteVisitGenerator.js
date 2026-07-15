@@ -4,8 +4,9 @@
 
 import jsPDF from 'jspdf';
 import { buildTheme } from './pdf/buildTheme';
-import { loadImage, formatDateFr, formatDateLong, lightenRgb, loadLogos, fitTextToWidth } from './pdf/pdfSharedHelpers';
+import { loadImage, formatDateFr, formatDateLong, lightenRgb, loadLogos, fitTextToWidth, drawCoverPage as drawSharedCoverPage } from './pdf/pdfSharedHelpers';
 import { stampPdfCredit } from './estimaCredit';
+import { usesPapyrusCover } from './coverPageTemplate';
 
 const PW = 210, PH = 297;
 const M = { top: 18, left: 15, right: 15, bottom: 18 };
@@ -997,11 +998,27 @@ export const generateSiteVisitPdf = async (visit, options = {}) => {
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
 
-  // Charger logo
-  const { logoMoe } = await loadLogos(branding, {});
+  // Charger les logos disponibles pour la couverture et les en-têtes.
+  const logos = await loadLogos(branding, visit);
+  const { logoMoe } = logos;
 
   // ── Page 1 : Couverture ──
-  drawCoverPage(doc, visit, THEME, logoMoe, branding);
+  if (usesPapyrusCover(branding)) {
+    drawSharedCoverPage(doc, {
+      docType: 'RAPPORT DE VISITE DE CHANTIER',
+      title: visit?.nom || 'Visite de site',
+      phaseLabel: (visit?.phase || 'CHANTIER').toUpperCase(),
+      clientName: visit?.client || 'Non renseigné',
+      clientStreet: visit?.clientAddress || '',
+      clientCityZip: [visit?.clientZip, visit?.clientCity].filter(Boolean).join(' '),
+      locationRaw: visit?.lieu || 'Non renseigné',
+      codeAffaire: visit?.code || visit?.projectCode || '',
+      branding,
+      today: visit?.date ? formatDateFr(visit.date) : new Date().toLocaleDateString('fr-FR'),
+    }, THEME, logos);
+  } else {
+    drawCoverPage(doc, visit, THEME, logoMoe, branding);
+  }
 
   // ── Page 2 : Vue aerienne (generee via Canvas + tuiles ArcGIS) ──
   if (visit.gpsTracking?.coordinates?.length > 0) {

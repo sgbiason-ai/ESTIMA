@@ -9,9 +9,11 @@ import CoverPreview from './branding/CoverPreview';
 import DetailPreview from './branding/DetailPreview';
 import { SectionTitle, Field, Input, Select, ColorPicker, SizeSlider } from './branding/BrandingFormParts';
 import { resolveAdvancedColors, ADVANCED_TABLE_COLORS, ADVANCED_TITLE_COLORS } from './branding/brandingColors';
+import { COVER_TEMPLATE_OPTIONS } from '../utils/coverPageTemplate';
 
 // ─── SCHÉMA PAR DÉFAUT ────────────────────────────────────────────────────────
 export const DEFAULT_BRANDING = {
+  coverTemplate: 'estima',
   // Identité MOE
   logo: null,
   companyName: '',
@@ -224,6 +226,18 @@ const BrandingView = ({
           {/* ── IDENTITÉ ── */}
           {activeTab === 'identity' && (
             <>
+              <SectionTitle>Modèle de page de garde</SectionTitle>
+              <Field label="Mise en page globale">
+                <Select
+                  value={branding.coverTemplate}
+                  onChange={value => update('coverTemplate', value)}
+                  options={COVER_TEMPLATE_OPTIONS}
+                />
+              </Field>
+              <p className="text-[11px] leading-relaxed text-gray-400 mb-5">
+                Ce choix s’applique aux pages de garde des exports PDF, Word et Excel.
+              </p>
+
               <SectionTitle>Logo de votre société</SectionTitle>
               <div
                 onDrop={handleDrop}

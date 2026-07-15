@@ -3,8 +3,58 @@
 
 import React from 'react';
 import { hexToRgbString, lightenHex } from '../../utils/colorHelpers';
+import { usesPapyrusCover } from '../../utils/coverPageTemplate';
+
+const PapyrusCoverPreview = ({ branding, activeDocType, project }) => {
+  const labels = {
+    estimation: 'ESTIMATION CONFIDENTIELLE DES TRAVAUX', dqe: 'DÉTAIL QUANTITATIF ESTIMATIF (D.Q.E.)',
+    bpu: 'BORDEREAU DES PRIX UNITAIRES', cctp: 'CAHIER DES CLAUSES TECHNIQUES PARTICULIÈRES',
+    rc: 'RÈGLEMENT DE LA CONSULTATION', analysis: "RAPPORT D'ANALYSE DES OFFRES",
+  };
+  const today = new Date().toLocaleDateString('fr-FR');
+  const clientAddress = [project?.clientAddress, [project?.clientZip, project?.clientCity].filter(Boolean).join(' ')].filter(Boolean);
+  return (
+    <div className="relative w-full overflow-hidden bg-white shadow-2xl border border-black" style={{ aspectRatio: '210 / 297', fontFamily: 'Arial, sans-serif' }}>
+      <div className="absolute left-[3%] top-[2%] right-[3%] flex items-start gap-[3%]">
+        {project?.clientLogo && <img src={project.clientLogo} alt="logo MOA" className="w-[16%] h-auto max-h-20 object-contain" />}
+        <div className="pt-[1%] min-w-0">
+          <div className="text-[clamp(7px,2vw,16px)] font-black uppercase truncate">{project?.client || "MAÎTRE D'OUVRAGE"}</div>
+          {clientAddress.map((line, index) => <div key={index} className="text-[clamp(5px,1.2vw,10px)] leading-tight">{line}</div>)}
+        </div>
+      </div>
+      <div className="absolute left-[12%] right-[12%] top-[34%] -translate-y-1/2 text-center font-black uppercase leading-tight text-[clamp(11px,3.5vw,28px)]">
+        {project?.name || 'NOM DU PROJET'}
+        {project?.location && <div className="mt-2 text-[clamp(5px,1.1vw,9px)] font-normal">{project.location}</div>}
+      </div>
+      <div className="absolute left-[2.5%] right-[2.5%] top-[51%] h-[20%] bg-[#dedede] flex items-center justify-center pr-[21%]">
+        <div className="px-3 text-center uppercase text-[clamp(7px,2.4vw,19px)] leading-tight">{labels[activeDocType] || 'DOCUMENT DE MARCHÉ'}</div>
+      </div>
+      <div className="absolute right-[9.5%] top-[47.5%] w-[15%] space-y-[13%]">
+        {[['Phase:', project?.phase || 'DCE'], ['N°:', project?.code || '—'], ['Échelle:', project?.scale || '']].map(([label, value]) => (
+          <div key={label} className="relative aspect-[1.35] border-2 border-black bg-white px-1 pt-0.5">
+            <div className="text-[clamp(4px,0.9vw,7px)] underline">{label}</div>
+            <div className="absolute inset-x-0 top-[42%] text-center text-[clamp(7px,2vw,16px)] font-black truncate px-1">{value}</div>
+          </div>
+        ))}
+      </div>
+      <div className="absolute left-[7%] bottom-[5%] w-[62%] border border-black text-[clamp(3px,0.8vw,6px)]">
+        <div className="grid grid-cols-[16%_10%_1fr] text-center"><span className="border-r border-black">Date</span><span className="border-r border-black">Indice</span><span /></div>
+        <div className="grid grid-cols-[16%_10%_1fr] border-t border-black"><span className="border-r border-black px-1">{today}</span><span className="border-r border-black text-center">0</span><span className="px-1">Première diffusion</span></div>
+        {[0, 1, 2, 3].map(row => <div key={row} className="h-2 border-t border-black" />)}
+        <div className="border-t border-black text-right px-2">Affaire N° : {project?.code || '—'}</div>
+      </div>
+      <div className="absolute right-[6%] bottom-[4.5%] w-[23%] text-[clamp(3px,0.8vw,6px)] leading-tight">
+        {branding.logo && <img src={branding.logo} alt="logo MOE" className="w-full h-12 object-contain object-left mb-1" />}
+        <div>{branding.companyName}</div><div>{branding.address}</div><div>{branding.zip} {branding.city}</div><div>{branding.phone}</div><div>{branding.email}</div>
+      </div>
+    </div>
+  );
+};
 
 const CoverPreview = ({ branding, activeDocType, project }) => {
+  if (usesPapyrusCover(branding)) {
+    return <PapyrusCoverPreview branding={branding} activeDocType={activeDocType} project={project} />;
+  }
   const docTypeLabel = {
     estimation: 'ESTIMATION CONFIDENTIELLE DES TRAVAUX',
     dqe:        'DÉTAIL QUANTITATIF ET ESTIMATIF',

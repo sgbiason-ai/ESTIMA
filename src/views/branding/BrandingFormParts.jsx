@@ -37,9 +37,11 @@ export const Select = ({ value, onChange, options }) => (
                text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-100
                focus:border-blue-400 focus:bg-white transition-all duration-150"
   >
-    {options.map(o => (
-      <option key={o} value={o}>{o}</option>
-    ))}
+    {options.map(o => {
+      const value = typeof o === 'string' ? o : o.value;
+      const label = typeof o === 'string' ? o : o.label;
+      return <option key={value} value={value}>{label}</option>;
+    })}
   </select>
 );
 

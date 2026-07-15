@@ -2,6 +2,8 @@
 // Helpers partagés entre tous les générateurs PDF (jsPDF)
 // Centralise : conversion couleurs, chargement images, formatage dates
 
+import { usesPapyrusCover } from '../coverPageTemplate';
+
 // ─── COULEURS ──────────────────────────────────────────────────────────────
 
 /** Convertit un hex (#RRGGBB) en tableau [R, G, B]. Retourne null si invalide. */
@@ -309,7 +311,126 @@ export const drawMoeFooter = (doc, branding, theme, today) => {
  * @param {{ logoMoe: HTMLImageElement|null, logoClient: HTMLImageElement|null }} logos
  * @returns {{ blockEndY: number }} position Y après le dernier bloc, pour continuer le contenu
  */
+const drawPapyrusCoverPage = (doc, config, theme, logos) => {
+  const pageWidth = doc.internal.pageSize.width;
+  const pageHeight = doc.internal.pageSize.height;
+  const {
+    docType = '', title: rawTitle, subtitle1 = '', subtitle2 = '', phaseLabel = '',
+    clientName = '', clientStreet = '', clientCityZip = '', locationRaw = '',
+    codeAffaire = '', documentNumber = '', scale = '', branding, today,
+    extraBlocks = [],
+  } = config;
+  const { logoMoe, logoClient, logoCoTraitants = [] } = logos;
+  const margin = 6;
+
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.35);
+  doc.rect(0.5, 0.5, pageWidth - 1, pageHeight - 1);
+
+  // Identité du maître d'ouvrage, calée comme le cartouche de référence.
+  if (logoClient) renderLogo(doc, logoClient, margin, 6, 30, 32);
+  const moaX = logoClient ? 41 : margin + 2;
+  doc.setFont('Helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor(0, 0, 0);
+  doc.text(fitTextToWidth(doc, (clientName || "MAÎTRE D'OUVRAGE").toUpperCase(), pageWidth - moaX - margin), moaX, 17);
+  doc.setFont('Helvetica', 'normal'); doc.setFontSize(10);
+  const moaLines = [clientStreet, clientCityZip].filter(Boolean);
+  moaLines.forEach((line, index) => doc.text(fitTextToWidth(doc, line, pageWidth - moaX - margin), moaX, 24 + index * 6));
+
+  // Titre de l'opération au centre de la page.
+  const titleParts = [rawTitle || 'NOM DU PROJET', subtitle1, subtitle2].filter(Boolean).join('\n').toUpperCase();
+  doc.setFont('Helvetica', 'bold'); doc.setFontSize(22);
+  const titleLines = doc.splitTextToSize(titleParts, pageWidth - 70);
+  const titleStartY = 105 - ((titleLines.length - 1) * 5);
+  doc.text(titleLines, pageWidth / 2, titleStartY, { align: 'center' });
+  if (locationRaw) {
+    doc.setFont('Helvetica', 'normal'); doc.setFontSize(10);
+    doc.text(fitTextToWidth(doc, locationRaw.toUpperCase(), pageWidth - 70), pageWidth / 2, titleStartY + titleLines.length * 9 + 3, { align: 'center' });
+  }
+
+  // Bandeau document et cartouches verticaux Phase / N° / Échelle.
+  const bandX = 5;
+  const bandY = 151;
+  const bandW = pageWidth - 10;
+  const bandH = 60;
+  const cardsW = 31;
+  const cardsX = pageWidth - margin - cardsW - 14;
+  doc.setFillColor(222, 222, 222);
+  doc.rect(bandX, bandY, bandW, bandH, 'F');
+  doc.setFont('Helvetica', 'normal'); doc.setFontSize(18); doc.setTextColor(0, 0, 0);
+  const documentLines = doc.splitTextToSize((docType || 'DOCUMENT DE MARCHÉ').toUpperCase(), cardsX - bandX - 14);
+  doc.text(documentLines, (bandX + cardsX) / 2, bandY + 31 - (documentLines.length - 1) * 4, { align: 'center' });
+
+  const drawCard = (label, value, y, height = 21) => {
+    doc.setFillColor(255, 255, 255); doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.8);
+    doc.rect(cardsX, y, cardsW, height, 'FD');
+    doc.setFont('Helvetica', 'normal'); doc.setFontSize(7); doc.text(label, cardsX + 1.5, y + 4.5);
+    doc.line(cardsX + 1.5, y + 5.5, cardsX + 7, y + 5.5);
+    if (value) {
+      doc.setFont('Helvetica', 'bold'); doc.setFontSize(15);
+      doc.text(fitTextToWidth(doc, String(value).toUpperCase(), cardsW - 4), cardsX + cardsW / 2, y + 14.5, { align: 'center' });
+    }
+  };
+  drawCard('Phase:', phaseLabel, bandY - 10, 21);
+  drawCard('N°:', documentNumber || codeAffaire, bandY + 25, 21);
+  drawCard('Échelle:', scale, bandY + 55, 21);
+
+  // Données complémentaires propres à certains documents (RAO notamment).
+  let extraY = bandY + bandH + 8;
+  extraBlocks.forEach((block) => {
+    (block.rows || []).forEach((row) => {
+      const x = row.col === 2 ? pageWidth / 2 + 4 : 15;
+      doc.setFont('Helvetica', 'bold'); doc.setFontSize(7); doc.text(row.label, x, extraY);
+      doc.setFont('Helvetica', 'normal'); doc.setFontSize(8);
+      doc.text(fitTextToWidth(doc, row.value || '—', pageWidth / 2 - 25), x, extraY + 4);
+    });
+    extraY += 12;
+  });
+
+  // Tableau des indices et référence affaire.
+  const tableX = 15;
+  const tableY = 243;
+  const tableW = 130;
+  const rowH = 5;
+  const dateW = 22;
+  const indexW = 12;
+  doc.setLineWidth(0.25); doc.setDrawColor(0, 0, 0);
+  for (let row = 0; row <= 7; row += 1) doc.line(tableX, tableY + row * rowH, tableX + tableW, tableY + row * rowH);
+  [tableX, tableX + dateW, tableX + dateW + indexW, tableX + tableW].forEach(x => doc.line(x, tableY, x, tableY + 7 * rowH));
+  doc.setFont('Helvetica', 'normal'); doc.setFontSize(7);
+  doc.text('Date', tableX + dateW / 2, tableY + 3.5, { align: 'center' });
+  doc.text('Indice', tableX + dateW + indexW / 2, tableY + 3.5, { align: 'center' });
+  doc.setFontSize(6.5);
+  doc.text((today || '').toUpperCase(), tableX + 1, tableY + rowH + 3.5);
+  doc.text('0', tableX + dateW + indexW / 2, tableY + rowH + 3.5, { align: 'center' });
+  doc.text('Première diffusion', tableX + dateW + indexW + 2, tableY + rowH + 3.5);
+  doc.setFontSize(7.5);
+  doc.text(`Affaire N° : ${codeAffaire || '—'}`, tableX + tableW - 2, tableY + 7 * rowH - 1.5, { align: 'right' });
+
+  // Identité de la maîtrise d'œuvre en bas à droite.
+  const moeX = pageWidth - 57;
+  if (logoMoe) renderLogo(doc, logoMoe, moeX, 238, 43, 24);
+  let coY = 263;
+  logoCoTraitants.slice(0, 2).forEach((logo) => {
+    if (logo) { renderLogo(doc, logo, moeX, coY, 43, 10); coY += 10; }
+  });
+  doc.setFont('Helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...(theme.text || [0, 0, 0]));
+  const contactLines = [
+    branding?.companyName,
+    branding?.address,
+    [branding?.zip, branding?.city].filter(Boolean).join(' '),
+    branding?.phone ? `Tél : ${branding.phone}` : '',
+    branding?.email ? `Mail : ${branding.email}` : '',
+    branding?.website,
+  ].filter(Boolean);
+  contactLines.slice(0, 6).forEach((line, index) => doc.text(fitTextToWidth(doc, line, 49), moeX, 265 + index * 4.2));
+
+  return { blockEndY: bandY + bandH };
+};
+
 export const drawCoverPage = (doc, config, theme, logos) => {
+  if (usesPapyrusCover(config?.branding)) {
+    return drawPapyrusCoverPage(doc, config, theme, logos);
+  }
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
   const {

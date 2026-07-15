@@ -5,6 +5,8 @@ import { stampPdfCredit } from '../../../utils/estimaCredit';
 import { cleanText } from '../../../utils/helpers';
 import { toast } from '../../../utils/globalUI';
 import { PAGE_WIDTH_PX, PAGE_HEIGHT_PX } from '../constants/bpuLayout';
+import { buildCoverPageCanvas } from '../../../utils/coverPageCanvas';
+import { usesPapyrusCover } from '../../../utils/coverPageTemplate';
 
 /**
  * useBpuPdfExport
@@ -19,7 +21,7 @@ import { PAGE_WIDTH_PX, PAGE_HEIGHT_PX } from '../constants/bpuLayout';
 // quasi nul à l'impression A4 et un coût temps ~+70%.
 const PDF_CAPTURE_SCALE = 1.5;
 
-export const useBpuPdfExport = ({ project }) => {
+export const useBpuPdfExport = ({ project, branding }) => {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [pdfProgress, setPdfProgress] = useState({ current: 0, total: 0 });
 
@@ -98,14 +100,19 @@ export const useBpuPdfExport = ({ project }) => {
 
       // ── PAGE DE GARDE (div cachée #bpu-pdf-cover) ────────────────────────
       if (coverElement) {
-        coverElement.style.display = 'block';
-        const coverCanvas = await html2canvas(coverElement, {
-          scale: PDF_CAPTURE_SCALE, useCORS: true, logging: false,
-          backgroundColor: '#ffffff',
-          windowWidth: PAGE_WIDTH_PX, windowHeight: PAGE_HEIGHT_PX,
-        });
-        coverElement.style.display = 'none';
-        doc.addImage(coverCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pageWidth, pageHeight, undefined, 'FAST');
+        if (usesPapyrusCover(branding)) {
+          const coverDataUrl = await buildCoverPageCanvas(project, 'BORDEREAU DES PRIX UNITAIRES', branding);
+          doc.addImage(coverDataUrl, 'PNG', 0, 0, pageWidth, pageHeight, undefined, 'FAST');
+        } else {
+          coverElement.style.display = 'block';
+          const coverCanvas = await html2canvas(coverElement, {
+            scale: PDF_CAPTURE_SCALE, useCORS: true, logging: false,
+            backgroundColor: '#ffffff',
+            windowWidth: PAGE_WIDTH_PX, windowHeight: PAGE_HEIGHT_PX,
+          });
+          coverElement.style.display = 'none';
+          doc.addImage(coverCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pageWidth, pageHeight, undefined, 'FAST');
+        }
         done += 1;
         setPdfProgress({ current: done, total });
       }

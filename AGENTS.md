@@ -1,6 +1,6 @@
 # AGENTS.md – EstimaVRD Workflow & Agents
 
-**V2.5** | Juin 2026 | Samuel & Codex | Économe tokens
+**V2.6** | Juillet 2026 | Samuel & Codex | Économe tokens
 
 ---
 
@@ -482,6 +482,7 @@ src/App.jsx                  # Sidebar nav + routing + FAB switch-to-mobile (tab
 - [x] **Audit 2026-06 — RAO source unique** : scoring f1-f9 + OAB Double Moyenne centralisés dans `analysisCompute` (`scoreOffer` / `computeOABThreshold`), mobile aligné sur desktop (clamp `[0,N]`), +25 tests
 - [x] **Audit 2026-06 — Résilience** : `ErrorBoundary` variant `inline` par module (helper `Lazy`) → crash de vue isolé
 - [x] **Audit 2026-06 — Fix env** : `firebase.js` ne lit plus `window` à l'import (suite verte, +21 tests débloqués)
+- [x] **Pages de garde** : choix global entre modèle Estima et « CARTOUCHE PAPYRUS STANDART » pour les exports PDF, Word et Excel existants
 - [ ] RAO: Export PDF avec sous-critères et groupements
 - [ ] CRC: form → Firestore → PDF complet
 - [ ] Admin-docs: templates éditables + role check
@@ -648,6 +649,7 @@ MOI: Code rules + tests
 
 | V | Date | Changes |
 |---|------|---------|
+| 2.6 | Juillet 2026 | **Pages de garde** : ajout du modèle global « CARTOUCHE PAPYRUS STANDART » inspiré du cartouche DCE, avec adaptation automatique des identités MOA/MOE, logos et champs projet sur les exports PDF, Word et Excel existants |
 | 2.5 | Juin 2026 | **Audit complet** (6 commits) : perf bundle −49 % (preload Vite isolé), 5 bugs hooks conditionnels corrigés, fix `firebase.js` lecture `window` à l'import, **RAO source unique** (scoring f1-f9 + OAB Double Moyenne dans `analysisCompute`, mobile aligné desktop, +25 tests), **ErrorBoundary par module** (variant `inline`). Backlog audit ajouté (§12) : Firestore rules, perf AnalysisTable, ESLint, xlsx |
 | 2.4 | Avril 2026 | **Support tablette Galaxy Tab S10 FE** : useDeviceMode, container adaptatif, split-view listes, hub multi-colonnes, caméra tablette (CRC + Visites), ribbon responsive, table observations compactée, toggle déplier/replier participants. **Règles d'Or** : questions d'abord, demander avant commit/deploy |
 | 2.3 | Avril 2026 | **Module RAO complet** : sauvegarde Firestore dédiée, sous-critères, groupements, OAB détail, volets figés, vue mobile RAO 4 onglets, hub mobile 2x3, import Excel multi-onglets + fallback ref, export/import JSON |

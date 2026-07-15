@@ -12,10 +12,13 @@ export const hexToDocxColor = (hex) => (hex ? hex.replace('#', '') : "286E55");
 // Centralisé ici pour que tous les fichiers utilisent le même objet normalisé.
 
 export const resolveBranding = (masterBranding = {}) => ({
+  coverTemplate: masterBranding?.coverTemplate || 'estima',
   logo:        masterBranding?.logo        || null,
   companyName: masterBranding?.companyName || '',
   tagline:     masterBranding?.tagline     || '',
   address:     masterBranding?.address     || '',
+  zip:         masterBranding?.zip         || '',
+  city:        masterBranding?.city        || '',
   phone:       masterBranding?.phone       || '',
   email:       masterBranding?.email       || '',
   website:     masterBranding?.website     || '',

@@ -6,6 +6,8 @@ import { cleanText, normalizeUnitSymbol } from '../../../utils/helpers';
 import { hexToDocxColor } from '../utils/bpuBrandingUtils';
 import { getRawDescription, normalizeToHtml } from '../utils/bpuDescriptionUtils';
 import { getCurrentPhase } from '../../../utils/phaseModel';
+import { buildCoverPageCanvas } from '../../../utils/coverPageCanvas';
+import { usesPapyrusCover } from '../../../utils/coverPageTemplate';
 
 let Document, Packer, Paragraph, Table, TableCell, TableRow,
     WidthType, BorderStyle, TextRun, AlignmentType,
@@ -220,7 +222,24 @@ export const useBpuWordExport = ({
         }),
       ];
 
-      const coverSection = { properties: { type: 'nextPage' }, children: coverParagraphs };
+      let coverSection = { properties: { type: 'nextPage' }, children: coverParagraphs };
+      if (usesPapyrusCover(branding)) {
+        const coverDataUrl = await buildCoverPageCanvas(project, 'BORDEREAU DES PRIX UNITAIRES', branding);
+        coverSection = {
+          properties: {
+            type: 'nextPage',
+            page: { margin: { top: 0, right: 0, bottom: 0, left: 0 } },
+          },
+          children: [new Paragraph({
+            spacing: { before: 0, after: 0, line: 1 },
+            children: [new ImageRun({
+              type: 'png',
+              data: base64ToUint8Array(coverDataUrl),
+              transformation: { width: 794, height: 1123 },
+            })],
+          })],
+        };
+      }
 
       // ── LIGNES DU TABLEAU ─────────────────────────────────────────────────
       const tableRows = await Promise.all(sortedCatalog.map(async (item) => {

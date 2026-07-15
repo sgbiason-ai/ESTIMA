@@ -23,6 +23,7 @@ const ptpx = (pt) => pt * S * 0.352778;
 import { loadImage as sharedLoadImage } from './pdf/pdfSharedHelpers';
 import { buildTheme } from './pdf/buildTheme';
 import { getCurrentPhaseCode } from './phaseModel';
+import { usesPapyrusCover } from './coverPageTemplate';
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 const rgb = ([r, g, b]) => `rgb(${r},${g},${b})`;
@@ -78,6 +79,84 @@ const roundedRect = (ctx, x, y, w, h, r) => {
 
 const loadImage = sharedLoadImage;
 
+const drawImageContain = (ctx, image, x, y, maxW, maxH) => {
+  if (!image) return;
+  const ratio = image.width / image.height;
+  let width = maxW;
+  let height = width / ratio;
+  if (height > maxH) { height = maxH; width = height * ratio; }
+  ctx.drawImage(image, px(x + (maxW - width) / 2), px(y + (maxH - height) / 2), px(width), px(height));
+};
+
+const drawPapyrusCanvas = (ctx, project, docLabel, branding, logos, values) => {
+  const { logoMoe, logoClient, logoCoTraitants } = logos;
+  const { phaseLabel, clientName, clientStreet, clientCityZip, locationRaw, codeAffaire, subtitle1, subtitle2, today } = values;
+  ctx.strokeStyle = '#000000'; ctx.lineWidth = px(0.35);
+  ctx.strokeRect(px(0.5), px(0.5), px(PW - 1), px(PH - 1));
+
+  drawImageContain(ctx, logoClient, 6, 6, 30, 32);
+  const moaX = logoClient ? 41 : 8;
+  ctx.fillStyle = '#000000'; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  ctx.font = `bold ${ptpx(15)}px Helvetica, Arial, sans-serif`;
+  ctx.fillText(fitCanvasText(ctx, clientName.toUpperCase(), px(PW - moaX - 6)), px(moaX), px(17));
+  ctx.font = `normal ${ptpx(10)}px Helvetica, Arial, sans-serif`;
+  [clientStreet, clientCityZip].filter(Boolean).forEach((line, index) => {
+    ctx.fillText(fitCanvasText(ctx, line, px(PW - moaX - 6)), px(moaX), px(24 + index * 6));
+  });
+
+  ctx.textAlign = 'center'; ctx.font = `bold ${ptpx(22)}px Helvetica, Arial, sans-serif`;
+  const title = [project?.name || 'NOM DU PROJET', subtitle1, subtitle2].filter(Boolean).join(' ').toUpperCase();
+  const titleLines = splitTextToSize(ctx, title, PW - 70);
+  const titleY = 105 - (titleLines.length - 1) * 5;
+  titleLines.forEach((line, index) => ctx.fillText(line, px(PW / 2), px(titleY + index * 9)));
+  if (locationRaw) {
+    ctx.font = `normal ${ptpx(10)}px Helvetica, Arial, sans-serif`;
+    ctx.fillText(fitCanvasText(ctx, locationRaw.toUpperCase(), px(PW - 70)), px(PW / 2), px(titleY + titleLines.length * 9 + 3));
+  }
+
+  const bandY = 151;
+  const cardsX = PW - 6 - 31 - 14;
+  ctx.fillStyle = '#DEDEDE'; ctx.fillRect(px(5), px(bandY), px(PW - 10), px(60));
+  ctx.fillStyle = '#000000'; ctx.font = `normal ${ptpx(18)}px Helvetica, Arial, sans-serif`;
+  const docLines = splitTextToSize(ctx, (docLabel || 'DOCUMENT DE MARCHÉ').toUpperCase(), cardsX - 19);
+  docLines.forEach((line, index) => ctx.fillText(line, px((5 + cardsX) / 2), px(bandY + 31 - (docLines.length - 1) * 4 + index * 8)));
+
+  const drawCard = (label, value, y) => {
+    ctx.fillStyle = '#FFFFFF'; ctx.strokeStyle = '#000000'; ctx.lineWidth = px(0.8);
+    ctx.fillRect(px(cardsX), px(y), px(31), px(21)); ctx.strokeRect(px(cardsX), px(y), px(31), px(21));
+    ctx.textAlign = 'left'; ctx.fillStyle = '#000000'; ctx.font = `normal ${ptpx(7)}px Helvetica, Arial, sans-serif`;
+    ctx.fillText(label, px(cardsX + 1.5), px(y + 4.5));
+    ctx.beginPath(); ctx.moveTo(px(cardsX + 1.5), px(y + 5.5)); ctx.lineTo(px(cardsX + 7), px(y + 5.5)); ctx.stroke();
+    if (value) {
+      ctx.textAlign = 'center'; ctx.font = `bold ${ptpx(15)}px Helvetica, Arial, sans-serif`;
+      ctx.fillText(fitCanvasText(ctx, String(value).toUpperCase(), px(27)), px(cardsX + 15.5), px(y + 14.5));
+    }
+  };
+  drawCard('Phase:', phaseLabel, bandY - 10);
+  drawCard('N°:', codeAffaire, bandY + 25);
+  drawCard('Échelle:', project?.scale || '', bandY + 55);
+
+  const tableX = 15, tableY = 243, tableW = 130, rowH = 5, dateW = 22, indexW = 12;
+  ctx.strokeStyle = '#000000'; ctx.lineWidth = px(0.25);
+  for (let row = 0; row <= 7; row += 1) { ctx.beginPath(); ctx.moveTo(px(tableX), px(tableY + row * rowH)); ctx.lineTo(px(tableX + tableW), px(tableY + row * rowH)); ctx.stroke(); }
+  [tableX, tableX + dateW, tableX + dateW + indexW, tableX + tableW].forEach((x) => { ctx.beginPath(); ctx.moveTo(px(x), px(tableY)); ctx.lineTo(px(x), px(tableY + 7 * rowH)); ctx.stroke(); });
+  ctx.fillStyle = '#000000'; ctx.textAlign = 'center'; ctx.font = `normal ${ptpx(7)}px Helvetica, Arial, sans-serif`;
+  ctx.fillText('Date', px(tableX + dateW / 2), px(tableY + 3.5));
+  ctx.fillText('Indice', px(tableX + dateW + indexW / 2), px(tableY + 3.5));
+  ctx.textAlign = 'left'; ctx.font = `normal ${ptpx(6.5)}px Helvetica, Arial, sans-serif`;
+  ctx.fillText(today.toUpperCase(), px(tableX + 1), px(tableY + rowH + 3.5));
+  ctx.textAlign = 'center'; ctx.fillText('0', px(tableX + dateW + indexW / 2), px(tableY + rowH + 3.5));
+  ctx.textAlign = 'left'; ctx.fillText('Première diffusion', px(tableX + dateW + indexW + 2), px(tableY + rowH + 3.5));
+  ctx.textAlign = 'right'; ctx.font = `normal ${ptpx(7.5)}px Helvetica, Arial, sans-serif`;
+  ctx.fillText(`Affaire N° : ${codeAffaire || '—'}`, px(tableX + tableW - 2), px(tableY + 7 * rowH - 1.5));
+
+  drawImageContain(ctx, logoMoe, PW - 57, 238, 43, 24);
+  logoCoTraitants.slice(0, 2).forEach((logo, index) => drawImageContain(ctx, logo, PW - 57, 263 + index * 10, 43, 9));
+  ctx.textAlign = 'left'; ctx.fillStyle = '#000000'; ctx.font = `normal ${ptpx(7)}px Helvetica, Arial, sans-serif`;
+  const contactLines = [branding?.companyName, branding?.address, [branding?.zip, branding?.city].filter(Boolean).join(' '), branding?.phone ? `Tél : ${branding.phone}` : '', branding?.email ? `Mail : ${branding.email}` : '', branding?.website].filter(Boolean);
+  contactLines.slice(0, 6).forEach((line, index) => ctx.fillText(fitCanvasText(ctx, line, px(49)), px(PW - 57), px(265 + index * 4.2)));
+};
+
 // ─── RENDU PRINCIPAL ──────────────────────────────────────────────────────────
 /**
  * Reproduit drawCoverPage (pdfGenerator.js) sur un canvas HTML.
@@ -119,6 +198,14 @@ export const buildCoverPageCanvas = async (project, docLabel, branding = null, t
     loadImage(project.clientLogo || null),
     ...coTraitantSrcs.map(loadImage),
   ]);
+
+  if (usesPapyrusCover(branding)) {
+    drawPapyrusCanvas(ctx, project, docLabel, branding, { logoMoe, logoClient, logoCoTraitants }, {
+      phaseLabel, clientName, clientStreet, clientCityZip, locationRaw, codeAffaire,
+      subtitle1, subtitle2, today,
+    });
+    return canvas.toDataURL('image/png');
+  }
 
   // ── 1. Bande de couleur gauche ──────────────────────────────────────────────
   ctx.fillStyle = rgb(THEME.primary);

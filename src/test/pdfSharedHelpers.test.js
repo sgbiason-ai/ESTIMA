@@ -395,4 +395,19 @@ describe('drawCoverPage', () => {
     // Au moins les 12 roundedRect des signatures (4 × 3) + ceux de la page
     expect(roundedRectCalls.length).toBeGreaterThanOrEqual(12);
   });
+
+  it('utilise le cartouche Papyrus quand le branding le demande', () => {
+    const textCalls = [];
+    const doc = { ...makeDoc(), text: (...args) => textCalls.push(args) };
+    const result = drawCoverPage(doc, {
+      docType: 'DÉTAIL QUANTITATIF ESTIMATIF', title: 'Route du port', phaseLabel: 'DCE',
+      clientName: 'Mairie de Lavaur', clientStreet: 'Rue du Général Sudre',
+      clientCityZip: '81500 Lavaur', locationRaw: 'Lavaur', codeAffaire: '26-0750',
+      branding: { coverTemplate: 'papyrus_standard', companyName: 'Papyrus' }, today: '15/07/2026',
+    }, theme, { logoMoe: null, logoClient: null });
+
+    expect(result.blockEndY).toBe(211);
+    expect(textCalls.some(call => String(call[0]).includes('Affaire N°'))).toBe(true);
+    expect(textCalls.some(call => String(call[0]).includes('Première diffusion'))).toBe(true);
+  });
 });

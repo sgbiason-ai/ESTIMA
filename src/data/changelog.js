@@ -8,6 +8,14 @@ export { APP_VERSION } from './appVersion';
 
 export const CHANGELOG = [
   {
+    version: '3.6.0',
+    date: '2026-07-15',
+    title: 'Pages de garde — cartouche Papyrus standard',
+    highlights: [
+      'Identité et charte graphique — nouveau modèle « CARTOUCHE PAPYRUS STANDART », inspiré du cartouche DCE Papyrus : identité MOA, titre d’opération, bandeau document, cases Phase/N°/Échelle, tableau des indices et identité MOE. Le choix est sauvegardé pour l’entreprise et s’applique aux pages de garde PDF, Word et Excel existantes (Estimation/DQE, BPU, CCTP/RC/CCAP, Analyse/RAO, visite de chantier et page de garde seule), tandis que le modèle Estima reste sélectionné par défaut pour les configurations existantes',
+    ],
+  },
+  {
     version: '3.5.9',
     date: '2026-07-15',
     title: 'Export Excel DQE — prix uniques par numéro',

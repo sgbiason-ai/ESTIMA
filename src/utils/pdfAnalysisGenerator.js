@@ -25,11 +25,12 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { cleanText, normalizeUnitSymbol } from './helpers';
-import { sanitizeFilename, formatNumberFr, fitTextToWidth } from './pdf/pdfSharedHelpers';
+import { sanitizeFilename, formatNumberFr, fitTextToWidth, loadLogos, drawCoverPage as drawSharedCoverPage } from './pdf/pdfSharedHelpers';
 import { stampPdfCredit } from './estimaCredit';
 import { buildTheme as _buildTheme } from './pdf/buildTheme';
 import { getCurrentPhaseCode } from './phaseModel';
 import { computeOABThreshold as calculateOABThreshold } from './analysisCompute';
+import { usesPapyrusCover } from './coverPageTemplate';
 
 // ─── CONSTRUCTION DU THÈME DEPUIS LE BRANDING ───────────────────────────────
 // Analyse utilise des defaults vert foncé différents du thème principal.
@@ -296,8 +297,26 @@ export const generateAnalysisPDF = async ({
     if (data && dims) coTraitantLogos.push({ data, dims });
   }
 
-  // Page de garde A4 — [MODIFIÉ] : on passe `branding`
-  drawCoverPage(doc, project, logoMoeData, logoMoeDims, logoClientData, logoClientDims, "RAPPORT D'ANALYSE DES OFFRES", dateStr, branding, coTraitantLogos);
+  // Page de garde A4 — le cartouche Papyrus passe par le moteur partagé.
+  if (usesPapyrusCover(branding)) {
+    const sharedLogos = await loadLogos(branding, project);
+    drawSharedCoverPage(doc, {
+      docType: "RAPPORT D'ANALYSE DES OFFRES",
+      title: project?.name,
+      subtitle1: (project?.subtitle1 || '').trim(),
+      subtitle2: (project?.subtitle2 || '').trim(),
+      phaseLabel: getCurrentPhaseCode(project).toUpperCase(),
+      clientName: project?.client || 'Non renseigné',
+      clientStreet: (project?.clientAddress || '').trim(),
+      clientCityZip: [project?.clientZip, project?.clientCity].filter(Boolean).join(' ').trim(),
+      locationRaw: project?.location || 'Non renseignée',
+      codeAffaire: project?.code || 'Non défini',
+      branding,
+      today: dateStr,
+    }, buildTheme(branding), sharedLogos);
+  } else {
+    drawCoverPage(doc, project, logoMoeData, logoMoeDims, logoClientData, logoClientDims, "RAPPORT D'ANALYSE DES OFFRES", dateStr, branding, coTraitantLogos);
+  }
 
   // Passage A3 paysage
   doc.addPage('a3', 'l');

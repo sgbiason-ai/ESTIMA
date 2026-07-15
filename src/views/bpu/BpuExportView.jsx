@@ -60,7 +60,7 @@ const BpuExportView = ({
   const { isGeneratingWord, handleDownloadWord } = useBpuWordExport({
     project, branding, resolvedLogo, sortedCatalog, unitResolver, articlesDb,
   });
-  const { isGeneratingPdf, pdfProgress, handleDownloadPdf } = useBpuPdfExport({ project, pages });
+  const { isGeneratingPdf, pdfProgress, handleDownloadPdf } = useBpuPdfExport({ project, pages, branding });
 
   return (
     <div className="flex flex-col bg-slate-200 h-screen w-full relative font-sans text-slate-900 overflow-hidden">

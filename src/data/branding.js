@@ -23,6 +23,9 @@
 // ═══════════════════════════════════════════════════════════════════
 
 export const DEFAULT_BRANDING = {
+  // Modèle global utilisé par les pages de garde PDF, Word et Excel.
+  coverTemplate: 'estima',
+
   // Identité société (affiché en pied de page de garde)
   logo:        null,
   companyName: '',
