@@ -72,7 +72,7 @@ const removeAccents = (str) =>
 
 /** Fallback de chargement pour React.lazy / Suspense */
 const LazyFallback = () => (
-  <div className="flex h-screen items-center justify-center bg-[#f5f5f7]">
+  <div className="flex h-full items-center justify-center bg-[#f5f5f7]">
     <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
   </div>
 );
