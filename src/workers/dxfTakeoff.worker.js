@@ -2,6 +2,11 @@ import DxfParser from 'dxf-viewer/src/parser/DxfParser.js';
 import { DxfScene } from 'dxf-viewer/src/DxfScene.js';
 import opentype from 'opentype.js';
 import { aggregateDxfTakeoff } from '../utils/takeoff/dxfTakeoff';
+import {
+  computeLayoutPaperBounds,
+  createPaperSpaceDxf,
+  scanDxfStructure,
+} from '../utils/takeoff/dxfLayouts';
 
 const SIGNATURE = 'DxfWorkerMsg';
 const LOAD = 'LOAD';
@@ -37,25 +42,23 @@ async function fetchDxf(url, encoding, sequence) {
     sendProgress(sequence, 'fetch', receivedSize, totalSize);
   }
 
-  const rawEntityCounts = {};
-  const entityPattern = /(?:^|\r?\n)\s*0\r?\n([A-Z][A-Z0-9_]*)\r?\n/g;
-  let match;
-  while ((match = entityPattern.exec(buffer)) !== null) {
-    const type = match[1];
-    rawEntityCounts[type] = (rawEntityCounts[type] || 0) + 1;
-  }
-
   sendProgress(sequence, 'parse', 0, totalSize);
+  const structure = scanDxfStructure(buffer);
   const dxf = new DxfParser().parseSync(buffer);
-  return { dxf, rawEntityCounts };
+  return { dxf, structure };
 }
 
 function createFontFetchers(urls, sequence) {
+  const cache = new Map();
   return (urls || []).map((url) => async () => {
-    sendProgress(sequence, 'font', 0, null);
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Police DXF inaccessible (${response.status})`);
-    const font = opentype.parse(await response.arrayBuffer());
+    if (!cache.has(url)) {
+      sendProgress(sequence, 'font', 0, null);
+      cache.set(url, fetch(url).then(async (response) => {
+        if (!response.ok) throw new Error(`Police DXF inaccessible (${response.status})`);
+        return opentype.parse(await response.arrayBuffer());
+      }));
+    }
+    const font = await cache.get(url);
     sendProgress(sequence, 'prepare', 0, null);
     return font;
   });
@@ -75,6 +78,36 @@ function removeInvalidHatches(dxf) {
   return skipped;
 }
 
+function addSceneTransfers(scene, transfers) {
+  transfers.push(scene.vertices, scene.indices, scene.transforms);
+}
+
+async function buildPaperLayouts(dxf, layouts, options, fontFetchers, sequence, transfers) {
+  const paperOptions = {
+    ...options,
+    sceneOptions: { ...options.sceneOptions, suppressPaperSpace: false },
+  };
+  const result = [];
+
+  for (let index = 0; index < layouts.length; index += 1) {
+    sendProgress(sequence, 'layouts', index, layouts.length);
+    const layout = layouts[index];
+    const paperDxf = createPaperSpaceDxf(dxf, layout);
+    const paperSceneBuilder = new DxfScene(paperOptions);
+    await paperSceneBuilder.Build(paperDxf, fontFetchers);
+    const paperScene = paperSceneBuilder.scene;
+    addSceneTransfers(paperScene, transfers);
+    result.push({
+      ...layout,
+      paperEntityCount: paperDxf.entities.length,
+      paperBounds: computeLayoutPaperBounds(layout, paperScene.bounds),
+      paperScene,
+    });
+  }
+  sendProgress(sequence, 'layouts', layouts.length, layouts.length);
+  return result;
+}
+
 self.onmessage = async (event) => {
   const message = event.data;
   if (message?.signature !== SIGNATURE) return;
@@ -84,17 +117,26 @@ self.onmessage = async (event) => {
   try {
     if (message.type === LOAD) {
       const { url, fonts, options = {} } = message.data || {};
-      const { dxf, rawEntityCounts } = await fetchDxf(url, options.fileEncoding, message.seq);
-      const takeoffSummary = aggregateDxfTakeoff(dxf, rawEntityCounts);
+      const { dxf, structure } = await fetchDxf(url, options.fileEncoding, message.seq);
+      const takeoffSummary = aggregateDxfTakeoff(dxf, structure.rawEntityCounts);
       takeoffSummary.metadata.invalidHatchesSkipped = removeInvalidHatches(dxf);
       sendProgress(message.seq, 'prepare', 0, null);
 
+      const fontFetchers = createFontFetchers(fonts, message.seq);
       const dxfScene = new DxfScene(options);
-      await dxfScene.Build(dxf, createFontFetchers(fonts, message.seq));
+      await dxfScene.Build(dxf, fontFetchers);
       const scene = dxfScene.scene;
       takeoffSummary.metadata.fitBounds = takeoffSummary.metadata.robustFitBounds || scene.bounds;
       takeoffSummary.metadata.robustFitApplied = Boolean(takeoffSummary.metadata.robustFitBounds);
-      transfers.push(scene.vertices, scene.indices, scene.transforms);
+      takeoffSummary.layouts = await buildPaperLayouts(
+        dxf,
+        structure.layouts,
+        options,
+        fontFetchers,
+        message.seq,
+        transfers,
+      );
+      addSceneTransfers(scene, transfers);
       // DxfViewer conserve ce champ dans GetDxf(). On y place uniquement le
       // résumé léger, jamais l'objet DXF complet de plusieurs centaines de Mo.
       response.data = { scene, dxf: takeoffSummary };

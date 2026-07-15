@@ -12,6 +12,17 @@ import {
   flattenProjectItems,
   isUnitCompatible,
 } from '../utils/takeoff/applyTakeoff';
+import {
+  collectReferencedBlocks,
+  computeLayoutPaperBounds,
+  createPaperSpaceDxf,
+  scanDxfStructure,
+} from '../utils/takeoff/dxfLayouts';
+import {
+  panViewByPixels,
+  paperRectToCanvas,
+  zoomViewAtCanvasPoint,
+} from '../components/takeoff/dxfLayoutRendering';
 
 describe('métré DXF — géométrie', () => {
   it('calcule une longueur de polyligne ouverte', () => {
@@ -87,6 +98,125 @@ describe('métré DXF — cadrage robuste', () => {
     }));
 
     expect(computeRobustFitBounds(entities)).toBeNull();
+  });
+});
+
+describe('métré DXF — présentations', () => {
+  const dxfSource = [
+    [0, 'SECTION'],
+    [0, 'LAYER'], [5, 'AA'], [2, 'AEP'],
+    [0, 'LAYOUT'], [5, '10'], [1, 'Model'], [71, 0], [330, 'MODEL'],
+    [0, 'LAYOUT'], [5, '20'], [1, 'Plan réseaux'], [71, 2], [330, 'PAPER'], [331, 'VP1'],
+    [0, 'VIEWPORT'], [5, 'VP0'], [330, 'PAPER'],
+    [10, 210], [20, 148], [40, 420], [41, 297], [12, 210], [22, 148], [45, 297],
+    [0, 'VIEWPORT'], [5, 'VP1'], [330, 'PAPER'], [69, 2],
+    [10, 210], [20, 148], [40, 360], [41, 240], [12, 1650000], [22, 3140000], [45, 480],
+    [16, 0], [26, 0], [36, 1], [331, 'AA'], [340, 'CLIP'],
+    [0, 'ENDSEC'], [0, 'EOF'],
+  ].map(([code, value]) => `${code}\n${value}`).join('\n');
+
+  it('extrait les onglets papier et leurs fenêtres dans l’ordre AutoCAD', () => {
+    const structure = scanDxfStructure(dxfSource);
+
+    expect(structure.rawEntityCounts.VIEWPORT).toBe(2);
+    expect(structure.layouts).toHaveLength(1);
+    expect(structure.layouts[0]).toMatchObject({
+      name: 'Plan réseaux',
+      blockRecordHandle: 'PAPER',
+      simplified: true,
+    });
+    expect(structure.layouts[0].viewports).toHaveLength(1);
+    expect(structure.layouts[0].viewports[0]).toMatchObject({
+      handle: 'VP1',
+      frozenLayers: ['AEP'],
+      clipHandle: 'CLIP',
+      viewCenter: { x: 1650000, y: 3140000 },
+      viewHeight: 480,
+    });
+  });
+
+  it('ne conserve que les blocs utilisés par le cartouche papier', () => {
+    const blocks = {
+      CARTOUCHE: { name: 'CARTOUCHE', entities: [{ type: 'INSERT', name: 'LOGO' }] },
+      LOGO: { name: 'LOGO', entities: [{ type: 'LINE' }] },
+      INUTILE: { name: 'INUTILE', entities: [{ type: 'CIRCLE' }] },
+    };
+    expect(Object.keys(collectReferencedBlocks([
+      { type: 'INSERT', name: 'CARTOUCHE' },
+    ], blocks))).toEqual(['CARTOUCHE', 'LOGO']);
+  });
+
+  it('isole les entités du paper space associé au layout', () => {
+    const dxf = {
+      header: { $INSUNITS: 6 },
+      tables: {},
+      entities: [],
+      blocks: {
+        '*Paper_Space2': {
+          name: '*Paper_Space2',
+          ownerHandle: 'PAPER',
+          entities: [{ type: 'INSERT', name: 'CARTOUCHE', inPaperSpace: true }],
+        },
+        CARTOUCHE: { name: 'CARTOUCHE', entities: [{ type: 'LINE' }] },
+        MODELE: { name: 'MODELE', entities: [{ type: 'CIRCLE' }] },
+      },
+    };
+
+    const paperDxf = createPaperSpaceDxf(dxf, { blockRecordHandle: 'paper' });
+    expect(paperDxf.entities).toHaveLength(1);
+    expect(Object.keys(paperDxf.blocks)).toEqual(['CARTOUCHE']);
+  });
+
+  it('convertit une fenêtre papier dans le repère du canvas', () => {
+    expect(paperRectToCanvas({
+      paperCenter: { x: 50, y: 25 },
+      paperSize: { width: 40, height: 20 },
+    }, {
+      minX: 0, maxX: 100, minY: 0, maxY: 50,
+    }, 1000, 500)).toEqual({
+      x: 300, y: 150, width: 400, height: 200,
+    });
+    expect(paperRectToCanvas({
+      paperCenter: { x: 1050, y: 2025 },
+      paperSize: { width: 40, height: 20 },
+    }, {
+      minX: 0, maxX: 100, minY: 0, maxY: 50,
+    }, 1000, 500, { x: 1000, y: 2000 })).toEqual({
+      x: 300, y: 150, width: 400, height: 200,
+    });
+  });
+
+  it('cadre ensemble le cartouche et toutes les fenêtres papier', () => {
+    const bounds = computeLayoutPaperBounds({
+      viewports: [{
+        paperCenter: { x: 100, y: 50 },
+        paperSize: { width: 160, height: 80 },
+      }],
+    }, { minX: -20, maxX: 20, minY: 0, maxY: 100 });
+    expect(bounds).toEqual({ minX: -20, maxX: 180, minY: 0, maxY: 100 });
+  });
+
+  it('zoome autour de la position de la souris dans la présentation', () => {
+    const bounds = { minX: 0, maxX: 100, minY: 0, maxY: 50 };
+    expect(zoomViewAtCanvasPoint(
+      bounds,
+      { x: 0, y: 0 },
+      1000,
+      500,
+      0.5,
+      1,
+      1000,
+    )).toEqual({ center: { x: 25, y: 37.5 }, width: 50 });
+  });
+
+  it('déplace la feuille selon le glissement au clic milieu', () => {
+    expect(panViewByPixels(
+      { minX: 0, maxX: 100, minY: 0, maxY: 50 },
+      100,
+      50,
+      1000,
+      500,
+    )).toEqual({ center: { x: 40, y: 30 }, width: 100 });
   });
 });
 
