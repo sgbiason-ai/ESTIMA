@@ -88,7 +88,7 @@ export const exportArchive = async (
     // sans elles, l'export d'une version figée ignorait silencieusement les cases cochées.
     await generateProfessionalExcel(
       projectForExport, clientQtyMaps, type, bpuConfig,
-      { selectedExports, includeSummary, includePM, lockPrices, uniquePrices, tranches },
+      { includeCover, selectedExports, includeSummary, includePM, lockPrices, uniquePrices, tranches },
       branding
     );
   }

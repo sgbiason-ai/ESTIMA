@@ -12,16 +12,14 @@ const OptionsStep = ({ isPdf, type, hasTranches, tranches, includeCover, setIncl
       {/* Body */}
       <div className="p-5 space-y-3 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 160px)' }}>
 
-        {/* Page de garde */}
-        {isPdf && (
-          <OptionRow
-            checked={includeCover}
-            onChange={setIncludeCover}
-            color="emerald"
-            label="Page de garde"
-            desc="Inclure la page de couverture"
-          />
-        )}
+        {/* Page de garde — PDF (1re page) ou Excel (onglet en tête du classeur) */}
+        <OptionRow
+          checked={includeCover}
+          onChange={setIncludeCover}
+          color="emerald"
+          label="Page de garde"
+          desc={isPdf ? 'Inclure la page de couverture' : 'Onglet de couverture en tête du classeur'}
+        />
 
         {/* Sélection des tranches */}
         {hasTranches && (
@@ -277,17 +275,29 @@ const ExportModal = ({
   const isPdf = format === 'pdf';
 
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) return;
+    if (isPdf) {
+      // PDF : comportement inchangé (tranche active, sans récap, avec PM).
       setSelectedExports([activeTrancheId || 'global']);
-      setIncludeSummary(false);
       setIncludeCover(true);
+      setIncludeSummary(false);
       setIncludePM(true);
       setLockPrices(false);
       setUniquePrices(true);
-      setStep('options');
-      setPreviewData(null);
+    } else {
+      // Excel : tout coché par défaut SAUF « Global » et « Afficher les prix pour mémoire ».
+      // Tranches → toutes cochées (hors Global) ; projet sans tranche → Global (sinon rien à exporter).
+      const trancheIds = (tranches || []).map(t => t.id);
+      setSelectedExports(trancheIds.length > 0 ? trancheIds : ['global']);
+      setIncludeCover(true);
+      setIncludeSummary(true);
+      setIncludePM(false);
+      setLockPrices(true);
+      setUniquePrices(true);
     }
-  }, [isOpen, activeTrancheId]);
+    setStep('options');
+    setPreviewData(null);
+  }, [isOpen, activeTrancheId, isPdf, tranches]);
 
   // Libérer les blob URLs à la fermeture
   useEffect(() => {

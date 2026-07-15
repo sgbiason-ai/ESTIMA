@@ -12,6 +12,8 @@ export const CHANGELOG = [
     date: '2026-07-15',
     title: 'Export Excel DQE — prix uniques par numéro',
     highlights: [
+      'Export Excel — page de garde : les exports DQE et estimation peuvent désormais inclure, en tête du classeur, un onglet « Page de garde » reprenant fidèlement la couverture du projet (logos maître d\'ouvrage / maître d\'œuvre, titre, phase, code affaire, cartouche signatures) — identique à la page de garde PDF/Word. Le libellé du document s\'adapte au type (« D.Q.E. » ou « ESTIMATION »), et l\'onglet est calibré pour s\'imprimer plein cadre sur une page A4. Option cochée par défaut dans la fenêtre d\'export, y compris depuis les documents émis (GED)',
+      'Export Excel — la fenêtre d\'export s\'ouvre désormais avec les cases pré-cochées les plus courantes : page de garde, récapitulatif financier, verrouillage « tout sauf les P.U. » et prix uniques par numéro sont activés, toutes les tranches sont sélectionnées (hors « Global »), et les « prix pour mémoire » sont masqués — il ne reste qu\'à générer',
       'Export Excel DQE — prix uniques par numéro : chaque numéro de prix ne se saisit plus qu\'une seule fois. Ses répétitions (autres chapitres ou autres tranches) sont reprises automatiquement par formule (cellules grises avec note explicative) ; combinée à l\'option « verrouiller tout sauf les P.U. », l\'entreprise ne peut plus saisir deux prix différents pour un même numéro. La cellule de saisie privilégie une ligne de base à quantité réelle (plutôt qu\'une ligne PM ou une PSE), et deux articles différents partageant un numéro par erreur ne sont jamais fusionnés. Option cochée par défaut dans la fenêtre d\'export, y compris depuis les documents émis (GED)',
     ],
   },

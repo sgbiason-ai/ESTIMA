@@ -656,7 +656,7 @@ const ProjectView = ({
       }
     } else if (format === 'excel') {
       const { generateProfessionalExcel } = await import('../utils/excelGenerator');
-      generateProfessionalExcel(projectForExport, clientQtyMaps, type, bpuConfig, { selectedExports, includeSummary, includePM, lockPrices, uniquePrices, tranches }, masterBranding);
+      generateProfessionalExcel(projectForExport, clientQtyMaps, type, bpuConfig, { includeCover, selectedExports, includeSummary, includePM, lockPrices, uniquePrices, tranches }, masterBranding);
     }
   };
 

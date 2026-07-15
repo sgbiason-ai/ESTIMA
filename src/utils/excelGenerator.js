@@ -6,6 +6,7 @@ import { saveFileWithPicker, FILE_TYPES, PICKER_IDS } from './fileSaver';
 import { stampExcelCredit } from './estimaCredit';
 import { computePseDeltas, buildPseNumbers, collectPseRoots, collectSubstitutions, buildChapterNumberMap } from './projectCalculations';
 import { htmlToPlainText, htmlToRichBlocks } from './richText';
+import { buildCoverPageCanvas } from './coverPageCanvas';
 
 // Description PSE (HTML riche) → richText ExcelJS (gras/souligné préservés, puces,
 // sauts de ligne entre blocs). Retourne null si vide.
@@ -70,7 +71,7 @@ const getImageDimensions = (buffer) => {
 // ─── FONCTION PRINCIPALE ──────────────────────────────────────────────────────
 
 export const generateProfessionalExcel = async (project, clientQtyMaps, type = 'ESTIMATION', bpuConfig = {}, options = {}, branding = null) => {
-  const { selectedExports = ['global'], includeSummary = false, includePM = true, tranches = [], lockPrices = false, uniquePrices = false } = options;
+  const { selectedExports = ['global'], includeSummary = false, includePM = true, tranches = [], lockPrices = false, uniquePrices = false, includeCover = false } = options;
   const workbook = new ExcelJS.Workbook();
   // Feuilles à protéger en fin de génération (option « verrouiller tout sauf les P.U. ») :
   // toutes les cellules restent verrouillées sauf les P.U. des articles, déverrouillées
@@ -184,6 +185,39 @@ export const generateProfessionalExcel = async (project, clientQtyMaps, type = '
     if (clientBuffer) {
       clientLogoId = workbook.addImage({ buffer: clientBuffer, extension: getExtFromSource(project.clientLogo) });
       clientDims = await getImageDimensions(clientBuffer);
+    }
+  }
+
+  // ── PAGE DE GARDE (onglet en tête du classeur) ──
+  // Réutilise la page de garde fidèle (image A4 identique au PDF/Word) : logos MOA/MOE,
+  // titre, phase, code affaire, signatures… Le libellé du document suit le type d'export
+  // (DQE → « D.Q.E. », estimation → « ESTIMATION »). Créée AVANT le récap et les feuilles
+  // détail → premier onglet du classeur.
+  if (includeCover) {
+    try {
+      const coverLabel = type === 'DQE' ? 'D.Q.E.' : type === 'BPU' ? 'B.P.U.' : 'ESTIMATION';
+      const coverDataUrl = await buildCoverPageCanvas(project, coverLabel, branding);
+      const coverBuffer = await fetchImageAsBuffer(coverDataUrl);
+      if (coverBuffer) {
+        const coverImgId = workbook.addImage({ buffer: coverBuffer, extension: 'png' });
+        const coverSheet = workbook.addWorksheet('Page de garde', { views: [{ showGridLines: false }] });
+        coverSheet.pageSetup = {
+          paperSize: 9, orientation: 'portrait',
+          fitToPage: true, fitToWidth: 1, fitToHeight: 1,
+          horizontalCentered: true, verticalCentered: true,
+          margins: { left: 0, right: 0, top: 0, bottom: 0, header: 0, footer: 0 },
+        };
+        // Impression PLEIN PAGE : image ancrée en haut-gauche, dimensionnée à la taille
+        // native du canvas (1050×1485 px = A4 à ~127 dpi), donc PLUS GRANDE qu'une A4 à
+        // 96 dpi. Combinée à fitToPage 1×1 + marges nulles, Excel la réduit pour remplir
+        // exactement une page A4 (même ratio A4 → aucune bande blanche ni déformation).
+        // On surdimensionne volontairement : le « fit » d'Excel réduit mais n'agrandit
+        // jamais — partir plus grand garantit le plein page à l'impression.
+        coverSheet.addImage(coverImgId, { tl: { col: 0, row: 0 }, ext: { width: 1050, height: 1485 } });
+      }
+    } catch (err) {
+      // Canvas indisponible (ex : environnement de test sans DOM) → on saute la page de garde.
+      console.warn('Page de garde Excel ignorée :', err);
     }
   }
 
