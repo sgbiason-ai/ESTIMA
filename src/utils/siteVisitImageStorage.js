@@ -12,7 +12,7 @@
 // migration, juste une coexistence (string base64 OU objet { src, path }).
 
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { storage } from '../firebase';
+import { storage } from '../firebaseStorage';
 import { compressImage } from './imageCompressor';
 
 // ── Convertit un dataURL base64 en Blob (pour uploadBytes) ─────────────────

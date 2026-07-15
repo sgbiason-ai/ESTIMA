@@ -8,7 +8,7 @@
 // On garde donc le nom "src" (pas "url") pour zero refactor cote lecture.
 
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { storage } from '../firebase';
+import { storage } from '../firebaseStorage';
 import { compressImage } from './imageCompressor';
 
 // ── Convertit un dataURL base64 en Blob (pour uploadBytes) ─────────────────

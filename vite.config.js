@@ -146,6 +146,12 @@ export default defineConfig({
             if (id.includes('mammoth')) return 'vendor-mammoth';
             if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler') || id.includes('prop-types') || id.includes('object-assign') || id.includes('loose-envify'))
               return 'vendor-react';
+            // storage/functions ne servent qu'à des vues lazy (Admin, CRC,
+            // visites de site, mails) : isolés du chunk préchargé au démarrage
+            // (auth + firestore, requis dès le login).
+            if (id.includes('firebase/storage') || id.includes('@firebase/storage') ||
+                id.includes('firebase/functions') || id.includes('@firebase/functions'))
+              return 'vendor-firebase-extra';
             if (id.includes('firebase'))
               return 'vendor-firebase';
           }

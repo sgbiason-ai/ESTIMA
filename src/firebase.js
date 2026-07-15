@@ -7,7 +7,6 @@ import {
   memoryLocalCache
 } from "firebase/firestore";
 import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
-import { getStorage } from "firebase/storage";
 
 // Configuration Firebase via variables d'environnement
 // Voir .env.example pour le format attendu
@@ -59,4 +58,6 @@ if (isTeslaBrowser) {
 }
 
 export { db, app };
-export const storage = getStorage(app);
+// `storage` (firebase/storage) n'est utilisé que par les photos CRC/visites de
+// site (lazy) : sorti dans firebaseStorage.js pour ne pas alourdir le chemin
+// critique (ce fichier est importé dès le démarrage par App.jsx).
