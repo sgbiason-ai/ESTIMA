@@ -59,12 +59,18 @@ export function isUnitCompatible(metric, unit) {
   return false;
 }
 
-function updateTargetItems(nodes, targets, trancheId, mode) {
+function updateTargetItems(nodes, targets, trancheId, mode, sources) {
+  const sourceKey = trancheId || 'global';
   return (nodes || []).map((node) => {
     // Articles ET blocs pilotes exposent une quantité référençable (cf. projectCalculations).
     const isTargetable = node?.type === 'item' || node?.isBloc;
     if (isTargetable && targets.has(String(node.id))) {
       const quantity = targets.get(String(node.id));
+      const src = sources?.get(String(node.id));
+      // Trace l'origine DXF de la quantité, par tranche (ou global) → badge dans l'estimation.
+      const takeoffSource = src
+        ? { ...(node.takeoffSource || {}), [sourceKey]: src }
+        : node.takeoffSource;
       if (trancheId) {
         const previous = finite(node.quantities?.[trancheId]);
         return {
@@ -77,6 +83,7 @@ function updateTargetItems(nodes, targets, trancheId, mode) {
             ...(node.quantitiesFormula || {}),
             [trancheId]: '',
           },
+          takeoffSource,
         };
       }
       const previous = finite(node.qty);
@@ -84,11 +91,12 @@ function updateTargetItems(nodes, targets, trancheId, mode) {
         ...node,
         qty: mode === 'add' ? previous + quantity : quantity,
         formula: '',
+        takeoffSource,
       };
     }
     // Ne pas descendre dans les enfants d'un bloc : ils sont pilotés par sa formule.
     if (node?.children && !node?.isBloc) {
-      return { ...node, children: updateTargetItems(node.children, targets, trancheId, mode) };
+      return { ...node, children: updateTargetItems(node.children, targets, trancheId, mode, sources) };
     }
     return node;
   });
@@ -103,18 +111,27 @@ export function applyTakeoffToProject(project, mappings, options = {}) {
 
   const trancheId = options.trancheId || null;
   const mode = options.mode === 'add' ? 'add' : 'replace';
+  const fileName = String(options.fileName || 'Plan DXF');
+  const importedAt = new Date().toISOString();
   const targets = new Map();
+  const sources = new Map();
   for (const mapping of activeMappings) {
     const itemId = String(mapping.itemId);
     targets.set(itemId, finite(targets.get(itemId)) + finite(mapping.appliedQuantity));
+    const src = sources.get(itemId) || {
+      fileName, importedAt, layers: [], metric: String(mapping.metric || ''),
+    };
+    const layer = String(mapping.layer || '');
+    if (layer && !src.layers.includes(layer)) src.layers.push(layer);
+    sources.set(itemId, src);
   }
 
-  const chapters = updateTargetItems(project.chapters, targets, trancheId, mode);
+  const chapters = updateTargetItems(project.chapters, targets, trancheId, mode, sources);
   const { updatedChapters, sourceIds } = recalculateProject(chapters, project.tranches || []);
   const historyEntry = {
     id: `takeoff_${Date.now()}`,
-    fileName: String(options.fileName || 'Plan DXF'),
-    importedAt: new Date().toISOString(),
+    fileName,
+    importedAt,
     trancheId: trancheId || 'global',
     mode,
     mappings: activeMappings.map((mapping) => ({

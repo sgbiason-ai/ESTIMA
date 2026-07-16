@@ -258,6 +258,10 @@ describe('métré DXF — application au projet', () => {
     expect(result.chapters[0].children[0].qty).toBe(20);
     expect(result.takeoffImports).toHaveLength(1);
     expect(project.chapters[0].children[0].qty).toBe(10);
+    // Traçabilité : la quantité porte sa source DXF (fichier + calques), effacée à l'édition manuelle.
+    const src = result.chapters[0].children[0].takeoffSource?.global;
+    expect(src?.fileName).toBe('plan.dxf');
+    expect(src?.layers).toEqual(['AEP-1', 'AEP-2']);
   });
 
   it('ajoute le métré à la quantité existante', () => {

@@ -311,6 +311,13 @@ export const useProjectManager = (user, companyId) => {
 
   const updateProjectItem = (parentId, uid, field, value) => {
     const toNumber = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+    // Édition manuelle d'une quantité → efface le repère « issu du métré DXF » de la clé concernée.
+    const clearTakeoff = (source, key) => {
+      if (!source || !(key in source)) return source;
+      const next = { ...source };
+      delete next[key];
+      return next;
+    };
 
     if (parentId === 'root' && uid === 'root') {
       if (field === 'tranche_rename') {
@@ -355,11 +362,21 @@ export const useProjectManager = (user, companyId) => {
                   newQuantities[trancheId] = toNumber(qtyValue);
                   newQuantitiesFormula[trancheId] = '';
                 }
-                return { ...it, quantities: newQuantities, quantitiesFormula: newQuantitiesFormula };
+                return {
+                  ...it,
+                  quantities: newQuantities,
+                  quantitiesFormula: newQuantitiesFormula,
+                  takeoffSource: clearTakeoff(it.takeoffSource, trancheId),
+                };
               }
               if (field === 'qty') {
                 const isFormula = typeof value === 'string' && value.startsWith('=');
-                return { ...it, qty: isFormula ? 0 : toNumber(value), formula: isFormula ? value : '' };
+                return {
+                  ...it,
+                  qty: isFormula ? 0 : toNumber(value),
+                  formula: isFormula ? value : '',
+                  takeoffSource: clearTakeoff(it.takeoffSource, 'global'),
+                };
               }
               if (field === 'price') return { ...it, [field]: toNumber(value) };
               return { ...it, [field]: value };

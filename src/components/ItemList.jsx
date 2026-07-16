@@ -1,7 +1,7 @@
 // src/components/ItemList.jsx
 import React, { useContext, memo, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Draggable, Droppable } from '@hello-pangea/dnd'; 
-import { GripVertical, Layers, Trash2, Plus, ShieldCheck, AlertCircle, AlertTriangle, FunctionSquare, Check, Boxes, Pencil, Target, Lock, Unlock, ChevronDown, ChevronRight, Link2 } from 'lucide-react';
+import { GripVertical, Layers, Trash2, Plus, ShieldCheck, AlertCircle, AlertTriangle, FunctionSquare, Check, Boxes, Pencil, Target, Lock, Unlock, ChevronDown, ChevronRight, Link2, Ruler } from 'lucide-react';
 
 import { ProjectContext } from '../context/ProjectContext';
 import { EditableTitle, FormattedInput, OptionToggle, PseModeControl, PseDescriptionEditor, ChapterCommentButton, ChapterCommentEditor } from './ProjectUI';
@@ -298,6 +298,11 @@ const ItemRow = memo(
 
     const hasFormula = !!(currentFormula && currentFormula.startsWith('='));
     const isSource = sourceIds?.includes(el.id);
+    // Repère « quantité issue d'un métré DXF » (par tranche ou global), effacé à l'édition manuelle.
+    // En vue globale on montre le repère dès qu'UNE tranche (ou le global) vient d'un DXF.
+    const takeoffKey = (activeTrancheId && activeTrancheId !== 'global') ? activeTrancheId : 'global';
+    const takeoffSrc = el.takeoffSource?.[takeoffKey]
+      || (takeoffKey === 'global' ? Object.values(el.takeoffSource || {})[0] : undefined);
 
     const [localPrice, setLocalPrice] = useState(el.price);
     useEffect(() => setLocalPrice(el.price), [el.price]);
@@ -525,6 +530,14 @@ const ItemRow = memo(
               {isSource && (
                 <span title={sourceTooltipText} className="shrink-0 w-3 h-3 rounded-full bg-blue-400 ring-2 ring-blue-100 cursor-help" />
               )}
+              {takeoffSrc && (
+                <span
+                  title={`Quantité issue du métré DXF\nFichier : ${takeoffSrc.fileName || '—'}\nCalque(s) : ${(takeoffSrc.layers || []).join(', ') || '—'}${takeoffSrc.importedAt ? `\nImporté le ${new Date(takeoffSrc.importedAt).toLocaleDateString('fr-FR')}` : ''}`}
+                  className="shrink-0 flex items-center justify-center w-5 h-5 rounded bg-blue-100 text-blue-600 cursor-help"
+                >
+                  <Ruler size={12} />
+                </span>
+              )}
             </div>
 
             {/* Unité */}
@@ -729,6 +742,10 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
   // ── Bloc (ouvrage composite) : en-tête porteur d'une surface (Qté + unité) ──
   const isBloc = !!el.isBloc;
   const isTrancheView = activeTrancheId && activeTrancheId !== 'global';
+  // Repère métré DXF sur le bloc pilote (même logique que les articles).
+  const blocTakeoffKey = isTrancheView ? activeTrancheId : 'global';
+  const blocTakeoffSrc = el.takeoffSource?.[blocTakeoffKey]
+    || (blocTakeoffKey === 'global' ? Object.values(el.takeoffSource || {})[0] : undefined);
   const surfaceVal = isTrancheView ? Number(el.quantities?.[activeTrancheId] || 0) : Number(el.qty || 0);
   const surfaceDisabled = isReadOnly || isGlobalMode || isRendu;
   // Libellé de la quantité pilote selon l'unité du bloc (m²→surface, ml→longueur, m³→volume).
@@ -872,7 +889,16 @@ const SubChapterRow = memo(({ el, index, parentId, level, isSelected, isReadOnly
                   {isBloc ? (
                     <>
                       {/* Colonnes alignées sur la grille article : (indic) · unité · surface · PU moyen · total */}
-                      <div className="w-10 shrink-0" />
+                      <div className="w-10 flex items-center justify-center shrink-0">
+                        {blocTakeoffSrc && (
+                          <span
+                            title={`Quantité issue du métré DXF\nFichier : ${blocTakeoffSrc.fileName || '—'}\nCalque(s) : ${(blocTakeoffSrc.layers || []).join(', ') || '—'}${blocTakeoffSrc.importedAt ? `\nImporté le ${new Date(blocTakeoffSrc.importedAt).toLocaleDateString('fr-FR')}` : ''}`}
+                            className="shrink-0 flex items-center justify-center w-5 h-5 rounded bg-blue-100 text-blue-600 cursor-help"
+                          >
+                            <Ruler size={12} />
+                          </span>
+                        )}
+                      </div>
                       <div className="w-16 flex justify-center shrink-0">
                         <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 uppercase">{normalizeUnitSymbol(el.unit)}</span>
                       </div>
