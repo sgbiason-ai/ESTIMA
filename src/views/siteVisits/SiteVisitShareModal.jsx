@@ -10,10 +10,12 @@ export default function SiteVisitShareModal({ isOpen, onClose, visit, companyId,
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   useEffect(() => {
     if (!isOpen || !companyId) return;
     setSelected(new Set((visit?.sharedWith || []).map(member => member.uid)));
+    setSaveError('');
     setLoading(true);
     setLoadError(false);
     getDocs(query(collection(db, 'users'), where('companyId', '==', companyId)))
@@ -34,9 +36,13 @@ export default function SiteVisitShareModal({ isOpen, onClose, visit, companyId,
 
   const handleSave = async () => {
     setSaving(true);
+    setSaveError('');
     try {
       await onSave(members.filter(member => selected.has(member.uid)));
       onClose();
+    } catch (error) {
+      console.error('[SiteVisit] Erreur partage :', error);
+      setSaveError("Le partage n'a pas pu être enregistré. Réessayez dans quelques instants.");
     } finally {
       setSaving(false);
     }
@@ -80,6 +86,7 @@ export default function SiteVisitShareModal({ isOpen, onClose, visit, companyId,
           </div>
         </div>
         <div className="flex justify-end gap-2 px-6 py-4 bg-gray-50 border-t border-gray-100">
+          {saveError && <p role="alert" className="mr-auto self-center text-xs font-medium text-red-600">{saveError}</p>}
           <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-200">Annuler</button>
           <button onClick={handleSave} disabled={saving} className="px-4 py-2 rounded-xl text-sm font-bold bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50">{saving ? 'Enregistrement…' : `Partager (${selected.size})`}</button>
         </div>

@@ -8,10 +8,11 @@ export { APP_VERSION } from './appVersion';
 
 export const CHANGELOG = [
   {
-    version: '3.9.0',
+    version: '3.9.1',
     date: '2026-07-16',
     title: 'Notifications de partage des visites',
     highlights: [
+      'Visites de site — la fenêtre de partage se ferme après une sauvegarde réussie et affiche désormais un message explicite si Firestore refuse l’opération',
       'Visites de site — lorsqu’une visite est partagée, le collaborateur reçoit une pastille rouge sur la carte « Visites de Site » du hub desktop et mobile. Le compteur indique le nombre de nouveaux partages et disparaît dès l’ouverture du module',
     ],
   },
