@@ -3,9 +3,15 @@ import React, {
 } from 'react';
 import PropTypes from 'prop-types';
 import {
-  AlertTriangle, Crosshair, Eye, Hash, Loader2, MousePointer2, X,
+  AlertTriangle, CircleDot, Crosshair, Eye, Hash, Loader2, MousePointer2, Palette, Spline, Square, X,
 } from 'lucide-react';
-import { Color, Vector3 } from 'three';
+import {
+  BufferGeometry, Color, Float32BufferAttribute, LineBasicMaterial, LineSegments,
+  Points, PointsMaterial, Vector3,
+} from 'three';
+import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
+import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
+import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { DxfViewer } from 'dxf-viewer';
 import dxfFontUrl from 'dejavu-fonts-ttf/ttf/DejaVuSans.ttf?url';
 import {
@@ -16,9 +22,18 @@ import {
   renderModelView,
   zoomViewAtCanvasPoint,
 } from './dxfLayoutRendering';
+import {
+  buildEntityGrid, buildHighlightBuffers, collectEntityBounds, hitTestEntities,
+} from './dxfEntityPicking';
+import { DXF_TYPE_LABELS, entityLookup } from '../../utils/takeoff/dxfTakeoff';
 
 // Rayon de capture du clic/survol, en pixels écran (converti en unités monde selon le zoom)
 const PICK_TOLERANCE_PX = 12;
+const MEASUREMENT_COLORS = [
+  '#f97316', '#ef4444', '#e11d48', '#db2777', '#9333ea',
+  '#4f46e5', '#2563eb', '#0284c7', '#0891b2', '#0d9488',
+  '#16a34a', '#65a30d', '#ca8a04', '#d97706', '#475569',
+];
 
 const PHASE_LABELS = {
   fetch: 'Lecture du fichier',
@@ -27,6 +42,32 @@ const PHASE_LABELS = {
   font: 'Chargement des textes',
   layouts: 'Préparation des présentations',
 };
+
+const formatMeasure = (value) => Number(value || 0).toLocaleString('fr-FR', {
+  maximumFractionDigits: 2,
+});
+
+// Modes de sélection d'éléments, alignés sur les métriques du métré (cf. METRIC_LABELS).
+const SELECTION_MODES = [
+  { key: 'length', label: 'Linéaire', Icon: Spline, title: 'Mesurer des longueurs élément par élément (clic sur le tracé)' },
+  { key: 'area', label: 'Surfaces', Icon: Square, title: 'Mesurer des surfaces fermées (clic sur le contour ou à l’intérieur)' },
+  { key: 'count', label: 'Comptage', Icon: CircleDot, title: 'Compter des éléments : blocs, points, cercles' },
+];
+
+// Remplace intégralement la géométrie d'un objet de surlignage (pas de fuite GPU).
+function applyOverlayPositions(object, positions) {
+  object.geometry.dispose();
+  object.geometry = new BufferGeometry();
+  object.geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
+  object.visible = positions.length > 0;
+}
+
+function applyWideOverlayPositions(object, positions) {
+  object.geometry.dispose();
+  object.geometry = new LineSegmentsGeometry();
+  if (positions.length > 0) object.geometry.setPositions(Array.from(positions));
+  object.visible = positions.length > 0;
+}
 
 function fitViewer(viewer, bounds, padding = 0.06) {
   const origin = viewer?.GetOrigin();
@@ -42,6 +83,11 @@ function fitViewer(viewer, bounds, padding = 0.06) {
 
 export default function DxfViewerPanel({
   file, isolatedLayer, onLoaded, onError, onPickLayer,
+  selectionMode = '', onSelectionModeChange = () => {}, highlightedEntityIds = [],
+  measuredEntityIds = [], measurementHighlightColor = '#f97316',
+  onMeasurementHighlightColorChange = () => {},
+  onPickEntity = () => {}, selectionSummary = null, onCreateSelectionRow = () => {},
+  onClearSelection = () => {}, focusEntities = null, scaleToMeters = 1,
 }) {
   const modelContainerRef = useRef(null);
   const paperContainerRef = useRef(null);
@@ -52,6 +98,12 @@ export default function DxfViewerPanel({
   const renderActiveRef = useRef(null);
   const paperLoadSequenceRef = useRef(0);
   const presentationFitWidthRef = useRef(null);
+  const entityIndexRef = useRef(null);
+  const entityGridRef = useRef(null);
+  const overlayRef = useRef(null);
+  // Miroir des ids surlignés pour le hit-test (évite de ré-abonner les listeners à chaque clic)
+  const highlightedIdsRef = useRef(highlightedEntityIds);
+  highlightedIdsRef.current = highlightedEntityIds;
   const [progress, setProgress] = useState(null);
   const [loading, setLoading] = useState(false);
   const [paperLoading, setPaperLoading] = useState(false);
@@ -61,6 +113,11 @@ export default function DxfViewerPanel({
   const [isPanning, setIsPanning] = useState(false);
   const [hover, setHover] = useState(null);
   const [hideFills, setHideFills] = useState(true);
+  // 'ok' = sélection possible · 'skipped' = plan trop volumineux · 'none' = rien à sélectionner
+  const [selectionAvailability, setSelectionAvailability] = useState('none');
+  // Métriques réellement présentes dans l'index → n'afficher que les modes utiles
+  const [metricAvailability, setMetricAvailability] = useState({ length: false, area: false, count: false });
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   const activeLayout = useMemo(
     () => layouts.find((layout) => layout.id === activeLayoutId) || null,
@@ -138,6 +195,9 @@ export default function DxfViewerPanel({
       setError('');
       setLayouts([]);
       setActiveLayoutId('model');
+      entityIndexRef.current = null;
+      entityGridRef.current = null;
+      setSelectionAvailability('none');
       setProgress({ phase: 'fetch', processed: 0, total: file.size });
       try {
         await viewer.Load({
@@ -160,6 +220,22 @@ export default function DxfViewerPanel({
           }
         }
         const takeoffSummary = viewer.GetDxf?.() || null;
+        const entityIndex = takeoffSummary?.entityIndex || null;
+        entityIndexRef.current = entityIndex?.ids ? entityIndex : null;
+        setSelectionAvailability(() => {
+          if (entityIndex?.ids) return 'ok';
+          return entityIndex?.skipped ? 'skipped' : 'none';
+        });
+        const available = { length: false, area: false, count: false };
+        if (entityIndex?.ids) {
+          for (let rank = 0; rank < entityIndex.count; rank += 1) {
+            if (entityIndex.lengths[rank] > 0) available.length = true;
+            if (entityIndex.areas[rank] > 0) available.area = true;
+            if (entityIndex.counts[rank] > 0) available.count = true;
+            if (available.length && available.area && available.count) break;
+          }
+        }
+        setMetricAvailability(available);
         fitBoundsRef.current = takeoffSummary?.metadata?.fitBounds || viewer.GetBounds();
         fitViewer(viewer, fitBoundsRef.current, 0.08);
         layersRef.current = layers;
@@ -231,6 +307,133 @@ export default function DxfViewerPanel({
     if (loading || paperLoading) return;
     requestAnimationFrame(renderActive);
   }, [isolatedLayer, loading, paperLoading, renderActive]);
+
+  // La sélection d'élément n'existe qu'en vue Modèle : quitter le mode en présentation.
+  useEffect(() => {
+    if (activeLayout && selectionMode) onSelectionModeChange('');
+  }, [activeLayout, selectionMode, onSelectionModeChange]);
+
+  useEffect(() => {
+    if (!selectionMode) return undefined;
+    const handleKey = (event) => {
+      if (event.key === 'Escape') onSelectionModeChange('');
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [selectionMode, onSelectionModeChange]);
+
+  // Surlignage des entités (sélection en orange, survol en bleu) par-dessus le plan.
+  useEffect(() => {
+    const viewer = modelViewerRef.current;
+    const scene = viewer?.GetScene?.();
+    const origin = viewer?.GetOrigin?.();
+    if (!viewer || !scene || !origin || loading) return;
+
+    let overlay = overlayRef.current;
+    if (!overlay) {
+      const make = (Ctor, material) => {
+        const object = new Ctor(new BufferGeometry(), material);
+        object.frustumCulled = false;
+        object.renderOrder = 50;
+        object.visible = false;
+        return object;
+      };
+      overlay = {
+        measurementLine: make(LineSegments2, new LineMaterial({
+          color: measurementHighlightColor,
+          linewidth: 4,
+          depthTest: false,
+          transparent: true,
+          opacity: 0.9,
+        })),
+        measurementMarker: make(Points, new PointsMaterial({
+          color: measurementHighlightColor, size: 11, sizeAttenuation: false, depthTest: false,
+        })),
+        line: make(LineSegments, new LineBasicMaterial({ color: 0xf97316, depthTest: false })),
+        marker: make(Points, new PointsMaterial({
+          color: 0xf97316, size: 9, sizeAttenuation: false, depthTest: false,
+        })),
+        hoverLine: make(LineSegments, new LineBasicMaterial({ color: 0x2563eb, depthTest: false })),
+        hoverMarker: make(Points, new PointsMaterial({
+          color: 0x2563eb, size: 9, sizeAttenuation: false, depthTest: false,
+        })),
+      };
+      overlayRef.current = overlay;
+    }
+    for (const object of Object.values(overlay)) {
+      if (object.parent !== scene) scene.add(object);
+    }
+    overlay.measurementLine.renderOrder = 45;
+    overlay.measurementMarker.renderOrder = 45;
+    overlay.measurementLine.material.color.set(measurementHighlightColor);
+    overlay.measurementMarker.material.color.set(measurementHighlightColor);
+    overlay.measurementLine.material.resolution.set(
+      modelContainerRef.current?.clientWidth || 1,
+      modelContainerRef.current?.clientHeight || 1,
+    );
+
+    const index = entityIndexRef.current;
+    const emptyBuffers = { linePositions: new Float32Array(0), markerPositions: new Float32Array(0) };
+    const measuredIds = index && !activeLayout ? measuredEntityIds || [] : [];
+    const measuredBuffers = index ? buildHighlightBuffers(index, measuredIds, origin) : emptyBuffers;
+    applyWideOverlayPositions(overlay.measurementLine, measuredBuffers.linePositions);
+    applyOverlayPositions(overlay.measurementMarker, measuredBuffers.markerPositions);
+
+    const selectedIds = index && !activeLayout ? highlightedEntityIds || [] : [];
+    const selectedBuffers = index ? buildHighlightBuffers(index, selectedIds, origin) : emptyBuffers;
+    applyOverlayPositions(overlay.line, selectedBuffers.linePositions);
+    applyOverlayPositions(overlay.marker, selectedBuffers.markerPositions);
+
+    const hoverIds = index && !activeLayout && hover?.kind === 'entity' ? [index.ids[hover.rank]] : [];
+    const hoverBuffers = index ? buildHighlightBuffers(index, hoverIds, origin) : emptyBuffers;
+    applyOverlayPositions(overlay.hoverLine, hoverBuffers.linePositions);
+    applyOverlayPositions(overlay.hoverMarker, hoverBuffers.markerPositions);
+
+    requestAnimationFrame(renderActive);
+  }, [highlightedEntityIds, measuredEntityIds, measurementHighlightColor, hover, activeLayout, loading, renderActive]);
+
+  useEffect(() => () => {
+    const overlay = overlayRef.current;
+    if (!overlay) return;
+    for (const object of Object.values(overlay)) {
+      object.parent?.remove(object);
+      object.geometry.dispose();
+      object.material.dispose();
+    }
+    overlayRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    const container = modelContainerRef.current;
+    if (!container || typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(() => {
+      const material = overlayRef.current?.measurementLine?.material;
+      if (!material?.resolution) return;
+      material.resolution.set(container.clientWidth || 1, container.clientHeight || 1);
+      requestAnimationFrame(renderActive);
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [renderActive]);
+
+  // Œil d'une sélection dans la liste : recadrer la vue Modèle sur ses éléments.
+  useEffect(() => {
+    if (!focusEntities?.nonce || !(focusEntities.ids || []).length) return;
+    const viewer = modelViewerRef.current;
+    const index = entityIndexRef.current;
+    if (!viewer?.GetOrigin?.() || !index) return;
+    const bounds = collectEntityBounds(index, focusEntities.ids);
+    if (!bounds) return;
+    setActiveLayoutId('model');
+    const pad = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY, 1) * 0.25;
+    fitViewer(viewer, {
+      minX: bounds.minX - pad,
+      maxX: bounds.maxX + pad,
+      minY: bounds.minY - pad,
+      maxY: bounds.maxY + pad,
+    }, 0.1);
+    requestAnimationFrame(() => renderActiveRef.current?.());
+  }, [focusEntities]);
 
   useEffect(() => {
     const modelViewer = modelViewerRef.current;
@@ -443,10 +646,57 @@ export default function DxfViewerPanel({
       return null;
     };
 
+    // Hit-test de l'index d'entités : curseur → monde (caméra ortho) → repère de l'index.
+    const hitEntity = (clientX, clientY) => {
+      const index = entityIndexRef.current;
+      if (!index) return -1;
+      const camera = modelViewer.GetCamera();
+      const origin = modelViewer.GetOrigin();
+      const rect = canvas.getBoundingClientRect();
+      if (!camera || !origin || rect.width <= 0 || rect.height <= 0) return -1;
+      const cameraBounds = getCameraBounds(camera);
+      const worldPerPixel = (cameraBounds.maxX - cameraBounds.minX) / rect.width;
+      if (!Number.isFinite(worldPerPixel) || worldPerPixel <= 0) return -1;
+      const x = cameraBounds.minX + (clientX - rect.left) * worldPerPixel
+        + origin.x - index.origin.x;
+      const y = cameraBounds.maxY - (clientY - rect.top)
+        * ((cameraBounds.maxY - cameraBounds.minY) / rect.height)
+        + origin.y - index.origin.y;
+      if (!entityGridRef.current) entityGridRef.current = buildEntityGrid(index);
+      const lookup = entityLookup(index);
+      const selectedRanks = new Set();
+      for (const id of highlightedIdsRef.current || []) {
+        const rank = lookup.get(id);
+        if (rank != null) selectedRanks.add(rank);
+      }
+      return hitTestEntities(
+        index,
+        entityGridRef.current,
+        x,
+        y,
+        PICK_TOLERANCE_PX * worldPerPixel,
+        isolatedLayer,
+        selectedRanks,
+        selectionMode, // '' | 'length' | 'area' | 'count' → restreint la visée à la métrique
+      );
+    };
+
     const runHover = () => {
       frame = null;
       if (!pending) return;
-      const found = pickAt(pending.x, pending.y, !heavyScene, false);
+      let found = null;
+      if (selectionMode) {
+        const rank = hitEntity(pending.x, pending.y);
+        if (rank >= 0) {
+          const rect = canvas.getBoundingClientRect();
+          found = {
+            kind: 'entity', rank, px: pending.x - rect.left, py: pending.y - rect.top,
+          };
+        }
+      } else if (!heavyScene) {
+        const picked = pickAt(pending.x, pending.y, true, false);
+        if (picked) found = { kind: 'layer', ...picked };
+      }
       pending = null;
       setHover(found);
       canvas.style.cursor = found ? 'pointer' : 'crosshair';
@@ -468,7 +718,14 @@ export default function DxfViewerPanel({
       if (event.button !== 0 || !down) return;
       const moved = Math.hypot(event.clientX - down.x, event.clientY - down.y);
       down = null;
-      if (moved > 4) return; // c'était un déplacement, pas un clic
+      // Un tap au doigt « bouge » naturellement de quelques pixels : seuil élargi en tactile.
+      if (moved > (event.pointerType === 'touch' ? 12 : 4)) return; // déplacement, pas un clic
+      if (selectionMode) {
+        const rank = hitEntity(event.clientX, event.clientY);
+        const index = entityIndexRef.current;
+        if (rank >= 0 && index) onPickEntity(index.ids[rank]);
+        return; // un clic dans le vide ne vide PAS la sélection (fausse manip fréquente)
+      }
       const found = pickAt(event.clientX, event.clientY, true, true);
       onPickLayer(found ? found.layer : '');
     };
@@ -487,7 +744,7 @@ export default function DxfViewerPanel({
       canvas.style.cursor = '';
       setHover(null);
     };
-  }, [activeLayout, loading, paperLoading, onPickLayer]);
+  }, [activeLayout, loading, paperLoading, onPickLayer, selectionMode, isolatedLayer, onPickEntity]);
 
   const fitDrawing = () => {
     if (activeLayout) {
@@ -505,6 +762,21 @@ export default function DxfViewerPanel({
   const percent = progress?.total > 0
     ? Math.min(100, Math.round((progress.processed / progress.total) * 100))
     : null;
+
+  // Info-bulle d'une entité survolée : type + mesures exactes (échelle utilisateur).
+  const entityHoverLabel = (rank) => {
+    const index = entityIndexRef.current;
+    if (!index) return '';
+    const scale = Math.max(1e-9, Number(scaleToMeters) || 1);
+    const parts = [];
+    if (index.lengths[rank] > 1e-9) parts.push(`${formatMeasure(index.lengths[rank] * scale)} ml`);
+    if (index.areas[rank] > 1e-9) parts.push(`${formatMeasure(index.areas[rank] * scale * scale)} m²`);
+    if (index.counts[rank] > 0) parts.push(`${formatMeasure(index.counts[rank])} u`);
+    const typeName = index.typeNames[index.typeCodes[rank]];
+    const selected = (highlightedEntityIds || []).includes(index.ids[rank]);
+    return `${DXF_TYPE_LABELS[typeName] || typeName}${parts.length ? ` — ${parts.join(' · ')}` : ''}${selected ? ' · sélectionné' : ''}`;
+  };
+
   return (
     <div className="relative h-full min-h-0 overflow-hidden border-r border-gray-200 bg-slate-50">
       <div data-dxf-layer="paper" className="absolute inset-0 invisible">
@@ -578,6 +850,64 @@ export default function DxfViewerPanel({
           >
             <Hash size={15} /> Hachures
           </button>
+          {!activeLayout && measuredEntityIds.length > 0 && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setPaletteOpen((value) => !value)}
+                title="Couleur des métrés réalisés"
+                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white/90 px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm backdrop-blur hover:bg-white"
+              >
+                <Palette size={15} />
+                <span className="h-3.5 w-3.5 rounded-full border border-black/10" style={{ backgroundColor: measurementHighlightColor }} />
+                Métrés
+              </button>
+              {paletteOpen && (
+                <div className="absolute left-0 top-full z-40 mt-1 grid w-[156px] grid-cols-5 gap-1.5 rounded-xl border border-gray-200 bg-white p-2 shadow-xl">
+                  {MEASUREMENT_COLORS.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => {
+                        onMeasurementHighlightColorChange(color);
+                        setPaletteOpen(false);
+                      }}
+                      aria-label={`Couleur ${color}`}
+                      title={color}
+                      className={`h-6 w-6 rounded-lg border-2 transition-transform hover:scale-110 ${measurementHighlightColor === color ? 'border-gray-900' : 'border-white'}`}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {!activeLayout && selectionAvailability === 'skipped' && (
+            <span
+              title="Plan trop volumineux pour la sélection d’élément"
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white/90 px-3 py-2 text-xs font-semibold text-gray-300 shadow-sm backdrop-blur"
+            >
+              <MousePointer2 size={15} /> Sélection
+            </span>
+          )}
+          {!activeLayout && selectionAvailability === 'ok' && (
+            <div className="inline-flex overflow-hidden rounded-xl border border-gray-200 bg-white/90 shadow-sm backdrop-blur">
+              {SELECTION_MODES.filter((mode) => metricAvailability[mode.key]).map((mode) => {
+                const active = selectionMode === mode.key;
+                return (
+                  <button
+                    key={mode.key}
+                    type="button"
+                    onClick={() => onSelectionModeChange(active ? '' : mode.key)}
+                    title={mode.title}
+                    className={`inline-flex items-center gap-1.5 border-l border-gray-200 px-3 py-2 text-xs font-semibold first:border-l-0 ${active ? 'bg-orange-50 text-orange-700' : 'text-gray-700 hover:bg-gray-50'}`}
+                  >
+                    <mode.Icon size={15} /> {mode.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {isolatedLayer && (
             <button
               type="button"
@@ -603,14 +933,66 @@ export default function DxfViewerPanel({
         <>
           {hover && !activeLayout && (
             <div
-              className="pointer-events-none absolute z-30 max-w-[280px] -translate-y-full truncate rounded-lg bg-blue-600 px-2 py-1 text-[11px] font-semibold text-white shadow-lg"
+              className={`pointer-events-none absolute z-30 max-w-[280px] -translate-y-full truncate rounded-lg px-2 py-1 text-[11px] font-semibold text-white shadow-lg ${hover.kind === 'entity' ? 'bg-orange-600' : 'bg-blue-600'}`}
               style={{ left: hover.px + 12, top: hover.py }}
             >
-              {hover.layer}
+              {hover.kind === 'entity' ? entityHoverLabel(hover.rank) : hover.layer}
+            </div>
+          )}
+          {selectionMode && !activeLayout && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-24 z-20 flex justify-center px-4">
+              <div className="pointer-events-auto flex max-w-full flex-wrap items-center justify-center gap-2 rounded-2xl border border-orange-200 bg-white/95 px-3 py-2 shadow-xl backdrop-blur">
+                <span className={`rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${selectionSummary?.editing ? 'bg-orange-600 text-white' : 'bg-orange-100 text-orange-700'}`}>
+                  {selectionSummary?.editing ? 'Modification' : (SELECTION_MODES.find((mode) => mode.key === selectionMode)?.label || 'Sélection')}
+                </span>
+                {selectionSummary?.entityCount > 0 ? (
+                  <>
+                    <span className="text-xs font-bold text-gray-900">
+                      {selectionSummary.entityCount} élément{selectionSummary.entityCount > 1 ? 's' : ''}
+                    </span>
+                    {selectionSummary.text && (
+                      <span className="text-xs font-bold text-orange-600">{selectionSummary.text}</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={onCreateSelectionRow}
+                      className="rounded-lg bg-blue-600 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-blue-700"
+                    >
+                      {selectionSummary?.editing ? 'Enregistrer' : 'Ajouter au métré'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onClearSelection}
+                      className="rounded-lg px-2 py-1.5 text-[11px] font-semibold text-gray-500 hover:bg-gray-100"
+                    >
+                      Vider
+                    </button>
+                  </>
+                ) : (
+                  <span className="text-xs text-gray-500">
+                    {selectionSummary?.editing
+                      ? 'Cliquez pour ajouter/retirer des éléments (Enregistrer indisponible si vide)'
+                      : 'Cliquez sur les éléments du plan à mesurer'}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => onSelectionModeChange('')}
+                  className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                  aria-label={selectionSummary?.editing ? 'Annuler la modification' : 'Quitter le mode sélection'}
+                  title={selectionSummary?.editing ? 'Annuler la modification (la ligne garde sa valeur)' : 'Quitter'}
+                >
+                  <X size={14} />
+                </button>
+              </div>
             </div>
           )}
           <div className="absolute bottom-14 left-1/2 z-10 -translate-x-1/2 rounded-xl bg-gray-900/85 px-3 py-1.5 text-[10px] text-white backdrop-blur">
-            {activeLayout ? 'Molette : zoom · Clic milieu : déplacer · Présentation en lecture seule' : 'Molette : zoom · Clic : isoler le calque · Survol : nom du calque'}
+            {(() => {
+              if (activeLayout) return 'Molette : zoom · Clic milieu : déplacer · Présentation en lecture seule';
+              if (selectionMode) return 'Molette : zoom · Clic : sélectionner / désélectionner un élément · Échap : quitter';
+              return 'Molette : zoom · Clic : isoler le calque · Survol : nom du calque';
+            })()}
           </div>
           <div className="absolute inset-x-0 bottom-0 z-10 border-t border-gray-200 bg-white/95 px-2 py-2 backdrop-blur-xl">
             <div className="flex gap-1 overflow-x-auto">
@@ -646,4 +1028,16 @@ DxfViewerPanel.propTypes = {
   onLoaded: PropTypes.func.isRequired,
   onError: PropTypes.func.isRequired,
   onPickLayer: PropTypes.func.isRequired,
+  selectionMode: PropTypes.oneOf(['', 'length', 'area', 'count']),
+  onSelectionModeChange: PropTypes.func,
+  highlightedEntityIds: PropTypes.arrayOf(PropTypes.string),
+  measuredEntityIds: PropTypes.arrayOf(PropTypes.string),
+  measurementHighlightColor: PropTypes.string,
+  onMeasurementHighlightColorChange: PropTypes.func,
+  onPickEntity: PropTypes.func,
+  selectionSummary: PropTypes.shape({ entityCount: PropTypes.number, text: PropTypes.string, editing: PropTypes.bool }),
+  onCreateSelectionRow: PropTypes.func,
+  onClearSelection: PropTypes.func,
+  focusEntities: PropTypes.shape({ ids: PropTypes.array, nonce: PropTypes.number }),
+  scaleToMeters: PropTypes.number,
 };

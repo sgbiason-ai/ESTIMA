@@ -8,14 +8,22 @@ export { APP_VERSION } from './appVersion';
 
 export const CHANGELOG = [
   {
-    version: '3.10.1',
+    version: '3.10.7',
     date: '2026-07-16',
     title: 'Partage et propriété des modules terrain',
     highlights: [
+      'Métré DXF — l’œil de chaque métré réalisé contrôle maintenant sa surépaisseur individuellement : masquer une ligne retire uniquement son repérage coloré, sans cacher le dessin DXF ni les autres métrés, et ce choix est sauvegardé',
+      'Métré DXF — les éléments appartenant aux métrés réalisés restent désormais visibles en surépaisseur sur le plan ; une palette simple de 15 couleurs permet à l’utilisateur de choisir le repérage, sauvegardé avec le fichier DXF',
+      'Métré DXF — une ligne créée depuis le DQE dispose maintenant du crayon de sélection : elle peut être complétée en pointant les éléments du plan tout en conservant son nom, son unité et son association à l’article',
+      'Métré DXF — la zone « Métrés réalisés » permet de créer une ligne vierge (nom, type et unité) ou de partir directement d’un article du DQE avec ses informations préremplies ; la quantité se renseigne avec la correction existante et la ligne reste sauvegardée avec le fichier',
+      'Métré DXF — supprimer une association est désormais enregistré avant la fermeture de la fenêtre : elle ne réapparaît plus à la réouverture, et la fenêtre reste ouverte avec un message clair si la sauvegarde cloud échoue',
+      'Métré DXF — le volet d’association est séparé en deux zones redimensionnables : les calques du dessin en haut et les métrés réalisés en bas, avec les mêmes outils d’association disponibles dans chaque liste',
       'Métré DXF — les modifications et suppressions d’associations déjà appliquées sont maintenant répercutées immédiatement dans le DQE : la contribution DXF est retirée de l’ancien article et transférée vers le nouveau, sans toucher aux quantités ajoutées manuellement',
       'CRC — tous les collaborateurs de l’entreprise peuvent consulter et exporter les comptes rendus, mais seul leur créateur peut les modifier ou les supprimer. Les anciens CRC sont automatiquement attribués au super-utilisateur et les autres membres disposent d’une vue clairement signalée en lecture seule sur desktop et mobile',
       'Visites de site — la fenêtre de partage se ferme après une sauvegarde réussie et affiche désormais un message explicite si Firestore refuse l’opération',
       'Visites de site — lorsqu’une visite est partagée, le collaborateur reçoit une pastille rouge sur la carte « Visites de Site » du hub desktop et mobile. Le compteur indique le nombre de nouveaux partages et disparaît dès l’ouverture du module',
+      'Métré DXF — sélection d’élément : dans l’aperçu, trois modes « Linéaire », « Surfaces » et « Comptage » permettent de mesurer les éléments un par un sans se tromper de type (en mode Linéaire, cliquer dans un parking ne le sélectionne pas ; en mode Surfaces, un clic à l’intérieur de la forme suffit, la plus petite en cas d’imbrication ; en mode Comptage, on pointe les blocs, points et cercles). Le survol affiche le type et la mesure exacte, le clic ajoute ou retire l’élément de la sélection (surlignée en orange) avec cumul en direct, et re-cliquer un élément déjà pris le retire de la somme. « Ajouter au métré » fige la sélection en ligne de métré associable à un article comme un calque — coefficient, conversions m³/T, feuille PDF et application au DQE compris — sauvegardée avec le fichier ; la ligne est renommable en place (« Réseau AEP »…) et son œil surligne et recadre ses éléments sur le plan',
+      'Métré DXF — modifier une ligne de métré existante : le crayon d’une ligne issue de sélection la rouvre sur le plan (ses éléments surlignés) pour en ajouter ou en retirer, puis « Enregistrer ». Et sur n’importe quelle ligne (sélection ou calque), un bouton de correction manuelle permet d’ajouter ou de retrancher une quantité fixe (ex. +15 ml pour un tronçon non dessiné, −20 m² de retenue) : la quantité mesurée, la conversion et la quantité appliquée au DQE en tiennent compte, et la correction est sauvegardée avec le fichier',
     ],
   },
   {

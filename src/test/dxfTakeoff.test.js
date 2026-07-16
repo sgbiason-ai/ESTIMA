@@ -1,12 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import {
   aggregateDxfTakeoff,
+  applyRowAdjustments,
+  buildEntityIndex,
   buildMeasurementRows,
+  buildSelectionRows,
   computeRobustFitBounds,
+  entityOutlinePoints,
   measureBulgeSegment,
   measureClosedPolylineArea,
   measurePolylineLength,
+  measureSelection,
 } from '../utils/takeoff/dxfTakeoff';
+import {
+  buildEntityGrid,
+  buildHighlightBuffers,
+  collectEntityBounds,
+  hitTestEntities,
+} from '../components/takeoff/dxfEntityPicking';
 import {
   applyTakeoffToProject,
   flattenProjectItems,
@@ -73,6 +84,204 @@ describe('métré DXF — géométrie', () => {
     expect(rows.find((row) => row.metric === 'length').quantity).toBe(1);
     expect(rows.find((row) => row.metric === 'area').quantity).toBe(1);
     expect(rows.find((row) => row.metric === 'count').quantity).toBe(2);
+  });
+});
+
+describe('métré DXF — sélection d’éléments', () => {
+  const dxf = {
+    entities: [
+      { type: 'LINE', layer: 'AEP', handle: 'A1', vertices: [{ x: 0, y: 0 }, { x: 3, y: 4 }] },
+      { type: 'LWPOLYLINE', layer: 'VOIRIE', shape: true, vertices: [
+        { x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 4 }, { x: 0, y: 4 },
+      ] },
+      { type: 'INSERT', layer: 'REGARDS', name: 'REGARD_EP', position: { x: 5, y: 5 }, rowCount: 2, columnCount: 3 },
+      { type: 'TEXT', layer: 'TEXTES' },
+      { type: 'LINE', layer: 'AEP', inPaperSpace: true, vertices: [{ x: 0, y: 0 }, { x: 1, y: 0 }] },
+    ],
+  };
+
+  it('aplatit un arc de bulge en gardant une longueur fidèle', () => {
+    const outline = entityOutlinePoints({
+      type: 'LWPOLYLINE',
+      vertices: [{ x: 0, y: 0, bulge: 1 }, { x: 2, y: 0 }],
+    });
+    expect(outline.length).toBeGreaterThan(4);
+    expect(measurePolylineLength(outline)).toBeCloseTo(Math.PI, 1);
+  });
+
+  it('indexe les entités mesurables avec handle, mesures et contours', () => {
+    const index = buildEntityIndex(dxf);
+
+    expect(index.count).toBe(3);
+    expect(index.ids[0]).toBe('A1');
+    expect(index.ids[1]).toBe('#1'); // pas de handle → rang dans le fichier
+    expect(index.lengths[0]).toBe(5);
+    expect(index.areas[1]).toBe(40);
+    expect(index.counts[2]).toBe(6);
+    expect(index.layerNames[index.layerCodes[2]]).toBe('REGARDS');
+    expect(index.pointOffsets[1] - index.pointOffsets[0]).toBe(2); // ligne = 2 points
+    expect(index.pointOffsets[3] - index.pointOffsets[2]).toBe(1); // bloc = point d'insertion
+  });
+
+  it('se désactive au-delà de la limite d’entités', () => {
+    expect(buildEntityIndex(dxf, 2)).toEqual({ skipped: true });
+  });
+
+  it('somme les mesures d’une sélection et signale les ids introuvables', () => {
+    const index = buildEntityIndex(dxf);
+    const measure = measureSelection(index, ['A1', '#1', 'ZZ']);
+
+    expect(measure.entityCount).toBe(2);
+    expect(measure.rawLength).toBeCloseTo(5 + 28, 8); // ligne + périmètre du rectangle
+    expect(measure.rawArea).toBe(40);
+    expect(measure.missingIds).toEqual(['ZZ']);
+  });
+
+  it('convertit une sélection en lignes de métré à l’échelle', () => {
+    const rows = buildSelectionRows([{
+      id: 's1', label: 'Réseau AEP', rawLength: 1000, rawArea: 0, rawCount: 0, entityCount: 3,
+    }], 0.001);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      id: 'sel::s1::length', metric: 'length', quantity: 1, layer: 'Réseau AEP', isSelection: true,
+    });
+  });
+
+  it('crée une ligne de métré manuelle vide avec son unité', () => {
+    const rows = buildSelectionRows([{
+      id: 'manual1', label: 'Article DQE', metric: 'area', unit: 'm³', isManual: true,
+      highlightHidden: true,
+    }], 1);
+
+    expect(rows).toEqual([expect.objectContaining({
+      id: 'sel::manual1::area',
+      layer: 'Article DQE',
+      metric: 'area',
+      unit: 'm³',
+      quantity: 0,
+      isManual: true,
+      highlightHidden: true,
+    })]);
+  });
+
+  it('retrouve l’entité la plus proche du clic (grille + tolérance + isolation)', () => {
+    const index = buildEntityIndex(dxf);
+    const grid = buildEntityGrid(index);
+    const relX = (x) => x - index.origin.x;
+    const relY = (y) => y - index.origin.y;
+
+    expect(hitTestEntities(index, grid, relX(1.5), relY(2), 0.5)).toBe(0); // sur la ligne AEP
+    expect(hitTestEntities(index, grid, relX(20), relY(20), 0.5)).toBe(-1); // dans le vide
+    expect(hitTestEntities(index, grid, relX(1.5), relY(2), 0.5, 'VOIRIE')).toBe(1); // intérieur du rectangle
+    expect(hitTestEntities(index, grid, relX(1.5), relY(2), 0.5, 'REGARDS')).toBe(-1); // calque isolé sans candidat
+    expect(hitTestEntities(index, grid, relX(1.5), relY(2), 3, 'VOIRIE')).toBe(1);
+    expect(hitTestEntities(index, grid, relX(5.1), relY(5), 0.2)).toBe(2); // point d'insertion du bloc
+  });
+
+  it('restreint la visée à la métrique du mode (Linéaire / Surfaces / Comptage)', () => {
+    const index = buildEntityIndex(dxf);
+    const grid = buildEntityGrid(index);
+    const relX = (x) => x - index.origin.x;
+    const relY = (y) => y - index.origin.y;
+    const NO_LAYER = '';
+    const NO_SEL = null;
+
+    // (1.5,2) : sur la ligne AEP et dans le rectangle VOIRIE.
+    // Mode Linéaire → la ligne (0) ; pas de clic intérieur (contour seul).
+    expect(hitTestEntities(index, grid, relX(1.5), relY(2), 0.5, NO_LAYER, NO_SEL, 'length')).toBe(0);
+    // Mode Surfaces → la ligne est ignorée (aucune aire), clic intérieur → rectangle (1).
+    expect(hitTestEntities(index, grid, relX(1.5), relY(2), 0.5, NO_LAYER, NO_SEL, 'area')).toBe(1);
+    // Mode Comptage → ni ligne ni surface, rien à cet endroit.
+    expect(hitTestEntities(index, grid, relX(1.5), relY(2), 0.5, NO_LAYER, NO_SEL, 'count')).toBe(-1);
+    // Mode Comptage → le bloc à son point d'insertion.
+    expect(hitTestEntities(index, grid, relX(5.1), relY(5), 0.2, NO_LAYER, NO_SEL, 'count')).toBe(2);
+    // Mode Linéaire → clic à l'intérieur du rectangle : refusé (contour seul).
+    expect(hitTestEntities(index, grid, relX(7), relY(2), 0.5, NO_LAYER, NO_SEL, 'length')).toBe(-1);
+  });
+
+  it('applique les corrections manuelles (+/−) aux lignes de métré', () => {
+    const rows = [
+      { id: 'A::length', metric: 'length', quantity: 128 },
+      { id: 'B::area', metric: 'area', quantity: 40 },
+      { id: 'C::count', metric: 'count', quantity: 3 },
+    ];
+    const adjusted = applyRowAdjustments(rows, { 'A::length': 15, 'B::area': -100 });
+
+    // +15 → 143, avec base et delta conservés
+    expect(adjusted[0]).toMatchObject({ quantity: 143, baseQuantity: 128, adjustment: 15 });
+    // −100 sur 40 : borné à 0 (jamais négatif)
+    expect(adjusted[1]).toMatchObject({ quantity: 0, baseQuantity: 40, adjustment: -100 });
+    // ligne sans ajustement : intacte, pas de champ ajouté
+    expect(adjusted[2]).toEqual({ id: 'C::count', metric: 'count', quantity: 3 });
+
+    // map absente / delta nul : lignes inchangées
+    expect(applyRowAdjustments(rows, null)).toBe(rows);
+    expect(applyRowAdjustments(rows, { 'A::length': 0 })[0]).toBe(rows[0]);
+  });
+
+  it('n’émet que la métrique du mode dans les lignes de sélection', () => {
+    // Sélection issue du mode Linéaire sur une polyligne fermée (a longueur ET aire) :
+    // seule la longueur doit sortir.
+    const rows = buildSelectionRows([{
+      id: 's1', label: 'Linéaire 1', metric: 'length', rawLength: 28, rawArea: 40, rawCount: 0, entityCount: 1,
+    }], 1);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ metric: 'length', quantity: 28 });
+
+    // Sans metric (ancienne sélection) : rétrocompatibilité, toutes les métriques présentes.
+    const legacy = buildSelectionRows([{
+      id: 's2', label: 'Sélection 1', rawLength: 28, rawArea: 40, rawCount: 0, entityCount: 1,
+    }], 1);
+    expect(legacy.map((row) => row.metric).sort()).toEqual(['area', 'length']);
+  });
+
+  it('sélectionne une surface par un clic à l’intérieur (la plus petite si imbriquées)', () => {
+    const index = buildEntityIndex(dxf);
+    const grid = buildEntityGrid(index);
+
+    // (7,2) est loin de tout contour mais dans le rectangle VOIRIE
+    expect(hitTestEntities(index, grid, 7 - index.origin.x, 2 - index.origin.y, 0.5)).toBe(1);
+    expect(hitTestEntities(index, grid, 7 - index.origin.x, 2 - index.origin.y, 0.5, 'AEP')).toBe(-1);
+
+    const nested = buildEntityIndex({
+      entities: [
+        { type: 'LWPOLYLINE', layer: 'A', shape: true, vertices: [
+          { x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 },
+        ] },
+        { type: 'LWPOLYLINE', layer: 'B', shape: true, vertices: [
+          { x: 4, y: 4 }, { x: 6, y: 4 }, { x: 6, y: 6 }, { x: 4, y: 6 },
+        ] },
+      ],
+    });
+    const nestedGrid = buildEntityGrid(nested);
+    expect(hitTestEntities(nested, nestedGrid, 5, 5, 0.2)).toBe(1); // îlot intérieur
+    expect(hitTestEntities(nested, nestedGrid, 2, 2, 0.2)).toBe(0); // hors îlot → grande surface
+  });
+
+  it('re-cliquer un élément sélectionné le retire même si un voisin est plus proche', () => {
+    const twin = buildEntityIndex({
+      entities: [
+        { type: 'LINE', layer: 'A', handle: 'L1', vertices: [{ x: 0, y: 0 }, { x: 10, y: 0 }] },
+        { type: 'LINE', layer: 'A', handle: 'L2', vertices: [{ x: 0, y: 0.3 }, { x: 10, y: 0.3 }] },
+      ],
+    });
+    const twinGrid = buildEntityGrid(twin);
+
+    // Clic à y=0,2 : L2 (0,1) est plus proche que L1 (0,2)…
+    expect(hitTestEntities(twin, twinGrid, 5, 0.2, 0.5)).toBe(1);
+    // …mais si L1 est déjà sélectionnée, le re-clic la vise (désélection prioritaire).
+    expect(hitTestEntities(twin, twinGrid, 5, 0.2, 0.5, '', new Set([0]))).toBe(0);
+  });
+
+  it('borne et surligne les entités choisies dans le repère de la scène', () => {
+    const index = buildEntityIndex(dxf);
+
+    expect(collectEntityBounds(index, ['A1'])).toEqual({ minX: 0, maxX: 3, minY: 0, maxY: 4 });
+
+    const buffers = buildHighlightBuffers(index, ['A1', '#2'], { x: 1, y: 1 });
+    expect(Array.from(buffers.linePositions)).toEqual([-1, -1, 0, 2, 3, 0]);
+    expect(Array.from(buffers.markerPositions)).toEqual([4, 4, 0]);
   });
 });
 
@@ -287,7 +496,7 @@ describe('métré DXF — application au projet', () => {
     expect(result.chapters[0].children[0].qty).toBe(5);
   });
 
-  it('transf?re la contribution DXF vers le nouvel article', () => {
+  it('transfère la contribution DXF vers le nouvel article', () => {
     const applied = {
       ...project,
       chapters: [{ ...project.chapters[0], children: [

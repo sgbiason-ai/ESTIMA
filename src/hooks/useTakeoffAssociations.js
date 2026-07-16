@@ -46,15 +46,18 @@ export function useTakeoffAssociations(companyId, projectId) {
   }, [companyId, projectId]);
 
   const saveAssociations = useCallback((dxfKey, data) => {
-    if (!companyId || !projectId || !dxfKey) return;
+    if (!companyId || !projectId || !dxfKey) return Promise.resolve();
     const next = { ...ref.current, [dxfKey]: { ...data, updatedAt: new Date().toISOString() } };
     ref.current = next;
     setAssociations(next);
-    setDoc(
+    return setDoc(
       doc(db, 'companies', companyId, 'projects', projectId, 'takeoff', 'data'),
       { associations: next, updatedAt: new Date().toISOString() },
       { merge: true },
-    ).catch((e) => console.error('[takeoff] sauvegarde des associations échouée', e));
+    ).catch((e) => {
+      console.error('[takeoff] sauvegarde des associations échouée', e);
+      throw e;
+    });
   }, [companyId, projectId]);
 
   return { associations, saveAssociations };

@@ -7,13 +7,20 @@ import {
 } from 'lucide-react';
 import DxfViewerPanel from './DxfViewerPanel';
 import DxfMappingPanel from './DxfMappingPanel';
-import { buildMeasurementRows, METRIC_LABELS } from '../../utils/takeoff/dxfTakeoff';
+import {
+  applyRowAdjustments, buildMeasurementRows, buildSelectionRows, measureSelection, METRIC_LABELS,
+} from '../../utils/takeoff/dxfTakeoff';
 import { flattenProjectItems, takeoffConversionFactor } from '../../utils/takeoff/applyTakeoff';
 import {
   loadDxfSession, saveDxfFile, clearDxfSession,
 } from '../../utils/takeoff/dxfPersistence';
 import { useTakeoffAssociations, dxfFileKey } from '../../hooks/useTakeoffAssociations';
 import { confirm, toast } from '../../utils/globalUI';
+
+const formatQty = (value) => Number(value || 0).toLocaleString('fr-FR', { maximumFractionDigits: 2 });
+
+// Préfixe du nom auto d'une sélection, selon le mode qui l'a créée (renommable ensuite).
+const SELECTION_LABEL_PREFIX = { length: 'Linéaire', area: 'Surface', count: 'Comptage' };
 
 export default function DxfTakeoffModal({
   project, companyId, branding, activeTrancheId, onApply, onSync, onClose, visible = true, onUnload,
@@ -38,16 +45,31 @@ export default function DxfTakeoffModal({
   const [applyMode, setApplyMode] = useState('replace');
   const [loadError, setLoadError] = useState('');
   const [rightWidth, setRightWidth] = useState(440);
+  // Sélection d'éléments : mode actif ('' | 'length' | 'area' | 'count'), éléments cochés
+  // (ids DXF), lignes de métré créées.
+  const [selectionMode, setSelectionMode] = useState('');
+  const [selectedEntityIds, setSelectedEntityIds] = useState([]);
+  const [entitySelections, setEntitySelections] = useState([]);
+  const [editingSelectionId, setEditingSelectionId] = useState('');
+  const [previewSelectionId, setPreviewSelectionId] = useState('');
+  const [focusEntities, setFocusEntities] = useState({ ids: [], nonce: 0 });
+  // Corrections manuelles (+/−) par ligne : rowId → delta dans l'unité de la métrique.
+  const [adjustments, setAdjustments] = useState({});
+  const [measurementHighlightColor, setMeasurementHighlightColor] = useState('#f97316');
 
   const projectItems = useMemo(() => flattenProjectItems(project?.chapters), [project?.chapters]);
-  const rows = useMemo(() => buildMeasurementRows(summary, scaleToMeters), [summary, scaleToMeters]);
+  const rows = useMemo(() => applyRowAdjustments([
+    ...buildSelectionRows(entitySelections, scaleToMeters),
+    ...buildMeasurementRows(summary, scaleToMeters),
+  ], adjustments), [entitySelections, summary, scaleToMeters, adjustments]);
   const rowMap = useMemo(() => new Map(rows.map((row) => [row.id, row])), [rows]);
   const selectedMappings = useMemo(() => Object.entries(mappings).flatMap(([rowId, mapping]) => {
     const row = rowMap.get(rowId);
     const coefficient = Number(mapping?.coefficient ?? 1);
     if (!row || !mapping?.itemId || !Number.isFinite(coefficient) || coefficient < 0) return [];
     const article = projectItems.find((item) => String(item.id) === String(mapping.itemId));
-    const conversion = article ? takeoffConversionFactor(METRIC_LABELS[row.metric]?.unit, article.unit, mapping) : 1;
+    const metricUnit = row.unit || METRIC_LABELS[row.metric]?.unit;
+    const conversion = article ? takeoffConversionFactor(metricUnit, article.unit, mapping) : 1;
     return [{
       rowId,
       layer: row.layer,
@@ -80,6 +102,13 @@ export default function DxfTakeoffModal({
     setMappings({});
     setIsolatedLayer('');
     setLoadError('');
+    setSelectionMode('');
+    setSelectedEntityIds([]);
+    setEntitySelections([]);
+    setEditingSelectionId('');
+    setPreviewSelectionId('');
+    setFocusEntities({ ids: [], nonce: 0 });
+    setAdjustments({});
   };
 
   const handleLoaded = useCallback((nextSummary, layers) => {
@@ -120,6 +149,187 @@ export default function DxfTakeoffModal({
     if (layer) setPick((previous) => ({ layer, nonce: previous.nonce + 1 }));
   }, []);
 
+  // --- Sélection d'entités réelles (mode « Sélection » de l'aperçu) ---
+  const entityIndex = summary?.entityIndex || null;
+  const liveSelectionMeasure = useMemo(
+    () => measureSelection(entityIndex, selectedEntityIds),
+    [entityIndex, selectedEntityIds],
+  );
+
+  // Le mode restreint la visée à sa métrique → on n'affiche que celle-là (une polyligne
+  // fermée prise en mode Linéaire a une aire, mais elle n'entre pas dans ce métré).
+  const selectionSummary = useMemo(() => {
+    if (!selectionMode) return null;
+    const measure = liveSelectionMeasure;
+    let text = '';
+    if (selectionMode === 'length') text = `${formatQty(measure.rawLength * scaleToMeters)} ml`;
+    else if (selectionMode === 'area') text = `${formatQty(measure.rawArea * scaleToMeters * scaleToMeters)} m²`;
+    else if (selectionMode === 'count') text = `${formatQty(measure.rawCount)} u`;
+    return { entityCount: measure.entityCount, text, editing: Boolean(editingSelectionId) };
+  }, [selectionMode, liveSelectionMeasure, scaleToMeters, editingSelectionId]);
+
+  const handleSelectionModeChange = useCallback((next) => {
+    setSelectionMode(next || '');
+    setSelectedEntityIds([]); // changer de mode repart d'une sélection vide (métriques disjointes)
+    setEditingSelectionId(''); // …et annule une édition en cours
+  }, []);
+
+  const handlePickEntity = useCallback((entityId) => {
+    setSelectedEntityIds((previous) => (previous.includes(entityId)
+      ? previous.filter((id) => id !== entityId)
+      : [...previous, entityId]));
+  }, []);
+
+  // Rouvre une ligne « Sélection » pour la modifier sur le plan : ses éléments redeviennent
+  // la sélection courante (surlignés), le mode reprend sa métrique, on recadre dessus.
+  const handleEditSelection = useCallback((selectionId) => {
+    const selection = entitySelections.find((item) => item.id === selectionId);
+    if (!selection) return;
+    setPreviewSelectionId('');
+    setEditingSelectionId(selectionId);
+    setSelectionMode(selection.metric || 'length');
+    setSelectedEntityIds(selection.entityIds || []);
+    setFocusEntities((previous) => ({ ids: selection.entityIds || [], nonce: previous.nonce + 1 }));
+  }, [entitySelections]);
+
+  // Valide la sélection courante : met à jour la ligne en cours d'édition, sinon en crée une
+  // nouvelle. Mesures brutes snapshotées → la ligne reste valide même sans reconstruire l'index.
+  // `metric` = mode actif → la ligne ne porte qu'une métrique (Linéaire/Surfaces/Comptage).
+  const handleCommitSelection = useCallback(() => {
+    const measure = liveSelectionMeasure;
+    if (!measure.entityCount || !selectionMode) return;
+    const snapshot = {
+      entityIds: [...selectedEntityIds],
+      rawLength: measure.rawLength,
+      rawArea: measure.rawArea,
+      rawCount: measure.rawCount,
+      entityCount: measure.entityCount,
+      approximateCount: measure.approximateCount,
+    };
+    if (editingSelectionId) {
+      setEntitySelections((previous) => previous.map((item) => (
+        item.id === editingSelectionId ? { ...item, ...snapshot, isManual: false } : item
+      )));
+      setEditingSelectionId('');
+      setSelectedEntityIds([]);
+      toast.success('Sélection mise à jour.');
+      return;
+    }
+    const prefix = SELECTION_LABEL_PREFIX[selectionMode] || 'Sélection';
+    const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const number = entitySelections.reduce((max, item) => {
+      const match = new RegExp(`^${escaped} (\\d+)$`).exec(item.label || '');
+      return match ? Math.max(max, Number(match[1])) : max;
+    }, 0) + 1;
+    const selection = {
+      id: `sel_${Date.now().toString(36)}`,
+      label: `${prefix} ${number}`,
+      metric: selectionMode,
+      ...snapshot,
+      createdAt: new Date().toISOString(),
+    };
+    setEntitySelections((previous) => [...previous, selection]);
+    setSelectedEntityIds([]);
+    toast.success(`« ${selection.label} » ajoutée à la liste de métré.`);
+  }, [liveSelectionMeasure, selectionMode, selectedEntityIds, entitySelections, editingSelectionId]);
+
+  // Correction manuelle (+/−) d'une ligne : delta nul/vide → on retire la clé.
+  const handleAdjustmentChange = useCallback((rowId, value) => {
+    setAdjustments((previous) => {
+      const num = Number(value);
+      const next = { ...previous };
+      if (value === '' || !Number.isFinite(num) || num === 0) delete next[rowId];
+      else next[rowId] = num;
+      return next;
+    });
+  }, []);
+
+  const handleRenameSelection = useCallback((selectionId, label) => {
+    const cleaned = String(label || '').trim().slice(0, 80);
+    if (!cleaned) return;
+    setEntitySelections((previous) => previous.map((selection) => (
+      selection.id === selectionId ? { ...selection, label: cleaned } : selection
+    )));
+  }, []);
+
+  const handleCreateManualMeasurement = useCallback(({ label, metric, unit, itemId }) => {
+    const id = `manual_${Date.now().toString(36)}`;
+    const rowId = `sel::${id}::${metric}`;
+    setEntitySelections((previous) => [...previous, {
+      id,
+      label: String(label || 'Nouveau métré').trim().slice(0, 80),
+      metric,
+      unit,
+      isManual: true,
+      entityIds: [],
+      rawLength: 0,
+      rawArea: 0,
+      rawCount: 0,
+      entityCount: 0,
+      createdAt: new Date().toISOString(),
+    }]);
+    if (itemId) {
+      setMappings((previous) => ({
+        ...previous,
+        [rowId]: { itemId, coefficient: 1 },
+      }));
+    }
+    toast.success(itemId ? 'Métré créé depuis le DQE.' : 'Ligne de métré vierge créée.');
+  }, []);
+
+  const handleDeleteSelection = useCallback((selectionId) => {
+    setEntitySelections((previous) => previous.filter((selection) => selection.id !== selectionId));
+    const purge = (map) => {
+      const next = {};
+      for (const [rowId, value] of Object.entries(map)) {
+        if (!rowId.startsWith(`sel::${selectionId}::`)) next[rowId] = value;
+      }
+      return next;
+    };
+    setMappings(purge); // retire l'association…
+    setAdjustments(purge); // …et la correction manuelle des lignes de cette sélection
+    setPreviewSelectionId((current) => (current === selectionId ? '' : current));
+    setEditingSelectionId((current) => (current === selectionId ? '' : current));
+  }, []);
+
+  // Œil d'une ligne sélection : surligne ses éléments et recadre l'aperçu dessus.
+  const handlePreviewSelection = (selectionId) => {
+    if (previewSelectionId === selectionId) {
+      setPreviewSelectionId('');
+      return;
+    }
+    setPreviewSelectionId(selectionId);
+    const selection = entitySelections.find((item) => item.id === selectionId);
+    if (selection) {
+      setFocusEntities((previous) => ({ ids: selection.entityIds || [], nonce: previous.nonce + 1 }));
+    }
+  };
+
+  const handleToggleSelectionVisibility = useCallback((selectionId) => {
+    setEntitySelections((previous) => previous.map((selection) => (
+      selection.id === selectionId
+        ? { ...selection, highlightHidden: !selection.highlightHidden }
+        : selection
+    )));
+    setPreviewSelectionId((current) => (current === selectionId ? '' : current));
+  }, []);
+
+  const highlightedEntityIds = useMemo(() => {
+    const ids = selectionMode ? [...selectedEntityIds] : [];
+    if (previewSelectionId) {
+      const selection = entitySelections.find((item) => item.id === previewSelectionId);
+      for (const id of selection?.entityIds || []) {
+        if (!ids.includes(id)) ids.push(id);
+      }
+    }
+    return ids;
+  }, [selectionMode, selectedEntityIds, previewSelectionId, entitySelections]);
+  const measuredEntityIds = useMemo(() => Array.from(new Set(
+    entitySelections.flatMap((selection) => (
+      selection.highlightHidden ? [] : (selection.entityIds || [])
+    )),
+  )), [entitySelections]);
+
   // Rechargement du FICHIER au montage (IndexedDB local → réouverture instantanée + F5).
   useEffect(() => {
     let cancelled = false;
@@ -151,6 +361,9 @@ export default function DxfTakeoffModal({
       if (saved.mappings) setMappings(saved.mappings);
       if (saved.scaleToMeters) setScaleToMeters(saved.scaleToMeters);
       if (saved.applyMode) setApplyMode(saved.applyMode);
+      if (Array.isArray(saved.selections)) setEntitySelections(saved.selections);
+      if (saved.adjustments) setAdjustments(saved.adjustments);
+      if (saved.measurementHighlightColor) setMeasurementHighlightColor(saved.measurementHighlightColor);
     }
 
     const trancheKey = targetTrancheId || 'global';
@@ -165,7 +378,8 @@ export default function DxfTakeoffModal({
     }
   }, [dxfKey, summary, associations, file?.name, project?.takeoffImports, targetTrancheId]);
 
-  // Maintient dans le DQE la contribution d'un fichier DXF deja applique.
+  // Une fois ce fichier appliqué au DQE, toute édition ultérieure est réconciliée aussitôt :
+  // ancienne contribution DXF retirée, nouvelle ajoutée, saisies manuelles inchangées.
   useEffect(() => {
     if (!onSync || syncedMappingsRef.current === null) return;
     const signature = JSON.stringify(selectedMappings);
@@ -190,10 +404,29 @@ export default function DxfTakeoffModal({
     if (!dxfKey || restoredKeyRef.current !== dxfKey) return undefined;
     if (skipCloudSaveRef.current) { skipCloudSaveRef.current = false; return undefined; }
     const timer = setTimeout(() => {
-      saveAssociations(dxfKey, { mappings, scaleToMeters, applyMode });
+      saveAssociations(dxfKey, {
+        mappings, scaleToMeters, applyMode, selections: entitySelections, adjustments,
+        measurementHighlightColor,
+      }).catch(() => {});
     }, 1000);
     return () => clearTimeout(timer);
-  }, [dxfKey, mappings, scaleToMeters, applyMode, saveAssociations]);
+  }, [dxfKey, mappings, scaleToMeters, applyMode, entitySelections, adjustments, measurementHighlightColor, saveAssociations]);
+
+  const handleClose = async () => {
+    if (dxfKey && restoredKeyRef.current === dxfKey) {
+      try {
+        await saveAssociations(dxfKey, {
+          mappings, scaleToMeters, applyMode, selections: entitySelections, adjustments,
+          measurementHighlightColor,
+        });
+      } catch {
+        toast.error('Impossible d’enregistrer les associations DXF. La fenêtre reste ouverte.');
+        return false;
+      }
+    }
+    onClose();
+    return true;
+  };
 
   const handleUnload = () => {
     clearDxfSession(projectId);
@@ -257,8 +490,9 @@ export default function DxfTakeoffModal({
     });
     syncedMappingsRef.current = selectedMappings;
     lastSyncSignatureRef.current = JSON.stringify(selectedMappings);
-    toast.success('Les quantités du métré DXF ont été appliquées et sauvegardées.');
-    onClose();
+    if (await handleClose()) {
+      toast.success('Les quantités du métré DXF ont été appliquées et sauvegardées.');
+    }
   };
 
   return (
@@ -317,7 +551,7 @@ export default function DxfTakeoffModal({
                 <Power size={15} /> Décharger
               </button>
             )}
-            <button type="button" onClick={onClose} className="rounded-xl p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700" aria-label="Fermer">
+            <button type="button" onClick={handleClose} className="rounded-xl p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700" aria-label="Fermer">
               <X size={20} />
             </button>
             <input ref={inputRef} type="file" accept=".dxf" className="hidden" onChange={(event) => selectFile(event.target.files?.[0])} />
@@ -332,7 +566,25 @@ export default function DxfTakeoffModal({
 
         <main ref={mainRef} className="flex flex-1 min-h-0">
           <div className="min-w-0 flex-1">
-            <DxfViewerPanel file={file} isolatedLayer={isolatedLayer} onLoaded={handleLoaded} onError={handleError} onPickLayer={handlePickLayer} />
+            <DxfViewerPanel
+              file={file}
+              isolatedLayer={isolatedLayer}
+              onLoaded={handleLoaded}
+              onError={handleError}
+              onPickLayer={handlePickLayer}
+              selectionMode={selectionMode}
+              onSelectionModeChange={handleSelectionModeChange}
+              highlightedEntityIds={highlightedEntityIds}
+              measuredEntityIds={measuredEntityIds}
+              measurementHighlightColor={measurementHighlightColor}
+              onMeasurementHighlightColorChange={setMeasurementHighlightColor}
+              onPickEntity={handlePickEntity}
+              selectionSummary={selectionSummary}
+              onCreateSelectionRow={handleCommitSelection}
+              onClearSelection={() => setSelectedEntityIds([])}
+              focusEntities={focusEntities}
+              scaleToMeters={scaleToMeters}
+            />
           </div>
           <div
             role="separator"
@@ -344,6 +596,7 @@ export default function DxfTakeoffModal({
           <div className="min-h-0 shrink-0" style={{ width: `${rightWidth}px` }}>
             <DxfMappingPanel
               summary={summary}
+              rows={rows}
               projectItems={projectItems}
               mappings={mappings}
               onMappingsChange={setMappings}
@@ -352,6 +605,16 @@ export default function DxfTakeoffModal({
               isolatedLayer={isolatedLayer}
               onIsolateLayer={setIsolatedLayer}
               pick={pick}
+              onDeleteSelection={handleDeleteSelection}
+              onRenameSelection={handleRenameSelection}
+              onEditSelection={handleEditSelection}
+              editingSelectionId={editingSelectionId}
+              adjustments={adjustments}
+              onAdjustmentChange={handleAdjustmentChange}
+              previewSelectionId={previewSelectionId}
+              onPreviewSelection={handlePreviewSelection}
+              onToggleSelectionVisibility={handleToggleSelectionVisibility}
+              onCreateMeasurement={handleCreateManualMeasurement}
             />
           </div>
         </main>
@@ -370,7 +633,7 @@ export default function DxfTakeoffModal({
           </div>
           <div className="flex items-center gap-2">
             {trancheMissing && <span className="text-[10px] font-semibold text-amber-700">Sélectionnez une tranche dans l’Estimation</span>}
-            <button type="button" onClick={onClose} className="rounded-xl px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-200">Annuler</button>
+            <button type="button" onClick={handleClose} className="rounded-xl px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-200">Annuler</button>
             <button
               type="button"
               onClick={handleApply}

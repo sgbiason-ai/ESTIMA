@@ -1,7 +1,7 @@
 import DxfParser from 'dxf-viewer/src/parser/DxfParser.js';
 import { DxfScene } from 'dxf-viewer/src/DxfScene.js';
 import opentype from 'opentype.js';
-import { aggregateDxfTakeoff, HATCH_RENDER_LAYER } from '../utils/takeoff/dxfTakeoff';
+import { aggregateDxfTakeoff, buildEntityIndex, HATCH_RENDER_LAYER } from '../utils/takeoff/dxfTakeoff';
 import {
   computeLayoutPaperBounds,
   createPaperSpaceDxf,
@@ -170,6 +170,22 @@ self.onmessage = async (event) => {
       const { url, fonts, options = {} } = message.data || {};
       const { dxf, structure } = await fetchDxf(url, options.fileEncoding, message.seq);
       const takeoffSummary = aggregateDxfTakeoff(dxf, structure.rawEntityCounts);
+      // Index par entité (sélection à l'écran) : construit AVANT le retag des calques,
+      // sur les mêmes entités que l'agrégation. Buffers transférés (pas copiés).
+      takeoffSummary.entityIndex = buildEntityIndex(dxf);
+      const entityIndex = takeoffSummary.entityIndex;
+      if (entityIndex?.points) {
+        transfers.push(
+          entityIndex.points.buffer,
+          entityIndex.pointOffsets.buffer,
+          entityIndex.lengths.buffer,
+          entityIndex.areas.buffer,
+          entityIndex.counts.buffer,
+          entityIndex.approximate.buffer,
+          entityIndex.layerCodes.buffer,
+          entityIndex.typeCodes.buffer,
+        );
+      }
       takeoffSummary.metadata.invalidHatchesSkipped = removeInvalidHatches(dxf);
       takeoffSummary.metadata.unfrozenLayers = revealHiddenGeometry(dxf);
       retagFillLayers(dxf);

@@ -3,9 +3,9 @@ import React, {
 } from 'react';
 import PropTypes from 'prop-types';
 import {
-  AlertTriangle, Eye, EyeOff, Link2, Plus, Search, Trash2,
+  AlertTriangle, Eye, EyeOff, Link2, Pencil, Plus, Search, SlidersHorizontal, Trash2, X,
 } from 'lucide-react';
-import { buildMeasurementRows, METRIC_LABELS } from '../../utils/takeoff/dxfTakeoff';
+import { METRIC_LABELS } from '../../utils/takeoff/dxfTakeoff';
 import { isUnitCompatible, takeoffGeoSpec, takeoffConversionFactor } from '../../utils/takeoff/applyTakeoff';
 import { toast } from '../../utils/globalUI';
 
@@ -20,6 +20,13 @@ const UNIT_SCALE_OPTIONS = [
   { label: 'Mètres', value: 1 },
   { label: 'Kilomètres', value: 1000 },
 ];
+
+const inferMetricFromUnit = (unit) => {
+  const normalized = String(unit || '').toLowerCase().replace(/²/g, '2').replace(/\s+/g, '');
+  if (['ml', 'm', 'mètre', 'metre'].includes(normalized)) return 'length';
+  if (['m2', 'mètrecarré', 'metrecarre'].includes(normalized)) return 'area';
+  return 'count';
+};
 
 function ProjectItemOptions({ items, metric }) {
   const sorted = useMemo(() => [...items].sort((a, b) => {
@@ -71,6 +78,7 @@ GeoInput.propTypes = {
 
 export default function DxfMappingPanel({
   summary,
+  rows = [],
   projectItems,
   mappings,
   onMappingsChange,
@@ -79,13 +87,26 @@ export default function DxfMappingPanel({
   isolatedLayer,
   onIsolateLayer,
   pick,
+  onDeleteSelection = () => {},
+  onRenameSelection = () => {},
+  onEditSelection = () => {},
+  editingSelectionId = '',
+  adjustments = {},
+  onAdjustmentChange = () => {},
+  onToggleSelectionVisibility = () => {},
+  onCreateMeasurement = () => {},
 }) {
   const [search, setSearch] = useState('');
   const [mappedOnly, setMappedOnly] = useState(false);
   const [metricFilters, setMetricFilters] = useState({ length: false, area: false, count: false });
   const [flashLayer, setFlashLayer] = useState('');
+  const [adjustingRowId, setAdjustingRowId] = useState('');
+  const [layersHeight, setLayersHeight] = useState(58);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [draft, setDraft] = useState({ itemId: '', label: '', metric: 'length', unit: 'ml' });
   const listRef = useRef(null);
-  const rows = useMemo(() => buildMeasurementRows(summary, scaleToMeters), [summary, scaleToMeters]);
+  const splitRef = useRef(null);
+  // Lignes (sélections puis calques) construites et ajustées par le parent (source unique).
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
   const metricCounts = useMemo(() => {
@@ -102,6 +123,10 @@ export default function DxfMappingPanel({
       return !query || row.layer.toLowerCase().includes(query) || row.metric.includes(query);
     });
   }, [mappedOnly, mappings, metricFilters, rows, search]);
+  const measurementUnits = useMemo(() => Array.from(new Set([
+    'ml', 'm²', 'u',
+    ...projectItems.map((item) => String(item.unit || '').trim()).filter(Boolean),
+  ])), [projectItems]);
 
   // Objet cliqué dans l'aperçu → réinitialise les filtres, surligne et défile jusqu'au calque
   useEffect(() => {
@@ -139,6 +164,54 @@ export default function DxfMappingPanel({
     });
   };
 
+  const startVerticalResize = (event) => {
+    event.preventDefault();
+    const container = splitRef.current;
+    if (!container) return;
+    const bounds = container.getBoundingClientRect();
+    const onMove = (moveEvent) => {
+      const minimum = Math.min(120, bounds.height * 0.35);
+      const y = Math.min(Math.max(moveEvent.clientY - bounds.top, minimum), bounds.height - minimum);
+      setLayersHeight((y / bounds.height) * 100);
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+  };
+
+  const selectDqeItem = (itemId) => {
+    const item = projectItems.find((candidate) => String(candidate.id) === String(itemId));
+    if (!item) {
+      setDraft((previous) => ({ ...previous, itemId: '' }));
+      return;
+    }
+    const unit = item.unit || 'u';
+    setDraft({
+      itemId: String(item.id),
+      label: item.designation || 'Nouveau métré',
+      metric: inferMetricFromUnit(unit),
+      unit,
+    });
+  };
+
+  const createMeasurement = () => {
+    const label = draft.label.trim();
+    if (!label) {
+      toast.warning('Saisissez un nom pour le métré.');
+      return;
+    }
+    onCreateMeasurement({ ...draft, label });
+    setDraft({ itemId: '', label: '', metric: 'length', unit: 'ml' });
+    setCreateOpen(false);
+  };
+
   if (!summary) {
     return (
       <div className="flex h-full items-center justify-center p-8 text-center text-sm text-gray-400">
@@ -148,7 +221,12 @@ export default function DxfMappingPanel({
   }
 
   const metadata = summary.metadata || {};
-  const displayedRows = visibleRows.slice(0, 150);
+  const displayedRows = [
+    ...visibleRows.filter((row) => !row.isSelection).slice(0, 150),
+    ...visibleRows.filter((row) => row.isSelection).slice(0, 150),
+  ];
+  const visibleLayerCount = visibleRows.filter((row) => !row.isSelection).length;
+  const visibleSelectionCount = visibleRows.filter((row) => row.isSelection).length;
   const presentMetrics = ['length', 'area', 'count'].filter((m) => metricCounts[m] > 0);
 
   return (
@@ -222,11 +300,14 @@ export default function DxfMappingPanel({
         )}
       </div>
 
-      <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto p-2">
-        <div className="space-y-1.5">
-          {displayedRows.map((row) => {
+      <div ref={listRef} className="flex min-h-0 flex-1 flex-col">
+        {(() => {
+          const cards = displayedRows.map((row) => {
             const mapping = mappings[row.id];
-            const metric = METRIC_LABELS[row.metric];
+            const metric = {
+              ...METRIC_LABELS[row.metric],
+              unit: row.unit || METRIC_LABELS[row.metric].unit,
+            };
             const coefficient = Number(mapping?.coefficient ?? 1);
             const selectedItem = projectItems.find((item) => String(item.id) === String(mapping?.itemId));
             const spec = selectedItem ? takeoffGeoSpec(metric.unit, selectedItem.unit) : null;
@@ -236,28 +317,99 @@ export default function DxfMappingPanel({
             // Incompatible seulement si l'unité ne matche PAS et n'est PAS convertible géométriquement.
             const incompatible = selectedItem && !isUnitCompatible(row.metric, selectedItem.unit) && !needsGeo;
             const targetUnit = needsGeo && selectedItem ? selectedItem.unit : metric.unit;
+            const isSelection = Boolean(row.isSelection);
+            const isManual = Boolean(row.isManual);
+            const isEditing = isSelection && editingSelectionId === row.selectionId;
+            const highlightHidden = isSelection && Boolean(row.highlightHidden);
+            const hasAdjustment = Number.isFinite(row.adjustment) && row.adjustment !== 0;
+            const adjustOpen = adjustingRowId === row.id;
             let rowTone = mapping ? 'border-blue-200 bg-blue-50/40' : 'border-gray-200 bg-white';
-            if (flashLayer === row.layer) rowTone = 'border-amber-400 bg-amber-50 ring-2 ring-amber-300';
+            if (isSelection && !mapping) rowTone = 'border-orange-200 bg-orange-50/30';
+            if (flashLayer === row.layer && !isSelection) rowTone = 'border-amber-400 bg-amber-50 ring-2 ring-amber-300';
+            if (isEditing) rowTone = 'border-orange-400 bg-orange-50 ring-2 ring-orange-300';
 
             return (
-              <div key={row.id} data-dxf-row-layer={row.layer} className={`rounded-xl border p-2 transition-colors ${rowTone}`}>
+              <div key={row.id} data-dxf-row-layer={isSelection ? undefined : row.layer} className={`rounded-xl border p-2 transition-colors ${rowTone}`}>
                 <div className="flex items-start gap-1.5">
-                  <button
+                  {!isManual && <button
                     type="button"
-                    onClick={() => onIsolateLayer(isolatedLayer === row.layer ? '' : row.layer)}
-                    title={isolatedLayer === row.layer ? 'Afficher tous les calques' : 'Isoler ce calque'}
-                    className={`mt-0.5 rounded-md p-1 ${isolatedLayer === row.layer ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500 hover:text-blue-600'}`}
+                    onClick={() => (isSelection
+                      ? onToggleSelectionVisibility(row.selectionId)
+                      : onIsolateLayer(isolatedLayer === row.layer ? '' : row.layer))}
+                    title={(() => {
+                      if (isSelection) return highlightHidden ? 'Afficher la surépaisseur' : 'Masquer la surépaisseur';
+                      return isolatedLayer === row.layer ? 'Afficher tous les calques' : 'Isoler ce calque';
+                    })()}
+                    className={`mt-0.5 rounded-md p-1 ${isSelection && highlightHidden ? 'bg-gray-200 text-gray-400' : (isSelection ? 'bg-blue-600 text-white' : isolatedLayer === row.layer ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500 hover:text-blue-600')}`}
                   >
-                    {isolatedLayer === row.layer ? <EyeOff size={13} /> : <Eye size={13} />}
-                  </button>
+                    {(isSelection ? highlightHidden : isolatedLayer === row.layer) ? <EyeOff size={13} /> : <Eye size={13} />}
+                  </button>}
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[11px] font-semibold text-gray-800" title={row.layer}>{row.layer}</p>
+                    {isSelection ? (
+                      // Nom éditable en place : Entrée/blur = renommer, Échap = annuler.
+                      // La clé force le resync du defaultValue si le libellé change ailleurs.
+                      <input
+                        key={`${row.selectionId}::${row.layer}`}
+                        type="text"
+                        defaultValue={row.layer}
+                        title="Renommer la sélection"
+                        maxLength={80}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') event.currentTarget.blur();
+                          if (event.key === 'Escape') {
+                            event.stopPropagation(); // ne pas quitter le mode sélection de l'aperçu
+                            event.currentTarget.value = row.layer;
+                            event.currentTarget.blur();
+                          }
+                        }}
+                        onBlur={(event) => {
+                          const value = event.target.value.trim();
+                          if (value && value !== row.layer) onRenameSelection(row.selectionId, value);
+                          else event.target.value = row.layer;
+                        }}
+                        className="-mx-1 w-full truncate rounded-md border border-transparent bg-transparent px-1 text-[11px] font-semibold text-gray-800 outline-none hover:border-gray-200 focus:border-blue-400 focus:bg-white"
+                      />
+                    ) : (
+                      <p className="truncate text-[11px] font-semibold text-gray-800" title={row.layer}>{row.layer}</p>
+                    )}
                     <div className="mt-0.5 flex items-center gap-1.5">
+                      {isSelection && !isManual && (
+                        <span className="rounded bg-orange-100 px-1 py-0.5 text-[8px] font-bold uppercase text-orange-600">
+                          {row.entityCount} élém.
+                        </span>
+                      )}
                       <span className="rounded bg-gray-100 px-1 py-0.5 text-[8px] font-bold uppercase text-gray-500">{metric.label}</span>
                       <span className="text-[11px] font-bold text-blue-700">{formatQuantity(row.quantity)} {metric.unit}</span>
+                      {hasAdjustment && (
+                        <span
+                          className="rounded bg-purple-100 px-1 py-0.5 text-[8px] font-bold text-purple-700"
+                          title={`Mesuré ${formatQuantity(row.baseQuantity)} ${metric.unit} · correction ${row.adjustment > 0 ? '+' : ''}${formatQuantity(row.adjustment)} ${metric.unit}`}
+                        >
+                          {row.adjustment > 0 ? '+' : ''}{formatQuantity(row.adjustment)}
+                        </span>
+                      )}
+                      {isEditing && <span className="text-[8px] font-semibold text-orange-600">édition sur le plan…</span>}
                       {row.approximateCount > 0 && <span className="text-[8px] text-amber-600">approx.</span>}
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setAdjustingRowId((current) => (current === row.id ? '' : row.id))}
+                    title="Corriger la quantité (+/−)"
+                    className={`rounded-md p-1 ${adjustOpen || hasAdjustment ? 'bg-purple-100 text-purple-700' : 'text-gray-400 hover:bg-gray-100 hover:text-purple-600'}`}
+                  >
+                    <SlidersHorizontal size={13} />
+                  </button>
+                  {isSelection && (
+                    <button
+                      type="button"
+                      onClick={() => onEditSelection(row.selectionId)}
+                      title="Modifier les éléments sur le plan"
+                      className={`rounded-md p-1 ${isEditing ? 'bg-orange-500 text-white' : 'text-gray-400 hover:bg-orange-50 hover:text-orange-600'}`}
+                    >
+                      <Pencil size={13} />
+                    </button>
+                  )}
                   {!mapping ? (
                     <button
                       type="button"
@@ -271,7 +423,37 @@ export default function DxfMappingPanel({
                       <Trash2 size={13} />
                     </button>
                   )}
+                  {isSelection && (
+                    <button
+                      type="button"
+                      onClick={() => onDeleteSelection(row.selectionId)}
+                      className="rounded-md p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
+                      title="Supprimer cette sélection"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
                 </div>
+
+                {adjustOpen && (
+                  <div className="mt-1.5 flex items-center gap-2 border-t border-purple-100 pt-1.5">
+                    <SlidersHorizontal size={13} className="shrink-0 text-purple-500" />
+                    <span className="text-[10px] font-medium text-gray-500">Corriger&nbsp;:</span>
+                    <span className="text-[10px] text-gray-400">{formatQuantity(row.baseQuantity ?? row.quantity)} {metric.unit}</span>
+                    <span className="text-[10px] font-medium text-gray-400">+</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={adjustments[row.id] ?? ''}
+                      onChange={(event) => onAdjustmentChange(row.id, event.target.value)}
+                      placeholder="0"
+                      title="Quantité à ajouter (positif) ou retrancher (négatif)"
+                      className="w-20 rounded-md border border-gray-200 bg-white px-1.5 py-1 text-right text-[11px] font-semibold outline-none focus:border-purple-400"
+                    />
+                    <span className="text-[10px] text-gray-400">{metric.unit}</span>
+                    <span className="ml-auto shrink-0 text-[11px] font-bold text-gray-700">= {formatQuantity(row.quantity)} {metric.unit}</span>
+                  </div>
+                )}
 
                 {mapping && (
                   <div className="mt-1.5 border-t border-blue-100 pt-1.5">
@@ -323,15 +505,105 @@ export default function DxfMappingPanel({
                 )}
               </div>
             );
-          })}
-        </div>
+          });
+          const layerCards = cards.filter((_, index) => !displayedRows[index].isSelection);
+          const selectionCards = cards.filter((_, index) => displayedRows[index].isSelection);
+          return (
+            <div ref={splitRef} className="flex min-h-0 flex-1 flex-col">
+              <section className="flex min-h-0 flex-col" style={{ height: `${layersHeight}%` }}>
+                <div className="flex shrink-0 items-center justify-between border-b border-gray-200 bg-gray-50/80 px-3 py-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wide text-gray-600">Calques du dessin</span>
+                  <span className="rounded-lg bg-white px-2 py-0.5 text-[10px] font-bold text-gray-500">{visibleLayerCount}</span>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto p-2">
+                  <div className="space-y-1.5">{layerCards}</div>
+                  {visibleLayerCount > 150 && <p className="py-3 text-center text-[10px] text-gray-400">Affinez la recherche pour voir les autres calques.</p>}
+                  {visibleLayerCount === 0 && <p className="py-8 text-center text-xs text-gray-400">Aucun calque mesurable.</p>}
+                </div>
+              </section>
 
-        {visibleRows.length > displayedRows.length && (
-          <p className="py-4 text-center text-[11px] text-gray-400">
-            {visibleRows.length - displayedRows.length} résultat(s) supplémentaires — affinez la recherche.
-          </p>
-        )}
-        {visibleRows.length === 0 && <p className="py-12 text-center text-sm text-gray-400">Aucun calque mesurable trouvé.</p>}
+              <div
+                role="separator"
+                aria-orientation="horizontal"
+                aria-label="Redimensionner les volets calques et métrés"
+                onPointerDown={startVerticalResize}
+                className="group relative h-2 shrink-0 cursor-row-resize border-y border-gray-200 bg-gray-100 hover:bg-blue-50"
+              >
+                <span className="absolute left-1/2 top-1/2 h-0.5 w-10 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gray-300 group-hover:bg-blue-400" />
+              </div>
+
+              <section className="flex min-h-0 flex-1 flex-col">
+                <div className="flex shrink-0 items-center justify-between border-b border-gray-200 bg-orange-50/60 px-3 py-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wide text-orange-700">Métrés réalisés</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="rounded-lg bg-white px-2 py-0.5 text-[10px] font-bold text-orange-600">{visibleSelectionCount}</span>
+                    <button
+                      type="button"
+                      onClick={() => setCreateOpen((value) => !value)}
+                      className="inline-flex items-center gap-1 rounded-lg bg-orange-600 px-2 py-1 text-[10px] font-bold text-white hover:bg-orange-700"
+                    >
+                      {createOpen ? <X size={11} /> : <Plus size={11} />}{createOpen ? 'Fermer' : 'Créer'}
+                    </button>
+                  </div>
+                </div>
+                {createOpen && (
+                  <div className="shrink-0 space-y-2 border-b border-orange-200 bg-orange-50 p-2.5">
+                    <select
+                      value={draft.itemId}
+                      onChange={(event) => selectDqeItem(event.target.value)}
+                      className="w-full rounded-lg border border-orange-200 bg-white px-2 py-1.5 text-[11px] font-medium text-gray-700 outline-none focus:border-orange-400"
+                    >
+                      <option value="">Ligne vierge — sans article DQE</option>
+                      {projectItems.map((item) => (
+                        <option key={item.id} value={item.id}>{item.designation} [{item.unit || '—'}]</option>
+                      ))}
+                    </select>
+                    <div className="grid grid-cols-[1fr_92px_72px] gap-1.5">
+                      <input
+                        value={draft.label}
+                        onChange={(event) => setDraft((previous) => ({ ...previous, label: event.target.value }))}
+                        placeholder="Nom du métré"
+                        maxLength={80}
+                        className="min-w-0 rounded-lg border border-orange-200 bg-white px-2 py-1.5 text-[11px] outline-none focus:border-orange-400"
+                      />
+                      <select
+                        value={draft.metric}
+                        onChange={(event) => setDraft((previous) => ({
+                          ...previous,
+                          metric: event.target.value,
+                          unit: event.target.value === 'length' ? 'ml' : event.target.value === 'area' ? 'm²' : 'u',
+                        }))}
+                        className="rounded-lg border border-orange-200 bg-white px-1.5 py-1.5 text-[11px] outline-none focus:border-orange-400"
+                      >
+                        <option value="length">Longueur</option>
+                        <option value="area">Surface</option>
+                        <option value="count">Comptage</option>
+                      </select>
+                      <select
+                        value={draft.unit}
+                        onChange={(event) => setDraft((previous) => ({ ...previous, unit: event.target.value }))}
+                        className="rounded-lg border border-orange-200 bg-white px-1.5 py-1.5 text-[11px] outline-none focus:border-orange-400"
+                      >
+                        {measurementUnits.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+                      </select>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[9px] text-orange-700">La quantité se renseigne ensuite avec le bouton de correction.</span>
+                      <button type="button" onClick={createMeasurement} className="shrink-0 rounded-lg bg-gray-900 px-3 py-1.5 text-[10px] font-bold text-white hover:bg-gray-700">
+                        Créer le métré
+                      </button>
+                    </div>
+                  </div>
+                )}
+                <div className="min-h-0 flex-1 overflow-y-auto p-2">
+                  <div className="space-y-1.5">{selectionCards}</div>
+                  {visibleSelectionCount > 150 && <p className="py-3 text-center text-[10px] text-gray-400">Affinez la recherche pour voir les autres métrés.</p>}
+                  {visibleSelectionCount === 0 && <p className="py-8 text-center text-xs text-gray-400">Aucun métré réalisé sur le dessin.</p>}
+                </div>
+              </section>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
@@ -339,6 +611,7 @@ export default function DxfMappingPanel({
 
 DxfMappingPanel.propTypes = {
   summary: PropTypes.object,
+  rows: PropTypes.arrayOf(PropTypes.object),
   projectItems: PropTypes.arrayOf(PropTypes.object).isRequired,
   mappings: PropTypes.object.isRequired,
   onMappingsChange: PropTypes.func.isRequired,
@@ -347,4 +620,12 @@ DxfMappingPanel.propTypes = {
   isolatedLayer: PropTypes.string,
   onIsolateLayer: PropTypes.func.isRequired,
   pick: PropTypes.shape({ layer: PropTypes.string, nonce: PropTypes.number }),
+  onDeleteSelection: PropTypes.func,
+  onRenameSelection: PropTypes.func,
+  onEditSelection: PropTypes.func,
+  editingSelectionId: PropTypes.string,
+  adjustments: PropTypes.object,
+  onAdjustmentChange: PropTypes.func,
+  onToggleSelectionVisibility: PropTypes.func,
+  onCreateMeasurement: PropTypes.func,
 };
