@@ -3,7 +3,7 @@ import React, {
 } from 'react';
 import PropTypes from 'prop-types';
 import {
-  AlertTriangle, FileUp, Layers3, LockKeyhole, Power, Ruler, X,
+  AlertTriangle, FileText, FileUp, Layers3, LockKeyhole, Power, Ruler, X,
 } from 'lucide-react';
 import DxfViewerPanel from './DxfViewerPanel';
 import DxfMappingPanel from './DxfMappingPanel';
@@ -16,7 +16,7 @@ import { useTakeoffAssociations, dxfFileKey } from '../../hooks/useTakeoffAssoci
 import { confirm, toast } from '../../utils/globalUI';
 
 export default function DxfTakeoffModal({
-  project, companyId, activeTrancheId, onApply, onClose, visible = true, onUnload,
+  project, companyId, branding, activeTrancheId, onApply, onClose, visible = true, onUnload,
 }) {
   const projectId = project?.id;
   const inputRef = useRef(null);
@@ -51,6 +51,11 @@ export default function DxfTakeoffModal({
       metric: row.metric,
       itemId: mapping.itemId,
       coefficient,
+      measuredQuantity: row.quantity,
+      largeur: mapping.largeur ?? '',
+      epaisseur: mapping.epaisseur ?? '',
+      densite: mapping.densite ?? '',
+      perte: mapping.perte ?? '',
       appliedQuantity: Math.round(row.quantity * coefficient * conversion * 1000) / 1000,
     }];
   }), [mappings, rowMap, projectItems]);
@@ -162,6 +167,31 @@ export default function DxfTakeoffModal({
     onUnload?.();
   };
 
+  const handleExportCurrentPdf = async () => {
+    try {
+      const trancheName = targetTrancheId
+        ? (project?.tranches?.find((t) => t.id === targetTrancheId)?.name || targetTrancheId)
+        : 'Global';
+      const { generateCurrentTakeoffPdf } = await import('../../utils/takeoff/pdfTakeoffGenerator');
+      await generateCurrentTakeoffPdf({
+        project, branding, mappings, rows, projectItems, fileName: file?.name, trancheName,
+      });
+    } catch {
+      toast.error('Échec de la génération du PDF.');
+    }
+  };
+
+  const handleExportHistoryPdf = async () => {
+    try {
+      const { generateHistoryTakeoffPdf } = await import('../../utils/takeoff/pdfTakeoffGenerator');
+      await generateHistoryTakeoffPdf({
+        project, branding, currentFile: file?.name, currentRows: rows, currentMappings: mappings,
+      });
+    } catch {
+      toast.error('Échec de la génération du PDF.');
+    }
+  };
+
   const handleApply = async () => {
     if (selectedMappings.length === 0) {
       toast.warning('Associez au moins un métré à un article du projet.');
@@ -215,6 +245,26 @@ export default function DxfTakeoffModal({
             <span className="hidden items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-2 text-[10px] font-semibold text-emerald-700 lg:inline-flex">
               <LockKeyhole size={13} /> Traitement local
             </span>
+            {selectedMappings.length > 0 && (
+              <button
+                type="button"
+                onClick={handleExportCurrentPdf}
+                title="Feuille de métré PDF (associations en cours)"
+                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100"
+              >
+                <FileText size={15} /> Feuille PDF
+              </button>
+            )}
+            {(project?.takeoffImports || []).length > 0 && (
+              <button
+                type="button"
+                onClick={handleExportHistoryPdf}
+                title="PDF de l'historique des imports DXF appliqués au projet"
+                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-[11px] font-semibold text-gray-500 hover:bg-gray-100"
+              >
+                <FileText size={14} /> Historique
+              </button>
+            )}
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
@@ -304,6 +354,7 @@ export default function DxfTakeoffModal({
 DxfTakeoffModal.propTypes = {
   project: PropTypes.object.isRequired,
   companyId: PropTypes.string,
+  branding: PropTypes.object,
   activeTrancheId: PropTypes.string,
   onApply: PropTypes.func.isRequired,
   onClose: PropTypes.func.isRequired,

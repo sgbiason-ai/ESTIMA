@@ -161,6 +161,12 @@ export function applyTakeoffToProject(project, mappings, options = {}) {
       itemId: String(mapping.itemId),
       coefficient: finite(mapping.coefficient, 1),
       quantity: finite(mapping.appliedQuantity),
+      // Détail pour la feuille de métré PDF (mesuré + conversion géométrique).
+      measuredQuantity: finite(mapping.measuredQuantity),
+      largeur: mapping.largeur ?? '',
+      epaisseur: mapping.epaisseur ?? '',
+      densite: mapping.densite ?? '',
+      perte: mapping.perte ?? '',
     })),
   };
 

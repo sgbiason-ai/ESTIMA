@@ -1125,6 +1125,7 @@ const ProjectView = ({
           <DxfTakeoffModal
             project={project}
             companyId={companyId}
+            branding={masterBranding}
             activeTrancheId={activeTrancheId}
             onApply={handleApplyTakeoff}
             visible={showDxfTakeoff}
