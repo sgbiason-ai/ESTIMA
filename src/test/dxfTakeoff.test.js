@@ -11,6 +11,7 @@ import {
   applyTakeoffToProject,
   flattenProjectItems,
   isUnitCompatible,
+  takeoffConversionFactor,
 } from '../utils/takeoff/applyTakeoff';
 import {
   collectReferencedBlocks,
@@ -284,6 +285,14 @@ describe('métré DXF — application au projet', () => {
     ], { trancheId: 't1' });
     expect(result.chapters[0].children[0].quantities.t1).toBe(18);
     expect(result.chapters[0].children[0].quantitiesFormula.t1).toBe('');
+  });
+
+  it('convertit géométriquement m²/ml vers m³ ou T (comme les blocs)', () => {
+    expect(takeoffConversionFactor('m²', 'm³', { epaisseur: 0.2 })).toBeCloseTo(0.2); // × épaisseur
+    expect(takeoffConversionFactor('m²', 'T', { epaisseur: 0.2, densite: 2.4 })).toBeCloseTo(0.48); // × ép × densité
+    expect(takeoffConversionFactor('ml', 'm²', { largeur: 3 })).toBeCloseTo(3); // × largeur
+    expect(takeoffConversionFactor('m²', 'm²', {})).toBe(1); // unités compatibles → pas de conversion
+    expect(takeoffConversionFactor('u', 'm³', { epaisseur: 0.2 })).toBe(1); // comptage → jamais de conversion
   });
 
   it('aplatit les articles et contrôle la compatibilité des unités', () => {

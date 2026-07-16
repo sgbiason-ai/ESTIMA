@@ -6,7 +6,7 @@ import {
   AlertTriangle, Eye, EyeOff, Link2, Plus, Search, Trash2,
 } from 'lucide-react';
 import { buildMeasurementRows, METRIC_LABELS } from '../../utils/takeoff/dxfTakeoff';
-import { isUnitCompatible } from '../../utils/takeoff/applyTakeoff';
+import { isUnitCompatible, takeoffGeoSpec, takeoffConversionFactor } from '../../utils/takeoff/applyTakeoff';
 import { toast } from '../../utils/globalUI';
 
 const formatQuantity = (value) => Number(value || 0).toLocaleString('fr-FR', {
@@ -42,6 +42,31 @@ function ProjectItemOptions({ items, metric }) {
 ProjectItemOptions.propTypes = {
   items: PropTypes.arrayOf(PropTypes.object).isRequired,
   metric: PropTypes.string.isRequired,
+};
+
+function GeoInput({ label, value, onChange, step = '0.01', placeholder = '0.00' }) {
+  return (
+    <label className="flex items-center gap-1 text-[9px] font-medium text-gray-500">
+      {label}
+      <input
+        type="number"
+        min="0"
+        step={step}
+        value={value ?? ''}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="w-12 rounded border border-gray-200 bg-white px-1 py-0.5 text-right text-[10px] font-semibold text-gray-800 outline-none focus:border-blue-400"
+      />
+    </label>
+  );
+}
+
+GeoInput.propTypes = {
+  label: PropTypes.string.isRequired,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onChange: PropTypes.func.isRequired,
+  step: PropTypes.string,
+  placeholder: PropTypes.string,
 };
 
 export default function DxfMappingPanel({
@@ -203,9 +228,14 @@ export default function DxfMappingPanel({
             const mapping = mappings[row.id];
             const metric = METRIC_LABELS[row.metric];
             const coefficient = Number(mapping?.coefficient ?? 1);
-            const appliedQuantity = row.quantity * (Number.isFinite(coefficient) ? coefficient : 0);
             const selectedItem = projectItems.find((item) => String(item.id) === String(mapping?.itemId));
-            const incompatible = selectedItem && !isUnitCompatible(row.metric, selectedItem.unit);
+            const spec = selectedItem ? takeoffGeoSpec(metric.unit, selectedItem.unit) : null;
+            const needsGeo = !!(spec && (spec.needsLargeur || spec.needsEpaisseur || spec.needsDensity));
+            const conversion = selectedItem ? takeoffConversionFactor(metric.unit, selectedItem.unit, mapping) : 1;
+            const appliedQuantity = row.quantity * (Number.isFinite(coefficient) ? coefficient : 0) * conversion;
+            // Incompatible seulement si l'unité ne matche PAS et n'est PAS convertible géométriquement.
+            const incompatible = selectedItem && !isUnitCompatible(row.metric, selectedItem.unit) && !needsGeo;
+            const targetUnit = needsGeo && selectedItem ? selectedItem.unit : metric.unit;
             let rowTone = mapping ? 'border-blue-200 bg-blue-50/40' : 'border-gray-200 bg-white';
             if (flashLayer === row.layer) rowTone = 'border-amber-400 bg-amber-50 ring-2 ring-amber-300';
 
@@ -261,17 +291,33 @@ export default function DxfMappingPanel({
                         step="0.01"
                         value={mapping.coefficient ?? 1}
                         onChange={(event) => updateMapping(row.id, { coefficient: event.target.value })}
-                        title="Coefficient"
+                        title="Coefficient (multiplicateur général)"
                         className="w-14 rounded-md border border-gray-200 bg-white px-1.5 py-1 text-right text-[11px] font-semibold outline-none focus:border-blue-400"
                       />
                     </div>
+
+                    {needsGeo && (
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 pl-[20px]">
+                        {spec.needsLargeur && (
+                          <GeoInput label="Larg. (m)" value={mapping.largeur} onChange={(v) => updateMapping(row.id, { largeur: v })} />
+                        )}
+                        {spec.needsEpaisseur && (
+                          <GeoInput label="Ép. (m)" value={mapping.epaisseur} onChange={(v) => updateMapping(row.id, { epaisseur: v })} />
+                        )}
+                        {spec.needsDensity && (
+                          <GeoInput label="Densité" value={mapping.densite} onChange={(v) => updateMapping(row.id, { densite: v })} />
+                        )}
+                        <GeoInput label="Perte %" value={mapping.perte} step="1" placeholder="0" onChange={(v) => updateMapping(row.id, { perte: v })} />
+                      </div>
+                    )}
+
                     <div className="mt-1 flex items-center justify-between gap-2 pl-[20px]">
-                      {incompatible ? (
-                        <span className="truncate text-[9px] font-medium text-amber-700">Unité {selectedItem.unit} ≠ {metric.unit}</span>
-                      ) : (
-                        <span className="text-[9px] text-gray-400">Coefficient ×</span>
-                      )}
-                      <span className="shrink-0 text-[11px] font-bold text-gray-700">→ {formatQuantity(appliedQuantity)} {metric.unit}</span>
+                      {(() => {
+                        if (incompatible) return <span className="truncate text-[9px] font-medium text-amber-700">Unité {selectedItem.unit} ≠ {metric.unit}</span>;
+                        if (needsGeo) return <span className="text-[9px] font-medium text-blue-600">Conversion {metric.unit} → {selectedItem.unit}</span>;
+                        return <span className="text-[9px] text-gray-400">Coefficient ×</span>;
+                      })()}
+                      <span className="shrink-0 text-[11px] font-bold text-gray-700">→ {formatQuantity(appliedQuantity)} {targetUnit}</span>
                     </div>
                   </div>
                 )}

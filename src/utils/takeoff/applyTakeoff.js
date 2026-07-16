@@ -1,9 +1,30 @@
 import { recalculateProject } from '../projectCalculations';
+import { geoSpec, blocUnitFactor } from '../blocPricing';
+import { dimensionOf } from '../../data/units';
 
 const finite = (value, fallback = 0) => {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
 };
+
+// Conversion géométrique d'une quantité DXF vers l'unité de l'article (réutilise la logique
+// testée des blocs) : m²→m³ (×épaisseur), m²→T (×épaisseur×densité), ml→m² (×largeur),
+// ml→m³/T, etc. Seules les métriques ml/m² se convertissent (le comptage n'a pas de volume).
+export function takeoffGeoSpec(metricUnit, articleUnit) {
+  const none = { needsLargeur: false, needsEpaisseur: false, needsDensity: false };
+  const dim = dimensionOf(metricUnit);
+  if (dim !== 'length' && dim !== 'area') return none;
+  return geoSpec(metricUnit, articleUnit);
+}
+
+export function takeoffConversionFactor(metricUnit, articleUnit, mapping) {
+  const spec = takeoffGeoSpec(metricUnit, articleUnit);
+  if (!(spec.needsLargeur || spec.needsEpaisseur || spec.needsDensity)) return 1;
+  const factor = blocUnitFactor(
+    metricUnit, articleUnit, mapping?.largeur, mapping?.epaisseur, mapping?.densite, mapping?.perte,
+  );
+  return Number.isFinite(factor) ? factor : 0;
+}
 
 export function flattenProjectItems(chapters, parents = []) {
   const result = [];

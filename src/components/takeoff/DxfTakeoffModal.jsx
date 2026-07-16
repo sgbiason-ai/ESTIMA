@@ -7,8 +7,8 @@ import {
 } from 'lucide-react';
 import DxfViewerPanel from './DxfViewerPanel';
 import DxfMappingPanel from './DxfMappingPanel';
-import { buildMeasurementRows } from '../../utils/takeoff/dxfTakeoff';
-import { flattenProjectItems } from '../../utils/takeoff/applyTakeoff';
+import { buildMeasurementRows, METRIC_LABELS } from '../../utils/takeoff/dxfTakeoff';
+import { flattenProjectItems, takeoffConversionFactor } from '../../utils/takeoff/applyTakeoff';
 import {
   loadDxfSession, saveDxfFile, clearDxfSession,
 } from '../../utils/takeoff/dxfPersistence';
@@ -43,15 +43,17 @@ export default function DxfTakeoffModal({
     const row = rowMap.get(rowId);
     const coefficient = Number(mapping?.coefficient ?? 1);
     if (!row || !mapping?.itemId || !Number.isFinite(coefficient) || coefficient < 0) return [];
+    const article = projectItems.find((item) => String(item.id) === String(mapping.itemId));
+    const conversion = article ? takeoffConversionFactor(METRIC_LABELS[row.metric]?.unit, article.unit, mapping) : 1;
     return [{
       rowId,
       layer: row.layer,
       metric: row.metric,
       itemId: mapping.itemId,
       coefficient,
-      appliedQuantity: Math.round(row.quantity * coefficient * 1000) / 1000,
+      appliedQuantity: Math.round(row.quantity * coefficient * conversion * 1000) / 1000,
     }];
-  }), [mappings, rowMap]);
+  }), [mappings, rowMap, projectItems]);
 
   const hasTranches = (project?.tranches || []).length > 0;
   const targetTrancheId = hasTranches && activeTrancheId !== 'global' ? activeTrancheId : null;
