@@ -16,7 +16,7 @@ import { useTakeoffAssociations, dxfFileKey } from '../../hooks/useTakeoffAssoci
 import { confirm, toast } from '../../utils/globalUI';
 
 export default function DxfTakeoffModal({
-  project, companyId, branding, activeTrancheId, onApply, onClose, visible = true, onUnload,
+  project, companyId, branding, activeTrancheId, onApply, onSync, onClose, visible = true, onUnload,
 }) {
   const projectId = project?.id;
   const inputRef = useRef(null);
@@ -24,6 +24,9 @@ export default function DxfTakeoffModal({
   const skipFileSaveRef = useRef(false);
   const restoredKeyRef = useRef(null);
   const skipCloudSaveRef = useRef(false);
+  const syncedMappingsRef = useRef(null);
+  const skipNextSyncRef = useRef(false);
+  const lastSyncSignatureRef = useRef('');
   const { associations, saveAssociations } = useTakeoffAssociations(companyId, projectId);
   const [file, setFile] = useState(null);
   const [summary, setSummary] = useState(null);
@@ -149,7 +152,37 @@ export default function DxfTakeoffModal({
       if (saved.scaleToMeters) setScaleToMeters(saved.scaleToMeters);
       if (saved.applyMode) setApplyMode(saved.applyMode);
     }
-  }, [dxfKey, summary, associations]);
+
+    const trancheKey = targetTrancheId || 'global';
+    const lastApplied = [...(project?.takeoffImports || [])].reverse().find((entry) => (
+      entry.fileName === file?.name && (entry.trancheId || 'global') === trancheKey
+    ));
+    if (lastApplied) {
+      syncedMappingsRef.current = lastApplied.mappings || [];
+      skipNextSyncRef.current = true;
+    } else {
+      syncedMappingsRef.current = null;
+    }
+  }, [dxfKey, summary, associations, file?.name, project?.takeoffImports, targetTrancheId]);
+
+  // Maintient dans le DQE la contribution d'un fichier DXF deja applique.
+  useEffect(() => {
+    if (!onSync || syncedMappingsRef.current === null) return;
+    const signature = JSON.stringify(selectedMappings);
+    if (signature === lastSyncSignatureRef.current) return;
+    if (skipNextSyncRef.current) {
+      skipNextSyncRef.current = false;
+      lastSyncSignatureRef.current = signature;
+      return;
+    }
+    const previous = syncedMappingsRef.current;
+    syncedMappingsRef.current = selectedMappings;
+    lastSyncSignatureRef.current = signature;
+    onSync(previous, selectedMappings, {
+      fileName: file?.name,
+      trancheId: targetTrancheId,
+    });
+  }, [selectedMappings, onSync, file?.name, targetTrancheId]);
 
   // Sauvegarde CLOUD des associations (débounce), uniquement après restauration pour ce
   // fichier → ne jamais écraser le cloud avec un état vide au chargement.
@@ -222,6 +255,8 @@ export default function DxfTakeoffModal({
       sourceSize: file?.size,
       viewerLayerCount: viewerLayers.length,
     });
+    syncedMappingsRef.current = selectedMappings;
+    lastSyncSignatureRef.current = JSON.stringify(selectedMappings);
     toast.success('Les quantités du métré DXF ont été appliquées et sauvegardées.');
     onClose();
   };
@@ -357,6 +392,7 @@ DxfTakeoffModal.propTypes = {
   branding: PropTypes.object,
   activeTrancheId: PropTypes.string,
   onApply: PropTypes.func.isRequired,
+  onSync: PropTypes.func,
   onClose: PropTypes.func.isRequired,
   visible: PropTypes.bool,
   onUnload: PropTypes.func,

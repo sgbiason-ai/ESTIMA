@@ -123,6 +123,90 @@ function updateTargetItems(nodes, targets, trancheId, mode, sources) {
   });
 }
 
+function mappingTotals(mappings) {
+  const totals = new Map();
+  for (const mapping of mappings || []) {
+    if (!mapping?.itemId) continue;
+    const itemId = String(mapping.itemId);
+    const quantity = mapping.appliedQuantity ?? mapping.quantity;
+    totals.set(itemId, finite(totals.get(itemId)) + finite(quantity));
+  }
+  return totals;
+}
+
+function reconcileTargetItems(nodes, previousTargets, nextTargets, trancheId, sources) {
+  const sourceKey = trancheId || 'global';
+  return (nodes || []).map((node) => {
+    const id = String(node?.id || '');
+    const isTargetable = node?.type === 'item' || node?.isBloc;
+    if (isTargetable && (previousTargets.has(id) || nextTargets.has(id))) {
+      const previousDxf = finite(previousTargets.get(id));
+      const nextDxf = finite(nextTargets.get(id));
+      const src = sources.get(id);
+      const takeoffSource = { ...(node.takeoffSource || {}) };
+      if (nextTargets.has(id) && src) takeoffSource[sourceKey] = src;
+      else delete takeoffSource[sourceKey];
+
+      if (trancheId) {
+        return {
+          ...node,
+          quantities: {
+            ...(node.quantities || {}),
+            [trancheId]: finite(node.quantities?.[trancheId]) - previousDxf + nextDxf,
+          },
+          quantitiesFormula: { ...(node.quantitiesFormula || {}), [trancheId]: '' },
+          takeoffSource,
+        };
+      }
+      return {
+        ...node,
+        qty: finite(node.qty) - previousDxf + nextDxf,
+        formula: '',
+        takeoffSource,
+      };
+    }
+    if (node?.children && !node?.isBloc) {
+      return {
+        ...node,
+        children: reconcileTargetItems(node.children, previousTargets, nextTargets, trancheId, sources),
+      };
+    }
+    return node;
+  });
+}
+
+/**
+ * Réconcilie une association DXF déjà appliquée : seule sa contribution varie.
+ * Toute différence ajoutée manuellement à la quantité du DQE est donc conservée.
+ */
+export function syncTakeoffAssociations(project, previousMappings, nextMappings, options = {}) {
+  if (!project) return project;
+  const trancheId = options.trancheId || null;
+  const previousTargets = mappingTotals(previousMappings);
+  const nextTargets = mappingTotals(nextMappings);
+  if (previousTargets.size === 0 && nextTargets.size === 0) return project;
+
+  const importedAt = new Date().toISOString();
+  const fileName = String(options.fileName || 'Plan DXF');
+  const sources = new Map();
+  for (const mapping of nextMappings || []) {
+    if (!mapping?.itemId) continue;
+    const itemId = String(mapping.itemId);
+    const src = sources.get(itemId) || {
+      fileName, importedAt, layers: [], metric: String(mapping.metric || ''),
+    };
+    const layer = String(mapping.layer || '');
+    if (layer && !src.layers.includes(layer)) src.layers.push(layer);
+    sources.set(itemId, src);
+  }
+
+  const chapters = reconcileTargetItems(
+    project.chapters, previousTargets, nextTargets, trancheId, sources,
+  );
+  const { updatedChapters, sourceIds } = recalculateProject(chapters, project.tranches || []);
+  return { ...project, chapters: updatedChapters, sourceIds };
+}
+
 /** Applique en une seule mutation les métrés validés et conserve une trace légère. */
 export function applyTakeoffToProject(project, mappings, options = {}) {
   const activeMappings = (mappings || []).filter(

@@ -11,6 +11,7 @@ import {
   applyTakeoffToProject,
   flattenProjectItems,
   isUnitCompatible,
+  syncTakeoffAssociations,
   takeoffConversionFactor,
 } from '../utils/takeoff/applyTakeoff';
 import {
@@ -270,6 +271,37 @@ describe('métré DXF — application au projet', () => {
       { itemId: 'i2', layer: 'REGARDS', metric: 'count', coefficient: 1, appliedQuantity: 4 },
     ], { mode: 'add' });
     expect(result.chapters[0].children[1].qty).toBe(5);
+  });
+
+  it('synchronise une suppression en conservant la saisie manuelle', () => {
+    const manuallyAdjusted = {
+      ...project,
+      chapters: [{ ...project.chapters[0], children: [
+        { ...project.chapters[0].children[0], qty: 25 }, // 20 DXF + 5 saisis manuellement
+        project.chapters[0].children[1],
+      ] }],
+    };
+    const result = syncTakeoffAssociations(manuallyAdjusted, [
+      { itemId: 'i1', layer: 'AEP', metric: 'length', quantity: 20 },
+    ], [], { fileName: 'plan.dxf' });
+    expect(result.chapters[0].children[0].qty).toBe(5);
+  });
+
+  it('transf?re la contribution DXF vers le nouvel article', () => {
+    const applied = {
+      ...project,
+      chapters: [{ ...project.chapters[0], children: [
+        { ...project.chapters[0].children[0], qty: 23 }, // 20 DXF + 3 manuels
+        { ...project.chapters[0].children[1], qty: 6 }, // 6 manuels
+      ] }],
+    };
+    const result = syncTakeoffAssociations(applied, [
+      { itemId: 'i1', layer: 'AEP', metric: 'length', quantity: 20 },
+    ], [
+      { itemId: 'i2', layer: 'AEP', metric: 'length', appliedQuantity: 20 },
+    ], { fileName: 'plan.dxf' });
+    expect(result.chapters[0].children[0].qty).toBe(3);
+    expect(result.chapters[0].children[1].qty).toBe(26);
   });
 
   it('applique dans une tranche et efface sa formule', () => {

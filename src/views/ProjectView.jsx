@@ -40,7 +40,7 @@ import { useBpuData } from './bpu/hooks/useBpuData';
 import { useBpuAudit } from './bpu/hooks/useBpuAudit';
 import { saveFileWithPicker, openFileWithPicker, FILE_TYPES, PICKER_IDS } from '../utils/fileSaver';
 import lazyWithReload from '../utils/lazyWithReload';
-import { applyTakeoffToProject } from '../utils/takeoff/applyTakeoff';
+import { applyTakeoffToProject, syncTakeoffAssociations } from '../utils/takeoff/applyTakeoff';
 
 const DxfTakeoffModal = lazyWithReload(() => import('../components/takeoff/DxfTakeoffModal'));
 
@@ -122,7 +122,20 @@ const ProjectView = ({
 
   const handleApplyTakeoff = useCallback((mappings, options) => {
     const nextProject = applyTakeoffToProject(projectRef.current, mappings, options);
-    if (nextProject !== projectRef.current) onReplaceProject(nextProject);
+    if (nextProject !== projectRef.current) {
+      projectRef.current = nextProject;
+      onReplaceProject(nextProject);
+    }
+  }, [onReplaceProject]);
+
+  const handleSyncTakeoff = useCallback((previousMappings, nextMappings, options) => {
+    const nextProject = syncTakeoffAssociations(
+      projectRef.current, previousMappings, nextMappings, options,
+    );
+    if (nextProject !== projectRef.current) {
+      projectRef.current = nextProject;
+      onReplaceProject(nextProject);
+    }
   }, [onReplaceProject]);
 
   const { sortedCatalog: bpuSortedCatalog } = useBpuData({
@@ -1128,6 +1141,7 @@ const ProjectView = ({
             branding={masterBranding}
             activeTrancheId={activeTrancheId}
             onApply={handleApplyTakeoff}
+            onSync={handleSyncTakeoff}
             visible={showDxfTakeoff}
             onClose={() => setShowDxfTakeoff(false)}
             onUnload={() => { setShowDxfTakeoff(false); setDxfMounted(false); }}
