@@ -4,9 +4,9 @@
 import React, { useState, useCallback, useRef, useEffect, Suspense, useMemo } from 'react';
 import lazyWithReload from '../../utils/lazyWithReload';
 import Icon from './Icon';
-import { simplifyGpsTrace } from '../../utils/gpsSimplify';
+import { cleanGpsTrace, createGpsFixProcessor } from '../../utils/gpsSimplify';
 import { stripHtml } from '../../utils/formatObsText';
-import { Maximize2, X } from 'lucide-react';
+import { Maximize2, X, Wand2, Undo2 } from 'lucide-react';
 import {
   haversine, totalDistance, accuracyColor,
   fmtDuration, fmtDist as fmtDistance,
@@ -17,7 +17,7 @@ const GpsMapView = lazyWithReload(() => import('./GpsMapView'));
 
 // ─── Composant principal ───────────────────────────────────────────────────
 
-export default function GpsTrackingSection({ meeting, manager, obsByCategory, onToast, externalObsMarkers }) {
+export default function GpsTrackingSection({ meeting, manager, obsByCategory, onToast, externalObsMarkers, readOnly = false }) {
   const tracking = meeting?.gpsTracking || { coordinates: [], startTime: null, endTime: null };
   const [isRecording, setIsRecording] = useState(false);
   const [liveCoords, setLiveCoords] = useState(tracking.coordinates || []);
@@ -30,11 +30,15 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
   const wakeLockRef = useRef(null);
   const timerRef = useRef(null);
   const startTimeRef = useRef(null);
+  const gpsProcessorRef = useRef(createGpsFixProcessor(tracking.coordinates || []));
+  const [traceBeforeClean, setTraceBeforeClean] = useState(null);
 
   // Sync liveCoords quand le meeting change
   useEffect(() => {
     if (!isRecording) setLiveCoords(tracking.coordinates || []);
   }, [meeting?.id, tracking.coordinates?.length, isRecording]);
+
+  useEffect(() => setTraceBeforeClean(null), [meeting?.id]);
 
   // ── Photos géolocalisées de ce CR ──
   const photoMarkers = useMemo(() => {
@@ -128,6 +132,7 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
 
     // GPS watch
     lastBearingPtRef.current = null;
+    gpsProcessorRef.current = createGpsFixProcessor(liveCoords);
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
         const point = {
@@ -137,25 +142,21 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
           accuracy: Math.round(pos.coords.accuracy * 10) / 10,
         };
         setLastAccuracy(point.accuracy);
+        const filteredPoint = gpsProcessorRef.current.push(point);
+        if (!filteredPoint) return;
         // Cap de déplacement : heading GPS si dispo (en mouvement), sinon cap entre 2 fixes ≥5m
         {
           const h = pos.coords.heading, s = pos.coords.speed;
           let cand = (h != null && !Number.isNaN(h) && s != null && s > 0.5) ? h : null;
           const lastPt = lastBearingPtRef.current;
-          if (lastPt == null || haversine(lastPt, point) >= 5) {
-            if (cand == null && lastPt) cand = bearingBetween(lastPt, point);
-            lastBearingPtRef.current = point;
+          if (lastPt == null || haversine(lastPt, filteredPoint) >= 5) {
+            if (cand == null && lastPt) cand = bearingBetween(lastPt, filteredPoint);
+            lastBearingPtRef.current = filteredPoint;
           }
           if (cand != null) setLiveBearing(prev => smoothBearing(prev, cand));
         }
         setLiveCoords(prev => {
-          // Filtre distance min 5m — ignorer si trop proche du dernier point
-          if (prev.length > 0) {
-            const last = prev[prev.length - 1];
-            const dist = haversine(last, point);
-            if (dist < 5) return prev;
-          }
-          const updated = [...prev, point];
+          const updated = [...prev, filteredPoint];
           // Sauvegarde périodique (tous les 5 points)
           if (updated.length % 5 === 0 && manager) {
             manager.updateMeetingField('gpsTracking', {
@@ -170,7 +171,7 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
       (err) => {
         console.warn('GPS error:', err.message);
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 2000 }
     );
   }, [manager, tracking, liveCoords, onToast]);
 
@@ -188,9 +189,9 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
       timerRef.current = null;
     }
 
-    // Simplification Douglas-Peucker (epsilon 5m) + sauvegarde finale
+    // Nettoyage final : précision, pointes, lissage, espacement et simplification 2 m.
     const rawCount = liveCoords.length;
-    const simplified = simplifyGpsTrace(liveCoords, 5);
+    const simplified = cleanGpsTrace(liveCoords);
     setLiveCoords(simplified);
 
     if (manager) {
@@ -204,6 +205,30 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
 
     onToast?.(`Tracé enregistré — ${simplified.length} pts (${rawCount - simplified.length} supprimés)`);
   }, [manager, tracking, liveCoords, onToast]);
+
+  const cleanExistingTrace = useCallback(() => {
+    const cleaned = cleanGpsTrace(liveCoords);
+    setTraceBeforeClean(liveCoords);
+    setLiveCoords(cleaned);
+    manager?.updateMeetingField('gpsTracking', {
+      ...tracking,
+      coordinates: cleaned,
+      distance: Math.round(totalDistance(cleaned)),
+    });
+    onToast?.(`Trace nettoyée — ${liveCoords.length} → ${cleaned.length} points`);
+  }, [liveCoords, manager, tracking, onToast]);
+
+  const undoTraceCleaning = useCallback(() => {
+    if (!traceBeforeClean) return;
+    setLiveCoords(traceBeforeClean);
+    manager?.updateMeetingField('gpsTracking', {
+      ...tracking,
+      coordinates: traceBeforeClean,
+      distance: Math.round(totalDistance(traceBeforeClean)),
+    });
+    setTraceBeforeClean(null);
+    onToast?.('Nettoyage annulé');
+  }, [traceBeforeClean, manager, tracking, onToast]);
 
   // Cleanup au démontage
   useEffect(() => {
@@ -247,8 +272,17 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
             </div>
           </div>
 
+          {!readOnly && !isRecording && hasTrack && (
+            <div className="flex items-center gap-1">
+              {traceBeforeClean && <button onClick={undoTraceCleaning} title="Annuler le nettoyage"
+                className="p-2.5 rounded-xl bg-gray-100 text-gray-600 active:bg-gray-200 transition"><Undo2 size={15} /></button>}
+              <button onClick={cleanExistingTrace} title="Nettoyer la trace GPS"
+                className="p-2.5 rounded-xl bg-blue-50 text-blue-600 active:bg-blue-100 transition"><Wand2 size={15} /></button>
+            </div>
+          )}
+
           {/* Bouton Start/Stop */}
-          {isRecording ? (
+          {!readOnly && (isRecording ? (
             <button
               onClick={stopRecording}
               className="shrink-0 px-4 py-2.5 rounded-xl bg-red-500 text-white text-[13px] font-bold flex items-center gap-2 active:scale-[0.97] transition shadow-sm"
@@ -264,7 +298,7 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
               <div className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
               Démarrer
             </button>
-          )}
+          ))}
         </div>
       </div>
 

@@ -2,7 +2,7 @@
 // Vue détail d'une visite de site — observations + terrain.
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { MapPin, Flag, LocateFixed, X, Navigation, Ruler } from 'lucide-react';
+import { MapPin, Flag, LocateFixed, X, Navigation, Ruler, Share2, LockKeyhole } from 'lucide-react';
 import Icon from './Icon';
 import { dateFr } from './formatters';
 import { stripHtml } from '../../utils/formatObsText';
@@ -15,6 +15,7 @@ import {
   haversine, computeUncertainty, getCurrentPosition, fetchIgnRoute, reverseGeocodeCommune,
 } from '../../utils/geoHelpers';
 import { deleteSiteVisitImage } from '../../utils/siteVisitImageStorage';
+import SiteVisitShareModal from '../../views/siteVisits/SiteVisitShareModal';
 
 // ─── Sous-composants ───────────────────────────────────────────────────────
 
@@ -123,7 +124,7 @@ function SiteVisitActionBar({
   );
 }
 
-function ObsCard({ obs, number, onTap, onDelete, onViewImage }) {
+function ObsCard({ obs, number, onTap, onDelete, onViewImage, readOnly = false }) {
   const text = stripHtml(obs.text || '');
   const images = obs.images || [];
   const [swipeX, setSwipeX] = useState(0);
@@ -134,18 +135,18 @@ function ObsCard({ obs, number, onTap, onDelete, onViewImage }) {
   return (
     <div className="relative overflow-hidden rounded-xl">
       {/* Bouton supprimer (révélé par swipe gauche) */}
-      <div className="absolute right-0 top-0 bottom-0 w-20 bg-red-500 flex items-center justify-center rounded-r-xl"
+      {!readOnly && <div className="absolute right-0 top-0 bottom-0 w-20 bg-red-500 flex items-center justify-center rounded-r-xl"
         onClick={() => onDelete?.(obs.id)}>
         <Icon name="trash" size={18} color="#fff" />
-      </div>
+      </div>}
 
       <div
         className="relative w-full bg-white border border-gray-200 p-3 active:bg-gray-50 cursor-pointer rounded-xl"
         style={{ transform: `translateX(${Math.min(0, Math.max(-80, swipeX))}px)`, transition: touchStartRef.current != null ? 'none' : 'transform 0.25s ease' }}
-        onClick={() => { if (wasTapRef.current) onTap(obs); else { swipeRef.current = 0; setSwipeX(0); } wasTapRef.current = true; }}
-        onTouchStart={e => { touchStartRef.current = e.touches[0].clientX; swipeRef.current = 0; wasTapRef.current = true; }}
-        onTouchMove={e => { if (touchStartRef.current != null) { const dx = e.touches[0].clientX - touchStartRef.current; swipeRef.current = dx; setSwipeX(dx); } }}
-        onTouchEnd={() => { wasTapRef.current = Math.abs(swipeRef.current) < 15; touchStartRef.current = null; if (swipeRef.current > -60) { swipeRef.current = 0; setSwipeX(0); } }}
+        onClick={() => { if (!readOnly && wasTapRef.current) onTap(obs); else { swipeRef.current = 0; setSwipeX(0); } wasTapRef.current = true; }}
+        onTouchStart={e => { if (!readOnly) { touchStartRef.current = e.touches[0].clientX; swipeRef.current = 0; wasTapRef.current = true; } }}
+        onTouchMove={e => { if (!readOnly && touchStartRef.current != null) { const dx = e.touches[0].clientX - touchStartRef.current; swipeRef.current = dx; setSwipeX(dx); } }}
+        onTouchEnd={() => { if (!readOnly) { wasTapRef.current = Math.abs(swipeRef.current) < 15; touchStartRef.current = null; if (swipeRef.current > -60) { swipeRef.current = 0; setSwipeX(0); } } }}
       >
       <div className="flex items-start gap-2.5">
         <span className="shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-[11px] font-bold flex items-center justify-center mt-0.5">{number}</span>
@@ -217,12 +218,16 @@ function ObsCard({ obs, number, onTap, onDelete, onViewImage }) {
 
 // ─── Composant principal ───────────────────────────────────────────────────
 
-export default function SiteVisitDetailView({ visit, onSave, saveStatus, onToast, isLandscape, branding, companyId }) {
+export default function SiteVisitDetailView({ visit, onSave, onUpdateSharing, currentUser, saveStatus, onToast, isLandscape, branding, companyId }) {
   const [activeSection, setActiveSection] = useState('observations');
   const [editingObs, setEditingObs] = useState(null);
   const [viewingImage, setViewingImage] = useState(null);
   const [editingInfo, setEditingInfo] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [localVisit, setLocalVisit] = useState(visit);
+  const canEdit = visit?.isOwner === true;
+
+  useEffect(() => setLocalVisit(visit), [visit]);
 
   // ── Auto-save via useEffect (pas de side-effect dans les setState updaters) ──
   const onSaveRef = useRef(onSave);
@@ -230,21 +235,23 @@ export default function SiteVisitDetailView({ visit, onSave, saveStatus, onToast
   const isUserEdit = useRef(false);
 
   useEffect(() => {
-    if (!isUserEdit.current) return;
+    if (!canEdit || !isUserEdit.current) return;
     isUserEdit.current = false;
     onSaveRef.current(localVisit.id, localVisit);
-  }, [localVisit]);
+  }, [localVisit, canEdit]);
 
   // ── Manager simplifié (imite l'interface de useCrrManager pour GpsTrackingSection) ──
   const manager = useMemo(() => ({
     updateMeetingField: (field, value) => {
+      if (!canEdit) return;
       isUserEdit.current = true;
       setLocalVisit(prev => ({ ...prev, [field]: value }));
     },
-  }), []);
+  }), [canEdit]);
 
   // ── Observations CRUD ──
   const addObservation = useCallback(() => {
+    if (!canEdit) return;
     const newObs = {
       id: `obs_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
       text: '',
@@ -254,29 +261,32 @@ export default function SiteVisitDetailView({ visit, onSave, saveStatus, onToast
     isUserEdit.current = true;
     setLocalVisit(prev => ({ ...prev, observations: [...(prev.observations || []), newObs] }));
     setEditingObs(newObs);
-  }, []);
+  }, [canEdit]);
 
   const updateObservation = useCallback((obsId, patch) => {
+    if (!canEdit) return;
     isUserEdit.current = true;
     setLocalVisit(prev => ({
       ...prev,
       observations: (prev.observations || []).map(o => o.id === obsId ? { ...o, ...patch } : o),
     }));
-  }, []);
+  }, [canEdit]);
 
   const deleteObservation = useCallback((obsId) => {
+    if (!canEdit) return;
     isUserEdit.current = true;
     setLocalVisit(prev => {
       const removed = (prev.observations || []).find(o => o.id === obsId);
       for (const img of (removed?.images || [])) deleteSiteVisitImage(img);
       return { ...prev, observations: (prev.observations || []).filter(o => o.id !== obsId) };
     });
-  }, []);
+  }, [canEdit]);
 
   const updateInfo = useCallback((patch) => {
+    if (!canEdit) return;
     isUserEdit.current = true;
     setLocalVisit(prev => ({ ...prev, ...patch }));
-  }, []);
+  }, [canEdit]);
 
   // ── Segments GPS (Départ / Fin / Point) — parité desktop SiteVisitsView ──
   const [pendingPoint, setPendingPoint] = useState(null);
@@ -514,11 +524,11 @@ export default function SiteVisitDetailView({ visit, onSave, saveStatus, onToast
             </button>
           </div>
         ) : (
-          <div className="flex items-center justify-between" onClick={() => setEditingInfo(true)}>
+          <div className="flex items-center justify-between" onClick={() => canEdit && setEditingInfo(true)}>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <div className="text-[15px] font-bold text-gray-900 truncate">{localVisit.nom || 'Visite sans nom'}</div>
-                <SaveStatusDot status={saveStatus} />
+                {canEdit ? <SaveStatusDot status={saveStatus} /> : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-100 text-indigo-700 text-[10px] font-bold"><LockKeyhole size={10} /> Lecture seule</span>}
               </div>
               <div className="flex items-center gap-2 mt-0.5 text-[12px] text-gray-500">
                 {localVisit.lieu && <span>{localVisit.lieu}</span>}
@@ -540,10 +550,13 @@ export default function SiteVisitDetailView({ visit, onSave, saveStatus, onToast
                 PDF
               </button>
               {/* Édition — bouton dédié */}
-              <button onClick={() => setEditingInfo(true)}
+              {canEdit && <button onClick={() => setShowShareModal(true)} className="p-2 rounded-xl bg-indigo-100 active:bg-indigo-200 transition" title="Partager">
+                <Share2 size={16} className="text-indigo-700" />
+              </button>}
+              {canEdit && <button onClick={() => setEditingInfo(true)}
                 className="p-2 rounded-xl bg-gray-100 active:bg-gray-200 transition">
                 <Icon name="edit" size={16} color="#6b7280" />
-              </button>
+              </button>}
             </div>
           </div>
         )}
@@ -573,7 +586,7 @@ export default function SiteVisitDetailView({ visit, onSave, saveStatus, onToast
         ) : activeSection === 'observations' && (
           <div className="space-y-2">
             {observations.map((obs, idx) => (
-              <ObsCard key={obs.id} obs={obs} number={idx + 1} onTap={setEditingObs} onDelete={deleteObservation} onViewImage={setViewingImage} />
+              <ObsCard key={obs.id} obs={obs} number={idx + 1} onTap={setEditingObs} onDelete={deleteObservation} onViewImage={setViewingImage} readOnly={!canEdit} />
             ))}
 
             {observations.length === 0 && (
@@ -593,12 +606,13 @@ export default function SiteVisitDetailView({ visit, onSave, saveStatus, onToast
             obsByCategory={{}}
             onToast={onToast}
             externalObsMarkers={obsMarkersForMap}
+            readOnly={!canEdit}
           />
         </div>
       </div>
 
       {/* ── Barre d'actions fixe (bas) — masquée pendant l'édition d'une observation ── */}
-      {!editingObs && (
+      {canEdit && !editingObs && (
         <div className="shrink-0 px-4 pt-2 pb-3 bg-white/70 backdrop-blur-xl">
           <SiteVisitActionBar
             measureMode={measureMode}
@@ -614,6 +628,12 @@ export default function SiteVisitDetailView({ visit, onSave, saveStatus, onToast
 
       {/* ── Modals ── */}
       {viewingImage && <ImageViewerModal src={viewingImage} onClose={() => setViewingImage(null)} />}
+      <SiteVisitShareModal isOpen={showShareModal} onClose={() => setShowShareModal(false)} visit={localVisit}
+        companyId={companyId} currentUser={currentUser} onSave={async members => {
+          await onUpdateSharing(localVisit.id, members);
+          setLocalVisit(prev => ({ ...prev, sharedWith: members, accessUids: [currentUser.uid, ...members.map(member => member.uid)] }));
+          onToast?.('Partage mis à jour');
+        }} />
 
       {/* Éditeur maintenant inline dans le content ci-dessus */}
     </div>

@@ -8,10 +8,12 @@ export { APP_VERSION } from './appVersion';
 
 export const CHANGELOG = [
   {
-    version: '3.8.1',
-    date: '2026-07-15',
+    version: '3.8.2',
+    date: '2026-07-16',
     title: 'Métré DXF avec présentations AutoCAD',
     highlights: [
+      'Visites de site — traces GPS fiabilisées : rejet automatique des positions imprécises ou incompatibles avec un déplacement normal, filtre médian et lissage communs aux vues desktop, mobile et Tesla, espacement ramené à 2,5 m et simplification finale à 2 m. Une action « Nettoyer » corrige aussi les anciennes traces avec possibilité d’annuler immédiatement',
+      'Visites de site — confidentialité et partage interne : chaque nouvelle visite est privée et visible uniquement par son créateur, qui peut la partager avec des collaborateurs Estima de son entreprise en lecture seule. Le créateur reste seul autorisé à modifier, partager ou supprimer ; les anciennes visites sont automatiquement attribuées au super-utilisateur',
       'Métré DXF — association aux blocs ESTIMA : quand le projet contient des blocs (ouvrages composites), le métré peut être associé directement au bloc plutôt qu’à ses articles internes. Poser la quantité mesurée sur le bloc (surface/linéaire pilote) recalcule automatiquement les quantités de tous ses articles composants ; les articles pilotés par le bloc sont masqués de la liste d’association pour éviter les doublons',
       'Métré DXF — feuille de métré PDF : deux exports depuis la fenêtre. « Feuille PDF » documente les associations en cours (calque, type, quantité mesurée, article, coefficient, conversion épaisseur/densité/largeur, quantité appliquée) ; « Historique » reprend tous les imports DXF déjà appliqués au projet (fichier, date, tranche, mode). Page de garde à la charte du projet',
       'Métré DXF — convertisseur d’unités : associer un calque mesuré en m² ou ml à un article en m³ ou en tonnes (T) fait apparaître les champs géométriques nécessaires (épaisseur, densité, largeur, perte %) et convertit automatiquement la quantité (m²×épaisseur = m³, m²×épaisseur×densité = T, ml×largeur = m²…), en plus du coefficient. Même logique que les blocs ESTIMA / ESTIMA TP',

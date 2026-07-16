@@ -76,6 +76,11 @@ service cloud.firestore {
                   && resource.data.companyId != null
                   && isCompanyAdmin(resource.data.companyId);
 
+      // Annuaire interne : un membre peut rechercher les collaborateurs de sa société.
+      allow read: if request.auth != null
+                  && resource.data.companyId != null
+                  && isCompanyMember(resource.data.companyId);
+
       // Admins of the same company can write any member profile
       // (including toggling isAdmin)
       allow update: if request.auth != null
@@ -221,7 +226,24 @@ service cloud.firestore {
 
       // Visites de site
       match /site_visits/{visitId} {
-        allow read, write: if isCompanyMember(companyId);
+        // Le super-utilisateur reprend les anciennes visites sans propriétaire.
+        allow read: if isAppSuperAdmin();
+        allow read: if isCompanyMember(companyId)
+                    && (resource.data.ownerId == request.auth.uid
+                        || request.auth.uid in resource.data.accessUids);
+
+        allow create: if isCompanyMember(companyId)
+                      && request.resource.data.ownerId == request.auth.uid
+                      && request.auth.uid in request.resource.data.accessUids;
+
+        // Seul le créateur peut modifier, partager ou supprimer une visite.
+        allow update: if isCompanyMember(companyId)
+                      && resource.data.ownerId == request.auth.uid
+                      && request.resource.data.ownerId == resource.data.ownerId
+                      && request.auth.uid in request.resource.data.accessUids;
+        allow update: if isAppSuperAdmin() && !('ownerId' in resource.data);
+        allow delete: if isCompanyMember(companyId)
+                      && resource.data.ownerId == request.auth.uid;
       }
 
       // ESTIMA TP — études de prix (chiffrage entreprise)

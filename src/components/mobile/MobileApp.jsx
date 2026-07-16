@@ -87,7 +87,7 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
   const { chantiers: crcChantiers, isLoading: crcLoading, refetch: crcRefetch, loadChantier, saveChantier } = useMobileCrc(user, companyId);
   const { devisList: moeDevisList, isLoading: moeLoading, refetch: moeRefetch, loadDevis: loadMoeDevis } = useMobileDevisMoe(user, companyId);
   const { fiches: adminFiches, isLoading: adminLoading, refetch: adminRefetch, loadFiche } = useMobileFichesMarche(user, companyId);
-  const { visits: siteVisits, isLoading: visitsLoading, refetch: visitsRefetch, loadVisit, saveVisit, createVisit, deleteVisit } = useMobileSiteVisits(user, companyId);
+  const { visits: siteVisits, isLoading: visitsLoading, refetch: visitsRefetch, loadVisit, saveVisit, createVisit, deleteVisit, updateSharing } = useMobileSiteVisits(user, companyId);
   const dbHook = useDatabase(user, companyId);
   const resources = useAppResources(user, companyId);
   // Template lettre négo (user pref Firestore) — null = fallback dans le générateur
@@ -244,7 +244,7 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
     const draft = loadDraft(`draft_sv_${v.id}`);
     const svDraftAt = draft?._draftAt || 0;
     const svFirestoreAt = data?.lastSaved ? new Date(data.lastSaved).getTime() : 0;
-    if (draft && svDraftAt > svFirestoreAt) {
+    if (!data?.isReadOnly && draft && svDraftAt > svFirestoreAt) {
       const { _draftAt, ...cleanDraft } = draft;
       setFullVisit(cleanDraft);
       // Re-pousser le brouillon vers Firestore. On ne nettoie le brouillon
@@ -804,7 +804,7 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
           isTablet && isLandscape ? (
             <SplitView
               List={<SiteVisitListView visits={siteVisits} loading={visitsLoading} onSelect={handleSelectVisit} onCreate={handleCreateVisit} onDelete={deleteVisit} onRefresh={visitsRefetch} isLandscape={false} />}
-              Detail={fullVisit && <SiteVisitDetailView visit={fullVisit} onSave={handleSiteVisitSave} saveStatus={svSaveStatus} onToast={triggerToast} isLandscape={isLandscape} branding={resources.masterBranding} companyId={companyId} />}
+              Detail={fullVisit && <SiteVisitDetailView visit={fullVisit} onSave={handleSiteVisitSave} onUpdateSharing={updateSharing} currentUser={user} saveStatus={svSaveStatus} onToast={triggerToast} isLandscape={isLandscape} branding={resources.masterBranding} companyId={companyId} />}
               hasSelection={!!selectedVisit}
               loading={visitLoading}
               emptyIcon="camera"
@@ -818,7 +818,7 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
               <span className="text-sm">Chargement…</span>
             </div>
           ) : fullVisit ? (
-            <SiteVisitDetailView visit={fullVisit} onSave={handleSiteVisitSave} saveStatus={svSaveStatus} onToast={triggerToast} isLandscape={isLandscape} branding={resources.masterBranding} companyId={companyId} />
+            <SiteVisitDetailView visit={fullVisit} onSave={handleSiteVisitSave} onUpdateSharing={updateSharing} currentUser={user} saveStatus={svSaveStatus} onToast={triggerToast} isLandscape={isLandscape} branding={resources.masterBranding} companyId={companyId} />
           ) : null
         )}
 

@@ -2,6 +2,86 @@
 // Simplification Douglas-Peucker pour traces GPS.
 // Reduit le nombre de points en gardant les virages significatifs.
 
+export const GPS_TRACK_CONFIG = Object.freeze({
+  maxAccuracy: 15,
+  maxSpeedKmh: 15,
+  minDistance: 2.5,
+  simplifyTolerance: 2,
+  smoothingAlpha: 0.65,
+});
+
+const EARTH_RADIUS = 6371000;
+const toRad = (value) => (value * Math.PI) / 180;
+
+function distanceMeters(a, b) {
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * EARTH_RADIUS * Math.asin(Math.sqrt(h));
+}
+
+function timestampMs(point) {
+  const value = typeof point?.timestamp === 'number' ? point.timestamp : Date.parse(point?.timestamp || '');
+  return Number.isFinite(value) ? value : null;
+}
+
+const isBreak = (point) => point?.break === true || point?._break === true;
+const isCoordinate = (point) => Number.isFinite(point?.lat) && Number.isFinite(point?.lng);
+const median = values => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
+
+/**
+ * Processeur temps reel partage par desktop, mobile et Tesla.
+ * Rejette les fixes imprecis/irrealistes, filtre la pointe mediane sur 3 fixes,
+ * puis lisse et espace les positions acceptees.
+ */
+export function createGpsFixProcessor(initialCoords = [], options = {}) {
+  const config = { ...GPS_TRACK_CONFIG, ...options };
+  const seed = initialCoords.filter(point => isCoordinate(point) && !isBreak(point)).slice(-3);
+  let rawWindow = [...seed];
+  let lastRaw = seed.at(-1) || null;
+  let lastAccepted = seed.at(-1) || null;
+
+  return {
+    push(point) {
+      if (!isCoordinate(point)) return null;
+      if (Number.isFinite(point.accuracy) && point.accuracy > config.maxAccuracy) return null;
+
+      if (isBreak(point)) {
+        rawWindow = [point];
+        lastRaw = point;
+        lastAccepted = null;
+      } else if (lastRaw) {
+        const previousAt = timestampMs(lastRaw);
+        const currentAt = timestampMs(point);
+        if (previousAt != null && currentAt != null && currentAt > previousAt) {
+          const speedKmh = (distanceMeters(lastRaw, point) / ((currentAt - previousAt) / 1000)) * 3.6;
+          if (speedKmh > config.maxSpeedKmh) return null;
+        }
+      }
+
+      rawWindow = [...rawWindow.slice(-2), point];
+      lastRaw = point;
+      const candidate = rawWindow.length === 3 ? {
+        ...point,
+        lat: median(rawWindow.map(item => item.lat)),
+        lng: median(rawWindow.map(item => item.lng)),
+      } : point;
+
+      if (lastAccepted && distanceMeters(lastAccepted, candidate) < config.minDistance) return null;
+
+      const smoothed = lastAccepted ? {
+        ...candidate,
+        lat: lastAccepted.lat + config.smoothingAlpha * (candidate.lat - lastAccepted.lat),
+        lng: lastAccepted.lng + config.smoothingAlpha * (candidate.lng - lastAccepted.lng),
+      } : candidate;
+
+      lastAccepted = smoothed;
+      return smoothed;
+    },
+  };
+}
+
 /**
  * Distance perpendiculaire d'un point a un segment (en metres).
  * Utilise la formule cross-track distance sur une sphere.
@@ -97,4 +177,80 @@ export function simplifyGpsTrace(coords, epsilon = 5) {
 
   // Simplifier chaque segment, puis rejoindre
   return segments.flatMap(seg => dpSimplify(seg, epsilon));
+}
+
+function removeTriangleOutliers(points) {
+  if (points.length < 3) return points;
+  return points.filter((point, index) => {
+    if (index === 0 || index === points.length - 1) return true;
+    const previous = points[index - 1];
+    const next = points[index + 1];
+    const before = distanceMeters(previous, point);
+    const after = distanceMeters(point, next);
+    const direct = distanceMeters(previous, next);
+    return !(Math.min(before, after) > 8 && before + after > Math.max(25, direct * 4));
+  });
+}
+
+function cleanSegment(segment, config) {
+  const accurate = segment.filter(point => isCoordinate(point)
+    && (!Number.isFinite(point.accuracy) || point.accuracy <= config.maxAccuracy));
+  if (accurate.length <= 2) return accurate;
+
+  const plausible = [];
+  for (const point of accurate) {
+    const previous = plausible.at(-1);
+    if (previous) {
+      const previousAt = timestampMs(previous);
+      const currentAt = timestampMs(point);
+      if (previousAt != null && currentAt != null && currentAt > previousAt) {
+        const speedKmh = (distanceMeters(previous, point) / ((currentAt - previousAt) / 1000)) * 3.6;
+        if (speedKmh > config.maxSpeedKmh) continue;
+      }
+    }
+    plausible.push(point);
+  }
+
+  const withoutSpikes = removeTriangleOutliers(removeTriangleOutliers(plausible));
+  const smoothed = withoutSpikes.map((point, index, list) => {
+    if (index === 0 || index === list.length - 1) return point;
+    const window = [list[index - 1], point, list[index + 1]];
+    return { ...point, lat: median(window.map(item => item.lat)), lng: median(window.map(item => item.lng)) };
+  }).map((point, index, list) => index === 0 ? point : ({
+    ...point,
+    lat: list[index - 1].lat + config.smoothingAlpha * (point.lat - list[index - 1].lat),
+    lng: list[index - 1].lng + config.smoothingAlpha * (point.lng - list[index - 1].lng),
+  }));
+
+  const spaced = [];
+  for (let index = 0; index < smoothed.length; index++) {
+    const point = smoothed[index];
+    const isLast = index === smoothed.length - 1;
+    if (spaced.length === 0 || isLast || distanceMeters(spaced.at(-1), point) >= config.minDistance) spaced.push(point);
+  }
+  return dpSimplify(spaced, config.simplifyTolerance);
+}
+
+/** Nettoie une trace existante sans relier les coupures entre sessions. */
+export function cleanGpsTrace(coords, options = {}) {
+  if (!Array.isArray(coords) || coords.length === 0) return [];
+  const config = { ...GPS_TRACK_CONFIG, ...options };
+  const result = [];
+  let segment = [];
+
+  const flush = () => {
+    if (segment.length) result.push(...cleanSegment(segment, config));
+    segment = [];
+  };
+
+  for (const point of coords) {
+    if (isBreak(point)) {
+      flush();
+      result.push(point);
+    } else {
+      segment.push(point);
+    }
+  }
+  flush();
+  return result;
 }

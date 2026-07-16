@@ -12,13 +12,13 @@ import { db, auth } from '../firebase';
 import {
   MapPin, RefreshCw, Camera, MessageSquare, Ruler, Trash2, FileDown,
   Maximize2, X, Play, Square, Flag, LocateFixed, Pencil, Plus, Info,
-  Layers, Navigation,
+  Layers, Navigation, Share2, LockKeyhole, Wand2, Undo2,
 } from 'lucide-react';
 import { stripHtml } from '../utils/formatObsText';
 import { confirm } from '../utils/globalUI';
 import HelpPanel from '../components/help/HelpPanel';
 import HelpButton from '../components/help/HelpButton';
-import { simplifyGpsTrace } from '../utils/gpsSimplify';
+import { cleanGpsTrace, createGpsFixProcessor } from '../utils/gpsSimplify';
 import { useMobileSiteVisits } from '../hooks/useMobileSiteVisits';
 import { useRobustSave, loadDraft, clearDraft } from '../hooks/useRobustSave';
 import { deleteSiteVisitImage } from '../utils/siteVisitImageStorage';
@@ -38,6 +38,7 @@ import {
 } from './siteVisits/MapSubComponents';
 import { VisitInfoModal, ObsEditModal } from './siteVisits/SiteVisitModals';
 import ImageLightbox from './siteVisits/ImageLightbox';
+import SiteVisitShareModal from './siteVisits/SiteVisitShareModal';
 import { usePresence, useCoEditors } from '../hooks/usePresence';
 import CoEditBanner from '../components/common/CoEditBanner';
 
@@ -50,7 +51,7 @@ const TeslaModeView = lazyWithReload(() => import('./TeslaModeView'));
 
 export default function SiteVisitsView({ companyId, masterBranding }) {
   const user = auth.currentUser;
-  const { visits, isLoading: listLoading, refetch, loadVisit, saveVisit, createVisit } = useMobileSiteVisits(user, companyId);
+  const { visits, isLoading: listLoading, refetch, loadVisit, saveVisit, createVisit, updateSharing } = useMobileSiteVisits(user, companyId);
 
   // ── Sauvegarde robuste (debounce, retry, brouillon localStorage, beforeunload) ──
   const visitSaveFn = useCallback(async (data) => {
@@ -87,6 +88,7 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
   const [draggingSplit, setDraggingSplit] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [editingObs, setEditingObs] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [lightbox, setLightbox] = useState(null); // { images: [...], index: number }
@@ -105,6 +107,8 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
   const wakeLockRef = useRef(null);
   const timerRef = useRef(null);
   const startTimeRef = useRef(null);
+  const gpsProcessorRef = useRef(createGpsFixProcessor());
+  const [traceBeforeClean, setTraceBeforeClean] = useState(null);
 
   // ── Map ──
   const [activeLayer, setActiveLayer] = useState('plan');
@@ -197,6 +201,8 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
     if (!isRecording) setLiveCoords(fullVisit?.gpsTracking?.coordinates || []);
   }, [fullVisit?.id, fullVisit?.gpsTracking?.coordinates?.length, isRecording]);
 
+  useEffect(() => setTraceBeforeClean(null), [fullVisit?.id]);
+
   // ── Delete visit ──
   const handleDelete = useCallback(async (visitId, visitNom) => {
     const ok = await confirm(`Supprimer la visite "${visitNom}" et toutes ses données ?`, { danger: true });
@@ -215,7 +221,7 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
 
   // ── Save visit info (modal) ──
   const handleSaveInfo = useCallback((info) => {
-    if (!fullVisit) return;
+    if (!fullVisit?.isOwner) return;
     const updated = { ...fullVisit, ...info };
     setFullVisit(updated);
     triggerSave(updated);
@@ -224,7 +230,7 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
 
   // ── Save observation (text + images) ──
   const handleSaveObsText = useCallback((newText, newImages) => {
-    if (!fullVisit || !editingObs) return;
+    if (!fullVisit?.isOwner || !editingObs) return;
     const updatedObs = (fullVisit.observations || []).map(o =>
       o.id === editingObs.id
         ? { ...o, text: newText, ...(newImages !== undefined ? { images: newImages } : {}) }
@@ -383,13 +389,15 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
     // Marquer une coupure si on reprend le suivi après un arrêt
     const isResume = liveCoords.length > 0;
     if (isResume) setLiveCoords(prev => [...prev, { break: true }]);
+    gpsProcessorRef.current = createGpsFixProcessor(isResume ? [] : liveCoords);
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
         const point = { lat: pos.coords.latitude, lng: pos.coords.longitude, timestamp: new Date().toISOString(), accuracy: Math.round(pos.coords.accuracy * 10) / 10 };
         setLastAccuracy(point.accuracy);
+        const filteredPoint = gpsProcessorRef.current.push(point);
+        if (!filteredPoint) return;
         setLiveCoords(prev => {
-          if (prev.length > 0 && !prev[prev.length - 1].break && haversine(prev[prev.length - 1], point) < 5) return prev;
-          const updated = [...prev, point];
+          const updated = [...prev, filteredPoint];
           if (updated.length % 5 === 0) {
             const ref = doc(db, 'companies', companyId, 'site_visits', fullVisit.id);
             updateDoc(ref, { 'gpsTracking.coordinates': updated, 'gpsTracking.distance': Math.round(totalDistance(updated)) }).catch(() => {});
@@ -398,7 +406,7 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
         });
       },
       (err) => console.warn('GPS error:', err.message),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 2000 }
     );
   }, [companyId, fullVisit?.id]);
 
@@ -408,11 +416,7 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
     wakeLockRef.current?.release(); wakeLockRef.current = null;
     if (watchIdRef.current != null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
-    // Simplifier chaque segment continu séparément (préserver les breaks)
-    const segments = []; let cur = [];
-    for (const c of liveCoords) { if (c.break) { if (cur.length) segments.push(cur); segments.push([c]); cur = []; } else { cur.push(c); } }
-    if (cur.length) segments.push(cur);
-    const simplified = segments.flatMap(seg => seg.length === 1 && seg[0].break ? seg : simplifyGpsTrace(seg, 5));
+    const simplified = cleanGpsTrace(liveCoords);
     setLiveCoords(simplified);
     if (fullVisit?.id) {
       const ref = doc(db, 'companies', companyId, 'site_visits', fullVisit.id);
@@ -420,6 +424,33 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
       handleLoadDetail(fullVisit.id);
     }
   }, [companyId, fullVisit?.id, liveCoords, handleLoadDetail]);
+
+  const handleCleanTrace = useCallback(() => {
+    if (!fullVisit || liveCoords.length < 3) return;
+    const cleaned = cleanGpsTrace(liveCoords);
+    const updated = {
+      ...fullVisit,
+      gpsTracking: { ...fullVisit.gpsTracking, coordinates: cleaned, distance: Math.round(totalDistance(cleaned)) },
+    };
+    setTraceBeforeClean(liveCoords);
+    setLiveCoords(cleaned);
+    setFullVisit(updated);
+    triggerSave(updated);
+    showToast(`Trace nettoyée — ${liveCoords.length} → ${cleaned.length} points`);
+  }, [fullVisit, liveCoords, triggerSave]);
+
+  const handleUndoTraceClean = useCallback(() => {
+    if (!fullVisit || !traceBeforeClean) return;
+    const updated = {
+      ...fullVisit,
+      gpsTracking: { ...fullVisit.gpsTracking, coordinates: traceBeforeClean, distance: Math.round(totalDistance(traceBeforeClean)) },
+    };
+    setLiveCoords(traceBeforeClean);
+    setFullVisit(updated);
+    setTraceBeforeClean(null);
+    triggerSave(updated);
+    showToast('Nettoyage annulé');
+  }, [fullVisit, traceBeforeClean, triggerSave]);
 
   useEffect(() => {
     return () => {
@@ -442,6 +473,7 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
 
   // ── Computed ──
   const tracking = fullVisit?.gpsTracking || {};
+  const canEdit = fullVisit?.isOwner === true;
   const coordinates = isRecording ? liveCoords : (tracking.coordinates || []);
   const observations = fullVisit?.observations || [];
   const liveDistance = totalDistance(coordinates);
@@ -586,6 +618,19 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
       <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="siteVisits" />
       <VisitInfoModal isOpen={showInfoModal} onClose={() => setShowInfoModal(false)} visit={fullVisit} onSave={handleSaveInfo} />
       <ObsEditModal isOpen={!!editingObs} onClose={() => setEditingObs(null)} obs={editingObs} onSave={handleSaveObsText} companyId={companyId} visitId={fullVisit?.id} />
+      <SiteVisitShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        visit={fullVisit}
+        companyId={companyId}
+        currentUser={user}
+        onSave={async members => {
+          await updateSharing(fullVisit.id, members);
+          await handleLoadDetail(fullVisit.id);
+          await refetch();
+          showToast('Partage mis à jour');
+        }}
+      />
 
       <CoEditBanner editors={coEditors} />
 
@@ -629,10 +674,10 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
                   {v.date && <span>{fmtDate(v.date)}</span>}
                 </div>
               </button>
-              <button onClick={() => handleDelete(v.id, v.nom)}
+              {v.isOwner && <button onClick={() => handleDelete(v.id, v.nom)}
                 className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all mr-1 shrink-0">
                 <Trash2 size={13} />
-              </button>
+              </button>}
             </div>
           ))}
           {!listLoading && visits.length === 0 && (
@@ -672,10 +717,10 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <h2 className="text-xl font-bold text-gray-900 truncate">{fullVisit.nom || 'Visite sans nom'}</h2>
-                    <SaveStatusDot status={saveStatus} />
-                    <button onClick={() => setShowInfoModal(true)} className="p-1 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition shrink-0" title="Modifier les informations">
+                    {canEdit ? <SaveStatusDot status={saveStatus} /> : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-100 text-indigo-700 text-[10px] font-bold"><LockKeyhole size={10} /> Lecture seule</span>}
+                    {canEdit && <button onClick={() => setShowInfoModal(true)} className="p-1 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition shrink-0" title="Modifier les informations">
                       <Pencil size={14} />
-                    </button>
+                    </button>}
                   </div>
                   <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
                     {fullVisit.lieu && <span>📍 {fullVisit.lieu}</span>}
@@ -684,18 +729,22 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <button onClick={() => setShowInfoModal(true)}
+                  {canEdit && <button onClick={() => setShowInfoModal(true)}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition active:scale-[0.97] border border-blue-200">
                     <Info size={13} /> Infos visite
-                  </button>
+                  </button>}
+                  {canEdit && <button onClick={() => setShowShareModal(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition active:scale-[0.97] border border-indigo-200">
+                    <Share2 size={13} /> Partager{fullVisit.sharedWith?.length ? ` (${fullVisit.sharedWith.length})` : ''}
+                  </button>}
                   <button onClick={handleExportPdf} disabled={exporting}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition active:scale-[0.97] ${exporting ? 'bg-gray-400 text-gray-200 cursor-wait' : 'bg-gray-900 text-white hover:bg-gray-800'}`}>
                     <FileDown size={13} className={exporting ? 'animate-pulse' : ''} /> {exporting ? 'Export...' : 'PDF'}
                   </button>
-                  <button onClick={() => handleDelete(fullVisit.id, fullVisit.nom)}
+                  {canEdit && <button onClick={() => handleDelete(fullVisit.id, fullVisit.nom)}
                     className="p-1.5 rounded-xl text-gray-300 hover:text-red-500 hover:bg-red-50 transition">
                     <Trash2 size={15} />
-                  </button>
+                  </button>}
                 </div>
               </div>
 
@@ -723,7 +772,18 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
                   <MessageSquare size={10} className="text-amber-500" /> {observations.length} obs.
                 </div>
 
-                <div className="ml-auto flex items-center gap-2">
+                {canEdit && !isRecording && coordinates.length >= 3 && (
+                  <div className="flex items-center gap-1">
+                    {traceBeforeClean && <button onClick={handleUndoTraceClean} title="Annuler le nettoyage"
+                      className="p-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition"><Undo2 size={12} /></button>}
+                    <button onClick={handleCleanTrace} title="Supprimer les points GPS aberrants et lisser la trace"
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 text-[10px] font-bold transition">
+                      <Wand2 size={12} /> Nettoyer
+                    </button>
+                  </div>
+                )}
+
+                {canEdit && <div className="ml-auto flex items-center gap-2">
                   {/* Segment buttons */}
                   {!pendingPoint ? (
                     <>
@@ -773,7 +833,7 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
                       <Play size={11} fill="white" /> Tracé GPS
                     </button>
                   )}
-                </div>
+                </div>}
               </div>
             </div>
 
@@ -842,7 +902,7 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
                       </div>
 
                       {/* Actions */}
-                      <div className="flex flex-col gap-1 shrink-0">
+                      {canEdit && <div className="flex flex-col gap-1 shrink-0">
                         <button onClick={(e) => { e.stopPropagation(); setEditingObs(obs); }}
                           className="p-1.5 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition" title="Modifier">
                           <Pencil size={13} />
@@ -851,7 +911,7 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
                           className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition" title="Supprimer">
                           <Trash2 size={13} />
                         </button>
-                      </div>
+                      </div>}
                     </div>
                   </div>
                 );

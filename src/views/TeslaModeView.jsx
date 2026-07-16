@@ -9,7 +9,7 @@ import 'leaflet/dist/leaflet.css';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { useMobileSiteVisits } from '../hooks/useMobileSiteVisits';
-import { simplifyGpsTrace } from '../utils/gpsSimplify';
+import { cleanGpsTrace, createGpsFixProcessor } from '../utils/gpsSimplify';
 import {
   Navigation, Play, Square, Plus, X, LogOut, MapPin, Flag, MessageSquare, Trash2, Check, Route, LocateFixed, Pin, ChevronLeft, ChevronRight
 } from 'lucide-react';
@@ -113,6 +113,7 @@ export default function TeslaModeView({ user, companyId, onExit }) {
   const timerRef = useRef(null);
   const startTimeRef = useRef(null);
   const gpsBreakNextRef = useRef(false); // marquer une coupure au prochain point GPS
+  const gpsProcessorRef = useRef(createGpsFixProcessor([], { maxSpeedKmh: 130 }));
 
   // Toast feedback
   const [toast, setToast] = useState(null);
@@ -418,19 +419,17 @@ export default function TeslaModeView({ user, companyId, onExit }) {
     updateDoc(ref, { 'gpsTracking.startTime': new Date().toISOString() }).catch(() => {});
 
     lastBearingPtRef.current = null;
+    gpsProcessorRef.current = createGpsFixProcessor(liveCoords, { maxSpeedKmh: 130 });
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
         const point = { lat: pos.coords.latitude, lng: pos.coords.longitude, timestamp: new Date().toISOString(), accuracy: Math.round(pos.coords.accuracy * 10) / 10 };
         if (gpsBreakNextRef.current) { point._break = true; gpsBreakNextRef.current = false; }
         setLastAccuracy(point.accuracy);
-        updateBearingFromFix(pos, point);
+        const filteredPoint = gpsProcessorRef.current.push(point);
+        if (!filteredPoint) return;
+        updateBearingFromFix(pos, filteredPoint);
         setLiveCoords(prev => {
-          // Filtre distance min 5m — ignorer si trop proche du dernier point (sauf break = nouveau segment)
-          if (!point._break && prev.length > 0) {
-            const last = prev[prev.length - 1];
-            if (haversine(last, point) < 5) return prev;
-          }
-          const updated = [...prev, point];
+          const updated = [...prev, filteredPoint];
           if (updated.length % 5 === 0) {
             const ref = doc(db, 'companies', companyId, 'site_visits', activeVisit.id);
             updateDoc(ref, { 'gpsTracking.coordinates': updated, 'gpsTracking.distance': Math.round(totalDistance(updated)) }).catch(() => {});
@@ -439,7 +438,7 @@ export default function TeslaModeView({ user, companyId, onExit }) {
         });
       },
       () => {},
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 2000 }
     );
   }, [companyId, activeVisit?.id, liveCoords.length, updateBearingFromFix]);
 
@@ -448,8 +447,7 @@ export default function TeslaModeView({ user, companyId, onExit }) {
     wakeLockRef.current?.release(); wakeLockRef.current = null;
     if (watchIdRef.current != null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
-    // Simplification Douglas-Peucker (epsilon 5m)
-    const simplified = simplifyGpsTrace(liveCoords, 5);
+    const simplified = cleanGpsTrace(liveCoords, { maxSpeedKmh: 130 });
     setLiveCoords(simplified);
 
     if (activeVisit?.id) {
@@ -490,15 +488,17 @@ export default function TeslaModeView({ user, companyId, onExit }) {
       if (isRecording && navigator.geolocation) {
         if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current);
         gpsBreakNextRef.current = true; // ne pas relier ancien tracé et nouveau
+        gpsProcessorRef.current = createGpsFixProcessor(liveCoords, { maxSpeedKmh: 130 });
         watchIdRef.current = navigator.geolocation.watchPosition(
           (pos) => {
             const point = { lat: pos.coords.latitude, lng: pos.coords.longitude, timestamp: new Date().toISOString(), accuracy: Math.round(pos.coords.accuracy * 10) / 10 };
             if (gpsBreakNextRef.current) { point._break = true; gpsBreakNextRef.current = false; }
             setLastAccuracy(point.accuracy);
-            updateBearingFromFix(pos, point);
+            const filteredPoint = gpsProcessorRef.current.push(point);
+            if (!filteredPoint) return;
+            updateBearingFromFix(pos, filteredPoint);
             setLiveCoords(prev => {
-              if (!point._break && prev.length > 0 && haversine(prev[prev.length - 1], point) < 5) return prev;
-              const updated = [...prev, point];
+              const updated = [...prev, filteredPoint];
               if (updated.length % 5 === 0 && activeVisit?.id) {
                 updateDoc(doc(db, 'companies', companyId, 'site_visits', activeVisit.id), {
                   'gpsTracking.coordinates': updated, 'gpsTracking.distance': Math.round(totalDistance(updated)),
@@ -508,7 +508,7 @@ export default function TeslaModeView({ user, companyId, onExit }) {
             });
           },
           () => {},
-          { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 2000 }
         );
       }
 

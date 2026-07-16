@@ -51,11 +51,11 @@ export default function SiteVisitListView({ visits, loading, onSelect, onCreate,
               onClick={() => { if (!contextMenu) onSelect(v); }}
               onTouchStart={(e) => {
                 const touch = e.touches[0];
-                pressTimer = setTimeout(() => setContextMenu({ visit: v, x: touch.clientX, y: touch.clientY }), 500);
+                if (v.isOwner) pressTimer = setTimeout(() => setContextMenu({ visit: v, x: touch.clientX, y: touch.clientY }), 500);
               }}
               onTouchEnd={() => clearTimeout(pressTimer)}
               onTouchMove={() => clearTimeout(pressTimer)}
-              onContextMenu={(e) => { e.preventDefault(); setContextMenu({ visit: v, x: e.clientX, y: e.clientY }); }}
+              onContextMenu={(e) => { e.preventDefault(); if (v.isOwner) setContextMenu({ visit: v, x: e.clientX, y: e.clientY }); }}
               className={`block p-4 bg-white rounded-xl border border-gray-200 text-left transition hover:shadow-md active:scale-[0.98] select-none ${isLandscape ? '' : 'w-[calc(100%-2rem)] mx-4 mb-2'}`}>
               <div className="flex items-start gap-3">
                 <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0 mt-0.5">
@@ -63,6 +63,7 @@ export default function SiteVisitListView({ visits, loading, onSelect, onCreate,
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-[15px] font-bold text-gray-900 leading-tight truncate">{v.nom || 'Visite sans nom'}</div>
+                  {v.isShared && <div className="inline-flex mt-1 px-2 py-0.5 rounded-lg bg-indigo-100 text-indigo-700 text-[10px] font-bold uppercase">Partagée avec moi</div>}
                   {v.lieu && <div className="text-[13px] text-gray-500 font-medium mt-0.5 truncate">{v.lieu}</div>}
                   {v.client && <div className="text-[12px] text-gray-400 mt-0.5 truncate">{v.client}</div>}
                   <div className="flex items-center gap-2 mt-1.5 text-[13px] text-gray-500 font-semibold">
