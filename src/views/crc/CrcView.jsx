@@ -51,6 +51,8 @@ import { useSmtpConfig } from '../../hooks/useSmtpConfig';
 import { usePresence, useCoEditors } from '../../hooks/usePresence';
 import CoEditBanner from '../../components/common/CoEditBanner';
 
+const APP_SUPER_ADMIN_EMAIL = 'samuel.biason@papyrus-be.fr';
+
 // ── VUE PRINCIPALE ──────────────────────────────────────────────────────────
 
 export default function CrcView({ onBackToHub, user, companyId, onNavigateModule }) {
@@ -65,8 +67,15 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
     const snap = await getDocs(collection(db, 'companies', companyId, 'crr'));
     const docs = [];
     snap.forEach((d) => docs.push({ id: d.id, ...d.data() }));
+    if (user?.email === APP_SUPER_ADMIN_EMAIL) {
+      await Promise.all(docs.filter(item => !item.ownerId).map(async item => {
+        const ownership = { ownerId: user.uid, ownerEmail: user.email || '' };
+        await setDoc(doc(db, 'companies', companyId, 'crr', item.id), ownership, { merge: true });
+        Object.assign(item, ownership);
+      }));
+    }
     return docs;
-  }, [companyId]);
+  }, [companyId, user]);
 
   useEffect(() => {
     if (!user || !companyId) return;
@@ -114,6 +123,7 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
         }
         const target = docs.find((d) => d.id === lastId) || docs[0];
         if (target) {
+          const targetCanEdit = target.ownerId === user.uid;
           // Verifier s'il y a un brouillon localStorage plus recent
           const draftKey = `draft_crr_${target.id}`;
           const draft = loadDraft(draftKey);
@@ -122,15 +132,15 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
           // Ne restaurer que si le brouillon appartient bien a CETTE affaire
           // (garde-fou anti-fuite : un brouillon ecrit sous une mauvaise cle lors
           // d'un changement d'affaire ne doit jamais s'appliquer a une autre).
-          if (draft && draftAt > firestoreAt && draft.id === target.id) {
+          if (targetCanEdit && draft && draftAt > firestoreAt && draft.id === target.id) {
             const { _draftAt, ...cleanDraft } = draft;
-            setCrrDoc(cleanDraft);
+            setCrrDoc({ ...cleanDraft, ownerId: target.ownerId, ownerEmail: target.ownerEmail || '' });
             toast.warning('Brouillon local restauré (dernière sauvegarde non envoyée).', { duration: 6000 });
             clearDraft(draftKey);
           } else {
             if (draft) clearDraft(draftKey);
             // Sync projet lié si nécessaire
-            if (target.linkedProjectId) {
+            if (target.linkedProjectId && targetCanEdit) {
               try {
                 const projSnap = await getDoc(doc(db, 'companies', companyId, 'projects', target.linkedProjectId));
                 if (projSnap.exists()) {
@@ -161,6 +171,7 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
   const handleSaveCrrDoc = useCallback(
     async (data) => {
       if (!data || !companyId) return;
+      if (data.ownerId !== user?.uid) throw new Error('Modification réservée au créateur du CRC.');
       const docId = data.id;
       try {
         await setDoc(doc(db, 'companies', companyId, 'crr', docId), {
@@ -193,6 +204,8 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
       : { nom: '', lieu: '', dureePreparation: '', dureeChantier: '', dateDebut: '', dateFin: '' };
     const newDoc = {
       id: newId,
+      ownerId: user.uid,
+      ownerEmail: user.email || '',
       ...(linkedProject ? { linkedProjectId: linkedProject.id } : {}),
       crrConfig: {
         participantGroups: [],
@@ -225,6 +238,10 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
     try {
       // Purge Storage en arriere-plan pour toutes les images de l'affaire
       const target = chantiers.find((c) => c.id === chantierId);
+      if (target?.ownerId !== user?.uid) {
+        toast.warning('Seul le créateur peut supprimer ce CRC.');
+        return;
+      }
       if (target?.crrMeetings) {
         for (const m of target.crrMeetings) {
           for (const obs of (m.observations || [])) {
@@ -242,12 +259,12 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
       console.error('[CRC] Erreur suppression chantier:', err);
       toast.error('Impossible de supprimer le chantier.');
     }
-  }, [companyId, crrDoc, chantiers]);
+  }, [companyId, crrDoc, chantiers, user]);
 
   const handleSelectChantier = useCallback(async (c) => {
     let docToSet = c;
     // Sync auto si lié à un projet
-    if (c.linkedProjectId && companyId) {
+    if (c.linkedProjectId && companyId && c.ownerId === user?.uid) {
       try {
         const projSnap = await getDoc(doc(db, 'companies', companyId, 'projects', c.linkedProjectId));
         if (projSnap.exists()) {
@@ -273,10 +290,12 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
     }
   }, [companyId, user]);
 
+  const canEdit = crrDoc?.ownerId === user?.uid;
+
   const manager = useCrrManager({
     project: crrDoc,
-    onUpdateProject: setCrrDoc,
-    onSaveProject: handleSaveCrrDoc,
+    onUpdateProject: canEdit ? setCrrDoc : undefined,
+    onSaveProject: canEdit ? handleSaveCrrDoc : undefined,
     masterBranding: branding,
   });
 
@@ -295,6 +314,9 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
   });
 
   const [viewMode, setViewMode] = useState('edit');
+  useEffect(() => {
+    if (crrDoc && !canEdit) setViewMode('preview');
+  }, [crrDoc, canEdit]);
   // Tri par date PAR categorie : map { [categorie]: 'asc' | 'desc' }
   const [sortDate, setSortDate] = useState(() => {
     try { return JSON.parse(localStorage.getItem('crc_sort_dates') || '{}') || {}; }
@@ -550,6 +572,10 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
     const { data } = importModal;
 
     if (mode === 'overwrite' && crrDoc) {
+      if (!canEdit) {
+        toast.warning('Seul le créateur peut remplacer ce CRC.');
+        return;
+      }
       const updated = { ...crrDoc, crrConfig: data.crrConfig, crrMeetings: data.crrMeetings };
       await setDoc(doc(db, 'companies', companyId, 'crr', crrDoc.id), {
         ...updated, lastSaved: new Date().toISOString(), updatedBy: user?.email,
@@ -561,6 +587,8 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
       const newId = `crr_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
       const newDoc = {
         id: newId,
+        ownerId: user.uid,
+        ownerEmail: user.email || '',
         crrConfig: data.crrConfig,
         crrMeetings: data.crrMeetings,
         createdAt: new Date().toISOString(),
@@ -573,7 +601,7 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
       toast.success('Affaire importee (nouveau chantier).');
     }
     setImportModal(null);
-  }, [importModal, crrDoc, companyId, user]);
+  }, [importModal, crrDoc, companyId, user, canEdit]);
 
   const handleSendMail = useCallback(async () => {
     if (manager.diffusionEmails.length === 0) {
@@ -736,19 +764,19 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
 
           {/* ── GROUPE : REUNION ── */}
           <RibbonGroup label="Reunion" dataTour="reunion">
-            <RibbonButton icon={Plus} label="Nouveau CR" onClick={manager.createMeeting} disabled={!crrDoc} variant="primary" title="Creer une nouvelle reunion de chantier" />
-            <RibbonButton icon={Copy} label="Dupliquer CR" onClick={() => setShowDuplicateModal(true)} disabled={!hasMeeting} variant="primary" title="Dupliquer la reunion avec report des observations non resolues" />
+            <RibbonButton icon={Plus} label="Nouveau CR" onClick={manager.createMeeting} disabled={!crrDoc || !canEdit} variant="primary" title="Creer une nouvelle reunion de chantier" />
+            <RibbonButton icon={Copy} label="Dupliquer CR" onClick={() => setShowDuplicateModal(true)} disabled={!hasMeeting || !canEdit} variant="primary" title="Dupliquer la reunion avec report des observations non resolues" />
             <RibbonButton icon={ArrowLeftRight} label="Audit CR" onClick={() => setShowAuditModal(true)} disabled={!previousMeeting} variant="accent" title="Comparer avec la reunion precedente" />
-            <RibbonButton icon={Trash2} label="Supprimer CR" onClick={handleDeleteActiveMeeting} disabled={!hasMeeting} variant="default" title="Supprimer definitivement cette reunion" />
+            <RibbonButton icon={Trash2} label="Supprimer CR" onClick={handleDeleteActiveMeeting} disabled={!hasMeeting || !canEdit} variant="default" title="Supprimer definitivement cette reunion" />
           </RibbonGroup>
 
           <RibbonDivider />
 
           {/* ── GROUPE : CONFIGURATION ── */}
           <RibbonGroup label="Configuration" dataTour="configuration">
-            <RibbonButton icon={Building2} label="Info Chantier" onClick={() => setShowInfoChantierModal(true)} disabled={!crrDoc} variant="primary" title="Nom, adresse et infos du chantier" />
-            <RibbonButton icon={Users} label="Participants" onClick={() => setShowParticipantsModal(true)} disabled={!crrDoc} variant="primary" title="Gerer les groupes et contacts participants" />
-            <RibbonButton icon={ListTree} label="Categories" onClick={() => setShowCategoriesModal(true)} disabled={!crrDoc} variant="primary" title="Gerer les categories d'observations" />
+            <RibbonButton icon={Building2} label="Info Chantier" onClick={() => setShowInfoChantierModal(true)} disabled={!crrDoc || !canEdit} variant="primary" title="Nom, adresse et infos du chantier" />
+            <RibbonButton icon={Users} label="Participants" onClick={() => setShowParticipantsModal(true)} disabled={!crrDoc || !canEdit} variant="primary" title="Gerer les groupes et contacts participants" />
+            <RibbonButton icon={ListTree} label="Categories" onClick={() => setShowCategoriesModal(true)} disabled={!crrDoc || !canEdit} variant="primary" title="Gerer les categories d'observations" />
           </RibbonGroup>
 
           <RibbonDivider />
@@ -761,10 +789,10 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
                 { id: 'preview', icon: Eye, label: 'Aperçu' },
                 { id: 'terrain', icon: MapPin, label: 'Terrain' },
               ].map(m => (
-                <button key={m.id} onClick={() => setViewMode(m.id)}
+                <button key={m.id} onClick={() => setViewMode(m.id)} disabled={!canEdit && m.id !== 'preview'}
                   className={`flex items-center gap-1 px-2 xl:px-3 py-1.5 xl:py-2 rounded-md xl:rounded-lg text-[10px] xl:text-xs font-medium transition-all ${
                     viewMode === m.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'
-                  }`}>
+                  } ${!canEdit && m.id !== 'preview' ? 'opacity-40 cursor-not-allowed' : ''}`}>
                   <m.icon size={12} className="xl:hidden" />
                   <m.icon size={14} className="hidden xl:block" />
                   {m.label}
@@ -806,13 +834,19 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
           <RibbonGroup label="Archivage" dataTour="archivage">
             <RibbonButton icon={Archive} label="Archiver" onClick={handleArchiveExport} disabled={!crrDoc} title="Exporter l'affaire complete (.crcestima)" />
             <RibbonButton icon={UploadCloud} label="Importer" onClick={() => importFileRef.current?.click()} title="Importer une affaire (.crcestima)" />
-            <RibbonButton icon={Minimize2} label="Optimiser images" onClick={handleOptimizeImages} disabled={!crrDoc} title="Recompresser toutes les photos pour passer sous la limite Firestore 1 Mo" />
+            <RibbonButton icon={Minimize2} label="Optimiser images" onClick={handleOptimizeImages} disabled={!crrDoc || !canEdit} title="Recompresser toutes les photos pour passer sous la limite Firestore 1 Mo" />
           </RibbonGroup>
 
         </div>
       </div>
 
       <CoEditBanner editors={coEditors} />
+
+      {crrDoc && !canEdit && (
+        <div className="shrink-0 px-4 py-2 bg-indigo-100 text-indigo-700 text-xs font-bold text-center border-b border-indigo-200">
+          Lecture seule — seul le créateur peut modifier ce compte rendu
+        </div>
+      )}
 
       {/* ═══════════════════════════════════════════════════════════════════════
           CONTENU PRINCIPAL
@@ -840,6 +874,7 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
             setActiveMeetingId={manager.setActiveMeetingId}
             saveStatus={manager.saveStatus}
             onForceSave={manager.forceSave}
+            readOnly={!canEdit}
           />
           </div>
 
@@ -851,11 +886,11 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
                   <Edit3 size={48} className="mb-4 opacity-30" />
                   <p className="text-sm">Cliquez sur « Nouveau CR » pour créer le premier compte rendu</p>
                 </div>
-              ) : viewMode === 'terrain' ? (
+              ) : viewMode === 'terrain' && canEdit ? (
                 <div className="p-6 h-full">
                   <CrcTerrainView meeting={manager.activeMeeting} observationsByCategory={manager.observationsByCategory} />
                 </div>
-              ) : viewMode === 'preview' ? (
+              ) : viewMode === 'preview' || !canEdit ? (
                 <div className="p-6 bg-gray-100 min-h-full">
                   <CrrPreview meeting={manager.activeMeeting} crrConfig={manager.crrConfig} projectName={chantierName} branding={branding} sortDate={sortDate} sortCat={sortCat} />
                 </div>
@@ -895,17 +930,18 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
         activeId={crrDoc?.id}
         onSelect={handleSelectChantier}
         onDelete={handleDeleteChantier}
+        canDelete={(chantier) => chantier.ownerId === user?.uid}
         companyId={companyId}
       />
 
-      <CrcCategoriesModal isOpen={showCategoriesModal} onClose={() => setShowCategoriesModal(false)}
+      <CrcCategoriesModal isOpen={showCategoriesModal && canEdit} onClose={() => setShowCategoriesModal(false)}
         categories={manager.crrConfig.categories} addCategory={manager.addCategory}
         renameCategory={manager.renameCategory} deleteCategory={manager.deleteCategory}
         reorderCategories={manager.reorderCategories}
         categoryCodes={manager.crrConfig.categoryCodes} setCategoryCode={manager.setCategoryCode} />
 
       <UnifiedParticipantsModal
-        isOpen={showParticipantsModal}
+        isOpen={showParticipantsModal && canEdit}
         onClose={() => setShowParticipantsModal(false)}
         participantGroups={manager.activeParticipantGroups}
         addContact={manager.addContact}
@@ -932,7 +968,7 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
       />
 
       <CrcInfoChantierModal
-        isOpen={showInfoChantierModal}
+        isOpen={showInfoChantierModal && canEdit}
         onClose={() => setShowInfoChantierModal(false)}
         chantierInfo={manager.crrConfig.chantierInfo}
         updateChantierInfo={manager.updateChantierInfo}
@@ -999,7 +1035,7 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
               </div>
 
               <div className="flex gap-2 pt-2">
-                {crrDoc && (
+                {crrDoc && canEdit && (
                   <button
                     onClick={() => handleImportConfirm('overwrite')}
                     className="flex-1 px-4 py-2.5 bg-orange-50 text-orange-600 text-sm font-medium rounded-xl hover:bg-orange-100 transition-all border border-orange-200"
@@ -1020,7 +1056,7 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
       )}
 
       <CrcDuplicateModal
-        isOpen={showDuplicateModal}
+        isOpen={showDuplicateModal && canEdit}
         onClose={() => setShowDuplicateModal(false)}
         onConfirm={handleDuplicateMeeting}
         defaultDate={defaultDuplicateDate}

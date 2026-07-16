@@ -47,6 +47,7 @@ export default function CrcChantierPickerModal({
   activeId,
   onSelect,
   onDelete,
+  canDelete = () => true,
   companyId,
 }) {
   const [query, setQuery] = useState('');
@@ -194,13 +195,15 @@ export default function CrcChantierPickerModal({
                     }`}
                   >
                     {/* Bouton suppression (visible au hover) */}
-                    <button
-                      onClick={(e) => handleDelete(e, c)}
-                      className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all"
-                      title="Supprimer le chantier"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    {canDelete(c) && (
+                      <button
+                        onClick={(e) => handleDelete(e, c)}
+                        className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all"
+                        title="Supprimer le chantier"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
 
                     {/* Logo / placeholder */}
                     <div className="flex items-start gap-3 mb-3">

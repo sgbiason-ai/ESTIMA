@@ -220,7 +220,18 @@ service cloud.firestore {
       // Comptes rendus de chantier (CRC/CRR)
       match /crr/{crrId} {
         allow read: if isCompanyMember(companyId);
-        allow write: if isCompanyMember(companyId);
+        allow create: if isCompanyMember(companyId)
+                      && request.resource.data.ownerId == request.auth.uid;
+        allow update: if isCompanyMember(companyId)
+                      && resource.data.ownerId == request.auth.uid
+                      && request.resource.data.ownerId == resource.data.ownerId;
+        allow delete: if isCompanyMember(companyId)
+                      && resource.data.ownerId == request.auth.uid;
+
+        // Reprise unique des anciens CRC sans propriétaire par le super-utilisateur.
+        allow update: if isAppSuperAdmin()
+                      && !('ownerId' in resource.data)
+                      && request.resource.data.ownerId == request.auth.uid;
 
         // Logs d'envoi mail — lecture par les membres, écriture par Cloud Function uniquement
         match /emails/{emailId} {

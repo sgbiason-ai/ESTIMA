@@ -8,10 +8,11 @@ export { APP_VERSION } from './appVersion';
 
 export const CHANGELOG = [
   {
-    version: '3.9.1',
+    version: '3.10.0',
     date: '2026-07-16',
-    title: 'Notifications de partage des visites',
+    title: 'Partage et propriété des modules terrain',
     highlights: [
+      'CRC — tous les collaborateurs de l’entreprise peuvent consulter et exporter les comptes rendus, mais seul leur créateur peut les modifier ou les supprimer. Les anciens CRC sont automatiquement attribués au super-utilisateur et les autres membres disposent d’une vue clairement signalée en lecture seule sur desktop et mobile',
       'Visites de site — la fenêtre de partage se ferme après une sauvegarde réussie et affiche désormais un message explicite si Firestore refuse l’opération',
       'Visites de site — lorsqu’une visite est partagée, le collaborateur reçoit une pastille rouge sur la carte « Visites de Site » du hub desktop et mobile. Le compteur indique le nombre de nouveaux partages et disparaît dès l’ouverture du module',
     ],

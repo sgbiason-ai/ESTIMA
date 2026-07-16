@@ -4,4 +4,4 @@
 // UpdatePrompt…) : il ne doit JAMAIS importer changelog.js (~160 KB de texte),
 // qui n'est nécessaire qu'à l'ouverture de la modale « Nouveautés ».
 
-export const APP_VERSION = '3.9.1';
+export const APP_VERSION = '3.10.0';

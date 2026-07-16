@@ -37,6 +37,7 @@ export default function CrcListView({ chantiers, loading, onSelect, onRefresh, i
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-[15px] font-semibold text-gray-900 leading-tight truncate">{ch.name}</div>
+              {!ch.isOwner && <div className="inline-flex mt-1 px-2 py-0.5 rounded-lg bg-indigo-100 text-indigo-700 text-[10px] font-bold uppercase">Lecture seule</div>}
               {ch.lieu && <div className="text-[13px] text-gray-400 font-medium mt-0.5 truncate">{ch.lieu}</div>}
               <div className="flex items-center gap-2 mt-1.5 text-[13px] text-gray-400 font-medium">
                 <span>{ch.meetingCount} réunion{ch.meetingCount > 1 ? 's' : ''}</span>

@@ -150,10 +150,14 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
     }
   }, [selectedChantier, saveChantier]);
 
+  const canEditCrr = !!fullChantier
+    && (fullChantier.ownerId === user?.uid
+      || (!fullChantier.ownerId && user?.email === 'samuel.biason@papyrus-be.fr'));
+
   const crrManager = useCrrManager({
     project: fullChantier,
-    onUpdateProject: setFullChantier,
-    onSaveProject: handleSaveCrrDoc,
+    onUpdateProject: canEditCrr ? setFullChantier : undefined,
+    onSaveProject: canEditCrr ? handleSaveCrrDoc : undefined,
     masterBranding: resources.masterBranding,
   });
 
@@ -180,7 +184,7 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
     const firestoreAt = data?.lastSaved ? new Date(data.lastSaved).getTime() : 0;
     if (draft && draftAt > firestoreAt) {
       const { _draftAt, ...cleanDraft } = draft;
-      setFullChantier(cleanDraft);
+      setFullChantier({ ...cleanDraft, ownerId: data?.ownerId, ownerEmail: data?.ownerEmail || '' });
       setToast('Brouillon CRC local restauré');
       setTimeout(() => setToast(null), 2400);
       clearDraft(`draft_crr_${ch.id}`);
@@ -736,7 +740,7 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
           isTablet && isLandscape ? (
             <SplitView
               List={<CrcListView chantiers={crcChantiers} loading={crcLoading} onSelect={handleSelectChantier} onRefresh={crcRefetch} isLandscape={false} />}
-              Detail={fullChantier && <CrcDetailView chantier={fullChantier} branding={resources.masterBranding} onToast={triggerToast} manager={crrManager} isLandscape={isLandscape} companyId={companyId} />}
+              Detail={fullChantier && <CrcDetailView chantier={fullChantier} branding={resources.masterBranding} onToast={triggerToast} manager={canEditCrr ? crrManager : null} isLandscape={isLandscape} companyId={companyId} />}
               hasSelection={!!selectedChantier}
               loading={chantierLoading}
               emptyIcon="clipboard"
@@ -750,7 +754,7 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
               <span className="text-sm">Chargement…</span>
             </div>
           ) : fullChantier ? (
-            <CrcDetailView chantier={fullChantier} branding={resources.masterBranding} onToast={triggerToast} manager={crrManager} isLandscape={isLandscape} companyId={companyId} />
+            <CrcDetailView chantier={fullChantier} branding={resources.masterBranding} onToast={triggerToast} manager={canEditCrr ? crrManager : null} isLandscape={isLandscape} companyId={companyId} />
           ) : null
         )}
 

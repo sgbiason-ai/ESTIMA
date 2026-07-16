@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ChevronLeft, ChevronRight, Save } from 'lucide-react';
 
-export default function CrcMeetingTabs({ meetings, activeMeetingId, setActiveMeetingId, saveStatus, onForceSave }) {
+export default function CrcMeetingTabs({ meetings, activeMeetingId, setActiveMeetingId, saveStatus, onForceSave, readOnly = false }) {
   const scrollRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
@@ -77,7 +77,7 @@ export default function CrcMeetingTabs({ meetings, activeMeetingId, setActiveMee
         </button>
       )}
 
-      <button
+      {!readOnly && <button
         onClick={onForceSave}
         disabled={saveStatus === 'saved' || saveStatus === 'saving'}
         title={saveStatus === 'saved' ? 'Tout est sauvegardé' : 'Sauvegarder maintenant'}
@@ -90,7 +90,7 @@ export default function CrcMeetingTabs({ meetings, activeMeetingId, setActiveMee
         <Save size={12} className={saveStatus === 'saving' ? 'text-blue-500 animate-pulse' : saveStatus === 'waiting' ? 'text-amber-500' : saveStatus === 'error' ? 'text-red-500' : 'text-emerald-500'} />
         <div className={`w-1.5 h-1.5 rounded-full ${si.dot}`} />
         <span className="text-[10px] text-gray-400 font-medium">{si.label}</span>
-      </button>
+      </button>}
     </div>
   );
 }

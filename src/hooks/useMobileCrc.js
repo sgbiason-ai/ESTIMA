@@ -8,6 +8,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { collection, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
+const APP_SUPER_ADMIN_EMAIL = 'samuel.biason@papyrus-be.fr';
+
 export const useMobileCrc = (user, companyId) => {
   const [chantiers, setChantiers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -20,8 +22,14 @@ export const useMobileCrc = (user, companyId) => {
 
     try {
       const snap = await getDocs(collection(db, 'companies', companyId, 'crr'));
-      const list = snap.docs.map(d => {
-        const data = d.data();
+      const isSuperUser = user.email === APP_SUPER_ADMIN_EMAIL;
+      const list = await Promise.all(snap.docs.map(async d => {
+        let data = d.data();
+        if (isSuperUser && !data.ownerId) {
+          const ownership = { ownerId: user.uid, ownerEmail: user.email || '' };
+          await setDoc(d.ref, ownership, { merge: true });
+          data = { ...data, ...ownership };
+        }
         const config = data.crrConfig || {};
         const meetings = data.crrMeetings || [];
         return {
@@ -33,8 +41,10 @@ export const useMobileCrc = (user, companyId) => {
             ? meetings[meetings.length - 1].date || ''
             : '',
           lastSaved: data.lastSaved || '',
+          ownerId: data.ownerId || null,
+          isOwner: data.ownerId === user.uid,
         };
-      })
+      }))
         .sort((a, b) => (b.lastSaved || '').localeCompare(a.lastSaved || ''));
 
       setChantiers(list);
@@ -61,6 +71,7 @@ export const useMobileCrc = (user, companyId) => {
 
   const saveChantier = useCallback(async (chantierId, data) => {
     if (!companyId) return;
+    if (data?.ownerId !== user?.uid) throw new Error('Modification réservée au créateur du CRC.');
     try {
       await setDoc(doc(db, 'companies', companyId, 'crr', chantierId), {
         ...data,
