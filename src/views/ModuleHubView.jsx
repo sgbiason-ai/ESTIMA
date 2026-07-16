@@ -16,6 +16,7 @@ import HelpPanel from '../components/help/HelpPanel';
 import HelpButton from '../components/help/HelpButton';
 import { isSuperAdmin } from '../config/superAdmin';
 import { useNewFeedbackCount } from '../hooks/useFeedback';
+import { useSiteVisitShareNotifications } from '../hooks/useSiteVisitShareNotifications';
 
 // ─── WIDGET MÉTÉO ──────────────────────────────────────────────────────────
 
@@ -133,7 +134,7 @@ const ROW_THEMES = {
 
 // ─── BENTO CARD ────────────────────────────────────────────────────────────
 
-function BentoCard({ mod, theme, accessible, onSelect, mounted, delay, notifCount = 0 }) {
+function BentoCard({ mod, theme, accessible, onSelect, mounted, delay, notifCount = 0, notifLabel = 'notification' }) {
   const Icon = mod.icon;
 
   return (
@@ -155,7 +156,7 @@ function BentoCard({ mod, theme, accessible, onSelect, mounted, delay, notifCoun
           {notifCount > 0 && (
             <span
               className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold leading-none ring-2 ring-white shadow-sm"
-              title={`${notifCount} feedback${notifCount > 1 ? 's' : ''} à traiter`}
+              title={`${notifCount} ${notifLabel}`}
             >
               {notifCount > 99 ? '99+' : notifCount}
             </span>
@@ -210,7 +211,7 @@ const ROW_LABELS = {
 
 // ─── COMPOSANT PRINCIPAL ────────────────────────────────────────────────────
 
-export default function ModuleHubView({ isAdmin, userEmail, userModules, onSelectModule, onLogout, onSwitchToMobile = null }) {
+export default function ModuleHubView({ isAdmin, userId, userEmail, userModules, onSelectModule, onLogout, onSwitchToMobile = null }) {
   const [mounted, setMounted] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -219,6 +220,14 @@ export default function ModuleHubView({ isAdmin, userEmail, userModules, onSelec
 
   // Pastille « nouveau feedback » sur la carte Administration (super-admin only).
   const newFeedbackCount = useNewFeedbackCount(isSuperAdmin(userEmail));
+  const { count: sharedVisitCount, markAllRead: markSharedVisitsRead } = useSiteVisitShareNotifications(userId);
+
+  const handleSelectModule = async (moduleId) => {
+    if (moduleId === 'site_visits') {
+      try { await markSharedVisitsRead(); } catch { /* la navigation reste disponible */ }
+    }
+    onSelectModule(moduleId);
+  };
 
   const handleClearCache = async () => {
     if (cacheClearing) return;
@@ -365,10 +374,13 @@ export default function ModuleHubView({ isAdmin, userEmail, userModules, onSelec
                         mod={mod}
                         theme={ROW_THEMES[rowNum]}
                         accessible={canAccess(mod)}
-                        onSelect={onSelectModule}
+                        onSelect={handleSelectModule}
                         mounted={mounted}
                         delay={200 + rowNum * 100 + idx * 60}
-                        notifCount={mod.id === 'admin' ? newFeedbackCount : 0}
+                        notifCount={mod.id === 'admin' ? newFeedbackCount : mod.id === 'site_visits' ? sharedVisitCount : 0}
+                        notifLabel={mod.id === 'admin'
+                          ? `feedback${newFeedbackCount > 1 ? 's' : ''} à traiter`
+                          : `nouvelle${sharedVisitCount > 1 ? 's' : ''} visite${sharedVisitCount > 1 ? 's' : ''} partagée${sharedVisitCount > 1 ? 's' : ''}`}
                       />
                     ))}
                   </div>

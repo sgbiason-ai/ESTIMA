@@ -232,6 +232,7 @@ export default function App() {
     return (
       <ModuleHubView
         isAdmin={isAdmin}
+        userId={user.uid}
         userEmail={user.email}
         userModules={userModules}
         onSelectModule={setActiveModule}

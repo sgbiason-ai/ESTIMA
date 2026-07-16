@@ -8,6 +8,7 @@ import lazyWithReload from '../../utils/lazyWithReload';
 const ChangelogModal = lazyWithReload(() => import('../ChangelogModal'));
 import { satisfiesDesktopGate, isSuperAdmin } from '../../config/superAdmin';
 import { useNewFeedbackCount } from '../../hooks/useFeedback';
+import { useSiteVisitShareNotifications } from '../../hooks/useSiteVisitShareNotifications';
 
 // ─── MODULES MOBILES ───────────────────────────────────────────────────────
 //
@@ -60,7 +61,7 @@ const ROW_THEMES = {
 
 // ─── COMPOSANT ─────────────────────────────────────────────────────────────
 
-export default function MobileHubView({ userEmail, userModules, userMobileModules, onSelectModule, onLogout, isLandscape, isTablet = false, onSwitchToDesktop = null }) {
+export default function MobileHubView({ userId, userEmail, userModules, userMobileModules, onSelectModule, onLogout, isLandscape, isTablet = false, onSwitchToDesktop = null }) {
   const [mounted, setMounted] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -68,6 +69,14 @@ export default function MobileHubView({ userEmail, userModules, userMobileModule
   // Pastille « nouveau feedback » sur l'avatar (super-admin only, informatif :
   // le panneau de traitement vit côté desktop).
   const newFeedbackCount = useNewFeedbackCount(isSuperAdmin(userEmail));
+  const { count: sharedVisitCount, markAllRead: markSharedVisitsRead } = useSiteVisitShareNotifications(userId);
+
+  const handleSelectModule = async (moduleId) => {
+    if (moduleId === 'site_visits') {
+      try { await markSharedVisitsRead(); } catch { /* la navigation reste disponible */ }
+    }
+    onSelectModule(moduleId);
+  };
 
   const firstName = userEmail?.split('@')[0]?.split('.')[0] || '';
   const displayName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
@@ -149,7 +158,7 @@ export default function MobileHubView({ userEmail, userModules, userMobileModule
             return (
               <button
                 key={mod.id}
-                onClick={() => onSelectModule(mod.id)}
+                onClick={() => handleSelectModule(mod.id)}
                 className={`
                   relative w-full rounded-[20px] border p-4
                   flex flex-col text-left
@@ -164,8 +173,14 @@ export default function MobileHubView({ userEmail, userModules, userMobileModule
               >
                 {/* Header: icon + badge */}
                 <div className="flex items-start justify-between mb-2">
-                  <div className={`w-10 h-10 rounded-xl ${theme.iconBg} flex items-center justify-center shrink-0`}>
+                  <div className={`relative w-10 h-10 rounded-xl ${theme.iconBg} flex items-center justify-center shrink-0`}>
                     <Icon name={mod.icon} size={20} color={theme.iconColor} />
+                    {mod.id === 'site_visits' && sharedVisitCount > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold leading-none ring-2 ring-white shadow-sm"
+                        title={`${sharedVisitCount} nouvelle${sharedVisitCount > 1 ? 's' : ''} visite${sharedVisitCount > 1 ? 's' : ''} partagée${sharedVisitCount > 1 ? 's' : ''}`}>
+                        {sharedVisitCount > 99 ? '99+' : sharedVisitCount}
+                      </span>
+                    )}
                   </div>
                   {mod.tag && (
                     <span className={`px-1.5 py-0.5 rounded-md text-[8px] font-bold uppercase tracking-wider border ${theme.badge}`}>

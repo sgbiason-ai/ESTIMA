@@ -97,6 +97,22 @@ service cloud.firestore {
         allow read, write: if request.auth != null && request.auth.uid == uid;
       }
 
+      // Notifications personnelles. Un collaborateur de la même société peut
+      // créer une notification de partage ; seul le destinataire peut la lire.
+      match /notifications/{notificationId} {
+        allow read, delete: if request.auth != null && request.auth.uid == uid;
+        allow update: if request.auth != null
+                      && request.auth.uid == uid
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt']);
+        allow create: if userExists()
+                      && request.resource.data.type == 'site_visit_share'
+                      && request.resource.data.recipientId == uid
+                      && request.resource.data.senderId == request.auth.uid
+                      && request.resource.data.companyId == getUserData().companyId
+                      && get(/databases/$(database)/documents/users/$(uid)).data.companyId == getUserData().companyId
+                      && get(/databases/$(database)/documents/companies/$(request.resource.data.companyId)/site_visits/$(request.resource.data.visitId)).data.ownerId == request.auth.uid;
+      }
+
       // Données privées (ex: mot de passe SMTP chiffré).
       // Aucun accès direct côté client — seules les Cloud Functions (admin SDK) y accèdent.
       match /private/{docId} {

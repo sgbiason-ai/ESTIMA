@@ -603,6 +603,7 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
         {/* Hub (écran d'accueil) */}
         {!activeModule && (
           <MobileHubView
+            userId={user?.uid}
             userEmail={user?.email}
             userModules={userModules}
             userMobileModules={userMobileModules}

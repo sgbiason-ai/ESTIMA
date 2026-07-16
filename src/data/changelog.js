@@ -8,6 +8,14 @@ export { APP_VERSION } from './appVersion';
 
 export const CHANGELOG = [
   {
+    version: '3.9.0',
+    date: '2026-07-16',
+    title: 'Notifications de partage des visites',
+    highlights: [
+      'Visites de site — lorsqu’une visite est partagée, le collaborateur reçoit une pastille rouge sur la carte « Visites de Site » du hub desktop et mobile. Le compteur indique le nombre de nouveaux partages et disparaît dès l’ouverture du module',
+    ],
+  },
+  {
     version: '3.8.2',
     date: '2026-07-16',
     title: 'Métré DXF avec présentations AutoCAD',

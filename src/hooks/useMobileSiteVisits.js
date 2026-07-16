@@ -2,7 +2,7 @@
 // Hook Firestore pour les visites de site (mobile + desktop lecture).
 
 import { useState, useEffect, useCallback } from 'react';
-import { collection, getDocs, getDoc, doc, setDoc, deleteDoc, updateDoc, query, where } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, setDoc, deleteDoc, updateDoc, query, where, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 
 const APP_SUPER_ADMIN_EMAIL = 'samuel.biason@papyrus-be.fr';
@@ -137,17 +137,36 @@ export const useMobileSiteVisits = (user, companyId) => {
 
   const updateSharing = useCallback(async (visitId, sharedWith) => {
     if (!companyId || !user?.uid) return;
+    const visitRef = doc(db, 'companies', companyId, 'site_visits', visitId);
+    const visitSnap = await getDoc(visitRef);
+    if (!visitSnap.exists()) return;
+    const previousIds = new Set((visitSnap.data().sharedWith || []).map(member => member.uid));
     const collaborators = sharedWith.map(member => ({
       uid: member.uid,
       displayName: member.displayName || '',
       email: member.email || '',
     }));
-    await updateDoc(doc(db, 'companies', companyId, 'site_visits', visitId), {
+    const batch = writeBatch(db);
+    batch.update(visitRef, {
       sharedWith: collaborators,
       accessUids: [user.uid, ...collaborators.map(member => member.uid)],
       lastSaved: new Date().toISOString(),
       updatedBy: user.email || '',
     });
+    collaborators.filter(member => !previousIds.has(member.uid)).forEach(member => {
+      batch.set(doc(collection(db, 'users', member.uid, 'notifications')), {
+        type: 'site_visit_share',
+        recipientId: member.uid,
+        senderId: user.uid,
+        senderEmail: user.email || '',
+        companyId,
+        visitId,
+        visitName: visitSnap.data().nom || 'Visite sans nom',
+        createdAt: serverTimestamp(),
+        readAt: null,
+      });
+    });
+    await batch.commit();
   }, [companyId, user]);
 
   return { visits, isLoading, refetch: fetchVisits, loadVisit, saveVisit, createVisit, deleteVisit, updateSharing };
