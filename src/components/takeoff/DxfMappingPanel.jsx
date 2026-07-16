@@ -197,8 +197,8 @@ export default function DxfMappingPanel({
         )}
       </div>
 
-      <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto p-3">
-        <div className="space-y-2">
+      <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto p-2">
+        <div className="space-y-1.5">
           {displayedRows.map((row) => {
             const mapping = mappings[row.id];
             const metric = METRIC_LABELS[row.metric];
@@ -210,66 +210,69 @@ export default function DxfMappingPanel({
             if (flashLayer === row.layer) rowTone = 'border-amber-400 bg-amber-50 ring-2 ring-amber-300';
 
             return (
-              <div key={row.id} data-dxf-row-layer={row.layer} className={`rounded-2xl border p-3 transition-colors ${rowTone}`}>
-                <div className="flex items-start gap-2">
+              <div key={row.id} data-dxf-row-layer={row.layer} className={`rounded-xl border p-2 transition-colors ${rowTone}`}>
+                <div className="flex items-start gap-1.5">
                   <button
                     type="button"
                     onClick={() => onIsolateLayer(isolatedLayer === row.layer ? '' : row.layer)}
                     title={isolatedLayer === row.layer ? 'Afficher tous les calques' : 'Isoler ce calque'}
-                    className={`mt-0.5 rounded-lg p-1.5 ${isolatedLayer === row.layer ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500 hover:text-blue-600'}`}
+                    className={`mt-0.5 rounded-md p-1 ${isolatedLayer === row.layer ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500 hover:text-blue-600'}`}
                   >
-                    {isolatedLayer === row.layer ? <EyeOff size={14} /> : <Eye size={14} />}
+                    {isolatedLayer === row.layer ? <EyeOff size={13} /> : <Eye size={13} />}
                   </button>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-semibold text-gray-800" title={row.layer}>{row.layer}</p>
-                    <div className="mt-1 flex items-center gap-2">
-                      <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-gray-500">{metric.label}</span>
-                      <span className="text-xs font-bold text-blue-700">{formatQuantity(row.quantity)} {metric.unit}</span>
-                      {row.approximateCount > 0 && <span className="text-[9px] text-amber-600">approx.</span>}
+                    <p className="truncate text-[11px] font-semibold text-gray-800" title={row.layer}>{row.layer}</p>
+                    <div className="mt-0.5 flex items-center gap-1.5">
+                      <span className="rounded bg-gray-100 px-1 py-0.5 text-[8px] font-bold uppercase text-gray-500">{metric.label}</span>
+                      <span className="text-[11px] font-bold text-blue-700">{formatQuantity(row.quantity)} {metric.unit}</span>
+                      {row.approximateCount > 0 && <span className="text-[8px] text-amber-600">approx.</span>}
                     </div>
                   </div>
                   {!mapping ? (
                     <button
                       type="button"
                       onClick={() => updateMapping(row.id, {})}
-                      className="inline-flex items-center gap-1 rounded-lg bg-gray-900 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-gray-700"
+                      className="inline-flex items-center gap-1 rounded-md bg-gray-900 px-2 py-1 text-[10px] font-semibold text-white hover:bg-gray-700"
                     >
-                      <Plus size={12} /> Associer
+                      <Plus size={11} /> Associer
                     </button>
                   ) : (
-                    <button type="button" onClick={() => removeMapping(row.id)} className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500" title="Retirer l’association">
-                      <Trash2 size={14} />
+                    <button type="button" onClick={() => removeMapping(row.id)} className="rounded-md p-1 text-gray-400 hover:bg-red-50 hover:text-red-500" title="Retirer l’association">
+                      <Trash2 size={13} />
                     </button>
                   )}
                 </div>
 
                 {mapping && (
-                  <div className="mt-3 space-y-2 border-t border-blue-100 pt-3">
-                    <div className="flex items-center gap-2">
-                      <Link2 size={14} className="shrink-0 text-blue-500" />
+                  <div className="mt-1.5 border-t border-blue-100 pt-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <Link2 size={13} className="shrink-0 text-blue-500" />
                       <select
                         value={mapping.itemId || ''}
                         onChange={(event) => updateMapping(row.id, { itemId: event.target.value })}
-                        className={`min-w-0 flex-1 rounded-xl border bg-white px-2.5 py-2 text-[11px] outline-none ${incompatible ? 'border-amber-300' : 'border-gray-200 focus:border-blue-400'}`}
+                        className={`min-w-0 flex-1 rounded-lg border bg-white px-2 py-1 text-[11px] outline-none ${incompatible ? 'border-amber-300' : 'border-gray-200 focus:border-blue-400'}`}
                       >
                         <ProjectItemOptions items={projectItems} metric={row.metric} />
                       </select>
-                    </div>
-                    <div className="flex items-center gap-2 pl-[22px]">
-                      <label className="text-[10px] font-medium text-gray-500">Coefficient</label>
+                      <span className="text-[10px] font-medium text-gray-400">×</span>
                       <input
                         type="number"
                         min="0"
                         step="0.01"
                         value={mapping.coefficient ?? 1}
                         onChange={(event) => updateMapping(row.id, { coefficient: event.target.value })}
-                        className="w-20 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-right text-xs font-semibold outline-none focus:border-blue-400"
+                        title="Coefficient"
+                        className="w-14 rounded-md border border-gray-200 bg-white px-1.5 py-1 text-right text-[11px] font-semibold outline-none focus:border-blue-400"
                       />
-                      <span className="ml-auto text-[11px] font-bold text-gray-700">→ {formatQuantity(appliedQuantity)} {metric.unit}</span>
                     </div>
-                    {incompatible && (
-                      <p className="pl-[22px] text-[10px] font-medium text-amber-700">L’unité de l’article ({selectedItem.unit}) ne correspond pas à {metric.unit}.</p>
-                    )}
+                    <div className="mt-1 flex items-center justify-between gap-2 pl-[20px]">
+                      {incompatible ? (
+                        <span className="truncate text-[9px] font-medium text-amber-700">Unité {selectedItem.unit} ≠ {metric.unit}</span>
+                      ) : (
+                        <span className="text-[9px] text-gray-400">Coefficient ×</span>
+                      )}
+                      <span className="shrink-0 text-[11px] font-bold text-gray-700">→ {formatQuantity(appliedQuantity)} {metric.unit}</span>
+                    </div>
                   </div>
                 )}
               </div>

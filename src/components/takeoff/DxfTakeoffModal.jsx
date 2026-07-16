@@ -20,6 +20,7 @@ export default function DxfTakeoffModal({
 }) {
   const projectId = project?.id;
   const inputRef = useRef(null);
+  const mainRef = useRef(null);
   const skipFileSaveRef = useRef(false);
   const restoredKeyRef = useRef(null);
   const skipCloudSaveRef = useRef(false);
@@ -33,6 +34,7 @@ export default function DxfTakeoffModal({
   const [pick, setPick] = useState({ layer: '', nonce: 0 });
   const [applyMode, setApplyMode] = useState('replace');
   const [loadError, setLoadError] = useState('');
+  const [rightWidth, setRightWidth] = useState(440);
 
   const projectItems = useMemo(() => flattenProjectItems(project?.chapters), [project?.chapters]);
   const rows = useMemo(() => buildMeasurementRows(summary, scaleToMeters), [summary, scaleToMeters]);
@@ -78,6 +80,29 @@ export default function DxfTakeoffModal({
   }, []);
 
   const handleError = useCallback((message) => setLoadError(message), []);
+
+  // Séparateur redimensionnable entre l'aperçu (gauche) et la liste (droite).
+  const startResize = (event) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = rightWidth;
+    const container = mainRef.current;
+    const maxWidth = Math.max(320, (container ? container.clientWidth : 1400) - 380);
+    const onMove = (moveEvent) => {
+      const next = startWidth - (moveEvent.clientX - startX);
+      setRightWidth(Math.min(Math.max(320, next), maxWidth));
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
 
   // Clic sur un objet de l'aperçu : isole son calque (vide = affiche tout) et cible la liste
   const handlePickLayer = useCallback((layer) => {
@@ -218,19 +243,30 @@ export default function DxfTakeoffModal({
           </div>
         )}
 
-        <main className="grid flex-1 min-h-0 grid-cols-[minmax(0,1fr)_minmax(360px,34%)]">
-          <DxfViewerPanel file={file} isolatedLayer={isolatedLayer} onLoaded={handleLoaded} onError={handleError} onPickLayer={handlePickLayer} />
-          <DxfMappingPanel
-            summary={summary}
-            projectItems={projectItems}
-            mappings={mappings}
-            onMappingsChange={setMappings}
-            scaleToMeters={scaleToMeters}
-            onScaleChange={setScaleToMeters}
-            isolatedLayer={isolatedLayer}
-            onIsolateLayer={setIsolatedLayer}
-            pick={pick}
+        <main ref={mainRef} className="flex flex-1 min-h-0">
+          <div className="min-w-0 flex-1">
+            <DxfViewerPanel file={file} isolatedLayer={isolatedLayer} onLoaded={handleLoaded} onError={handleError} onPickLayer={handlePickLayer} />
+          </div>
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            onPointerDown={startResize}
+            title="Glisser pour redimensionner"
+            className="w-1.5 shrink-0 cursor-col-resize bg-gray-200 transition-colors hover:bg-blue-400"
           />
+          <div className="min-h-0 shrink-0" style={{ width: `${rightWidth}px` }}>
+            <DxfMappingPanel
+              summary={summary}
+              projectItems={projectItems}
+              mappings={mappings}
+              onMappingsChange={setMappings}
+              scaleToMeters={scaleToMeters}
+              onScaleChange={setScaleToMeters}
+              isolatedLayer={isolatedLayer}
+              onIsolateLayer={setIsolatedLayer}
+              pick={pick}
+            />
+          </div>
         </main>
 
         {/* pr-20 : dégage le coin bas-droite occupé par le FAB feedback (z-9998, fixe viewport) */}

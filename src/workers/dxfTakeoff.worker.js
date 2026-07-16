@@ -1,12 +1,21 @@
 import DxfParser from 'dxf-viewer/src/parser/DxfParser.js';
 import { DxfScene } from 'dxf-viewer/src/DxfScene.js';
 import opentype from 'opentype.js';
-import { aggregateDxfTakeoff } from '../utils/takeoff/dxfTakeoff';
+import { aggregateDxfTakeoff, HATCH_RENDER_LAYER } from '../utils/takeoff/dxfTakeoff';
 import {
   computeLayoutPaperBounds,
   createPaperSpaceDxf,
   scanDxfStructure,
 } from '../utils/takeoff/dxfLayouts';
+
+// dxf-viewer émet un console.warn pour CHAQUE entité HATCH dont il ne sait pas convertir
+// les contours (types de boucles non implémentés). Ces hachures sont simplement ignorées au
+// rendu (et le métré n'utilise jamais les HATCH) → on filtre ce message pour éviter le flood.
+const originalWarn = console.warn.bind(console);
+console.warn = (...args) => {
+  if (typeof args[0] === 'string' && args[0].includes('HATCH entity with empty boundary loops')) return;
+  originalWarn(...args);
+};
 
 const SIGNATURE = 'DxfWorkerMsg';
 const LOAD = 'LOAD';
@@ -78,6 +87,48 @@ function removeInvalidHatches(dxf) {
   return skipped;
 }
 
+// dxf-viewer (_FilterEntity) masque les calques GELÉS et les entités cachées, alors que le
+// métré les compte. On les révèle pour que l'aperçu corresponde au métré.
+function revealHiddenGeometry(dxf) {
+  let unfrozen = 0;
+  const layers = dxf?.tables?.layer?.layers;
+  if (layers) {
+    for (const layer of Object.values(layers)) {
+      if (layer && layer.frozen) { layer.frozen = false; unfrozen += 1; }
+    }
+  }
+  const unhide = (entities) => {
+    for (const entity of entities || []) {
+      if (entity && entity.hidden) entity.hidden = false;
+    }
+  };
+  unhide(dxf.entities);
+  for (const block of Object.values(dxf.blocks || {})) unhide(block.entities);
+  return unfrozen;
+}
+
+// Regroupe les aplats pleins (HATCH/SOLID) sur un calque de rendu dédié pour pouvoir les
+// masquer sans cacher le texte (rendu aussi en Mesh). Ajoute ce calque à la table pour que
+// dxf-viewer l'instancie réellement (sinon les objets retombent sur le calque « 0 »).
+function retagFillLayers(dxf) {
+  const layers = dxf.tables?.layer?.layers;
+  if (layers && !layers[HATCH_RENDER_LAYER]) {
+    layers[HATCH_RENDER_LAYER] = {
+      name: HATCH_RENDER_LAYER, frozen: false, visible: true, color: 0x9aa0a6, colorIndex: 8,
+    };
+  }
+  // Aplats de niveau supérieur → calque de rendu dédié (masquables via le bouton « Hachures »).
+  for (const entity of dxf.entities || []) {
+    if (entity && (entity.type === 'HATCH' || entity.type === 'SOLID')) entity.layer = HATCH_RENDER_LAYER;
+  }
+  // Dans les blocs, l'INSERT impose SON calque aux entités (dxf-viewer, cf. _CreateObjects) → le
+  // retag est inopérant. On SUPPRIME donc les HATCH des définitions de blocs (gros aplats
+  // instanciés, jamais métrés) ; les SOLID (petits symboles remplis) sont conservés.
+  for (const block of Object.values(dxf.blocks || {})) {
+    if (block.entities) block.entities = block.entities.filter((entity) => entity?.type !== 'HATCH');
+  }
+}
+
 function addSceneTransfers(scene, transfers) {
   transfers.push(scene.vertices, scene.indices, scene.transforms);
 }
@@ -120,6 +171,8 @@ self.onmessage = async (event) => {
       const { dxf, structure } = await fetchDxf(url, options.fileEncoding, message.seq);
       const takeoffSummary = aggregateDxfTakeoff(dxf, structure.rawEntityCounts);
       takeoffSummary.metadata.invalidHatchesSkipped = removeInvalidHatches(dxf);
+      takeoffSummary.metadata.unfrozenLayers = revealHiddenGeometry(dxf);
+      retagFillLayers(dxf);
       sendProgress(message.seq, 'prepare', 0, null);
 
       const fontFetchers = createFontFetchers(fonts, message.seq);

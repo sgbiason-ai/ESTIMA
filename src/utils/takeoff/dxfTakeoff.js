@@ -29,6 +29,11 @@ export const METRIC_LABELS = Object.freeze({
   count: { label: 'Comptage', unit: 'u' },
 });
 
+// Calque de rendu synthétique où l'on regroupe les aplats pleins (HATCH/SOLID) pour pouvoir
+// les masquer isolément, sans toucher au texte (lui aussi rendu en Mesh par dxf-viewer).
+// Jamais métré (le retag a lieu APRÈS l'agrégation, et measureEntity ignore HATCH/SOLID).
+export const HATCH_RENDER_LAYER = '__ESTIMA_HATCH__';
+
 const finite = (value, fallback = 0) => {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;

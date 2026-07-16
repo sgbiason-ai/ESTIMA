@@ -1,4 +1,5 @@
 import { OrthographicCamera } from 'three';
+import { HATCH_RENDER_LAYER } from '../../utils/takeoff/dxfTakeoff';
 
 const SIGNATURE = 'DxfWorkerMsg';
 
@@ -134,24 +135,27 @@ export function paperRectToCanvas(
   };
 }
 
-function setLayerVisibility(viewer, isolatedLayer, frozenLayers = []) {
+function setLayerVisibility(viewer, isolatedLayer, frozenLayers = [], hideFills = false) {
   const frozen = new Set(frozenLayers);
   for (const [name, layer] of viewer.layers || []) {
-    const visible = (!isolatedLayer || name === isolatedLayer) && !frozen.has(name);
-    for (const object of layer.objects || []) object.visible = visible;
+    // On masque UNIQUEMENT le calque de rendu des aplats (HATCH/SOLID), pas tous les Mesh :
+    // le texte est aussi rendu en Mesh et doit rester visible.
+    const hidden = frozen.has(name) || (hideFills && name === HATCH_RENDER_LAYER);
+    const layerVisible = (!isolatedLayer || name === isolatedLayer) && !hidden;
+    for (const object of layer.objects || []) object.visible = layerVisible;
   }
 }
 
-export function renderModelView(viewer, isolatedLayer) {
+export function renderModelView(viewer, isolatedLayer, hideFills = false) {
   const renderer = viewer?.GetRenderer();
   if (!renderer) return;
   renderer.setScissorTest(false);
   renderer.setViewport(0, 0, viewer.canvasWidth, viewer.canvasHeight);
-  setLayerVisibility(viewer, isolatedLayer);
+  setLayerVisibility(viewer, isolatedLayer, [], hideFills);
   viewer.Render();
 }
 
-export function renderLayoutViewports(modelViewer, paperViewer, layout, isolatedLayer) {
+export function renderLayoutViewports(modelViewer, paperViewer, layout, isolatedLayer, hideFills = false) {
   const renderer = modelViewer?.GetRenderer();
   const modelScene = modelViewer?.GetScene();
   const paperScene = paperViewer?.GetScene();
@@ -179,7 +183,7 @@ export function renderLayoutViewports(modelViewer, paperViewer, layout, isolated
     );
     if (!rect || viewport.viewHeight <= 0 || viewport.paperSize.height <= 0) continue;
 
-    setLayerVisibility(modelViewer, isolatedLayer, viewport.frozenLayers);
+    setLayerVisibility(modelViewer, isolatedLayer, viewport.frozenLayers, hideFills);
     const viewWidth = viewport.viewHeight * (viewport.paperSize.width / viewport.paperSize.height);
     const camera = new OrthographicCamera(
       -viewWidth / 2,
@@ -231,5 +235,5 @@ export function renderLayoutViewports(modelViewer, paperViewer, layout, isolated
   renderer.autoClear = false;
   renderer.render(paperScene, paperCamera);
   renderer.autoClear = autoClear;
-  setLayerVisibility(modelViewer, isolatedLayer);
+  setLayerVisibility(modelViewer, isolatedLayer, [], hideFills);
 }

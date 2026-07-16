@@ -3,7 +3,7 @@ import React, {
 } from 'react';
 import PropTypes from 'prop-types';
 import {
-  AlertTriangle, Crosshair, Eye, Loader2, MousePointer2, X,
+  AlertTriangle, Crosshair, Eye, Hash, Loader2, MousePointer2, X,
 } from 'lucide-react';
 import { Color, Vector3 } from 'three';
 import { DxfViewer } from 'dxf-viewer';
@@ -60,6 +60,7 @@ export default function DxfViewerPanel({
   const [activeLayoutId, setActiveLayoutId] = useState('model');
   const [isPanning, setIsPanning] = useState(false);
   const [hover, setHover] = useState(null);
+  const [hideFills, setHideFills] = useState(true);
 
   const activeLayout = useMemo(
     () => layouts.find((layout) => layout.id === activeLayoutId) || null,
@@ -75,11 +76,12 @@ export default function DxfViewerPanel({
         paperViewerRef.current,
         activeLayout,
         isolatedLayer,
+        hideFills,
       );
     } else {
-      renderModelView(modelViewer, isolatedLayer);
+      renderModelView(modelViewer, isolatedLayer, hideFills);
     }
-  }, [activeLayout, isolatedLayer]);
+  }, [activeLayout, isolatedLayer, hideFills]);
 
   useEffect(() => {
     renderActiveRef.current = renderActive;
@@ -567,6 +569,14 @@ export default function DxfViewerPanel({
             className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white/90 px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm backdrop-blur hover:bg-white"
           >
             <Crosshair size={15} /> Cadrer
+          </button>
+          <button
+            type="button"
+            onClick={() => setHideFills((value) => !value)}
+            title={hideFills ? 'Afficher les hachures / aplats' : 'Masquer les hachures / aplats'}
+            className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold shadow-sm backdrop-blur ${hideFills ? 'border-gray-200 bg-white/90 text-gray-400 hover:bg-white' : 'border-blue-200 bg-blue-50/95 text-blue-700'}`}
+          >
+            <Hash size={15} /> Hachures
           </button>
           {isolatedLayer && (
             <button
