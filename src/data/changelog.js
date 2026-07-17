@@ -8,10 +8,11 @@ export { APP_VERSION } from './appVersion';
 
 export const CHANGELOG = [
   {
-    version: '3.11.0',
-    date: '2026-07-16',
+    version: '3.11.1',
+    date: '2026-07-17',
     title: 'Partage et propriété des modules terrain',
     highlights: [
+      'Métré DXF — correction du chargement sur la version déployée : la politique de sécurité autorise désormais les fichiers locaux transmis au worker DXF, et le script de secours au démarrage est chargé sans enfreindre la CSP',
       'Métré DXF — les surfaces réalisées sont maintenant remplies avec la couleur propre à leur métré à 25 % d’opacité, tout en conservant un contour opaque en surépaisseur ; l’œil de la ligne masque ou réaffiche les deux éléments ensemble',
       'Métré DXF — chaque famille de réseau propose désormais 8 nuances coordonnées, présentées et attribuées de la plus claire à la plus foncée : plusieurs métrés d’un même réseau restent conformes à sa couleur métier tout en étant immédiatement différenciables sur le plan. Les métrés existants sont redistribués automatiquement par famille et les choix manuels restent prioritaires',
       'Métré DXF — la palette par métré distingue désormais les couleurs métier des réseaux (électricité rouge, gaz jaune, chimie orange, AEP bleu, assainissement/pluvial marron, chauffage violet, télécom vert, multiréseaux rose) et une gamme « Autres » ; le choix est suggéré automatiquement depuis le libellé DQE, sans couleur blanche « zone de travaux »',
