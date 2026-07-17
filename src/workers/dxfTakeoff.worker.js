@@ -17,6 +17,13 @@ console.warn = (...args) => {
   originalWarn(...args);
 };
 
+// Rev à incrémenter quand le CSP (firebase.json) change d'une façon qui concerne
+// ce worker : le fichier buildé est servi immutable 1 an et un worker prend son
+// CSP des headers de SA réponse — sans nouveau hash, les clients gardent
+// l'ancien CSP en cache HTTP et fetch(blob:) reste bloqué. Doit être du code
+// effectif (un commentaire seul est strippé par le minifier → hash inchangé).
+self.__DXF_WORKER_REV = 2;
+
 const SIGNATURE = 'DxfWorkerMsg';
 const LOAD = 'LOAD';
 const PROGRESS = 'PROGRESS';

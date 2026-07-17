@@ -41,7 +41,9 @@ Ownership `user_id==auth.uid`, isolation multi-tenant (jamais croiser `projectId
 | Vite cache path après refactor | relancer `npm run dev` |
 | Tab S10 FE force « site desktop » | `useDeviceMode` (touch+width) + override |
 | CSP `connect-src` sans `blob:` → worker DXF `fetch(blob:)` bloqué (« violates CSP », DXF ne charge pas) | header dans `firebase.json` ; `blob:` requis pour le worker |
-| Changement de **header** (CSP…) invisible aux clients PWA : SW Workbox re-précache `index.html` sur la révision du **corps**, pas des headers → ancien header figé | navigations en **NetworkFirst** (`html-shell`, `navigateFallback: undefined`) ; sinon vider cache/SW. Nécessite rebuild+deploy hosting |
+| Changement de **header** (CSP…) invisible aux clients PWA : SW Workbox re-précache `index.html` sur la révision du **corps**, pas des headers → ancien header figé | navigations en **NetworkFirst** (`html-shell`, `navigateFallback: undefined`, `fetchOptions: cache no-store`) + shell HTML (`/`, `/index.html`) en no-store dans `firebase.json`. Nécessite rebuild+deploy hosting |
+| CSP d'un **worker** = headers de **SA** réponse HTTP (pas du document) ; assets servis `immutable` 1 an → un changement de CSP n'atteint **jamais** un worker au hash inchangé (cache HTTP client, pas de 304, le 304 Firebase omet le CSP de toute façon) | incrémenter `self.__DXF_WORKER_REV` dans `dxfTakeoff.worker.js` (code effectif — un commentaire est strippé par le minifier → hash inchangé) → nouveau hash → URL neuve |
+| `firebase.json` headers : la **dernière** règle matchante gagne (même clé) ; `**/*.js` immutable écrasait le no-store de `/sw.js`+`/startup-failsafe.js` | règles spécifiques (no-store) **après** la règle générale immutable |
 
 ## Modules
 | Module | Statut | Note · Stockage |

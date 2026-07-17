@@ -80,6 +80,10 @@ export default defineConfig({
             options: {
               cacheName: 'html-shell',
               networkTimeoutSeconds: 3,
+              // Bypass du cache HTTP : sans ça, fetch() peut resservir un
+              // index.html HTTP-caché avec de VIEUX headers (CSP) pendant
+              // max-age. Le repli offline reste assuré par le cache SW.
+              fetchOptions: { cache: 'no-store' },
               expiration: { maxEntries: 8, maxAgeSeconds: 60 * 60 * 24 * 7 },
               cacheableResponse: { statuses: [0, 200] },
             },
