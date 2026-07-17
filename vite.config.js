@@ -61,11 +61,29 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 Mo
         skipWaiting: true,
         clientsClaim: true,
-        // Exclut les requêtes Firestore du cache SW
-        navigateFallbackDenylist: [/^\/__(\/|$)/],
-        // Ne pas intercepter les requêtes Firestore / APIs externes
-        navigateFallback: '/index.html',
+        // Désactive la NavigationRoute précachée (default vite-plugin-pwa =
+        // 'index.html') qui figeait l'ancien header CSP. Les navigations
+        // passent par la règle NetworkFirst 'html-shell' ci-dessous.
+        navigateFallback: undefined,
         runtimeCaching: [
+          {
+            // Navigations (shell HTML) : réseau d'abord, pour que les
+            // changements de headers (CSP…) et d'index.html atteignent les
+            // clients PWA sans vidage de cache manuel. Hors-ligne, fetch échoue
+            // vite → repli cache quasi-instantané (networkTimeout ne mord que
+            // sur réseau lent). Exclut /__ (auth Firebase, Firestore), jamais
+            // mis en cache. Remplace navigateFallback précaché, qui figeait
+            // l'ancien header CSP côté clients PWA.
+            urlPattern: ({ request, url }) =>
+              request.mode === 'navigate' && !url.pathname.startsWith('/__'),
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'html-shell',
+              networkTimeoutSeconds: 3,
+              expiration: { maxEntries: 8, maxAgeSeconds: 60 * 60 * 24 * 7 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
           {
             // Cache les fonts Google
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

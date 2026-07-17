@@ -40,6 +40,8 @@ Ownership `user_id==auth.uid`, isolation multi-tenant (jamais croiser `projectId
 | Doc >1 Mo (anciennes photos base64) | photos CRC+visites déjà sur Storage ; reste à ré-optimiser les vieilles base64 (bouton comme CRC) |
 | Vite cache path après refactor | relancer `npm run dev` |
 | Tab S10 FE force « site desktop » | `useDeviceMode` (touch+width) + override |
+| CSP `connect-src` sans `blob:` → worker DXF `fetch(blob:)` bloqué (« violates CSP », DXF ne charge pas) | header dans `firebase.json` ; `blob:` requis pour le worker |
+| Changement de **header** (CSP…) invisible aux clients PWA : SW Workbox re-précache `index.html` sur la révision du **corps**, pas des headers → ancien header figé | navigations en **NetworkFirst** (`html-shell`, `navigateFallback: undefined`) ; sinon vider cache/SW. Nécessite rebuild+deploy hosting |
 
 ## Modules
 | Module | Statut | Note · Stockage |
