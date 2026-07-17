@@ -19,6 +19,13 @@ import {
   hitTestEntities,
 } from '../components/takeoff/dxfEntityPicking';
 import {
+  assignMissingMeasurementColors,
+  NETWORK_MEASUREMENT_PALETTES,
+  OTHER_MEASUREMENT_COLORS,
+  nextMeasurementColor,
+  suggestMeasurementColor,
+} from '../components/takeoff/measurementColors';
+import {
   applyTakeoffToProject,
   flattenProjectItems,
   isUnitCompatible,
@@ -165,6 +172,45 @@ describe('métré DXF — sélection d’éléments', () => {
     })]);
   });
 
+  it('attribue des nuances distinctes dans chaque famille de réseau', () => {
+    const existing = [
+      { id: 's1', highlightColor: OTHER_MEASUREMENT_COLORS[0].color },
+      { id: 's2', highlightColor: OTHER_MEASUREMENT_COLORS[1].color },
+    ];
+    expect(nextMeasurementColor(existing)).toBe(OTHER_MEASUREMENT_COLORS[2].color);
+
+    const migrated = assignMissingMeasurementColors([
+      { id: 's1', label: 'Canalisation AEP principale' },
+      { id: 's2', label: 'Branchement AEP secondaire', highlightColor: '#123456' },
+      { id: 's3', label: 'Réseau EU', highlightColor: '#abcdef', colorLocked: true },
+    ]);
+    const aep = NETWORK_MEASUREMENT_PALETTES.find((palette) => palette.id === 'eau_potable');
+    const assainissement = NETWORK_MEASUREMENT_PALETTES.find((palette) => palette.id === 'assainissement');
+    const telecom = NETWORK_MEASUREMENT_PALETTES.find((palette) => palette.id === 'telecom');
+
+    expect(migrated[0].highlightColor).toBe(aep.colors[0]);
+    expect(migrated[1].highlightColor).toBe(aep.colors[1]);
+    expect(migrated[2].highlightColor).toBe('#abcdef');
+    expect(suggestMeasurementColor('Canalisation AEP')).toBe(aep.colors[0]);
+    expect(suggestMeasurementColor('Réseau EU')).toBe(assainissement.colors[0]);
+    expect(suggestMeasurementColor('Fourreau fibre TBT')).toBe(telecom.colors[0]);
+  });
+
+  it('ordonne chaque gamme réseau de la nuance la plus claire à la plus foncée', () => {
+    const brightness = (color) => {
+      const value = Number.parseInt(color.slice(1), 16);
+      const red = value >> 16;
+      const green = (value >> 8) & 255;
+      const blue = value & 255;
+      return (red * 299 + green * 587 + blue * 114) / 1000;
+    };
+
+    for (const palette of NETWORK_MEASUREMENT_PALETTES) {
+      const levels = palette.colors.map(brightness);
+      expect(levels, palette.label).toEqual([...levels].sort((a, b) => b - a));
+    }
+  });
+
   it('retrouve l’entité la plus proche du clic (grille + tolérance + isolation)', () => {
     const index = buildEntityIndex(dxf);
     const grid = buildEntityGrid(index);
@@ -281,7 +327,12 @@ describe('métré DXF — sélection d’éléments', () => {
 
     const buffers = buildHighlightBuffers(index, ['A1', '#2'], { x: 1, y: 1 });
     expect(Array.from(buffers.linePositions)).toEqual([-1, -1, 0, 2, 3, 0]);
+    expect(buffers.fillPositions).toHaveLength(0);
     expect(Array.from(buffers.markerPositions)).toEqual([4, 4, 0]);
+
+    const surfaceBuffers = buildHighlightBuffers(index, ['#1'], { x: 0, y: 0 });
+    expect(surfaceBuffers.fillPositions).toHaveLength(18); // rectangle = 2 triangles
+    expect(Array.from(surfaceBuffers.markerPositions)).toEqual([]);
   });
 });
 

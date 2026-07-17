@@ -3,6 +3,7 @@
 // le panneau d'aperçu fait les conversions écran ↔ monde ↔ origine. Fonctions pures.
 
 import { entityLookup } from '../../utils/takeoff/dxfTakeoff';
+import { ShapeUtils, Vector2 } from 'three';
 
 const GRID_DIM = 256; // grille spatiale ~256×256 cellules sur l'étendue du plan
 const GRID_KEY_STRIDE = 4096;
@@ -235,11 +236,16 @@ export function collectEntityBounds(index, entityIds) {
 
 /**
  * Buffers de surlignage Three.js (positions xyz) pour une liste d'entités :
- * segments pour les contours, marqueurs pour les entités ponctuelles (blocs, points).
+ * segments pour les contours, triangles pour les surfaces et marqueurs pour les entités
+ * ponctuelles (blocs, points).
  * `viewerOrigin` = origine de la scène dxf-viewer (les positions rendues y sont relatives).
  */
 export function buildHighlightBuffers(index, entityIds, viewerOrigin = { x: 0, y: 0 }) {
-  const empty = { linePositions: new Float32Array(0), markerPositions: new Float32Array(0) };
+  const empty = {
+    linePositions: new Float32Array(0),
+    fillPositions: new Float32Array(0),
+    markerPositions: new Float32Array(0),
+  };
   const lookup = entityLookup(index);
   if (!lookup) return empty;
   const shiftX = index.origin.x - (viewerOrigin.x || 0);
@@ -247,6 +253,7 @@ export function buildHighlightBuffers(index, entityIds, viewerOrigin = { x: 0, y
   const points = index.points;
   const offsets = index.pointOffsets;
   const lines = [];
+  const fills = [];
   const markers = [];
   for (const entityId of entityIds || []) {
     const rank = lookup.get(entityId);
@@ -257,6 +264,21 @@ export function buildHighlightBuffers(index, entityIds, viewerOrigin = { x: 0, y
       markers.push(points[start * 2] + shiftX, points[start * 2 + 1] + shiftY, 0);
       continue;
     }
+    if (index.areas[rank] > 0 && end - start >= 4) {
+      const contour = [];
+      // Le dernier point des contours fermés répète le premier : Three.js attend un anneau
+      // sans doublon terminal pour produire une triangulation stable.
+      const last = end - 1;
+      const duplicateEnd = points[start * 2] === points[last * 2]
+        && points[start * 2 + 1] === points[last * 2 + 1];
+      const contourEnd = duplicateEnd ? last : end;
+      for (let pair = start; pair < contourEnd; pair += 1) {
+        contour.push(new Vector2(points[pair * 2] + shiftX, points[pair * 2 + 1] + shiftY));
+      }
+      for (const triangle of ShapeUtils.triangulateShape(contour, [])) {
+        for (const vertex of triangle) fills.push(vertex.x, vertex.y, 0);
+      }
+    }
     for (let pair = start; pair + 1 < end; pair += 1) {
       lines.push(
         points[pair * 2] + shiftX, points[pair * 2 + 1] + shiftY, 0,
@@ -264,5 +286,9 @@ export function buildHighlightBuffers(index, entityIds, viewerOrigin = { x: 0, y
       );
     }
   }
-  return { linePositions: Float32Array.from(lines), markerPositions: Float32Array.from(markers) };
+  return {
+    linePositions: Float32Array.from(lines),
+    fillPositions: Float32Array.from(fills),
+    markerPositions: Float32Array.from(markers),
+  };
 }

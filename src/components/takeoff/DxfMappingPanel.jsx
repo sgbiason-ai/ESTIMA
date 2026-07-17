@@ -8,6 +8,7 @@ import {
 import { METRIC_LABELS } from '../../utils/takeoff/dxfTakeoff';
 import { isUnitCompatible, takeoffGeoSpec, takeoffConversionFactor } from '../../utils/takeoff/applyTakeoff';
 import { toast } from '../../utils/globalUI';
+import { MEASUREMENT_COLOR_GROUPS } from './measurementColors';
 
 const formatQuantity = (value) => Number(value || 0).toLocaleString('fr-FR', {
   maximumFractionDigits: 3,
@@ -94,6 +95,7 @@ export default function DxfMappingPanel({
   adjustments = {},
   onAdjustmentChange = () => {},
   onToggleSelectionVisibility = () => {},
+  onSelectionColorChange = () => {},
   onCreateMeasurement = () => {},
 }) {
   const [search, setSearch] = useState('');
@@ -104,6 +106,7 @@ export default function DxfMappingPanel({
   const [layersHeight, setLayersHeight] = useState(58);
   const [createOpen, setCreateOpen] = useState(false);
   const [draft, setDraft] = useState({ itemId: '', label: '', metric: 'length', unit: 'ml' });
+  const [colorPickerRowId, setColorPickerRowId] = useState('');
   const listRef = useRef(null);
   const splitRef = useRef(null);
   // Lignes (sélections puis calques) construites et ajustées par le parent (source unique).
@@ -329,7 +332,7 @@ export default function DxfMappingPanel({
             if (isEditing) rowTone = 'border-orange-400 bg-orange-50 ring-2 ring-orange-300';
 
             return (
-              <div key={row.id} data-dxf-row-layer={isSelection ? undefined : row.layer} className={`rounded-xl border p-2 transition-colors ${rowTone}`}>
+              <div key={row.id} data-dxf-row-layer={isSelection ? undefined : row.layer} className={`relative rounded-xl border p-2 transition-colors ${rowTone}`}>
                 <div className="flex items-start gap-1.5">
                   {!isManual && <button
                     type="button"
@@ -344,6 +347,71 @@ export default function DxfMappingPanel({
                   >
                     {(isSelection ? highlightHidden : isolatedLayer === row.layer) ? <EyeOff size={13} /> : <Eye size={13} />}
                   </button>}
+                  {isSelection && (
+                    <div className="relative mt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setColorPickerRowId((current) => (current === row.id ? '' : row.id))}
+                        title="Modifier la couleur de ce métré"
+                        aria-label={`Couleur du métré ${row.layer}`}
+                        className="h-[21px] w-[21px] rounded-md border-2 border-white shadow-sm ring-1 ring-gray-200 transition-transform hover:scale-110"
+                        style={{ backgroundColor: row.highlightColor || '#f97316' }}
+                      />
+                      {colorPickerRowId === row.id && (
+                        <div
+                          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20 p-4 backdrop-blur-sm"
+                          onClick={() => setColorPickerRowId('')}
+                          role="presentation"
+                        >
+                          <div
+                            className="max-h-[min(620px,85vh)] w-full max-w-sm space-y-2 overflow-y-auto rounded-3xl border border-gray-200 bg-white p-4 shadow-2xl"
+                            onClick={(event) => event.stopPropagation()}
+                            role="dialog"
+                            aria-modal="true"
+                            aria-label={`Couleur du métré ${row.layer}`}
+                          >
+                          <div className="flex items-center justify-between gap-2 border-b border-gray-100 pb-2">
+                            <div>
+                              <p className="text-xs font-bold text-gray-900">Couleur du métré</p>
+                              <p className="max-w-[220px] truncate text-[10px] text-gray-500">{row.layer}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onSelectionColorChange(row.selectionId, '');
+                                setColorPickerRowId('');
+                              }}
+                              className="rounded-md bg-gray-100 px-2 py-1 text-[9px] font-bold text-gray-600 hover:bg-gray-200"
+                            >
+                              Couleur auto
+                            </button>
+                          </div>
+                          {MEASUREMENT_COLOR_GROUPS.map((group) => (
+                            <div key={group.id}>
+                              <p className={`mb-1 text-[9px] font-bold uppercase tracking-wide ${group.isNetwork ? 'text-blue-700' : 'text-gray-400'}`}>{group.label}</p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {group.options.map((option) => (
+                                  <button
+                                    key={option.color}
+                                    type="button"
+                                    onClick={() => {
+                                      onSelectionColorChange(row.selectionId, option.color);
+                                      setColorPickerRowId('');
+                                    }}
+                                    aria-label={`Choisir ${option.label}`}
+                                    title={option.label}
+                                    className={`h-7 w-7 rounded-lg border-2 transition-transform hover:scale-110 ${row.highlightColor === option.color ? 'border-gray-900' : 'border-white'}`}
+                                    style={{ backgroundColor: option.color }}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="min-w-0 flex-1">
                     {isSelection ? (
                       // Nom éditable en place : Entrée/blur = renommer, Échap = annuler.
@@ -627,5 +695,6 @@ DxfMappingPanel.propTypes = {
   adjustments: PropTypes.object,
   onAdjustmentChange: PropTypes.func,
   onToggleSelectionVisibility: PropTypes.func,
+  onSelectionColorChange: PropTypes.func,
   onCreateMeasurement: PropTypes.func,
 };

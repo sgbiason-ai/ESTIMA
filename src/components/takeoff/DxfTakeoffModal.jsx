@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import DxfViewerPanel from './DxfViewerPanel';
 import DxfMappingPanel from './DxfMappingPanel';
+import { assignMissingMeasurementColors, suggestMeasurementColor } from './measurementColors';
 import {
   applyRowAdjustments, buildMeasurementRows, buildSelectionRows, measureSelection, METRIC_LABELS,
 } from '../../utils/takeoff/dxfTakeoff';
@@ -55,7 +56,6 @@ export default function DxfTakeoffModal({
   const [focusEntities, setFocusEntities] = useState({ ids: [], nonce: 0 });
   // Corrections manuelles (+/−) par ligne : rowId → delta dans l'unité de la métrique.
   const [adjustments, setAdjustments] = useState({});
-  const [measurementHighlightColor, setMeasurementHighlightColor] = useState('#f97316');
 
   const projectItems = useMemo(() => flattenProjectItems(project?.chapters), [project?.chapters]);
   const rows = useMemo(() => applyRowAdjustments([
@@ -225,6 +225,7 @@ export default function DxfTakeoffModal({
       id: `sel_${Date.now().toString(36)}`,
       label: `${prefix} ${number}`,
       metric: selectionMode,
+      highlightColor: suggestMeasurementColor(`${prefix} ${number}`, entitySelections),
       ...snapshot,
       createdAt: new Date().toISOString(),
     };
@@ -247,9 +248,16 @@ export default function DxfTakeoffModal({
   const handleRenameSelection = useCallback((selectionId, label) => {
     const cleaned = String(label || '').trim().slice(0, 80);
     if (!cleaned) return;
-    setEntitySelections((previous) => previous.map((selection) => (
-      selection.id === selectionId ? { ...selection, label: cleaned } : selection
-    )));
+    setEntitySelections((previous) => previous.map((selection) => {
+      if (selection.id !== selectionId) return selection;
+      return {
+        ...selection,
+        label: cleaned,
+        highlightColor: selection.colorLocked
+          ? selection.highlightColor
+          : suggestMeasurementColor(cleaned, previous.filter((item) => item.id !== selectionId)),
+      };
+    }));
   }, []);
 
   const handleCreateManualMeasurement = useCallback(({ label, metric, unit, itemId }) => {
@@ -261,6 +269,7 @@ export default function DxfTakeoffModal({
       metric,
       unit,
       isManual: true,
+      highlightColor: suggestMeasurementColor(label, previous),
       entityIds: [],
       rawLength: 0,
       rawArea: 0,
@@ -314,6 +323,22 @@ export default function DxfTakeoffModal({
     setPreviewSelectionId((current) => (current === selectionId ? '' : current));
   }, []);
 
+  const handleSelectionColorChange = useCallback((selectionId, highlightColor) => {
+    setEntitySelections((previous) => previous.map((selection) => {
+      if (selection.id !== selectionId) return selection;
+      return highlightColor
+        ? { ...selection, highlightColor, colorLocked: true }
+        : {
+          ...selection,
+          highlightColor: suggestMeasurementColor(
+            selection.label,
+            previous.filter((item) => item.id !== selectionId),
+          ),
+          colorLocked: false,
+        };
+    }));
+  }, []);
+
   const highlightedEntityIds = useMemo(() => {
     const ids = selectionMode ? [...selectedEntityIds] : [];
     if (previewSelectionId) {
@@ -324,11 +349,13 @@ export default function DxfTakeoffModal({
     }
     return ids;
   }, [selectionMode, selectedEntityIds, previewSelectionId, entitySelections]);
-  const measuredEntityIds = useMemo(() => Array.from(new Set(
-    entitySelections.flatMap((selection) => (
-      selection.highlightHidden ? [] : (selection.entityIds || [])
-    )),
-  )), [entitySelections]);
+  const measuredEntityGroups = useMemo(() => entitySelections
+    .filter((selection) => !selection.highlightHidden && (selection.entityIds || []).length > 0)
+    .map((selection) => ({
+      id: selection.id,
+      color: selection.highlightColor || '#f97316',
+      entityIds: selection.entityIds || [],
+    })), [entitySelections]);
 
   // Rechargement du FICHIER au montage (IndexedDB local → réouverture instantanée + F5).
   useEffect(() => {
@@ -361,9 +388,10 @@ export default function DxfTakeoffModal({
       if (saved.mappings) setMappings(saved.mappings);
       if (saved.scaleToMeters) setScaleToMeters(saved.scaleToMeters);
       if (saved.applyMode) setApplyMode(saved.applyMode);
-      if (Array.isArray(saved.selections)) setEntitySelections(saved.selections);
+      if (Array.isArray(saved.selections)) {
+        setEntitySelections(assignMissingMeasurementColors(saved.selections));
+      }
       if (saved.adjustments) setAdjustments(saved.adjustments);
-      if (saved.measurementHighlightColor) setMeasurementHighlightColor(saved.measurementHighlightColor);
     }
 
     const trancheKey = targetTrancheId || 'global';
@@ -406,18 +434,16 @@ export default function DxfTakeoffModal({
     const timer = setTimeout(() => {
       saveAssociations(dxfKey, {
         mappings, scaleToMeters, applyMode, selections: entitySelections, adjustments,
-        measurementHighlightColor,
       }).catch(() => {});
     }, 1000);
     return () => clearTimeout(timer);
-  }, [dxfKey, mappings, scaleToMeters, applyMode, entitySelections, adjustments, measurementHighlightColor, saveAssociations]);
+  }, [dxfKey, mappings, scaleToMeters, applyMode, entitySelections, adjustments, saveAssociations]);
 
   const handleClose = async () => {
     if (dxfKey && restoredKeyRef.current === dxfKey) {
       try {
         await saveAssociations(dxfKey, {
           mappings, scaleToMeters, applyMode, selections: entitySelections, adjustments,
-          measurementHighlightColor,
         });
       } catch {
         toast.error('Impossible d’enregistrer les associations DXF. La fenêtre reste ouverte.');
@@ -575,9 +601,7 @@ export default function DxfTakeoffModal({
               selectionMode={selectionMode}
               onSelectionModeChange={handleSelectionModeChange}
               highlightedEntityIds={highlightedEntityIds}
-              measuredEntityIds={measuredEntityIds}
-              measurementHighlightColor={measurementHighlightColor}
-              onMeasurementHighlightColorChange={setMeasurementHighlightColor}
+              measuredEntityGroups={measuredEntityGroups}
               onPickEntity={handlePickEntity}
               selectionSummary={selectionSummary}
               onCreateSelectionRow={handleCommitSelection}
@@ -614,6 +638,7 @@ export default function DxfTakeoffModal({
               previewSelectionId={previewSelectionId}
               onPreviewSelection={handlePreviewSelection}
               onToggleSelectionVisibility={handleToggleSelectionVisibility}
+              onSelectionColorChange={handleSelectionColorChange}
               onCreateMeasurement={handleCreateManualMeasurement}
             />
           </div>

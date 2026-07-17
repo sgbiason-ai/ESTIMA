@@ -3,11 +3,11 @@ import React, {
 } from 'react';
 import PropTypes from 'prop-types';
 import {
-  AlertTriangle, CircleDot, Crosshair, Eye, Hash, Loader2, MousePointer2, Palette, Spline, Square, X,
+  AlertTriangle, CircleDot, Crosshair, Eye, Hash, Loader2, MousePointer2, Spline, Square, X,
 } from 'lucide-react';
 import {
-  BufferGeometry, Color, Float32BufferAttribute, LineBasicMaterial, LineSegments,
-  Points, PointsMaterial, Vector3,
+  BufferGeometry, Color, DoubleSide, Float32BufferAttribute, LineBasicMaterial, LineSegments,
+  Mesh, MeshBasicMaterial, Points, PointsMaterial, Scene, Vector3,
 } from 'three';
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
@@ -29,11 +29,6 @@ import { DXF_TYPE_LABELS, entityLookup } from '../../utils/takeoff/dxfTakeoff';
 
 // Rayon de capture du clic/survol, en pixels écran (converti en unités monde selon le zoom)
 const PICK_TOLERANCE_PX = 12;
-const MEASUREMENT_COLORS = [
-  '#f97316', '#ef4444', '#e11d48', '#db2777', '#9333ea',
-  '#4f46e5', '#2563eb', '#0284c7', '#0891b2', '#0d9488',
-  '#16a34a', '#65a30d', '#ca8a04', '#d97706', '#475569',
-];
 
 const PHASE_LABELS = {
   fetch: 'Lecture du fichier',
@@ -84,8 +79,7 @@ function fitViewer(viewer, bounds, padding = 0.06) {
 export default function DxfViewerPanel({
   file, isolatedLayer, onLoaded, onError, onPickLayer,
   selectionMode = '', onSelectionModeChange = () => {}, highlightedEntityIds = [],
-  measuredEntityIds = [], measurementHighlightColor = '#f97316',
-  onMeasurementHighlightColorChange = () => {},
+  measuredEntityGroups = [],
   onPickEntity = () => {}, selectionSummary = null, onCreateSelectionRow = () => {},
   onClearSelection = () => {}, focusEntities = null, scaleToMeters = 1,
 }) {
@@ -101,6 +95,7 @@ export default function DxfViewerPanel({
   const entityIndexRef = useRef(null);
   const entityGridRef = useRef(null);
   const overlayRef = useRef(null);
+  const fillCanvasRef = useRef(null);
   // Miroir des ids surlignés pour le hit-test (évite de ré-abonner les listeners à chaque clic)
   const highlightedIdsRef = useRef(highlightedEntityIds);
   highlightedIdsRef.current = highlightedEntityIds;
@@ -117,12 +112,66 @@ export default function DxfViewerPanel({
   const [selectionAvailability, setSelectionAvailability] = useState('none');
   // Métriques réellement présentes dans l'index → n'afficher que les modes utiles
   const [metricAvailability, setMetricAvailability] = useState({ length: false, area: false, count: false });
-  const [paletteOpen, setPaletteOpen] = useState(false);
 
   const activeLayout = useMemo(
     () => layouts.find((layout) => layout.id === activeLayoutId) || null,
     [activeLayoutId, layouts],
   );
+
+  const renderMeasuredFills = useCallback((viewer) => {
+    const canvas = fillCanvasRef.current;
+    const container = modelContainerRef.current;
+    const index = entityIndexRef.current;
+    const camera = viewer?.GetCamera?.();
+    const viewerOrigin = viewer?.GetOrigin?.();
+    if (!canvas || !container) return;
+    const width = Math.max(1, container.clientWidth);
+    const height = Math.max(1, container.clientHeight);
+    const ratio = window.devicePixelRatio || 1;
+    if (canvas.width !== Math.round(width * ratio) || canvas.height !== Math.round(height * ratio)) {
+      canvas.width = Math.round(width * ratio);
+      canvas.height = Math.round(height * ratio);
+    }
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.clearRect(0, 0, width, height);
+    if (activeLayout || !index || !camera || !viewerOrigin) return;
+
+    const lookup = entityLookup(index);
+    if (!lookup) return;
+    const shiftX = index.origin.x - (viewerOrigin.x || 0);
+    const shiftY = index.origin.y - (viewerOrigin.y || 0);
+    const point = new Vector3();
+    const toCanvas = (pair) => {
+      point.set(index.points[pair * 2] + shiftX, index.points[pair * 2 + 1] + shiftY, 0);
+      point.project(camera);
+      return { x: ((point.x + 1) / 2) * width, y: ((1 - point.y) / 2) * height };
+    };
+
+    context.save();
+    context.globalAlpha = 0.25;
+    for (const group of measuredEntityGroups || []) {
+      context.fillStyle = group.color;
+      for (const entityId of group.entityIds || []) {
+        const rank = lookup.get(entityId);
+        if (rank == null || index.areas[rank] <= 0) continue;
+        const start = index.pointOffsets[rank];
+        const end = index.pointOffsets[rank + 1];
+        if (end - start < 4) continue;
+        context.beginPath();
+        const first = toCanvas(start);
+        context.moveTo(first.x, first.y);
+        for (let pair = start + 1; pair < end; pair += 1) {
+          const current = toCanvas(pair);
+          context.lineTo(current.x, current.y);
+        }
+        context.closePath();
+        context.fill('evenodd');
+      }
+    }
+    context.restore();
+  }, [activeLayout, measuredEntityGroups]);
 
   const renderActive = useCallback(() => {
     const modelViewer = modelViewerRef.current;
@@ -137,8 +186,22 @@ export default function DxfViewerPanel({
       );
     } else {
       renderModelView(modelViewer, isolatedLayer, hideFills);
+      const overlay = overlayRef.current;
+      const renderer = modelViewer.GetRenderer?.();
+      const camera = modelViewer.GetCamera?.();
+      if (overlay?.fillScene && overlay?.strokeScene && renderer && camera) {
+        // dxf-viewer trie/dessine ses propres lots avec un pipeline non conventionnel.
+        // Les overlays sont donc rendus explicitement après le plan : aplats puis contours.
+        const autoClear = renderer.autoClear;
+        renderer.autoClear = false;
+        renderer.resetState();
+        renderer.render(overlay.strokeScene, camera);
+        renderer.resetState();
+        renderer.autoClear = autoClear;
+      }
+      renderMeasuredFills(modelViewer);
     }
-  }, [activeLayout, isolatedLayer, hideFills]);
+  }, [activeLayout, isolatedLayer, hideFills, renderMeasuredFills]);
 
   useEffect(() => {
     renderActiveRef.current = renderActive;
@@ -168,13 +231,16 @@ export default function DxfViewerPanel({
       sceneOptions: { suppressPaperSpace: true },
     });
     const handleResize = () => requestAnimationFrame(() => renderActiveRef.current?.());
+    const handleViewChanged = () => requestAnimationFrame(() => renderActiveRef.current?.());
     modelViewer.Subscribe('resized', handleResize);
+    modelViewer.Subscribe('viewChanged', handleViewChanged);
     paperViewer.Subscribe('resized', handleResize);
     modelViewerRef.current = modelViewer;
     paperViewerRef.current = paperViewer;
 
     return () => {
       modelViewer.Unsubscribe('resized', handleResize);
+      modelViewer.Unsubscribe('viewChanged', handleViewChanged);
       paperViewer.Unsubscribe('resized', handleResize);
       modelViewer.Destroy();
       paperViewer.Destroy();
@@ -330,6 +396,22 @@ export default function DxfViewerPanel({
     if (!viewer || !scene || !origin || loading) return;
 
     let overlay = overlayRef.current;
+    if (overlay && (!overlay.fillScene || !overlay.strokeScene)) {
+      for (const object of [overlay.line, overlay.marker, overlay.hoverLine, overlay.hoverMarker]) {
+        object?.parent?.remove(object);
+        object?.geometry?.dispose();
+        object?.material?.dispose();
+      }
+      for (const objects of overlay.measurements?.values?.() || []) {
+        for (const object of [objects.line, objects.marker, objects.fill]) {
+          object?.parent?.remove(object);
+          object?.geometry?.dispose();
+          object?.material?.dispose();
+        }
+      }
+      overlay = null;
+      overlayRef.current = null;
+    }
     if (!overlay) {
       const make = (Ctor, material) => {
         const object = new Ctor(new BufferGeometry(), material);
@@ -339,16 +421,9 @@ export default function DxfViewerPanel({
         return object;
       };
       overlay = {
-        measurementLine: make(LineSegments2, new LineMaterial({
-          color: measurementHighlightColor,
-          linewidth: 4,
-          depthTest: false,
-          transparent: true,
-          opacity: 0.9,
-        })),
-        measurementMarker: make(Points, new PointsMaterial({
-          color: measurementHighlightColor, size: 11, sizeAttenuation: false, depthTest: false,
-        })),
+        fillScene: new Scene(),
+        strokeScene: new Scene(),
+        measurements: new Map(),
         line: make(LineSegments, new LineBasicMaterial({ color: 0xf97316, depthTest: false })),
         marker: make(Points, new PointsMaterial({
           color: 0xf97316, size: 9, sizeAttenuation: false, depthTest: false,
@@ -360,24 +435,83 @@ export default function DxfViewerPanel({
       };
       overlayRef.current = overlay;
     }
-    for (const object of Object.values(overlay)) {
-      if (object.parent !== scene) scene.add(object);
+    for (const object of [overlay.line, overlay.marker, overlay.hoverLine, overlay.hoverMarker]) {
+      if (object.parent !== overlay.strokeScene) overlay.strokeScene.add(object);
     }
-    overlay.measurementLine.renderOrder = 45;
-    overlay.measurementMarker.renderOrder = 45;
-    overlay.measurementLine.material.color.set(measurementHighlightColor);
-    overlay.measurementMarker.material.color.set(measurementHighlightColor);
-    overlay.measurementLine.material.resolution.set(
-      modelContainerRef.current?.clientWidth || 1,
-      modelContainerRef.current?.clientHeight || 1,
-    );
 
     const index = entityIndexRef.current;
-    const emptyBuffers = { linePositions: new Float32Array(0), markerPositions: new Float32Array(0) };
-    const measuredIds = index && !activeLayout ? measuredEntityIds || [] : [];
-    const measuredBuffers = index ? buildHighlightBuffers(index, measuredIds, origin) : emptyBuffers;
-    applyWideOverlayPositions(overlay.measurementLine, measuredBuffers.linePositions);
-    applyOverlayPositions(overlay.measurementMarker, measuredBuffers.markerPositions);
+    const emptyBuffers = {
+      linePositions: new Float32Array(0),
+      fillPositions: new Float32Array(0),
+      markerPositions: new Float32Array(0),
+    };
+    const activeMeasurementIds = new Set();
+    for (const group of measuredEntityGroups || []) {
+      activeMeasurementIds.add(group.id);
+      let objects = overlay.measurements.get(group.id);
+      // Une recharge du DXF vide la scène Three.js sans vider nos refs. De même, Fast Refresh
+      // peut conserver un ancien overlay créé avant l'ajout du remplissage. Dans les deux cas,
+      // on recrée/rattache explicitement les trois objets du métré.
+      if (objects && !objects.fill) {
+        for (const object of [objects.line, objects.marker]) {
+          object.parent?.remove(object);
+          object.geometry.dispose();
+          object.material.dispose();
+        }
+        overlay.measurements.delete(group.id);
+        objects = null;
+      }
+      if (!objects) {
+        const line = new LineSegments2(new LineSegmentsGeometry(), new LineMaterial({
+          color: group.color,
+          linewidth: 4,
+          depthTest: false,
+          transparent: true,
+          opacity: 0.9,
+        }));
+        const marker = new Points(new BufferGeometry(), new PointsMaterial({
+          color: group.color, size: 11, sizeAttenuation: false, depthTest: false,
+        }));
+        const fill = new Mesh(new BufferGeometry(), new MeshBasicMaterial({
+          color: group.color,
+          transparent: true,
+          opacity: 0.25,
+          depthTest: false,
+          depthWrite: false,
+          side: DoubleSide,
+        }));
+        for (const object of [fill, line, marker]) {
+          object.frustumCulled = false;
+          object.renderOrder = object === fill ? 44 : 45;
+          object.visible = false;
+        }
+        overlay.fillScene.add(fill);
+        overlay.strokeScene.add(line, marker);
+        objects = { line, marker, fill };
+        overlay.measurements.set(group.id, objects);
+      }
+      if (objects.fill.parent !== overlay.fillScene) overlay.fillScene.add(objects.fill);
+      if (objects.line.parent !== overlay.strokeScene) overlay.strokeScene.add(objects.line);
+      if (objects.marker.parent !== overlay.strokeScene) overlay.strokeScene.add(objects.marker);
+      objects.line.material.color.set(group.color);
+      objects.marker.material.color.set(group.color);
+      objects.fill.material.color.set(group.color);
+      objects.line.material.resolution.set(
+        modelContainerRef.current?.clientWidth || 1,
+        modelContainerRef.current?.clientHeight || 1,
+      );
+      const measuredIds = index && !activeLayout ? group.entityIds || [] : [];
+      const measuredBuffers = index ? buildHighlightBuffers(index, measuredIds, origin) : emptyBuffers;
+      applyWideOverlayPositions(objects.line, measuredBuffers.linePositions);
+      applyOverlayPositions(objects.fill, measuredBuffers.fillPositions);
+      applyOverlayPositions(objects.marker, measuredBuffers.markerPositions);
+    }
+    for (const [groupId, objects] of overlay.measurements) {
+      if (activeMeasurementIds.has(groupId)) continue;
+      objects.line.visible = false;
+      objects.marker.visible = false;
+      objects.fill.visible = false;
+    }
 
     const selectedIds = index && !activeLayout ? highlightedEntityIds || [] : [];
     const selectedBuffers = index ? buildHighlightBuffers(index, selectedIds, origin) : emptyBuffers;
@@ -390,15 +524,22 @@ export default function DxfViewerPanel({
     applyOverlayPositions(overlay.hoverMarker, hoverBuffers.markerPositions);
 
     requestAnimationFrame(renderActive);
-  }, [highlightedEntityIds, measuredEntityIds, measurementHighlightColor, hover, activeLayout, loading, renderActive]);
+  }, [highlightedEntityIds, measuredEntityGroups, hover, activeLayout, loading, renderActive]);
 
   useEffect(() => () => {
     const overlay = overlayRef.current;
     if (!overlay) return;
-    for (const object of Object.values(overlay)) {
+    for (const object of [overlay.line, overlay.marker, overlay.hoverLine, overlay.hoverMarker]) {
       object.parent?.remove(object);
       object.geometry.dispose();
       object.material.dispose();
+    }
+    for (const objects of overlay.measurements.values()) {
+      for (const object of [objects.line, objects.marker, objects.fill]) {
+        object.parent?.remove(object);
+        object.geometry.dispose();
+        object.material.dispose();
+      }
     }
     overlayRef.current = null;
   }, []);
@@ -407,9 +548,11 @@ export default function DxfViewerPanel({
     const container = modelContainerRef.current;
     if (!container || typeof ResizeObserver === 'undefined') return undefined;
     const observer = new ResizeObserver(() => {
-      const material = overlayRef.current?.measurementLine?.material;
-      if (!material?.resolution) return;
-      material.resolution.set(container.clientWidth || 1, container.clientHeight || 1);
+      const measurements = overlayRef.current?.measurements;
+      if (!measurements) return;
+      for (const objects of measurements.values()) {
+        objects.line.material.resolution.set(container.clientWidth || 1, container.clientHeight || 1);
+      }
       requestAnimationFrame(renderActive);
     });
     observer.observe(container);
@@ -785,6 +928,7 @@ export default function DxfViewerPanel({
       <div data-dxf-layer="model" className={`absolute inset-0 z-[1] ${activeLayout ? (isPanning ? 'cursor-grabbing' : 'cursor-grab') : ''}`}>
         <div ref={modelContainerRef} className="h-full min-h-0 w-full" />
       </div>
+      <canvas ref={fillCanvasRef} className="pointer-events-none absolute inset-0 z-[2] h-full w-full" aria-hidden="true" />
 
       {!file && (
         <div className="absolute inset-0 z-[2] flex flex-col items-center justify-center text-slate-400 pointer-events-none">
@@ -850,38 +994,6 @@ export default function DxfViewerPanel({
           >
             <Hash size={15} /> Hachures
           </button>
-          {!activeLayout && measuredEntityIds.length > 0 && (
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setPaletteOpen((value) => !value)}
-                title="Couleur des métrés réalisés"
-                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white/90 px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm backdrop-blur hover:bg-white"
-              >
-                <Palette size={15} />
-                <span className="h-3.5 w-3.5 rounded-full border border-black/10" style={{ backgroundColor: measurementHighlightColor }} />
-                Métrés
-              </button>
-              {paletteOpen && (
-                <div className="absolute left-0 top-full z-40 mt-1 grid w-[156px] grid-cols-5 gap-1.5 rounded-xl border border-gray-200 bg-white p-2 shadow-xl">
-                  {MEASUREMENT_COLORS.map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => {
-                        onMeasurementHighlightColorChange(color);
-                        setPaletteOpen(false);
-                      }}
-                      aria-label={`Couleur ${color}`}
-                      title={color}
-                      className={`h-6 w-6 rounded-lg border-2 transition-transform hover:scale-110 ${measurementHighlightColor === color ? 'border-gray-900' : 'border-white'}`}
-                      style={{ backgroundColor: color }}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
           {!activeLayout && selectionAvailability === 'skipped' && (
             <span
               title="Plan trop volumineux pour la sélection d’élément"
@@ -1031,9 +1143,11 @@ DxfViewerPanel.propTypes = {
   selectionMode: PropTypes.oneOf(['', 'length', 'area', 'count']),
   onSelectionModeChange: PropTypes.func,
   highlightedEntityIds: PropTypes.arrayOf(PropTypes.string),
-  measuredEntityIds: PropTypes.arrayOf(PropTypes.string),
-  measurementHighlightColor: PropTypes.string,
-  onMeasurementHighlightColorChange: PropTypes.func,
+  measuredEntityGroups: PropTypes.arrayOf(PropTypes.shape({
+    id: PropTypes.string.isRequired,
+    color: PropTypes.string.isRequired,
+    entityIds: PropTypes.arrayOf(PropTypes.string).isRequired,
+  })),
   onPickEntity: PropTypes.func,
   selectionSummary: PropTypes.shape({ entityCount: PropTypes.number, text: PropTypes.string, editing: PropTypes.bool }),
   onCreateSelectionRow: PropTypes.func,

@@ -467,6 +467,7 @@ export function buildSelectionRows(selections, scaleToMeters = 1) {
       isSelection: true,
       isManual: Boolean(selection.isManual),
       highlightHidden: Boolean(selection.highlightHidden),
+      highlightColor: selection.highlightColor || '#f97316',
       unit: selection.unit || '',
       entityCount: finite(selection.entityCount),
       approximateCount: finite(selection.approximateCount),
