@@ -30,13 +30,14 @@ Ownership `user_id==auth.uid`, isolation multi-tenant (jamais croiser `projectId
 | Piège | Solution |
 |---|---|
 | Règles Firestore en retard (deploy hosting-only) → `permission-denied` faux « Erreur réseau » | `firebase deploy --only firestore:rules` séparément |
+| `storage.rules` avec `firestore.get()` → `storage/unauthorized`, photos « prises mais invisibles » (cross-service casse l'upload) | jamais de `firestore.get()` en règle Storage : `auth+size+content-type` ; ownership côté Firestore/app ; `firebase deploy --only storage` (piège récurrent 3×) |
 | jsPDF WinAnsi : `−ΔΩ√` → `"”` (Helvetica = CP1252) | texte rendu WinAnsi-safe (`-` pas `−`) |
 | IDs doc `__x__` réservés → `setDoc` rejette | préfixer `_cfg_` |
 | ExportModal ↔ GED : option = no-op silencieux | répercuter dans `gedExport.exportArchive` |
 | Build hors repo sans `.env.local` → prod down | copier `.env.local`, vérifier `grep -c AIza dist/assets/index-*.js` |
 | Prix RAO faux (nego/à valoir) | lire via `getEffectiveOffers`, jamais `c.offers` |
 | Excel `&8` collé à un chiffre → pied géant | écrire TAILLE puis POLICE `&8&"Aptos"` |
-| Doc >1 Mo (photos base64) | subcollections (migration Storage TODO) |
+| Doc >1 Mo (anciennes photos base64) | photos CRC+visites déjà sur Storage ; reste à ré-optimiser les vieilles base64 (bouton comme CRC) |
 | Vite cache path après refactor | relancer `npm run dev` |
 | Tab S10 FE force « site desktop » | `useDeviceMode` (touch+width) + override |
 
@@ -51,10 +52,10 @@ Ownership `user_id==auth.uid`, isolation multi-tenant (jamais croiser `projectId
 | CRC | Prod | obs, participants groupes/sous-groupes/labels, exports PDF+Word · `crc/` |
 | Docs Admin | WIP | templates, role-check · `admin-docs/` |
 | Notes de Frais · Estim. Rapide · MOE Devis | Prod | Firestore |
-| Visites de Site | Prod | GPS, photos base64, Tesla plein écran · `siteVisits/` |
+| Visites de Site | Prod | GPS, photos **Firebase Storage** (`siteVisitImageStorage.js`, plus base64), Tesla plein écran · `siteVisits/` + Storage `companies/{id}/site_visits/` |
 | RGPD/Legal · Branding | Prod | `masterBranding` |
 | ESTIMA TP | Prod | produit entreprise TP (Phases 1→3, v3.5.8) · `estimaTp/` |
-| Métré DXF | POC | `dxf-viewer` (Three.js/WebGL), lecture locale, présentations AutoCAD, isolation calques, clic-pour-isoler + survol (picking par **projection écran** — le raycaster de lignes ne marche pas ici, cf. mémoire ; croix ✕ pour tout réafficher ; vue Modèle), longueurs/surfaces/comptages → articles projet · `src/components/takeoff/` |
+| Métré DXF | POC | `dxf-viewer` (Three.js/WebGL), lecture locale, présentations AutoCAD, isolation calques, clic-pour-isoler + survol (picking par **projection écran** — le raycaster de lignes ne marche pas ici, cf. mémoire ; croix ✕ pour tout réafficher ; vue Modèle), longueurs/surfaces/comptages → articles projet · **sélection d'élément** : bouton « Sélection » → index par entité construit dans le worker (`buildEntityIndex`, handles DXF, contours tessellés **relatifs à `index.origin`** — float32 vs Lambert), hit-test grille (`dxfEntityPicking.js`), cumul multi-éléments → ligne `sel::<id>::<metric>` associable/persistée (`selections` dans takeoff/data), overlay orange/bleu (scène − `GetOrigin()`) · `src/components/takeoff/` |
 | PWA Mobile | Prod | offline, 7+ modules · SW |
 
 ## Commandes
@@ -87,7 +88,7 @@ lint · imports Vite · rules multi-tenant (déployées séparément si modifié
 
 ## Backlog
 **Livré récent** : ESTIMA TP (v3.5.8) · DQE prix uniques (v3.5.9) · Docs CCTP/RC/CCAP save/projet · RAO source unique · bundle −49 % · CRC sous-groupes + Word.
-**TODO** : RAO export PDF sous-critères/groupements · CRC form→Firestore→PDF + test `useCrrManager` · admin-docs templates+role · photos base64→Storage · Firestore rules (custom claim, validation tailles) · perf (`React.memo(PriceCell)`, virtualisation `AnalysisTable`, TTL `history/`) · ESLint `only-export-components` · migration xlsx→ExcelJS.
+**TODO** : RAO export PDF sous-critères/groupements · CRC form→Firestore→PDF + test `useCrrManager` · admin-docs templates+role · ré-optimiser anciennes photos base64 visites (bouton comme CRC ; nouvelles déjà sur Storage) · Firestore rules (custom claim, validation tailles) · perf (`React.memo(PriceCell)`, virtualisation `AnalysisTable`, TTL `history/`) · ESLint `only-export-components` · migration xlsx→ExcelJS.
 **Vulnérabilités npm (audit --force, à traiter isolément)** : jsPDF 2→4 (risque élevé, cœur des exports PDF) · Vite 5→8/esbuild (risque build/PWA) · react-quill (le "fix" 0.0.2 est un downgrade cassé, ne pas appliquer) · ExcelJS (le "fix" 3.4.0 est une régression vs 4.4.0 actuel, ne pas appliquer) · xlsx sans fix dispo (rejoint migration xlsx→ExcelJS ci-dessus). 16 vulnérabilités non-breaking déjà corrigées 2026-07-15 (`npm audit fix`, commit 37c05ec).
 
 ## Versions app

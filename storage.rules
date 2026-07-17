@@ -21,27 +21,30 @@ service firebase.storage {
     // Lecture publique : les <img src=...> doivent pouvoir charger sans auth.
     // Le cloisonnement multi-tenant est garanti par l'imprevisibilite des paths
     // (4 segments d'UUIDs random) et l'absence de listing public.
+    // ⚠️ NE JAMAIS ajouter firestore.get() ici : les regles Cloud Storage ne
+    // peuvent pas lire Firestore de facon fiable (IAM cross-service non garanti
+    // sur Blaze) → storage/unauthorized, upload casse. Deja retire en avril
+    // (commit 6c5ee5d), re-introduit puis re-retire. L'ownership « createur
+    // uniquement » se garantit cote Firestore rules + app, pas ici.
     match /companies/{companyId}/crr/{crrId}/{obsId}/{fileName} {
       allow read: if true;
       allow write: if request.auth != null
-                   && firestore.get(/databases/(default)/documents/companies/$(companyId)/crr/$(crrId)).data.ownerId == request.auth.uid
                    && request.resource.size < 5 * 1024 * 1024
                    && request.resource.contentType.matches('image/.*');
-      allow delete: if request.auth != null
-                    && firestore.get(/databases/(default)/documents/companies/$(companyId)/crr/$(crrId)).data.ownerId == request.auth.uid;
+      allow delete: if request.auth != null;
     }
 
     // Photos Visites de site (meme modele de securite que le CRC)
     // Lecture publique : les <img src=...> doivent charger sans auth.
     // Cloisonnement garanti par l'imprevisibilite des paths (UUIDs random).
+    // ⚠️ Meme regle que le CRC : PAS de firestore.get() (cross-service casse
+    // l'upload → storage/unauthorized). Cf. commentaire du bloc CRC ci-dessus.
     match /companies/{companyId}/site_visits/{visitId}/{obsId}/{fileName} {
       allow read: if true;
       allow write: if request.auth != null
-                   && firestore.get(/databases/(default)/documents/companies/$(companyId)/site_visits/$(visitId)).data.ownerId == request.auth.uid
                    && request.resource.size < 5 * 1024 * 1024
                    && request.resource.contentType.matches('image/.*');
-      allow delete: if request.auth != null
-                    && firestore.get(/databases/(default)/documents/companies/$(companyId)/site_visits/$(visitId)).data.ownerId == request.auth.uid;
+      allow delete: if request.auth != null;
     }
 
     // Bloquer tout le reste par defaut
