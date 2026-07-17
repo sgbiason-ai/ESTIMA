@@ -30,8 +30,11 @@ function conversionText(spec, geo) {
   return parts.length ? parts.join(' · ') : '-';
 }
 
+// En-tête du tableau détaillé de métré (partagé avec le « Plan des métrés »).
+export const TAKEOFF_TABLE_HEAD = ['Calque', 'Type', 'Qté mesurée', 'Article', 'Coef.', 'Conversion', 'Qté appliquée'];
+
 // Construit une ligne de tableau [calque, type, qté mesurée, article, coef, conversion, qté appliquée].
-function formatRow({
+export function formatRow({
   layer, metric, measuredQty, article, coefficient, geo, appliedQty,
 }) {
   const metricInfo = METRIC_LABELS[metric] || { label: metric, unit: '' };

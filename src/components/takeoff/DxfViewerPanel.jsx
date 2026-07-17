@@ -1,5 +1,5 @@
 import React, {
-  useCallback, useEffect, useMemo, useRef, useState,
+  forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState,
 } from 'react';
 import PropTypes from 'prop-types';
 import {
@@ -76,13 +76,13 @@ function fitViewer(viewer, bounds, padding = 0.06) {
   );
 }
 
-export default function DxfViewerPanel({
+const DxfViewerPanel = forwardRef(function DxfViewerPanel({
   file, isolatedLayer, onLoaded, onError, onPickLayer,
   selectionMode = '', onSelectionModeChange = () => {}, highlightedEntityIds = [],
   measuredEntityGroups = [],
   onPickEntity = () => {}, selectionSummary = null, onCreateSelectionRow = () => {},
   onClearSelection = () => {}, focusEntities = null, scaleToMeters = 1,
-}) {
+}, ref) {
   const modelContainerRef = useRef(null);
   const paperContainerRef = useRef(null);
   const modelViewerRef = useRef(null);
@@ -96,6 +96,8 @@ export default function DxfViewerPanel({
   const entityGridRef = useRef(null);
   const overlayRef = useRef(null);
   const fillCanvasRef = useRef(null);
+  // Dernière version de renderMeasuredFills, appelable hors rendu React (capture export)
+  const renderMeasuredFillsRef = useRef(null);
   // Miroir des ids surlignés pour le hit-test (évite de ré-abonner les listeners à chaque clic)
   const highlightedIdsRef = useRef(highlightedEntityIds);
   highlightedIdsRef.current = highlightedEntityIds;
@@ -208,6 +210,10 @@ export default function DxfViewerPanel({
   }, [renderActive]);
 
   useEffect(() => {
+    renderMeasuredFillsRef.current = renderMeasuredFills;
+  }, [renderMeasuredFills]);
+
+  useEffect(() => {
     if (!modelContainerRef.current || !paperContainerRef.current) return undefined;
     const paperViewer = new DxfViewer(paperContainerRef.current, {
       autoResize: true,
@@ -228,6 +234,8 @@ export default function DxfViewerPanel({
       blackWhiteInversion: true,
       retainParsedDxf: false,
       fileEncoding: 'utf-8',
+      // Nécessaire pour capturer le rendu (toDataURL / drawImage) lors de l'export « Plan des métrés »
+      preserveDrawingBuffer: true,
       sceneOptions: { suppressPaperSpace: true },
     });
     const handleResize = () => requestAnimationFrame(() => renderActiveRef.current?.());
@@ -889,6 +897,92 @@ export default function DxfViewerPanel({
     };
   }, [activeLayout, loading, paperLoading, onPickLayer, selectionMode, isolatedLayer, onPickEntity]);
 
+  // Capture d'images du plan cadrées sur des groupes d'entités (export « Plan des métrés »).
+  // `frames` = liste de tableaux d'ids ; renvoie pour chacun { dataUrl, width, height } ou null.
+  // Rend le plan complet (tous calques) + les surlignages colorés du métré, sans la sélection
+  // orange transitoire ni le survol. La vue courante est restaurée à la fin.
+  const captureFrames = useCallback(async (frames = []) => {
+    const viewer = modelViewerRef.current;
+    const index = entityIndexRef.current;
+    if (!viewer?.GetOrigin?.() || !index) return frames.map(() => null);
+
+    // Les surlignages du métré n'existent qu'en vue Modèle : y basculer et laisser React
+    // reconstruire les overlays si l'on vient d'une présentation.
+    setActiveLayoutId('model');
+    await new Promise((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(resolve));
+    });
+
+    const overlay = overlayRef.current;
+    const transient = overlay
+      ? [overlay.line, overlay.marker, overlay.hoverLine, overlay.hoverMarker]
+      : [];
+    const transientVisible = transient.map((object) => object?.visible);
+    for (const object of transient) if (object) object.visible = false;
+
+    const camera = viewer.GetCamera();
+    const savedBounds = getCameraBounds(camera);
+    const savedView = {
+      center: {
+        x: (savedBounds.minX + savedBounds.maxX) / 2,
+        y: (savedBounds.minY + savedBounds.maxY) / 2,
+      },
+      width: savedBounds.maxX - savedBounds.minX,
+    };
+
+    const snapshot = () => {
+      renderModelView(viewer, '', hideFills); // plan complet, tous calques visibles
+      const renderer = viewer.GetRenderer();
+      const cam = viewer.GetCamera();
+      if (overlay?.strokeScene && renderer && cam) {
+        const autoClear = renderer.autoClear;
+        renderer.autoClear = false;
+        renderer.resetState();
+        renderer.render(overlay.strokeScene, cam);
+        renderer.resetState();
+        renderer.autoClear = autoClear;
+      }
+      renderMeasuredFillsRef.current?.(viewer);
+      const gl = viewer.GetCanvas();
+      const fill = fillCanvasRef.current;
+      const out = document.createElement('canvas');
+      out.width = gl.width;
+      out.height = gl.height;
+      const context = out.getContext('2d');
+      if (!context) return null;
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, out.width, out.height);
+      context.drawImage(gl, 0, 0);
+      if (fill) context.drawImage(fill, 0, 0, out.width, out.height);
+      return { dataUrl: out.toDataURL('image/png'), width: out.width, height: out.height };
+    };
+
+    const results = [];
+    for (const entityIds of frames) {
+      const bounds = collectEntityBounds(index, entityIds || []);
+      if (!bounds) { results.push(null); continue; }
+      const span = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY, 1);
+      const pad = span * 0.12;
+      fitViewer(viewer, {
+        minX: bounds.minX - pad,
+        maxX: bounds.maxX + pad,
+        minY: bounds.minY - pad,
+        maxY: bounds.maxY + pad,
+      }, 0.06);
+      results.push(snapshot());
+    }
+
+    // Restaurer l'affichage interactif (calque isolé, surlignages transitoires, vue).
+    for (let i = 0; i < transient.length; i += 1) {
+      if (transient[i]) transient[i].visible = transientVisible[i];
+    }
+    viewer.SetView(savedView.center, savedView.width);
+    requestAnimationFrame(() => renderActiveRef.current?.());
+    return results;
+  }, [hideFills]);
+
+  useImperativeHandle(ref, () => ({ captureFrames }), [captureFrames]);
+
   const fitDrawing = () => {
     if (activeLayout) {
       const paperViewer = paperViewerRef.current;
@@ -1132,7 +1226,7 @@ export default function DxfViewerPanel({
       )}
     </div>
   );
-}
+});
 
 DxfViewerPanel.propTypes = {
   file: PropTypes.instanceOf(File),
@@ -1155,3 +1249,5 @@ DxfViewerPanel.propTypes = {
   focusEntities: PropTypes.shape({ ids: PropTypes.array, nonce: PropTypes.number }),
   scaleToMeters: PropTypes.number,
 };
+
+export default DxfViewerPanel;

@@ -3,7 +3,7 @@ import React, {
 } from 'react';
 import PropTypes from 'prop-types';
 import {
-  AlertTriangle, FileText, FileUp, Layers3, LockKeyhole, Power, Ruler, X,
+  AlertTriangle, FileText, FileUp, Layers3, LockKeyhole, Map as MapIcon, PanelRightOpen, Power, Ruler, X,
 } from 'lucide-react';
 import DxfViewerPanel from './DxfViewerPanel';
 import DxfMappingPanel from './DxfMappingPanel';
@@ -23,12 +23,37 @@ const formatQty = (value) => Number(value || 0).toLocaleString('fr-FR', { maximu
 // Préfixe du nom auto d'une sélection, selon le mode qui l'a créée (renommable ensuite).
 const SELECTION_LABEL_PREFIX = { length: 'Linéaire', area: 'Surface', count: 'Comptage' };
 
+// Disposition des trois colonnes (Métrés · Plan · Calques) : préférence d'affichage LOCALE
+// par projet (localStorage), séparée des données métier cloud. Repli auto des Calques sur petit
+// écran/tablette (< 1024px) pour laisser Métrés + Plan respirer.
+const DXF_LAYOUT_DEFAULT = {
+  leftWidth: 400,
+  rightWidth: 440,
+  layersCollapsed: typeof window !== 'undefined' && window.innerWidth < 1024,
+};
+const dxfLayoutKey = (id) => `estima:dxf:layout:${id || 'default'}`;
+const readDxfLayout = (id) => {
+  try {
+    const raw = localStorage.getItem(dxfLayoutKey(id));
+    if (!raw) return DXF_LAYOUT_DEFAULT;
+    const parsed = JSON.parse(raw);
+    return {
+      leftWidth: Number(parsed.leftWidth) || DXF_LAYOUT_DEFAULT.leftWidth,
+      rightWidth: Number(parsed.rightWidth) || DXF_LAYOUT_DEFAULT.rightWidth,
+      layersCollapsed: Boolean(parsed.layersCollapsed),
+    };
+  } catch {
+    return DXF_LAYOUT_DEFAULT;
+  }
+};
+
 export default function DxfTakeoffModal({
   project, companyId, branding, activeTrancheId, onApply, onSync, onClose, visible = true, onUnload,
 }) {
   const projectId = project?.id;
   const inputRef = useRef(null);
   const mainRef = useRef(null);
+  const viewerRef = useRef(null);
   const skipFileSaveRef = useRef(false);
   const restoredKeyRef = useRef(null);
   const skipCloudSaveRef = useRef(false);
@@ -45,7 +70,9 @@ export default function DxfTakeoffModal({
   const [pick, setPick] = useState({ layer: '', nonce: 0 });
   const [applyMode, setApplyMode] = useState('replace');
   const [loadError, setLoadError] = useState('');
-  const [rightWidth, setRightWidth] = useState(440);
+  const [leftWidth, setLeftWidth] = useState(() => readDxfLayout(projectId).leftWidth);
+  const [rightWidth, setRightWidth] = useState(() => readDxfLayout(projectId).rightWidth);
+  const [layersCollapsed, setLayersCollapsed] = useState(() => readDxfLayout(projectId).layersCollapsed);
   // Sélection d'éléments : mode actif ('' | 'length' | 'area' | 'count'), éléments cochés
   // (ids DXF), lignes de métré créées.
   const [selectionMode, setSelectionMode] = useState('');
@@ -120,16 +147,24 @@ export default function DxfTakeoffModal({
 
   const handleError = useCallback((message) => setLoadError(message), []);
 
-  // Séparateur redimensionnable entre l'aperçu (gauche) et la liste (droite).
-  const startResize = (event) => {
+  // Séparateurs redimensionnables. `side` = 'left' (volet Métrés) ou 'right' (volet Calques).
+  // Borne max : jamais recouvrir le plan → on réserve ~380px pour le plan + la largeur de l'autre
+  // volet (0 si les Calques sont repliés à droite).
+  const startResize = (side) => (event) => {
     event.preventDefault();
     const startX = event.clientX;
-    const startWidth = rightWidth;
+    const startLeft = leftWidth;
+    const startRight = rightWidth;
     const container = mainRef.current;
-    const maxWidth = Math.max(320, (container ? container.clientWidth : 1400) - 380);
+    const containerWidth = container ? container.clientWidth : 1400;
+    const otherWidth = side === 'left' ? (layersCollapsed ? 36 : startRight) : startLeft;
+    const minWidth = side === 'left' ? 340 : 320;
+    const maxWidth = Math.max(minWidth, containerWidth - otherWidth - 380);
     const onMove = (moveEvent) => {
-      const next = startWidth - (moveEvent.clientX - startX);
-      setRightWidth(Math.min(Math.max(320, next), maxWidth));
+      const delta = moveEvent.clientX - startX;
+      const next = side === 'left' ? startLeft + delta : startRight - delta;
+      const clamped = Math.min(Math.max(minWidth, next), maxWidth);
+      if (side === 'left') setLeftWidth(clamped); else setRightWidth(clamped);
     };
     const onUp = () => {
       window.removeEventListener('pointermove', onMove);
@@ -143,10 +178,32 @@ export default function DxfTakeoffModal({
     document.body.style.userSelect = 'none';
   };
 
-  // Clic sur un objet de l'aperçu : isole son calque (vide = affiche tout) et cible la liste
+  // Recharge la disposition mémorisée quand on change de projet.
+  useEffect(() => {
+    const layout = readDxfLayout(projectId);
+    setLeftWidth(layout.leftWidth);
+    setRightWidth(layout.rightWidth);
+    setLayersCollapsed(layout.layersCollapsed);
+  }, [projectId]);
+
+  // Persiste la disposition (débounce) en localStorage — préférence locale, hors cloud métier.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(dxfLayoutKey(projectId), JSON.stringify({ leftWidth, rightWidth, layersCollapsed }));
+      } catch { /* quota/localStorage indisponible : sans effet */ }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [projectId, leftWidth, rightWidth, layersCollapsed]);
+
+  // Clic sur un objet de l'aperçu : isole son calque (vide = affiche tout) et cible le volet
+  // Calques (qui se déplie s'il était replié pour que la ligne surlignée soit visible).
   const handlePickLayer = useCallback((layer) => {
     setIsolatedLayer(layer || '');
-    if (layer) setPick((previous) => ({ layer, nonce: previous.nonce + 1 }));
+    if (layer) {
+      setLayersCollapsed(false);
+      setPick((previous) => ({ layer, nonce: previous.nonce + 1 }));
+    }
   }, []);
 
   // --- Sélection d'entités réelles (mode « Sélection » de l'aperçu) ---
@@ -459,6 +516,55 @@ export default function DxfTakeoffModal({
     onUnload?.();
   };
 
+  // Sélections colorées réellement représentables sur le plan (avec éléments, non masquées).
+  const measuredSelections = useMemo(
+    () => entitySelections.filter((sel) => (sel.entityIds || []).length > 0 && !sel.highlightHidden),
+    [entitySelections],
+  );
+
+  // Export « Plan des métrés » : plan sans échelle cadré sur les sélections + légende + tableau.
+  const handleExportMeasurePlan = async () => {
+    if (!measuredSelections.length) {
+      toast.warning('Aucune sélection à représenter. Mesurez des éléments avec l’outil « Sélection ».');
+      return;
+    }
+    if (!viewerRef.current?.captureFrames) return;
+    try {
+      const overviewIds = measuredSelections.flatMap((sel) => sel.entityIds || []);
+      const frames = [overviewIds, ...measuredSelections.map((sel) => sel.entityIds || [])];
+      const images = await viewerRef.current.captureFrames(frames);
+      const trancheName = targetTrancheId
+        ? (project?.tranches?.find((t) => t.id === targetTrancheId)?.name || targetTrancheId)
+        : 'Global';
+      const entries = measuredSelections.map((sel, index) => {
+        const row = rows.find((item) => item.selectionId === sel.id) || null;
+        const mapping = row ? mappings[row.id] : null;
+        const article = mapping?.itemId
+          ? projectItems.find((item) => String(item.id) === String(mapping.itemId))
+          : null;
+        return {
+          color: sel.highlightColor || '#f97316',
+          label: sel.label || 'Sélection',
+          row,
+          mapping,
+          article,
+          image: images[index + 1] || null,
+        };
+      });
+      const { generateMeasurePlanPdf } = await import('../../utils/takeoff/pdfTakeoffPlanGenerator');
+      await generateMeasurePlanPdf({
+        project,
+        branding,
+        fileName: file?.name,
+        trancheName,
+        overviewImage: images[0] || null,
+        entries,
+      });
+    } catch {
+      toast.error('Échec de la génération du plan des métrés.');
+    }
+  };
+
   const handleExportCurrentPdf = async () => {
     try {
       const trancheName = targetTrancheId
@@ -521,6 +627,31 @@ export default function DxfTakeoffModal({
     }
   };
 
+  // Props communes aux deux volets (Métrés à gauche, Calques à droite) : source unique = la modale.
+  // Seuls diffèrent `mode`, `pick` (Calques seul) et `onCollapse` (Calques seul).
+  const panelProps = {
+    summary,
+    rows,
+    projectItems,
+    mappings,
+    onMappingsChange: setMappings,
+    scaleToMeters,
+    onScaleChange: setScaleToMeters,
+    isolatedLayer,
+    onIsolateLayer: setIsolatedLayer,
+    onDeleteSelection: handleDeleteSelection,
+    onRenameSelection: handleRenameSelection,
+    onEditSelection: handleEditSelection,
+    editingSelectionId,
+    adjustments,
+    onAdjustmentChange: handleAdjustmentChange,
+    previewSelectionId,
+    onPreviewSelection: handlePreviewSelection,
+    onToggleSelectionVisibility: handleToggleSelectionVisibility,
+    onSelectionColorChange: handleSelectionColorChange,
+    onCreateMeasurement: handleCreateManualMeasurement,
+  };
+
   return (
     <div className={`fixed inset-0 z-modal flex ${visible ? '' : 'invisible pointer-events-none'}`} role="dialog" aria-modal="true" aria-label="Métré DXF">
       <div className="flex h-full w-full flex-col overflow-hidden bg-white">
@@ -548,6 +679,16 @@ export default function DxfTakeoffModal({
                 className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100"
               >
                 <FileText size={15} /> Feuille PDF
+              </button>
+            )}
+            {measuredSelections.length > 0 && (
+              <button
+                type="button"
+                onClick={handleExportMeasurePlan}
+                title="Plan des métrés PDF : plan sans échelle cadré sur les sélections + légende + tableau"
+                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100"
+              >
+                <MapIcon size={15} /> Plan des métrés
               </button>
             )}
             {(project?.takeoffImports || []).length > 0 && (
@@ -591,8 +732,22 @@ export default function DxfTakeoffModal({
         )}
 
         <main ref={mainRef} className="flex flex-1 min-h-0">
+          {/* Volet Métrés (gauche) — toujours visible (volet primaire du métreur) */}
+          <div className="min-h-0 shrink-0" style={{ width: `${leftWidth}px` }}>
+            <DxfMappingPanel mode="metres" {...panelProps} />
+          </div>
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            onPointerDown={startResize('left')}
+            title="Glisser pour redimensionner"
+            className="w-1.5 shrink-0 cursor-col-resize bg-gray-200 transition-colors hover:bg-blue-400"
+          />
+
+          {/* Plan (centre) */}
           <div className="min-w-0 flex-1">
             <DxfViewerPanel
+              ref={viewerRef}
               file={file}
               isolatedLayer={isolatedLayer}
               onLoaded={handleLoaded}
@@ -610,38 +765,38 @@ export default function DxfTakeoffModal({
               scaleToMeters={scaleToMeters}
             />
           </div>
-          <div
-            role="separator"
-            aria-orientation="vertical"
-            onPointerDown={startResize}
-            title="Glisser pour redimensionner"
-            className="w-1.5 shrink-0 cursor-col-resize bg-gray-200 transition-colors hover:bg-blue-400"
-          />
-          <div className="min-h-0 shrink-0" style={{ width: `${rightWidth}px` }}>
-            <DxfMappingPanel
-              summary={summary}
-              rows={rows}
-              projectItems={projectItems}
-              mappings={mappings}
-              onMappingsChange={setMappings}
-              scaleToMeters={scaleToMeters}
-              onScaleChange={setScaleToMeters}
-              isolatedLayer={isolatedLayer}
-              onIsolateLayer={setIsolatedLayer}
-              pick={pick}
-              onDeleteSelection={handleDeleteSelection}
-              onRenameSelection={handleRenameSelection}
-              onEditSelection={handleEditSelection}
-              editingSelectionId={editingSelectionId}
-              adjustments={adjustments}
-              onAdjustmentChange={handleAdjustmentChange}
-              previewSelectionId={previewSelectionId}
-              onPreviewSelection={handlePreviewSelection}
-              onToggleSelectionVisibility={handleToggleSelectionVisibility}
-              onSelectionColorChange={handleSelectionColorChange}
-              onCreateMeasurement={handleCreateManualMeasurement}
-            />
-          </div>
+
+          {/* Volet Calques (droite) — escamotable en rail */}
+          {layersCollapsed ? (
+            <button
+              type="button"
+              onClick={() => setLayersCollapsed(false)}
+              title="Afficher les calques du dessin"
+              className="flex w-9 shrink-0 flex-col items-center gap-2 border-l border-gray-200 bg-gray-50 py-3 text-gray-500 hover:bg-gray-100"
+            >
+              <PanelRightOpen size={16} />
+              <span className="text-[10px] font-bold uppercase tracking-wide [writing-mode:vertical-rl]">Calques</span>
+              <span className="rounded bg-white px-1 py-0.5 text-[9px] font-bold text-gray-500">{summary?.layers?.length || 0}</span>
+            </button>
+          ) : (
+            <>
+              <div
+                role="separator"
+                aria-orientation="vertical"
+                onPointerDown={startResize('right')}
+                title="Glisser pour redimensionner"
+                className="w-1.5 shrink-0 cursor-col-resize bg-gray-200 transition-colors hover:bg-blue-400"
+              />
+              <div className="min-h-0 shrink-0" style={{ width: `${rightWidth}px` }}>
+                <DxfMappingPanel
+                  mode="layers"
+                  pick={pick}
+                  onCollapse={() => setLayersCollapsed(true)}
+                  {...panelProps}
+                />
+              </div>
+            </>
+          )}
         </main>
 
         {/* pr-20 : dégage le coin bas-droite occupé par le FAB feedback (z-9998, fixe viewport) */}
