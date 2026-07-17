@@ -735,7 +735,7 @@ const preloadObsImages = async (observations) => {
     const fbMod = await import('firebase/storage');
     fbGetBlob = fbMod.getBlob;
     fbRef = fbMod.ref;
-    fbStorage = (await import('../firebase')).storage;
+    fbStorage = (await import('../firebaseStorage')).storage;
   } catch { /* Firebase non disponible */ }
 
   const blobToDataUrl = (blob) => new Promise((resolve) => {
@@ -760,7 +760,11 @@ const preloadObsImages = async (observations) => {
       }
       if (!dataUri && !src.startsWith('data:')) {
         try {
-          const resp = await fetch(src);
+          // Le SW (CacheFirst photos) peut resservir une reponse opaque (status 0)
+          // deposee par un <img> no-cors → ok=false ; retenter avec une URL
+          // modifiee pour forcer le passage reseau en mode cors.
+          let resp = await fetch(src);
+          if (!resp.ok) resp = await fetch(src + (src.includes('?') ? '&' : '?') + 'swbust=' + Date.now());
           if (resp.ok) dataUri = await blobToDataUrl(await resp.blob());
         } catch { /* image ignoree */ }
       }

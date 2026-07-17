@@ -20,7 +20,11 @@ const blobToDataUrl = (blob) => new Promise((resolve, reject) => {
 
 // Helper : telecharge une URL Storage et la convertit en base64
 const fetchToDataUrl = async (url) => {
-  const resp = await fetch(url);
+  // Le SW (CacheFirst photos) peut resservir une reponse opaque (status 0)
+  // deposee par un <img> no-cors → ok=false ; retenter avec une URL
+  // modifiee pour forcer le passage reseau en mode cors.
+  let resp = await fetch(url);
+  if (!resp.ok) resp = await fetch(url + (url.includes('?') ? '&' : '?') + 'swbust=' + Date.now());
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   const blob = await resp.blob();
   return blobToDataUrl(blob);

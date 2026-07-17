@@ -734,7 +734,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
     const fbMod = await import('firebase/storage');
     fbGetBlob = fbMod.getBlob;
     fbRef = fbMod.ref;
-    fbStorage = (await import('../firebase')).storage;
+    fbStorage = (await import('../firebaseStorage')).storage;
   } catch { /* Firebase non disponible */ }
 
   const imageCache = new Map();
@@ -762,7 +762,11 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
 
         if (!dataUri && !src.startsWith('data:')) {
           try {
-            const resp = await fetch(src);
+            // Le SW (CacheFirst photos) peut resservir une reponse opaque (status 0)
+            // deposee par un <img> no-cors → ok=false ; retenter avec une URL
+            // modifiee pour forcer le passage reseau en mode cors.
+            let resp = await fetch(src);
+            if (!resp.ok) resp = await fetch(src + (src.includes('?') ? '&' : '?') + 'swbust=' + Date.now());
             if (resp.ok) {
               const blob = await resp.blob();
               dataUri = await new Promise((resolve) => {
