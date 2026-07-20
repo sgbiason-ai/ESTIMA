@@ -246,6 +246,28 @@ describe('métré DXF — sélection d’éléments', () => {
     expect(hitTestEntities(index, grid, relX(7), relY(2), 0.5, NO_LAYER, NO_SEL, 'length')).toBe(-1);
   });
 
+  it('exclut les calques masqués du picking (param excludedLayers)', () => {
+    const index = buildEntityIndex(dxf);
+    const grid = buildEntityGrid(index);
+    const relX = (x) => x - index.origin.x;
+    const relY = (y) => y - index.origin.y;
+    const NO_LAYER = '';
+    const NO_SEL = null;
+    const NO_METRIC = '';
+
+    // Référence sans exclusion : ligne AEP (0) au clic ; rectangle VOIRIE (1) en clic intérieur isolé.
+    expect(hitTestEntities(index, grid, relX(1.5), relY(2), 0.5)).toBe(0);
+    expect(hitTestEntities(index, grid, relX(1.5), relY(2), 0.5, 'VOIRIE')).toBe(1);
+
+    // Exclure VOIRIE (isolé sur VOIRIE) → plus de clic intérieur.
+    expect(hitTestEntities(index, grid, relX(1.5), relY(2), 0.5, 'VOIRIE', NO_SEL, NO_METRIC, new Set(['VOIRIE']))).toBe(-1);
+    // Exclure AEP + VOIRIE → aucun candidat (contour ni intérieur) à (1.5,2).
+    expect(hitTestEntities(index, grid, relX(1.5), relY(2), 0.5, NO_LAYER, NO_SEL, NO_METRIC, new Set(['AEP', 'VOIRIE']))).toBe(-1);
+    // Set sans correspondance ou vide → comportement inchangé (ligne AEP).
+    expect(hitTestEntities(index, grid, relX(1.5), relY(2), 0.5, NO_LAYER, NO_SEL, NO_METRIC, new Set(['NOPE']))).toBe(0);
+    expect(hitTestEntities(index, grid, relX(1.5), relY(2), 0.5, NO_LAYER, NO_SEL, NO_METRIC, new Set())).toBe(0);
+  });
+
   it('applique les corrections manuelles (+/−) aux lignes de métré', () => {
     const rows = [
       { id: 'A::length', metric: 'length', quantity: 128 },

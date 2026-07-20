@@ -146,12 +146,14 @@ function setLayerVisibility(viewer, isolatedLayer, frozenLayers = [], hideFills 
   }
 }
 
-export function renderModelView(viewer, isolatedLayer, hideFills = false) {
+// `hiddenLayers` (gestionnaire de calques) réutilise le slot `frozenLayers` de setLayerVisibility :
+// masquage multi-calques indépendant de l'isolation (l'isolation prime dans la formule visible).
+export function renderModelView(viewer, isolatedLayer, hideFills = false, hiddenLayers = []) {
   const renderer = viewer?.GetRenderer();
   if (!renderer) return;
   renderer.setScissorTest(false);
   renderer.setViewport(0, 0, viewer.canvasWidth, viewer.canvasHeight);
-  setLayerVisibility(viewer, isolatedLayer, [], hideFills);
+  setLayerVisibility(viewer, isolatedLayer, hiddenLayers, hideFills);
   viewer.Render();
 }
 

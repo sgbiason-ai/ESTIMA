@@ -3,7 +3,7 @@ import React, {
 } from 'react';
 import PropTypes from 'prop-types';
 import {
-  AlertTriangle, Eye, EyeOff, Link2, PanelRightClose, Pencil, Plus, Search, SlidersHorizontal, Trash2, X,
+  AlertTriangle, Eye, EyeOff, Focus, Link2, PanelRightClose, Pencil, Plus, Search, SlidersHorizontal, Trash2, X,
 } from 'lucide-react';
 import { METRIC_LABELS } from '../../utils/takeoff/dxfTakeoff';
 import { isUnitCompatible, takeoffGeoSpec, takeoffConversionFactor } from '../../utils/takeoff/applyTakeoff';
@@ -89,6 +89,11 @@ export default function DxfMappingPanel({
   onScaleChange,
   isolatedLayer,
   onIsolateLayer,
+  hiddenLayers = null,
+  onToggleLayerHidden = () => {},
+  onShowAllLayers = () => {},
+  onHideLayers = () => {},
+  onSetHoverLayer = () => {},
   pick,
   onDeleteSelection = () => {},
   onRenameSelection = () => {},
@@ -216,6 +221,15 @@ export default function DxfMappingPanel({
   const visibleCount = visibleRows.length;
   const presentMetrics = ['length', 'area', 'count'].filter((m) => metricCounts[m] > 0);
 
+  // Gestionnaire de calques (volet layers) : actions globales de visibilité.
+  // Consts simples (PAS de hook : on est après le early return `if (!summary)`).
+  const hiddenSet = hiddenLayers || null;
+  const allLayerNames = [...new Set(baseRows.map((row) => row.layer))];
+  const filteredLayerNames = [...new Set(visibleRows.map((row) => row.layer))];
+  const hasActiveFilter = search.trim() !== '' || mappedOnly || Object.values(metricFilters).some(Boolean);
+  const hasHiddenOrIsolated = (hiddenSet?.size || 0) > 0 || Boolean(isolatedLayer);
+  const allHidden = allLayerNames.length > 0 && allLayerNames.every((name) => hiddenSet?.has(name));
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-white">
       <div className="shrink-0 border-b border-gray-200 p-3">
@@ -291,6 +305,41 @@ export default function DxfMappingPanel({
             ))}
           </div>
         )}
+
+        {/* Gestionnaire de calques : actions globales de visibilité (volet Calques) */}
+        {!isMetres && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="self-center text-[10px] font-semibold text-gray-400">Calques :</span>
+            <button
+              type="button"
+              onClick={onShowAllLayers}
+              disabled={!hasHiddenOrIsolated}
+              title="Réafficher tous les calques (annule masquages et isolation)"
+              className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-semibold ${hasHiddenOrIsolated ? 'border-gray-200 text-gray-600 hover:bg-gray-50' : 'border-gray-100 text-gray-300 cursor-not-allowed'}`}
+            >
+              <Eye size={12} /> Tout afficher
+            </button>
+            <button
+              type="button"
+              onClick={() => onHideLayers(allLayerNames)}
+              disabled={allHidden}
+              title="Masquer tous les calques (repartir d’un plan vide)"
+              className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-semibold ${allHidden ? 'border-gray-100 text-gray-300 cursor-not-allowed' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+            >
+              <EyeOff size={12} /> Tout masquer
+            </button>
+            {hasActiveFilter && filteredLayerNames.length > 0 && (
+              <button
+                type="button"
+                onClick={() => onHideLayers(filteredLayerNames)}
+                title="Masquer les calques du résultat filtré (ex. tout le cadastre « CAD_ »)"
+                className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-[10px] font-semibold text-gray-600 hover:bg-gray-50"
+              >
+                <EyeOff size={12} /> Masquer les résultats
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <div ref={listRef} className="flex min-h-0 flex-1 flex-col">
@@ -312,6 +361,9 @@ export default function DxfMappingPanel({
             const targetUnit = needsGeo && selectedItem ? selectedItem.unit : metric.unit;
             const isSelection = Boolean(row.isSelection);
             const isManual = Boolean(row.isManual);
+            const isLayerRow = !isSelection;
+            const layerHidden = isLayerRow && Boolean(hiddenSet?.has(row.layer));
+            const isIsolated = isLayerRow && isolatedLayer === row.layer;
             const isEditing = isSelection && editingSelectionId === row.selectionId;
             const highlightHidden = isSelection && Boolean(row.highlightHidden);
             const hasAdjustment = Number.isFinite(row.adjustment) && row.adjustment !== 0;
@@ -319,24 +371,50 @@ export default function DxfMappingPanel({
             let rowTone = mapping ? 'border-blue-200 bg-blue-50/40' : 'border-gray-200 bg-white';
             if (isSelection && !mapping) rowTone = 'border-orange-200 bg-orange-50/30';
             if (flashLayer === row.layer && !isSelection) rowTone = 'border-amber-400 bg-amber-50 ring-2 ring-amber-300';
+            if (isIsolated) rowTone = 'border-blue-300 bg-blue-50 ring-1 ring-blue-200';
             if (isEditing) rowTone = 'border-orange-400 bg-orange-50 ring-2 ring-orange-300';
 
             return (
-              <div key={row.id} data-dxf-row-layer={isSelection ? undefined : row.layer} className={`relative rounded-xl border p-2 transition-colors ${rowTone}`}>
+              <div
+                key={row.id}
+                data-dxf-row-layer={isSelection ? undefined : row.layer}
+                onMouseEnter={isLayerRow ? () => onSetHoverLayer(row.layer) : undefined}
+                onMouseLeave={isLayerRow ? () => onSetHoverLayer('') : undefined}
+                className={`relative rounded-xl border p-2 transition-colors ${rowTone} ${layerHidden ? 'opacity-60' : ''}`}
+              >
                 <div className="flex items-start gap-1.5">
-                  {!isManual && <button
-                    type="button"
-                    onClick={() => (isSelection
-                      ? onToggleSelectionVisibility(row.selectionId)
-                      : onIsolateLayer(isolatedLayer === row.layer ? '' : row.layer))}
-                    title={(() => {
-                      if (isSelection) return highlightHidden ? 'Afficher la surépaisseur' : 'Masquer la surépaisseur';
-                      return isolatedLayer === row.layer ? 'Afficher tous les calques' : 'Isoler ce calque';
-                    })()}
-                    className={`mt-0.5 rounded-md p-1 ${isSelection && highlightHidden ? 'bg-gray-200 text-gray-400' : (isSelection ? 'bg-blue-600 text-white' : isolatedLayer === row.layer ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500 hover:text-blue-600')}`}
-                  >
-                    {(isSelection ? highlightHidden : isolatedLayer === row.layer) ? <EyeOff size={13} /> : <Eye size={13} />}
-                  </button>}
+                  {isSelection && !isManual && (
+                    <button
+                      type="button"
+                      onClick={() => onToggleSelectionVisibility(row.selectionId)}
+                      title={highlightHidden ? 'Afficher la surépaisseur' : 'Masquer la surépaisseur'}
+                      className={`mt-0.5 rounded-md p-1 ${highlightHidden ? 'bg-gray-200 text-gray-400' : 'bg-blue-600 text-white'}`}
+                    >
+                      {highlightHidden ? <EyeOff size={13} /> : <Eye size={13} />}
+                    </button>
+                  )}
+                  {isLayerRow && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => onToggleLayerHidden(row.layer)}
+                        title={layerHidden ? 'Afficher ce calque' : 'Masquer ce calque'}
+                        aria-label={layerHidden ? 'Afficher ce calque' : 'Masquer ce calque'}
+                        className={`mt-0.5 rounded-md p-1 ${layerHidden ? 'bg-gray-200 text-gray-400' : 'bg-gray-100 text-gray-500 hover:text-blue-600'}`}
+                      >
+                        {layerHidden ? <EyeOff size={13} /> : <Eye size={13} />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onIsolateLayer(isIsolated ? '' : row.layer)}
+                        title={isIsolated ? 'Afficher tous les calques' : 'Isoler ce calque (masquer tous les autres)'}
+                        aria-label={isIsolated ? 'Afficher tous les calques' : 'Isoler ce calque'}
+                        className={`mt-0.5 rounded-md p-1 ${isIsolated ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500 hover:text-blue-600'}`}
+                      >
+                        <Focus size={13} />
+                      </button>
+                    </>
+                  )}
                   {isSelection && (
                     <div className="relative mt-0.5">
                       <button
@@ -670,6 +748,11 @@ DxfMappingPanel.propTypes = {
   onScaleChange: PropTypes.func.isRequired,
   isolatedLayer: PropTypes.string,
   onIsolateLayer: PropTypes.func.isRequired,
+  hiddenLayers: PropTypes.instanceOf(Set),
+  onToggleLayerHidden: PropTypes.func,
+  onShowAllLayers: PropTypes.func,
+  onHideLayers: PropTypes.func,
+  onSetHoverLayer: PropTypes.func,
   pick: PropTypes.shape({ layer: PropTypes.string, nonce: PropTypes.number }),
   onDeleteSelection: PropTypes.func,
   onRenameSelection: PropTypes.func,

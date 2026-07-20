@@ -117,13 +117,18 @@ function distanceToSegment(px, py, ax, ay, bx, by) {
  * même si un voisin est plus proche → re-cliquer un élément sélectionné le retire toujours
  * (réseaux parallèles à quelques pixels). `metric` ('length'|'area'|'count') restreint la
  * visée aux entités portant cette métrique — mode Linéaire / Surfaces / Comptage ; le clic
- * intérieur des formes fermées est coupé en mode Linéaire (contour seul).
+ * intérieur des formes fermées est coupé en mode Linéaire (contour seul). `excludedLayers`
+ * (Set de noms) = calques masqués/verrouillés dont les entités sont ignorées au picking
+ * (param de queue optionnel → n'impacte pas les appels positionnels existants/testés).
  * Renvoie le rang dans l'index, ou -1.
  */
-export function hitTestEntities(index, grid, x, y, tolerance, layerName = '', selectedRanks = null, metric = '') {
+export function hitTestEntities(index, grid, x, y, tolerance, layerName = '', selectedRanks = null, metric = '', excludedLayers = null) {
   if (!index?.points || !grid) return -1;
   const points = index.points;
   const offsets = index.pointOffsets;
+  const isExcluded = (rank) => excludedLayers
+    && excludedLayers.size > 0
+    && excludedLayers.has(index.layerNames[index.layerCodes[rank]]);
   const matchesMetric = (rank) => {
     if (!metric) return true;
     if (metric === 'length') return index.lengths[rank] > 0;
@@ -148,6 +153,7 @@ export function hitTestEntities(index, grid, x, y, tolerance, layerName = '', se
         seen.add(rank);
         if (!matchesMetric(rank)) continue;
         if (layerName && index.layerNames[index.layerCodes[rank]] !== layerName) continue;
+        if (isExcluded(rank)) continue;
         const start = offsets[rank];
         const end = offsets[rank + 1];
         let distance;
@@ -190,6 +196,7 @@ export function hitTestEntities(index, grid, x, y, tolerance, layerName = '', se
       || y < grid.closedBounds[box + 1] || y > grid.closedBounds[box + 3]) continue;
     if (!matchesMetric(rank)) continue;
     if (layerName && index.layerNames[index.layerCodes[rank]] !== layerName) continue;
+    if (isExcluded(rank)) continue;
     if (!pointInRing(points, offsets[rank], offsets[rank + 1], x, y)) continue;
     const area = (grid.closedBounds[box + 2] - grid.closedBounds[box])
       * (grid.closedBounds[box + 3] - grid.closedBounds[box + 1]);

@@ -7,6 +7,9 @@ import {
 } from 'lucide-react';
 import DxfViewerPanel from './DxfViewerPanel';
 import DxfMappingPanel from './DxfMappingPanel';
+import {
+  RibbonGroup, RibbonBtnLarge, RibbonBtnSmall, RibbonContainer,
+} from '../common/RibbonParts';
 import { assignMissingMeasurementColors, suggestMeasurementColor } from './measurementColors';
 import {
   applyRowAdjustments, buildMeasurementRows, buildSelectionRows, measureSelection, METRIC_LABELS,
@@ -30,6 +33,7 @@ const DXF_LAYOUT_DEFAULT = {
   leftWidth: 400,
   rightWidth: 440,
   layersCollapsed: typeof window !== 'undefined' && window.innerWidth < 1024,
+  hiddenLayers: [],
 };
 const dxfLayoutKey = (id) => `estima:dxf:layout:${id || 'default'}`;
 const readDxfLayout = (id) => {
@@ -41,6 +45,7 @@ const readDxfLayout = (id) => {
       leftWidth: Number(parsed.leftWidth) || DXF_LAYOUT_DEFAULT.leftWidth,
       rightWidth: Number(parsed.rightWidth) || DXF_LAYOUT_DEFAULT.rightWidth,
       layersCollapsed: Boolean(parsed.layersCollapsed),
+      hiddenLayers: Array.isArray(parsed.hiddenLayers) ? parsed.hiddenLayers.filter((n) => typeof n === 'string') : [],
     };
   } catch {
     return DXF_LAYOUT_DEFAULT;
@@ -67,6 +72,10 @@ export default function DxfTakeoffModal({
   const [mappings, setMappings] = useState({});
   const [scaleToMeters, setScaleToMeters] = useState(1);
   const [isolatedLayer, setIsolatedLayer] = useState('');
+  // Gestionnaire de calques : calques masqués (multi, indépendant de l'isolation, persisté) +
+  // calque survolé (transitoire, pré-isolation/surbrillance sur le plan, non persisté).
+  const [hiddenLayers, setHiddenLayers] = useState(() => new Set(readDxfLayout(projectId).hiddenLayers));
+  const [hoverLayer, setHoverLayer] = useState('');
   const [pick, setPick] = useState({ layer: '', nonce: 0 });
   const [applyMode, setApplyMode] = useState('replace');
   const [loadError, setLoadError] = useState('');
@@ -128,6 +137,8 @@ export default function DxfTakeoffModal({
     setViewerLayers([]);
     setMappings({});
     setIsolatedLayer('');
+    setHiddenLayers(new Set());
+    setHoverLayer('');
     setLoadError('');
     setSelectionMode('');
     setSelectedEntityIds([]);
@@ -184,17 +195,46 @@ export default function DxfTakeoffModal({
     setLeftWidth(layout.leftWidth);
     setRightWidth(layout.rightWidth);
     setLayersCollapsed(layout.layersCollapsed);
+    setHiddenLayers(new Set(layout.hiddenLayers));
   }, [projectId]);
 
   // Persiste la disposition (débounce) en localStorage — préférence locale, hors cloud métier.
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
-        localStorage.setItem(dxfLayoutKey(projectId), JSON.stringify({ leftWidth, rightWidth, layersCollapsed }));
+        localStorage.setItem(dxfLayoutKey(projectId), JSON.stringify({
+          leftWidth, rightWidth, layersCollapsed, hiddenLayers: Array.from(hiddenLayers),
+        }));
       } catch { /* quota/localStorage indisponible : sans effet */ }
     }, 300);
     return () => clearTimeout(timer);
-  }, [projectId, leftWidth, rightWidth, layersCollapsed]);
+  }, [projectId, leftWidth, rightWidth, layersCollapsed, hiddenLayers]);
+
+  // --- Gestionnaire de calques : visibilité multi (masquer/afficher), « tout afficher/masquer »,
+  //     survol = surbrillance sur le plan. L'isolation (isolatedLayer) reste gérée à part.
+  const handleToggleLayerHidden = useCallback((layer) => {
+    if (!layer) return;
+    setHiddenLayers((previous) => {
+      const next = new Set(previous);
+      if (next.has(layer)) next.delete(layer); else next.add(layer);
+      return next;
+    });
+  }, []);
+
+  const handleShowAllLayers = useCallback(() => {
+    setIsolatedLayer('');
+    setHiddenLayers((previous) => (previous.size ? new Set() : previous));
+  }, []);
+
+  const handleHideLayers = useCallback((names) => {
+    setHiddenLayers((previous) => {
+      const next = new Set(previous);
+      for (const name of names || []) if (name) next.add(name);
+      return next;
+    });
+  }, []);
+
+  const handleSetHoverLayer = useCallback((layer) => setHoverLayer(layer || ''), []);
 
   // Clic sur un objet de l'aperçu : isole son calque (vide = affiche tout) et cible le volet
   // Calques (qui se déplie s'il était replié pour que la ligne surlignée soit visible).
@@ -639,6 +679,11 @@ export default function DxfTakeoffModal({
     onScaleChange: setScaleToMeters,
     isolatedLayer,
     onIsolateLayer: setIsolatedLayer,
+    hiddenLayers,
+    onToggleLayerHidden: handleToggleLayerHidden,
+    onShowAllLayers: handleShowAllLayers,
+    onHideLayers: handleHideLayers,
+    onSetHoverLayer: handleSetHoverLayer,
     onDeleteSelection: handleDeleteSelection,
     onRenameSelection: handleRenameSelection,
     onEditSelection: handleEditSelection,
@@ -671,59 +716,62 @@ export default function DxfTakeoffModal({
             <span className="hidden items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-2 text-[10px] font-semibold text-emerald-700 lg:inline-flex">
               <LockKeyhole size={13} /> Traitement local
             </span>
-            {selectedMappings.length > 0 && (
-              <button
-                type="button"
-                onClick={handleExportCurrentPdf}
-                title="Feuille de métré PDF (associations en cours)"
-                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100"
-              >
-                <FileText size={15} /> Feuille PDF
-              </button>
-            )}
-            {measuredSelections.length > 0 && (
-              <button
-                type="button"
-                onClick={handleExportMeasurePlan}
-                title="Plan des métrés PDF : plan sans échelle cadré sur les sélections + légende + tableau"
-                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100"
-              >
-                <MapIcon size={15} /> Plan des métrés
-              </button>
-            )}
-            {(project?.takeoffImports || []).length > 0 && (
-              <button
-                type="button"
-                onClick={handleExportHistoryPdf}
-                title="PDF de l'historique des imports DXF appliqués au projet"
-                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-[11px] font-semibold text-gray-500 hover:bg-gray-100"
-              >
-                <FileText size={14} /> Historique
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => inputRef.current?.click()}
-              className="inline-flex items-center gap-2 rounded-xl bg-gray-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-gray-700"
-            >
-              <FileUp size={15} /> {file ? 'Changer de DXF' : 'Ouvrir un DXF'}
-            </button>
-            {file && (
-              <button
-                type="button"
-                onClick={handleUnload}
-                title="Décharger le DXF de la mémoire (les associations restent enregistrées et reviendront en rechargeant ce fichier)"
-                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100"
-              >
-                <Power size={15} /> Décharger
-              </button>
-            )}
             <button type="button" onClick={handleClose} className="rounded-xl p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700" aria-label="Fermer">
               <X size={20} />
             </button>
             <input ref={inputRef} type="file" accept=".dxf" className="hidden" onChange={(event) => selectFile(event.target.files?.[0])} />
           </div>
         </header>
+
+        {/* ═══════ RIBBON (Fichier · Exports) — comme les autres modules ═══════ */}
+        <RibbonContainer>
+          <RibbonGroup label="Fichier">
+            <RibbonBtnLarge
+              icon={FileUp}
+              label={file ? 'Changer' : 'Ouvrir'}
+              onClick={() => inputRef.current?.click()}
+              accent="text-blue-600"
+              title={file ? 'Charger un autre fichier DXF' : 'Ouvrir un fichier DXF (traitement 100 % local)'}
+            />
+            <RibbonBtnLarge
+              icon={Power}
+              label="Décharger"
+              onClick={handleUnload}
+              disabled={!file}
+              accent="text-slate-500"
+              title="Décharger le DXF de la mémoire (les associations restent enregistrées et reviendront en rechargeant ce fichier)"
+            />
+          </RibbonGroup>
+
+          <RibbonGroup label="Exports" noBorder>
+            <RibbonBtnLarge
+              icon={MapIcon}
+              label="Plan des métrés"
+              onClick={handleExportMeasurePlan}
+              disabled={measuredSelections.length === 0}
+              accent="text-violet-500"
+              title="Plan des métrés PDF : plan sans échelle cadré sur les sélections + légende + tableau détaillé"
+            />
+            <div className="flex flex-col justify-center gap-[3px]">
+              <RibbonBtnSmall
+                icon={FileText}
+                label="Feuille PDF"
+                onClick={handleExportCurrentPdf}
+                disabled={selectedMappings.length === 0}
+                accent="text-red-500"
+                title="Feuille de métré PDF (associations en cours)"
+              />
+              <RibbonBtnSmall
+                icon={FileText}
+                label="Historique"
+                onClick={handleExportHistoryPdf}
+                disabled={(project?.takeoffImports || []).length === 0}
+                accent="text-slate-500"
+                title="PDF de l'historique des imports DXF appliqués au projet"
+              />
+            </div>
+          </RibbonGroup>
+        </RibbonContainer>
 
         {file?.size > 75 * 1024 * 1024 && !loadError && (
           <div className="flex shrink-0 items-center gap-2 border-b border-amber-200 bg-amber-50 px-5 py-2 text-[11px] text-amber-800">
@@ -763,6 +811,9 @@ export default function DxfTakeoffModal({
               onClearSelection={() => setSelectedEntityIds([])}
               focusEntities={focusEntities}
               scaleToMeters={scaleToMeters}
+              hiddenLayers={hiddenLayers}
+              hoverLayer={hoverLayer}
+              onShowAllLayers={handleShowAllLayers}
             />
           </div>
 
