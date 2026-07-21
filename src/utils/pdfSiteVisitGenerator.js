@@ -7,6 +7,7 @@ import { buildTheme } from './pdf/buildTheme';
 import { loadImage, formatDateFr, formatDateLong, lightenRgb, loadLogos, fitTextToWidth, drawCoverPage as drawSharedCoverPage } from './pdf/pdfSharedHelpers';
 import { stampPdfCredit } from './estimaCredit';
 import { usesPapyrusCover } from './coverPageTemplate';
+import { PDF_MAP_VIEWS, DEFAULT_PDF_VIEWS, buildTileUrl, lat2tileY, lng2tileX, latLng2px } from './ignTiles';
 
 const PW = 210, PH = 297;
 const M = { top: 18, left: 15, right: 15, bottom: 18 };
@@ -185,18 +186,7 @@ const drawCoverPage = (doc, visit, THEME, logoMoe, branding) => {
 
 // ─── TUILES SATELLITE (slippy tiles comme Leaflet) ────────────────────────────
 
-const deg2rad = (d) => d * Math.PI / 180;
-const lat2tileY = (lat, z) => Math.floor((1 - Math.log(Math.tan(deg2rad(lat)) + 1 / Math.cos(deg2rad(lat))) / Math.PI) / 2 * (1 << z));
-const lng2tileX = (lng, z) => Math.floor((lng + 180) / 360 * (1 << z));
-
-// Convertit lat/lng vers pixel dans le systeme de tuiles mondial
-const latLng2px = (lat, lng, z) => {
-  const n = 1 << z;
-  const x = ((lng + 180) / 360) * n * 256;
-  const latRad = deg2rad(lat);
-  const y = ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n * 256;
-  return { x, y };
-};
+// Maths slippy tiles : lat2tileY / lng2tileX / latLng2px viennent d'ignTiles.js
 
 const fetchTileAsImg = async (url, maxAttempts = 3, timeoutMs = 5000) => {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -217,6 +207,28 @@ const fetchTileAsImg = async (url, maxAttempts = 3, timeoutMs = 5000) => {
   return null;
 };
 
+// Assemble une pile de calques WMTS sur un canvas de tuiles : les calques sont
+// dessines l'un apres l'autre (fond puis surcouches, ex. cadastre sur le plan),
+// les tuiles d'un meme calque en parallele. Les tuiles absentes sont ignorees.
+const drawTileStack = async (ctx, stack, zoom, tileXmin, tileXmax, tileYmin, tileYmax) => {
+  for (const layerKey of stack) {
+    const jobs = [];
+    for (let ty = tileYmin; ty <= tileYmax; ty++) {
+      for (let tx = tileXmin; tx <= tileXmax; tx++) {
+        const url = buildTileUrl(layerKey, zoom, tx, ty);
+        if (!url) continue;
+        const dx = (tx - tileXmin) * 256;
+        const dy = (ty - tileYmin) * 256;
+        jobs.push(fetchTileAsImg(url).then(img => { if (img) ctx.drawImage(img, dx, dy, 256, 256); }));
+      }
+    }
+    await Promise.all(jobs);
+  }
+};
+
+// Resout une cle de vue vers sa definition (fallback sur le rendu historique).
+const resolveView = (viewKey, fallbackKey) => PDF_MAP_VIEWS[viewKey] || PDF_MAP_VIEWS[fallbackKey];
+
 // ─── GENERATION CARTE SATELLITE (Canvas natif + tuiles) ──────────────────────
 
 // IGN Itinéraires (libre, France) — remplace OSRM demo, avec retry
@@ -236,7 +248,7 @@ const fetchIgnRoutePdf = async (from, to, retries = 2) => {
   return null;
 };
 
-const buildMapCanvas = async (visit, THEME) => {
+const buildMapCanvas = async (visit, THEME, viewKey = DEFAULT_PDF_VIEWS.overview) => {
   const tracking = visit.gpsTracking || {};
   const coordinates = tracking.coordinates || [];
   const observations = visit.observations || [];
@@ -318,17 +330,9 @@ const buildMapCanvas = async (visit, THEME) => {
   ctx.fillStyle = '#e8edf2';
   ctx.fillRect(0, 0, tilesW, tilesH);
 
-  // Charger et assembler les tuiles satellite IGN Géoplateforme (ORTHOPHOTOS)
-  const tilePromises = [];
-  for (let ty = tileYmin; ty <= tileYmax; ty++) {
-    for (let tx = tileXmin; tx <= tileXmax; tx++) {
-      const url = `https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX=${zoom}&TILEROW=${ty}&TILECOL=${tx}&FORMAT=image/jpeg`;
-      const dx = (tx - tileXmin) * 256;
-      const dy = (ty - tileYmin) * 256;
-      tilePromises.push(fetchTileAsImg(url).then(img => { if (img) ctx.drawImage(img, dx, dy, 256, 256); }));
-    }
-  }
-  await Promise.all(tilePromises);
+  // Charger et assembler les tuiles IGN Géoplateforme selon la vue choisie
+  const view = resolveView(viewKey, DEFAULT_PDF_VIEWS.overview);
+  await drawTileStack(ctx, view.stack, zoom, tileXmin, tileXmax, tileYmin, tileYmax);
 
   // Offset pour convertir les coordonnees monde en coordonnees canvas
   const worldOriginX = tileXmin * 256;
@@ -523,7 +527,8 @@ const drawMapPage = async (doc, mapImage, visit, THEME) => {
 
 // ─── MINI-CARTE PAR OBSERVATION ──────────────────────────────────────────────
 
-const buildObsMiniMap = async (obs, visit, THEME, obsIdx) => {
+// Retourne un tableau de vignettes (1 image, ou 2 en vue « Satellite + Plan »).
+const buildObsMiniMap = async (obs, visit, THEME, obsIdx, viewKey = DEFAULT_PDF_VIEWS.obs) => {
   const tracking = visit.gpsTracking || {};
   const coordinates = tracking.coordinates || [];
   const hasSeg = obs.segmentFrom && obs.segmentTo;
@@ -607,26 +612,6 @@ const buildObsMiniMap = async (obs, visit, THEME, obsIdx) => {
   const tilesH = (tileYmax - tileYmin + 1) * 256;
 
   const SIZE = 512;
-  const canvas = document.createElement('canvas');
-  canvas.width = tilesW;
-  canvas.height = tilesH;
-  const ctx = canvas.getContext('2d');
-
-  // Fond gris clair (fallback si tuiles non chargees)
-  ctx.fillStyle = '#e8edf2';
-  ctx.fillRect(0, 0, tilesW, tilesH);
-
-  // Charger tuiles IGN PlanIGNv2 (Géoplateforme — libre, CORS OK)
-  const tilePromises = [];
-  for (let ty = tileYmin; ty <= tileYmax; ty++) {
-    for (let tx = tileXmin; tx <= tileXmax; tx++) {
-      const url = `https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX=${zoom}&TILEROW=${ty}&TILECOL=${tx}&FORMAT=image/png`;
-      const dx = (tx - tileXmin) * 256;
-      const dy = (ty - tileYmin) * 256;
-      tilePromises.push(fetchTileAsImg(url).then(img => { if (img) ctx.drawImage(img, dx, dy, 256, 256); }));
-    }
-  }
-  await Promise.all(tilePromises);
 
   // Origine du canvas tuiles en coordonnées monde
   const worldOriginX = tileXmin * 256;
@@ -638,90 +623,115 @@ const buildObsMiniMap = async (obs, visit, THEME, obsIdx) => {
   const cx = centerPxX - worldOriginX;
   const cy = centerPxY - worldOriginY;
 
-  const crop = document.createElement('canvas');
-  crop.width = SIZE;
-  crop.height = SIZE;
-  const cctx = crop.getContext('2d');
-  // Fond gris clair pour les zones hors tuiles
-  cctx.fillStyle = '#e8edf2';
-  cctx.fillRect(0, 0, SIZE, SIZE);
-  cctx.drawImage(canvas, cx - half, cy - half, cropSpan, cropSpan, 0, 0, SIZE, SIZE);
-
   // Fonctions de coordonnées dans le crop
   const scale = SIZE / cropSpan;
   const cToX = (lng) => (toX(lng) - (cx - half)) * scale;
   const cToY = (lat) => (toY(lat) - (cy - half)) * scale;
 
-  // Dessiner le tracé GPS à proximité
-  if (nearbyCoords.length > 1) {
-    cctx.beginPath();
-    cctx.moveTo(cToX(nearbyCoords[0].lng), cToY(nearbyCoords[0].lat));
-    for (let i = 1; i < nearbyCoords.length; i++) cctx.lineTo(cToX(nearbyCoords[i].lng), cToY(nearbyCoords[i].lat));
-    cctx.strokeStyle = 'rgba(59,130,246,0.5)';
-    cctx.lineWidth = 3;
-    cctx.lineJoin = 'round';
-    cctx.lineCap = 'round';
-    cctx.stroke();
-  }
-
+  // Route du segment résolue UNE fois : la vue double rend deux vignettes, il ne
+  // faut pas refaire l'appel itinéraire IGN pour chacune.
+  let segPts = null;
   if (hasSeg) {
-    // Route stockée ou fallback IGN
     const route = Array.isArray(obs.segmentRoute) && obs.segmentRoute.length >= 2
       ? obs.segmentRoute
       : await fetchIgnRoutePdf(obs.segmentFrom, obs.segmentTo);
-    const pts = route || [obs.segmentFrom, obs.segmentTo];
-
-    // Ombre
-    cctx.beginPath();
-    cctx.moveTo(cToX(pts[0].lng), cToY(pts[0].lat));
-    for (let j = 1; j < pts.length; j++) cctx.lineTo(cToX(pts[j].lng), cToY(pts[j].lat));
-    cctx.strokeStyle = 'rgba(0,0,0,0.3)';
-    cctx.lineWidth = 8;
-    cctx.lineJoin = 'round';
-    cctx.lineCap = 'round';
-    cctx.stroke();
-
-    // Trait orange
-    cctx.beginPath();
-    cctx.moveTo(cToX(pts[0].lng), cToY(pts[0].lat));
-    for (let j = 1; j < pts.length; j++) cctx.lineTo(cToX(pts[j].lng), cToY(pts[j].lat));
-    cctx.strokeStyle = '#f97316';
-    cctx.lineWidth = 5;
-    cctx.lineJoin = 'round';
-    cctx.lineCap = 'round';
-    cctx.stroke();
-
-    // Points départ/arrivée
-    const sx = cToX(obs.segmentFrom.lng), sy = cToY(obs.segmentFrom.lat);
-    cctx.beginPath(); cctx.arc(sx, sy, 8, 0, Math.PI * 2);
-    cctx.fillStyle = '#22c55e'; cctx.fill();
-    cctx.strokeStyle = '#fff'; cctx.lineWidth = 3; cctx.stroke();
-
-    const ex = cToX(obs.segmentTo.lng), ey = cToY(obs.segmentTo.lat);
-    cctx.beginPath(); cctx.arc(ex, ey, 8, 0, Math.PI * 2);
-    cctx.fillStyle = '#ef4444'; cctx.fill();
-    cctx.strokeStyle = '#fff'; cctx.lineWidth = 3; cctx.stroke();
-  } else {
-    // Marqueur simple
-    const ox = cToX(centerLng), oy = cToY(centerLat);
-    cctx.beginPath(); cctx.arc(ox + 1, oy + 1, 14, 0, Math.PI * 2);
-    cctx.fillStyle = 'rgba(0,0,0,0.3)'; cctx.fill();
-    cctx.beginPath(); cctx.arc(ox, oy, 13, 0, Math.PI * 2);
-    cctx.fillStyle = `rgb(${THEME.primary[0]},${THEME.primary[1]},${THEME.primary[2]})`; cctx.fill();
-    cctx.strokeStyle = '#fff'; cctx.lineWidth = 3; cctx.stroke();
-    cctx.fillStyle = '#fff';
-    cctx.font = 'bold 16px system-ui';
-    cctx.textAlign = 'center';
-    cctx.textBaseline = 'middle';
-    cctx.fillText(String(obsIdx + 1), ox, oy);
+    segPts = route || [obs.segmentFrom, obs.segmentTo];
   }
 
-  // Bordure arrondie
-  cctx.strokeStyle = 'rgba(255,255,255,0.6)';
-  cctx.lineWidth = 4;
-  cctx.strokeRect(2, 2, SIZE - 4, SIZE - 4);
+  // Rend une vignette pour une pile de calques — cadrage identique pour toutes
+  const renderCrop = async (stack) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = tilesW;
+    canvas.height = tilesH;
+    const ctx = canvas.getContext('2d');
 
-  return crop.toDataURL('image/jpeg', 0.85);
+    // Fond gris clair (fallback si tuiles non chargees)
+    ctx.fillStyle = '#e8edf2';
+    ctx.fillRect(0, 0, tilesW, tilesH);
+    await drawTileStack(ctx, stack, zoom, tileXmin, tileXmax, tileYmin, tileYmax);
+
+    const crop = document.createElement('canvas');
+    crop.width = SIZE;
+    crop.height = SIZE;
+    const cctx = crop.getContext('2d');
+    // Fond gris clair pour les zones hors tuiles
+    cctx.fillStyle = '#e8edf2';
+    cctx.fillRect(0, 0, SIZE, SIZE);
+    cctx.drawImage(canvas, cx - half, cy - half, cropSpan, cropSpan, 0, 0, SIZE, SIZE);
+
+    // Dessiner le tracé GPS à proximité
+    if (nearbyCoords.length > 1) {
+      cctx.beginPath();
+      cctx.moveTo(cToX(nearbyCoords[0].lng), cToY(nearbyCoords[0].lat));
+      for (let i = 1; i < nearbyCoords.length; i++) cctx.lineTo(cToX(nearbyCoords[i].lng), cToY(nearbyCoords[i].lat));
+      cctx.strokeStyle = 'rgba(59,130,246,0.5)';
+      cctx.lineWidth = 3;
+      cctx.lineJoin = 'round';
+      cctx.lineCap = 'round';
+      cctx.stroke();
+    }
+
+    if (hasSeg) {
+      const pts = segPts;
+
+      // Ombre
+      cctx.beginPath();
+      cctx.moveTo(cToX(pts[0].lng), cToY(pts[0].lat));
+      for (let j = 1; j < pts.length; j++) cctx.lineTo(cToX(pts[j].lng), cToY(pts[j].lat));
+      cctx.strokeStyle = 'rgba(0,0,0,0.3)';
+      cctx.lineWidth = 8;
+      cctx.lineJoin = 'round';
+      cctx.lineCap = 'round';
+      cctx.stroke();
+
+      // Trait orange
+      cctx.beginPath();
+      cctx.moveTo(cToX(pts[0].lng), cToY(pts[0].lat));
+      for (let j = 1; j < pts.length; j++) cctx.lineTo(cToX(pts[j].lng), cToY(pts[j].lat));
+      cctx.strokeStyle = '#f97316';
+      cctx.lineWidth = 5;
+      cctx.lineJoin = 'round';
+      cctx.lineCap = 'round';
+      cctx.stroke();
+
+      // Points départ/arrivée
+      const sx = cToX(obs.segmentFrom.lng), sy = cToY(obs.segmentFrom.lat);
+      cctx.beginPath(); cctx.arc(sx, sy, 8, 0, Math.PI * 2);
+      cctx.fillStyle = '#22c55e'; cctx.fill();
+      cctx.strokeStyle = '#fff'; cctx.lineWidth = 3; cctx.stroke();
+
+      const ex = cToX(obs.segmentTo.lng), ey = cToY(obs.segmentTo.lat);
+      cctx.beginPath(); cctx.arc(ex, ey, 8, 0, Math.PI * 2);
+      cctx.fillStyle = '#ef4444'; cctx.fill();
+      cctx.strokeStyle = '#fff'; cctx.lineWidth = 3; cctx.stroke();
+    } else {
+      // Marqueur simple
+      const ox = cToX(centerLng), oy = cToY(centerLat);
+      cctx.beginPath(); cctx.arc(ox + 1, oy + 1, 14, 0, Math.PI * 2);
+      cctx.fillStyle = 'rgba(0,0,0,0.3)'; cctx.fill();
+      cctx.beginPath(); cctx.arc(ox, oy, 13, 0, Math.PI * 2);
+      cctx.fillStyle = `rgb(${THEME.primary[0]},${THEME.primary[1]},${THEME.primary[2]})`; cctx.fill();
+      cctx.strokeStyle = '#fff'; cctx.lineWidth = 3; cctx.stroke();
+      cctx.fillStyle = '#fff';
+      cctx.font = 'bold 16px system-ui';
+      cctx.textAlign = 'center';
+      cctx.textBaseline = 'middle';
+      cctx.fillText(String(obsIdx + 1), ox, oy);
+    }
+
+    // Bordure arrondie
+    cctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    cctx.lineWidth = 4;
+    cctx.strokeRect(2, 2, SIZE - 4, SIZE - 4);
+
+    return crop.toDataURL('image/jpeg', 0.85);
+  };
+
+  // Vue double → deux vignettes (satellite + plan) sur le même cadrage
+  const view = resolveView(viewKey, DEFAULT_PDF_VIEWS.obs);
+  const stacks = view.dual || [view.stack];
+  const images = await Promise.all(stacks.map(stack => renderCrop(stack)));
+  return images.filter(Boolean);
 };
 
 // ─── PAGES OBSERVATIONS ───────────────────────────────────────────────────────
@@ -777,7 +787,7 @@ const preloadObsImages = async (observations) => {
   return cache;
 };
 
-const drawObservations = async (doc, visit, THEME) => {
+const drawObservations = async (doc, visit, THEME, obsViewKey = DEFAULT_PDF_VIEWS.obs) => {
   const observations = visit.observations || [];
   if (!observations.length) return;
 
@@ -794,9 +804,9 @@ const drawObservations = async (doc, visit, THEME) => {
   doc.text('Observations', M.left, y);
   y += 10;
 
-  // Pré-générer toutes les mini-cartes en parallèle
+  // Pré-générer toutes les mini-cartes en parallèle (1 ou 2 vignettes chacune)
   const miniMaps = await Promise.all(
-    observations.map((obs, i) => buildObsMiniMap(obs, visit, THEME, i).catch(() => null))
+    observations.map((obs, i) => buildObsMiniMap(obs, visit, THEME, i, obsViewKey).catch(() => null))
   );
 
   for (let i = 0; i < observations.length; i++) {
@@ -804,12 +814,15 @@ const drawObservations = async (doc, visit, THEME) => {
     const obsNum = i + 1;
     const text = stripHtml(obs.text);
     const images = obs.images || [];
-    const miniMap = miniMaps[i];
+    const mapImages = miniMaps[i] || [];
 
-    // Dimensions mini-carte
-    const MAP_W = 55; // largeur mini-carte en mm
-    const MAP_H = 55;
-    const hasMap = !!miniMap;
+    // Dimensions mini-carte — la colonne fait toujours 55 mm ; en vue double,
+    // deux vignettes carrées se partagent la largeur (gouttière 3 mm).
+    const MAP_W = 55; // largeur de la colonne carte en mm
+    const GUTTER = 3;
+    const tileW = mapImages.length > 1 ? (MAP_W - GUTTER) / 2 : MAP_W;
+    const MAP_H = tileW; // vignettes carrées
+    const hasMap = mapImages.length > 0;
     const textColW = hasMap ? CW - MAP_W - 5 - 13 : CW - 13; // largeur texte réduite si carte
 
     // Estimer la hauteur nécessaire — mesurer avec la police de DESSIN du texte
@@ -862,14 +875,16 @@ const drawObservations = async (doc, visit, THEME) => {
 
     y += 11;
 
-    // ── Mini-carte à droite ──
+    // ── Mini-carte(s) à droite ──
     if (hasMap) {
-      const mapX = PW - M.right - MAP_W;
       const mapY = obsStartY;
       doc.setDrawColor(...THEME.borders);
       doc.setLineWidth(0.3);
-      doc.roundedRect(mapX - 0.5, mapY - 0.5, MAP_W + 1, MAP_H + 1, 2, 2, 'S');
-      doc.addImage(miniMap, 'JPEG', mapX, mapY, MAP_W, MAP_H);
+      mapImages.forEach((img, k) => {
+        const mapX = PW - M.right - MAP_W + k * (tileW + GUTTER);
+        doc.roundedRect(mapX - 0.5, mapY - 0.5, tileW + 1, MAP_H + 1, 2, 2, 'S');
+        doc.addImage(img, 'JPEG', mapX, mapY, tileW, MAP_H);
+      });
       doc.setLineWidth(0.2);
     }
 
@@ -996,8 +1011,13 @@ const drawObservations = async (doc, visit, THEME) => {
 
 // ─── EXPORT PRINCIPAL ─────────────────────────────────────────────────────────
 
+// options.obsMapView / options.overviewMapView : cles de PDF_MAP_VIEWS (ignTiles).
 export const generateSiteVisitPdf = async (visit, options = {}) => {
-  const { branding = null } = options;
+  const {
+    branding = null,
+    obsMapView = DEFAULT_PDF_VIEWS.obs,
+    overviewMapView = DEFAULT_PDF_VIEWS.overview,
+  } = options;
   const THEME = buildTheme(branding);
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
@@ -1024,14 +1044,14 @@ export const generateSiteVisitPdf = async (visit, options = {}) => {
     drawCoverPage(doc, visit, THEME, logoMoe, branding);
   }
 
-  // ── Page 2 : Vue aerienne (generee via Canvas + tuiles ArcGIS) ──
+  // ── Page 2 : Vue d'ensemble (generee via Canvas + tuiles IGN) ──
   if (visit.gpsTracking?.coordinates?.length > 0) {
-    const mapImage = await buildMapCanvas(visit, THEME);
+    const mapImage = await buildMapCanvas(visit, THEME, overviewMapView);
     if (mapImage) await drawMapPage(doc, mapImage, visit, THEME);
   }
 
   // ── Pages 3+ : Observations ──
-  await drawObservations(doc, visit, THEME);
+  await drawObservations(doc, visit, THEME, obsMapView);
 
   // ── En-tetes et pieds de page (pages 2+) ──
   const totalPages = doc.internal.getNumberOfPages();

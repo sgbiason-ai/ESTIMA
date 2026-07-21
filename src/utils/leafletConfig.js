@@ -3,18 +3,13 @@
 // Centralise la config dupliquée entre SiteVisitsView, TeslaModeView, GpsMapView.
 
 import L from 'leaflet';
+import { IGN_BASE, TILE_LAYERS } from './ignTiles';
 
 // ─── Tile Layers IGN ─────────────────────────────────────────────────────────
 // IGN Géoplateforme (libre, officiel, France) — fair-use ~50 req/s soutenu
+// Definitions dans ignTiles.js (module pur, reutilise par les generateurs PDF).
 
-export const IGN_BASE = 'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}';
-
-export const TILE_LAYERS = {
-  satellite: { url: `${IGN_BASE}&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&FORMAT=image/jpeg`, maxZoom: 19, label: 'Satellite' },
-  plan:      { url: `${IGN_BASE}&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&FORMAT=image/png`, maxZoom: 19, label: 'Plan' },
-  cadastre:  { url: `${IGN_BASE}&LAYER=CADASTRALPARCELS.PARCELLAIRE_EXPRESS&FORMAT=image/png`, maxZoom: 20, label: 'Cadastre' },
-  abf:       { type: 'wms', url: 'https://data.geopf.fr/wms-v/ows', layers: 'monument_historique', maxZoom: 20, label: 'ABF (MH)', overlayOnly: true },
-};
+export { IGN_BASE, TILE_LAYERS };
 
 /** Crée un L.TileLayer (ou WMS) à partir d'une clé TILE_LAYERS */
 export function createTileLayer(key, opacity = 1) {

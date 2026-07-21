@@ -37,6 +37,7 @@ import {
   FollowPosition, UserInteractionDetector, FitBoundsOnce,
 } from './siteVisits/MapSubComponents';
 import { VisitInfoModal, ObsEditModal } from './siteVisits/SiteVisitModals';
+import SiteVisitExportModal from './siteVisits/SiteVisitExportModal';
 import ImageLightbox from './siteVisits/ImageLightbox';
 import SiteVisitShareModal from './siteVisits/SiteVisitShareModal';
 import { usePresence, useCoEditors } from '../hooks/usePresence';
@@ -91,6 +92,7 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
   const [showShareModal, setShowShareModal] = useState(false);
   const [editingObs, setEditingObs] = useState(null);
   const [exporting, setExporting] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
   const [lightbox, setLightbox] = useState(null); // { images: [...], index: number }
 
   // ── Segments + OSRM ──
@@ -460,13 +462,13 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
     };
   }, []);
 
-  // ── Export PDF ──
-  const handleExportPdf = useCallback(async () => {
+  // ── Export PDF (vues cartographiques choisies dans la modale) ──
+  const runExportPdf = useCallback(async (views) => {
     if (!fullVisit) return;
     setExporting(true);
     try {
       const { generateSiteVisitPdf } = await import('../utils/pdfSiteVisitGenerator');
-      await generateSiteVisitPdf(fullVisit, { branding: masterBranding });
+      await generateSiteVisitPdf(fullVisit, { branding: masterBranding, ...views });
     } catch (e) { console.error('Erreur export PDF:', e); }
     setExporting(false);
   }, [fullVisit, masterBranding]);
@@ -618,6 +620,7 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
       <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="siteVisits" />
       <VisitInfoModal isOpen={showInfoModal} onClose={() => setShowInfoModal(false)} visit={fullVisit} onSave={handleSaveInfo} />
       <ObsEditModal isOpen={!!editingObs} onClose={() => setEditingObs(null)} obs={editingObs} onSave={handleSaveObsText} companyId={companyId} visitId={fullVisit?.id} />
+      <SiteVisitExportModal isOpen={showExportModal} onClose={() => setShowExportModal(false)} visit={fullVisit} onExport={runExportPdf} />
       <SiteVisitShareModal
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
@@ -737,7 +740,7 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition active:scale-[0.97] border border-indigo-200">
                     <Share2 size={13} /> Partager{fullVisit.sharedWith?.length ? ` (${fullVisit.sharedWith.length})` : ''}
                   </button>}
-                  <button onClick={handleExportPdf} disabled={exporting}
+                  <button onClick={() => setShowExportModal(true)} disabled={exporting}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition active:scale-[0.97] ${exporting ? 'bg-gray-400 text-gray-200 cursor-wait' : 'bg-gray-900 text-white hover:bg-gray-800'}`}>
                     <FileDown size={13} className={exporting ? 'animate-pulse' : ''} /> {exporting ? 'Export...' : 'PDF'}
                   </button>

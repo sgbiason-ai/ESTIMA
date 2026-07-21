@@ -16,6 +16,7 @@ import {
 } from '../../utils/geoHelpers';
 import { deleteSiteVisitImage } from '../../utils/siteVisitImageStorage';
 import SiteVisitShareModal from '../../views/siteVisits/SiteVisitShareModal';
+import SiteVisitExportModal from '../../views/siteVisits/SiteVisitExportModal';
 
 // ─── Sous-composants ───────────────────────────────────────────────────────
 
@@ -224,6 +225,7 @@ export default function SiteVisitDetailView({ visit, onSave, onUpdateSharing, cu
   const [viewingImage, setViewingImage] = useState(null);
   const [editingInfo, setEditingInfo] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
   const [localVisit, setLocalVisit] = useState(visit);
   const canEdit = visit?.isOwner === true;
 
@@ -458,11 +460,12 @@ export default function SiteVisitDetailView({ visit, onSave, onUpdateSharing, cu
 
   const observations = localVisit.observations || [];
 
-  // ── Export PDF ──
-  const handleExportPdf = useCallback(async () => {
+  // ── Export PDF (vues cartographiques choisies dans la modale) ──
+  const runExportPdf = useCallback(async (views) => {
     try {
+      onToast?.('Génération du PDF...');
       const { generateSiteVisitPdf } = await import('../../utils/pdfSiteVisitGenerator');
-      await generateSiteVisitPdf(localVisit, { branding });
+      await generateSiteVisitPdf(localVisit, { branding, ...views });
       onToast?.('PDF téléchargé');
     } catch (err) {
       console.error('Export PDF visite:', err);
@@ -544,7 +547,7 @@ export default function SiteVisitDetailView({ visit, onSave, onUpdateSharing, cu
             <div className="flex items-center gap-2 shrink-0" onClick={e => e.stopPropagation()}>
               <span className="text-[12px] text-gray-400">{dateFr(localVisit.date)}</span>
               {/* PDF — agrandi + libellé, séparé de l'édition */}
-              <button onClick={handleExportPdf}
+              <button onClick={() => setShowExportModal(true)}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-50 text-red-600 text-[13px] font-bold active:bg-red-100 active:scale-[0.97] transition">
                 <Icon name="download" size={16} color="#ef4444" />
                 PDF
@@ -634,6 +637,9 @@ export default function SiteVisitDetailView({ visit, onSave, onUpdateSharing, cu
           setLocalVisit(prev => ({ ...prev, sharedWith: members, accessUids: [currentUser.uid, ...members.map(member => member.uid)] }));
           onToast?.('Partage mis à jour');
         }} />
+
+      <SiteVisitExportModal isOpen={showExportModal} onClose={() => setShowExportModal(false)}
+        visit={localVisit} onExport={runExportPdf} />
 
       {/* Éditeur maintenant inline dans le content ci-dessus */}
     </div>
