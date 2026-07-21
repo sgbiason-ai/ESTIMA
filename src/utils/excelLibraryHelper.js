@@ -74,9 +74,9 @@ function richTextToHtml(cell) {
 
         if (part) {
           let escapedPart = part.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-          if (font.bold) escapedPart = `<strong>${escapPart}</strong>`;
-          if (font.italic) escapedPart = `<em>${escapPart}</em>`;
-          if (font.underline) escapedPart = `<u>${escapPart}</u>`;
+          if (font.bold) escapedPart = `<strong>${escapedPart}</strong>`;
+          if (font.italic) escapedPart = `<em>${escapedPart}</em>`;
+          if (font.underline) escapedPart = `<u>${escapedPart}</u>`;
           currentParagraph += escapedPart;
         }
       });
