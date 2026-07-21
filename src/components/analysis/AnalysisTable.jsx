@@ -4,13 +4,20 @@ import { formatPrice, normalizeUnitSymbol } from '../../utils/helpers';
 import { COMPANY_STYLES } from '../../utils/analysisConstants';
 import { computeOABThreshold as calculateOABThreshold, computePriceReference, getEffectiveOffers, getEffectiveVariantOffers, getEffectiveVariantNewItems, getCompanyRabaisPct, getEffectiveConclusion } from '../../utils/analysisCompute';
 import OabDetailModal from './OabDetailModal';
+import { useNumericDraft } from './useNumericDraft';
 
 // --- SOUS-COMPOSANT : Cellule de Prix ---
 // anomaly: { type: 'low' | 'high', z, mean, deltaPct, n } | null
 // nego: { initialPu } | null — prix modifié en phase après négociation
+// Saisie tamponnée (useNumericDraft) : commit au blur/Entrée, Échap annule.
 const PriceCell = ({ value, onChange, style, anomaly, nego = null }) => {
   const [isEditing, setIsEditing] = useState(false);
   const inputRef = useRef(null);
+  const draftProps = useNumericDraft({
+    value,
+    onCommit: onChange,
+    onDone: () => setIsEditing(false),
+  });
 
   useEffect(() => {
     if (isEditing && inputRef.current) inputRef.current.focus();
@@ -29,13 +36,10 @@ const PriceCell = ({ value, onChange, style, anomaly, nego = null }) => {
     return (
       <input
         ref={inputRef}
-        type="number"
-        value={value || ''}
-        onChange={(e) => onChange(e.target.value)}
-        onBlur={() => setIsEditing(false)}
-        onKeyDown={(e) => { if (e.key === 'Enter') setIsEditing(false); }}
+        type="text"
+        {...draftProps}
         className="w-full bg-white border border-blue-400 rounded px-1 text-right text-[11px] font-bold text-slate-800 outline-none p-0 tabular-nums tracking-tight shadow-md z-50 relative"
-        placeholder="0.00"
+        placeholder="0,00"
       />
     );
   }
@@ -63,6 +67,22 @@ const PriceCell = ({ value, onChange, style, anomaly, nego = null }) => {
         {value ? formatPrice(value) : '-'}
       </span>
     </div>
+  );
+};
+
+// --- SOUS-COMPOSANT : Rabais commercial négo (%) ---
+// Composant à part entière (et non un <input> inline dans le .map des colonnes)
+// pour pouvoir porter le tampon de saisie useNumericDraft.
+const NegoRabaisInput = ({ value, onCommit }) => {
+  const draftProps = useNumericDraft({ value: value ?? null, onCommit });
+  return (
+    <input
+      type="text"
+      {...draftProps}
+      placeholder="0"
+      className="w-11 bg-white/15 border border-white/30 rounded px-1 text-right text-[10px] font-bold text-white outline-none focus:ring-1 ring-white/50 tabular-nums placeholder:text-white/40"
+      title="Rabais commercial en % consenti sur le Total HT (déduit du montant noté)"
+    />
   );
 };
 
@@ -475,13 +495,9 @@ const AnalysisTable = ({
                       {negoActive && col.kind === 'base' && updateCompanyNegoRabais && (
                         <div className="flex items-center justify-center gap-1 text-[9px] text-white/90 font-semibold">
                           <span className="uppercase tracking-wider">Rabais</span>
-                          <input
-                            type="number" min="0" max="100" step="0.1"
-                            value={company.negoRabaisPct ?? ''}
-                            onChange={(e) => updateCompanyNegoRabais(company.id, e.target.value)}
-                            placeholder="0"
-                            className="w-11 bg-white/15 border border-white/30 rounded px-1 text-right text-[10px] font-bold text-white outline-none focus:ring-1 ring-white/50 tabular-nums placeholder:text-white/40"
-                            title="Rabais commercial en % consenti sur le Total HT (déduit du montant noté)"
+                          <NegoRabaisInput
+                            value={company.negoRabaisPct}
+                            onCommit={(v) => updateCompanyNegoRabais(company.id, v)}
                           />
                           <span>%</span>
                         </div>
