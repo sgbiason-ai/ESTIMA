@@ -173,6 +173,56 @@ describe('computeChaptersData', () => {
   it('retourne [] si le projet est vide', () => {
     expect(computeChaptersData(null, companies, qtyMap)).toEqual([]);
   });
+
+  // ── groupPath : hiérarchie des sous-chapitres conservée malgré l'aplatissement
+  describe('groupPath (sous-chapitres)', () => {
+    const nested = {
+      chapters: [
+        {
+          id: 'c1', title: 'Lot 1',
+          children: [
+            { type: 'item', id: 'racine' },
+            {
+              id: 'sc1', title: 'Terrassements', type: 'chapter',
+              children: [
+                { type: 'item', id: 'sc1-a' },
+                {
+                  id: 'sc2', title: 'Déblais', type: 'chapter',
+                  children: [{ type: 'item', id: 'sc2-a' }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    it('un article posé sous le chapitre racine a un groupPath vide', () => {
+      const [chap] = computeChaptersData(nested, [], {});
+      expect(chap.items.find(i => i.id === 'racine').groupPath).toEqual([]);
+    });
+
+    it('un article porte la chaîne de ses sous-chapitres, racine exclue', () => {
+      const [chap] = computeChaptersData(nested, [], {});
+      expect(chap.items.find(i => i.id === 'sc1-a').groupPath)
+        .toEqual([{ id: 'sc1', title: 'Terrassements' }]);
+    });
+
+    it('imbrication profonde : la chaîne complète est conservée (N niveaux)', () => {
+      const [chap] = computeChaptersData(nested, [], {});
+      expect(chap.items.find(i => i.id === 'sc2-a').groupPath).toEqual([
+        { id: 'sc1', title: 'Terrassements' },
+        { id: 'sc2', title: 'Déblais' },
+      ]);
+    });
+
+    it('items reste PLAT et dans l\'ordre du DQE (contrat des 4 exports)', () => {
+      const [chap] = computeChaptersData(nested, [], {});
+      expect(chap.items.map(i => i.id)).toEqual(['racine', 'sc1-a', 'sc2-a']);
+      // chapterId/chapterTitle restent ceux du chapitre RACINE
+      expect(chap.items.every(i => i.chapterId === 'c1')).toBe(true);
+    });
+  });
 });
 
 // ── Phase après négociation : offres effectives + comparatif ─────────────────

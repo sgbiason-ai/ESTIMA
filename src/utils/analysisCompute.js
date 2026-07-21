@@ -416,7 +416,11 @@ export function computeChaptersData(project, companies, clientQtyMap, basis = 'i
 
   return project.chapters.map(chapter => {
     const items = [];
-    const extract = (nodes) => {
+    // groupPath = chaîne des sous-chapitres traversés (chapitre racine EXCLU).
+    // L'arbre est aplati (contrat `items` plat consommé par les 4 générateurs
+    // d'export), mais chaque article garde de quoi reconstituer sa hiérarchie
+    // au rendu — cf. AnalysisTable.buildGroupTree.
+    const extract = (nodes, groupPath) => {
       nodes.forEach(node => {
         if (node.type === 'item') {
           const activeQty       = qty[node.id] || 0;
@@ -452,13 +456,14 @@ export function computeChaptersData(project, companies, clientQtyMap, basis = 'i
             maxTotal: maxTotal === -Infinity ? 0 : maxTotal,
             chapterId:    chapter.id,
             chapterTitle: chapter.title,
+            groupPath,
           });
         } else if (node.children) {
-          extract(node.children);
+          extract(node.children, [...groupPath, { id: node.id, title: node.title }]);
         }
       });
     };
-    extract(chapter.children || []);
+    extract(chapter.children || [], []);
     return { id: chapter.id, title: chapter.title, isOption: chapter.isOption, items };
   });
 }

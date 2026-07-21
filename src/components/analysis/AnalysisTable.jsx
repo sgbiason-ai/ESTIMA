@@ -137,6 +137,38 @@ const getHeatmapColor = (value, reference) => {
   return 'bg-slate-50 text-slate-600';
 };
 
+/**
+ * Reconstitue l'arborescence des sous-chapitres à partir du `groupPath` porté
+ * par chaque article (computeChaptersData aplatit l'arbre pour les exports).
+ * L'ordre du DQE est préservé : un groupe est inséré à la position de son
+ * premier article, donc un article posé directement sous le chapitre après un
+ * sous-chapitre reste bien après lui.
+ *
+ * Noeud : { id, title, entries: [{kind:'item'|'group', ...}], allItems }
+ * `allItems` = tous les articles descendants (sous-totaux) ; `entries` = le
+ * contenu direct, dans l'ordre.
+ */
+const buildGroupTree = (items) => {
+  const makeNode = (id, title) => ({ id, title, entries: [], byId: new Map(), allItems: [] });
+  const root = makeNode(null, '');
+  items.forEach(item => {
+    let node = root;
+    root.allItems.push(item);
+    (item.groupPath || []).forEach(seg => {
+      let child = node.byId.get(seg.id);
+      if (!child) {
+        child = makeNode(seg.id, seg.title);
+        node.byId.set(seg.id, child);
+        node.entries.push({ kind: 'group', node: child });
+      }
+      child.allItems.push(item);
+      node = child;
+    });
+    node.entries.push({ kind: 'item', item });
+  });
+  return root;
+};
+
 const AnalysisTable = ({
   chaptersData, companies, stats, updateCompanyOffer, renameCompany, removeCompany, project, bpuConfig, scoringConfig,
   analysisMode, averagesHorsOAB = {}, negoActive = false, updateCompanyNegoRabais = null,
@@ -292,6 +324,17 @@ const AnalysisTable = ({
   // Largeur sub-colonnes par "displayColumn" : 3 pour base, 4 pour variante (Qté var en plus)
   const subColsCount = (col) => (col.kind === 'variant' ? 4 : 3);
 
+  // Sous-totaux d'un lot d'articles (chapitre ou sous-chapitre) : même règle
+  // partout — quantité de la variante si elle en impose une, articles supprimés
+  // par la variante exclus.
+  const groupEstTotal = (list) => list.reduce((acc, i) => acc + (i.activeQty * i.price), 0);
+  const groupTotalsPerColumn = (list) => displayColumns.map(col => list.reduce((acc, i) => {
+    if (col.removedIds.has(i.id)) return acc;
+    const pu  = Number(col.offers[i.id] || 0);
+    const qty = col.quantities[i.id] != null ? Number(col.quantities[i.id]) : i.activeQty;
+    return acc + qty * pu;
+  }, 0));
+
 
   // Total recalculé par displayColumn (utilisé pour totaux footer + scoring)
   const columnTotals = useMemo(() => {
@@ -398,6 +441,9 @@ const AnalysisTable = ({
   const [collapsedChapters, setCollapsedChapters] = useState(() => new Set());
   const allChapterIds = chaptersData.map(c => c.id);
   const allCollapsed = allChapterIds.length > 0 && allChapterIds.every(id => collapsedChapters.has(id));
+  // Le même Set porte aussi les sous-chapitres repliés : le compteur ne doit
+  // décompter que les chapitres racine.
+  const collapsedRootCount = allChapterIds.filter(id => collapsedChapters.has(id)).length;
   const toggleChapter = (id) => setCollapsedChapters(prev => {
     const next = new Set(prev);
     if (next.has(id)) next.delete(id); else next.add(id);
@@ -411,7 +457,7 @@ const AnalysisTable = ({
       <div className="shrink-0 flex items-center justify-between gap-2 px-3 py-1.5 border-b border-slate-100 bg-slate-50/60">
         <span className="text-[10px] font-medium text-slate-400">
           {chaptersData.length} chapitre{chaptersData.length > 1 ? 's' : ''}
-          {collapsedChapters.size > 0 ? ` · ${collapsedChapters.size} replié${collapsedChapters.size > 1 ? 's' : ''}` : ''}
+          {collapsedRootCount > 0 ? ` · ${collapsedRootCount} replié${collapsedRootCount > 1 ? 's' : ''}` : ''}
         </span>
         <button
           type="button"
@@ -532,42 +578,15 @@ const AnalysisTable = ({
           
           <tbody className="bg-white divide-y divide-slate-100">
             {chaptersData.map((chapter) => {
-              const chapEstTotal = chapter.items.reduce((acc, item) => acc + (item.activeQty * item.price), 0);
-
-              const chapterTotalsPerColumn = displayColumns.map(col => {
-                return chapter.items.reduce((acc, i) => {
-                  if (col.removedIds.has(i.id)) return acc;
-                  const pu = Number(col.offers[i.id] || 0);
-                  const qty = col.quantities[i.id] != null ? Number(col.quantities[i.id]) : i.activeQty;
-                  return acc + qty * pu;
-                }, 0);
-              });
+              const chapEstTotal           = groupEstTotal(chapter.items);
+              const chapterTotalsPerColumn = groupTotalsPerColumn(chapter.items);
               const chapterOABThreshold = (analysisMode === 'oab') ? calculateOABThreshold(chapterTotalsPerColumn) : 0;
 
               const isCollapsed = collapsedChapters.has(chapter.id);
+              const groupTree = buildGroupTree(chapter.items);
 
-              return (
-                <React.Fragment key={chapter.id}>
-                  <tr
-                    className="bg-slate-50 border-y border-slate-200 cursor-pointer select-none hover:bg-slate-100 transition-colors"
-                    onClick={() => toggleChapter(chapter.id)}
-                    title={isCollapsed ? 'Déplier le chapitre' : 'Replier le chapitre'}
-                  >
-                    <td colSpan={5} style={STICKY.DESIG} className="px-2 py-1.5 bg-slate-50">
-                      <div className="flex items-center gap-2">
-                        <ChevronRight size={14} className={`text-slate-500 transition-transform ${isCollapsed ? '' : 'rotate-90'}`} />
-                        <span className="text-[11px] font-bold uppercase text-slate-800 truncate">{chapter.title}</span>
-                        {isCollapsed && (
-                          <span className="text-[9px] font-bold text-slate-400 normal-case">({chapter.items.length} article{chapter.items.length > 1 ? 's' : ''} replié{chapter.items.length > 1 ? 's' : ''})</span>
-                        )}
-                      </div>
-                    </td>
-                    {displayColumns.map(col => (
-                      <td key={`chap-${col.key}`} colSpan={subColsCount(col)} className="bg-slate-50" />
-                    ))}
-                  </tr>
-
-                  {!isCollapsed && chapter.items.map((item) => {
+              // Ligne d'article : identique quelle que soit sa profondeur.
+              const renderItemRow = (item) => {
                     const itemPrices = displayColumns.map(col => col.offers[item.id] || 0);
                     const medianStats = (analysisMode === 'oab') ? calculatePriceMedian(itemPrices) : null;
 
@@ -677,8 +696,96 @@ const AnalysisTable = ({
                         })}
                       </tr>
                     );
-                  })}
-                  
+              };
+
+              // Contenu d'un chapitre / sous-chapitre : articles et sous-groupes
+              // dans l'ordre du DQE, chaque sous-groupe avec son entête repliable
+              // et son sous-total. Récursif : profondeur non bornée.
+              const renderEntries = (node, depth) => node.entries.map(entry => {
+                if (entry.kind === 'item') return renderItemRow(entry.item);
+
+                const g          = entry.node;
+                const gCollapsed = collapsedChapters.has(g.id);
+                const gEstTotal  = groupEstTotal(g.allItems);
+                const gTotals    = groupTotalsPerColumn(g.allItems);
+                const nb         = g.allItems.length;
+
+                return (
+                  <React.Fragment key={`grp-${g.id}`}>
+                    <tr
+                      className="bg-slate-50 border-y border-slate-100 cursor-pointer select-none hover:bg-slate-100 transition-colors"
+                      onClick={() => toggleChapter(g.id)}
+                      title={gCollapsed ? 'Déplier le sous-chapitre' : 'Replier le sous-chapitre'}
+                    >
+                      <td colSpan={5} style={STICKY.DESIG} className="px-2 py-1 bg-slate-50">
+                        <div className="flex items-center gap-1.5" style={{ paddingLeft: 10 + depth * 14 }}>
+                          <span className="w-0.5 self-stretch bg-slate-300 rounded shrink-0" />
+                          <ChevronRight size={12} className={`text-slate-400 shrink-0 transition-transform ${gCollapsed ? '' : 'rotate-90'}`} />
+                          <span className="text-[10px] font-bold uppercase text-slate-600 truncate">{g.title}</span>
+                          {gCollapsed && (
+                            <span className="text-[9px] font-bold text-slate-400 normal-case shrink-0">({nb} article{nb > 1 ? 's' : ''} replié{nb > 1 ? 's' : ''})</span>
+                          )}
+                        </div>
+                      </td>
+                      {displayColumns.map(col => (
+                        <td key={`sub-${g.id}-${col.key}`} colSpan={subColsCount(col)} className="bg-slate-50" />
+                      ))}
+                    </tr>
+
+                    {!gCollapsed && renderEntries(g, depth + 1)}
+
+                    {/* Sous-total : visible même replié, c'est la valeur qu'on compare */}
+                    <tr className="border-b border-slate-100">
+                      <td colSpan={4} style={STICKY.DESIG} className="px-2 py-0.5 text-right text-[9px] font-bold uppercase text-slate-400 tracking-tight border-r border-slate-200 bg-slate-50">Total {g.title}</td>
+                      <td style={STICKY.EST_TOTAL} className="px-1 py-0.5 text-right border-r border-slate-200 text-[10px] font-bold text-slate-600 bg-slate-100/70 tabular-nums shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">{formatPrice(gEstTotal)}</td>
+                      {displayColumns.map((col, ci) => {
+                        const style     = COMPANY_STYLES[col.companyIndex % COMPANY_STYLES.length];
+                        const isVariant = col.kind === 'variant';
+                        const cellBg    = col.irregular ? 'bg-slate-100' : style.bg;
+                        const borderCls = isVariant ? style.variantBorder : style.border;
+                        const irregularOpacity = col.irregular ? 'opacity-60' : '';
+
+                        return (
+                          <React.Fragment key={`total-sub-${g.id}-${col.key}`}>
+                            {isVariant && <td className={`border-r ${borderCls} ${col.irregular ? 'bg-slate-100' : style.variantBg} ${irregularOpacity}`} />}
+                            <td className={`border-r ${borderCls} ${cellBg} ${irregularOpacity}`} />
+                            <td className={`px-1 py-0.5 text-right border-r ${borderCls} ${cellBg} text-[10px] font-bold text-slate-600 tabular-nums ${irregularOpacity}`}>
+                              {formatPrice(gTotals[ci])}
+                            </td>
+                            <td className={`px-0.5 py-0.5 text-center border-r border-slate-200 ${cellBg} ${irregularOpacity}`}>
+                              {renderDelta(gTotals[ci], gEstTotal)}
+                            </td>
+                          </React.Fragment>
+                        );
+                      })}
+                    </tr>
+                  </React.Fragment>
+                );
+              });
+
+              return (
+                <React.Fragment key={chapter.id}>
+                  <tr
+                    className="bg-slate-50 border-y border-slate-200 cursor-pointer select-none hover:bg-slate-100 transition-colors"
+                    onClick={() => toggleChapter(chapter.id)}
+                    title={isCollapsed ? 'Déplier le chapitre' : 'Replier le chapitre'}
+                  >
+                    <td colSpan={5} style={STICKY.DESIG} className="px-2 py-1.5 bg-slate-50">
+                      <div className="flex items-center gap-2">
+                        <ChevronRight size={14} className={`text-slate-500 transition-transform ${isCollapsed ? '' : 'rotate-90'}`} />
+                        <span className="text-[11px] font-bold uppercase text-slate-800 truncate">{chapter.title}</span>
+                        {isCollapsed && (
+                          <span className="text-[9px] font-bold text-slate-400 normal-case">({chapter.items.length} article{chapter.items.length > 1 ? 's' : ''} replié{chapter.items.length > 1 ? 's' : ''})</span>
+                        )}
+                      </div>
+                    </td>
+                    {displayColumns.map(col => (
+                      <td key={`chap-${col.key}`} colSpan={subColsCount(col)} className="bg-slate-50" />
+                    ))}
+                  </tr>
+
+                  {!isCollapsed && renderEntries(groupTree, 0)}
+
                   <tr className="bg-slate-100 border-t border-slate-200 border-b">
                     <td colSpan={4} style={STICKY.DESIG} className="px-2 py-1 text-right text-[10px] font-bold uppercase text-slate-500 tracking-tight border-r border-slate-200 bg-slate-100">Total {chapter.title}</td>
                     <td style={STICKY.EST_TOTAL} className="px-1 py-1 text-right border-r border-slate-200 text-[11px] font-black text-slate-700 bg-slate-200/50 tabular-nums shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">{formatPrice(chapEstTotal)}</td>
