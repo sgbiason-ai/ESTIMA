@@ -173,11 +173,79 @@ function joinThousandsSpaces(text) {
   return ref + ' ' + rest;
 }
 
+// Token purement numérique : "740", "740.00", "740,00"
+const NUMERIC_TOKEN = /^\d+(?:[.,]\d+)?$/;
+
+/**
+ * Parse une ligne dont les montants portent un symbole monétaire ("7 740,00 €").
+ *
+ * Le "€" est un ancrage que la passe token-based n'exploite pas : il borne la fin
+ * de chaque montant, ce qui permet de recoller les séparateurs de milliers
+ * français sans risquer de fusionner deux nombres distincts — écueil de
+ * joinThousandsSpaces, qui lit "1 550,00" (qté 1 × P.U. 550,00) comme 1550,00.
+ * L'ambiguïté restante est tranchée par la cohérence qté × P.U. ≈ montant.
+ *
+ * Sans le symbole, la passe token-based traite la ligne comme unité "€" et
+ * échoue (cf. DQE PDF d'entreprise dont chaque montant est suffixé "€").
+ *
+ * @returns {{ ref, designation, unit, qty, price, montant } | null} null si la
+ *   ligne ne porte pas au moins deux montants : les passes suivantes prennent le relais.
+ */
+function parseCurrencyAnchoredLine(text) {
+  const line = String(text || '').replace(/[\u00A0\u202F]/g, ' ').replace(/\s+/g, ' ').trim();
+  const segments = line.split('€');
+  if (segments.length < 3) return null; // il faut le P.U. ET le montant
+
+  // Montant : borné à gauche par le "€" du P.U., donc jamais ambigu
+  const montant = parseFrNumber(segments[segments.length - 2].trim().replace(/\s(?=\d{3}\b)/g, ''));
+  if (!Number.isFinite(montant)) return null;
+
+  const tokens = segments[segments.length - 3].split(' ').filter(Boolean);
+  if (tokens.length < 4 || !looksLikeRef(tokens[0])) return null;
+
+  // Le P.U. occupe 1 à 3 tokens ("740,00", "7 740,00", "1 234 567,00") ; passé le
+  // premier, chaque groupe de milliers fait exactement 3 chiffres.
+  for (let k = 1; k <= 3 && k < tokens.length; k++) {
+    const puTokens = tokens.slice(tokens.length - k);
+    if (!puTokens.every(t => NUMERIC_TOKEN.test(t))) break;
+    if (k > 1 && !puTokens.slice(1).every(t => /^\d{3}(?:[.,]\d+)?$/.test(t))) continue;
+    const price = parseFrNumber(puTokens.join(''));
+    if (!Number.isFinite(price)) continue;
+
+    // La quantité précède immédiatement le P.U. (elle peut aussi être en milliers)
+    let idx = tokens.length - k - 1;
+    const qtyTokens = [];
+    while (idx >= 1 && NUMERIC_TOKEN.test(tokens[idx])) { qtyTokens.unshift(tokens[idx]); idx--; }
+    if (qtyTokens.length === 0) continue;
+    const qty = parseFrNumber(qtyTokens.join(''));
+    if (!Number.isFinite(qty) || qty === 0) continue;
+
+    // Arbitrage : seule la lecture cohérente avec le montant de la ligne est retenue
+    const expected = qty * price;
+    if (Math.abs(expected - montant) / Math.max(Math.abs(expected), Math.abs(montant), 1) > 0.02) continue;
+
+    if (idx < 1 || !looksLikeUnit(tokens[idx])) continue;
+    const designation = tokens.slice(1, idx).join(' ').trim();
+    if (designation.length < 3) continue;
+
+    return { ref: tokens[0], designation, unit: tokens[idx], qty, price, montant };
+  }
+  return null;
+}
+
 /**
  * Wrapper qui tente plusieurs passes de parsing (du moins agressif au plus agressif).
  * Important pour les PDF scannés à OCR dégradé.
+ *
+ * Exportée pour les tests : c'est une fonction pure sur une ligne de texte, seul
+ * moyen de couvrir le parsing sans embarquer un PDF de fixture.
  */
-function parseArticleLine(rawText) {
+export function parseArticleLine(rawText) {
+  // Passe 0 : montants suffixés d'un symbole monétaire — ancrage fiable, tenté
+  // en premier. Rend null sur les lignes sans "€" : aucun effet sur les autres PDF.
+  const r0 = parseCurrencyAnchoredLine(fixOcrNumbers(cleanOcrLine(rawText)));
+  if (r0) return r0;
+
   // Passe 1 : nettoyage standard, SANS jonction millier (cas normal)
   const cleaned1 = fixOcrNumbers(cleanOcrLine(rawText));
   const r1 = parseArticleLineCore(cleaned1);
@@ -421,10 +489,26 @@ export async function parsePdfOffer(file, options = {}) {
     }
   }
 
-  // 2. Fallback OCR si rien d'extrait (PDF scanné)
+  // 2. Fallback OCR si rien d'extrait
+  //    Deux situations très différentes se cachent derrière « 0 article » :
+  //      - PDF réellement scanné (aucun calque texte) → l'OCR est la bonne réponse ;
+  //      - calque texte présent mais aucune ligne interprétable → le format sort
+  //        du périmètre du parseur. L'OCR coûte plusieurs minutes et rendra au
+  //        mieux le même texte, en moins fiable. Le basculement était silencieux :
+  //        l'utilisateur attendait sans savoir pourquoi, puis récupérait un
+  //        import partiel sans signal. On le dit désormais explicitement.
   if (articles.length === 0) {
-    console.log('[parsePdfOffer] Aucun article extrait directement, basculement sur OCR…');
-    onProgress?.({ stage: 'detect', message: 'Aucun texte direct, lancement de l\'OCR (PDF scanné détecté)…' });
+    const hasTextLayer = totalLines > 0;
+    if (hasTextLayer) {
+      warnings.push(
+        `Ce PDF contient bien du texte (${totalLines} lignes lues) mais aucune ligne n'a pu être interprétée comme un article : son format n'est pas reconnu. Une reconnaissance d'image a été lancée en secours — le résultat peut être partiel, vérifiez les prix importés.`
+      );
+    }
+    const detectMsg = hasTextLayer
+      ? `Texte lu (${totalLines} lignes) mais aucun article reconnu — reconnaissance d'image en secours…`
+      : 'Aucun texte direct, lancement de l\'OCR (PDF scanné détecté)…';
+    console.log(`[parsePdfOffer] ${detectMsg}`);
+    onProgress?.({ stage: 'detect', message: detectMsg });
     try {
       const pages = await extractPdfViaOcr(file, onProgress);
       const ocrResult = parseOcrPages(pages);

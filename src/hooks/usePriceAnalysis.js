@@ -4,7 +4,8 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db as fireDb } from '../firebase';
 import { useDialog } from '../contexts/DialogContext';
 import { useToast } from '../contexts/ToastContext';
-import { computeChaptersData, computeAnalysisStats, computeOABThreshold as calculateOABThreshold, companiesHaveNego, computeVariantTotal, variantHasNego, newItemMatchKey, findMatchingVariantNewItem, findBestPrefixMatch } from '../utils/analysisCompute';
+import { computeChaptersData, computeAnalysisStats, computeOABThreshold as calculateOABThreshold, companiesHaveNego, computeVariantTotal, variantHasNego, newItemMatchKey, findMatchingVariantNewItem } from '../utils/analysisCompute';
+import { createOfferItemMatcher } from '../utils/offerItemMatcher';
 
 // Algorithme OAB (Double Moyenne) : source unique dans analysisCompute.
 
@@ -323,6 +324,10 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
         return { ok: false, reason: 'no_articles' };
       }
 
+      // Un import issu du secours OCR peut être partiel : le signaler, sinon rien
+      // ne distingue une extraction fiable d'une extraction dégradée.
+      result.warnings.forEach(w => toast.warning(w));
+
       const totalStr = result.stats.totalAmount.toLocaleString('fr-FR', { minimumFractionDigits: 2 });
       const ocrLabel = result.viaOcr ? ' (via OCR)' : '';
       toast.info(`PDF${ocrLabel} : ${result.articles.length} article(s) extrait(s) (total ≈ ${totalStr} €). Matching en cours…`);
@@ -412,43 +417,17 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
           .trim();
       };
 
-      // Map désignation normalisée → itemId
-      const projectItemsMap = new Map();
-      const itemIdToDesignation = new Map();
-      const itemIdToUnit = new Map();
-      chaptersData.forEach(chap => {
-        chap.items.forEach(item => {
-          if (item.designation) {
-            projectItemsMap.set(normalizeDesignation(item.designation), item.id);
-            itemIdToDesignation.set(item.id, item.designation);
-            itemIdToUnit.set(item.id, item.unit || '');
-          }
-        });
-      });
-
       // Map itemId → quantité MOE (ce que l'entreprise doit respecter — Code Commande Publique L2152-2)
       const moeQtyMap = clientQtyMaps[activeTrancheId] || new Map();
-      // Map ref normalisée → itemId pour fallback si désignation modifiée
-      const projectRefMap = new Map();
-      if (project?.chapters) {
-        let counter = 1;
-        const traverse = (items) => {
-          if (!items) return;
-          items.forEach(item => {
-            if (item.type === 'item') {
-              // 1. Numérotation auto P.XX (legacy)
-              const autoRef = normalizeRef(`P.${String(counter).padStart(2, '0')}`);
-              // 2. Référence BPU saisie (bpuNum) — peut être "1 005", "1.005", "1-005"...
-              const bpuRef = item.bpuNum ? normalizeRef(item.bpuNum) : null;
-              if (bpuRef && !projectRefMap.has(bpuRef)) projectRefMap.set(bpuRef, item.id);
-              if (!projectRefMap.has(autoRef)) projectRefMap.set(autoRef, item.id);
-              counter++;
-            }
-            if (item.children?.length > 0) traverse(item.children);
-          });
-        };
-        project.chapters.forEach(chap => { if (chap.children) traverse(chap.children); });
-      }
+
+      // Résolution ligne → article. Gère les désignations répétées (même prix
+      // réutilisé dans plusieurs sous-chapitres avec des quantités différentes)
+      // qu'une Map<désignation, itemId> écrasait silencieusement, laissant des
+      // articles à 0 € et déclenchant de fausses divergences de quantité.
+      const matcher = createOfferItemMatcher({
+        chaptersData, project, moeQtyMap, normalizeDesignation, normalizeRef,
+      });
+      const { itemIdToDesignation, itemIdToUnit } = matcher;
 
       // Lecture sûre d'une cellule (gère les cellules fusionnées MergeValue)
       const safeCellStr = (cell) => {
@@ -482,40 +461,39 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
 
           if (!designationNorm) { skippedRows++; return; }
 
-          // 1. Match par désignation normalisée
-          let itemId = projectItemsMap.get(designationNorm);
-          // 2. Fallback : match par référence normalisée (col 1)
-          if (!itemId) {
-            const refNorm = normalizeRef(safeCellStr(row.getCell(1)));
-            if (refNorm && projectRefMap.has(refNorm)) {
-              itemId = projectRefMap.get(refNorm);
-              refMatchedRows++;
-            }
-          }
-          // 3. Fallback : match par préfixe tolérant (score gradué, rejette les
+          const price = safeCellNum(row.getCell(5));
+          const offerQty = safeCellNum(row.getCell(4)); // quantité de l'offre (col 4)
+          const refRaw = safeCellStr(row.getCell(1)).trim();
+
+          // Rang de mise en forme (titre de chapitre / sous-chapitre) : il peut
+          // porter la même désignation qu'un article sans en être un — il ne
+          // doit pas consommer une occurrence de cette désignation.
+          const isSectionHeader = !refRaw && price === 0 && offerQty === 0;
+
+          // 1. Désignation normalisée (occurrence suivante encore libre, avec
+          //    préférence pour le candidat dont la quantité MOE coïncide)
+          // 2. Fallback : n° de prix normalisé (col 1)
+          // 3. Fallback : préfixe tolérant (score gradué, rejette les
           //    qualificatifs qui changent le prix/la nature technique, ex. "DE
           //    NUIT" — cf. bug matching couche d'accrochage / variante nocturne)
-          if (!itemId) {
-            const candidate = findBestPrefixMatch(designationNorm, projectItemsMap);
-            if (candidate) {
-              itemId = candidate;
-              refMatchedRows++; // compté dans les approximatifs
-            }
-          }
+          const { itemId, via } = matcher.resolve({
+            designationNorm,
+            refRaw,
+            qty: offerQty,
+            consume: !isSectionHeader,
+          });
+          if (via === 'ref' || via === 'prefix') refMatchedRows++; // approximatifs
 
           if (!itemId) {
             unmatchedRows++;
             unmatchedDetails.push({
               sheet: ws.name,
               row: rowNumber,
-              ref: safeCellStr(row.getCell(1)).trim(),
+              ref: refRaw,
               designation: designationRaw,
             });
             return;
           }
-
-          const price = safeCellNum(row.getCell(5));
-          const offerQty = safeCellNum(row.getCell(4)); // quantité de l'offre (col 4)
 
           // Garder le premier prix non-nul trouvé (évite d'écraser avec 0)
           if (!(itemId in importedOffers) || (importedOffers[itemId] === 0 && price !== 0)) {
@@ -902,6 +880,7 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
           toast.error('Aucun article détecté dans le PDF de variante même après OCR.');
           return { ok: false, reason: 'no_articles' };
         }
+        result.warnings.forEach(w => toast.warning(w));
         const ocrLabel = result.viaOcr ? ' (via OCR)' : '';
         toast.info(`PDF variante${ocrLabel} : ${result.articles.length} article(s) extrait(s). Matching en cours…`);
         workingFile = await pdfToWorkbookFile(result.articles, file.name.replace(/\.pdf$/i, '.xlsx'));
@@ -957,39 +936,14 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
           .trim();
       };
 
-      // Maps de matching (désignation normalisée + ref normalisée)
-      const projectItemsMap = new Map();
-      const itemIdToDesignation = new Map();
-      const itemIdToUnit = new Map();
-      chaptersData.forEach(chap => {
-        chap.items.forEach(item => {
-          if (item.designation) {
-            projectItemsMap.set(normalizeDesignation(item.designation), item.id);
-            itemIdToDesignation.set(item.id, item.designation);
-            itemIdToUnit.set(item.id, item.unit || '');
-          }
-        });
-      });
-      const projectRefMap = new Map();
-      if (project?.chapters) {
-        let counter = 1;
-        const traverse = (items) => {
-          if (!items) return;
-          items.forEach(item => {
-            if (item.type === 'item') {
-              const autoRef = normalizeRef(`P.${String(counter).padStart(2, '0')}`);
-              const bpuRef = item.bpuNum ? normalizeRef(item.bpuNum) : null;
-              if (bpuRef && !projectRefMap.has(bpuRef)) projectRefMap.set(bpuRef, item.id);
-              if (!projectRefMap.has(autoRef)) projectRefMap.set(autoRef, item.id);
-              counter++;
-            }
-            if (item.children?.length > 0) traverse(item.children);
-          });
-        };
-        project.chapters.forEach(chap => { if (chap.children) traverse(chap.children); });
-      }
-
       const moeQtyMap = clientQtyMaps[activeTrancheId] || new Map();
+
+      // Résolution ligne → article, mutualisée avec handleImportExcel : gère les
+      // désignations répétées (même prix dans plusieurs sous-chapitres).
+      const matcher = createOfferItemMatcher({
+        chaptersData, project, moeQtyMap, normalizeDesignation, normalizeRef,
+      });
+      const { itemIdToDesignation, itemIdToUnit } = matcher;
       const baseOffers = company.offers || {};
 
       const round = (n) => Math.round(Number(n || 0) * 1e6) / 1e6;
@@ -1043,21 +997,17 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
 
           totalRows++;
 
-          // 1. Match par désignation normalisée
-          let itemId = projectItemsMap.get(designationNorm);
-          // 2. Fallback : match par référence normalisée
-          if (!itemId) {
-            const refNorm = normalizeRef(rawRef);
-            if (refNorm && projectRefMap.has(refNorm)) {
-              itemId = projectRefMap.get(refNorm);
-            }
-          }
-          // 3. Fallback : match par préfixe tolérant (score gradué, rejette les
+          // 1. Désignation (occurrence suivante libre, préférence quantité MOE)
+          // 2. Fallback : n° de prix normalisé
+          // 3. Fallback : préfixe tolérant (score gradué, rejette les
           //    qualificatifs qui changent le prix/la nature technique)
-          if (!itemId) {
-            const candidate = findBestPrefixMatch(designationNorm, projectItemsMap);
-            if (candidate) itemId = candidate;
-          }
+          // Les rangs de mise en forme sont déjà écartés plus haut : toute
+          // ligne parvenue ici est un article et consomme son occurrence.
+          const { itemId } = matcher.resolve({
+            designationNorm,
+            refRaw: rawRef,
+            qty,
+          });
 
           if (!itemId) {
             // Prix nouveau : article ajouté par la variante, absent du DQE base
