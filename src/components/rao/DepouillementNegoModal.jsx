@@ -58,7 +58,13 @@ export default function DepouillementNegoModal({
         aeNego: v.aeAmountNego != null ? String(v.aeAmountNego).replace('.', ',') : '',
       })),
     })));
-  }, [open, companies]);
+    // Amorçage à l'ouverture uniquement, comme DepouillementModal : `companies`
+    // est stable aujourd'hui (useState dans usePriceAnalysis), donc sans effet
+    // immédiat — mais toute prop d'identité instable rejouerait cet effet et
+    // écraserait la saisie en cours, exactement comme le bug corrigé dans la
+    // modale de dépouillement. Préventif.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   if (!open) return null;
 

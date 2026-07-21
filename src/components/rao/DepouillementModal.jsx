@@ -87,7 +87,15 @@ export default function DepouillementModal({
     setDateOpening(existingConsultation.dateOuverturePLis || existingConsultation.dateRemise || '');
     setVariantsRegime(existingConsultation.variantsAllowed || 'forbidden');
     setVariantsRequirements(existingConsultation.variantsRequirements || '');
-  }, [open, existingCompanies, existingConsultation]);
+    // Amorçage À L'OUVERTURE UNIQUEMENT. `existingConsultation` est un littéral
+    // recréé à chaque rendu de RaoView (useRao.js:75, non mémoïsé) : le garder
+    // en dépendance rejouait cet effet à chaque rendu du parent et écrasait la
+    // saisie en cours — y compris pendant la frappe, le champ gardant le focus.
+    // Le parent rend périodiquement sans action de l'utilisateur (battement de
+    // présence usePresence, 25 s ; cycle saveStatus), d'où un effacement vécu
+    // comme « régulier » et sans lien apparent avec la frappe.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   if (!open) return null;
 
