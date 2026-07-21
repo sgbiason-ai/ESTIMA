@@ -789,7 +789,6 @@ function DesktopApp({ user, companyId, isAdmin, handleLogout, onBackToHub, onNav
                 bpuConfig={bpuConfig}
                 onUpdateItem={localMode.handleUpdateBpuItem}
                 setItemToDuplicate={(item) => modals.openAddBpuModal(item)}
-                isAdmin={isAdmin}
                 isSuperAdmin={isSuperAdmin(user?.email)}
                 onForceRefresh={db.forceRefresh}
                 masterCctp={resources.masterCctp}
