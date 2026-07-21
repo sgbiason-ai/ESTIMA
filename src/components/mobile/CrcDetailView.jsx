@@ -509,6 +509,12 @@ export default function CrcDetailView({ chantier, branding, onToast, manager, is
               setEditingObs(prev => prev ? { ...prev, ...patch } : null);
             }}
             onDelete={(obsId) => manager.deleteObservation(obsId)}
+            onRemoveImage={(obsId, idx) => {
+              manager.removeObservationImage(obsId, idx);
+              setEditingObs(prev => (prev && prev.id === obsId
+                ? { ...prev, images: (prev.images || []).filter((_, i) => i !== idx) }
+                : prev));
+            }}
             onClose={() => setEditingObs(null)}
             onViewImage={setViewingImage}
             companyId={companyId}

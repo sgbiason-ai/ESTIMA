@@ -11,7 +11,7 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { OBSERVATION_STATUSES, getGroupColor, obsDisplayNumber, obsAge, obsValidation } from '../../data/crrData';
 import { confirm, toast } from '../../utils/globalUI';
 import { normalizeObsText } from '../../utils/formatObsText.jsx';
-import { uploadCrrImage, deleteCrrImage } from '../../utils/crrImageStorage';
+import { uploadCrrImage } from '../../utils/crrImageStorage';
 import GroupBadge from './GroupBadge';
 import { groupBadgeOptions, groupBadgeNameMap } from '../../utils/crrParticipantTree';
 import ImageLightbox from '../../views/siteVisits/ImageLightbox';
@@ -269,7 +269,7 @@ const InlineToolbar = ({ onExecFormat, onHighlight, onSelectAll, fileRef, camera
   );
 };
 
-const ObservationRow = memo(({ obs, obsNumber, meetingNumber, onUpdate, onDelete, participantGroups, dragHandleProps, companyId, crrId, isEditing, onEditorFocus, onEditorBlur }) => {
+const ObservationRow = memo(({ obs, obsNumber, meetingNumber, onUpdate, onDelete, onRemoveImage, participantGroups, dragHandleProps, companyId, crrId, isEditing, onEditorFocus, onEditorBlur }) => {
   const fileRef = useRef(null);
   const cameraRef = useRef(null);
   const editorRef = useRef(null);
@@ -401,11 +401,10 @@ const ObservationRow = memo(({ obs, obsNumber, meetingNumber, onUpdate, onDelete
     }
   };
 
-  const removeImage = (idx) => {
-    const removed = images[idx];
-    onUpdate(obs.id, { images: images.filter((_, i) => i !== idx) });
-    deleteCrrImage(removed);
-  };
+  // Passe par le manager : lui seul voit TOUTES les reunions et peut verifier
+  // qu'aucun autre CR ne reference encore ce fichier Storage (observation
+  // reportee = entree image partagee) avant de le supprimer du bucket.
+  const removeImage = (idx) => onRemoveImage(obs.id, idx);
 
   const handleFocus = useCallback(() => {
     onEditorFocus({ obsId: obs.id, editorRef, execFormat, handleHighlight, fileRef, cameraRef });
@@ -648,6 +647,7 @@ const CrrObservations = ({
   addObservation,
   updateObservation,
   deleteObservation,
+  removeObservationImage,
   reorderObservations,
   legalText,
   participantGroups = [],
@@ -830,6 +830,7 @@ const CrrObservations = ({
                               meetingNumber={meeting.number}
                               onUpdate={updateObservation}
                               onDelete={deleteObservation}
+                              onRemoveImage={removeObservationImage}
                               meetingDate={meeting.date}
                               participantGroups={participantGroups}
                               dragHandleProps={prov.dragHandleProps}

@@ -28,7 +28,7 @@ import {
 import { useRobustSave } from './useRobustSave';
 import { useStableHash } from './useStableHash';
 import { reoptimizeDataUrl } from '../utils/imageCompressor';
-import { uploadCrrDataUrl, deleteCrrImage } from '../utils/crrImageStorage';
+import { uploadCrrDataUrl, deleteCrrImage, collectStoragePaths } from '../utils/crrImageStorage';
 
 export const useCrrManager = ({
   project,
@@ -150,6 +150,22 @@ export const useCrrManager = ({
     },
     [updateProject]
   );
+
+  // Supprime de Storage uniquement les fichiers qui ne sont plus references
+  // NULLE PART apres la modification. Indispensable : une observation reportee
+  // d'un CR au suivant partage la meme entree image (donc le meme "path"), et
+  // supprimer l'observation cote CR recent effacait le blob, cassant la photo
+  // des CR anterieurs. Perte de donnees observee en prod (2026-07-21).
+  // @param images   images de l'element supprime
+  // @param nextMeetings etat des reunions APRES suppression
+  const deleteImagesUnlessShared = useCallback((images, nextMeetings) => {
+    const stillReferenced = collectStoragePaths(nextMeetings);
+    for (const img of images || []) {
+      const path = typeof img === 'object' && img ? img.path : null;
+      if (path && stillReferenced.has(path)) continue; // encore utilise ailleurs
+      deleteCrrImage(img);
+    }
+  }, []);
 
   // patchOrFn peut etre :
   //  - un objet patch    : { observations: [...] }
@@ -329,14 +345,14 @@ export const useCrrManager = ({
 
   const deleteMeeting = useCallback(
     (meetingId) => {
-      // Purge Storage en arriere-plan pour toutes les images de la reunion
+      const newMeetings = meetings.filter((m) => m.id !== meetingId);
+      // Purge Storage en arriere-plan, SAUF pour les fichiers encore references
+      // par un autre CR (observation reportee = meme entree image partagee).
       const target = meetings.find((m) => m.id === meetingId);
       if (target?.observations) {
-        for (const obs of target.observations) {
-          for (const img of (obs.images || [])) deleteCrrImage(img);
-        }
+        const images = target.observations.flatMap((obs) => obs.images || []);
+        deleteImagesUnlessShared(images, newMeetings);
       }
-      const newMeetings = meetings.filter((m) => m.id !== meetingId);
       updateMeetings(newMeetings);
       if (activeMeetingId === meetingId) {
         setActiveMeetingId(
@@ -344,7 +360,7 @@ export const useCrrManager = ({
         );
       }
     },
-    [meetings, activeMeetingId, updateMeetings]
+    [meetings, activeMeetingId, updateMeetings, deleteImagesUnlessShared]
   );
 
   // ── ACTIONS MEETING FIELDS ────────────────────────────────────────────
@@ -860,16 +876,48 @@ export const useCrrManager = ({
       // Si jamais on rate une image (race), on aura un orphelin dans Storage,
       // pas un bug fonctionnel.
       const id = activeMeetingIdRef.current;
-      const currentMeeting = meetingsRef.current?.find((m) => m.id === id);
+      const current = meetingsRef.current || [];
+      const currentMeeting = current.find((m) => m.id === id);
       const target = currentMeeting?.observations?.find((o) => o.id === obsId);
       if (target?.images?.length) {
-        for (const img of target.images) deleteCrrImage(img);
+        // Etat APRES suppression, pour ne purger que les fichiers orphelins.
+        const next = current.map((m) => (m.id === id
+          ? { ...m, observations: (m.observations || []).filter((o) => o.id !== obsId) }
+          : m));
+        deleteImagesUnlessShared(target.images, next);
       }
       updateActiveMeeting((meeting) => ({
         observations: (meeting.observations || []).filter((o) => o.id !== obsId),
       }));
     },
-    [updateActiveMeeting]
+    [updateActiveMeeting, deleteImagesUnlessShared]
+  );
+
+  // Retrait d'UNE photo d'une observation. Passe par le manager (et non par un
+  // deleteCrrImage direct dans l'UI) pour beneficier du garde-fou de partage.
+  const removeObservationImage = useCallback(
+    (obsId, index) => {
+      const id = activeMeetingIdRef.current;
+      const current = meetingsRef.current || [];
+      const target = current.find((m) => m.id === id)?.observations?.find((o) => o.id === obsId);
+      const removed = (target?.images || [])[index];
+      if (removed === undefined) return;
+      const next = current.map((m) => (m.id === id
+        ? {
+          ...m,
+          observations: (m.observations || []).map((o) => (o.id === obsId
+            ? { ...o, images: (o.images || []).filter((_, i) => i !== index) }
+            : o)),
+        }
+        : m));
+      deleteImagesUnlessShared([removed], next);
+      updateActiveMeeting((meeting) => ({
+        observations: (meeting.observations || []).map((o) => (o.id === obsId
+          ? { ...o, images: (o.images || []).filter((_, i) => i !== index) }
+          : o)),
+      }));
+    },
+    [updateActiveMeeting, deleteImagesUnlessShared]
   );
 
   const reorderObservations = useCallback(
@@ -1064,7 +1112,14 @@ export const useCrrManager = ({
       try {
         let isBroken = cache.get(ref.url);
         if (isBroken === undefined) {
-          const resp = await fetch(ref.url, { method: 'GET', cache: 'no-store' });
+          // `cache: no-store` est une directive HTTP : elle ne contourne PAS le
+          // service worker. En PWA, le SW (CacheFirst sur Storage) sert une
+          // reponse OPAQUE deposee par un <img> no-cors → ok=false sur une
+          // photo pourtant saine, qui serait alors retiree DEFINITIVEMENT du
+          // document. Le parametre swbust force le passage reseau.
+          const bust = (u) => u + (u.includes('?') ? '&' : '?') + 'swbust=' + Date.now();
+          let resp = await fetch(ref.url, { method: 'GET', cache: 'no-store' });
+          if (!resp.ok) resp = await fetch(bust(ref.url), { method: 'GET', cache: 'no-store' });
           isBroken = !resp.ok;
           cache.set(ref.url, isBroken);
         }
@@ -1164,6 +1219,7 @@ export const useCrrManager = ({
     addObservation,
     updateObservation,
     deleteObservation,
+    removeObservationImage,
     reorderObservations,
 
     // Utils

@@ -5,7 +5,7 @@
 
 import React, { useState, useRef, useCallback } from 'react';
 import Icon from './Icon';
-import { uploadCrrImage, deleteCrrImage } from '../../utils/crrImageStorage';
+import { uploadCrrImage } from '../../utils/crrImageStorage';
 import { useOrientation } from '../../hooks/useOrientation';
 import { sanitizeHtml } from '../../utils/helpers';
 import { toast } from '../../utils/globalUI';
@@ -38,6 +38,7 @@ export default function ObservationEditSheet({
   groupColorMap = {},
   onUpdate,
   onDelete,
+  onRemoveImage,
   onClose,
   onViewImage,
   companyId,
@@ -74,12 +75,11 @@ export default function ObservationEditSheet({
     }
   }, [images, update, companyId, crrId, obs?.id]);
 
+  // Passe par le manager : lui seul peut verifier qu'aucun autre CR ne
+  // reference encore ce fichier Storage avant de le supprimer du bucket.
   const handleRemoveImage = useCallback((idx) => {
-    const removed = images[idx];
-    const next = images.filter((_, i) => i !== idx);
-    update({ images: next });
-    deleteCrrImage(removed);
-  }, [images, update]);
+    onRemoveImage(obs.id, idx);
+  }, [onRemoveImage, obs?.id]);
 
   const handleTextBlur = useCallback(() => {
     if (textRef.current) {

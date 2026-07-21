@@ -609,7 +609,7 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
       return;
     }
     const { buildExportFilename, loadDirHandle, saveDirHandle, saveToDirectory } = await import('../../utils/exportHelpers');
-    const { buildLightVbs, buildMailSubject, buildMailHtml } = await import('../../utils/crrMailer');
+    const { buildLightVbs, buildMailScript, buildMailSubject, buildMailHtml } = await import('../../utils/crrMailer');
     const info = manager.crrConfig.chantierInfo || {};
     const meeting = manager.activeMeeting;
 
@@ -658,11 +658,43 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
     const htmlBody = buildMailHtml(meeting, chantierName);
     const vbsContent = buildLightVbs(pdfFilename, to, subject, htmlBody);
     const vbsBlob = new Blob([vbsContent], { type: 'application/octet-stream' });
-    const vbsFilename = `Envoyer_CR_${String(meeting.number).padStart(2, '0')}.vbs`;
-    await saveToDirectory(dirHandle, vbsFilename, vbsBlob);
+    const crNumber = String(meeting.number).padStart(2, '0');
+    const vbsFilename = `Envoyer_CR_${crNumber}.vbs`;
+    const vbsSaved = await saveToDirectory(dirHandle, vbsFilename, vbsBlob);
 
-    toast.success(`${pdfFilename} + ${vbsFilename} enregistres.\nDouble-cliquez le .vbs pour ouvrir Outlook.`, { duration: 8000 });
-  }, [manager, chantierName, branding, companyId, crrDoc]);
+    // 5. Telecharger aussi le script auto-porte (PDF embarque en base64) :
+    // cliquer « Ouvrir » dans la barre de telechargements lance Outlook sans
+    // avoir a naviguer jusqu'au dossier projet (le navigateur ne peut pas
+    // ouvrir l'Explorateur). Extension .estimavrd = association wscript.exe
+    // faite une fois par poste (cf. aide), evite le blocage Chrome sur .vbs.
+    let downloaded = false;
+    try {
+      const script = await buildMailScript(meeting, chantierName, manager.diffusionEmails, pdfData);
+      const dlUrl = URL.createObjectURL(script.blob);
+      const dlLink = document.createElement('a');
+      dlLink.href = dlUrl;
+      dlLink.download = `Envoyer_CR_${crNumber}.estimavrd`;
+      document.body.appendChild(dlLink);
+      dlLink.click();
+      document.body.removeChild(dlLink);
+      URL.revokeObjectURL(dlUrl);
+      downloaded = true;
+    } catch (e) {
+      const { Sentry } = await import('../../sentry');
+      Sentry.captureException(e);
+    }
+
+    // L'archive a reussi meme si le telechargement echoue : le dire, et
+    // orienter vers le chemin qui marche (echec silencieux interdit).
+    const archived = vbsSaved ? `${pdfFilename} + ${vbsFilename}` : pdfFilename;
+    if (downloaded) {
+      toast.success(`${archived} archives dans le dossier projet.\nCliquez « Ouvrir » sur le telechargement pour lancer Outlook.`, { duration: 8000 });
+    } else if (vbsSaved) {
+      toast.warning(`${archived} archives, mais echec du telechargement du script.\nDouble-cliquez ${vbsFilename} dans le dossier projet pour ouvrir Outlook.`, { duration: 8000 });
+    } else {
+      toast.error(`${pdfFilename} archive, mais echec du script d'envoi (telechargement et dossier).\nEnvoyez le PDF manuellement ou utilisez « Envoyer (web) ».`, { duration: 10000 });
+    }
+  }, [manager, chantierName, branding, companyId, crrDoc, sortDate, sortCat]);
 
   // ── Optimisation images : recompression + migration vers Firebase Storage ───
   const handleOptimizeImages = useCallback(async () => {
@@ -909,6 +941,7 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
                     categoryCodes={manager.crrConfig.categoryCodes}
                     observationsByCategory={manager.observationsByCategory} addObservation={manager.addObservation}
                     updateObservation={manager.updateObservation} deleteObservation={manager.deleteObservation}
+                    removeObservationImage={manager.removeObservationImage}
                     reorderObservations={manager.reorderObservations}
                     legalText={manager.crrConfig.legalText}
                     participantGroups={manager.crrConfig.participantGroups}

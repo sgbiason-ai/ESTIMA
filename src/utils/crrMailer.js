@@ -185,20 +185,32 @@ If Err.Number <> 0 Then
 End If
 
 Set objMail = objOutlook.CreateItem(0)
+Dim attachOk
+attachOk = True
 With objMail
     .To = mailTo
     .Subject = mailSubject
     .BodyFormat = 2
     .HTMLBody = mailHtml
+    ' On Error Resume Next est actif : sans ce test, un echec de la piece
+    ' jointe (antivirus verrouillant le PDF fraichement ecrit) ouvrirait le
+    ' mail SANS piece jointe, sans aucun message.
+    Err.Clear
     .Attachments.Add tempPath
+    If Err.Number <> 0 Then
+        attachOk = False
+        Err.Clear
+        MsgBox "Le PDF n'a pas pu etre joint automatiquement." & vbCrLf & "Joignez-le manuellement depuis :" & vbCrLf & tempPath, vbExclamation, "EstimaVRD"
+    End If
     .Display
 End With
 
 ' --- Nettoyage : suppression du PDF temporaire et du script ---
+' (le PDF est conserve si la jointure a echoue, pour attachement manuel)
 On Error Resume Next
 Dim fso
 Set fso = CreateObject("Scripting.FileSystemObject")
-fso.DeleteFile tempPath
+If attachOk Then fso.DeleteFile tempPath
 fso.DeleteFile WScript.ScriptFullName
 
 Set objMail = Nothing
@@ -240,7 +252,14 @@ With objMail
     .Subject = ${escapeVbsLiteral(mailSubject)}
     .BodyFormat = 2
     .HTMLBody = ${escapeVbsLiteral(mailHtml)}
+    ' On Error Resume Next est actif : sans ce test, un echec de la piece
+    ' jointe ouvrirait le mail SANS piece jointe, sans aucun message.
+    Err.Clear
     .Attachments.Add pdfPath
+    If Err.Number <> 0 Then
+        Err.Clear
+        MsgBox "Le PDF n'a pas pu etre joint automatiquement." & vbCrLf & "Joignez-le manuellement depuis :" & vbCrLf & pdfPath, vbExclamation, "EstimaVRD"
+    End If
     .Display
 End With
 
@@ -255,47 +274,7 @@ Set fso = Nothing
 
 // ─── FONCTION PRINCIPALE ────────────────────────────────────────────────────
 
-/**
- * Workflow d'envoi du CR par mail via Outlook (Chrome desktop Windows) :
- * 1. Archive le PDF dans le dossier projet (FileSystemAccess, best-effort)
- * 2. Genere un VBS auto-porte (PDF embarque en base64)
- * 3. Telecharge le VBS via le navigateur -> apparait dans la barre de telechargements
- * 4. L'utilisateur clique "Ouvrir" -> Outlook s'ouvre avec PDF + destinataires
- *
- * @returns {{ pdfSaved: boolean, pdfArchived?: boolean, vbsDownloaded?: boolean, fallback?: boolean }}
- */
-export const openOutlookMail = async (meeting, crrConfig, projectName, emails, pdfData) => {
-  // ── Fallback : navigateur sans File System Access (Firefox, mobile) ──
-  if (!window.showDirectoryPicker) {
-    const url = URL.createObjectURL(pdfData.blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = pdfData.filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    const subject = buildMailSubject(meeting, projectName);
-    const to = emails.join(',');
-    const body = buildMailBodyPlainText(meeting, projectName);
-    window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    return { pdfSaved: true, vbsDownloaded: false, fallback: true };
-  }
-
-  // Construit le script et le retourne (le caller gere la sauvegarde via showSaveFilePicker)
-  const subject = buildMailSubject(meeting, projectName);
-  const to = emails.join(';');
-  const htmlBody = buildMailHtml(meeting, projectName);
-  const base64Pdf = await blobToBase64(pdfData.blob);
-  const vbsContent = buildSelfContainedVbs(base64Pdf, to, subject, htmlBody, pdfData.filename);
-  const vbsBlob = new Blob([vbsContent], { type: 'application/octet-stream' });
-  const vbsFilename = 'Envoyer_CR.estimavrd';
-
-  return { vbsBlob, vbsFilename, ready: true };
-};
-
-// Helper exporte pour build seul — retourne un .vbs direct (utilise `<a download>` cote caller)
+// Construit le VBS auto-porte du CR — retourne un .vbs direct (utilise `<a download>` cote caller)
 export const buildMailScript = async (meeting, projectName, emails, pdfData) => {
   const subject = buildMailSubject(meeting, projectName);
   const to = emails.join(';');

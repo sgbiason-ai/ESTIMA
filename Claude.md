@@ -98,7 +98,7 @@ lint · imports Vite · rules multi-tenant (déployées séparément si modifié
 
 ## Backlog
 **Livré récent** : ESTIMA TP (v3.5.8) · DQE prix uniques (v3.5.9) · Docs CCTP/RC/CCAP save/projet · RAO source unique · bundle −49 % · CRC sous-groupes + Word.
-**TODO** : RAO export PDF sous-critères/groupements · CRC form→Firestore→PDF + test `useCrrManager` · admin-docs templates+role · ré-optimiser anciennes photos base64 visites (bouton comme CRC ; nouvelles déjà sur Storage) · Firestore rules (custom claim, validation tailles) · perf (`React.memo(PriceCell)`, virtualisation `AnalysisTable`, TTL `history/`) · ESLint `only-export-components` · migration xlsx→ExcelJS.
+**TODO** : envoi Outlook CRC = VBScript (déprécié MS ; FoD Windows, désactivation par défaut annoncée ~2027) → bascule à terme vers « Envoyer (web) »/Graph · RAO export PDF sous-critères/groupements · CRC form→Firestore→PDF + test `useCrrManager` · admin-docs templates+role · ré-optimiser anciennes photos base64 visites (bouton comme CRC ; nouvelles déjà sur Storage) · Firestore rules (custom claim, validation tailles) · perf (`React.memo(PriceCell)`, virtualisation `AnalysisTable`, TTL `history/`) · ESLint `only-export-components` · migration xlsx→ExcelJS.
 **Vulnérabilités npm (audit --force, à traiter isolément)** : jsPDF 2→4 (risque élevé, cœur des exports PDF) · Vite 5→8/esbuild (risque build/PWA) · react-quill (le "fix" 0.0.2 est un downgrade cassé, ne pas appliquer) · ExcelJS (le "fix" 3.4.0 est une régression vs 4.4.0 actuel, ne pas appliquer) · xlsx sans fix dispo (rejoint migration xlsx→ExcelJS ci-dessus). 16 vulnérabilités non-breaking déjà corrigées 2026-07-15 (`npm audit fix`, commit 37c05ec).
 
 ## Versions app

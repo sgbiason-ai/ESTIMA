@@ -82,6 +82,28 @@ export const uploadCrrDataUrl = async (dataUrl, { companyId, crrId, obsId, lat, 
 
 // ── Suppression d'une photo Storage ────────────────────────────────────────
 /**
+ * Recense tous les "path" Storage references par un jeu de reunions.
+ * Sert de garde-fou avant suppression : une observation reportee d'un CR au
+ * suivant partage la MEME entree image (spread superficiel dans createMeeting /
+ * duplicateMeeting), donc le meme fichier Storage. Supprimer le blob depuis un
+ * CR emporterait la photo des CR qui la referencent encore.
+ * @param {Array} meetings crrMeetings
+ * @returns {Set<string>}
+ */
+export const collectStoragePaths = (meetings) => {
+  const paths = new Set();
+  for (const m of meetings || []) {
+    for (const obs of m?.observations || []) {
+      for (const img of obs?.images || []) {
+        const path = typeof img === 'object' && img ? img.path : null;
+        if (path) paths.add(path);
+      }
+    }
+  }
+  return paths;
+};
+
+/**
  * Supprime une image de Storage si elle a un "path" Storage.
  * No-op pour les anciennes images stockees en base64 (pas de path).
  */
