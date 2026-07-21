@@ -12,7 +12,6 @@ import {
   createEmptyObservation,
   generateCrrId,
   defaultCategoryCode,
-  abbreviateGroup,
   normalizeGroupBadgeName,
 } from '../data/crrData';
 import { migrateCrrData } from '../utils/crrMigration';
@@ -25,7 +24,6 @@ import {
   updateSubGroupInTree,
   deleteSubGroupFromTree,
   moveContactInTree,
-  renameBadgeNameInTree,
 } from '../utils/crrParticipantTree';
 import { useRobustSave } from './useRobustSave';
 import { useStableHash } from './useStableHash';
@@ -401,19 +399,16 @@ export const useCrrManager = ({
     (groupId, patch) => {
       const oldGroup = activeParticipantGroups.find((g) => g.id === groupId);
       const oldName = oldGroup?.name;
-      const oldBadge = normalizeGroupBadgeName(oldGroup?.badgeName) || abbreviateGroup(oldGroup?.name);
       const safePatch = patch.badgeName !== undefined
         ? { ...patch, badgeName: normalizeGroupBadgeName(patch.badgeName) }
         : patch;
       const newName = safePatch.name;
-      const newBadge = safePatch.badgeName;
 
-      let groups = activeParticipantGroups.map((g) =>
+      // Renommage strictement cible : la pastille d'un autre noeud portant le
+      // meme code (collision des valeurs par defaut) ne doit jamais suivre.
+      const groups = activeParticipantGroups.map((g) =>
         g.id === groupId ? { ...g, ...safePatch } : g
       );
-      if (safePatch.badgeName !== undefined && oldBadge && newBadge !== oldBadge) {
-        groups = renameBadgeNameInTree(groups, oldBadge, newBadge);
-      }
 
       // Sans reunion active : ecrire le template global (pas d'observations a patcher).
       if (!activeMeeting) { updateMeetingParticipantGroups(groups); return; }
@@ -551,15 +546,11 @@ export const useCrrManager = ({
     (_groupId, contactId, patch) => {
       const oldContact = flattenAllContacts(activeParticipantGroups).find((c) => c.id === contactId);
       const oldLabel = (oldContact?.subLabel || '').trim();
-      const oldBadge = normalizeGroupBadgeName(oldContact?.badgeName) || abbreviateGroup(oldLabel);
       const safePatch = patch.badgeName !== undefined
         ? { ...patch, badgeName: normalizeGroupBadgeName(patch.badgeName) }
         : patch;
-      let groups = updateContactInTree(activeParticipantGroups, contactId, safePatch);
-      const newBadge = safePatch.badgeName;
-      if (safePatch.badgeName !== undefined && oldBadge && newBadge !== oldBadge) {
-        groups = renameBadgeNameInTree(groups, oldBadge, newBadge || '');
-      }
+      // Renommage strictement cible (voir updateParticipantGroup).
+      const groups = updateContactInTree(activeParticipantGroups, contactId, safePatch);
       const obsPatch = (safePatch.subLabel !== undefined && oldLabel && safePatch.subLabel !== oldLabel)
         ? remapObsBadgeName(oldLabel, safePatch.subLabel || null)
         : null;
@@ -596,15 +587,11 @@ export const useCrrManager = ({
     (groupId, subGroupId, patch) => {
       const parent = activeParticipantGroups.find((g) => g.id === groupId);
       const oldName = (parent?.subGroups || []).find((sg) => sg.id === subGroupId)?.name;
-      const oldSubGroup = (parent?.subGroups || []).find((sg) => sg.id === subGroupId);
-      const oldBadge = normalizeGroupBadgeName(oldSubGroup?.badgeName) || abbreviateGroup(oldSubGroup?.name);
       const safePatch = patch.badgeName !== undefined
         ? { ...patch, badgeName: normalizeGroupBadgeName(patch.badgeName) }
         : patch;
-      let groups = updateSubGroupInTree(activeParticipantGroups, groupId, subGroupId, safePatch);
-      if (safePatch.badgeName !== undefined && oldBadge && safePatch.badgeName !== oldBadge) {
-        groups = renameBadgeNameInTree(groups, oldBadge, safePatch.badgeName || '');
-      }
+      // Renommage strictement cible (voir updateParticipantGroup).
+      const groups = updateSubGroupInTree(activeParticipantGroups, groupId, subGroupId, safePatch);
       // Propager un renommage aux pastilles des observations (comme un groupe)
       const obsPatch = (safePatch.name !== undefined && oldName && safePatch.name !== oldName)
         ? remapObsBadgeName(oldName, safePatch.name || null) : null;

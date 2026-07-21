@@ -1,7 +1,6 @@
 // src/utils/crrParticipantTree.js
 //
 // Manipulation pure (sans React) de l'arborescence des participants CRC.
-import { abbreviateGroup, normalizeGroupBadgeName } from '../data/crrData';
 //
 // Modele : participantGroups[] ; chaque groupe = { id, name, subLabel,
 //   contacts: [], subGroups?: [] }. Un sous-groupe = { id, name, subLabel,
@@ -70,28 +69,10 @@ export const groupBadgeNameMap = (groups) => {
   return map;
 };
 
-const effectiveBadgeName = (fallbackName, badgeName) =>
-  normalizeGroupBadgeName(badgeName) || abbreviateGroup(fallbackName);
-
-// Renomme un code pastille partout dans l'arborescence participants, sans
-// toucher aux noms metier (groupe.name / sous-groupe.name / contact.subLabel).
-export const renameBadgeNameInTree = (groups, oldName, newName) => {
-  if (!oldName || oldName === newName) return groups;
-  const oldBadge = normalizeGroupBadgeName(oldName);
-  const newBadge = normalizeGroupBadgeName(newName);
-  const patchBadge = (fallbackName, badgeName) =>
-    effectiveBadgeName(fallbackName, badgeName) === oldBadge ? newBadge : badgeName;
-  return (groups || []).map((g) => ({
-    ...g,
-    badgeName: patchBadge(g.name, g.badgeName),
-    contacts: (g.contacts || []).map((c) => ({ ...c, badgeName: patchBadge(c.subLabel || g.name, c.badgeName) })),
-    subGroups: (g.subGroups || []).map((sg) => ({
-      ...sg,
-      badgeName: patchBadge(sg.name, sg.badgeName),
-      contacts: (sg.contacts || []).map((c) => ({ ...c, badgeName: patchBadge(c.subLabel || sg.name, c.badgeName) })),
-    })),
-  }));
-};
+// NOTE : l'ancienne propagation par valeur (renameBadgeNameInTree) a été
+// retirée : renommer une pastille est strictement ciblé par id. Deux noeuds
+// portant le même code par coïncidence (valeurs par défaut « SOUSG ») ne
+// doivent jamais être renommés ensemble.
 
 // Liste plate de tous les contacts de tous les groupes, avec le contexte
 // (groupId/groupName, et subGroupId/subGroupName si le contact est dans un

@@ -4,7 +4,7 @@ import {
   flattenGroupContacts, countGroupContacts, flattenAllContacts,
   addContactToTree, updateContactInTree, deleteContactFromTree,
   addSubGroupToTree, updateSubGroupInTree, deleteSubGroupFromTree,
-  moveContactInTree, groupBadgeOptions, groupColorIndexMap, renameBadgeNameInTree,
+  moveContactInTree, groupBadgeOptions, groupColorIndexMap,
 } from '../utils/crrParticipantTree';
 
 const c = (id, name) => ({ id, name, email: `${name}@x.fr`, cpr: false });
@@ -181,28 +181,29 @@ describe('crrParticipantTree — pastilles observations (groupes + sous-groupes)
     expect(groupColorIndexMap([{ id: 'g', name: 'Seul', contacts: [] }])).toEqual({ Seul: 0 });
   });
 
-  it('renameBadgeNameInTree renomme toutes les pastilles identiques', () => {
+  // Non-régression : renommer une pastille est strictement ciblé par id.
+  // L'ancienne propagation par valeur (renameBadgeNameInTree) renommait TOUS
+  // les noeuds au même code — deux sous-groupes gardant la pastille par
+  // défaut « SOUSG » étaient renommés ensemble.
+  it('updateSubGroupInTree ne renomme que la pastille du sous-groupe ciblé, même à code identique', () => {
     const source = [
       {
         id: 'g1',
-        name: 'Papyrus VRD',
-        badgeName: 'PAPYR',
-        contacts: [{ id: 'c1', subLabel: 'Papyrus VRD', badgeName: 'PAPYR' }, { id: 'c2', subLabel: 'MOE' }],
-        subGroups: [{ id: 's1', name: 'Lot Papyrus', badgeName: 'PAPYR', contacts: [{ id: 'c3', subLabel: 'Papyrus VRD', badgeName: 'PAPYR' }] }],
+        name: 'Entreprises',
+        contacts: [{ id: 'c1', subLabel: 'Sous-groupe', badgeName: 'SOUSG' }],
+        subGroups: [
+          { id: 's1', name: 'Sous-groupe', badgeName: 'SOUSG', contacts: [] },
+          { id: 's2', name: 'Sous-groupe', badgeName: 'SOUSG', contacts: [] },
+        ],
       },
-      { id: 'g2', name: 'Entreprises', contacts: [{ id: 'c4', subLabel: 'Papyrus VRD', badgeName: 'PAPYR' }], subGroups: [] },
+      { id: 'g2', name: 'Autre', badgeName: 'SOUSG', contacts: [], subGroups: [] },
     ];
 
-    const out = renameBadgeNameInTree(source, 'PAPYR', 'PAPY2');
+    const out = updateSubGroupInTree(source, 'g1', 's1', { badgeName: 'LOT1' });
 
-    expect(out[0].name).toBe('Papyrus VRD');
-    expect(out[0].badgeName).toBe('PAPY2');
-    expect(out[0].contacts.map((c) => c.subLabel)).toEqual(['Papyrus VRD', 'MOE']);
-    expect(out[0].contacts[0].badgeName).toBe('PAPY2');
-    expect(out[0].subGroups[0].name).toBe('Lot Papyrus');
-    expect(out[0].subGroups[0].badgeName).toBe('PAPY2');
-    expect(out[0].subGroups[0].contacts[0].badgeName).toBe('PAPY2');
-    expect(out[1].contacts[0].subLabel).toBe('Papyrus VRD');
-    expect(out[1].contacts[0].badgeName).toBe('PAPY2');
+    expect(out[0].subGroups[0].badgeName).toBe('LOT1');   // ciblé : renommé
+    expect(out[0].subGroups[1].badgeName).toBe('SOUSG');  // même code : intact
+    expect(out[0].contacts[0].badgeName).toBe('SOUSG');   // contact : intact
+    expect(out[1].badgeName).toBe('SOUSG');               // autre groupe : intact
   });
 });
