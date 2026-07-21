@@ -23,12 +23,18 @@ export const useMobileCrc = (user, companyId) => {
     try {
       const snap = await getDocs(collection(db, 'companies', companyId, 'crr'));
       const isSuperUser = user.email === APP_SUPER_ADMIN_EMAIL;
-      const list = await Promise.all(snap.docs.map(async d => {
+      const list = (await Promise.all(snap.docs.map(async d => {
         let data = d.data();
+        // Reprise des anciens CRC sans propriétaire — best-effort : un refus de
+        // règle ne doit jamais faire disparaître la liste (cf. desktop CrcView).
         if (isSuperUser && !data.ownerId) {
           const ownership = { ownerId: user.uid, ownerEmail: user.email || '' };
-          await setDoc(d.ref, ownership, { merge: true });
-          data = { ...data, ...ownership };
+          try {
+            await setDoc(d.ref, ownership, { merge: true });
+            data = { ...data, ...ownership };
+          } catch (e) {
+            console.warn('[useMobileCrc] Reprise ownerId ignorée:', d.id, e?.code || e);
+          }
         }
         const config = data.crrConfig || {};
         const meetings = data.crrMeetings || [];
@@ -44,7 +50,7 @@ export const useMobileCrc = (user, companyId) => {
           ownerId: data.ownerId || null,
           isOwner: data.ownerId === user.uid,
         };
-      }))
+      })))
         .sort((a, b) => (b.lastSaved || '').localeCompare(a.lastSaved || ''));
 
       setChantiers(list);

@@ -84,7 +84,7 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
 
   // ── Données ──
   const { projects, folders, isLoading: projectsLoading, refetch, loadProject } = useMobileProjects(user, companyId);
-  const { chantiers: crcChantiers, isLoading: crcLoading, refetch: crcRefetch, loadChantier, saveChantier } = useMobileCrc(user, companyId);
+  const { chantiers: crcChantiers, isLoading: crcLoading, error: crcError, refetch: crcRefetch, loadChantier, saveChantier } = useMobileCrc(user, companyId);
   const { devisList: moeDevisList, isLoading: moeLoading, refetch: moeRefetch, loadDevis: loadMoeDevis } = useMobileDevisMoe(user, companyId);
   const { fiches: adminFiches, isLoading: adminLoading, refetch: adminRefetch, loadFiche } = useMobileFichesMarche(user, companyId);
   const { visits: siteVisits, isLoading: visitsLoading, refetch: visitsRefetch, loadVisit, saveVisit, createVisit, deleteVisit, updateSharing } = useMobileSiteVisits(user, companyId);
@@ -739,7 +739,7 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
         {activeModule === 'crc' && (
           isTablet && isLandscape ? (
             <SplitView
-              List={<CrcListView chantiers={crcChantiers} loading={crcLoading} onSelect={handleSelectChantier} onRefresh={crcRefetch} isLandscape={false} />}
+              List={<CrcListView chantiers={crcChantiers} loading={crcLoading} error={crcError} onSelect={handleSelectChantier} onRefresh={crcRefetch} isLandscape={false} />}
               Detail={fullChantier && <CrcDetailView chantier={fullChantier} branding={resources.masterBranding} onToast={triggerToast} manager={canEditCrr ? crrManager : null} isLandscape={isLandscape} companyId={companyId} />}
               hasSelection={!!selectedChantier}
               loading={chantierLoading}
@@ -747,7 +747,7 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
               emptyLabel="Sélectionnez un chantier à gauche"
             />
           ) : !selectedChantier ? (
-            <CrcListView chantiers={crcChantiers} loading={crcLoading} onSelect={handleSelectChantier} onRefresh={crcRefetch} isLandscape={isLandscape} />
+            <CrcListView chantiers={crcChantiers} loading={crcLoading} error={crcError} onSelect={handleSelectChantier} onRefresh={crcRefetch} isLandscape={isLandscape} />
           ) : chantierLoading ? (
             <div className="flex items-center justify-center py-20 gap-2 text-slate-500">
               <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />

@@ -2,7 +2,7 @@ import React from 'react';
 import Icon from './Icon';
 import { dateFr } from './formatters';
 
-export default function CrcListView({ chantiers, loading, onSelect, onRefresh, isLandscape }) {
+export default function CrcListView({ chantiers, loading, error, onSelect, onRefresh, isLandscape }) {
   return (
     <div className="pb-2">
       <div className="flex gap-2 px-4 pt-3 pb-2 mb-1">
@@ -51,7 +51,17 @@ export default function CrcListView({ chantiers, loading, onSelect, onRefresh, i
       </div>
       )}
 
-      {!loading && chantiers.length === 0 && (
+      {/* Un échec de chargement ne doit pas se confondre avec une liste vide. */}
+      {!loading && error && (
+        <div className="mx-4 my-3 p-4 rounded-xl bg-red-50 border border-red-200/70 text-center">
+          <div className="text-sm font-semibold text-red-800">{error}</div>
+          <button onClick={onRefresh} className="mt-2 px-3 py-1.5 rounded-lg bg-white border border-red-200 text-[13px] font-medium text-red-700 hover:bg-red-50 transition active:scale-[0.97]">
+            Réessayer
+          </button>
+        </div>
+      )}
+
+      {!loading && !error && chantiers.length === 0 && (
         <div className="text-center py-10 text-gray-400 text-sm">Aucun compte rendu de chantier</div>
       )}
     </div>
