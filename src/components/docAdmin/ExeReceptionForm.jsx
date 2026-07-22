@@ -764,9 +764,36 @@ export default function ExeReceptionForm({ fiche, user, companyId, dateFinRevise
             <RibbonBtnLarge icon={Save} label={isSaving ? 'Enreg...' : 'Enregistrer'} onClick={handleSave} disabled={isSaving} accent="text-purple-500" title="Enregistrer" />
           </RibbonGroup>
           <RibbonSpacer />
+          {(activeTab === 'exe4' || activeTab === 'exe5') && (
+            <RibbonGroup label="Annexe PDF">
+              <div className="flex items-center rounded-xl bg-slate-200/80 p-0.5 border border-slate-300/70">
+                {[
+                  { value: 'detailed', label: 'Détaillé' },
+                  { value: 'compact', label: 'Compact' },
+                ].map((option) => {
+                  const isActive = (data.reservePdfMode || 'detailed') === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => update('reservePdfMode', option.value)}
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition-all ${
+                        isActive
+                          ? 'bg-white text-slate-900 shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                      }`}
+                      title={`Annexe PDF ${option.label.toLowerCase()}`}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </RibbonGroup>
+          )}
           <RibbonGroup label={tabLabels[activeTab]} noBorder>
             <RibbonBtnLarge icon={FileText} label={isGenerating === `${activeTab}-docx` ? 'Word...' : 'Word'} onClick={() => handleGenerate('docx')} disabled={!!isGenerating} accent={tabAccent[activeTab]} title={`Générer ${activeTab.toUpperCase()} en .docx`} />
-            <RibbonBtnLarge icon={FileDown} label={isGenerating === `${activeTab}-pdf` ? 'PDF...' : 'PDF'} onClick={() => handleGenerate('pdf')} disabled={!!isGenerating} accent="text-red-500" title={`Générer ${activeTab.toUpperCase()} en .pdf`} />
+            <RibbonBtnLarge icon={FileDown} label={isGenerating === `${activeTab}-pdf` ? 'PDF...' : 'PDF'} onClick={() => handleGenerate('pdf')} disabled={!!isGenerating} accent="text-red-500" title={`Générer ${activeTab.toUpperCase()} en .pdf${activeTab === 'exe4' || activeTab === 'exe5' ? ` - annexe ${(data.reservePdfMode || 'detailed') === 'compact' ? 'compacte' : 'détaillée'}` : ''}`} />
           </RibbonGroup>
         </RibbonContainer>
       </div>

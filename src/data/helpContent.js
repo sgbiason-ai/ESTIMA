@@ -1112,7 +1112,7 @@ REGLES
               { title: 'EXE 8 — Visa', text: "Fiches de visa des documents d'execution." },
               { title: 'EXE 9 — Reserves', text: "Tableau des reserves lors de la reception." },
               { title: 'EXE 10 — Reception', text: "Proces-verbal de reception des travaux." },
-              { title: 'Annexe des réserves depuis une visite', text: "Dans EXE4 ou EXE5, cliquez sur « Depuis une visite de site ». Toutes les observations et photos sont reprises ; la trace GPS ouvre l’annexe avec des repères numérotés correspondant aux réserves." },
+              { title: 'Annexe des réserves depuis une visite', text: "Dans EXE4 ou EXE5, cliquez sur « Depuis une visite de site ». Toutes les observations et photos sont reprises ; la trace GPS ouvre l’annexe avec des repères numérotés correspondant aux réserves. Avant l’export PDF, choisissez « Détaillé » pour obtenir une fiche illustrée par réserve ou « Compact » pour produire des planches photographiques condensées." },
             ],
           },
         ],

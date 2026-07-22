@@ -561,6 +561,10 @@ const buildObsMiniMap = async (obs, visit, THEME, obsIdx, viewKey = DEFAULT_PDF_
     points.push({ lat: obs.segmentTo.lat, lng: obs.segmentTo.lng });
     centerLat = (obs.segmentFrom.lat + obs.segmentTo.lat) / 2;
     centerLng = (obs.segmentFrom.lng + obs.segmentTo.lng) / 2;
+  } else if (obs.pointLocation?.lat != null && obs.pointLocation?.lng != null) {
+    centerLat = obs.pointLocation.lat;
+    centerLng = obs.pointLocation.lng;
+    points.push({ lat: centerLat, lng: centerLng });
   } else {
     // Chercher position depuis photos ou tracé
     for (const img of (obs.images || [])) {
@@ -735,7 +739,7 @@ const buildObsMiniMap = async (obs, visit, THEME, obsIdx, viewKey = DEFAULT_PDF_
       cctx.font = 'bold 16px system-ui';
       cctx.textAlign = 'center';
       cctx.textBaseline = 'middle';
-      cctx.fillText(String(obsIdx + 1), ox, oy);
+      cctx.fillText(String(obs.mapNumber || obsIdx + 1), ox, oy);
     }
 
     // Bordure arrondie
@@ -752,6 +756,19 @@ const buildObsMiniMap = async (obs, visit, THEME, obsIdx, viewKey = DEFAULT_PDF_
   const images = await Promise.all(stacks.map(stack => renderCrop(stack)));
   return images.filter(Boolean);
 };
+
+/**
+ * Produit la ou les mini-cartes d'une observation pour les annexes de réserves.
+ */
+export const generateSiteVisitObservationMaps = async (observation, visit, options = {}) => (
+  buildObsMiniMap(
+    observation,
+    visit,
+    { primary: options.primary || [37, 99, 235] },
+    options.observationIndex || 0,
+    options.viewKey || DEFAULT_PDF_VIEWS.obs,
+  )
+);
 
 // ─── PAGES OBSERVATIONS ───────────────────────────────────────────────────────
 
