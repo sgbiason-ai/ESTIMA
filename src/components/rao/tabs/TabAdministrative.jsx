@@ -4,7 +4,9 @@ import { FileText, Target, MessageSquare, Users, Plus, Trash2, Pencil, Check, X,
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Field, Textarea, OuiNonToggle } from '../RaoUI';
 import { COMPANY_UI_COLORS, CONCLUSION_OPTIONS, NON_REGULAR_STATUSES } from '../RaoConstants';
-import { getEffectiveConclusion, isRegularizedAfterNego } from '../../../utils/analysisCompute';
+import { getEffectiveConclusion, getEffectiveIrregularityReason, isRegularizedAfterNego } from '../../../utils/analysisCompute';
+import { isRichTextEmpty } from '../../../utils/richText';
+import RichTextField from '../../common/RichTextField';
 import CompanySidebar from '../CompanySidebar';
 import AddVariantModal from '../AddVariantModal';
 import TabAlertBanner from '../TabAlertBanner';
@@ -97,10 +99,13 @@ const TabAdministrative = ({
   const getAdminCompletion = (companyName) => {
     const admin = companiesData[companyName]?.admin || {};
     if (isNegoPhase) {
-      // Étape 7 : statut effectif après négo (hérité compris) + motif si régularisée.
+      // Étape 8 : statut effectif après négo (hérité compris), motif de régularisation
+      // si régularisée, et motif de non-régularité si l'offre reste écartée.
       const effNego = getEffectiveConclusion(admin, 'nego');
       const regMotifMissing = isRegularizedAfterNego(admin) && !(admin.regularizationComment || '').trim();
-      if (effNego && !regMotifMissing) return 'complete';
+      const irregMotifMissing = NON_REGULAR_STATUSES.includes(effNego)
+        && isRichTextEmpty(getEffectiveIrregularityReason(admin, 'nego'));
+      if (effNego && !regMotifMissing && !irregMotifMissing) return 'complete';
       if (effNego || admin.conclusionNego) return 'partial';
       return 'empty';
     }
@@ -109,7 +114,9 @@ const TabAdministrative = ({
     const allPieceIds = [...adminPieces.map(p => p.id), ...offerPieces.map(p => p.id)];
     const answeredCount = allPieceIds.filter(id => pcs[id] !== undefined && pcs[id] !== null).length;
     const hasConclusion = conclusion && conclusion !== '';
-    if (hasConclusion && answeredCount === allPieceIds.length) return 'complete';
+    // Offre écartée sans motif : l'étape reste incomplète (CCP R2181-1).
+    const irregMotifMissing = NON_REGULAR_STATUSES.includes(conclusion) && isRichTextEmpty(admin.irregularityReason);
+    if (hasConclusion && answeredCount === allPieceIds.length && !irregMotifMissing) return 'complete';
     if (hasConclusion || answeredCount > 0) return 'partial';
     return 'empty';
   };
@@ -319,6 +326,46 @@ const TabAdministrative = ({
                   )}
                 </div>
               )}
+              {/* Motif de non-régularité après négo — hérité de l'étape 3, retouchable.
+                  Requis tant que l'offre reste (ou devient) non régulière (CCP R2181-1). */}
+              {NON_REGULAR_STATUSES.includes(effNego) && (() => {
+                const effReason = getEffectiveIrregularityReason(admin, 'nego');
+                const inherited = !admin.irregularityReasonNego && !isRichTextEmpty(admin.irregularityReason);
+                return (
+                  <div id={`admin-irreg-reason-nego-${name}`} className="mt-5 pt-5 border-t border-emerald-100">
+                    <Field
+                      label={`Motif — pourquoi cette offre reste-t-elle ${(CONCLUSION_OPTIONS.find(o => o.value === effNego) || {}).label?.toLowerCase().replace('offre ', '') || 'non régulière'} après négociation ?`}
+                      icon={MessageSquare}
+                    >
+                      <RichTextField
+                        value={effReason}
+                        onChange={v => updateAdminField(name, 'irregularityReasonNego', v)}
+                        placeholder="Exposez les éléments qui fondent ce statut à l'issue de la négociation (écart non corrigé, pièce toujours absente…) — repris dans le rapport (art. R2181-1)."
+                        className={isRichTextEmpty(effReason) ? 'rao-empty' : ''}
+                        rows={3}
+                      />
+                    </Field>
+                    <div className="mt-2 flex items-center gap-3 flex-wrap">
+                      {isRichTextEmpty(effReason) && (
+                        <p className="flex items-center gap-1.5 text-[11px] font-bold text-amber-700">
+                          <AlertTriangle size={12} /> Requis : motivez le statut retenu après négociation.
+                        </p>
+                      )}
+                      {inherited && (
+                        <span className="text-[11px] text-slate-400 italic">Hérité de l'analyse initiale — toute modification est enregistrée à part.</span>
+                      )}
+                      {admin.irregularityReasonNego && (
+                        <button
+                          onClick={() => updateAdminField(name, 'irregularityReasonNego', '')}
+                          className="text-[11px] font-bold text-slate-400 hover:text-slate-600 transition-colors"
+                          title="Revenir au motif saisi à l'étape 3"
+                        >↺ Hériter du motif initial</button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
               {initialNonRegular && !regularized && admin.conclusionNego && admin.conclusionNego !== admin.conclusion && (
                 <p className="mt-3 text-[11px] text-slate-500 italic">
                   Statut modifié après négociation. Sélectionnez « Offre régulière » pour régulariser l'offre.
@@ -632,6 +679,28 @@ const TabAdministrative = ({
                 ))}
               </div>
             </div>
+
+            {/* Motif de non-régularité — requis dès qu'une offre est écartée.
+                Le rejet d'une offre doit être motivé (CCP R2181-1) ; le texte est
+                repris dans le rapport (§3 fiche administrative et §3.1 conformité). */}
+            {NON_REGULAR_STATUSES.includes(concl) && admin.conclusion && (
+              <div id={`admin-irreg-reason-${name}`} className="mt-5 pt-5 border-t border-slate-100">
+                <Field label={`Motif — pourquoi cette offre est-elle ${conclOpt.label.toLowerCase().replace('offre ', '')} ?`} icon={MessageSquare}>
+                  <RichTextField
+                    value={admin.irregularityReason || ''}
+                    onChange={v => updateAdminField(name, 'irregularityReason', v)}
+                    placeholder="Exposez les éléments qui fondent ce statut : pièce manquante ou non signée, quantités du DQE modifiées, prestation non conforme au CCTP, offre au-dessus du budget… — repris dans le rapport (art. R2181-1)."
+                    className={isRichTextEmpty(admin.irregularityReason) ? 'rao-empty' : ''}
+                    rows={3}
+                  />
+                </Field>
+                {isRichTextEmpty(admin.irregularityReason) && (
+                  <p className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-amber-700">
+                    <AlertTriangle size={12} /> Requis : motivez le statut retenu pour cette offre.
+                  </p>
+                )}
+              </div>
+            )}
 
           </div>
 

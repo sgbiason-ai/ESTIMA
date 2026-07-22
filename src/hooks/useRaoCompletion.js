@@ -6,7 +6,7 @@
 
 import { useMemo } from 'react';
 import { NON_REGULAR_STATUSES } from '../components/rao/RaoConstants';
-import { getEffectiveConclusion, getEffectiveTechnical, isRegularizedAfterNego, getCompanyRabaisPct, variantHasNego } from '../utils/analysisCompute';
+import { getEffectiveConclusion, getEffectiveTechnical, getEffectiveIrregularityReason, isRegularizedAfterNego, getCompanyRabaisPct, variantHasNego } from '../utils/analysisCompute';
 import { isRichTextEmpty } from '../utils/richText';
 
 export const useRaoCompletion = ({
@@ -66,9 +66,24 @@ export const useRaoCompletion = ({
 
     // ─── 3. Administratif (phase initiale uniquement) ───
     const adminConcl = companyNames.filter(name => !!companiesData[name]?.admin?.conclusion).length;
+    // Offres écartées : le motif est requis (obligation de motivation, CCP R2181-1).
+    const nonRegularNames = companyNames.filter(name =>
+      NON_REGULAR_STATUSES.includes(companiesData[name]?.admin?.conclusion));
+    const irregReasonMissingNames = nonRegularNames.filter(name =>
+      isRichTextEmpty(companiesData[name]?.admin?.irregularityReason));
     const adminItems = [
       { id: 'conclusions', label: `Conclusions admin (${adminConcl}/${nbCompanies})`, ok: adminConcl === nbCompanies && nbCompanies > 0, value: `${adminConcl}/${nbCompanies}` },
     ];
+    if (nonRegularNames.length > 0) {
+      const motived = nonRegularNames.length - irregReasonMissingNames.length;
+      adminItems.push({
+        id: 'irregularity_reasons',
+        label: `Motifs des offres écartées (${motived}/${nonRegularNames.length})`,
+        ok: irregReasonMissingNames.length === 0,
+        warn: irregReasonMissingNames.length > 0,
+        value: `${motived}/${nonRegularNames.length}`,
+      });
+    }
     const adminMissing = [];
     companyNames.forEach(name => {
       if (!companiesData[name]?.admin?.conclusion) {
@@ -80,6 +95,15 @@ export const useRaoCompletion = ({
           type: 'admin_conclusion',
         });
       }
+    });
+    irregReasonMissingNames.forEach(name => {
+      adminMissing.push({
+        id: `irreg_reason_${name}`,
+        label: `Motif de non-régularité pour ${name}`,
+        anchorId: `admin-irreg-reason-${name}`,
+        companyName: name,
+        type: 'admin_irregularity_reason',
+      });
     });
     const adminDone = nbCompanies > 0 && adminMissing.length === 0;
     const adminRatio = nbCompanies > 0 ? `${adminConcl}/${nbCompanies}` : null;
@@ -225,9 +249,24 @@ export const useRaoCompletion = ({
     const adminNegoConcl = companyNames.filter(name => !!getEffectiveConclusion(companiesData[name]?.admin, 'nego')).length;
     const regularizedNames = companyNames.filter(name => isRegularizedAfterNego(companiesData[name]?.admin));
     const regCommentMissingNames = regularizedNames.filter(name => !(companiesData[name]?.admin?.regularizationComment || '').trim());
+    // Offres encore écartées après négo : motif requis (hérité de l'étape 3 s'il existe).
+    const nonRegularNegoNames = companyNames.filter(name =>
+      NON_REGULAR_STATUSES.includes(getEffectiveConclusion(companiesData[name]?.admin, 'nego')));
+    const irregReasonNegoMissingNames = nonRegularNegoNames.filter(name =>
+      isRichTextEmpty(getEffectiveIrregularityReason(companiesData[name]?.admin, 'nego')));
     const adminNegoItems = [
       { id: 'conclusions_nego', label: `Statuts après négo (${adminNegoConcl}/${nbCompanies})`, ok: adminNegoConcl === nbCompanies && nbCompanies > 0, value: `${adminNegoConcl}/${nbCompanies}` },
     ];
+    if (nonRegularNegoNames.length > 0) {
+      const motived = nonRegularNegoNames.length - irregReasonNegoMissingNames.length;
+      adminNegoItems.push({
+        id: 'irregularity_reasons_nego',
+        label: `Motifs des offres écartées (${motived}/${nonRegularNegoNames.length})`,
+        ok: irregReasonNegoMissingNames.length === 0,
+        warn: irregReasonNegoMissingNames.length > 0,
+        value: `${motived}/${nonRegularNegoNames.length}`,
+      });
+    }
     if (regularizedNames.length > 0) {
       const motived = regularizedNames.length - regCommentMissingNames.length;
       adminNegoItems.push({
@@ -257,6 +296,15 @@ export const useRaoCompletion = ({
         anchorId: `admin-reg-comment-${name}`,
         companyName: name,
         type: 'admin_regularization_comment',
+      });
+    });
+    irregReasonNegoMissingNames.forEach(name => {
+      adminNegoMissing.push({
+        id: `irreg_reason_nego_${name}`,
+        label: `Motif de non-régularité après négo pour ${name}`,
+        anchorId: `admin-irreg-reason-nego-${name}`,
+        companyName: name,
+        type: 'admin_irregularity_reason',
       });
     });
     const adminNegoDone = nbCompanies > 0 && adminNegoMissing.length === 0;
