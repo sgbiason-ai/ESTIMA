@@ -95,7 +95,7 @@ const RaoView = ({
   // Phase de négociation à marquer sur le rapport : 'none' | 'before' | 'after'.
   // 'none' par défaut : page de garde et conclusion inchangées (marchés sans négo).
   const [negotiationPhase, setNegotiationPhase] = useState('none');
-  // Format papier du detail des prix unitaires (§7) : 'a4' (compact) ou 'a3' (confort de lecture).
+  // Format papier des annexes de prix A/B : 'a4' (compact) ou 'a3' (confort de lecture).
   // Defaut 'a4' : imprimable partout sans reglage particulier ; l'utilisateur bascule sur A3
   // quand il y a beaucoup d'entreprises/variantes pour ameliorer la lisibilite.
   const [pricesPaperSize, setPricesPaperSize] = useState('a4');
@@ -247,7 +247,7 @@ const RaoView = ({
   // le Récap). Montants des deux phases (hors options PSE), rabais commercial
   // global déduit des montants négo, notes prix recalculées sur la fourchette
   // complète (computePriceReference → scoreOffer, source unique).
-  // Alimente le panneau Négociation, l'onglet Dépouillement (mode négo) et le PDF 6.bis.
+  // Alimente le panneau Négociation, l'onglet Dépouillement (mode négo) et l'étape 7 du PDF.
   const negoComparison = useMemo(() => {
     // Visible dès que des données négo existent OU que la phase est active
     // (permet de saisir rabais / PV après négo depuis le RAO avant tout prix négocié).
@@ -374,8 +374,11 @@ const RaoView = ({
         analysisCompanies,
         scores: rao.computeScores(),
         ranking,
+        rankingInitial,
+        rankingNego,
         branding: masterBranding,
         analysisStats: rao.raoAnalysisStats,
+        analysisStatsInitial,
         chaptersData,
         clientQtyMaps,
         bpuRefMap,

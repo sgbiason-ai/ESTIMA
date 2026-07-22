@@ -10,9 +10,9 @@ import { NON_REGULAR_STATUSES } from '../components/rao/RaoConstants';
 import { buildTheme as _buildTheme } from './pdf/buildTheme';
 import { getCurrentPhaseCode } from './phaseModel';
 import { computeVatBreakdown } from './financeFormat';
-import { scoreOffer, computePriceReference, getEffectiveOffers, getEffectiveVariantOffers, getEffectiveVariantNewItems, getVariantEffectiveTotal, getCompanyRabaisPct, getEffectiveConclusion, getEffectiveTechnical, isRegularizedAfterNego } from './analysisCompute';
+import { scoreOffer, computePriceReference, getEffectiveOffers, getEffectiveVariantOffers, getEffectiveVariantNewItems, getVariantEffectiveTotal, getCompanyRabaisPct, getEffectiveConclusion, getEffectiveTechnical, getEffectiveIrregularityReason, isRegularizedAfterNego, companiesHaveNego } from './analysisCompute';
 import { stampPdfCredit } from './estimaCredit';
-import { htmlToPlainText } from './richText';
+import { htmlToPlainText, isRichTextEmpty } from './richText';
 
 // ─── COULEUR PRIMAIRE RAO : VERT PAPYRUS ────────────────────────────────────
 const VERT_PAPYRUS = [45, 138, 78];   // #2d8a4e
@@ -140,7 +140,7 @@ const drawJustifiedText = (doc, text, x, y, maxWidth, lineH = 4.5) => {
 };
 
 // ─── RENDU HTML → PDF (Gras / Italique / Souligné + listes à puces / numérotées) ──
-// Parseur minimaliste utilisé par la §6.ter (réponses & engagements de négociation).
+// Parseur minimaliste utilisé par l'étape 6 (réponses et engagements de négociation).
 // Produit une liste de blocs { kind, olIndex?, runs:[{text, bold, italic, underline}] }.
 // Ignore les balises non gérées (structure conservée, styles WYSIWYG hors périmètre).
 
@@ -580,8 +580,8 @@ const sectionTitle = (doc, text, y, colorArr) => {
 // ── GÉNÉRATION PRINCIPALE DU RAO ───────────────────────────────────────────
 export const generateRaoPDF = async (optionsParams) => {
   const {
-    project, consultation, criteria, rao, analysisCompanies, ranking, branding,
-    analysisStats, chaptersData, bpuRefMap, tranches, analysisMode, scoringConfig,
+    project, consultation, criteria, rao, analysisCompanies, ranking, rankingInitial, rankingNego, branding,
+    analysisStats, analysisStatsInitial, chaptersData, bpuRefMap, tranches, analysisMode, scoringConfig,
     // Nouvelles props refonte complète
     optionChapters = [], includedOptions = {},
     // Quantités « à valoir » (client, majorées) par tranche — source unique computeQtyMaps.
@@ -595,12 +595,12 @@ export const generateRaoPDF = async (optionsParams) => {
     //   - préfixe de la phrase de recommandation par défaut (conclusion)
     // Défaut 'none' : aucune mention (rétro-compatible, ex. appelants mobile).
     negotiationPhase = 'none',
-    // Format papier du detail des prix unitaires (§7) : 'a4' (defaut, compact) ou
+    // Format papier des annexes de prix A/B : 'a4' (defaut, compact) ou
     // 'a3' (police plus lisible, utile quand il y a beaucoup d'entreprises/variantes).
     pricesPaperSize = 'a4',
     // Comparatif avant/après négociation : [{ name, initialTotal, negoTotal,
     // delta, deltaPct, negotiated, scoreInitial, scoreNego }] | null.
-    // Rendu en section 6.bis uniquement si negotiationPhase === 'after'.
+    // Rendu à l'étape 7 dès que des données négociées existent.
     negoComparison = null,
     // Phase « après négo » active dans l'analyse : le détail des prix unitaires
     // reprend alors les prix négociés (fusion initial + négocié par article).
@@ -621,6 +621,7 @@ export const generateRaoPDF = async (optionsParams) => {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const companiesData = rao.companies || {};
   const companyNames = analysisCompanies.map(c => c.name);
+  const hasNegoPriceData = companiesHaveNego(analysisCompanies);
   const today = new Date().toLocaleDateString('fr-FR');
   const W = doc.internal.pageSize.getWidth();
   let pageNum = 1;
@@ -635,13 +636,13 @@ export const generateRaoPDF = async (optionsParams) => {
   // - Recalcule priceScore + totalScore pour TOUTES les lignes valides
   // - Réattribue les rangs (1, 2, 3...) après recalcul
   const NON_REG_RECAP = ['irreguliere', 'inacceptable', 'inappropriee'];
-  const buildExtendedRanking = () => {
-    if (!ranking || ranking.length === 0) return [];
+  const buildExtendedRanking = (sourceRanking = ranking, basis = 'initial') => {
+    if (!sourceRanking || sourceRanking.length === 0) return [];
     const N = Number(scoringConfig?.maxScore || 40);
     const mode = scoringConfig?.mode || 'f1';
 
     const flat = [];
-    ranking.forEach(r => {
+    sourceRanking.forEach(r => {
       flat.push({ ...r, kind: 'base' });
       const co = analysisCompanies.find(c => c.name === r.name);
       const retainedVars = (co?.variants || []).filter(v => v.retained);
@@ -656,7 +657,7 @@ export const generateRaoPDF = async (optionsParams) => {
           variantLabel: v.label || '',
           // Total net (rabais commercial global de l'entreprise déduit) — même
           // primitif que le comparatif RAO et le Récap (source unique).
-          price: getVariantEffectiveTotal(co, v, negoActive ? 'nego' : 'initial'),
+          price: getVariantEffectiveTotal(co, v, basis),
           irregular: !!variantIrregular,
           irregularLabel: variantConcl,
         });
@@ -682,7 +683,10 @@ export const generateRaoPDF = async (optionsParams) => {
       .sort((a, b) => b.totalScore - a.totalScore)
       .map((r, i) => ({ ...r, rank: i + 1 }));
   };
-  const extendedRanking = buildExtendedRanking();
+  const extendedRanking = buildExtendedRanking(
+    hasNegoPriceData ? (rankingNego || ranking) : (rankingInitial || ranking),
+    hasNegoPriceData ? 'nego' : 'initial',
+  );
 
   const addPage = (sectionTitle_, format = 'a4', orientation = 'portrait') => {
     doc.addPage(format, orientation);
@@ -708,9 +712,9 @@ export const generateRaoPDF = async (optionsParams) => {
   // ── PAGE : OBJET + CRITÈRES ──
   // (Synthèse Exécutive supprimée — les données clés sont déjà présentes dans le
   //  Récapitulatif Général et la Recommandation finale.)
-  let y = addPage('Critères de notation', 'a4', 'portrait');
-  tocEntries.push({ label: '1. Objet de la consultation', page: pageNum });
-  y = sectionTitle(doc, '1  Objet de la consultation', y, THEME.primary);
+  let y = addPage('1 — Consultation', 'a4', 'portrait');
+  tocEntries.push({ label: '1. Consultation', page: pageNum });
+  y = sectionTitle(doc, '1.1  Objet de la consultation', y, THEME.primary);
 
   doc.setFont('Helvetica', 'bold');
   doc.setFontSize(9); // body
@@ -742,8 +746,7 @@ export const generateRaoPDF = async (optionsParams) => {
   y += 10;
 
   // Section 2 : Remise des dossiers
-  tocEntries.push({ label: '2. Remise des dossiers de réponse', page: pageNum });
-  y = sectionTitle(doc, '2  Remise des dossiers de réponse', y, THEME.primary);
+  y = sectionTitle(doc, '1.2  Remise des dossiers de réponse', y, THEME.primary);
   doc.setFont('Helvetica', 'normal');
   doc.setFontSize(9);
   doc.setTextColor(...THEME.lightText);
@@ -768,8 +771,7 @@ export const generateRaoPDF = async (optionsParams) => {
 
   // Section 3 : Critères de notation — RENDU MANUEL (pas d'autoTable)
   //   pour avoir un contrôle total sur la hauteur des blocs et la justification.
-  tocEntries.push({ label: '3. Rappel des critères de notation', page: pageNum });
-  y = sectionTitle(doc, '3  Rappel des critères de notation', y, THEME.primary);
+  y = sectionTitle(doc, '1.3  Rappel des critères de notation', y, THEME.primary);
 
   // Constantes layout
   const BOTTOM_CRIT = 297 - 25;
@@ -917,9 +919,8 @@ export const generateRaoPDF = async (optionsParams) => {
   y += 10;
 
   // ── PAGE : RÉGIME DES VARIANTES (CCP R2151-8) ──
-  y = addPage('Régime des variantes', 'a4', 'portrait');
-  tocEntries.push({ label: '3.bis Régime des variantes (R2151-8)', page: pageNum });
-  y = sectionTitle(doc, '3.bis  Régime des variantes — CCP R2151-8 à R2151-11', y, THEME.primary);
+  y = addPage('1 — Consultation · Variantes', 'a4', 'portrait');
+  y = sectionTitle(doc, '1.4  Régime des variantes — CCP R2151-8 à R2151-11', y, THEME.primary);
 
   const variantsRegime = consultation?.variantsAllowed || 'forbidden';
   const variantsRegimeLabels = {
@@ -979,9 +980,9 @@ export const generateRaoPDF = async (optionsParams) => {
   //    administrative qui suivent.
 
   // ── PV DE DÉPOUILLEMENT (devient la section 5 après suppression de "Réponses reçues") ──
-  y = addPage('PV de dépouillement', 'a4', 'portrait');
-  tocEntries.push({ label: '4. PV de dépouillement', page: pageNum });
-  y = sectionTitle(doc, '4  Procès-verbal de dépouillement (CCP L2113-1)', y, THEME.primary);
+  y = addPage('2 — Dépouillement initial', 'a4', 'portrait');
+  tocEntries.push({ label: '2. Dépouillement initial', page: pageNum });
+  y = sectionTitle(doc, '2  Procès-verbal de dépouillement initial (CCP L2113-1)', y, THEME.primary);
 
   // Date d'ouverture des plis
   const dateOuverture = consultation?.dateOuverturePLis || consultation?.dateRemise || '';
@@ -1062,9 +1063,9 @@ export const generateRaoPDF = async (optionsParams) => {
 
   // ── ANALYSE ADMINISTRATIVE — Tableau comparatif avec colonnes subdivisées pour groupements ──
   {
-    y = addPage('Analyse administrative', 'a4', 'portrait');
-    tocEntries.push({ label: '5. Analyse administrative', page: pageNum });
-    y = sectionTitle(doc, '5  ANALYSE ADMINISTRATIVE — PIÈCES DE CANDIDATURE', y, THEME.primary);
+    y = addPage('3 — Analyse administrative initiale', 'a4', 'portrait');
+    tocEntries.push({ label: '3. Analyse administrative initiale', page: pageNum });
+    y = sectionTitle(doc, '3  ANALYSE ADMINISTRATIVE INITIALE — PIÈCES DE CANDIDATURE', y, THEME.primary);
 
     const conclLabelsA = { reguliere: 'RÉGULIÈRE', irreguliere: 'IRRÉGULIÈRE', inacceptable: 'INACCEPTABLE', inappropriee: 'INAPPROPRIÉE' };
     const conclColorsA = { reguliere: THEME.yes, irreguliere: [255, 140, 0], inacceptable: THEME.no, inappropriee: THEME.no };
@@ -1151,6 +1152,29 @@ export const generateRaoPDF = async (optionsParams) => {
     // Ligne CONCLUSION supprimee (la conclusion admin apparait deja dans le bloc
     // Recommandation finale + ailleurs dans le PDF — eviter la redondance).
 
+    // Motif de non-régularité (si au moins une offre écartée) — rappel synthétique
+    // dans la fiche administrative ; le texte complet figure au §3.1 Conformité.
+    const NON_REG_ADMIN = ['irreguliere', 'inacceptable', 'inappropriee'];
+    const hasIrregReason = companyNames.some(n => {
+      const a = companiesData[n]?.admin || {};
+      return NON_REG_ADMIN.includes(a.conclusion) && !isRichTextEmpty(a.irregularityReason);
+    });
+    if (hasIrregReason) {
+      adminBody.push([{ content: 'MOTIF DE NON-RÉGULARITÉ (CCP R2181-1)', colSpan: totalCols, styles: { fillColor: [255, 140, 0], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7 } }]);
+      const reasonRow = [{ content: 'Motif retenu', styles: { fontStyle: 'bold' } }];
+      companyNames.forEach(name => {
+        const admin = companiesData[name]?.admin || {};
+        const isNonReg = NON_REG_ADMIN.includes(admin.conclusion);
+        // Cellule de tableau : texte aplati (le rendu riche est réservé au §3.1).
+        const reason = isNonReg ? htmlToPlainText(admin.irregularityReason).trim() : '';
+        const content = isNonReg ? (reason || '(motif non renseigné)') : '—';
+        const memberCount = (admin.isGroupement && admin.groupementMembers?.length > 0) ? admin.groupementMembers.length : 1;
+        const styles = { halign: 'left', fontSize: 6, textColor: isNonReg ? [146, 64, 14] : [180, 180, 180] };
+        reasonRow.push(memberCount > 1 ? { content, colSpan: memberCount, styles } : { content, styles });
+      });
+      adminBody.push(reasonRow);
+    }
+
     // Observations admin (si saisies)
     const hasObs = companyNames.some(n => companiesData[n]?.admin?.obsAdmin || companiesData[n]?.admin?.obsOffre);
     if (hasObs) {
@@ -1213,10 +1237,10 @@ export const generateRaoPDF = async (optionsParams) => {
     y = doc.lastAutoTable.finalY + 6;
   }
 
-  // ── SECTION 6.bis : CONFORMITÉ ET ANOMALIES DÉTECTÉES ──
+  // ── ÉTAPE 3.1 : CONFORMITÉ ET ANOMALIES DÉTECTÉES ──
   // Pour chaque entreprise avec écart AE / écart quantité, liste détaillée
   {
-    // Une entreprise apparaît en §5.bis si elle a un écart AE/quantités, OU un
+    // Une entreprise apparaît en 3.1 si elle a un écart AE/quantités, OU un
     // statut non régulier (initial OU effectif), OU a été régularisée en négo
     // (pour tracer la transition avant → après, CCP R2152-2).
     // Exception : une offre explicitement jugée RÉGULIÈRE par l'analyste ne
@@ -1225,8 +1249,8 @@ export const generateRaoPDF = async (optionsParams) => {
     // régularisation après négociation reste imprimée (transition R2152-2).
     const irregularCompanies = analysisCompanies.filter(c => {
       const admin = companiesData[c.name]?.admin || {};
-      const effConcl = getEffectiveConclusion(admin, negoActive ? 'nego' : 'initial');
-      const regularized = negoActive && isRegularizedAfterNego(admin);
+      const effConcl = getEffectiveConclusion(admin, 'initial');
+      const regularized = false;
       if (effConcl === 'reguliere' && !regularized) return false;
       return (c.amountMismatch
         || (c.quantityMismatches || []).length > 0
@@ -1235,9 +1259,9 @@ export const generateRaoPDF = async (optionsParams) => {
     });
 
     if (irregularCompanies.length > 0) {
-      y = addPage('Conformité et anomalies', 'a4', 'portrait');
-      tocEntries.push({ label: '5.bis Conformité et anomalies', page: pageNum });
-      y = sectionTitle(doc, '5.bis  Conformité et anomalies (CCP L2152-2)', y, THEME.primary);
+      y = addPage('3 — Conformité et anomalies initiales', 'a4', 'portrait');
+      tocEntries.push({ label: '3.1 Conformité et anomalies initiales', page: pageNum });
+      y = sectionTitle(doc, '3.1  Conformité et anomalies initiales (CCP L2152-2)', y, THEME.primary);
 
       doc.setFont('Helvetica', 'normal');
       doc.setFontSize(8);
@@ -1256,9 +1280,9 @@ export const generateRaoPDF = async (optionsParams) => {
       irregularCompanies.forEach(c => {
         const admin = companiesData[c.name]?.admin || {};
         // Statut effectif (après régularisation éventuelle) = celui du badge et du classement.
-        const concl = getEffectiveConclusion(admin, negoActive ? 'nego' : 'initial') || 'reguliere';
+        const concl = getEffectiveConclusion(admin, 'initial') || 'reguliere';
         const conclLabel = CONCL_LABELS_CNF[concl] || concl;
-        const regularized = negoActive && isRegularizedAfterNego(admin);
+        const regularized = false;
 
         // Pagination
         if (y > 250) { y = addPage('Conformité et anomalies (suite)', 'a4', 'portrait'); }
@@ -1308,6 +1332,30 @@ export const generateRaoPDF = async (optionsParams) => {
             mLines.forEach(ln => { doc.text(ln, M + 4, ry); ry += 4; });
           }
           y += boxH + 4;
+        }
+
+        // Motif de non-régularité saisi par l'analyste (obligation de motivation
+        // du rejet, CCP R2181-1). Texte riche → blocs mesurés puis dessinés.
+        if (NON_REG_CNF.includes(concl)) {
+          const reasonBlocks = richFieldToBlocks(getEffectiveIrregularityReason(admin, 'initial'));
+          if (reasonBlocks.length) {
+            const rOpts = { fontSize: 8, lineH: 4.2, textColor: [80, 40, 10] };
+            const innerW = W - 2 * M - 8;
+            const txtH = measureHtmlBlocks(doc, reasonBlocks, innerW, rOpts);
+            const boxH = 5.5 + 4.5 + txtH + 4;
+            if (y + boxH > 285 && y > 60) { y = addPage('Conformité et anomalies (suite)', 'a4', 'portrait'); }
+            doc.setFillColor(255, 251, 235); // amber-50
+            doc.roundedRect(M, y, W - 2 * M, boxH, 1.5, 1.5, 'F');
+            doc.setDrawColor(253, 230, 138); // amber-300
+            doc.setLineWidth(0.3);
+            doc.roundedRect(M, y, W - 2 * M, boxH, 1.5, 1.5);
+            doc.setFont('Helvetica', 'bold');
+            doc.setFontSize(7.5);
+            doc.setTextColor(146, 64, 14); // amber-800
+            doc.text(`MOTIF — POURQUOI CETTE OFFRE EST ${conclLabel}`, M + 4, y + 5);
+            drawHtmlBlocks(doc, reasonBlocks, M + 4, y + 9.5, innerW, rOpts);
+            y += boxH + 4;
+          }
         }
 
         // Recommandation de régularisation (CCP) — différenciée par statut.
@@ -1416,13 +1464,15 @@ export const generateRaoPDF = async (optionsParams) => {
   }
 
   // ── ANALYSE FINANCIÈRE ──
-  if (analysisStats && analysisCompanies.length > 0) {
-    y = addPage('Analyse financière — Synthèse', 'a4', 'portrait');
-    tocEntries.push({ label: '6. Synthèse de l\'analyse financière', page: pageNum });
-    y = sectionTitle(doc, `6  SYNTHÈSE DE L'ANALYSE FINANCIÈRE`, y, THEME.primary);
+  const renderFinancialSummary = () => {
+    const workflowStats = analysisStatsInitial || analysisStats;
+    if (!workflowStats || analysisCompanies.length === 0) return;
+    y = addPage('5 — Récapitulatif avant négociation', 'a4', 'portrait');
+    tocEntries.push({ label: '5. Récapitulatif avant négociation', page: pageNum });
+    y = sectionTitle(doc, `5  SYNTHÈSE FINANCIÈRE AVANT NÉGOCIATION`, y, THEME.primary);
 
     const maxScore = Number(scoringConfig?.maxScore || 40);
-    const grandTotalBase = analysisStats.totalEstimation || 0;
+    const grandTotalBase = workflowStats.totalEstimation || 0;
     const NON_REGULAR_SYNTH = ['irreguliere', 'inacceptable', 'inappropriee'];
 
     // 1. Construire la liste : base + variantes retenues. Réintégration CCP : les
@@ -1431,11 +1481,11 @@ export const generateRaoPDF = async (optionsParams) => {
     analysisCompanies.forEach(c => {
       const admin = companiesData[c.name]?.admin || {};
       // Statut effectif : en phase après négo, une offre régularisée redevient régulière.
-      const effConcl = getEffectiveConclusion(admin, negoActive ? 'nego' : 'initial');
+      const effConcl = getEffectiveConclusion(admin, 'initial');
       const baseConcl = effConcl && NON_REGULAR_SYNTH.includes(effConcl) ? effConcl : null;
       synthRows.push({
         id: c.id, name: c.name, kind: 'base',
-        total: analysisStats.companiesTotals[c.id] || 0,
+        total: workflowStats.companiesTotals[c.id] || 0,
         irregular: !!baseConcl, irregularLabel: baseConcl,
       });
       // Variantes retenues : ajoutées en plus
@@ -1450,7 +1500,7 @@ export const generateRaoPDF = async (optionsParams) => {
           baseCompanyId: c.id,
           // Total net (rabais commercial global déduit en phase après négo) —
           // même primitif que le comparatif RAO et le Récap (source unique).
-          total: getVariantEffectiveTotal(c, v, negoActive ? 'nego' : 'initial'),
+          total: getVariantEffectiveTotal(c, v, 'initial'),
           irregular: !!vConcl, irregularLabel: vConcl,
         });
       });
@@ -1480,7 +1530,7 @@ export const generateRaoPDF = async (optionsParams) => {
       const rowFill = irr ? [254, 226, 226] : (isVariant ? [243, 232, 255] : undefined);
       const statusTag = irr ? `\n${STATUS_LABEL_SYNTH[d.irregularLabel] || 'NON RÉGULIÈRE'} (sous réserve)` : '';
       // Rabais commercial (phase après négo) : le total affiché est NET — rappel sous le nom.
-      const rabaisSynth = d.kind === 'base' ? (analysisStats.companiesRabais?.[d.id] || 0) : 0;
+      const rabaisSynth = d.kind === 'base' ? (workflowStats.companiesRabais?.[d.id] || 0) : 0;
       const rabaisTag = rabaisSynth > 0 ? `\n(rabais commercial -${String(rabaisSynth).replace('.', ',')} % déduit)` : '';
       const displayName = (isVariant
         ? `  > ${d.name} - V${d.variantIndex}${d.variantLabel ? ` (${d.variantLabel})` : ''}`
@@ -1503,7 +1553,7 @@ export const generateRaoPDF = async (optionsParams) => {
 
     autoTable(doc, {
       startY: y + 2,
-      head: [['Rang', 'Entreprise', 'Montant HT', 'Montant TTC', 'Écart / Estim.', 'Note Finale']],
+      head: [['Rang prix', 'Entreprise', 'Montant HT', 'Montant TTC', 'Écart / Estim.', 'Note prix']],
       body: summaryBody,
       theme: 'striped',
       headStyles: { fillColor: THEME.primary, textColor: [255, 255, 255], fontStyle: 'bold' },
@@ -1534,18 +1584,56 @@ export const generateRaoPDF = async (optionsParams) => {
     });
     y += 6;
 
-    // ── SECTION 6.bis : ANALYSE AVANT / APRÈS NÉGOCIATION ──
-    // Rendue uniquement quand le rapport est établi « après négociation » et que
-    // des prix négociés existent. Compare les montants initiaux et finaux par
-    // entreprise ; la note prix du rapport est établie sur les montants négociés.
-    if (negotiationPhase === 'after' && Array.isArray(negoComparison) && negoComparison.length > 0) {
-      y = addPage('Analyse financière — Après négociation', 'a4', 'portrait');
-      tocEntries.push({ label: '6.bis Analyse avant / après négociation', page: pageNum });
-      y = sectionTitle(doc, `6.bis  ANALYSE AVANT / APRÈS NÉGOCIATION`, y, THEME.primary);
+    const initialRecap = buildExtendedRanking(rankingInitial || ranking, 'initial');
+    if (initialRecap.length > 0) {
+      if (y > 215) y = addPage('5 — Classement avant négociation', 'a4', 'portrait');
+      y = sectionTitle(doc, '5.1  CLASSEMENT GÉNÉRAL AVANT NÉGOCIATION', y, THEME.primary);
+      const initialRecapBody = initialRecap.map((row) => {
+        const techScore = Object.values(row.techScores || {}).reduce((sum, value) => sum + Number(value || 0), 0);
+        const label = row.kind === 'variant'
+          ? `${row.name} — ${row.variantLabel || `Variante ${row.variantIndex || ''}`}`
+          : row.name;
+        return [
+          cleanText(label),
+          { content: formatNumberFr(row.price) + ' €', styles: { halign: 'right' } },
+          { content: fmtScore(row.priceScore), styles: { halign: 'center' } },
+          { content: fmtScore(techScore), styles: { halign: 'center' } },
+          { content: fmtScore(row.totalScore), styles: { halign: 'center', fontStyle: 'bold' } },
+          { content: String(row.rank), styles: { halign: 'center', fontStyle: 'bold' } },
+        ];
+      });
+      autoTable(doc, {
+        startY: y,
+        head: [['Entreprise', 'Montant HT', 'Note prix', 'Note technique', 'Total / 100', 'Rang']],
+        body: initialRecapBody,
+        styles: { font: 'Helvetica', fontSize: 8, cellPadding: 2.5 },
+        headStyles: { fillColor: THEME.primary, textColor: [255, 255, 255], fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: THEME.tableAlt },
+        margin: { left: M, right: M },
+        didDrawPage: () => drawFooter(doc, pageNum, consultation, project, THEME),
+      });
+      y = doc.lastAutoTable.finalY + 8;
+    }
+  };
 
-      // Pas de paragraphe d'introduction : le tableau se suffit (demande user 2026-07-22).
-      const maxScoreNego = Number(scoringConfig?.maxScore || 40);
-      const negoBody = negoComparison.map(r => {
+  // ── ÉTAPE 7 : DÉPOUILLEMENT APRÈS NÉGOCIATION ──
+  const renderNegoDepouillement = () => {
+    if (!hasNegoPriceData) return;
+    y = addPage('7 — Dépouillement après négociation', 'a4', 'portrait');
+    tocEntries.push({ label: '7. Dépouillement après négociation', page: pageNum });
+    y = sectionTitle(doc, `7  COMPARAISON DES OFFRES AVANT / APRÈS NÉGOCIATION`, y, THEME.primary);
+
+    if (!Array.isArray(negoComparison) || negoComparison.length === 0) {
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(...THEME.lightText);
+      doc.text('Aucun comparatif financier avant/après négociation n’est disponible.', M, y);
+      return;
+    }
+
+    // Pas de paragraphe d'introduction : le tableau se suffit.
+    const maxScoreNego = Number(scoringConfig?.maxScore || 40);
+    const negoBody = negoComparison.map(r => {
         const origIdx = analysisCompanies.findIndex(c => c.name === r.name);
         const cStyle = getCompanyStyle(origIdx !== -1 ? origIdx : 0);
         const down = r.delta < -0.005;
@@ -1561,9 +1649,9 @@ export const generateRaoPDF = async (optionsParams) => {
           { content: r.scoreInitial.toFixed(2), styles: { halign: 'center', textColor: [120, 120, 120] } },
           { content: r.scoreNego.toFixed(2) + ` / ${maxScoreNego}`, styles: { halign: 'center', fontStyle: 'bold' } },
         ];
-      });
+    });
 
-      autoTable(doc, {
+    autoTable(doc, {
         startY: y + 2,
         head: [['Entreprise', 'Montant initial HT', 'Rabais', 'Après négo HT (net)', 'Écart (€)', 'Écart (%)', 'Note init.', 'Note prix finale']],
         body: negoBody,
@@ -1575,17 +1663,18 @@ export const generateRaoPDF = async (optionsParams) => {
           4: { cellWidth: 24 }, 5: { cellWidth: 15 }, 6: { cellWidth: 15 }, 7: { cellWidth: 21 },
         },
         didDrawPage: () => drawFooter(doc, pageNum, consultation, project, THEME),
-      });
-      y = doc.lastAutoTable.finalY + 8;
-    }
+    });
+    y = doc.lastAutoTable.finalY + 8;
+  };
 
-    // ── SECTION 6.ter : RÉPONSES & ENGAGEMENTS DES SOUMISSIONNAIRES ──
+  // ── ÉTAPE 6 : RÉPONSES & ENGAGEMENTS DES SOUMISSIONNAIRES ──
     // Rendue uniquement si au moins une entreprise a consigné des réponses
     // (champ nego.responses saisi dans l'onglet Négociation).
     // Contenu WYSIWYG : gras / italique / souligné + listes à puces/numérotées
     // (parsés HTML via parseHtmlToBlocks / drawHtmlBlocks). Compat : les anciennes
     // saisies texte plain (avec \n) sont converties transparente à l'affichage.
-    {
+  const renderNegoResponses = () => {
+      if (!hasNegoPriceData) return;
       const isHtmlContent = (v) => typeof v === 'string' && /<[a-z][^>]*>/i.test(v);
       const negoRespRows = analysisCompanies
         .map(c => {
@@ -1596,10 +1685,17 @@ export const generateRaoPDF = async (optionsParams) => {
         })
         .filter(r => r.hasContent);
 
-      if (negoRespRows.length > 0) {
-        y = addPage('Réponses & engagements — Négociation', 'a4', 'portrait');
-        tocEntries.push({ label: '6.ter Réponses & engagements des soumissionnaires', page: pageNum });
-        y = sectionTitle(doc, `6.ter  RÉPONSES & ENGAGEMENTS DES SOUMISSIONNAIRES`, y, THEME.primary);
+      y = addPage('6 — Négociation', 'a4', 'portrait');
+      tocEntries.push({ label: '6. Négociation — Réponses et engagements', page: pageNum });
+      y = sectionTitle(doc, `6  NÉGOCIATION — RÉPONSES ET ENGAGEMENTS`, y, THEME.primary);
+
+      if (negoRespRows.length === 0) {
+        doc.setFont('Helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(...THEME.lightText);
+        doc.text('Aucune réponse ou engagement complémentaire n’a été consigné dans le module RAO.', M, y);
+        return;
+      }
 
         doc.setFont('Helvetica', 'normal');
         doc.setFontSize(9);
@@ -1656,10 +1752,12 @@ export const generateRaoPDF = async (optionsParams) => {
           });
           y += 6;
         });
-      }
-    }
+  };
 
-    // ── DÉTAIL DES PRIX UNITAIRES — Un tableau A4 paysage par tranche ──
+  // ── ANNEXES A/B : DÉTAIL DES PRIX UNITAIRES PAR PHASE ──
+  const renderPriceAnnex = (basis, annexCode) => {
+    const isNegoBasis = basis === 'nego';
+    const phaseLabel = isNegoBasis ? 'APRÈS NÉGOCIATION' : 'AVANT NÉGOCIATION';
     if (chaptersData && chaptersData.length > 0) {
 
       // Helper : construit chaptersData pour une tranche donnée.
@@ -1704,18 +1802,18 @@ export const generateRaoPDF = async (optionsParams) => {
       analysisCompanies.forEach((c, idx) => {
         const admin = companiesData[c.name]?.admin || {};
         // Statut effectif (régularisation après négo prise en compte).
-        const effConcl = getEffectiveConclusion(admin, negoActive ? 'nego' : 'initial');
+        const effConcl = getEffectiveConclusion(admin, basis);
         const baseConcl = effConcl && NON_REG_DETAIL.includes(effConcl) ? effConcl : null;
         // Rabais commercial global (phase après négo) — s'applique à la colonne
         // base ET à ses variantes (déduit du Total HT en pied de tableau).
-        const rabaisPct = negoActive ? getCompanyRabaisPct(c, 'nego') : 0;
+        const rabaisPct = isNegoBasis ? getCompanyRabaisPct(c, 'nego') : 0;
         detailColumns.push({
           key: `${c.id}_base`,
           companyId: c.id,
           companyName: c.name,
           companyIndex: idx,
           kind: 'base',
-          offers: getEffectiveOffers(c, negoActive ? 'nego' : 'initial'),
+          offers: getEffectiveOffers(c, basis),
           quantities: {},
           removedIds: new Set(),
           newItems: [],
@@ -1736,10 +1834,10 @@ export const generateRaoPDF = async (optionsParams) => {
             kind: 'variant',
             // Fusion base + variante, puis prix négociés propres à la variante en
             // phase après négo (source unique — cohérent avec le total dénormalisé v.totalNego).
-            offers: getEffectiveVariantOffers(c, v, negoActive ? 'nego' : 'initial'),
+            offers: getEffectiveVariantOffers(c, v, basis),
             quantities: v.quantities || {},
             removedIds: new Set((v.removedItems || []).map(it => it.itemId)),
-            newItems: getEffectiveVariantNewItems(v, negoActive ? 'nego' : 'initial'),
+            newItems: getEffectiveVariantNewItems(v, basis),
             irregular: !!vConcl,
             irregularLabel: vConcl,
             rabaisPct,
@@ -1752,15 +1850,17 @@ export const generateRaoPDF = async (optionsParams) => {
       const totalSubCols = detailColumns.reduce((a, c) => a + subCount(c), 0);
 
       trancheList.forEach((tranche) => {
-        const trLabel = hasTr ? tranche.name : 'Détail des Prix Unitaires';
-        y = addPage(`Analyse financière — ${trLabel}`, pricesPaperSize, 'landscape');
+        const trLabel = hasTr ? tranche.name : 'Détail des prix unitaires';
+        y = addPage(`${annexCode} — Prix ${isNegoBasis ? 'après' : 'avant'} négociation · ${trLabel}`, pricesPaperSize, 'landscape');
         if (!tocAdded) {
-          tocEntries.push({ label: '7. Détail des prix unitaires (A4 paysage)', page: pageNum });
+          tocEntries.push({ label: `${annexCode} — Prix ${isNegoBasis ? 'après' : 'avant'} négociation (${pricesPaperSize.toUpperCase()} paysage)`, page: pageNum });
           tocAdded = true;
         }
 
         doc.setFontSize(14); doc.setTextColor(...THEME.primary); doc.setFont("Helvetica", "bold");
-        const title = hasTr ? `DÉTAIL DES PRIX UNITAIRES — ${tranche.name.toUpperCase()}` : "DÉTAIL DES PRIX UNITAIRES";
+        const title = hasTr
+          ? `${annexCode.toUpperCase()} — PRIX ${phaseLabel} — ${tranche.name.toUpperCase()}`
+          : `${annexCode.toUpperCase()} — DÉTAIL DES PRIX ${phaseLabel}`;
         doc.text(title, M, y);
 
         if (analysisMode === 'heatmap') {
@@ -2046,19 +2146,26 @@ export const generateRaoPDF = async (optionsParams) => {
         });
       }); // fin boucle tranches
     }
-  }
+  };
 
-  // ── SECTION 8.bis : ANALYSE DES VARIANTES RETENUES ──
+  // ── ANNEXE C : VARIANTES RETENUES ET PSE ──
   // Pour chaque entreprise ayant des variantes retenues, détail des modifications
-  {
+  const renderVariantsAnnex = () => {
+    const variantBasis = hasNegoPriceData ? 'nego' : 'initial';
+    let variantsTocAdded = false;
+    const addVariantsToc = () => {
+      if (variantsTocAdded) return;
+      tocEntries.push({ label: 'Annexe C — Variantes retenues et PSE', page: pageNum });
+      variantsTocAdded = true;
+    };
     const companiesWithRetainedVariants = analysisCompanies.filter(c =>
       (c.variants || []).some(v => v.retained)
     );
 
     if (companiesWithRetainedVariants.length > 0) {
-      y = addPage('Variantes retenues', 'a4', 'portrait');
-      tocEntries.push({ label: '7.bis Analyse des variantes retenues', page: pageNum });
-      y = sectionTitle(doc, '7.bis  Analyse des variantes retenues (CCP R2151-11)', y, THEME.primary);
+      y = addPage('Annexe C — Variantes retenues', 'a4', 'portrait');
+      addVariantsToc();
+      y = sectionTitle(doc, 'ANNEXE C.1 — Variantes retenues (CCP R2151-11)', y, THEME.primary);
 
       doc.setFont('Helvetica', 'normal');
       doc.setFontSize(8);
@@ -2085,7 +2192,7 @@ export const generateRaoPDF = async (optionsParams) => {
           {
             // Total net (rabais commercial global de l'entreprise déduit en phase après négo) —
             // même primitif que la synthèse financière et le Récap (source unique).
-            const vTotalEff = getVariantEffectiveTotal(c, v, negoActive ? 'nego' : 'initial');
+            const vTotalEff = getVariantEffectiveTotal(c, v, variantBasis);
             const vRabaisPct = negoActive ? getCompanyRabaisPct(c, 'nego') : 0;
             doc.text(`Total HT : ${fmt(vTotalEff)} €${vRabaisPct > 0 ? ` (net, rabais -${vRabaisPct}%)` : ''}  •  Base HT : ${fmt(analysisStats?.companiesTotals?.[c.id] || 0)} €`, M + 3, y + 10);
           }
@@ -2126,7 +2233,7 @@ export const generateRaoPDF = async (optionsParams) => {
           }
 
           // Articles ajoutés (newItems) — prix négociés appliqués en phase après négo
-          const newItems = getEffectiveVariantNewItems(v, negoActive ? 'nego' : 'initial')
+          const newItems = getEffectiveVariantNewItems(v, variantBasis)
             .filter(it => Number(it.qty || 0) > 0);
           if (newItems.length > 0) {
             doc.setFont('Helvetica', 'bold');
@@ -2210,14 +2317,13 @@ export const generateRaoPDF = async (optionsParams) => {
         });
       });
     }
-  }
 
-  // ── SECTION 8.ter : PSE / OPTIONS ──
+  // ── ANNEXE C.2 : PSE / OPTIONS ──
   // Décision sur les chapitres marqués comme options dans le DQE
   if (optionChapters && optionChapters.length > 0) {
-    y = addPage('PSE / Options', 'a4', 'portrait');
-    tocEntries.push({ label: '7.ter Décision sur les PSE / Options', page: pageNum });
-    y = sectionTitle(doc, '7.ter  Prestations Supplémentaires Éventuelles (PSE) / Options', y, THEME.primary);
+    y = addPage('Annexe C — PSE / Options', 'a4', 'portrait');
+    addVariantsToc();
+    y = sectionTitle(doc, 'ANNEXE C.2 — Prestations Supplémentaires Éventuelles (PSE) / Options', y, THEME.primary);
 
     doc.setFont('Helvetica', 'normal');
     doc.setFontSize(8);
@@ -2260,9 +2366,10 @@ export const generateRaoPDF = async (optionsParams) => {
     doc.setTextColor(...THEME.lightText);
     doc.text(`${nbRetenues} option${nbRetenues > 1 ? 's' : ''} retenue${nbRetenues > 1 ? 's' : ''} sur ${optionChapters.length}.`, M, y);
   }
+  };
 
   // ── ANALYSE TECHNIQUE — 1 à 2 pages par critère pour aérer la lecture ──
-  {
+  const renderTechnicalAnalysis = (basis, stepNum, phaseLabel) => {
     const nonAutoCriteria = criteria.filter(c => !c.auto);
     if (nonAutoCriteria.length > 0) {
       // Bas de page utile (A4 portrait = 297mm, footer ~20mm)
@@ -2270,15 +2377,15 @@ export const generateRaoPDF = async (optionsParams) => {
 
       nonAutoCriteria.forEach((crit, critIdx) => {
         // ► NOUVEAU : chaque critère démarre sur une nouvelle page A4 portrait
-        y = addPage('Analyse technique', 'a4', 'portrait');
+        y = addPage(`${stepNum} — Analyse technique ${phaseLabel}`, 'a4', 'portrait');
         if (critIdx === 0) {
-          tocEntries.push({ label: '8. Analyse technique', page: pageNum });
+          tocEntries.push({ label: `${stepNum}. Analyse technique ${phaseLabel}`, page: pageNum });
         }
 
         const hasSubs = (crit.subCriteria || []).length > 0;
 
         // Header critère — bande verte avec poids
-        y = sectionTitle(doc, `${critIdx + 2}.  ${crit.label}  (${crit.weight}%)`, y, THEME.primary);
+        y = sectionTitle(doc, `${stepNum}.${critIdx + 1}  ${crit.label}  (${crit.weight}%)`, y, THEME.primary);
         y += 2;
 
         // Pondération max = poids critère (échelle de la barre)
@@ -2327,9 +2434,9 @@ export const generateRaoPDF = async (optionsParams) => {
             const blocks = companyNames
               .map((name, ci) => ({ name, ci }))
               .map(({ name, ci }) => {
-                const irregular = NON_REGULAR_STATUSES.includes(getEffectiveConclusion(companiesData[name]?.admin, negoActive ? 'nego' : 'initial'));
+                const irregular = NON_REGULAR_STATUSES.includes(getEffectiveConclusion(companiesData[name]?.admin, basis));
                 // Notes effectives : en phase après négo, technicalNego surcharge l'initial.
-                const tech = getEffectiveTechnical(companiesData[name], negoActive ? 'nego' : 'initial');
+                const tech = getEffectiveTechnical(companiesData[name], basis);
                 const sd = tech[sc.id] || {};
                 let h = HEADER_BLOCK;
                 // Commentaire riche (gras/listes) : mesure exacte par le moteur
@@ -2427,9 +2534,9 @@ export const generateRaoPDF = async (optionsParams) => {
           const blocks = companyNames
             .map((name, ci) => ({ name, ci }))
             .map(({ name, ci }) => {
-              const irregular = NON_REGULAR_STATUSES.includes(getEffectiveConclusion(companiesData[name]?.admin, negoActive ? 'nego' : 'initial'));
+              const irregular = NON_REGULAR_STATUSES.includes(getEffectiveConclusion(companiesData[name]?.admin, basis));
               // Notes effectives : en phase après négo, technicalNego surcharge l'initial.
-              const tech = getEffectiveTechnical(companiesData[name], negoActive ? 'nego' : 'initial');
+              const tech = getEffectiveTechnical(companiesData[name], basis);
               const d = tech[crit.id] || {};
               let h = HEADER_BLOCK;
               // Synthèse riche : mesure exacte (cf. bloc sous-critères ci-dessus)
@@ -2460,7 +2567,7 @@ export const generateRaoPDF = async (optionsParams) => {
           pages.forEach((pg, pgIdx) => {
             if (pgIdx > 0) {
               y = addPage(`${crit.label} (suite ${pgIdx + 1}/${pages.length})`, 'a4', 'portrait');
-              y = sectionTitle(doc, `${critIdx + 2}.  ${crit.label}  (${crit.weight}%) — suite ${pgIdx + 1}/${pages.length}`, y, THEME.primary);
+              y = sectionTitle(doc, `${stepNum}.${critIdx + 1}  ${crit.label}  (${crit.weight}%) — suite ${pgIdx + 1}/${pages.length}`, y, THEME.primary);
               y += 2;
             }
             const pageStart = y;
@@ -2501,8 +2608,8 @@ export const generateRaoPDF = async (optionsParams) => {
       });
 
       // Tableau récap des notes techniques — toujours sur sa propre page
-      y = addPage('Récapitulatif des notes techniques', 'a4', 'portrait');
-      y = sectionTitle(doc, 'Récapitulatif des notes techniques', y, THEME.primary);
+      y = addPage(`${stepNum} — Récapitulatif des notes techniques · phase ${phaseLabel}`, 'a4', 'portrait');
+      y = sectionTitle(doc, `${stepNum} — Récapitulatif des notes techniques · phase ${phaseLabel}`, y, THEME.primary);
       const techRecapCols = [];
       nonAutoCriteria.forEach(crit => {
         const hasSubs = (crit.subCriteria || []).length > 0;
@@ -2522,7 +2629,7 @@ export const generateRaoPDF = async (optionsParams) => {
 
       const techRecapBody = companyNames.map((name) => {
         // Notes effectives : en phase après négo, technicalNego surcharge l'initial.
-        const tech = getEffectiveTechnical(companiesData[name], negoActive ? 'nego' : 'initial');
+        const tech = getEffectiveTechnical(companiesData[name], basis);
         let total = 0;
         const notes = techRecapCols.map(col => {
           const d = tech[col.id] || {};
@@ -2553,14 +2660,89 @@ export const generateRaoPDF = async (optionsParams) => {
       });
       y = doc.lastAutoTable.finalY + 10;
     }
+  };
+
+  const renderAdminAfterNego = () => {
+    if (!hasNegoPriceData || companyNames.length === 0) return;
+    y = addPage('8 — Analyse administrative après négociation', 'a4', 'portrait');
+    tocEntries.push({ label: '8. Analyse administrative après négociation', page: pageNum });
+    y = sectionTitle(doc, '8  ANALYSE ADMINISTRATIVE APRÈS NÉGOCIATION', y, THEME.primary);
+
+    const statusLabels = {
+      reguliere: 'RÉGULIÈRE',
+      irreguliere: 'IRRÉGULIÈRE',
+      inacceptable: 'INACCEPTABLE',
+      inappropriee: 'INAPPROPRIÉE',
+    };
+    const NON_REG_AFTER = ['irreguliere', 'inacceptable', 'inappropriee'];
+    // Colonne « Motif » ajoutée seulement si au moins une offre reste écartée
+    // après négociation (obligation de motivation du rejet, CCP R2181-1).
+    const hasIrregAfter = companyNames.some(name =>
+      NON_REG_AFTER.includes(getEffectiveConclusion(companiesData[name]?.admin, 'nego')));
+
+    const adminAfterBody = companyNames.map((name) => {
+      const admin = companiesData[name]?.admin || {};
+      const initial = getEffectiveConclusion(admin, 'initial');
+      const after = getEffectiveConclusion(admin, 'nego') || initial;
+      const regularized = isRegularizedAfterNego(admin);
+      const evolution = regularized
+        ? 'Régularisée après négociation'
+        : initial !== after
+          ? 'Statut modifié'
+          : 'Statut inchangé';
+      const row = [
+        { content: cleanText(name), styles: { fontStyle: 'bold' } },
+        statusLabels[initial] || 'NON RENSEIGNÉE',
+        { content: statusLabels[after] || 'NON RENSEIGNÉE', styles: { fontStyle: 'bold' } },
+        { content: evolution, styles: { textColor: regularized ? [21, 128, 61] : THEME.lightText } },
+      ];
+      if (hasIrregAfter) {
+        const isNonReg = NON_REG_AFTER.includes(after);
+        // Motif de non-régularité, ou motif de régularisation si l'offre a été régularisée.
+        const txt = isNonReg
+          ? (htmlToPlainText(getEffectiveIrregularityReason(admin, 'nego')).trim() || '(motif non renseigné)')
+          : (regularized ? (admin.regularizationComment || '').trim() || '—' : '—');
+        row.push({
+          content: cleanText(txt),
+          styles: { fontSize: 7, textColor: isNonReg ? [146, 64, 14] : (regularized ? [21, 128, 61] : [180, 180, 180]) },
+        });
+      }
+      return row;
+    });
+
+    const headAfter = ['Entreprise', 'Statut initial', 'Statut après négociation', 'Évolution'];
+    if (hasIrregAfter) headAfter.push('Motif (CCP R2181-1)');
+
+    autoTable(doc, {
+      startY: y,
+      head: [headAfter],
+      body: adminAfterBody,
+      styles: { font: 'Helvetica', fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: THEME.primary, textColor: [255, 255, 255], fontStyle: 'bold' },
+      columnStyles: hasIrregAfter ? { 4: { cellWidth: 55 } } : {},
+      alternateRowStyles: { fillColor: THEME.tableAlt },
+      margin: { left: M, right: M },
+      didDrawPage: () => drawFooter(doc, pageNum, consultation, project, THEME),
+    });
+    y = doc.lastAutoTable.finalY + 8;
+  };
+
+  // Ordre du corps du rapport = ordre canonique du workflow RAO.
+  renderTechnicalAnalysis('initial', 4, 'initiale');
+  renderFinancialSummary();
+  if (hasNegoPriceData) {
+    renderNegoResponses();
+    renderNegoDepouillement();
+    renderAdminAfterNego();
+    renderTechnicalAnalysis('nego', 9, 'après négociation');
   }
 
-  // Section Négociation supprimée — les négociations sont exclues du PDF RAO.
-
   // ── RÉCAPITULATIF FINAL ──
-  y = addPage('Récapitulatif général', 'a4', 'portrait');
-  tocEntries.push({ label: '9. Récapitulatif général', page: pageNum });
-  y = sectionTitle(doc, 'RÉCAPITULATIF GÉNÉRAL', y, THEME.primary);
+  const recapStep = hasNegoPriceData ? 10 : '5.2';
+  const recapLabel = hasNegoPriceData ? 'Récapitulatif final' : 'Conclusion avant négociation';
+  y = addPage(`${recapStep} — ${recapLabel}`, 'a4', 'portrait');
+  tocEntries.push({ label: `${recapStep}${hasNegoPriceData ? '.' : ''} ${recapLabel}`, page: pageNum });
+  y = sectionTitle(doc, `${recapStep}  ${recapLabel.toUpperCase()}`, y, THEME.primary);
 
   const techCs = criteria.filter(c => !c.auto);
 
@@ -2779,14 +2961,17 @@ export const generateRaoPDF = async (optionsParams) => {
     doc.text(`Score : ${fmtScore(winner.totalScore)} / 100  —  Montant : ${fmt(winner.price)} € HT  —  ${fmt(computeVatBreakdown(winner.price, projectTvaRate).ttc)} € TTC`, W / 2, textY + 2, { align: 'center' });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // ── ANNEXES (formules de scoring, références CCP) — masquées si exclues ──
-  // ─────────────────────────────────────────────────────────────────────────
+  // ── ANNEXES DU RAPPORT ──
+  renderPriceAnnex('initial', 'Annexe A');
+  if (hasNegoPriceData) renderPriceAnnex('nego', 'Annexe B');
+  renderVariantsAnnex();
+
+  // Annexes méthodologiques et réglementaires — masquées si exclues.
   if (includeAnnexes) {
-  // ── ANNEXE A — Formules de scoring ──
+  // ── ANNEXE D — Formules de scoring ──
   y = addPage('Annexes — Formules', 'a4', 'portrait');
-  tocEntries.push({ label: 'Annexe A — Formules de scoring', page: pageNum });
-  y = sectionTitle(doc, 'ANNEXE A — Formules de notation du critère prix', y, THEME.primary);
+  tocEntries.push({ label: 'Annexe D — Formules de notation', page: pageNum });
+  y = sectionTitle(doc, 'ANNEXE D — Formules de notation du critère prix', y, THEME.primary);
 
   doc.setFont('Helvetica', 'normal');
   doc.setFontSize(9);
@@ -2827,10 +3012,10 @@ export const generateRaoPDF = async (optionsParams) => {
   });
   y = doc.lastAutoTable.finalY + 10;
 
-  // ── ANNEXE B — Références CCP ──
+  // ── ANNEXE E — Références CCP ──
   if (y > 200) { y = addPage('Annexes — Références CCP', 'a4', 'portrait'); }
-  tocEntries.push({ label: 'Annexe B — Références CCP', page: pageNum });
-  y = sectionTitle(doc, 'ANNEXE B — Références du Code de la Commande Publique', y, THEME.primary);
+  tocEntries.push({ label: 'Annexe E — Références CCP', page: pageNum });
+  y = sectionTitle(doc, 'ANNEXE E — Références du Code de la Commande Publique', y, THEME.primary);
 
   const ccpRefs = [
     {

@@ -8,10 +8,11 @@ export { APP_VERSION } from './appVersion';
 
 export const CHANGELOG = [
   {
-    version: '3.11.2',
+    version: '3.12.0',
     date: '2026-07-17',
     title: 'Partage et propriété des modules terrain',
     highlights: [
+      'RAO, rapport PDF — la page de garde et le sommaire ouvrent désormais un rapport organisé dans le même ordre que le workflow : étapes 1 à 5 avant négociation, puis 6 à 10 uniquement lorsque des données négociées existent. Le détail des prix est déplacé en deux tableaux paysage distincts et de structure identique : annexe A pour les prix avant négociation, annexe B pour les prix après négociation ; les variantes/PSE, formules et références réglementaires deviennent respectivement les annexes C, D et E',
       'RAO — le bouton « Fiche affaire » est désormais placé à l’extrême gauche du ruban, avec un séparateur avant les étapes du workflow',
       'RAO — le workflow passe de 6 à 10 étapes, organisées en deux phases : Avant négociation (1. Consultation, 2. Dépouillement, 3. Administratif, 4. Technique, 5. Récap avant négo) et Après négociation (6. Négociation, 7. Dépouillement après négo, 8. Administratif, 9. Technique, 10. Récap final). Les étapes d’après-négo restent grisées tant que la négociation n’est pas engagée — un bouton « Engager la négociation » dans le Récap (5) les déverrouille, et elles s’activent d’elles-mêmes dès que des prix négociés existent ; sans négociation, le Récap avant négo fait office de classement final. Le Dépouillement après négo (7) reprend l’import des offres finales, les rabais commerciaux et le PV après négociation, jusqu’ici mêlés au dépouillement initial ; l’étape 2 porte désormais toujours sur les offres initiales. Les statuts administratifs et les notes techniques d’après-négo sont pré-remplis par héritage de l’avant-négo : seuls les éléments retouchés sont enregistrés à part, l’analyse initiale reste intacte (trace avant/après conservée, régularisations motivées au titre de l’art. R2152-2). La date et l’heure de remise des offres se saisissent désormais aussi dans l’onglet Consultation, synchronisées avec la Fiche affaire (même donnée, éditable des deux côtés)',
       'RAO — un ré-import sans divergence de quantités lève automatiquement le classement « irrégulière » que l’import précédent avait posé (et lui seul : une conclusion saisie manuellement n’est jamais modifiée). Une offre corrigée par un nouvel import ne reste plus marquée irrégulière à vie',

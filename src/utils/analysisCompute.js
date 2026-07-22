@@ -137,6 +137,22 @@ export function isConclusionNonRegular(admin, basis = 'initial') {
 }
 
 /**
+ * Motif d'irrégularité EFFECTIF selon la phase. En phase 'nego', le motif saisi
+ * après négociation (admin.irregularityReasonNego) prend le pas sur le motif
+ * initial (admin.irregularityReason) ; sans saisie, le motif initial est hérité.
+ * Motive le rejet d'une offre non régulière (obligation de motivation, CCP R2181-1).
+ *
+ * @param {Object} admin - rao.companies[name].admin
+ * @param {string} basis - 'initial' (défaut) | 'nego'
+ * @returns {string} HTML du champ riche (chaîne vide si non saisi)
+ */
+export function getEffectiveIrregularityReason(admin, basis = 'initial') {
+  if (!admin) return '';
+  if (basis === 'nego' && admin.irregularityReasonNego) return admin.irregularityReasonNego;
+  return admin.irregularityReason || '';
+}
+
+/**
  * Vrai si l'offre a été RÉGULARISÉE en négociation : statut initial non régulier
  * mais statut « après négo » régulier. Sert à documenter la transition (§5.bis PDF).
  */

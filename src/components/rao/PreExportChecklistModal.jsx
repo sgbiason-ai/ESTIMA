@@ -169,21 +169,21 @@ const PreExportChecklistModal = ({
               <span className="flex-1">
                 <span className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
                   <Files size={14} className="text-slate-500" />
-                  Inclure les annexes
+                  Inclure les annexes méthodologiques
                 </span>
                 <span className="block text-[11px] text-slate-500 mt-0.5">
-                  Annexe B (formules de notation du critère prix) et Annexe C (références du Code de la
+                  Annexe D (formules de notation du critère prix) et Annexe E (références du Code de la
                   commande publique). Décoché, le PDF est allégé sans ces annexes.
                 </span>
               </span>
             </label>
           </div>
 
-          {/* Format papier du detail des prix (§7) — A4 compact ou A3 confort de lecture */}
+          {/* Format papier des annexes de prix A/B — A4 compact ou A3 confort de lecture */}
           <div className="shrink-0 px-6 py-3 border-t border-slate-100 bg-slate-50/40">
             <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 mb-2">
               <Printer size={14} className="text-slate-500" />
-              Impression du détail des prix (§7)
+              Impression des annexes de prix (A/B)
             </div>
             <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
               {[
