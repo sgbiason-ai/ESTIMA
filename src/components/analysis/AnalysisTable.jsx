@@ -170,9 +170,10 @@ const buildGroupTree = (items) => {
 };
 
 const AnalysisTable = ({
-  chaptersData, companies, stats, updateCompanyOffer, renameCompany, removeCompany, project, bpuConfig, scoringConfig,
+  chaptersData, companies, stats, updateCompanyOffer, renameCompany, removeCompany, project, scoringConfig,
   analysisMode, averagesHorsOAB = {}, negoActive = false, updateCompanyNegoRabais = null,
-  updateVariantOffer = null, updateVariantNewItemPrice = null
+  updateVariantOffer = null, updateVariantNewItemPrice = null,
+  refMap = new Map(),
 }) => {
 
   // COMPANY_STYLES : couleur par entreprise (cycle si plus d'entreprises que de styles).
@@ -220,21 +221,12 @@ const AnalysisTable = ({
     H_EST_TOTAL: { position: 'sticky', left: 435, zIndex: 30 },
   };
 
-  const refMap = useMemo(() => {
-    const map = new Map();
-    let counter = 1;
-    const traverse = (nodes) => {
-      nodes.forEach((node) => {
-        if (node.type === "item") {
-          let refLabel = (bpuConfig?.numberingMode === "manual" && node.bpuNum) ? String(node.bpuNum).trim() : `P.${counter++}`;
-          map.set(node.id, refLabel);
-        }
-        if (node.children) traverse(node.children);
-      });
-    };
-    traverse(project?.chapters || []);
-    return map;
-  }, [project, bpuConfig]);
+  // Numérotation des articles : reçue en prop (refMap de useProjectCalculations,
+  // via buildRefMap) — la MÊME que le DQE exporté et les exports PDF/Excel.
+  // Ne JAMAIS reconstruire un compteur local « P.n par article » ici : le
+  // registre de prix uniques ne consomme un numéro que sur un prix nouveau, un
+  // compteur naïf diverge donc dès le premier prix répété et le tableau affiche
+  // des numéros qui ne correspondent plus au DQE de l'affaire.
 
   const renderDelta = (current, reference) => {
     if (!reference || reference === 0 || !current || current === 0) return <span className="text-slate-300">-</span>;

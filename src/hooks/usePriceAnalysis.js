@@ -6,6 +6,7 @@ import { useDialog } from '../contexts/DialogContext';
 import { useToast } from '../contexts/ToastContext';
 import { computeChaptersData, computeAnalysisStats, computeOABThreshold as calculateOABThreshold, companiesHaveNego, computeVariantTotal, variantHasNego, newItemMatchKey, findMatchingVariantNewItem } from '../utils/analysisCompute';
 import { createOfferItemMatcher } from '../utils/offerItemMatcher';
+import { buildOfferImportReport } from '../utils/importReport';
 
 // Algorithme OAB (Double Moyenne) : source unique dans analysisCompute.
 
@@ -34,6 +35,9 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
   const [firestoreLoaded, setFirestoreLoaded] = useState(false);
   // Progression OCR pour PDF scannés
   const [ocrProgress, setOcrProgress] = useState(null);
+  // Rapport du dernier import d'offre : lignes non rattachées + articles restés
+  // sans prix. null = rien à signaler (la modale ne s'affiche pas).
+  const [importReport, setImportReport] = useState(null);
   // Stocke le projectId pour lequel Firestore a été chargé (pas un boolean, un ID)
   const loadedForProjectRef = useRef(null);
 
@@ -344,6 +348,9 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
   };
 
   const handleImportExcel = async (event, forcedCompanyName = null, opts = {}) => {
+    // Chaque import repart d'un rapport vierge : un rapport d'un import précédent
+    // ne doit jamais réapparaître sous le nom d'un autre fichier.
+    setImportReport(null);
     // event peut être un événement DOM (input file) ou un objet { target: { files: [file] } }
     // forcedCompanyName : si fourni, skip le prompt (workflow guidé depuis Dépouillement)
     // opts.toNego : force l'import vers les prix NÉGOCIÉS (offersNego) même si la
@@ -533,6 +540,14 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
       });
       const isAutoFlaggedIrregular = quantityMismatches.length > 0;
 
+      // ─── Rapport d'import : anomalies rendues visibles (modale) ────────────
+      // Un article laissé à 0 € ne se manifestait que par l'écart AE — indirect.
+      const report = buildOfferImportReport({
+        project, bpuConfig, chaptersData, importedOffers, moeQtyMap,
+        unmatchedDetails,
+        stats: { totalRows, matchCount: Object.keys(importedOffers).length, refMatchedRows, unmatchedRows, skippedRows },
+      });
+
       const matchCount = Object.keys(importedOffers).length;
       if (matchCount === 0) {
         const details = [];
@@ -540,6 +555,16 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
         if (invalidPriceRows > 0) details.push(`${invalidPriceRows} prix invalide(s)`);
         if (skippedRows > 0) details.push(`${skippedRows} ligne(s) vide(s)`);
         toast.warning(`Aucune correspondance trouvée.${details.length > 0 ? ' ' + details.join(', ') + '.' : ''}`);
+        // Le rapport liste les lignes du fichier : c'est le seul diagnostic utile
+        // ici (tous les articles étant sans prix, leur liste serait du bruit).
+        if (report.unmatched.length > 0) {
+          setImportReport({
+            companyName: (companyName || '').trim() || suggestedName,
+            fileName: file.name,
+            ...report,
+            zeroPriceItems: [],
+          });
+        }
         event.target.value = null;
         return;
       }
@@ -699,6 +724,12 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
         toast.warning(
           `⚠ Écart AE détecté pour "${finalCompanyName}" : annoncé ${fmt(amountMismatch.expectedAe)} € → recalculé ${fmt(amountMismatch.computedTotal)} € (${sign}${fmt(amountMismatch.delta)} €, ${sign}${amountMismatch.deltaPct}%). Vérifier les prix unitaires (BPU prévaut contractuellement).`
         );
+      }
+
+      // Rapport détaillé (modale) dès qu'une anomalie existe — les toasts ne
+      // donnent que des compteurs, jamais QUELS articles sont concernés.
+      if (report.hasAnomalies) {
+        setImportReport({ companyName: finalCompanyName, fileName: file.name, ...report });
       }
     } catch (error) {
       console.error("Erreur lecture fichier Excel:", error);
@@ -1557,6 +1588,9 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
     handleImportPdfOffer,
     // Progression OCR (PDF scannés)
     ocrProgress,
+    // Rapport du dernier import (lignes non rattachées + articles sans prix)
+    importReport,
+    clearImportReport: () => setImportReport(null),
   };
 };
 

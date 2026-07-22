@@ -5,6 +5,7 @@ import AnalysisToolbar from '../components/analysis/AnalysisToolbar';
 import AnalysisTable from '../components/analysis/AnalysisTable';
 import RaoView from './RaoView';
 import OcrProgressModal from '../components/rao/OcrProgressModal';
+import ImportReportModal from '../components/rao/ImportReportModal';
 
 // MAGIE : On importe le moteur de calcul du projet !
 import { useProjectCalculations } from '../hooks/useProjectCalculations';
@@ -106,6 +107,9 @@ const PriceAnalysisView = ({
 
       {/* Modale globale de progression OCR (PDF scannés) */}
       <OcrProgressModal open={!!analysis.ocrProgress} progress={analysis.ocrProgress} />
+
+      {/* Rapport d'import : lignes non rattachées + articles restés sans prix */}
+      <ImportReportModal report={analysis.importReport} onClose={analysis.clearImportReport} />
 
       {/* ── ONGLETS PRINCIPAUX ── */}
       {/* AIDE retirée ici : le bouton AIDE en haut à droite (RaoAnalysisView) sert d'unique point d'entrée à l'aide. */}
@@ -246,8 +250,8 @@ const PriceAnalysisView = ({
           {...analysis}
           project={project}
           activeTrancheId={activeTrancheId}
-          bpuConfig={bpuConfig}
           analysisMode={analysisMode}
+          refMap={bpuRefMap}
         />
       </div>
       </>}
