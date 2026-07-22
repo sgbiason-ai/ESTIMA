@@ -36,6 +36,10 @@ import {
 // Ordre canonique des étapes du RAO : source unique dans RaoConstants
 // (partagée avec NextStepHint, RaoOrientationPanel et la checklist pré-export).
 
+// Onglets « plein écran » (sidebar entreprises + scroll interne) : pas de
+// scroll/padding sur le conteneur, chaque onglet gère le sien.
+const FULLSCREEN_TABS = ['admin', 'technique', 'negociation', 'depouillement', 'depouillementNego', 'adminNego', 'techniqueNego'];
+
 const RaoView = ({
   project,
   setProject,
@@ -136,7 +140,32 @@ const RaoView = ({
     }
   }, [setProject, handleSaveProject]);
 
-  const rao = useRao(project, setProject, analysisCompanies, analysisStats, scoringConfig, tranches);
+  // ─── Date/heure de remise : éditable dans Consultation ET Fiche affaire ──
+  // Même champ du doc projet (dateRemise/timeRemise) — écriture immédiate dans
+  // le state, persistance débouncée (le doc racine n'a pas d'auto-save).
+  const projectRef = useRef(project);
+  useEffect(() => { projectRef.current = project; });
+  const remiseTimerRef = useRef(null);
+  const handleUpdateRemise = useCallback((field, value) => {
+    setProject(prev => (prev ? { ...prev, [field]: value } : prev));
+    if (!handleSaveProject) return;
+    clearTimeout(remiseTimerRef.current);
+    remiseTimerRef.current = setTimeout(() => {
+      if (projectRef.current) {
+        handleSaveProject(projectRef.current).catch(e => console.error('[RAO] Sauvegarde date de remise:', e));
+      }
+    }, 1200);
+  }, [setProject, handleSaveProject]);
+
+  // statsByBasis : stats des deux phases pour les classements forcés par étape
+  // (5 = Récap avant négo sur les offres initiales, 9 = Récap final sur les négociées).
+  const rao = useRao(project, setProject, analysisCompanies, analysisStats, scoringConfig, tranches, [],
+    { initial: analysisStatsInitial, nego: analysisStatsNego });
+
+  // ─── Négociation engagée ? Déverrouille les étapes 6-9 du workflow. ──────
+  // Trois portes d'entrée : marqueur explicite (bouton « Engager la négociation »
+  // du Récap avant négo), prix négociés déjà importés, ou notation déjà basculée.
+  const negoEngaged = rao.negoEngaged || negoActive || hasNegoOffers;
 
   // ─── Persistance Firestore dédiée : projects/{id}/rao/data ────────────
   const projectId = project?.id;
@@ -206,7 +235,11 @@ const RaoView = ({
     return () => window.removeEventListener('beforeunload', handler);
   }, [saveStatus]);
 
+  // Classement de la phase globale (export PDF — comportement historique) +
+  // classements forcés par phase pour les étapes 5 (avant négo) et 9 (final).
   const ranking = rao.getRanking();
+  const rankingInitial = rao.getRanking('initial');
+  const rankingNego = negoEngaged ? rao.getRanking('nego') : null;
   const companyNames = analysisCompanies.map(c => c.name);
 
   // ─── COMPARATIF AVANT / APRÈS NÉGOCIATION ────────────────────────────────
@@ -284,6 +317,7 @@ const RaoView = ({
     analysisCompanies,
     companiesData: project?.rao?.companies || {},
     scoringConfig,
+    negoEngaged,
   });
 
   // ─── Atterrissage intelligent ───────────────────────────────────────────
@@ -301,7 +335,9 @@ const RaoView = ({
     // arriveront si le chargement Firestore précède la population des entreprises.
     if (analysisCompanies.length === 0) return;
     landedForRef.current = projectId;
-    const order = ['consultation', 'depouillement', 'admin', 'technique', 'recap'];
+    const order = negoEngaged
+      ? ['consultation', 'depouillement', 'admin', 'technique', 'recap', 'depouillementNego', 'adminNego', 'techniqueNego', 'recapNego']
+      : ['consultation', 'depouillement', 'admin', 'technique', 'recap'];
     const firstIncomplete = order.find(id => !completion.tabStates[id]?.done);
     if (firstIncomplete) setActiveTab(firstIncomplete);
   }, [analysisLoaded, raoLoaded, projectId, analysisCompanies.length]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -372,6 +408,45 @@ const RaoView = ({
     finally { setIsExporting(false); }
   };
 
+  // ─── Bouton d'étape du stepper (partagé par les deux groupes de phase) ───
+  // Étapes 'apres' verrouillées tant que la négociation n'est pas engagée.
+  const renderStepBtn = (step) => {
+    const locked = step.phase === 'apres' && !negoEngaged;
+    const state = completion.tabStates[step.id];
+    const isActive = activeTab === step.id;
+    const isDone = !locked && state?.done;
+    const isOptional = state?.optional;
+    const hasWarn = !locked && state?.items?.some(it => it.warn);
+    // Priorité : verrouillé > actif > complété > alerte > optionnel neutre > à faire.
+    const accent = locked ? 'text-slate-300'
+      : isActive ? 'text-emerald-600'
+      : isDone ? 'text-emerald-500'
+      : hasWarn ? 'text-amber-500'
+      : isOptional ? 'text-slate-300'
+      : 'text-slate-500';
+    return (
+      <RibbonBtnLarge
+        key={step.id}
+        icon={isDone && !isOptional ? CheckIcon : step.icon}
+        title={locked ? 'Étape verrouillée — engagez la négociation depuis le Récap (étape 5)' : undefined}
+        label={
+          <span className="flex flex-col items-center leading-none gap-0.5">
+            <span>{step.num}. {step.label}</span>
+            {!locked && state?.ratio && (
+              <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${isOptional ? 'bg-slate-100 text-slate-500' : isDone ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                {state.ratio}
+              </span>
+            )}
+          </span>
+        }
+        onClick={() => { if (!locked) setActiveTab(step.id); }}
+        active={isActive}
+        accent={accent}
+        disabled={locked}
+      />
+    );
+  };
+
   return (
     <div className={`flex flex-col h-full bg-[#f8fafc] overflow-hidden ${isMobile ? 'pb-16' : ''}`}>
 
@@ -387,40 +462,12 @@ const RaoView = ({
       {/* ═══════ NAVIGATION : RIBBON (Desktop) ou COMPACT (Mobile) ═══════ */}
       {!isMobile ? (
         <RibbonContainer>
-          <RibbonGroup label="Étapes">
-            {RAO_STEPS.map(step => {
-              const state = completion.tabStates[step.id];
-              const isActive = activeTab === step.id;
-              const isDone = state?.done;
-              const isOptional = state?.optional;
-              const hasWarn = state?.items?.some(it => it.warn);
-              // Priorité : actif > complété > alerte > optionnel neutre > à faire.
-              // (l'onglet optionnel actif/complété doit refléter son état, pas rester gris)
-              const accent = isActive ? 'text-emerald-600'
-                : isDone ? 'text-emerald-500'
-                : hasWarn ? 'text-amber-500'
-                : isOptional ? 'text-slate-300'
-                : 'text-slate-500';
-              return (
-                <RibbonBtnLarge
-                  key={step.id}
-                  icon={isDone && !isOptional ? CheckIcon : step.icon}
-                  label={
-                    <span className="flex flex-col items-center leading-none gap-0.5">
-                      <span>{step.num}. {step.label}</span>
-                      {state?.ratio && (
-                        <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${isOptional ? 'bg-slate-100 text-slate-500' : isDone ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                          {state.ratio}
-                        </span>
-                      )}
-                    </span>
-                  }
-                  onClick={() => setActiveTab(step.id)}
-                  active={isActive}
-                  accent={accent}
-                />
-              );
-            })}
+          <RibbonGroup label="Avant négociation">
+            {RAO_STEPS.filter(s => s.phase === 'avant').map(renderStepBtn)}
+          </RibbonGroup>
+
+          <RibbonGroup label="Après négociation">
+            {RAO_STEPS.filter(s => s.phase === 'apres').map(renderStepBtn)}
           </RibbonGroup>
 
           <RibbonGroup label="Affaire">
@@ -506,9 +553,16 @@ const RaoView = ({
                 onChange={(e) => setActiveTab(e.target.value)}
                 className="appearance-none bg-transparent border-none font-black text-xs uppercase tracking-widest text-emerald-600 pr-6 focus:ring-0 outline-none"
               >
-                {RAO_STEPS.map(s => (
-                  <option key={s.id} value={s.id}>{s.num}. {s.label}</option>
-                ))}
+                <optgroup label="Avant négociation">
+                  {RAO_STEPS.filter(s => s.phase === 'avant').map(s => (
+                    <option key={s.id} value={s.id}>{s.num}. {s.label}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="Après négociation">
+                  {RAO_STEPS.filter(s => s.phase === 'apres').map(s => (
+                    <option key={s.id} value={s.id} disabled={!negoEngaged}>{s.num}. {s.label}</option>
+                  ))}
+                </optgroup>
               </select>
               <ChevronDown size={12} className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
@@ -552,7 +606,7 @@ const RaoView = ({
       {/* Bandeau « Prochaine étape » — suggestion non bloquante sous le ribbon */}
       {!isMobile && (
         <NextStepHint
-          steps={RAO_STEPS}
+          steps={negoEngaged ? RAO_STEPS : RAO_STEPS.filter(s => s.phase === 'avant')}
           tabStates={completion.tabStates}
           activeTab={activeTab}
           onGoToTab={setActiveTab}
@@ -612,8 +666,10 @@ const RaoView = ({
         branding={masterBranding}
       />
 
-      <div className={`flex-1 relative ${activeTab === 'admin' || activeTab === 'technique' || activeTab === 'negociation' || activeTab === 'depouillement' ? 'overflow-hidden' : `overflow-y-auto ${isMobile ? 'p-3' : 'p-6'}`}`}>
-        <div className={activeTab === 'admin' || activeTab === 'technique' || activeTab === 'negociation' || activeTab === 'depouillement' ? 'h-full' : ''}>
+      <div className={`flex-1 relative ${FULLSCREEN_TABS.includes(activeTab) ? 'overflow-hidden' : `overflow-y-auto ${isMobile ? 'p-3' : 'p-6'}`}`}>
+        <div className={FULLSCREEN_TABS.includes(activeTab) ? 'h-full' : ''}>
+          {/* Étape 2 — Dépouillement des offres INITIALES (phase portée par le
+              workflow : plus de bascule interne, toujours sur les offres initiales) */}
           {activeTab === 'depouillement' && (
             <TabDepouillement
               consultation={rao.consultation}
@@ -628,11 +684,28 @@ const RaoView = ({
               onGoToAdmin={(name) => { setSelectedCompany(name); setActiveTab('admin'); }}
               onGoToConsultation={() => setActiveTab('consultation')}
               tabStates={completion.tabStates}
-              analysisStats={analysisStats}
+              analysisStats={analysisStatsInitial || analysisStats}
               companiesData={project?.rao?.companies || {}}
               criteria={rao.criteria}
-              negoActive={negoActive}
-              onSetNegoPhase={onSetNegoPhase}
+              negoActive={false}
+            />
+          )}
+          {/* Étape 7 — Dépouillement APRÈS NÉGO (offres finales, PV, imports négociés) */}
+          {activeTab === 'depouillementNego' && (
+            <TabDepouillement
+              consultation={rao.consultation}
+              analysisCompanies={analysisCompanies}
+              onUpdateAeAmount={onUpdateAeAmount}
+              onUpdateVariantAeAmount={onUpdateVariantAeAmount}
+              onImportVariant={onImportVariant}
+              onGoToTechnique={(name) => { setSelectedCompany(name); setActiveTab('techniqueNego'); }}
+              onGoToAdmin={(name) => { setSelectedCompany(name); setActiveTab('adminNego'); }}
+              onGoToConsultation={() => setActiveTab('consultation')}
+              tabStates={completion.tabStates}
+              analysisStats={analysisStatsNego || analysisStats}
+              companiesData={project?.rao?.companies || {}}
+              criteria={rao.criteria}
+              negoActive={true}
               negoRows={negoComparison}
               onOpenDepouillementNego={onApplyDepouillementNego ? () => setDepouillementNegoOpen(true) : null}
               onUpdateAeAmountNego={onUpdateAeAmountNego}
@@ -641,13 +714,19 @@ const RaoView = ({
             />
           )}
           {activeTab === 'consultation' && (
-            <TabConsultation consultation={rao.consultation} updateConsultation={rao.updateConsultation} criteria={rao.criteria} updateCriteria={rao.updateCriteria} addCriterion={rao.addCriterion} removeCriterion={rao.removeCriterion} addSubCriterion={rao.addSubCriterion} removeSubCriterion={rao.removeSubCriterion} updateSubCriterion={rao.updateSubCriterion} scoringConfig={scoringConfig} hasTranches={rao.hasTranches} tranches={rao.tranches} raoTrancheId={rao.raoTrancheId} setRaoTrancheId={rao.setRaoTrancheId} />
+            <TabConsultation consultation={rao.consultation} updateConsultation={rao.updateConsultation} criteria={rao.criteria} updateCriteria={rao.updateCriteria} addCriterion={rao.addCriterion} removeCriterion={rao.removeCriterion} addSubCriterion={rao.addSubCriterion} removeSubCriterion={rao.removeSubCriterion} updateSubCriterion={rao.updateSubCriterion} scoringConfig={scoringConfig} hasTranches={rao.hasTranches} tranches={rao.tranches} raoTrancheId={rao.raoTrancheId} setRaoTrancheId={rao.setRaoTrancheId} dateRemise={project?.dateRemise || ''} timeRemise={project?.timeRemise || ''} onUpdateRemise={handleUpdateRemise} />
           )}
           {activeTab === 'admin' && (
-            <TabAdministrative companyNames={companyNames} companiesData={project?.rao?.companies || {}} updateAdminPiece={rao.updateAdminPiece} updateAdminField={rao.updateAdminField} selectedCompany={selectedCompany} onSelectCompany={setSelectedCompany} adminPieces={rao.adminPieces} offerPieces={rao.offerPieces} setAdminPieces={rao.setAdminPieces} setOfferPieces={rao.setOfferPieces} analysisCompanies={analysisCompanies} consultation={rao.consultation} onImportVariant={onImportVariant} onRemoveVariant={onRemoveVariant} onToggleVariantRetained={onToggleVariantRetained} onGoToDepouillement={() => setActiveTab('depouillement')} missing={completion.tabStates.admin?.missing || []} negoActive={negoActive} />
+            <TabAdministrative companyNames={companyNames} companiesData={project?.rao?.companies || {}} updateAdminPiece={rao.updateAdminPiece} updateAdminField={rao.updateAdminField} selectedCompany={selectedCompany} onSelectCompany={setSelectedCompany} adminPieces={rao.adminPieces} offerPieces={rao.offerPieces} setAdminPieces={rao.setAdminPieces} setOfferPieces={rao.setOfferPieces} analysisCompanies={analysisCompanies} consultation={rao.consultation} onImportVariant={onImportVariant} onRemoveVariant={onRemoveVariant} onToggleVariantRetained={onToggleVariantRetained} onGoToDepouillement={() => setActiveTab('depouillement')} missing={completion.tabStates.admin?.missing || []} phase="initial" />
+          )}
+          {activeTab === 'adminNego' && (
+            <TabAdministrative companyNames={companyNames} companiesData={project?.rao?.companies || {}} updateAdminPiece={rao.updateAdminPiece} updateAdminField={rao.updateAdminField} selectedCompany={selectedCompany} onSelectCompany={setSelectedCompany} adminPieces={rao.adminPieces} offerPieces={rao.offerPieces} setAdminPieces={rao.setAdminPieces} setOfferPieces={rao.setOfferPieces} analysisCompanies={analysisCompanies} consultation={rao.consultation} onGoToDepouillement={() => setActiveTab('depouillement')} missing={completion.tabStates.adminNego?.missing || []} phase="nego" />
           )}
           {activeTab === 'technique' && (
-            <TabTechnique companyNames={companyNames} companiesData={project?.rao?.companies || {}} criteria={rao.criteria} updateTechnical={rao.updateTechnical} analysisStats={rao.raoAnalysisStats} scoringConfig={scoringConfig} analysisCompanies={analysisCompanies} selectedCompany={selectedCompany} onSelectCompany={setSelectedCompany} onUpdateVariantJustification={onUpdateVariantJustification} onGoToConsultation={() => setActiveTab('consultation')} onGoToDepouillement={() => setActiveTab('depouillement')} missing={completion.tabStates.technique?.missing || []} />
+            <TabTechnique companyNames={companyNames} companiesData={project?.rao?.companies || {}} criteria={rao.criteria} updateTechnical={rao.updateTechnical} analysisStats={rao.raoAnalysisStats} scoringConfig={scoringConfig} analysisCompanies={analysisCompanies} selectedCompany={selectedCompany} onSelectCompany={setSelectedCompany} onUpdateVariantJustification={onUpdateVariantJustification} onGoToConsultation={() => setActiveTab('consultation')} onGoToDepouillement={() => setActiveTab('depouillement')} missing={completion.tabStates.technique?.missing || []} phase="initial" />
+          )}
+          {activeTab === 'techniqueNego' && (
+            <TabTechnique companyNames={companyNames} companiesData={project?.rao?.companies || {}} criteria={rao.criteria} updateTechnical={(n, cid, f, v) => rao.updateTechnical(n, cid, f, v, 'nego')} analysisStats={analysisStatsNego || rao.raoAnalysisStats} scoringConfig={scoringConfig} analysisCompanies={analysisCompanies} selectedCompany={selectedCompany} onSelectCompany={setSelectedCompany} onUpdateVariantJustification={onUpdateVariantJustification} onGoToConsultation={() => setActiveTab('consultation')} onGoToDepouillement={() => setActiveTab('depouillement')} missing={completion.tabStates.techniqueNego?.missing || []} phase="nego" />
           )}
           {activeTab === 'negociation' && (
             <TabNegociation
@@ -675,7 +754,10 @@ const RaoView = ({
             />
           )}
           {activeTab === 'recap' && (
-            <TabRecap criteria={rao.criteria} ranking={ranking} companyNames={companyNames} onExportPDF={() => setPreExportOpen(true)} isExporting={isExporting} scoringConfig={scoringConfig} hasTranches={rao.hasTranches} raoTrancheId={rao.raoTrancheId} tranches={rao.tranches} analysisCompanies={analysisCompanies} optionChapters={rao.optionChapters} includedOptions={rao.includedOptions} recommendation={rao.recommendation} updateRecommendation={rao.updateRecommendation} negoActive={negoActive} />
+            <TabRecap criteria={rao.criteria} ranking={rankingInitial} companyNames={companyNames} onExportPDF={() => setPreExportOpen(true)} isExporting={isExporting} scoringConfig={scoringConfig} hasTranches={rao.hasTranches} raoTrancheId={rao.raoTrancheId} tranches={rao.tranches} analysisCompanies={analysisCompanies} optionChapters={rao.optionChapters} includedOptions={rao.includedOptions} recommendation={rao.recommendation} updateRecommendation={rao.updateRecommendation} negoActive={false} phase="initial" isFinal={!negoEngaged} onEngageNego={!negoEngaged ? () => { rao.setNegoEngaged(true); setActiveTab('negociation'); } : null} onGoToFinalRecap={negoEngaged ? () => setActiveTab('recapNego') : null} />
+          )}
+          {activeTab === 'recapNego' && (
+            <TabRecap criteria={rao.criteria} ranking={rankingNego || rankingInitial} companyNames={companyNames} onExportPDF={() => setPreExportOpen(true)} isExporting={isExporting} scoringConfig={scoringConfig} hasTranches={rao.hasTranches} raoTrancheId={rao.raoTrancheId} tranches={rao.tranches} analysisCompanies={analysisCompanies} optionChapters={rao.optionChapters} includedOptions={rao.includedOptions} recommendation={rao.recommendation} updateRecommendation={rao.updateRecommendation} negoActive={true} phase="nego" isFinal={true} />
           )}
         </div>
       </div>

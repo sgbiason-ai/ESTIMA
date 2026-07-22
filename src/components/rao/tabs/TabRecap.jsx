@@ -1,6 +1,6 @@
 // src/components/rao/tabs/TabRecap.jsx
 import React, { useMemo } from 'react';
-import { Award, Download, ShieldCheck, Info, Layers, CheckCircle2, XCircle, GitBranch, Check } from 'lucide-react';
+import { Award, Download, ShieldCheck, Info, Layers, CheckCircle2, XCircle, GitBranch, Check, Handshake } from 'lucide-react';
 import { FORMULA_LABELS_CONSULT } from '../RaoConstants';
 import { computePriceReference, getVariantEffectiveTotal } from '../../../utils/analysisCompute';
 import { htmlToPlainText } from '../../../utils/richText';
@@ -18,9 +18,16 @@ const TabRecap = ({
   analysisCompanies = [],
   recommendation = '', updateRecommendation = () => {},
   negoActive = false,
+  // Workflow 9 étapes : 'initial' → étape 5 (Récap avant négo), 'nego' → étape 9
+  // (Récap final). isFinal pilote la recommandation/conclusion (une seule source).
+  phase = 'initial',
+  isFinal = true,
+  onEngageNego = null,   // étape 5, négo non engagée → CTA « Engager la négociation »
+  onGoToFinalRecap = null, // étape 5, négo engagée → renvoi vers le Récap final (9)
 }) => {
   const priceC  = criteria.find(c => c.auto) || criteria[0];
   const techCs  = criteria.filter(c => !c.auto);
+  const isNegoPhase = phase === 'nego';
 
   // ─── Construire les lignes "variante retenue" sous chaque entreprise ──
   // Recalcule un nouveau Pmin/Pmax/Pmoy qui inclut les variantes retenues,
@@ -136,7 +143,11 @@ const TabRecap = ({
             <Award size={28} />
           </div>
           <div>
-            <h3 className="text-lg font-black text-slate-800 tracking-tight">Classement Final</h3>
+            <h3 className="text-lg font-black text-slate-800 tracking-tight">
+              {isNegoPhase ? 'Classement final — après négociation'
+                : isFinal ? 'Classement Final'
+                : 'Récap avant négociation'}
+            </h3>
             {scoringConfig && (
               <p className="text-xs text-slate-500 mt-1">
                 Formule prix : <strong className="text-slate-700">{FORMULA_LABELS_CONSULT[scoringConfig.mode] || scoringConfig.mode?.toUpperCase()}</strong>
@@ -159,6 +170,41 @@ const TabRecap = ({
           {isExporting ? 'Génération du document…' : 'Générer le PDF final'}
         </button>
       </div>
+
+      {/* ── Étape 5, négo non engagée : proposer d'engager la négociation ──── */}
+      {onEngageNego && (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-blue-50/70 border border-blue-200 rounded-2xl px-5 py-4">
+          <Handshake size={18} className="shrink-0 text-blue-600" />
+          <p className="flex-1 text-xs text-blue-900 leading-relaxed">
+            <strong>Ce classement porte sur les offres initiales.</strong> Si le marché prévoit une négociation,
+            engagez-la pour déverrouiller les étapes 6 à 10 (courriers, dépouillement des offres finales,
+            statuts et notes après négo, classement final). Sinon, ce récap fait office de classement final.
+          </p>
+          <button
+            onClick={onEngageNego}
+            className="shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-black uppercase tracking-wider shadow-sm transition-all active:scale-95"
+          >
+            <Handshake size={13} /> Engager la négociation
+          </button>
+        </div>
+      )}
+
+      {/* ── Étape 5, négo engagée : ce récap fige l'avant-négo ─────────────── */}
+      {!isFinal && onGoToFinalRecap && (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-amber-50/70 border border-amber-200 rounded-2xl px-5 py-4">
+          <Info size={16} className="shrink-0 text-amber-600" />
+          <p className="flex-1 text-xs text-amber-900 leading-relaxed">
+            <strong>Négociation engagée :</strong> ce récap fige l'état <strong>avant négociation</strong> (comparatif).
+            Le classement qui engage l'attribution est le <strong>Récap final (étape 10)</strong>, établi sur les offres finales.
+          </p>
+          <button
+            onClick={onGoToFinalRecap}
+            className="shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-black uppercase tracking-wider shadow-sm transition-all active:scale-95"
+          >
+            Voir le Récap final
+          </button>
+        </div>
+      )}
 
       {/* ── Bloc conformité CCP ────────────────────────────────────────────── */}
       <div className="bg-white rounded-[24px] border border-slate-200 shadow-sm px-6 py-5">
@@ -321,8 +367,8 @@ const TabRecap = ({
         </div>
       </div>
 
-      {/* ── Recommandation MOE ────────────────────────────────────────────── */}
-      {winner && (
+      {/* ── Recommandation MOE (récap FINAL uniquement — étape 9, ou 5 sans négo) ── */}
+      {isFinal && winner && (
         <div className="bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-[32px] p-10 text-white shadow-[0_20px_40px_-10px_rgba(16,185,129,0.3)] relative overflow-hidden">
           <Award size={160} className="absolute -right-10 -bottom-10 text-white opacity-10 rotate-12" />
           <div className="relative z-10">
@@ -362,8 +408,8 @@ const TabRecap = ({
         </div>
       )}
 
-      {/* ── Conclusion finale (PDF) — editable ──────────────────────────── */}
-      {winner && (
+      {/* ── Conclusion finale (PDF) — editable, récap FINAL uniquement ──── */}
+      {isFinal && winner && (
         <div className="bg-white rounded-2xl border border-gray-200/60 p-5">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">

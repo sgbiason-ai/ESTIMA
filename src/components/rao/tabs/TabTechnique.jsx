@@ -3,7 +3,7 @@ import React from 'react';
 import { Brain, MessageSquare, AlertCircle, AlertTriangle, GitBranch, Check, X, Building2, ListChecks, Info } from 'lucide-react';
 import { ScoreBadge, CalcHint } from '../RaoUI';
 import { COMPANY_UI_COLORS, FORMULA_LABELS_CONSULT, NON_REGULAR_STATUSES } from '../RaoConstants';
-import { getEffectiveConclusion } from '../../../utils/analysisCompute';
+import { getEffectiveConclusion, getEffectiveTechnical } from '../../../utils/analysisCompute';
 import { isRichTextEmpty } from '../../../utils/richText';
 import RichTextField, { RichTextView } from '../../common/RichTextField';
 import CompanySidebar from '../CompanySidebar';
@@ -18,19 +18,24 @@ const TabTechnique = ({
   onGoToConsultation = null,
   onGoToDepouillement = null,
   missing = [], // items à compléter dans cet onglet (alimente le banner)
+  // 'initial' → étape 4 (notes sur les offres initiales)
+  // 'nego'    → étape 8 (notes ajustées sur les offres finales — pré-remplies
+  //             par héritage, les retouches vont dans technicalNego)
+  phase = 'initial',
 }) => {
   const nonAuto = criteria.filter(c => !c.auto);
   const autoCrit = criteria.find(c => c.auto);
+  const isNegoPhase = phase === 'nego';
 
   // Offres non régulières : restent visibles et éditables à l'écran, mais grisées +
   // signalées par un avertissement, et exclues de l'export PDF du RAO (§8 technique).
   // Phase après négo : une offre régularisée (conclusionNego) n'est plus grisée.
-  const basis = scoringConfig?.basis === 'nego' ? 'nego' : 'initial';
+  const basis = isNegoPhase ? 'nego' : 'initial';
   const isNonRegular = (n) => NON_REGULAR_STATUSES.includes(getEffectiveConclusion(companiesData[n]?.admin, basis));
 
   // ── Logique complétion pour sidebar ──
   const getTechCompletion = (companyName) => {
-    const tech = companiesData[companyName]?.technical || {};
+    const tech = getEffectiveTechnical(companiesData[companyName], basis);
     if (nonAuto.length === 0) return 'empty';
     let filled = 0;
     nonAuto.forEach(crit => {
@@ -75,7 +80,9 @@ const TabTechnique = ({
   const ci = companyNames.indexOf(selectedCompany);
   const name = selectedCompany;
   const uiColor = COMPANY_UI_COLORS[ci % COMPANY_UI_COLORS.length];
-  const tech = companiesData[name]?.technical || {};
+  // Notes effectives : en phase 'nego', technicalNego surcharge l'initial champ
+  // par champ (pré-remplissage par héritage) ; en 'initial', notes brutes.
+  const tech = getEffectiveTechnical(companiesData[name], basis);
 
   const totalTechScore = nonAuto.reduce((sum, crit) => {
     const hasSubs = (crit.subCriteria || []).length > 0;
@@ -122,6 +129,18 @@ const TabTechnique = ({
               if (item.companyName && item.companyName !== name) onSelectCompany(item.companyName);
             }}
           />
+
+          {/* Phase après négo : notes pré-remplies par héritage de l'avant-négo */}
+          {isNegoPhase && (
+            <div className="flex items-start gap-3 px-4 py-3 bg-emerald-50/70 border border-emerald-200 rounded-2xl">
+              <Info size={16} className="text-emerald-700 shrink-0 mt-0.5" />
+              <div className="text-xs text-emerald-900 leading-relaxed">
+                <strong>Pré-rempli depuis l'avant-négo :</strong> les notes et commentaires de l'étape 4 sont repris
+                automatiquement. Ajustez uniquement ce qui change avec les offres finales — vos retouches sont
+                stockées à part, l'analyse initiale reste intacte.
+              </div>
+            </div>
+          )}
 
           {/* Avertissement offre non régulière — notée ET reprise dans le rapport, sous réserve */}
           {isNonRegular(name) && (

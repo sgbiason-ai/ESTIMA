@@ -1288,16 +1288,20 @@ REGLES
       {
         id: 'workflow', label: 'Workflow', icon: 'ListTree',
         sections: [
-          { type: 'intro', text: "Le RAO suit un workflow en 6 étapes correspondant aux onglets de la vue." },
+          { type: 'intro', text: "Le RAO suit un workflow en 10 étapes, organisées en deux phases : avant négociation (1-5) et après négociation (6-10). Les étapes d'après-négo restent grisées tant que la négociation n'est pas engagée — sans négociation, le Récap avant négo (5) fait office de classement final." },
           {
             type: 'steps',
             items: [
-              { color: 'blue', title: '1. Consultation', description: "Critères de notation + sous-critères. La fiche affaire (modale icône stylo dans le ribbon) regroupe les infos du projet." },
+              { color: 'blue', title: '1. Consultation', description: "Critères de notation + sous-critères, date et heure de remise des offres (synchronisées avec la Fiche affaire). La fiche affaire (modale icône stylo dans le ribbon) regroupe les infos du projet." },
               { color: 'amber', title: '2. Dépouillement', description: "Déclarez les entreprises consultées, le régime des variantes et les exigences minimales. Génère un PV de dépouillement automatique." },
               { color: 'emerald', title: '3. Administratif', description: "Cochez les pièces fournies, gérez les groupements et statuez sur la conformité de chaque offre (régulière / irrégulière / inacceptable / inappropriée)." },
               { color: 'purple', title: '4. Technique', description: "Notez chaque offre sur les critères techniques, rédigez les commentaires, justifiez l'acceptation des variantes." },
-              { color: 'rose', title: '5. Négociation', description: "Optionnel — Suivez les phases de négociation et les engagements des entreprises." },
-              { color: 'indigo', title: '6. Récapitulatif', description: "Classement final combiné (Prix × Valeur technique), recommandation MOE et export PDF du rapport complet." },
+              { color: 'indigo', title: '5. Récap avant négo', description: "Classement sur les offres initiales. Si le marché prévoit une négociation, engagez-la ici pour déverrouiller les étapes 6 à 10 ; sinon ce récap est le classement final." },
+              { color: 'rose', title: '6. Négociation', description: "Courriers de négociation et suivi des échanges avec les entreprises." },
+              { color: 'amber', title: '7. Dépouillement après négo', description: "Import des offres finales (fichier ou PDF), rabais commerciaux, PV après négociation et montants annoncés." },
+              { color: 'emerald', title: '8. Administratif après négo', description: "Statuts pré-remplis par héritage de l'étape 3 : ajustez ceux qui changent, motivez toute régularisation (CCP R2152-2)." },
+              { color: 'purple', title: '9. Technique après négo', description: "Notes et commentaires pré-remplis depuis l'étape 4 : retouchez uniquement ce qui change avec les offres finales — l'analyse initiale reste intacte." },
+              { color: 'indigo', title: '10. Récap final', description: "Classement final combiné (Prix × Valeur technique) sur les offres négociées, recommandation MOE et export PDF du rapport complet." },
             ],
           },
           { type: 'tip', text: "Le bouton « Sauvegarder » dans le ribbon enregistre le RAO entier dans Firestore (projects/.../rao/data). Pensez à sauvegarder régulièrement — pas d'auto-save sur cette partie." },

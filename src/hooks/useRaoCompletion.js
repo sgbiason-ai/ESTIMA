@@ -1,11 +1,12 @@
 // src/hooks/useRaoCompletion.js
 // Hook centralisé : calcule l'état de complétion + items manquants détaillés
-// par onglet du RAO. Alimente le stepper, les badges, la checklist pré-export
-// ET les banners d'alerte / marquages inline dans chaque onglet.
+// par étape du RAO (workflow 9 étapes, deux phases avant/après négociation).
+// Alimente le stepper, les badges, la checklist pré-export ET les banners
+// d'alerte / marquages inline dans chaque onglet.
 
 import { useMemo } from 'react';
 import { NON_REGULAR_STATUSES } from '../components/rao/RaoConstants';
-import { getEffectiveConclusion, isRegularizedAfterNego } from '../utils/analysisCompute';
+import { getEffectiveConclusion, getEffectiveTechnical, isRegularizedAfterNego, getCompanyRabaisPct, variantHasNego } from '../utils/analysisCompute';
 import { isRichTextEmpty } from '../utils/richText';
 
 export const useRaoCompletion = ({
@@ -15,6 +16,8 @@ export const useRaoCompletion = ({
   analysisCompanies = [],
   companiesData = {},
   scoringConfig = null,
+  // Négociation engagée : les étapes 7-9 comptent dans l'avancement + l'export.
+  negoEngaged = false,
 }) => {
   return useMemo(() => {
     const companyNames = analysisCompanies.map(c => c.name);
@@ -61,29 +64,11 @@ export const useRaoCompletion = ({
     });
     const depouillementDone = depouillementMissing.length === 0 && nbCompanies > 0;
 
-    // ─── 3. Administratif ───
-    // Phase après négo : le statut effectif (régularisation prise en compte) pilote
-    // les exigences ; un motif de régularisation est requis pour toute offre régularisée.
-    const adminBasis = scoringConfig?.basis === 'nego' ? 'nego' : 'initial';
+    // ─── 3. Administratif (phase initiale uniquement) ───
     const adminConcl = companyNames.filter(name => !!companiesData[name]?.admin?.conclusion).length;
-    // Offres régularisées en négociation : motif de régularisation obligatoire (CCP R2152-2).
-    const regularizedNames = adminBasis === 'nego'
-      ? companyNames.filter(name => isRegularizedAfterNego(companiesData[name]?.admin))
-      : [];
-    const regCommentMissingNames = regularizedNames.filter(name => !(companiesData[name]?.admin?.regularizationComment || '').trim());
     const adminItems = [
       { id: 'conclusions', label: `Conclusions admin (${adminConcl}/${nbCompanies})`, ok: adminConcl === nbCompanies && nbCompanies > 0, value: `${adminConcl}/${nbCompanies}` },
     ];
-    if (regularizedNames.length > 0) {
-      const motived = regularizedNames.length - regCommentMissingNames.length;
-      adminItems.push({
-        id: 'regularization_comments',
-        label: `Motifs de régularisation après négo (${motived}/${regularizedNames.length})`,
-        ok: regCommentMissingNames.length === 0,
-        warn: regCommentMissingNames.length > 0,
-        value: `${motived}/${regularizedNames.length}`,
-      });
-    }
     const adminMissing = [];
     companyNames.forEach(name => {
       if (!companiesData[name]?.admin?.conclusion) {
@@ -96,77 +81,65 @@ export const useRaoCompletion = ({
         });
       }
     });
-    regCommentMissingNames.forEach(name => {
-      adminMissing.push({
-        id: `reg_comment_${name}`,
-        label: `Motif de régularisation après négo pour ${name}`,
-        anchorId: `admin-reg-comment-${name}`,
-        companyName: name,
-        type: 'admin_regularization_comment',
-      });
-    });
     const adminDone = nbCompanies > 0 && adminMissing.length === 0;
     const adminRatio = nbCompanies > 0 ? `${adminConcl}/${nbCompanies}` : null;
 
-    // ─── 4. Technique (entreprises régulières uniquement — statut effectif) ───
-    const regularCompanies = analysisCompanies.filter(c => {
-      const concl = getEffectiveConclusion(companiesData[c.name]?.admin, adminBasis);
-      return !concl || !NON_REGULAR_STATUSES.includes(concl);
-    });
+    // ─── Fabrique commune : complétion technique d'une phase ───
+    // basis 'initial' → notes saisies (technical) ; basis 'nego' → notes
+    // effectives (technicalNego surcharge l'initial champ par champ) — le
+    // pré-remplissage par héritage compte donc comme rempli.
+    const buildTechState = (basis) => {
+      const regularCompanies = analysisCompanies.filter(c => {
+        const concl = getEffectiveConclusion(companiesData[c.name]?.admin, basis);
+        return !concl || !NON_REGULAR_STATUSES.includes(concl);
+      });
 
-    let totalTechSlots = 0, filledTechSlots = 0;
-    let totalCommSlots = 0, filledCommSlots = 0;
-    const techMissing = [];
+      let totalTechSlots = 0, filledTechSlots = 0;
+      let totalCommSlots = 0, filledCommSlots = 0;
+      const missing = [];
 
-    regularCompanies.forEach(c => {
-      const tech = companiesData[c.name]?.technical || {};
-      techCs.forEach(crit => {
-        const hasSubs = (crit.subCriteria || []).length > 0;
-        if (hasSubs) {
-          crit.subCriteria.forEach(sc => {
+      regularCompanies.forEach(c => {
+        const tech = getEffectiveTechnical(companiesData[c.name], basis);
+        techCs.forEach(crit => {
+          const hasSubs = (crit.subCriteria || []).length > 0;
+          const slots = hasSubs ? crit.subCriteria : [crit];
+          slots.forEach(slot => {
             totalTechSlots++;
             totalCommSlots++;
-            const noteFilled = Number(tech[sc.id]?.note || 0) > 0;
-            const commFilled = !isRichTextEmpty(tech[sc.id]?.text);
-            if (noteFilled) filledTechSlots++; else techMissing.push({
-              id: `note_${c.name}_${sc.id}`,
-              label: `Note ${sc.label || 'sous-critère'} manquante pour ${c.name}`,
-              anchorId: `tech-note-${c.name}-${sc.id}`,
+            const slotLabel = hasSubs ? (slot.label || 'sous-critère') : crit.label;
+            const noteFilled = Number(tech[slot.id]?.note || 0) > 0;
+            const commFilled = !isRichTextEmpty(tech[slot.id]?.text);
+            if (noteFilled) filledTechSlots++; else missing.push({
+              id: `note_${c.name}_${slot.id}`,
+              label: `Note ${slotLabel} manquante pour ${c.name}`,
+              anchorId: `tech-note-${c.name}-${slot.id}`,
               companyName: c.name,
               type: 'note',
             });
-            if (commFilled) filledCommSlots++; else techMissing.push({
-              id: `comm_${c.name}_${sc.id}`,
-              label: `Commentaire ${sc.label || 'sous-critère'} pour ${c.name}`,
-              anchorId: `tech-comm-${c.name}-${sc.id}`,
+            if (commFilled) filledCommSlots++; else missing.push({
+              id: `comm_${c.name}_${slot.id}`,
+              label: `Commentaire ${slotLabel} pour ${c.name}`,
+              anchorId: `tech-comm-${c.name}-${slot.id}`,
               companyName: c.name,
               type: 'comment',
             });
           });
-        } else {
-          totalTechSlots++;
-          totalCommSlots++;
-          const noteFilled = Number(tech[crit.id]?.note || 0) > 0;
-          const commFilled = !isRichTextEmpty(tech[crit.id]?.text);
-          if (noteFilled) filledTechSlots++; else techMissing.push({
-            id: `note_${c.name}_${crit.id}`,
-            label: `Note ${crit.label} manquante pour ${c.name}`,
-            anchorId: `tech-note-${c.name}-${crit.id}`,
-            companyName: c.name,
-            type: 'note',
-          });
-          if (commFilled) filledCommSlots++; else techMissing.push({
-            id: `comm_${c.name}_${crit.id}`,
-            label: `Commentaire ${crit.label} pour ${c.name}`,
-            anchorId: `tech-comm-${c.name}-${crit.id}`,
-            companyName: c.name,
-            type: 'comment',
-          });
-        }
+        });
       });
-    });
 
-    // Variantes retenues : justifications
+      const items = [
+        { id: 'notes', label: `Notes techniques (${filledTechSlots}/${totalTechSlots})`, ok: totalTechSlots > 0 && filledTechSlots === totalTechSlots, warn: filledTechSlots < totalTechSlots, value: `${filledTechSlots}/${totalTechSlots}` },
+        { id: 'comments', label: `Commentaires (${filledCommSlots}/${totalCommSlots})`, ok: totalCommSlots > 0 && filledCommSlots === totalCommSlots, warn: filledCommSlots < totalCommSlots, value: `${filledCommSlots}/${totalCommSlots}` },
+      ];
+      return { items, missing, totalTechSlots, filledTechSlots, totalCommSlots, filledCommSlots };
+    };
+
+    // ─── 4. Technique (phase initiale — entreprises régulières uniquement) ───
+    const techState = buildTechState('initial');
+    const techMissing = techState.missing;
+    const techItems = techState.items;
+
+    // Variantes retenues : justifications (phase initiale uniquement)
     let retainedVariants = 0, justifiedVariants = 0;
     analysisCompanies.forEach(c => {
       (c.variants || []).forEach((v, vi) => {
@@ -183,11 +156,6 @@ export const useRaoCompletion = ({
         }
       });
     });
-
-    const techItems = [
-      { id: 'notes', label: `Notes techniques (${filledTechSlots}/${totalTechSlots})`, ok: totalTechSlots > 0 && filledTechSlots === totalTechSlots, warn: filledTechSlots < totalTechSlots, value: `${filledTechSlots}/${totalTechSlots}` },
-      { id: 'comments', label: `Commentaires (${filledCommSlots}/${totalCommSlots})`, ok: totalCommSlots > 0 && filledCommSlots === totalCommSlots, warn: filledCommSlots < totalCommSlots, value: `${filledCommSlots}/${totalCommSlots}` },
-    ];
     if (retainedVariants > 0) {
       techItems.push({
         id: 'variants_justif',
@@ -197,10 +165,24 @@ export const useRaoCompletion = ({
         value: `${justifiedVariants}/${retainedVariants}`,
       });
     }
-    const techDone = totalTechSlots > 0 && techMissing.length === 0;
-    const techRatio = totalTechSlots > 0 ? `${filledTechSlots}/${totalTechSlots}` : null;
+    const techDone = techState.totalTechSlots > 0 && techMissing.length === 0;
+    const techRatio = techState.totalTechSlots > 0 ? `${techState.filledTechSlots}/${techState.totalTechSlots}` : null;
 
-    // ─── 5. Négociation (optionnel) ───
+    // ─── 5. Récap avant négo ───
+    const recapItems = [
+      { id: 'consultation_ok', label: 'Consultation', ok: consultationDone },
+      { id: 'depouillement_ok', label: 'Dépouillement', ok: depouillementDone },
+      { id: 'admin_ok', label: 'Administratif', ok: adminDone },
+      { id: 'technique_ok', label: 'Technique', ok: techDone },
+    ];
+    const recapMissing = [];
+    if (!consultationDone) recapMissing.push({ id: 'rcp_c', label: 'Compléter l\'onglet Consultation', anchorId: null, type: 'tab', goToTab: 'consultation' });
+    if (!depouillementDone) recapMissing.push({ id: 'rcp_d', label: 'Compléter l\'onglet Dépouillement', anchorId: null, type: 'tab', goToTab: 'depouillement' });
+    if (!adminDone) recapMissing.push({ id: 'rcp_a', label: 'Compléter l\'onglet Administratif', anchorId: null, type: 'tab', goToTab: 'admin' });
+    if (!techDone) recapMissing.push({ id: 'rcp_t', label: 'Compléter l\'onglet Technique', anchorId: null, type: 'tab', goToTab: 'technique' });
+    const recapDone = consultationDone && depouillementDone && adminDone && techDone;
+
+    // ─── 6. Négociation (optionnel) ───
     let negotiationsFilled = 0;
     companyNames.forEach(name => {
       const nego = companiesData[name]?.negotiation || {};
@@ -215,47 +197,134 @@ export const useRaoCompletion = ({
     const negociationDone = false;
     const negociationRatio = nbCompanies > 0 ? `${negotiationsFilled}/${nbCompanies}` : null;
 
-    // ─── 6. Récap ───
-    const recapItems = [
-      { id: 'consultation_ok', label: 'Consultation', ok: consultationDone },
-      { id: 'depouillement_ok', label: 'Dépouillement', ok: depouillementDone },
-      { id: 'admin_ok', label: 'Administratif', ok: adminDone },
-      { id: 'technique_ok', label: 'Technique', ok: techDone },
+    // ─── 7. Dépouillement après négo (offres finales) ───
+    // Une entreprise a « remis une offre finale » dès qu'elle porte des prix
+    // négociés (import), un rabais commercial global, ou une variante renégociée.
+    const negotiatedCompanies = analysisCompanies.filter(c =>
+      (c.offersNego && Object.keys(c.offersNego).length > 0) ||
+      getCompanyRabaisPct(c, 'nego') > 0 ||
+      (c.variants || []).some(v => variantHasNego(v))
+    );
+    const nbNegotiated = negotiatedCompanies.length;
+    const aeNegoFilled = analysisCompanies.filter(c => c.aeAmountNego != null && c.aeAmountNego !== '').length;
+    const depouillementNegoItems = [
+      { id: 'offres_nego', label: `Offres finales dépouillées (${nbNegotiated}/${nbCompanies})`, ok: nbCompanies > 0 && nbNegotiated > 0, warn: nbCompanies > 0 && nbNegotiated === 0, value: `${nbNegotiated}/${nbCompanies}` },
+      { id: 'ae_nego', label: `Montants annoncés après négo (${aeNegoFilled}/${nbCompanies})`, ok: aeNegoFilled === nbCompanies && nbCompanies > 0, info: true },
     ];
-    const recapMissing = [];
-    if (!consultationDone) recapMissing.push({ id: 'rcp_c', label: 'Compléter l\'onglet Consultation', anchorId: null, type: 'tab', goToTab: 'consultation' });
-    if (!depouillementDone) recapMissing.push({ id: 'rcp_d', label: 'Compléter l\'onglet Dépouillement', anchorId: null, type: 'tab', goToTab: 'depouillement' });
-    if (!adminDone) recapMissing.push({ id: 'rcp_a', label: 'Compléter l\'onglet Administratif', anchorId: null, type: 'tab', goToTab: 'admin' });
-    if (!techDone) recapMissing.push({ id: 'rcp_t', label: 'Compléter l\'onglet Technique', anchorId: null, type: 'tab', goToTab: 'technique' });
-    const recapDone = consultationDone && depouillementDone && adminDone && techDone;
+    const depouillementNegoMissing = [];
+    if (nbCompanies > 0 && nbNegotiated === 0) {
+      depouillementNegoMissing.push({ id: 'no_nego_offers', label: 'Aucune offre finale dépouillée (import fichier, rabais global ou PV après négo)', anchorId: null, type: 'depouillement' });
+    }
+    const depouillementNegoDone = nbCompanies > 0 && nbNegotiated > 0;
+    const depouillementNegoRatio = nbCompanies > 0 ? `${nbNegotiated}/${nbCompanies}` : null;
 
-    // ─── État par onglet ───
+    // ─── 8. Administratif après négo ───
+    // Pré-rempli par héritage : sans override, le statut initial vaut statut
+    // effectif (getEffectiveConclusion). Exigence propre à la phase : un motif
+    // de régularisation pour toute offre régularisée (CCP R2152-2).
+    const adminNegoConcl = companyNames.filter(name => !!getEffectiveConclusion(companiesData[name]?.admin, 'nego')).length;
+    const regularizedNames = companyNames.filter(name => isRegularizedAfterNego(companiesData[name]?.admin));
+    const regCommentMissingNames = regularizedNames.filter(name => !(companiesData[name]?.admin?.regularizationComment || '').trim());
+    const adminNegoItems = [
+      { id: 'conclusions_nego', label: `Statuts après négo (${adminNegoConcl}/${nbCompanies})`, ok: adminNegoConcl === nbCompanies && nbCompanies > 0, value: `${adminNegoConcl}/${nbCompanies}` },
+    ];
+    if (regularizedNames.length > 0) {
+      const motived = regularizedNames.length - regCommentMissingNames.length;
+      adminNegoItems.push({
+        id: 'regularization_comments',
+        label: `Motifs de régularisation (${motived}/${regularizedNames.length})`,
+        ok: regCommentMissingNames.length === 0,
+        warn: regCommentMissingNames.length > 0,
+        value: `${motived}/${regularizedNames.length}`,
+      });
+    }
+    const adminNegoMissing = [];
+    companyNames.forEach(name => {
+      if (!getEffectiveConclusion(companiesData[name]?.admin, 'nego')) {
+        adminNegoMissing.push({
+          id: `concl_nego_${name}`,
+          label: `Statut après négo pour ${name}`,
+          anchorId: `admin-concl-nego-${name}`,
+          companyName: name,
+          type: 'admin_conclusion',
+        });
+      }
+    });
+    regCommentMissingNames.forEach(name => {
+      adminNegoMissing.push({
+        id: `reg_comment_${name}`,
+        label: `Motif de régularisation après négo pour ${name}`,
+        anchorId: `admin-reg-comment-${name}`,
+        companyName: name,
+        type: 'admin_regularization_comment',
+      });
+    });
+    const adminNegoDone = nbCompanies > 0 && adminNegoMissing.length === 0;
+    const adminNegoRatio = nbCompanies > 0 ? `${adminNegoConcl}/${nbCompanies}` : null;
+
+    // ─── 9. Technique après négo (notes effectives — héritage compris) ───
+    const techNegoState = buildTechState('nego');
+    const techNegoDone = techNegoState.totalTechSlots > 0 && techNegoState.missing.length === 0;
+    const techNegoRatio = techNegoState.totalTechSlots > 0 ? `${techNegoState.filledTechSlots}/${techNegoState.totalTechSlots}` : null;
+
+    // ─── 10. Récap après négo ───
+    const recapNegoItems = [
+      { id: 'recap_avant_ok', label: 'Phase avant négo complète', ok: recapDone },
+      { id: 'depouillement_nego_ok', label: 'Dépouillement après négo', ok: depouillementNegoDone },
+      { id: 'admin_nego_ok', label: 'Administratif après négo', ok: adminNegoDone },
+      { id: 'technique_nego_ok', label: 'Technique après négo', ok: techNegoDone },
+    ];
+    const recapNegoMissing = [];
+    if (!recapDone) recapNegoMissing.push({ id: 'rcpn_avant', label: 'Compléter la phase avant négo (étapes 1-5)', anchorId: null, type: 'tab', goToTab: 'recap' });
+    if (!depouillementNegoDone) recapNegoMissing.push({ id: 'rcpn_d', label: 'Compléter le Dépouillement après négo', anchorId: null, type: 'tab', goToTab: 'depouillementNego' });
+    if (!adminNegoDone) recapNegoMissing.push({ id: 'rcpn_a', label: 'Compléter l\'Administratif après négo', anchorId: null, type: 'tab', goToTab: 'adminNego' });
+    if (!techNegoDone) recapNegoMissing.push({ id: 'rcpn_t', label: 'Compléter la Technique après négo', anchorId: null, type: 'tab', goToTab: 'techniqueNego' });
+    const recapNegoDone = recapDone && depouillementNegoDone && adminNegoDone && techNegoDone;
+
+    // ─── État par étape ───
     const tabStates = {
       consultation:  { done: consultationDone,  items: consultationItems,  missing: consultationMissing, ratio: null },
       depouillement: { done: depouillementDone, items: depouillementItems, missing: depouillementMissing, ratio: null },
       admin:         { done: adminDone,         items: adminItems,         missing: adminMissing,         ratio: adminRatio },
       technique:     { done: techDone,          items: techItems,          missing: techMissing,          ratio: techRatio },
-      negociation:   { done: negociationDone,   items: negociationItems,   missing: [],                   ratio: negociationRatio, optional: true },
       recap:         { done: recapDone,         items: recapItems,         missing: recapMissing,         ratio: null },
+      negociation:   { done: negociationDone,   items: negociationItems,   missing: [],                   ratio: negociationRatio, optional: true },
+      depouillementNego: { done: depouillementNegoDone, items: depouillementNegoItems, missing: depouillementNegoMissing, ratio: depouillementNegoRatio },
+      adminNego:     { done: adminNegoDone,     items: adminNegoItems,     missing: adminNegoMissing,     ratio: adminNegoRatio },
+      techniqueNego: { done: techNegoDone,      items: techNegoState.items, missing: techNegoState.missing, ratio: techNegoRatio },
+      recapNego:     { done: recapNegoDone,     items: recapNegoItems,     missing: recapNegoMissing,     ratio: null },
     };
 
     // ─── Avancement global ───
-    const tabsForProgress = ['consultation', 'depouillement', 'admin', 'technique'];
+    // Sans négo engagée : les 4 étapes de fond de la phase initiale.
+    // Négo engagée : les étapes après-négo comptent aussi (7 étapes de fond).
+    const tabsForProgress = negoEngaged
+      ? ['consultation', 'depouillement', 'admin', 'technique', 'depouillementNego', 'adminNego', 'techniqueNego']
+      : ['consultation', 'depouillement', 'admin', 'technique'];
     const completedTabs = tabsForProgress.filter(t => tabStates[t].done).length;
     const overallProgress = Math.round((completedTabs / tabsForProgress.length) * 100);
+
+    // ─── Checklist pré-export ───
+    const preExportChecks = [
+      { tab: 'consultation', label: 'Consultation', items: consultationItems, missing: consultationMissing },
+      { tab: 'depouillement', label: 'Dépouillement', items: depouillementItems, missing: depouillementMissing },
+      { tab: 'admin', label: 'Administratif', items: adminItems, missing: adminMissing },
+      { tab: 'technique', label: 'Technique', items: techItems, missing: techMissing },
+    ];
+    if (negoEngaged) {
+      preExportChecks.push(
+        { tab: 'adminNego', label: 'Administratif après négo', items: adminNegoItems, missing: adminNegoMissing },
+        { tab: 'techniqueNego', label: 'Technique après négo', items: techNegoState.items, missing: techNegoState.missing },
+      );
+    }
 
     return {
       tabStates,
       overallProgress,
-      isReadyForExport: recapDone,
-      preExportChecks: [
-        { tab: 'consultation', label: 'Consultation', items: consultationItems, missing: consultationMissing },
-        { tab: 'depouillement', label: 'Dépouillement', items: depouillementItems, missing: depouillementMissing },
-        { tab: 'admin', label: 'Administratif', items: adminItems, missing: adminMissing },
-        { tab: 'technique', label: 'Technique', items: techItems, missing: techMissing },
-      ],
+      isReadyForExport: negoEngaged ? recapNegoDone : recapDone,
+      preExportChecks,
     };
-  }, [rao, consultation, criteria, analysisCompanies, companiesData, scoringConfig]);
+  }, [rao, consultation, criteria, analysisCompanies, companiesData, scoringConfig, negoEngaged]);
 };
 
 export default useRaoCompletion;

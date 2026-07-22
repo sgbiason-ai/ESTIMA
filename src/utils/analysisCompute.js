@@ -146,6 +146,26 @@ export function isRegularizedAfterNego(admin) {
   return wasNonRegular && admin.conclusionNego === 'reguliere';
 }
 
+/**
+ * Notes techniques EFFECTIVES d'une entreprise selon la phase. En phase 'nego',
+ * les saisies « après négociation » (technicalNego) surchargent CHAMP PAR CHAMP
+ * les saisies initiales (technical) : l'après-négo est pré-rempli par héritage,
+ * seuls les champs retouchés sont stockés séparément (trace avant/après conservée).
+ * En phase 'initial', on lit toujours les saisies initiales.
+ *
+ * @param {Object} companyData - rao.companies[name]
+ * @param {string} basis - 'initial' (défaut) | 'nego'
+ * @returns {Object} map criterionId → { note, noteMax, text }
+ */
+export function getEffectiveTechnical(companyData, basis = 'initial') {
+  const tech = companyData?.technical || {};
+  if (basis !== 'nego') return tech;
+  const over = companyData?.technicalNego || {};
+  const merged = { ...tech };
+  Object.keys(over).forEach(id => { merged[id] = { ...(tech[id] || {}), ...over[id] }; });
+  return merged;
+}
+
 /** Vrai si la variante porte des données négociées (prix ré-importés ou total dénormalisé). */
 export function variantHasNego(variant) {
   return !!(variant?.offersNego && Object.keys(variant.offersNego).length > 0) || variant?.totalNego != null;

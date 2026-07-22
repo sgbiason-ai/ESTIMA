@@ -161,6 +161,9 @@ const TabConsultation = ({
   addCriterion, removeCriterion, addSubCriterion, removeSubCriterion, updateSubCriterion,
   scoringConfig, hasTranches,
   tranches, raoTrancheId, setRaoTrancheId,
+  // Date/heure de remise des offres — même champ que la Fiche affaire
+  // (project.dateRemise/timeRemise), éditable des deux côtés (synchro auto).
+  dateRemise = '', timeRemise = '', onUpdateRemise = null,
 }) => {
   return (
     <SplitPanel
@@ -192,6 +195,31 @@ const TabConsultation = ({
               <strong> critères de notation</strong> (volet droit).
             </div>
           </div>
+
+          {/* Remise des offres — synchronisée avec la Fiche affaire (même champ projet) */}
+          {onUpdateRemise && (
+            <div>
+              <h4 className="text-[11px] font-black uppercase tracking-widest text-blue-600 mb-4 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                Remise des offres
+                <span className="ml-1 text-[9px] font-bold text-blue-400 normal-case tracking-normal flex items-center gap-1">
+                  <FileSignature size={11} /> synchronisée avec la Fiche affaire
+                </span>
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
+                <div className="md:col-span-6">
+                  <Field label="Date de remise des offres">
+                    <Input type="date" value={dateRemise} onChange={v => onUpdateRemise('dateRemise', v)} />
+                  </Field>
+                </div>
+                <div className="md:col-span-6">
+                  <Field label="Heure de remise des offres">
+                    <Input type="time" value={timeRemise} onChange={v => onUpdateRemise('timeRemise', v)} />
+                  </Field>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Spécificités RAO (procédure marché public, lot, date après négo) */}
           <div>

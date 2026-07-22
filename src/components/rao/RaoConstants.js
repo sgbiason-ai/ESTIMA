@@ -5,13 +5,20 @@ import { FileText, ScrollText, CheckSquare, Brain, MessageSquare, BarChart2 } fr
 // Étapes du workflow RAO — ordre canonique du processus. Source unique pour le
 // stepper du ribbon (RaoView), le panneau d'orientation (TabDepouillement) et
 // le bandeau « Prochaine étape » (NextStepHint).
+// Deux phases : 'avant' (offres initiales) et 'apres' (offres négociées).
+// Les étapes 'apres' sont grisées tant que la négociation n'est pas engagée
+// (rao.negoEngaged, prix négociés existants ou notation basculée « après négo »).
 export const RAO_STEPS = [
-  { id: 'consultation',  num: 1, label: 'Consultation',  icon: FileText,      hint: 'Critères de jugement et pondérations' },
-  { id: 'depouillement', num: 2, label: 'Dépouillement', icon: ScrollText,    hint: 'Ouverture des plis et import des offres' },
-  { id: 'admin',         num: 3, label: 'Administratif', icon: CheckSquare,   hint: 'Pièces et régularité des candidatures' },
-  { id: 'technique',     num: 4, label: 'Technique',     icon: Brain,         hint: 'Notation des critères techniques' },
-  { id: 'negociation',   num: 5, label: 'Négociation',   icon: MessageSquare, hint: 'Courriers et offres finales', optional: true },
-  { id: 'recap',         num: 6, label: 'Récap',         icon: BarChart2,     hint: 'Classement final et export du rapport' },
+  { id: 'consultation',  num: 1, label: 'Consultation',  icon: FileText,      phase: 'avant', hint: 'Critères de jugement et pondérations' },
+  { id: 'depouillement', num: 2, label: 'Dépouillement', icon: ScrollText,    phase: 'avant', hint: 'Ouverture des plis et import des offres' },
+  { id: 'admin',         num: 3, label: 'Administratif', icon: CheckSquare,   phase: 'avant', hint: 'Pièces et régularité des candidatures' },
+  { id: 'technique',     num: 4, label: 'Technique',     icon: Brain,         phase: 'avant', hint: 'Notation des critères techniques' },
+  { id: 'recap',         num: 5, label: 'Récap',         icon: BarChart2,     phase: 'avant', hint: 'Classement avant négociation' },
+  { id: 'negociation',       num: 6,  label: 'Négociation',   icon: MessageSquare, phase: 'apres', hint: 'Courriers et échanges avec les entreprises', optional: true },
+  { id: 'depouillementNego', num: 7,  label: 'Dépouillement', icon: ScrollText,    phase: 'apres', hint: 'Import des offres finales et PV après négo' },
+  { id: 'adminNego',         num: 8,  label: 'Administratif', icon: CheckSquare,   phase: 'apres', hint: 'Statuts après négociation et régularisations' },
+  { id: 'techniqueNego',     num: 9,  label: 'Technique',     icon: Brain,         phase: 'apres', hint: 'Notes ajustées sur les offres finales' },
+  { id: 'recapNego',         num: 10, label: 'Récap final',   icon: BarChart2,     phase: 'apres', hint: 'Classement final et export du rapport' },
 ];
 
 export const CONCLUSION_OPTIONS = [

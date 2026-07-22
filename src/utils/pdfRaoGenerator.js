@@ -10,7 +10,7 @@ import { NON_REGULAR_STATUSES } from '../components/rao/RaoConstants';
 import { buildTheme as _buildTheme } from './pdf/buildTheme';
 import { getCurrentPhaseCode } from './phaseModel';
 import { computeVatBreakdown } from './financeFormat';
-import { scoreOffer, computePriceReference, getEffectiveOffers, getEffectiveVariantOffers, getEffectiveVariantNewItems, getVariantEffectiveTotal, getCompanyRabaisPct, getEffectiveConclusion, isRegularizedAfterNego } from './analysisCompute';
+import { scoreOffer, computePriceReference, getEffectiveOffers, getEffectiveVariantOffers, getEffectiveVariantNewItems, getVariantEffectiveTotal, getCompanyRabaisPct, getEffectiveConclusion, getEffectiveTechnical, isRegularizedAfterNego } from './analysisCompute';
 import { stampPdfCredit } from './estimaCredit';
 import { htmlToPlainText } from './richText';
 
@@ -2328,7 +2328,8 @@ export const generateRaoPDF = async (optionsParams) => {
               .map((name, ci) => ({ name, ci }))
               .map(({ name, ci }) => {
                 const irregular = NON_REGULAR_STATUSES.includes(getEffectiveConclusion(companiesData[name]?.admin, negoActive ? 'nego' : 'initial'));
-                const tech = companiesData[name]?.technical || {};
+                // Notes effectives : en phase après négo, technicalNego surcharge l'initial.
+                const tech = getEffectiveTechnical(companiesData[name], negoActive ? 'nego' : 'initial');
                 const sd = tech[sc.id] || {};
                 let h = HEADER_BLOCK;
                 // Commentaire riche (gras/listes) : mesure exacte par le moteur
@@ -2427,7 +2428,8 @@ export const generateRaoPDF = async (optionsParams) => {
             .map((name, ci) => ({ name, ci }))
             .map(({ name, ci }) => {
               const irregular = NON_REGULAR_STATUSES.includes(getEffectiveConclusion(companiesData[name]?.admin, negoActive ? 'nego' : 'initial'));
-              const tech = companiesData[name]?.technical || {};
+              // Notes effectives : en phase après négo, technicalNego surcharge l'initial.
+              const tech = getEffectiveTechnical(companiesData[name], negoActive ? 'nego' : 'initial');
               const d = tech[crit.id] || {};
               let h = HEADER_BLOCK;
               // Synthèse riche : mesure exacte (cf. bloc sous-critères ci-dessus)
@@ -2519,7 +2521,8 @@ export const generateRaoPDF = async (optionsParams) => {
       }), 'Total'];
 
       const techRecapBody = companyNames.map((name) => {
-        const tech = companiesData[name]?.technical || {};
+        // Notes effectives : en phase après négo, technicalNego surcharge l'initial.
+        const tech = getEffectiveTechnical(companiesData[name], negoActive ? 'nego' : 'initial');
         let total = 0;
         const notes = techRecapCols.map(col => {
           const d = tech[col.id] || {};

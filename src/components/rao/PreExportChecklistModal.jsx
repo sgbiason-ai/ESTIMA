@@ -10,6 +10,8 @@ const TAB_LABELS = {
   depouillement: { num: 2, label: 'Dépouillement' },
   admin: { num: 3, label: 'Administratif' },
   technique: { num: 4, label: 'Technique' },
+  adminNego: { num: 8, label: 'Administratif après négo' },
+  techniqueNego: { num: 9, label: 'Technique après négo' },
 };
 
 const PreExportChecklistModal = ({

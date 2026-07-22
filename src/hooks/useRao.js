@@ -1,6 +1,6 @@
 // src/hooks/useRao.js
 import { useCallback, useMemo } from 'react';
-import { computePriceReference, getCompanyRabaisPct, getEffectiveConclusion } from '../utils/analysisCompute';
+import { computePriceReference, getCompanyRabaisPct, getEffectiveConclusion, getEffectiveTechnical } from '../utils/analysisCompute';
 
 // ── CONSTANTES ──────────────────────────────────────────────────────────────
 
@@ -34,7 +34,7 @@ export const DEFAULT_OFFER_PIECES = [
 
 // ── HOOK ────────────────────────────────────────────────────────────────────
 
-export const useRao = (project, setProject, analysisCompanies = [], analysisStats = null, scoringConfig = null, tranches = [], chaptersData = []) => {
+export const useRao = (project, setProject, analysisCompanies = [], analysisStats = null, scoringConfig = null, tranches = [], chaptersData = [], statsByBasis = null) => {
   const rao = project?.rao || {};
 
   // ── Updater générique ──
@@ -84,12 +84,15 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
     phase: project?.phase || 'DCE',
     duration: project?.duration || '',
     prepPeriod: project?.prepPeriod || '1 mois',
-    dateRemise: project?.dateRemise || '',
-    timeRemise: project?.timeRemise || '',
     lot: '',
     procedure: '',
     dateNego: '',
-    ...(rao.consultation || {})
+    ...(rao.consultation || {}),
+    // Date/heure de remise : synchronisées avec la Fiche affaire (même champ du
+    // projet, éditable des deux côtés). Le projet PRIME sur une éventuelle copie
+    // héritée dans rao.consultation (anciennes données) pour éviter la désynchro.
+    dateRemise: project?.dateRemise || (rao.consultation || {}).dateRemise || '',
+    timeRemise: project?.timeRemise || (rao.consultation || {}).timeRemise || '',
   };
 
   const updateConsultation = (field, value) =>
@@ -193,11 +196,14 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
   const setOfferPieces = useCallback((pieces) => updateRao({ offerPieces: pieces }), [updateRao]);
 
   // ── TECHNIQUE ─────────────────────────────────────────────────────────────
-  const updateTechnical = (companyName, criterionId, field, value) => {
+  // basis 'nego' → écrit dans technicalNego (diff par champ, l'initial reste
+  // intact — trace avant/après). Lecture effective : getEffectiveTechnical.
+  const updateTechnical = (companyName, criterionId, field, value, basis = 'initial') => {
+    const section = basis === 'nego' ? 'technicalNego' : 'technical';
     setProject(prev => {
       const r = prev?.rao || {};
       const co = (r.companies || {})[companyName] || {};
-      const tech = co.technical || {};
+      const tech = co[section] || {};
       const crit = tech[criterionId] || {};
       return {
         ...prev,
@@ -207,7 +213,7 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
             ...(r.companies || {}),
             [companyName]: {
               ...co,
-              technical: { ...tech, [criterionId]: { ...crit, [field]: value } },
+              [section]: { ...tech, [criterionId]: { ...crit, [field]: value } },
             },
           },
         },
@@ -314,13 +320,23 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
   // ── CALCUL DES SCORES ─────────────────────────────────────────────────────
   // Reprend directement les scores prix de l'analyse financière (usePriceAnalysis)
   // et les rebase sur le poids du critère prix dans la grille RAO.
-  const computeScores = () => {
+  // basisOverride ('initial' | 'nego') : force la phase indépendamment du
+  // commutateur global scoringConfig.basis — utilisé par les étapes 5 (Récap
+  // avant négo) et 9 (Récap final) du workflow. Sans override : phase globale
+  // (comportement historique, conservé pour l'export PDF).
+  const computeScores = (basisOverride = null) => {
     // N = barème prix dans la grille RAO (affiché en lecture seule = scoringConfig.maxScore)
     const N = Number(scoringConfig?.maxScore || 40);
     const mode = scoringConfig?.mode || 'f1';
 
-    // Totaux depuis l'analyse financière (source de vérité unique)
-    const effectiveStats = raoAnalysisStats || analysisStats;
+    // Totaux depuis l'analyse financière (source de vérité unique).
+    // Phase forcée → stats de la phase correspondante (statsByBasis) ; une phase
+    // nego sans prix négociés retombe sur les stats initiales (pas de trou).
+    const effectiveStats = basisOverride
+      ? (basisOverride === 'nego'
+          ? (statsByBasis?.nego || statsByBasis?.initial || raoAnalysisStats || analysisStats)
+          : (statsByBasis?.initial || raoAnalysisStats || analysisStats))
+      : (raoAnalysisStats || analysisStats);
     const companiesTotals = effectiveStats?.companiesTotals || {};
 
     // Statut de régularité (CCP) — conservé comme MARQUEUR, plus comme exclusion.
@@ -328,7 +344,7 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
     // la régularisation reste une décision du pouvoir adjudicateur (cf. RAO §5.bis).
     // Phase après négo : une offre régularisée (admin.conclusionNego) n'est plus
     // marquée « sous réserve » — cf. getEffectiveConclusion (CCP R2152-2).
-    const basis = scoringConfig?.basis === 'nego' ? 'nego' : 'initial';
+    const basis = basisOverride || (scoringConfig?.basis === 'nego' ? 'nego' : 'initial');
     const NON_REGULAR = ['irreguliere', 'inacceptable', 'inappropriee'];
     const isIrregular = (companyName) => {
       const conclusion = getEffectiveConclusion(rao.companies?.[companyName]?.admin, basis);
@@ -369,9 +385,10 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
         priceScore = Math.max(0, Math.min(N, rawScore));
       }
 
-      // Scores techniques (notes saisies dans le RAO)
+      // Scores techniques — notes EFFECTIVES selon la phase (en 'nego',
+      // technicalNego surcharge champ par champ les notes initiales).
       const techScores = {};
-      const techData = rao.companies?.[name]?.technical || {};
+      const techData = getEffectiveTechnical(rao.companies?.[name], basis);
       criteria.filter(c => !c.auto).forEach(crit => {
         const hasSubs = (crit.subCriteria || []).length > 0;
         if (hasSubs) {
@@ -400,12 +417,19 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
   // Toutes les offres sont classées ensemble (rang chiffré), y compris les
   // irrégulières — celles-ci restent signalées par leur flag `irregular` afin
   // d'être marquées « sous réserve de régularisation » dans l'UI et le rapport.
-  const getRanking = () => {
-    const scores = computeScores();
+  const getRanking = (basisOverride = null) => {
+    const scores = computeScores(basisOverride);
     return Object.entries(scores)
       .sort((a, b) => b[1].totalScore - a[1].totalScore)
       .map(([name, s], i) => ({ name, rank: i + 1, ...s }));
   };
+
+  // ── PHASE NÉGOCIATION (workflow 9 étapes) ────────────────────────────────
+  // Marqueur explicite « négociation engagée » : déverrouille les étapes 6-9.
+  // (les étapes après-négo se déverrouillent aussi d'elles-mêmes si des prix
+  // négociés existent ou si la notation est déjà basculée — cf. RaoView).
+  const negoEngaged = !!rao.negoEngaged;
+  const setNegoEngaged = (v) => updateRao(() => ({ negoEngaged: !!v }));
 
   return {
     rao,
@@ -419,6 +443,8 @@ export const useRao = (project, setProject, analysisCompanies = [], analysisStat
     letterConfig, updateLetterConfig,
     recommendation, updateRecommendation,
     computeScores, getRanking,
+    // Phase négociation (workflow 9 étapes)
+    negoEngaged, setNegoEngaged,
     // Tranches
     hasTranches, tranches, raoTrancheId, setRaoTrancheId,
     // PSE / Options
