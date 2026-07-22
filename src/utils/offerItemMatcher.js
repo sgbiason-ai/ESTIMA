@@ -124,10 +124,17 @@ export function createOfferItemMatcher({
     // vraie ligne article qui suit.
     if (!consume) return list[list.length - 1];
 
-    const free = list.filter(id => !used.has(id));
-    // Plus de candidat libre : le fichier contient plus de lignes que le DQE
-    // pour cette désignation → on retombe sur le comportement historique.
-    if (free.length === 0) return list[list.length - 1];
+    let free = list.filter(id => !used.has(id));
+    // Plus de candidat libre : le fichier reliste les mêmes articles — cas d'un
+    // DQE à TRANCHES, où chaque tranche répète l'intégralité du bordereau. On
+    // repart alors sur un nouveau cycle (les occurrences redeviennent libres)
+    // pour que la 1re ligne de la tranche suivante retombe sur le 1er article,
+    // pas sur le dernier : avec des prix réutilisés, « dernier gagne » enverrait
+    // la quantité de la tranche 2 sur un autre article que celui de la tranche 1.
+    if (free.length === 0) {
+      list.forEach(id => used.delete(id));
+      free = list;
+    }
 
     let chosen = free[0];
     if (free.length > 1 && offerQty > 0) {

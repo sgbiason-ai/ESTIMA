@@ -506,9 +506,16 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
           if (!(itemId in importedOffers) || (importedOffers[itemId] === 0 && price !== 0)) {
             importedOffers[itemId] = price;
           }
-          // Idem pour la quantité (premier non-nul gagne)
-          if (offerQty > 0 && (!(itemId in importedQuantities) || importedQuantities[itemId] === 0)) {
-            importedQuantities[itemId] = offerQty;
+          // Quantité : SOMME des lignes rattachées à l'article. Un DQE à
+          // tranches répète chaque article (un onglet ou une section par
+          // tranche) avec sa quantité de tranche ; la quantité MOE comparée
+          // (clientQtyMaps) étant la somme des tranches, retenir la première
+          // ligne déclarait de fausses divergences sur TOUS les articles
+          // multi-tranches → offre auto-classée irrégulière (52 faux écarts
+          // constatés en prod). Sur un fichier mono-tranche, chaque ligne a son
+          // propre article (occurrences) : la somme est neutre.
+          if (offerQty > 0) {
+            importedQuantities[itemId] = (importedQuantities[itemId] || 0) + offerQty;
           }
         });
       }
@@ -701,6 +708,31 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
             },
           };
         });
+      } else if (typeof setProject === 'function'
+        && project?.rao?.companies?.[finalCompanyName]?.admin?.conclusion === 'irreguliere'
+        && project?.rao?.companies?.[finalCompanyName]?.admin?.autoFlaggedReason === 'quantity_mismatch') {
+        // Ré-import SANS divergence : lever le classement « irrégulière » posé
+        // AUTOMATIQUEMENT par un import précédent (et lui seul — une conclusion
+        // saisie à la main par l'analyste n'est jamais touchée). Sans cela, une
+        // offre corrigée par un ré-import restait marquée irrégulière à vie.
+        setProject(prev => {
+          const admin = prev?.rao?.companies?.[finalCompanyName]?.admin;
+          if (!admin || admin.conclusion !== 'irreguliere' || admin.autoFlaggedReason !== 'quantity_mismatch') return prev;
+          const r = prev.rao;
+          const co = r.companies[finalCompanyName];
+          const { autoFlaggedReason, autoFlaggedAt, ...rest } = admin;
+          return {
+            ...prev,
+            rao: {
+              ...r,
+              companies: {
+                ...r.companies,
+                [finalCompanyName]: { ...co, admin: { ...rest, conclusion: '' } },
+              },
+            },
+          };
+        });
+        toast.info(`Classement « irrégulière » levé pour "${finalCompanyName}" : plus aucune divergence de quantité après ce ré-import.`);
       }
       const warnings = [];
       if (unmatchedRows > 0) warnings.push(`${unmatchedRows} non trouvé(s)`);
@@ -1057,8 +1089,9 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
           if (!(itemId in variantOffers) || (variantOffers[itemId] === 0 && price !== 0)) {
             variantOffers[itemId] = price;
           }
-          if (qty > 0 && (!(itemId in variantQuantities) || variantQuantities[itemId] === 0)) {
-            variantQuantities[itemId] = qty;
+          // Somme des quantités par article (tranches multiples) — cf. handleImportExcel
+          if (qty > 0) {
+            variantQuantities[itemId] = (variantQuantities[itemId] || 0) + qty;
           }
         });
       }

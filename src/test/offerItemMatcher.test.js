@@ -165,6 +165,22 @@ describe('createOfferItemMatcher — désignations répétées', () => {
     });
   });
 
+  it('repart en début de cycle quand un DQE à tranches reliste les mêmes articles', () => {
+    // Un bordereau multi-tranches répète TOUTES les lignes (une section par
+    // tranche). Quand les occurrences d'une désignation sont épuisées, la ligne
+    // suivante doit retomber sur le PREMIER article (nouveau cycle), pas sur le
+    // dernier : avec des prix réutilisés, la quantité de la tranche 2 partirait
+    // sur un autre article que celui servi en tranche 1.
+    const m = makeMatcher();
+    // Tranche 1 : les 3 GNT consomment i3, i7, i9 (ordre document)
+    expect(m.resolve({ designationNorm: 'GNT 0/80', refRaw: 'P.22', qty: 999 }).itemId).toBe('i3');
+    expect(m.resolve({ designationNorm: 'GNT 0/80', refRaw: 'P.22', qty: 999 }).itemId).toBe('i7');
+    expect(m.resolve({ designationNorm: 'GNT 0/80', refRaw: 'P.22', qty: 999 }).itemId).toBe('i9');
+    // Tranche 2 : nouveau cycle — i3 à nouveau en premier, pas i9
+    expect(m.resolve({ designationNorm: 'GNT 0/80', refRaw: 'P.22', qty: 999 }).itemId).toBe('i3');
+    expect(m.resolve({ designationNorm: 'GNT 0/80', refRaw: 'P.22', qty: 999 }).itemId).toBe('i7');
+  });
+
   it('ne rend aucun article quand la ligne est inconnue', () => {
     const m = makeMatcher();
     const r = m.resolve({ designationNorm: 'FOURNITURE DE ZEBRES DACIER', refRaw: 'Z.99', qty: 3 });

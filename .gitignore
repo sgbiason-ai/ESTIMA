@@ -29,3 +29,4 @@ estimavrd-icons.zip
 # Artefacts régénérables
 coverage
 .firebase
+*.traineddata

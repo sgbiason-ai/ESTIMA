@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseArticleLine } from '../utils/parsePdfOffer';
+import { parseArticleLine, isGarbledText } from '../utils/parsePdfOffer';
 
 // Lignes réelles extraites du calque texte d'un DQE PDF d'entreprise (SPIE
 // BATIGNOLLES MALET, affaire BOUT DU PONT DE L'ARN). Chaque montant y est suffixé
@@ -94,8 +94,33 @@ describe('parseArticleLine — découpage en cellules fourni par le PDF', () => 
     });
   });
 
-  it('n’accepte pas une ligne dont l’unité n’est pas reconnue', () => {
-    const items = cells('P.99', 'LIGNE DOUTEUSE', 'XYZ', '2', '10,00', '20,00');
+  it('accepte une unité hors catalogue quand l’arithmétique la valide (cellules)', () => {
+    // « FT / MOIS » wrappé par le PDF : la cellule unité ne contient que « MOIS ».
+    // La structure en colonnes + qté × P.U. = montant suffisent comme preuve —
+    // l'exigence stricte du catalogue laissait l'article à 0 € (cas réel
+    // GESTION DE LA CIRCULATION, offre BRESSOLLES).
+    const items = cells('P.02', 'GESTION DE LA CIRCULATION', 'MOIS', '2', '900,00 €', '1 800,00 €');
+    expect(parseArticleLine('', items)).toMatchObject({
+      ref: 'P.02', designation: 'GESTION DE LA CIRCULATION', qty: 2, price: 900, montant: 1800,
+    });
+  });
+
+  it('rejette toujours une ligne incohérente, même à unité plausible', () => {
+    // Sans cohérence qté × P.U. ≈ montant, l'unité souple ne doit rien laisser passer.
+    const items = cells('P.99', 'LIGNE DOUTEUSE', 'XYZ', '2', '10,00', '95,00');
     expect(parseArticleLine('', items)).toBeNull();
+  });
+});
+
+describe('isGarbledText — pages au calque texte corrompu', () => {
+  it('détecte un texte de police sans table Unicode', () => {
+    // Motif réel (offre BRESSOLLES, pages tranches 2/3) : glyphes PUA/combinants
+    expect(isGarbledText('͖((³ϙ( i[ϙ@)b)[ϙ ͕͔͒ ϙ͓͑͐Ϡ͔͏ϙ ь ͖((³ϙ(')).toBe(true);
+  });
+  it('laisse passer un bordereau français normal', () => {
+    expect(isGarbledText('P.08 DÉCROUTAGE VOIRIE BICOUCHE / TRICOUCHE m² 583 5,50 € 3 206,50 €')).toBe(false);
+  });
+  it('ignore les textes trop courts pour juger', () => {
+    expect(isGarbledText('͖((')).toBe(false);
   });
 });

@@ -214,8 +214,14 @@ function parseArticleLineFromCells(items) {
   const qty     = parseFrNumber(cells[n - 3]);
   if (![montant, price, qty].every(Number.isFinite) || qty === 0) return null;
 
+  // Unité : contrôle SOUPLE, contrairement aux passes texte. Ici la structure en
+  // colonnes + la cohérence qté × P.U. ≈ montant suffisent comme preuve — exiger
+  // une unité du catalogue perdait les unités composites éclatées par le PDF
+  // (« FT / MOIS » wrappé : la cellule ne contient que « MOIS ») et l'article
+  // n'était jamais importé. On rejette seulement ce qui ne peut pas être une
+  // unité (trop long, purement numérique).
   const unit = cells[n - 4];
-  if (!looksLikeUnit(unit)) return null;
+  if (unit.length > 12 || NUMERIC_TOKEN.test(unit)) return null;
 
   // Garde-fou : une ligne mal découpée (cellules fragmentées ou fusionnées) ne
   // vérifiera pas cette égalité et repartira vers les passes texte.
@@ -424,7 +430,9 @@ function parseArticleLineCore(text) {
  * @param {Function} onProgress ({ stage, page, totalPages, progress }) → void
  * @returns {Promise<Array<{ pageNum: number, text: string }>>}
  */
-async function extractPdfViaOcr(file, onProgress) {
+// pageFilter : liste de numéros de pages à OCRiser (null = toutes). Sert à
+// l'OCR ciblé des seules pages au texte corrompu d'un PDF mixte.
+async function extractPdfViaOcr(file, onProgress, pageFilter = null) {
   console.log('[OCR] 🔄 Démarrage extraction OCR…');
 
   // Lazy import de Tesseract (lourd : ~5-10 Mo)
@@ -467,6 +475,7 @@ async function extractPdfViaOcr(file, onProgress) {
   const pages = [];
   try {
     for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+      if (pageFilter && !pageFilter.includes(pageNum)) continue;
       onProgress?.({ stage: 'render', page: pageNum, totalPages, progress: 0, message: `Rendu page ${pageNum}/${totalPages}…` });
       console.log(`[OCR] Page ${pageNum}/${totalPages} : rendu canvas…`);
 
@@ -518,8 +527,30 @@ function parseOcrPages(pages) {
 }
 
 /**
+ * Détecte un texte de page ILLISIBLE : police à l'encodage cassé (pas de table
+ * ToUnicode) dont l'extraction rend des glyphes hors alphabet (« ((³ϙ( »).
+ * Cas réel : un PDF d'offre assemblé depuis plusieurs sources, où certaines
+ * pages ont un calque texte sain et d'autres un calque corrompu — le fallback
+ * OCR global ne se déclenchait pas (des articles étaient extraits des pages
+ * saines) et les articles des pages corrompues restaient silencieusement à 0 €.
+ *
+ * Exportée pour les tests.
+ */
+export function isGarbledText(text) {
+  const s = String(text || '').replace(/\s/g, '');
+  if (s.length < 20) return false;
+  // Caractères attendus d'un bordereau : latin (accentué), chiffres, ponctuation
+  // usuelle, symboles monnaie/unités. Tout le reste (PUA, glyphes combinants
+  // orphelins, contrôle…) compte comme illisible.
+  const readable = s.match(/[\x20-\x7E\u00A0-\u017F\u20AC\u2010-\u2027]/g) || [];
+  return (s.length - readable.length) / s.length > 0.2;
+}
+
+/**
  * Parse un fichier PDF d'offre et retourne les articles détectés.
- * Stratégie : extraction texte d'abord (rapide). Si 0 article, fallback OCR (lent).
+ * Stratégie : extraction texte d'abord (rapide). Les pages au texte corrompu
+ * (encodage de police cassé) sont ré-extraites par OCR ciblé. Si rien du tout,
+ * fallback OCR complet (PDF scanné).
  * @param {File} file Fichier PDF
  * @param {Object} options
  * @param {Function} options.onProgress Callback de progression pour l'OCR
@@ -547,6 +578,34 @@ export async function parsePdfOffer(file, options = {}) {
       // line.items porte le découpage en colonnes : la passe cellules s'en sert.
       const article = parseArticleLine(line.text, line.items);
       if (article) articles.push({ ...article, pageNum: line.pageNum });
+    }
+
+    // 1.bis — Pages au texte corrompu → OCR ciblé sur CES pages seulement,
+    // fusionné avec les articles des pages saines (ordre du document préservé,
+    // les DQE à tranches répètent le bordereau section par section).
+    const pageText = new Map();
+    lines.forEach(l => pageText.set(l.pageNum, (pageText.get(l.pageNum) || '') + l.text + '\n'));
+    const garbledPages = [...pageText.entries()].filter(([, t]) => isGarbledText(t)).map(([p]) => p);
+    if (garbledPages.length > 0) {
+      const pagesLabel = garbledPages.join(', ');
+      console.warn(`[parsePdfOffer] Pages au texte illisible (encodage) : ${pagesLabel} — OCR ciblé…`);
+      onProgress?.({ stage: 'detect', message: `Texte illisible pages ${pagesLabel} (encodage de police) — reconnaissance d'image sur ces pages…` });
+      try {
+        const ocrPages = await extractPdfViaOcr(file, onProgress, garbledPages);
+        const ocrResult = parseOcrPages(ocrPages);
+        articles = articles
+          .concat(ocrResult.articles)
+          .sort((a, b) => (a.pageNum || 0) - (b.pageNum || 0));
+        viaOcr = true;
+        warnings.push(
+          `Pages ${pagesLabel} : texte illisible (encodage de police du PDF) — ces pages ont été lues par reconnaissance d'image (${ocrResult.articles.length} article(s) supplémentaire(s)). Vérifiez les prix concernés.`
+        );
+      } catch (e) {
+        console.error('[parsePdfOffer] OCR ciblé impossible :', e);
+        warnings.push(
+          `Pages ${pagesLabel} : texte illisible (encodage de police) et reconnaissance d'image impossible (${e.message || 'erreur'}). Les articles portés par ces pages n'ont PAS été importés.`
+        );
+      }
     }
   }
 
