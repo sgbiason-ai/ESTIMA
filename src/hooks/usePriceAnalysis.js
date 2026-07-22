@@ -425,7 +425,7 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
       // qu'une Map<désignation, itemId> écrasait silencieusement, laissant des
       // articles à 0 € et déclenchant de fausses divergences de quantité.
       const matcher = createOfferItemMatcher({
-        chaptersData, project, moeQtyMap, normalizeDesignation, normalizeRef,
+        chaptersData, project, bpuConfig, moeQtyMap, normalizeDesignation, normalizeRef,
       });
       const { itemIdToDesignation, itemIdToUnit } = matcher;
 
@@ -941,7 +941,7 @@ const usePriceAnalysis = (project, bpuConfig, activeTrancheId = 'global', client
       // Résolution ligne → article, mutualisée avec handleImportExcel : gère les
       // désignations répétées (même prix dans plusieurs sous-chapitres).
       const matcher = createOfferItemMatcher({
-        chaptersData, project, moeQtyMap, normalizeDesignation, normalizeRef,
+        chaptersData, project, bpuConfig, moeQtyMap, normalizeDesignation, normalizeRef,
       });
       const { itemIdToDesignation, itemIdToUnit } = matcher;
       const baseOffers = company.offers || {};

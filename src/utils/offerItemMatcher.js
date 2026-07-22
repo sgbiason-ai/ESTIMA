@@ -22,6 +22,7 @@
 // usePriceAnalysis et sont partagées telles quelles par les deux imports.
 
 import { findBestPrefixMatch } from './analysisCompute';
+import { buildRefMap } from './projectCalculations';
 
 const round6 = (n) => Math.round(Number(n || 0) * 1e6) / 1e6;
 
@@ -29,6 +30,9 @@ const round6 = (n) => Math.round(Number(n || 0) * 1e6) / 1e6;
  * @param {Object}   p
  * @param {Array}    p.chaptersData   chapitres aplatis ({ items: [...] }), ordre document
  * @param {Object}   p.project        { chapters } — pour le fallback par n° de prix
+ * @param {Object}   [p.bpuConfig]    mode de numérotation (auto / manual / hierarchical) :
+ *                                    doit être celui du projet, sinon les numéros
+ *                                    reconstruits ne correspondent pas au DQE envoyé
  * @param {Map|Object} p.moeQtyMap    itemId → quantité MOE de la tranche active
  * @param {Function} p.normalizeDesignation
  * @param {Function} p.normalizeRef
@@ -36,6 +40,7 @@ const round6 = (n) => Math.round(Number(n || 0) * 1e6) / 1e6;
 export function createOfferItemMatcher({
   chaptersData,
   project,
+  bpuConfig,
   moeQtyMap,
   normalizeDesignation,
   normalizeRef,
@@ -59,16 +64,18 @@ export function createOfferItemMatcher({
     });
   });
 
-  // Fallback par n° de prix, en DEUX passes : les références réellement saisies
-  // (bpuNum) d'abord, la numérotation automatique ensuite.
+  // Fallback par n° de prix. La numérotation vient de buildRefMap — la MÊME
+  // fonction que celle qui numérote le DQE exporté, donc les deux ne peuvent
+  // plus diverger.
   //
-  // En une seule passe, le « P.43 » automatique du 43e article s'enregistre
-  // avant que le traversal n'atteigne le véritable article P.43 — décalé plus
-  // loin dès qu'un prix est réutilisé, la numérotation « prix uniques » ne
-  // réincrémentant pas sur un doublon. Le vrai P.43 trouve alors sa clé prise et
-  // devient inatteignable : une ligne dont la désignation a été retouchée par
-  // l'entreprise est rattachée au mauvais article (constaté sur un DQE PDF où
-  // « CANALISATION EU » avait été saisi « CANALISATION EP »).
+  // Une numérotation maison « un P.n par article » est fausse : le registre de
+  // prix uniques n'incrémente le compteur que sur un prix NOUVEAU, si bien qu'un
+  // DQE de 79 lignes ne compte que 73 numéros. Le « P.43 » naïf tombait sur le
+  // 43e article du document au lieu du véritable P.43, situé plus loin (65 des
+  // 79 articles étaient mal numérotés). Une ligne dont l'entreprise a retouché
+  // la désignation partait alors sur le mauvais article et le bon restait à 0 €
+  // — écart de 3 405,60 € constaté en production sur une offre PDF où
+  // « CANALISATION EU » avait été saisi « CANALISATION EP ».
   const projectRefMap = new Map();
   if (project?.chapters) {
     const ordered = [];
@@ -81,18 +88,25 @@ export function createOfferItemMatcher({
     };
     project.chapters.forEach(chap => { if (chap.children) traverse(chap.children); });
 
+    // Références réellement saisies d'abord : elles priment sur toute
+    // numérotation calculée et ne doivent jamais se faire souffler leur clé.
     ordered.forEach(item => {
       const bpuRef = item.bpuNum ? normalizeRef(item.bpuNum) : null;
       if (bpuRef && !projectRefMap.has(bpuRef)) projectRefMap.set(bpuRef, item.id);
     });
-    // L'export numérote « P.1 »… sans zéro de tête ; des fichiers plus anciens
-    // portent « P.01 ». normalizeRef retirant le point, on enregistre les deux
-    // formes — sans jamais écraser une référence saisie.
-    ordered.forEach((item, i) => {
-      const n = i + 1;
-      [`P.${n}`, `P.${String(n).padStart(2, '0')}`].forEach(raw => {
+
+    const refMap = buildRefMap(project.chapters, bpuConfig || {});
+    ordered.forEach(item => {
+      const ref = refMap.get(item.id);
+      if (!ref) return;
+      // L'export écrit « P.1 » sans zéro de tête, d'anciens fichiers « P.01 » ;
+      // normalizeRef retirant le point, les deux formes doivent être connues.
+      const variants = [ref];
+      const m = /^P\.?(\d+)$/i.exec(String(ref).trim());
+      if (m) variants.push(`P.${m[1].padStart(2, '0')}`, `P.${Number(m[1])}`);
+      variants.forEach(raw => {
         const key = normalizeRef(raw);
-        if (!projectRefMap.has(key)) projectRefMap.set(key, item.id);
+        if (key && !projectRefMap.has(key)) projectRefMap.set(key, item.id);
       });
     });
   }

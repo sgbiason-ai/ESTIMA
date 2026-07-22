@@ -119,6 +119,52 @@ describe('createOfferItemMatcher — désignations répétées', () => {
     expect(m.itemIdToDesignation.get(r.itemId)).toBe('GRAVES NON TRAITÉES 0/20 SOUS VOIRIE');
   });
 
+  describe('projet SANS bpuNum — la numérotation P.xx est calculée, pas stockée', () => {
+    // Cas réel : dans un projet EstimaVRD, « P.43 » n'est écrit nulle part sur
+    // l'article. Le numéro est produit à l'export par buildRefMap, dont le
+    // registre de prix uniques ne consomme un numéro que sur un prix NOUVEAU.
+    // Reconstruire « un P.n par article » à l'import donne donc une numérotation
+    // décalée dès le premier prix répété (65 articles sur 79 mal numérotés sur
+    // l'affaire BOUT DU PONT DE L'ARN) : la ligne partait sur le mauvais article
+    // et le bon restait à 0 € — 3 405,60 € d'écart en production.
+    const BARE = ITEMS.map(({ id, designation, unit, qty }) => ({
+      id, designation, unit, qty, type: 'item', price: 0, // aucun bpuNum, aucun uid
+    }));
+    const bareChapters = [{ id: 'c1', title: 'CHAUSSÉE - TROTTOIRS', items: BARE }];
+    const bareProject = { chapters: [{ id: 'c1', children: BARE }] };
+    const bareMatcher = () => createOfferItemMatcher({
+      chaptersData: bareChapters,
+      project: bareProject,
+      moeQtyMap: new Map(BARE.map(i => [i.id, i.qty])),
+      normalizeDesignation, normalizeRef,
+    });
+
+    it('numérote comme l’export : un prix répété garde son numéro', () => {
+      const m = bareMatcher();
+      // 9 articles mais 4 prix distincts → P.1 à P.4 seulement.
+      // GNT 0/80 (i3, i7, i9) partagent P.3 ; le 5e article n'est PAS « P.5 ».
+      const gnt = m.resolve({ designationNorm: 'GNT 0/80', refRaw: 'P.3', qty: 260 });
+      expect(gnt.itemId).toBe('i3');
+      // « P.5 » n'existe pas dans cette numérotation : aucun article ne doit répondre
+      expect(m.resolve({ designationNorm: 'INCONNU AU BORDEREAU', refRaw: 'P.5', qty: 1 }).itemId).toBeNull();
+    });
+
+    it('rattache la désignation retouchée au bon article via son n° réel', () => {
+      const m = bareMatcher();
+      // L'entreprise a saisi une désignation différente ; seul le n° permet le lien.
+      // P.4 = GRAVES NON TRAITÉES (4e prix distinct), et surtout PAS le 4e article.
+      const r = m.resolve({ designationNorm: 'GRAVES NON TRAITEES 0 20 SOUS VOIRIE MODIFIEE', refRaw: 'P.4', qty: 98 });
+      expect(r.via).toBe('ref');
+      expect(m.itemIdToDesignation.get(r.itemId)).toBe('GRAVES NON TRAITÉES 0/20 SOUS VOIRIE');
+    });
+
+    it('accepte le zéro de tête (« P.04 » des anciens fichiers)', () => {
+      const m = bareMatcher();
+      const r = m.resolve({ designationNorm: 'DESIGNATION RETOUCHEE', refRaw: 'P.04', qty: 98 });
+      expect(m.itemIdToDesignation.get(r.itemId)).toBe('GRAVES NON TRAITÉES 0/20 SOUS VOIRIE');
+    });
+  });
+
   it('ne rend aucun article quand la ligne est inconnue', () => {
     const m = makeMatcher();
     const r = m.resolve({ designationNorm: 'FOURNITURE DE ZEBRES DACIER', refRaw: 'Z.99', qty: 3 });
