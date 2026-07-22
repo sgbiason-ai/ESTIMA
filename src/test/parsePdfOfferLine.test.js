@@ -49,3 +49,53 @@ describe('parseArticleLine — montants suffixés d’un symbole monétaire', ()
       .toMatchObject({ ref: 'P.13', unit: 'M3', qty: 637, price: 3.3 });
   });
 });
+
+// Le PDF fournit chaque colonne comme un item texte distinct. L'aplatir crée des
+// ambiguïtés arithmétiquement insolubles, que seules les cellules lèvent.
+describe('parseArticleLine — découpage en cellules fourni par le PDF', () => {
+  const cells = (...strs) => strs.map((str, i) => ({ x: 60 + i * 50, str }));
+
+  it('lève l’ambiguïté « 1 1 100,00 » que la cohérence ne peut pas trancher', () => {
+    // Ligne réelle (EIFFAGE, P.59). Aplatie, elle se lit aussi bien
+    // qté 1 × 1 100,00 que qté 11 × 100,00 : les deux donnent 1 100,00.
+    // Les cellules disent « 1 » et « 1 100,00 » — sans ambiguïté.
+    const items = cells('P.59', ' ', 'PLAQUE PLEINE, VIDANGE ET VENTOUSE', ' ', 'FT', ' ',
+                        '1', ' ', '1 100,00', ' ', '€', ' ', '1 100,00', ' ', '€');
+    const flat = 'P.59 PLAQUE PLEINE, VIDANGE ET VENTOUSE FT 1 1 100,00 € 1 100,00 €';
+
+    expect(parseArticleLine(flat, items)).toMatchObject({
+      ref: 'P.59', unit: 'FT', qty: 1, price: 1100, montant: 1100,
+    });
+    // Sans les cellules, la lecture erronée qté 11 est retenue — d'où la passe.
+    expect(parseArticleLine(flat).qty).toBe(11);
+  });
+
+  it('reste inerte sans cellules : le chemin OCR n’est pas affecté', () => {
+    const flat = 'P.07 DÉCROUTAGE DALLE SPORTIVE EXISTANTE M2 229 7.10 € 1 625.90 €';
+    const attendu = { ref: 'P.07', unit: 'M2', qty: 229, price: 7.1 };
+    expect(parseArticleLine(flat)).toMatchObject(attendu);
+    expect(parseArticleLine(flat, null)).toMatchObject(attendu);
+    expect(parseArticleLine(flat, [])).toMatchObject(attendu);
+  });
+
+  it('rend la main aux passes texte si les cellules sont incohérentes', () => {
+    // Nombre fragmenté sur deux items : qté × P.U. ≠ montant → repli, pas de
+    // résultat faux. La passe monétaire reprend depuis la ligne aplatie.
+    const items = cells('P.07', 'DÉCROUTAGE DALLE SPORTIVE EXISTANTE', 'M2', '229', '7', '.10', '1 625.90');
+    const flat = 'P.07 DÉCROUTAGE DALLE SPORTIVE EXISTANTE M2 229 7.10 € 1 625.90 €';
+    expect(parseArticleLine(flat, items)).toMatchObject({ qty: 229, price: 7.1 });
+  });
+
+  it('recompose une désignation éclatée sur plusieurs cellules', () => {
+    const items = cells('P.18', 'REPRISE ET MISE EN PLACE', 'DE LA TERRE VÉGÉTALE', 'M3', '73', '5,40', '394,20');
+    expect(parseArticleLine('', items)).toMatchObject({
+      ref: 'P.18', designation: 'REPRISE ET MISE EN PLACE DE LA TERRE VÉGÉTALE',
+      unit: 'M3', qty: 73, price: 5.4,
+    });
+  });
+
+  it('n’accepte pas une ligne dont l’unité n’est pas reconnue', () => {
+    const items = cells('P.99', 'LIGNE DOUTEUSE', 'XYZ', '2', '10,00', '20,00');
+    expect(parseArticleLine('', items)).toBeNull();
+  });
+});

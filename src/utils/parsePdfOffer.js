@@ -177,6 +177,58 @@ function joinThousandsSpaces(text) {
 const NUMERIC_TOKEN = /^\d+(?:[.,]\d+)?$/;
 
 /**
+ * Parse une ligne à partir de ses CELLULES (items texte du PDF avec leur x),
+ * et non de sa version aplatie en chaîne.
+ *
+ * C'est la passe la plus fiable, car elle n'a aucune ambiguïté à lever : le PDF
+ * livre déjà le découpage en colonnes. Une cellule numérique est un nombre
+ * complet, donc l'espace de milliers qu'elle contient est un séparateur — pas
+ * une frontière entre deux valeurs.
+ *
+ * Aplatir d'abord détruit cette information et crée des ambiguïtés
+ * arithmétiquement insolubles : « FT 1 1 100,00 € 1 100,00 € » se lit aussi bien
+ * qté 1 × P.U. 1 100,00 (la vérité, cellules « 1 » et « 1 100,00 ») que
+ * qté 11 × P.U. 100,00 — les deux donnent le montant de la ligne, donc aucun
+ * contrôle de cohérence ne peut trancher. Constaté sur un DQE d'entreprise :
+ * quantité lue 11 au lieu de 1, et 1 000 € d'écart à l'import.
+ *
+ * @param {Array<{x:number,str:string}>} items items texte de la ligne
+ * @returns {{ ref, designation, unit, qty, price, montant } | null} null si la
+ *   ligne n'a pas la forme attendue : les passes texte prennent alors le relais
+ *   (indispensable pour l'OCR, qui ne fournit aucune position).
+ */
+function parseArticleLineFromCells(items) {
+  if (!Array.isArray(items) || items.length === 0) return null;
+
+  // Une cellule par item non vide. Le « € » isolé est un ornement de colonne.
+  const cells = items
+    .map(i => String(i?.str ?? '').replace(/[\u00A0\u202F]/g, ' ').trim())
+    .filter(s => s && s !== '€');
+  // ref + désignation + unité + qté + P.U. + montant
+  if (cells.length < 5) return null;
+  if (!looksLikeRef(cells[0])) return null;
+
+  const n = cells.length;
+  const montant = parseFrNumber(cells[n - 1]);
+  const price   = parseFrNumber(cells[n - 2]);
+  const qty     = parseFrNumber(cells[n - 3]);
+  if (![montant, price, qty].every(Number.isFinite) || qty === 0) return null;
+
+  const unit = cells[n - 4];
+  if (!looksLikeUnit(unit)) return null;
+
+  // Garde-fou : une ligne mal découpée (cellules fragmentées ou fusionnées) ne
+  // vérifiera pas cette égalité et repartira vers les passes texte.
+  const expected = qty * price;
+  if (Math.abs(expected - montant) / Math.max(Math.abs(expected), Math.abs(montant), 1) > 0.02) return null;
+
+  const designation = cells.slice(1, n - 4).join(' ').replace(/\s+/g, ' ').trim();
+  if (designation.length < 3) return null;
+
+  return { ref: cells[0], designation, unit, qty, price, montant };
+}
+
+/**
  * Parse une ligne dont les montants portent un symbole monétaire ("7 740,00 €").
  *
  * Le "€" est un ancrage que la passe token-based n'exploite pas : il borne la fin
@@ -234,15 +286,23 @@ function parseCurrencyAnchoredLine(text) {
 }
 
 /**
- * Wrapper qui tente plusieurs passes de parsing (du moins agressif au plus agressif).
- * Important pour les PDF scannés à OCR dégradé.
+ * Wrapper qui tente plusieurs passes de parsing (de la plus fiable à la plus
+ * tolérante). Important pour les PDF scannés à OCR dégradé.
  *
- * Exportée pour les tests : c'est une fonction pure sur une ligne de texte, seul
- * moyen de couvrir le parsing sans embarquer un PDF de fixture.
+ * Exportée pour les tests : fonction pure sur une ligne, seul moyen de couvrir
+ * le parsing sans embarquer un PDF de fixture.
+ *
+ * @param {string} rawText            ligne aplatie (seule source pour l'OCR)
+ * @param {Array}  [items]            cellules du PDF (x + str) si disponibles
  */
-export function parseArticleLine(rawText) {
-  // Passe 0 : montants suffixés d'un symbole monétaire — ancrage fiable, tenté
-  // en premier. Rend null sur les lignes sans "€" : aucun effet sur les autres PDF.
+export function parseArticleLine(rawText, items = null) {
+  // Passe -1 : découpage en colonnes fourni par le PDF. Sans ambiguïté possible,
+  // donc prioritaire. Absente en OCR (aucune position) → passes texte ci-dessous.
+  const rCells = parseArticleLineFromCells(items);
+  if (rCells) return rCells;
+
+  // Passe 0 : montants suffixés d'un symbole monétaire — ancrage fiable. Sert de
+  // repli quand les cellules sont fragmentées. Rend null sans "€".
   const r0 = parseCurrencyAnchoredLine(fixOcrNumbers(cleanOcrLine(rawText)));
   if (r0) return r0;
 
@@ -484,7 +544,8 @@ export async function parsePdfOffer(file, options = {}) {
     }
     totalLines = lines.length;
     for (const line of lines) {
-      const article = parseArticleLine(line.text);
+      // line.items porte le découpage en colonnes : la passe cellules s'en sert.
+      const article = parseArticleLine(line.text, line.items);
       if (article) articles.push({ ...article, pageNum: line.pageNum });
     }
   }
