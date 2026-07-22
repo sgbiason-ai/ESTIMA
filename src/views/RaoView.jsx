@@ -462,14 +462,6 @@ const RaoView = ({
       {/* ═══════ NAVIGATION : RIBBON (Desktop) ou COMPACT (Mobile) ═══════ */}
       {!isMobile ? (
         <RibbonContainer>
-          <RibbonGroup label="Avant négociation">
-            {RAO_STEPS.filter(s => s.phase === 'avant').map(renderStepBtn)}
-          </RibbonGroup>
-
-          <RibbonGroup label="Après négociation">
-            {RAO_STEPS.filter(s => s.phase === 'apres').map(renderStepBtn)}
-          </RibbonGroup>
-
           <RibbonGroup label="Affaire">
             <RibbonBtnLarge
               icon={FileSignature}
@@ -477,6 +469,14 @@ const RaoView = ({
               onClick={() => setDetailsOpen(true)}
               accent="text-purple-500"
             />
+          </RibbonGroup>
+
+          <RibbonGroup label="Avant négociation">
+            {RAO_STEPS.filter(s => s.phase === 'avant').map(renderStepBtn)}
+          </RibbonGroup>
+
+          <RibbonGroup label="Après négociation">
+            {RAO_STEPS.filter(s => s.phase === 'apres').map(renderStepBtn)}
           </RibbonGroup>
 
           <RibbonGroup label="Avancement">
