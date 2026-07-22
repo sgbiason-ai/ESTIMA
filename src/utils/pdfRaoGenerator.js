@@ -1219,9 +1219,15 @@ export const generateRaoPDF = async (optionsParams) => {
     // Une entreprise apparaît en §5.bis si elle a un écart AE/quantités, OU un
     // statut non régulier (initial OU effectif), OU a été régularisée en négo
     // (pour tracer la transition avant → après, CCP R2152-2).
+    // Exception : une offre explicitement jugée RÉGULIÈRE par l'analyste ne
+    // porte plus aucun commentaire d'anomalie dans le rapport — l'adjudication
+    // a tranché, imprimer les écarts contredirait la conclusion. La trace de
+    // régularisation après négociation reste imprimée (transition R2152-2).
     const irregularCompanies = analysisCompanies.filter(c => {
       const admin = companiesData[c.name]?.admin || {};
       const effConcl = getEffectiveConclusion(admin, negoActive ? 'nego' : 'initial');
+      const regularized = negoActive && isRegularizedAfterNego(admin);
+      if (effConcl === 'reguliere' && !regularized) return false;
       return (c.amountMismatch
         || (c.quantityMismatches || []).length > 0
         || ['irreguliere', 'inacceptable', 'inappropriee'].includes(admin.conclusion)
@@ -1537,20 +1543,7 @@ export const generateRaoPDF = async (optionsParams) => {
       tocEntries.push({ label: '6.bis Analyse avant / après négociation', page: pageNum });
       y = sectionTitle(doc, `6.bis  ANALYSE AVANT / APRÈS NÉGOCIATION`, y, THEME.primary);
 
-      doc.setFont('Helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(60, 60, 60);
-      const introNego = doc.splitTextToSize(
-        "À l'issue de la phase de négociation menée conformément aux documents de la consultation, les soumissionnaires ont été invités à remettre leur meilleure offre finale. " +
-        "Le tableau ci-dessous compare, pour chaque entreprise, le montant de l'offre initiale et le montant de l'offre finale après négociation. " +
-        "Le rabais commercial éventuellement consenti sur le montant total HT est indiqué et déduit du montant final. " +
-        "Les entreprises n'ayant pas remis de contre-proposition conservent leur offre initiale. " +
-        "La notation du critère prix du présent rapport est établie sur les montants après négociation (nets de rabais).",
-        W - 2 * M
-      );
-      doc.text(introNego, M, y);
-      y += introNego.length * 4 + 4;
-
+      // Pas de paragraphe d'introduction : le tableau se suffit (demande user 2026-07-22).
       const maxScoreNego = Number(scoringConfig?.maxScore || 40);
       const negoBody = negoComparison.map(r => {
         const origIdx = analysisCompanies.findIndex(c => c.name === r.name);
