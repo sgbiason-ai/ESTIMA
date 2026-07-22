@@ -6,6 +6,7 @@
 import { useMemo } from 'react';
 import { NON_REGULAR_STATUSES } from '../components/rao/RaoConstants';
 import { getEffectiveConclusion, isRegularizedAfterNego } from '../utils/analysisCompute';
+import { isRichTextEmpty } from '../utils/richText';
 
 export const useRaoCompletion = ({
   rao,
@@ -126,7 +127,7 @@ export const useRaoCompletion = ({
             totalTechSlots++;
             totalCommSlots++;
             const noteFilled = Number(tech[sc.id]?.note || 0) > 0;
-            const commFilled = (tech[sc.id]?.text || '').trim();
+            const commFilled = !isRichTextEmpty(tech[sc.id]?.text);
             if (noteFilled) filledTechSlots++; else techMissing.push({
               id: `note_${c.name}_${sc.id}`,
               label: `Note ${sc.label || 'sous-critère'} manquante pour ${c.name}`,
@@ -146,7 +147,7 @@ export const useRaoCompletion = ({
           totalTechSlots++;
           totalCommSlots++;
           const noteFilled = Number(tech[crit.id]?.note || 0) > 0;
-          const commFilled = (tech[crit.id]?.text || '').trim();
+          const commFilled = !isRichTextEmpty(tech[crit.id]?.text);
           if (noteFilled) filledTechSlots++; else techMissing.push({
             id: `note_${c.name}_${crit.id}`,
             label: `Note ${crit.label} manquante pour ${c.name}`,
@@ -171,7 +172,7 @@ export const useRaoCompletion = ({
       (c.variants || []).forEach((v, vi) => {
         if (v.retained) {
           retainedVariants++;
-          if ((v.justification || '').trim()) justifiedVariants++;
+          if (!isRichTextEmpty(v.justification)) justifiedVariants++;
           else techMissing.push({
             id: `var_justif_${c.id}_${v.id}`,
             label: `Justification de la variante V${vi + 1} ${v.label ? `(${v.label}) ` : ''}pour ${c.name}`,

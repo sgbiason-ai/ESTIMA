@@ -10,6 +10,7 @@ import { flattenItems } from './helpers';
 import { scoreOffer, computeOABThreshold, computeChaptersData, computeAnalysisStats, getVariantEffectiveTotal, getEffectiveConclusion, getEffectiveOffers, getEffectiveVariantOffers, getEffectiveVariantNewItems } from '../../utils/analysisCompute';
 import { computeVatBreakdown } from '../../utils/financeFormat';
 import { NON_REGULAR_STATUSES } from '../rao/RaoConstants';
+import { htmlToPlainText, isRichTextEmpty } from '../../utils/richText';
 
 // Notation prix : primitif partagé scoreOffer (src/utils/analysisCompute.js),
 // même source que le desktop — inclut le clamp [0, N] (les offres chères ne
@@ -346,7 +347,7 @@ export default function RAOView({ project, companyId, calcHook }) {
             const issues = [];
             companies.forEach(c => {
               (c.variants || []).forEach((v, vi) => {
-                if (v.retained && !(v.justification || '').trim()) {
+                if (v.retained && isRichTextEmpty(v.justification)) {
                   issues.push({ company: c.name, label: v.label || `V${vi + 1}` });
                 }
               });
@@ -631,8 +632,8 @@ export default function RAOView({ project, companyId, calcHook }) {
                                           </span>
                                         </div>
                                         {/* Synthèse sous-critère */}
-                                        {sd.text && (
-                                          <p className="text-[10px] text-gray-500 leading-snug mt-0.5 ml-2 italic">{sd.text}</p>
+                                        {!isRichTextEmpty(sd.text) && (
+                                          <p className="text-[10px] text-gray-500 leading-snug mt-0.5 ml-2 italic">{htmlToPlainText(sd.text)}</p>
                                         )}
                                       </div>
                                     );
@@ -669,7 +670,7 @@ export default function RAOView({ project, companyId, calcHook }) {
                             </div>
                             <div className="space-y-2">
                               {c.variants.map((v, vi) => {
-                                const justifMissing = v.retained && !(v.justification || '').trim();
+                                const justifMissing = v.retained && isRichTextEmpty(v.justification);
                                 // Total net (rabais commercial global déduit en phase après négo) —
                                 // même primitif que le desktop (source unique, analysisCompute).
                                 const vTotalComputed = getVariantEffectiveTotal(c, v, scoringConfig?.basis === 'nego' ? 'nego' : 'initial');
@@ -700,8 +701,8 @@ export default function RAOView({ project, companyId, calcHook }) {
                                         </span>
                                       )}
                                     </div>
-                                    {v.justification ? (
-                                      <p className="text-[10px] text-gray-600 italic leading-snug">{v.justification}</p>
+                                    {!isRichTextEmpty(v.justification) ? (
+                                      <p className="text-[10px] text-gray-600 italic leading-snug">{htmlToPlainText(v.justification)}</p>
                                     ) : justifMissing ? (
                                       <p className="text-[10px] text-amber-700 font-bold italic">⚠ Justification d'acceptation requise</p>
                                     ) : null}

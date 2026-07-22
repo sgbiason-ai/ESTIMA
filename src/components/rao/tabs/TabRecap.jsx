@@ -3,6 +3,8 @@ import React, { useMemo } from 'react';
 import { Award, Download, ShieldCheck, Info, Layers, CheckCircle2, XCircle, GitBranch, Check } from 'lucide-react';
 import { FORMULA_LABELS_CONSULT } from '../RaoConstants';
 import { computePriceReference, getVariantEffectiveTotal } from '../../../utils/analysisCompute';
+import { htmlToPlainText } from '../../../utils/richText';
+import RichTextField from '../../common/RichTextField';
 
 // ─── Formatage montant FR ─────────────────────────────────────────────────────
 const fmtPrice = (v) =>
@@ -385,11 +387,18 @@ const TabRecap = ({
           <p className="text-[10px] text-gray-400 mb-2">
             Ce texte s'affiche dans le bloc de recommandation du PDF RAO. Modifiez-le si besoin (mentions légales, nuances, etc.).
           </p>
-          <textarea
+          <RichTextField
             value={effectiveRecommendation}
-            onChange={(e) => updateRecommendation(e.target.value === defaultRecommendation ? '' : e.target.value)}
+            onChange={(html) => {
+              // Revenir au texte par défaut = ne rien stocker. La comparaison se
+              // fait sur le texte aplati : si l'utilisateur a seulement ajouté de
+              // la mise en forme (gras…) au texte par défaut, le HTML porte des
+              // balises de style → on le conserve.
+              const plain = htmlToPlainText(html).trim();
+              const hasStyling = /<(b|strong|i|em|u|ul|ol|li)\b/i.test(html);
+              updateRecommendation(!plain || (plain === defaultRecommendation && !hasStyling) ? '' : html);
+            }}
             rows={3}
-            className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 leading-relaxed focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition resize-none"
             placeholder={defaultRecommendation}
           />
         </div>

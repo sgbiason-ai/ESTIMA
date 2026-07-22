@@ -13,6 +13,7 @@ import {
   CheckCircle2, AlertTriangle, Clock, RefreshCw, Plus, ChevronRight, FileText, Handshake
 } from 'lucide-react';
 import { getVariantEffectiveTotal, variantHasNego, getCompanyRabaisPct, getEffectiveConclusion } from '../../../utils/analysisCompute';
+import { isRichTextEmpty } from '../../../utils/richText';
 import RaoOrientationPanel from '../RaoOrientationPanel';
 import RaoKpiBar from '../RaoKpiBar';
 
@@ -299,7 +300,7 @@ export default function TabDepouillement({
                 (c.variants || []).forEach(v => {
                   if (v.retained) {
                     retainedVar++;
-                    if ((v.justification || '').trim()) justifiedVar++;
+                    if (!isRichTextEmpty(v.justification)) justifiedVar++;
                   }
                 });
                 const techDone = totalSlots > 0

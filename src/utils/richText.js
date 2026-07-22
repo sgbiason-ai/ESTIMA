@@ -110,3 +110,15 @@ export function htmlToRichBlocks(html) {
     })
     .filter((b) => b.runs.some((r) => r.text.trim()));
 }
+
+// ─── VACUITÉ D'UN CHAMP RICHE ────────────────────────────────────────────────
+//
+// Un RichTextField « vide » ne rend pas '' : le contentEditable laisse des
+// résidus (<div><br></div>, <p></p>, &nbsp;). Tout test de présence du type
+// `(v || '').trim()` compte ces résidus comme du contenu — champ « requis pour
+// le PDF » considéré rempli alors qu'il est vide à l'écran. Toujours passer par
+// cette sonde pour les champs édités en riche (compatible texte plain).
+
+export function isRichTextEmpty(v) {
+  return htmlToPlainText(v).trim() === '';
+}

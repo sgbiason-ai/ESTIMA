@@ -7,6 +7,7 @@
 
 import React, { useState, useRef } from 'react';
 import { X, GitBranch, FileSpreadsheet, FileText, Loader2, AlertTriangle, ScrollText, Check } from 'lucide-react';
+import RichTextField from '../common/RichTextField';
 
 export default function AddVariantModal({
   open,
@@ -103,13 +104,11 @@ export default function AddVariantModal({
             <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-600 mb-1.5">
               Descriptif (optionnel)
             </label>
-            <textarea
+            <RichTextField
               value={description}
-              onChange={e => setDescription(e.target.value)}
+              onChange={setDescription}
               rows={3}
               placeholder="Décrivez brièvement les modifications proposées par cette variante..."
-              className="w-full px-3 py-2 text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100 resize-none"
-              disabled={importing}
             />
           </div>
 

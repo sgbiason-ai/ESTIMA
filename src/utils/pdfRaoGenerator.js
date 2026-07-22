@@ -12,6 +12,7 @@ import { getCurrentPhaseCode } from './phaseModel';
 import { computeVatBreakdown } from './financeFormat';
 import { scoreOffer, computePriceReference, getEffectiveOffers, getEffectiveVariantOffers, getEffectiveVariantNewItems, getVariantEffectiveTotal, getCompanyRabaisPct, getEffectiveConclusion, isRegularizedAfterNego } from './analysisCompute';
 import { stampPdfCredit } from './estimaCredit';
+import { htmlToPlainText } from './richText';
 
 // ─── COULEUR PRIMAIRE RAO : VERT PAPYRUS ────────────────────────────────────
 const VERT_PAPYRUS = [45, 138, 78];   // #2d8a4e
@@ -317,6 +318,10 @@ const drawHtmlBlocks = (doc, blocks, x, y, maxWidth, opts = {}) => {
   const fontName = opts.fontName || 'Helvetica';
   const fontSize = opts.fontSize || 9;
   const lineH = opts.lineH || 4.5;
+  // dryRun : mesure seule (wrap réel via les métriques de police), aucun dessin.
+  // Sert aux paginations qui distribuent les blocs par hauteur AVANT de dessiner
+  // (section technique) — l'estimation « chars / 90 » est trop grossière pour ça.
+  const dryRun = opts.dryRun === true;
   // blockGap = 0 par defaut : le browser contentEditable enveloppe CHAQUE ligne
   // dans son propre <div> (typique apres Enter). Avec un gap non nul, les
   // reponses saisies au champ « Reponses & Engagements » apparaissaient trop
@@ -381,11 +386,11 @@ const drawHtmlBlocks = (doc, blocks, x, y, maxWidth, opts = {}) => {
     lines.forEach((line, li) => {
       let curX = x + indent;
       // Préfixe de liste sur la 1re ligne
-      if (isList && li === 0 && prefix) {
+      if (isList && li === 0 && prefix && !dryRun) {
         doc.setFont(fontName, 'normal'); doc.setFontSize(fontSize);
         doc.text(prefix, x, curY);
       }
-      line.forEach(seg => {
+      if (!dryRun) line.forEach(seg => {
         doc.setFont(fontName, _fontStyle(seg.bold, seg.italic));
         doc.setFontSize(fontSize);
         doc.text(seg.text, curX, curY);
@@ -403,6 +408,25 @@ const drawHtmlBlocks = (doc, blocks, x, y, maxWidth, opts = {}) => {
 
   return curY;
 };
+
+// Champ riche OU texte plain hérité → blocs prêts pour drawHtmlBlocks.
+// Tous les champs texte du RAO passent par là depuis leur bascule WYSIWYG :
+// les anciennes saisies plain (retours à la ligne) restent rendues à l'identique.
+const richFieldToBlocks = (raw) => {
+  const s = String(raw || '');
+  if (!s.trim()) return [];
+  const html = /<[a-z][^>]*>/i.test(s)
+    ? s
+    : s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+  return parseHtmlToBlocks(html);
+};
+
+// Hauteur exacte (mm) qu'occupera drawHtmlBlocks — wrap réel, aucun dessin.
+const measureHtmlBlocks = (doc, blocks, maxWidth, opts = {}) =>
+  drawHtmlBlocks(doc, blocks, 0, 0, maxWidth, { ...opts, dryRun: true, pageBreak: null });
+
+// Vacuité d'un champ riche (résidus contentEditable : <div><br></div>, &nbsp;…)
+const isRichEmpty = (v) => !String(v || '').replace(/<[^>]+>/g, '').replace(/&nbsp;/gi, ' ').trim();
 
 // ─── PAGE DE GARDE RAO — utilise drawCoverPage partagé + bloc consultation ──
 const drawCoverPageRao = (doc, project, consultation, logoMoe, logoClient, today, branding, THEME, logoCoTraitants = [], negotiationPhase = 'none') => {
@@ -783,15 +807,9 @@ export const generateRaoPDF = async (optionsParams) => {
     doc.setFontSize(fs);
     const labelLines = doc.splitTextToSize(label || '', COL_LABEL_W - 2 * PAD_X);
     let h = labelLines.length * lineH;
-    if (description) {
-      doc.setFont('Helvetica', 'normal');
-      // Compte les lignes par paragraphe (même logique que drawJustifiedText)
-      const paragraphs = String(description).split('\n');
-      paragraphs.forEach(para => {
-        if (para.trim() === '') { h += lineH; return; }
-        const ls = doc.splitTextToSize(para, COL_LABEL_W - 2 * PAD_X);
-        h += ls.length * lineH;
-      });
+    if (!isRichEmpty(description)) {
+      // Description riche (gras/listes) — mesure par le même moteur que le dessin
+      h += measureHtmlBlocks(doc, richFieldToBlocks(description), COL_LABEL_W - 2 * PAD_X, { fontSize: fs, lineH });
       h += lineH; // ligne vide entre label et description
     }
     return h + 2 * padY;
@@ -837,12 +855,9 @@ export const generateRaoPDF = async (optionsParams) => {
     const labelLines = doc.splitTextToSize(label || '', textW);
     labelLines.forEach((ln, idx) => doc.text(ln, textX, textY + idx * lineH));
     textY += labelLines.length * lineH;
-    if (description) {
+    if (!isRichEmpty(description)) {
       textY += lineH; // ligne vide
-      doc.setFont('Helvetica', 'normal');
-      doc.setFontSize(fs);
-      doc.setTextColor(...textColor);
-      drawJustifiedText(doc, description, textX, textY, textW, lineH);
+      drawHtmlBlocks(doc, richFieldToBlocks(description), textX, textY, textW, { fontSize: fs, lineH, textColor });
     }
 
     // Col 3 : Pondération (% en haut)
@@ -929,20 +944,20 @@ export const generateRaoPDF = async (optionsParams) => {
   y += 22;
 
   // Exigences minimales (si déclarées)
-  if (consultation?.variantsRequirements && variantsRegime !== 'forbidden') {
+  if (!isRichEmpty(consultation?.variantsRequirements) && variantsRegime !== 'forbidden') {
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(...THEME.text);
     doc.text('Exigences minimales fixées dans la consultation :', M, y);
     y += 6;
-    doc.setFont('Helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(...THEME.lightText);
-    const reqLines = doc.splitTextToSize(consultation.variantsRequirements, W - 2 * M - 10);
+    // Contenu riche (gras/listes) — hauteur mesurée avant le fond gris
+    const reqBlocks = richFieldToBlocks(consultation.variantsRequirements);
+    const reqOpts = { fontName: 'Helvetica', fontSize: 9, lineH: 4.5, textColor: THEME.lightText };
+    const reqH = measureHtmlBlocks(doc, reqBlocks, W - 2 * M - 10, reqOpts);
     doc.setFillColor(248, 250, 252);
-    doc.rect(M, y - 3, W - 2 * M, reqLines.length * 4.5 + 6, 'F');
-    drawJustifiedText(doc, consultation.variantsRequirements, M + 5, y + 2, W - 2 * M - 10, 4.5);
-    y += reqLines.length * 4.5 + 12;
+    doc.rect(M, y - 3, W - 2 * M, reqH + 6, 'F');
+    drawHtmlBlocks(doc, reqBlocks, M + 5, y + 2, W - 2 * M - 10, reqOpts);
+    y += reqH + 12;
   }
 
   // Référence CCP
@@ -2083,22 +2098,27 @@ export const generateRaoPDF = async (optionsParams) => {
           }
           y += 16;
 
-          if (v.description) {
+          if (!isRichEmpty(v.description)) {
+            doc.setFont('Helvetica', 'bold');
             doc.setFontSize(8);
             doc.setTextColor(...THEME.lightText);
-            const descTxt = `Descriptif : ${v.description}`;
-            ({ y } = drawJustifiedText(doc, descTxt, M + 3, y, W - 2 * M - 3, 4.5));
+            doc.text('Descriptif :', M + 3, y);
+            y += 4.5;
+            y = drawHtmlBlocks(doc, richFieldToBlocks(v.description), M + 3, y, W - 2 * M - 3, {
+              fontSize: 8, lineH: 4.5, textColor: THEME.lightText,
+            });
             y += 3;
           }
 
           // ► Justification de l'acceptation (saisie en tab Technique)
-          if (v.justification && v.justification.trim()) {
+          if (!isRichEmpty(v.justification)) {
             // Encadré vert clair pour faire ressortir la motivation
             doc.setFillColor(236, 253, 245); // emerald-50
             const tmpY = y;
-            // Calcul approximatif de la hauteur avant de dessiner le fond
-            const justifLines = doc.splitTextToSize(v.justification, W - 2 * M - 10);
-            const justifH = 6 + justifLines.length * 4.2 + 4;
+            // Contenu riche (gras/listes) : hauteur mesurée avant de dessiner le fond
+            const justifBlocks = richFieldToBlocks(v.justification);
+            const justifOpts = { fontName: 'Helvetica', fontSize: 8, lineH: 4.2, textColor: [30, 50, 40] };
+            const justifH = 6 + measureHtmlBlocks(doc, justifBlocks, W - 2 * M - 12, justifOpts) + 4;
             doc.rect(M + 3, y, W - 2 * M - 3, justifH, 'F');
             doc.setDrawColor(167, 243, 208); // emerald-200
             doc.setLineWidth(0.3);
@@ -2108,11 +2128,7 @@ export const generateRaoPDF = async (optionsParams) => {
             doc.setFontSize(7.5);
             doc.setTextColor(6, 78, 59); // emerald-900
             doc.text("Motivation de l'acceptation par le pouvoir adjudicateur :", M + 6, y + 5);
-            // Texte justifié
-            doc.setFont('Helvetica', 'normal');
-            doc.setFontSize(8);
-            doc.setTextColor(30, 50, 40);
-            ({ y } = drawJustifiedText(doc, v.justification, M + 6, y + 9, W - 2 * M - 12, 4.2));
+            drawHtmlBlocks(doc, justifBlocks, M + 6, y + 9, W - 2 * M - 12, justifOpts);
             y = tmpY + justifH + 4;
           }
 
@@ -2301,11 +2317,10 @@ export const generateRaoPDF = async (optionsParams) => {
               y += bandH + 4;
             }
 
-            if (sc.description) {
-              doc.setFont('Helvetica', 'italic');
-              doc.setFontSize(8);
-              doc.setTextColor(...THEME.lightText);
-              ({ y } = drawJustifiedText(doc, sc.description, M, y, W - 2 * M, 4));
+            if (!isRichEmpty(sc.description)) {
+              y = drawHtmlBlocks(doc, richFieldToBlocks(sc.description), M, y, W - 2 * M, {
+                fontSize: 8, lineH: 4, textColor: THEME.lightText,
+              });
               y += 4;
             }
 
@@ -2323,12 +2338,14 @@ export const generateRaoPDF = async (optionsParams) => {
                 const tech = companiesData[name]?.technical || {};
                 const sd = tech[sc.id] || {};
                 let h = HEADER_BLOCK;
-                let lines = [];
-                if (sd.text) {
-                  lines = doc.splitTextToSize(sd.text, W - 2 * M - 10);
-                  h += lines.length * LINE_H;
-                }
-                return { name, ci, sd, h, lines, irregular };
+                // Commentaire riche (gras/listes) : mesure exacte par le moteur
+                // de dessin lui-même — la pagination gloutonne en dépend.
+                const rich = richFieldToBlocks(sd.text);
+                const textH = rich.length
+                  ? measureHtmlBlocks(doc, rich, W - 2 * M - 10, { fontSize: FONT_BODY, lineH: LINE_H })
+                  : 0;
+                h += textH;
+                return { name, ci, sd, h, rich, textH, irregular };
               });
 
             // Distribution gloutonne sur 1+ pages
@@ -2388,12 +2405,11 @@ export const generateRaoPDF = async (optionsParams) => {
                 doc.text(`${sNote}/${sMaxN}  =  ${fmtScore(sPond)}`, W - M, y + BAR_H / 2 + 1.5, { align: 'right' });
                 y += BAR_H + 4;
 
-                if (b.lines.length > 0) {
-                  doc.setFont('Helvetica', 'normal');
-                  doc.setFontSize(FONT_BODY);
-                  doc.setTextColor(...THEME.lightText);
-                  drawJustifiedText(doc, b.sd.text, M + 10, y, W - 2 * M - 10, LINE_H);
-                  y += b.lines.length * LINE_H;
+                if (b.rich.length > 0) {
+                  drawHtmlBlocks(doc, b.rich, M + 10, y, W - 2 * M - 10, {
+                    fontSize: FONT_BODY, lineH: LINE_H, textColor: THEME.lightText,
+                  });
+                  y += b.textH;
                 }
 
                 if (k < pg.length - 1) y += effectiveGap;
@@ -2401,11 +2417,10 @@ export const generateRaoPDF = async (optionsParams) => {
             });
           });
         } else {
-          if (crit.description) {
-            doc.setFont('Helvetica', 'italic');
-            doc.setFontSize(8.5);
-            doc.setTextColor(...THEME.lightText);
-            ({ y } = drawJustifiedText(doc, crit.description, M, y, W - 2 * M, 4));
+          if (!isRichEmpty(crit.description)) {
+            y = drawHtmlBlocks(doc, richFieldToBlocks(crit.description), M, y, W - 2 * M, {
+              fontSize: 8.5, lineH: 4, textColor: THEME.lightText,
+            });
             y += 4;
           }
 
@@ -2422,12 +2437,13 @@ export const generateRaoPDF = async (optionsParams) => {
               const tech = companiesData[name]?.technical || {};
               const d = tech[crit.id] || {};
               let h = HEADER_BLOCK;
-              let lines = [];
-              if (d.text) {
-                lines = doc.splitTextToSize(d.text, W - 2 * M - 5);
-                h += lines.length * LINE_H;
-              }
-              return { name, ci, d, h, lines, irregular };
+              // Synthèse riche : mesure exacte (cf. bloc sous-critères ci-dessus)
+              const rich = richFieldToBlocks(d.text);
+              const textH = rich.length
+                ? measureHtmlBlocks(doc, rich, W - 2 * M - 5, { fontSize: FONT_BODY, lineH: LINE_H })
+                : 0;
+              h += textH;
+              return { name, ci, d, h, rich, textH, irregular };
             });
 
           const spaceAvail = BOTTOM - y;
@@ -2476,12 +2492,11 @@ export const generateRaoPDF = async (optionsParams) => {
               doc.text(`${note}/${noteMax}  =  ${fmtScore(notePond)}`, W - M, y + BAR_H / 2 + 1.5, { align: 'right' });
               y += BAR_H + 4;
 
-              if (b.lines.length > 0) {
-                doc.setFont('Helvetica', 'normal');
-                doc.setFontSize(FONT_BODY);
-                doc.setTextColor(...THEME.lightText);
-                drawJustifiedText(doc, b.d.text, M + 5, y, W - 2 * M - 5, LINE_H);
-                y += b.lines.length * LINE_H;
+              if (b.rich.length > 0) {
+                drawHtmlBlocks(doc, b.rich, M + 5, y, W - 2 * M - 5, {
+                  fontSize: FONT_BODY, lineH: LINE_H, textColor: THEME.lightText,
+                });
+                y += b.textH;
               }
 
               if (k < pg.length - 1) y += effectiveGap;
@@ -2726,7 +2741,11 @@ export const generateRaoPDF = async (optionsParams) => {
       : winner.name.toUpperCase();
     // Texte personnalise si l'utilisateur l'a edite dans TabRecap, sinon texte par defaut.
     // Le texte custom est stocke dans rao.recommendation (string).
-    const customText = (rao?.recommendation || '').trim();
+    // Bandeau centré blanc-sur-vert : rendu en texte simple — la mise en forme
+    // saisie au RichTextField (gras/listes) est aplatie ici, le bandeau imposant
+    // sa propre typographie (gras, centré). htmlToPlainText préserve puces et
+    // retours à la ligne.
+    const customText = htmlToPlainText(rao?.recommendation || '').trim();
     // Préfixe selon la phase de négociation — appliqué uniquement au texte par défaut
     // (un texte personnalisé saisi dans TabRecap est respecté tel quel).
     const negoPrefix = negotiationPhase === 'after'

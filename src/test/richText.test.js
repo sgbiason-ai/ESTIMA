@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { htmlToPlainText, htmlToRichBlocks } from '../utils/richText';
+import { htmlToPlainText, htmlToRichBlocks, isRichTextEmpty } from '../utils/richText';
 
 describe('htmlToPlainText', () => {
   it('retourne une chaîne vide pour une entrée vide / nulle', () => {
@@ -51,5 +51,18 @@ describe('htmlToRichBlocks', () => {
     const blocks = htmlToRichBlocks('<b>A</b><b>B</b>');
     expect(blocks[0].runs).toHaveLength(1);
     expect(blocks[0].runs[0].text).toBe('AB');
+  });
+});
+
+describe('isRichTextEmpty', () => {
+  it('compte comme vides les résidus contentEditable', () => {
+    ['', null, undefined, '<div><br></div>', '<p></p>', '&nbsp; ', '<div>&nbsp;</div>', '  \n '].forEach(v => {
+      expect(isRichTextEmpty(v)).toBe(true);
+    });
+  });
+  it('détecte le contenu réel, riche ou plain', () => {
+    ['texte', '<b>gras</b>', '<ul><li>point</li></ul>', 'ligne\nligne'].forEach(v => {
+      expect(isRichTextEmpty(v)).toBe(false);
+    });
   });
 });

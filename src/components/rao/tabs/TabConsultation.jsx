@@ -3,6 +3,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Info, BarChart2, Plus, Trash2, Layers, Lock, AlertTriangle, ShieldCheck, CornerDownRight, GitBranch, ScrollText, FileSignature } from 'lucide-react';
 import { Field, Input } from '../RaoUI';
 import { FORMULA_LABELS_CONSULT } from '../RaoConstants';
+import RichTextField from '../../common/RichTextField';
 
 // ─── Section Variantes (CCP R2151-8 à R2151-11) ──────────────────────────────
 const VARIANT_REGIMES = [
@@ -73,12 +74,11 @@ const VariantsSection = ({ consultation, updateConsultation }) => {
         {regime !== 'forbidden' && (
           <div className="md:col-span-12">
             <Field label="Exigences minimales que les variantes doivent respecter">
-              <textarea
+              <RichTextField
                 value={requirements}
-                onChange={e => updateConsultation('variantsRequirements', e.target.value)}
+                onChange={html => updateConsultation('variantsRequirements', html)}
                 rows={4}
                 placeholder="Ex. Respect des performances techniques minimales de la solution de base. Maintien des caractéristiques fonctionnelles. Aucune diminution du périmètre des prestations…"
-                className="w-full px-3 py-2 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100 transition-all resize-none"
               />
             </Field>
           </div>
@@ -96,28 +96,6 @@ const VariantsSection = ({ consultation, updateConsultation }) => {
         </div>
       </div>
     </div>
-  );
-};
-
-// ─── Textarea auto-resize ────────────────────────────────────────────────────
-const AutoTextarea = ({ value, onChange, className, placeholder }) => {
-  const ref = useRef(null);
-  const resize = () => {
-    if (!ref.current) return;
-    ref.current.style.height = 'auto';
-    ref.current.style.height = ref.current.scrollHeight + 'px';
-  };
-  useEffect(resize, [value]);
-  return (
-    <textarea
-      ref={ref}
-      value={value}
-      onChange={e => { onChange(e.target.value); resize(); }}
-      onFocus={resize}
-      rows={1}
-      className={`resize-none overflow-hidden ${className}`}
-      placeholder={placeholder}
-    />
   );
 };
 
@@ -363,14 +341,15 @@ const TabConsultation = ({
               {/* ── Description du critère (masquée si sous-critères) ── */}
               {!hasSubs && (
                 <div className="px-4 pb-3 pt-0">
-                  <AutoTextarea
+                  <RichTextField
                     value={crit.description || ''}
                     onChange={v => {
                       const newC = [...criteria];
                       newC[i] = { ...newC[i], description: v };
                       updateCriteria(newC);
                     }}
-                    className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-400/30 text-slate-500 ml-14"
+                    className="ml-14"
+                    rows={2}
                     placeholder="Description ou méthode de calcul de la note…"
                   />
                 </div>
@@ -438,10 +417,11 @@ const TabConsultation = ({
                           <Trash2 size={12} />
                         </button>
                       </div>
-                      <AutoTextarea
+                      <RichTextField
                         value={sub.description || ''}
                         onChange={v => updateSubCriterion?.(crit.id, sub.id, 'description', v)}
-                        className="w-full px-2 py-1.5 text-[11px] bg-slate-50 border border-slate-100 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400/30 text-slate-500 ml-7"
+                        className="ml-7"
+                        rows={2}
                         placeholder="Description ou méthode de notation…"
                       />
                     </div>

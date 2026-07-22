@@ -61,12 +61,37 @@ const toEditorHtml = (value) => {
   );
 };
 
+// Styles du contenu riche — partagés éditeur (RichTextField) et lecture seule
+// (RichTextView) : le rendu doit être identique dans les deux contextes.
+const RICH_CONTENT_CSS = `
+  .rich-text-field ul { display: block; list-style-type: disc; padding-left: 1.5rem; margin: 0.35rem 0; }
+  .rich-text-field ol { display: block; list-style-type: decimal; padding-left: 1.5rem; margin: 0.35rem 0; }
+  .rich-text-field li { display: list-item; margin-bottom: 0.2rem; }
+  .rich-text-field b, .rich-text-field strong { font-weight: 700; }
+  .rich-text-field i, .rich-text-field em { font-style: italic; }
+  .rich-text-field u { text-decoration: underline; }
+`;
+
+// Affichage lecture seule d'un contenu saisi au RichTextField (compatible texte
+// plain hérité : retours à la ligne → <br>). Sanitize identique à l'éditeur.
+export const RichTextView = ({ value, className = '' }) => {
+  const html = toEditorHtml(value);
+  if (!html) return null;
+  return (
+    <>
+      <div className={`rich-text-field ${className}`} dangerouslySetInnerHTML={{ __html: html }} />
+      <style>{RICH_CONTENT_CSS}</style>
+    </>
+  );
+};
+
 const RichTextField = ({
   value,
   onChange,
   placeholder = '',
   rows = 6,
   className = '',
+  id,
 }) => {
   const editorRef = useRef(null);
   const lastEmitted = useRef('');
@@ -144,6 +169,7 @@ const RichTextField = ({
       </div>
 
       <div
+        id={id}
         ref={editorRef}
         contentEditable
         onInput={emit}
@@ -162,12 +188,7 @@ const RichTextField = ({
       />
 
       <style>{`
-        .rich-text-field ul { display: block; list-style-type: disc; padding-left: 1.5rem; margin: 0.35rem 0; }
-        .rich-text-field ol { display: block; list-style-type: decimal; padding-left: 1.5rem; margin: 0.35rem 0; }
-        .rich-text-field li { display: list-item; margin-bottom: 0.2rem; }
-        .rich-text-field b, .rich-text-field strong { font-weight: 700; }
-        .rich-text-field i, .rich-text-field em { font-style: italic; }
-        .rich-text-field u { text-decoration: underline; }
+        ${RICH_CONTENT_CSS}
         .rich-text-field:empty:before {
           content: attr(data-placeholder);
           color: #94a3b8;

@@ -1,19 +1,14 @@
 // src/components/rao/tabs/TabTechnique.jsx
-import React, { useRef, useEffect } from 'react';
+import React from 'react';
 import { Brain, MessageSquare, AlertCircle, AlertTriangle, GitBranch, Check, X, Building2, ListChecks, Info } from 'lucide-react';
 import { ScoreBadge, CalcHint } from '../RaoUI';
 import { COMPANY_UI_COLORS, FORMULA_LABELS_CONSULT, NON_REGULAR_STATUSES } from '../RaoConstants';
 import { getEffectiveConclusion } from '../../../utils/analysisCompute';
+import { isRichTextEmpty } from '../../../utils/richText';
+import RichTextField, { RichTextView } from '../../common/RichTextField';
 import CompanySidebar from '../CompanySidebar';
 import TabAlertBanner from '../TabAlertBanner';
 import StepPrerequisiteState from '../StepPrerequisiteState';
-
-const AutoTextarea = ({ value, onChange, className, placeholder, rows, id }) => {
-  const ref = useRef(null);
-  const resize = () => { if (!ref.current) return; ref.current.style.height = 'auto'; ref.current.style.height = ref.current.scrollHeight + 'px'; };
-  useEffect(resize, [value]);
-  return <textarea id={id} ref={ref} value={value} onChange={e => { onChange(e); resize(); }} onFocus={resize} rows={rows || 1} className={`resize-none overflow-hidden ${className}`} placeholder={placeholder} />;
-};
 
 const TabTechnique = ({
   companyNames, companiesData, criteria, updateTechnical,
@@ -273,21 +268,17 @@ const TabTechnique = ({
                       </label>
                       <span className="px-2 py-0.5 bg-purple-50 text-purple-600 rounded-full text-[10px] font-bold tracking-widest uppercase">PDF</span>
                     </div>
-                    <AutoTextarea
+                    <RichTextField
                       id={`tech-var-${name}-${v.id}`}
                       value={v.justification || ''}
-                      onChange={e => onUpdateVariantJustification && onUpdateVariantJustification(companyObj.id, v.id, e.target.value)}
-                      placeholder={v.retained && !(v.justification || '').trim()
+                      onChange={html => onUpdateVariantJustification && onUpdateVariantJustification(companyObj.id, v.id, html)}
+                      placeholder={v.retained && isRichTextEmpty(v.justification)
                         ? "⚠ Justification requise pour le PDF — variante RETENUE : pourquoi est-elle retenue ? (avantages technique/économique/délai, etc.)"
                         : v.retained
                           ? "Pourquoi cette variante est-elle retenue ? (avantages technique/économique/délai, conformité aux exigences min, etc.)"
                           : "Pourquoi cette variante n'est-elle pas retenue ? (non-conformité, désintérêt technique, surcoût, etc.)"
                       }
-                      className={`w-full rounded-xl p-4 text-sm font-medium text-slate-700 leading-relaxed shadow-inner focus:ring-4 outline-none transition-all min-h-[60px] ${
-                        v.retained && !(v.justification || '').trim()
-                          ? 'rao-empty border-2 placeholder:text-amber-600 placeholder:italic focus:ring-amber-500/10'
-                          : 'bg-white border-2 border-purple-100 focus:border-purple-400 focus:ring-purple-500/10'
-                      }`}
+                      className={v.retained && isRichTextEmpty(v.justification) ? 'rao-empty' : ''}
                       rows={2}
                     />
                   </div>
@@ -361,12 +352,12 @@ const TabTechnique = ({
 
                   <div className="p-6 space-y-4">
                     {/* Guide de notation : rappel de la méthode d'évaluation (saisie en Consultation) */}
-                    {(crit.description || '').trim() && (
+                    {!isRichTextEmpty(crit.description) && (
                       <div className="flex items-start gap-2 px-4 py-3 bg-blue-50/60 border border-blue-100 rounded-xl">
                         <Info size={14} className="text-blue-500 shrink-0 mt-0.5" />
                         <div>
                           <span className="block text-[10px] font-black uppercase tracking-widest text-blue-500 mb-0.5">Méthode d'évaluation</span>
-                          <p className="text-xs text-slate-600 leading-relaxed">{crit.description}</p>
+                          <RichTextView value={crit.description} className="text-xs text-slate-600 leading-relaxed" />
                         </div>
                       </div>
                     )}
@@ -402,13 +393,13 @@ const TabTechnique = ({
                                   <span className="text-[10px] font-black text-blue-600 ml-1">{sc.pts.toFixed(1)}pts</span>
                                 </div>
                               </div>
-                              <AutoTextarea
+                              <RichTextField
                                 id={`tech-comm-${name}-${sc.id}`}
                                 value={sd.text || ''}
-                                onChange={e => updateTechnical(name, sc.id, 'text', e.target.value)}
-                                placeholder={(sd.text || '').trim() ? `Synthèse pour ${sc.label || 'ce sous-critère'}…` : `⚠ Commentaire requis pour le PDF — ${sc.label || 'sous-critère'}…`}
-                                className={`w-full rounded-xl px-4 py-3 text-xs font-medium text-slate-600 leading-relaxed focus:ring-2 focus:ring-blue-500/10 outline-none transition-all min-h-[40px] ${(sd.text || '').trim() ? 'bg-white border border-blue-100 focus:border-blue-300' : 'rao-empty border placeholder:text-amber-600 placeholder:italic'}`}
-                                rows={1}
+                                onChange={html => updateTechnical(name, sc.id, 'text', html)}
+                                placeholder={isRichTextEmpty(sd.text) ? `⚠ Commentaire requis pour le PDF — ${sc.label || 'sous-critère'}…` : `Synthèse pour ${sc.label || 'ce sous-critère'}…`}
+                                className={isRichTextEmpty(sd.text) ? 'rao-empty' : ''}
+                                rows={2}
                               />
                             </div>
                           );
@@ -424,16 +415,16 @@ const TabTechnique = ({
                         </label>
                         <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold tracking-widest uppercase">PDF</span>
                       </div>
-                      <AutoTextarea
+                      <RichTextField
                         id={hasSubs ? undefined : `tech-comm-${name}-${crit.id}`}
                         value={d.text || ''}
-                        onChange={e => updateTechnical(name, crit.id, 'text', e.target.value)}
-                        placeholder={(d.text || '').trim()
+                        onChange={html => updateTechnical(name, crit.id, 'text', html)}
+                        placeholder={!isRichTextEmpty(d.text)
                           ? "Conclusion de l'analyse technique pour ce critère..."
                           : "⚠ Commentaire requis pour le PDF — conclusion de l'analyse pour ce critère…"
                         }
-                        className={`w-full rounded-2xl p-5 text-sm font-medium text-slate-700 leading-relaxed shadow-sm focus:ring-4 focus:ring-blue-500/10 outline-none transition-all min-h-[40px] ${(d.text || '').trim() || hasSubs ? 'bg-white border-2 border-slate-100 focus:border-blue-400' : 'rao-empty border-2 placeholder:text-amber-600 placeholder:italic'}`}
-                        rows={1}
+                        className={!isRichTextEmpty(d.text) || hasSubs ? '' : 'rao-empty'}
+                        rows={2}
                       />
                     </div>
                   </div>
