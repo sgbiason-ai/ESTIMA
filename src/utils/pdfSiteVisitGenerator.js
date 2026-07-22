@@ -256,7 +256,11 @@ const buildMapCanvas = async (visit, THEME, viewKey = DEFAULT_PDF_VIEWS.overview
   // Collecter les segments mesurés
   const segments = observations.filter(obs => obs.segmentFrom && obs.segmentTo);
 
-  if (coordinates.length === 0 && segments.length === 0) return null;
+  const hasLocatedObservation = observations.some(obs => (
+    (obs.pointLocation?.lat != null && obs.pointLocation?.lng != null)
+    || (obs.images || []).some(img => typeof img === 'object' && img?.lat != null && img?.lng != null)
+  ));
+  if (coordinates.length === 0 && segments.length === 0 && !hasLocatedObservation) return null;
 
   // Collecter tous les points (GPS + observations + segments)
   const allPoints = coordinates.filter(c => !c.break).map(c => ({ lat: c.lat, lng: c.lng }));
@@ -267,7 +271,10 @@ const buildMapCanvas = async (visit, THEME, viewKey = DEFAULT_PDF_VIEWS.overview
   const obsPositions = [];
   observations.forEach((obs, idx) => {
     let lat = null, lng = null;
-    if (obs.segmentFrom && obs.segmentTo) {
+    if (obs.pointLocation?.lat != null && obs.pointLocation?.lng != null) {
+      lat = obs.pointLocation.lat;
+      lng = obs.pointLocation.lng;
+    } else if (obs.segmentFrom && obs.segmentTo) {
       lat = (obs.segmentFrom.lat + obs.segmentTo.lat) / 2;
       lng = (obs.segmentFrom.lng + obs.segmentTo.lng) / 2;
     }
@@ -286,7 +293,7 @@ const buildMapCanvas = async (visit, THEME, viewKey = DEFAULT_PDF_VIEWS.overview
     }
     if (lat != null) {
       allPoints.push({ lat, lng });
-      obsPositions.push({ lat, lng, number: idx + 1 });
+      obsPositions.push({ lat, lng, number: obs.mapNumber || idx + 1 });
     }
   });
 
@@ -446,6 +453,18 @@ const buildMapCanvas = async (visit, THEME, viewKey = DEFAULT_PDF_VIEWS.overview
 
   return canvas.toDataURL('image/jpeg', 0.92);
 };
+
+/**
+ * Produit uniquement la carte générale d'une visite (trace + repères numérotés).
+ * Utilisé par le rapport de visite et par les annexes de réserves EXE4/EXE5.
+ */
+export const generateSiteVisitOverviewMap = async (visit, options = {}) => (
+  buildMapCanvas(
+    visit,
+    { primary: options.primary || [37, 99, 235] },
+    options.viewKey || DEFAULT_PDF_VIEWS.overview,
+  )
+);
 
 // ─── PAGE VUE AERIENNE ────────────────────────────────────────────────────────
 

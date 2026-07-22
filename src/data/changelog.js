@@ -8,10 +8,11 @@ export { APP_VERSION } from './appVersion';
 
 export const CHANGELOG = [
   {
-    version: '3.12.0',
-    date: '2026-07-17',
-    title: 'Partage et propriété des modules terrain',
+    version: '3.13.0',
+    date: '2026-07-22',
+    title: 'Documents administratifs et modules terrain',
     highlights: [
+      'Documents administratifs — EXE4 / EXE5 : une visite de site peut désormais devenir directement l’annexe des réserves. Toutes ses observations sont importées dans l’ordre avec toutes leurs photos ; la première page de l’annexe reprend la trace GPS et ses repères numérotés, identiques aux numéros des réserves détaillées ensuite. La même annexe est générée en PDF et en Word, et un nouvel import remplace explicitement la visite précédente',
       'RAO, rapport PDF — la page de garde et le sommaire ouvrent désormais un rapport organisé dans le même ordre que le workflow : étapes 1 à 5 avant négociation, puis 6 à 10 uniquement lorsque des données négociées existent. Le détail des prix est déplacé en deux tableaux paysage distincts et de structure identique : annexe A pour les prix avant négociation, annexe B pour les prix après négociation ; les variantes/PSE, formules et références réglementaires deviennent respectivement les annexes C, D et E',
       'RAO — nouveau champ « Motif » pour expliquer pourquoi une offre n’est pas régulière. Dès qu’une offre est jugée irrégulière, inacceptable ou inappropriée à l’étape Administratif, une zone de rédaction apparaît sous la conclusion pour exposer ce qui fonde ce statut (pièce manquante, quantités du DQE modifiées, prestation non conforme au CCTP…). Le motif est requis : l’étape reste signalée incomplète et l’item apparaît dans la vérification pré-export tant qu’il est vide, conformément à l’obligation de motiver le rejet d’une offre (art. R2181-1). Il accepte la mise en forme (gras, italique, listes) comme les autres champs de rédaction du module, et se retrouve dans le rapport PDF : encadré complet dans la section « Conformité et anomalies » et rappel dans la fiche administrative. En phase après négociation, le motif est pré-rempli par héritage de l’analyse initiale et peut être ajusté si l’offre reste écartée — la version initiale reste intacte',
       'RAO — le bouton « Fiche affaire » est désormais placé à l’extrême gauche du ruban, avec un séparateur avant les étapes du workflow',

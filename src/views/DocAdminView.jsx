@@ -381,7 +381,7 @@ export default function DocAdminView({ onBackToHub, user, companyId }) {
         exeFormProps = { fiche: ficheForExe, dateFinRevisee, onBack: () => setActiveView('recap'), onGenerate: handleGenerateExe1, onSave: saveForExe, isSaving };
       } else if (activeView === 'reception') {
         ExeFormComponent = ExeReceptionForm;
-        exeFormProps = { fiche: ficheForExe, dateFinRevisee, onBack: () => setActiveView('recap'), onGenerate: (t, d, f) => handleGenerateExeReception(t, d, f), onSave: saveForExe, isSaving };
+        exeFormProps = { fiche: ficheForExe, user, companyId, dateFinRevisee, onBack: () => setActiveView('recap'), onGenerate: (t, d, f) => handleGenerateExeReception(t, d, f), onSave: saveForExe, isSaving };
       } else if (activeView === 'levee') {
         ExeFormComponent = ExeLeveeForm;
         exeFormProps = { fiche: ficheForExe, onBack: () => setActiveView('recap'), onGenerate: (t, d, f) => handleGenerateExeReception(t, d, f), onSave: saveForExe, isSaving };
