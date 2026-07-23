@@ -420,6 +420,9 @@ const ObservationRow = memo(({ obs, obsNumber, meetingNumber, onUpdate, onDelete
 
   return (
     <div
+      // Ancre de navigation : le plan d'actions cible une observation precise
+      // (cf. CrcView.handleOpenFromActionPlan → CrrObservations.focusObsId).
+      data-obs-id={obs.id}
       className={`border rounded-xl transition-all duration-300 overflow-hidden shadow-sm hover:shadow-md hover:-translate-y-0.5 ${
         isEditing
           ? 'ring-2 ring-indigo-300 border-indigo-400 bg-indigo-50/40 shadow-md z-10 relative'
@@ -657,10 +660,50 @@ const CrrObservations = ({
   sortCat,
   onCycleDateSort,
   onCycleCatSort,
+  focusObsId = null,
+  onFocusHandled,
 }) => {
   const [collapsedCats, setCollapsedCats] = useState(new Set());
   const [activeEdit, setActiveEdit] = useState(null);
   const blurTimeoutRef = useRef(null);
+
+  // ── Ciblage d'une observation (plan d'actions) ────────────────────────────
+  // Le deplie/scroll vit ICI et non dans CrcView : la categorie repliee est un
+  // etat local (collapsedCats) qu'un scroll piloté de l'exterieur ne verrait
+  // pas — l'element cible ne serait tout simplement pas dans le DOM.
+  useEffect(() => {
+    if (!focusObsId || !meeting) return;
+
+    // Deplier la categorie qui porte l'observation, si besoin
+    const cat = (meeting.observations || []).find((o) => o.id === focusObsId)?.category;
+    if (cat) {
+      setCollapsedCats((prev) => {
+        if (!prev.has(cat)) return prev;
+        const s = new Set(prev);
+        s.delete(cat);
+        return s;
+      });
+    }
+
+    // Le rendu peut arriver apres (changement d'affaire, depliage) : on retente
+    // quelques frames plutot que de parier sur un delai fixe.
+    let tries = 0;
+    let raf = 0;
+    const seek = () => {
+      const el = document.querySelector(`[data-obs-id="${focusObsId}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('rao-highlight-pulse');
+        setTimeout(() => el.classList.remove('rao-highlight-pulse'), 2000);
+        onFocusHandled?.();
+        return;
+      }
+      if (++tries < 40) raf = requestAnimationFrame(seek); // ~650 ms max
+      else onFocusHandled?.();
+    };
+    raf = requestAnimationFrame(seek);
+    return () => cancelAnimationFrame(raf);
+  }, [focusObsId, meeting, onFocusHandled]);
 
   const sortedCategories = sortCat
     ? [...categories].sort((a, b) => sortCat === 'asc' ? a.localeCompare(b) : b.localeCompare(a))

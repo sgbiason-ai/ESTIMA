@@ -15,6 +15,7 @@ import { doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs, delet
 import { db } from '../../firebase';
 import { deleteCrrImage } from '../../utils/crrImageStorage';
 import { isChantierArchived, countOpenObservations, formatArchivedAt } from '../../utils/crcChantierStatus';
+import { setObsStatusInLastMeeting } from '../../utils/crcActionPlan';
 import { loadDraft, clearDraft } from '../../hooks/useRobustSave';
 import { DEFAULT_BRANDING } from '../../data/branding';
 import CrcLinkProjectModal from './CrcLinkProjectModal';
@@ -409,19 +410,71 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
   const { config: smtpConfig, isConfigured: smtpConfigured } = useSmtpConfig();
   const [showChantierPicker, setShowChantierPicker] = useState(false);
   const [showActionPlan, setShowActionPlan] = useState(false);
+  // Observation ciblee depuis le plan d'actions (consommee par CrrObservations,
+  // qui la deplie/scrolle puis rappelle onFocusHandled pour remettre a null).
+  const [focusObsId, setFocusObsId] = useState(null);
 
   // Ouverture d'une affaire depuis le plan d'actions : selectionne le chantier
   // ET recale le CR actif sur son dernier CR (celui qui porte les actions).
   // Indispensable : activeMeetingId n'est pas remis a zero au changement
   // d'affaire, un id d'un autre chantier resterait actif.
-  const handleOpenFromActionPlan = useCallback(async (chantierId) => {
-    const c = chantiers.find((x) => x.id === chantierId);
+  const handleOpenFromActionPlan = useCallback(async (row) => {
+    const c = chantiers.find((x) => x.id === row.chantierId);
     if (!c) return;
     setShowActionPlan(false);
     await handleSelectChantier(c);
     const meetings = c.crrMeetings || [];
     if (meetings.length > 0) manager.setActiveMeetingId(meetings[meetings.length - 1].id);
-  }, [chantiers, handleSelectChantier, manager]);
+    // Les observations ne sont rendues qu'en mode Édition : arriver en Aperçu
+    // depuis le plan ne montrerait pas la ligne ciblée.
+    if (c.ownerId === user?.uid && !isChantierArchived(c)) setViewMode('edit');
+    // Repris par CrrObservations : deplie la categorie, scrolle, surligne.
+    setFocusObsId(row.obsId);
+  }, [chantiers, handleSelectChantier, manager, user]);
+
+  // Changement de statut depuis le plan d'actions. Deux chemins d'ecriture,
+  // volontairement distincts :
+  //  - chantier OUVERT  → etat local, l'autosave du manager persiste (setDoc
+  //    complet). Ecrire en direct ici serait ecrase par le prochain autosave,
+  //    construit sur un crrDoc encore porteur de l'ancien statut.
+  //  - autre chantier   → updateDoc CIBLE sur crrMeetings. Jamais un setDoc
+  //    complet : le document n'est pas monte dans le manager, on ne dispose pas
+  //    d'un etat fiable pour le reecrire en entier.
+  const handleActionStatusChange = useCallback(async (row, status) => {
+    const target = chantiers.find((c) => c.id === row.chantierId);
+    if (!target) return;
+    if (target.ownerId !== user?.uid) {
+      toast.warning('Seul le créateur peut modifier ce compte rendu.');
+      return;
+    }
+    const nextMeetings = setObsStatusInLastMeeting(target, row.obsId, status);
+    if (!nextMeetings) return; // obs introuvable ou statut inchange
+
+    // Solder une action la retire du plan (buildActionRows ignore 'done') :
+    // sans retour explicite, la ligne disparaitrait sans explication.
+    if (status === 'done') toast.success(`Action ${row.number || ''} soldée.`.replace('  ', ' '));
+
+    if (crrDoc?.id === row.chantierId) {
+      setCrrDoc((prev) => (prev?.id === row.chantierId ? { ...prev, crrMeetings: nextMeetings } : prev));
+      setChantiers((prev) => prev.map((c) => (c.id === row.chantierId ? { ...c, crrMeetings: nextMeetings } : c)));
+      return;
+    }
+
+    try {
+      await updateDoc(doc(db, 'companies', companyId, 'crr', row.chantierId), {
+        crrMeetings: nextMeetings,
+        lastSaved: new Date().toISOString(),
+        updatedBy: user?.email || '',
+      });
+      setChantiers((prev) => prev.map((c) => (c.id === row.chantierId ? { ...c, crrMeetings: nextMeetings } : c)));
+    } catch (err) {
+      console.error('[CRC] Erreur changement de statut depuis le plan:', err);
+      toast.error("Impossible d'enregistrer le nouveau statut.");
+    }
+  }, [chantiers, crrDoc, companyId, user]);
+
+  const clearFocusObs = useCallback(() => setFocusObsId(null), []);
+
   const [importModal, setImportModal] = useState(null);
   const importFileRef = useRef(null);
 
@@ -519,6 +572,13 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
     const { generatePdfCrr } = await import('../../utils/pdfCrrGenerator');
     const result = await generatePdfCrr(meeting, manager.crrConfig, chantierName, branding, { returnBlob: true, sortDate, sortCat });
     if (!result?.blob) { toast.error('Echec generation PDF.'); return; }
+    // Un logo renseigne mais illisible sortait du PDF sans rien dire.
+    if (result.logoWarnings?.length) {
+      toast.warning(
+        `Logo ${result.logoWarnings.join(' et ')} illisible : absent du PDF. Utilisez un PNG ou un JPEG (le SVG et les fichiers corrompus ne sont pas rendus).`,
+        { duration: 8000 }
+      );
+    }
 
     const openAction = {
       label: 'Ouvrir le PDF',
@@ -1062,7 +1122,8 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
                     participantGroups={manager.crrConfig.participantGroups}
                     companyId={companyId} crrId={crrDoc?.id}
                     sortDate={sortDate} sortCat={sortCat}
-                    onCycleDateSort={cycleDateSort} onCycleCatSort={cycleCatSort} />
+                    onCycleDateSort={cycleDateSort} onCycleCatSort={cycleCatSort}
+                    focusObsId={focusObsId} onFocusHandled={clearFocusObs} />
                 </div>
               )}
             </div>
@@ -1088,6 +1149,8 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
         onClose={() => setShowActionPlan(false)}
         chantiers={chantiers}
         onOpenChantier={handleOpenFromActionPlan}
+        onChangeStatus={handleActionStatusChange}
+        currentUserId={user?.uid}
       />
 
       <CrcCategoriesModal isOpen={showCategoriesModal && canEdit} onClose={() => setShowCategoriesModal(false)}

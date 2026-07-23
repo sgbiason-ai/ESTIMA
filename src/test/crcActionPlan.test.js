@@ -6,6 +6,7 @@ import {
   collectResponsables,
   filterRows,
   diffDays,
+  setObsStatusInLastMeeting,
 } from '../utils/crcActionPlan';
 
 const TODAY = '2026-07-23';
@@ -86,5 +87,37 @@ describe('filtres', () => {
     expect(filterRows(rows, { responsable: 'MOE' }).map((r) => r.obsId)).toEqual(['o1']);
     expect(filterRows(rows, { chantierId: 'c2' }).map((r) => r.obsId)).toEqual(['o2']);
     expect(filterRows(rows, { chantierId: 'c2', responsable: 'MOE' })).toHaveLength(0);
+  });
+});
+
+describe('setObsStatusInLastMeeting', () => {
+  const base = () => chantier('c1', 'A', [obs('o1', '2026-08-01'), obs('o2', '2026-08-02')]);
+
+  it('ne modifie que le dernier CR, sans muter l entree', () => {
+    const c = base();
+    const next = setObsStatusInLastMeeting(c, 'o1', 'done');
+    expect(next[1].observations[0].status).toBe('done');
+    expect(next[1].observations[1].status).toBe('open');
+    // CR anterieur intact (deja diffuse) + pas de mutation en place
+    expect(next[0]).toBe(c.crrMeetings[0]);
+    expect(c.crrMeetings[1].observations[0].status).toBe('open');
+  });
+
+  it('renvoie null quand il n y a rien a ecrire', () => {
+    expect(setObsStatusInLastMeeting(base(), 'inconnue', 'done')).toBeNull();
+    expect(setObsStatusInLastMeeting(base(), 'o1', 'open')).toBeNull();
+    expect(setObsStatusInLastMeeting({ crrMeetings: [] }, 'o1', 'done')).toBeNull();
+    expect(setObsStatusInLastMeeting(null, 'o1', 'done')).toBeNull();
+  });
+
+  it('une action soldee sort du plan', () => {
+    const c = base();
+    c.crrMeetings = setObsStatusInLastMeeting(c, 'o1', 'done');
+    expect(buildActionRows([c], TODAY).map((r) => r.obsId)).toEqual(['o2']);
+  });
+
+  it('expose ownerId sur les lignes (droit de solder)', () => {
+    const rows = buildActionRows([chantier('c1', 'A', [obs('o1', '2026-08-01')], { ownerId: 'u1' })], TODAY);
+    expect(rows[0].ownerId).toBe('u1');
   });
 });

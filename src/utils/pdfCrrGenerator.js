@@ -14,7 +14,7 @@ import { DEFAULT_BRANDING } from '../data/branding';
 import { MEETING_TYPES, GROUP_COLORS, abbreviateGroup, computeObsStats, obsDisplayNumber, obsAge } from '../data/crrData';
 import { parseObsHtml, stripHtml } from './formatObsText.jsx';
 import { flattenGroupContacts, groupColorIndexMap, groupBadgeNameMap } from './crrParticipantTree';
-import { lightenRgb, darkenRgb, loadImage, formatDateFr, formatDateLong, sanitizeFilename, loadLogos, fitTextToWidth } from './pdf/pdfSharedHelpers';
+import { lightenRgb, darkenRgb, loadImage, loadImageForPdf, formatDateFr, formatDateLong, sanitizeFilename, loadLogos, fitTextToWidth } from './pdf/pdfSharedHelpers';
 import { buildTheme as _buildTheme } from './pdf/buildTheme';
 
 // ─── HELPERS ────────────────────────────────────────────────────────────────
@@ -190,15 +190,29 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
 
   // Logos
   const { logoMoe } = await loadLogos(branding, {});
+  // loadImageForPdf (et non loadImage) : rasterise les SVG, que jsPDF ne sait
+  // pas rendre — sinon le logo s'affiche dans l'app mais sort absent du PDF.
   const logoCommune = crrConfig.chantierInfo?.communeLogo
-    ? await loadImage(crrConfig.chantierInfo.communeLogo).catch(() => null)
+    ? await loadImageForPdf(crrConfig.chantierInfo.communeLogo).catch(() => null)
     : null;
   const logoCommune2 = crrConfig.chantierInfo?.communeLogo2
-    ? await loadImage(crrConfig.chantierInfo.communeLogo2).catch(() => null)
+    ? await loadImageForPdf(crrConfig.chantierInfo.communeLogo2).catch(() => null)
     : null;
   const logoCotraitant = crrConfig.chantierInfo?.cotraitantLogo
-    ? await loadImage(crrConfig.chantierInfo.cotraitantLogo).catch(() => null)
+    ? await loadImageForPdf(crrConfig.chantierInfo.cotraitantLogo).catch(() => null)
     : null;
+
+  // Un logo renseigne mais illisible etait jusqu'ici ecarte EN SILENCE : le PDF
+  // sortait sans lui, sans aucun signal (etat vide indistinguable d'une erreur).
+  // On remonte la liste a l'appelant, qui previent l'utilisateur.
+  const logoWarnings = [
+    ['commune', crrConfig.chantierInfo?.communeLogo, logoCommune],
+    ['commune 2', crrConfig.chantierInfo?.communeLogo2, logoCommune2],
+    ['co-traitant', crrConfig.chantierInfo?.cotraitantLogo, logoCotraitant],
+  ].filter(([, src, img]) => src && !img).map(([label]) => label);
+  if (logoWarnings.length) {
+    console.warn('[CRC PDF] Logo(s) illisible(s), absents du PDF :', logoWarnings.join(', '));
+  }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // 1. EN-TETE
@@ -1372,7 +1386,7 @@ export const generatePdfCrr = async (meeting, crrConfig, projectName = '', brand
   // Si returnBlob, retourner le blob + filename sans telecharger
   if (options?.returnBlob) {
     const blob = doc.output('blob');
-    return { blob, filename };
+    return { blob, filename, logoWarnings };
   }
 
   doc.save(filename);

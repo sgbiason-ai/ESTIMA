@@ -7,14 +7,19 @@
 //
 // Aucune lecture Firestore : s'appuie sur les chantiers deja charges par CrcView.
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, CalendarClock, AlertCircle, FolderOpen, Filter } from 'lucide-react';
+import {
+  X, CalendarClock, AlertCircle, FolderOpen, Filter,
+  MinusCircle, Circle, Loader, CheckCircle2, ChevronDown,
+} from 'lucide-react';
 import {
   buildActionRows, collectResponsables, filterRows,
   SECTION_ORDER, SECTION_LABELS,
 } from '../../utils/crcActionPlan';
 import { OBSERVATION_STATUSES } from '../../data/crrData';
+import { normalizeObsText } from '../../utils/formatObsText';
+import { sanitizeHtml } from '../../utils/helpers';
 
 // "mer. 29 juil." — jour de semaine inclus : c'est un echeancier
 const formatDeadline = (isoDate) => {
@@ -36,12 +41,107 @@ const SECTION_STYLES = {
   later: 'bg-gray-50 text-gray-500 border-gray-200',
 };
 
-const StatusChip = ({ status }) => {
-  const st = OBSERVATION_STATUSES.find((s) => s.value === status);
-  if (!st) return null;
-  return (
-    <span className={`inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold whitespace-nowrap ${st.bg} ${st.color}`}>
+const STATUS_ICONS = {
+  minus: MinusCircle,
+  circle: Circle,
+  loader: Loader,
+  check: CheckCircle2,
+};
+
+// Statut editable depuis le plan. Menu explicite (et non le bouton cyclique de
+// CrrObservations) : depuis un echeancier on vise « FAIT » directement, pas
+// deux clics pour traverser les etats intermediaires.
+const MENU_HEIGHT = 132; // 4 statuts x 27px + padding — suffit pour choisir le sens
+
+const StatusPicker = ({ status, onChange, disabled }) => {
+  const [open, setOpen] = useState(false);
+  // Position fixe calculee a l'ouverture : le menu est rendu en PORTAIL car la
+  // carte du tableau est en `overflow-hidden` — en absolute il y serait rogne
+  // (constate en prod : menu coupe sous la carte).
+  const [pos, setPos] = useState(null);
+  const ref = useRef(null);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    // Le menu vit dans un portail : il n'est PAS un descendant de `ref`. Sans
+    // ce second test, le mousedown (capture, donc avant le clic) fermerait le
+    // menu et le choix ne partirait jamais.
+    const close = (e) => {
+      if (ref.current?.contains(e.target) || menuRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
+    // capture : le clic est intercepte avant le handler de ligne (ouvrir l'affaire)
+    document.addEventListener('mousedown', close, true);
+    // Le menu ne suit pas la page : on le ferme plutot que de le laisser flotter
+    const onScroll = () => setOpen(false);
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', onScroll);
+    return () => {
+      document.removeEventListener('mousedown', close, true);
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, [open]);
+
+  const toggle = (e) => {
+    e.stopPropagation();
+    if (open) { setOpen(false); return; }
+    const r = e.currentTarget.getBoundingClientRect();
+    // Vers le haut quand le bas de fenetre est trop proche (dernieres lignes)
+    const flipUp = r.bottom + MENU_HEIGHT > window.innerHeight;
+    setPos({
+      top: flipUp ? r.top - MENU_HEIGHT - 4 : r.bottom + 4,
+      right: Math.max(8, window.innerWidth - r.right),
+    });
+    setOpen(true);
+  };
+
+  const st = OBSERVATION_STATUSES.find((s) => s.value === status) || OBSERVATION_STATUSES[0];
+  const Icon = STATUS_ICONS[st.icon];
+
+  const chip = (
+    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold whitespace-nowrap ${st.bg} ${st.color}`}>
+      {Icon && <Icon size={11} className={st.icon === 'loader' ? 'animate-spin' : ''} />}
       {st.label}
+      {!disabled && <ChevronDown size={10} className="opacity-60" />}
+    </span>
+  );
+
+  if (disabled) {
+    return <span title="Seul le créateur du CRC peut modifier ce statut">{chip}</span>;
+  }
+
+  return (
+    <span ref={ref} className="inline-block">
+      <button onClick={toggle} className="transition-all hover:scale-105" title="Changer le statut">
+        {chip}
+      </button>
+      {open && pos && createPortal(
+        <div
+          ref={menuRef}
+          className="fixed z-modal-stack bg-white rounded-xl shadow-lg border border-gray-200/60 py-1 min-w-[120px]"
+          style={{ top: pos.top, right: pos.right }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {OBSERVATION_STATUSES.map((s) => {
+            const SIcon = STATUS_ICONS[s.icon];
+            return (
+              <button
+                key={s.value}
+                onClick={(e) => { e.stopPropagation(); setOpen(false); if (s.value !== status) onChange(s.value); }}
+                className={`w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-semibold hover:bg-gray-50 transition-colors ${s.color} ${
+                  s.value === status ? 'bg-gray-50' : ''
+                }`}
+              >
+                {SIcon && <SIcon size={12} />}
+                {s.label}
+              </button>
+            );
+          })}
+        </div>,
+        document.body
+      )}
     </span>
   );
 };
@@ -60,7 +160,7 @@ const ParBadges = ({ value }) => {
   );
 };
 
-export default function CrcActionPlanModal({ isOpen, onClose, chantiers, onOpenChantier }) {
+export default function CrcActionPlanModal({ isOpen, onClose, chantiers, onOpenChantier, onChangeStatus, currentUserId }) {
   const [filterChantier, setFilterChantier] = useState('');
   const [filterResp, setFilterResp] = useState('');
 
@@ -102,15 +202,12 @@ export default function CrcActionPlanModal({ isOpen, onClose, chantiers, onOpenC
     .map((s) => ({ id: s, rows: rows.filter((r) => r.section === s) }))
     .filter((s) => s.rows.length > 0);
 
+  // Plein ecran : le plan est un tableau de travail, pas une boite de dialogue —
+  // toute la largeur sert aux colonnes Observation / Par. Plus de fond
+  // cliquable : fermeture par le bouton X ou Echap.
   return createPortal(
-    <div
-      className="fixed inset-0 z-modal-backdrop flex items-center justify-center bg-black/30 backdrop-blur-sm p-4 sm:p-8"
-      onClick={onClose}
-    >
-      <div
-        className="bg-[#f5f5f7] rounded-3xl shadow-2xl w-full max-w-6xl max-h-[85vh] flex flex-col overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 z-modal-backdrop flex">
+      <div className="bg-[#f5f5f7] w-full h-full flex flex-col overflow-hidden">
         {/* Header */}
         <div className="shrink-0 bg-white/80 backdrop-blur-xl border-b border-gray-200/60 px-6 py-4 flex items-center gap-4 flex-wrap">
           <CalendarClock size={18} className="text-blue-500" />
@@ -173,14 +270,14 @@ export default function CrcActionPlanModal({ isOpen, onClose, chantiers, onOpenC
               </p>
             </div>
           ) : (
-            <div className="bg-white rounded-2xl border border-gray-200/60 overflow-hidden">
+            <div className="bg-white rounded-2xl border border-gray-200/60 overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-left text-[10px] uppercase tracking-wide text-gray-400 border-b border-gray-200/60">
                     <th className="px-4 py-2.5 font-semibold w-[110px]">Pour le</th>
                     <th className="px-3 py-2.5 font-semibold w-[80px]">N°</th>
-                    <th className="px-3 py-2.5 font-semibold w-[180px]">Chantier</th>
-                    <th className="px-3 py-2.5 font-semibold">Observation</th>
+                    <th className="px-3 py-2.5 font-semibold w-[220px] min-w-[180px]">Chantier</th>
+                    <th className="px-3 py-2.5 font-semibold min-w-[320px]">Observation</th>
                     <th className="px-3 py-2.5 font-semibold w-[150px]">Par</th>
                     <th className="px-4 py-2.5 font-semibold w-[90px]">Statut</th>
                   </tr>
@@ -196,11 +293,11 @@ export default function CrcActionPlanModal({ isOpen, onClose, chantiers, onOpenC
                       {section.rows.map((r) => (
                         <tr
                           key={r.key}
-                          onClick={() => onOpenChantier(r.chantierId)}
+                          onClick={() => onOpenChantier(r)}
                           className="border-b border-gray-100 last:border-0 hover:bg-blue-50/50 cursor-pointer transition-colors"
-                          title={`Ouvrir « ${r.chantierNom} » (CR n°${r.meetingNumber})`}
+                          title={`Aller à l'observation ${r.number || ''} — « ${r.chantierNom} » (CR n°${r.meetingNumber})`}
                         >
-                          <td className="px-4 py-2.5 whitespace-nowrap">
+                          <td className="px-4 py-2.5 whitespace-nowrap align-top">
                             <div className={`font-semibold ${r.section === 'overdue' ? 'text-red-700' : 'text-gray-800'}`}>
                               {formatDeadline(r.deadline)}
                             </div>
@@ -210,18 +307,38 @@ export default function CrcActionPlanModal({ isOpen, onClose, chantiers, onOpenC
                               </div>
                             )}
                           </td>
-                          <td className="px-3 py-2.5 font-mono text-[10px] text-gray-500 whitespace-nowrap">{r.number || '—'}</td>
-                          <td className="px-3 py-2.5">
-                            <div className="flex items-center gap-1.5 text-gray-700 font-medium">
-                              <FolderOpen size={11} className="shrink-0 text-gray-300" />
-                              <span className="truncate max-w-[150px]">{r.chantierNom}</span>
+                          <td className="px-3 py-2.5 font-mono text-[10px] text-gray-500 whitespace-nowrap align-top">{r.number || '—'}</td>
+                          <td className="px-3 py-2.5 align-top">
+                            {/* Nom complet sur plusieurs lignes : tronquer masquait
+                                la tranche/le lot, qui distingue deux affaires voisines. */}
+                            <div className="flex items-start gap-1.5 text-gray-700 font-medium">
+                              <FolderOpen size={11} className="shrink-0 text-gray-300 mt-0.5" />
+                              <span className="break-words">{r.chantierNom}</span>
                             </div>
                           </td>
-                          <td className="px-3 py-2.5 text-gray-600">
-                            <span className="line-clamp-2">{r.text || <span className="text-gray-300">(sans texte)</span>}</span>
+                          <td className="px-3 py-2.5 text-gray-600 align-top">
+                            {r.text ? (
+                              // Le texte d'observation est du HTML (gras, listes,
+                              // surlignage — cf. formatObsText) : le rendre tel quel
+                              // afficherait les balises. Affiche en entier, avec
+                              // retour a la ligne — l'ecran est en plein ecran, la
+                              // troncature cachait la fin des consignes.
+                              <div
+                                className="break-words whitespace-normal [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-4 [&_ol]:pl-4 [&_li]:list-item"
+                                dangerouslySetInnerHTML={{ __html: sanitizeHtml(normalizeObsText(r.text)) }}
+                              />
+                            ) : (
+                              <span className="text-gray-300">(sans texte)</span>
+                            )}
                           </td>
-                          <td className="px-3 py-2.5"><ParBadges value={r.actionBy} /></td>
-                          <td className="px-4 py-2.5"><StatusChip status={r.status} /></td>
+                          <td className="px-3 py-2.5 align-top"><ParBadges value={r.actionBy} /></td>
+                          <td className="px-4 py-2.5 align-top">
+                            <StatusPicker
+                              status={r.status}
+                              disabled={!onChangeStatus || r.ownerId !== currentUserId}
+                              onChange={(s) => onChangeStatus(r, s)}
+                            />
+                          </td>
                         </tr>
                       ))}
                     </React.Fragment>

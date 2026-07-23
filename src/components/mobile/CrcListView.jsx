@@ -3,6 +3,8 @@ import Icon from './Icon';
 import { dateFr } from './formatters';
 import { collectResponsables, filterRows, SECTION_ORDER, SECTION_LABELS } from '../../utils/crcActionPlan';
 import { OBSERVATION_STATUSES } from '../../data/crrData';
+import { normalizeObsText } from '../../utils/formatObsText';
+import { sanitizeHtml } from '../../utils/helpers';
 
 const SECTION_COLORS = {
   overdue: 'bg-red-100 text-red-700',
@@ -69,7 +71,17 @@ function ActionsList({ actionRows, chantiers, onSelect }) {
                   )}
                   <span className="ml-auto text-[10px] font-mono text-gray-400">{r.number}</span>
                 </div>
-                <div className="text-[13px] text-gray-700 mt-1 line-clamp-2">{r.text || '(sans texte)'}</div>
+                {/* Texte d'observation = HTML (cf. formatObsText) : le rendre
+                    brut afficherait les balises. Blocs en ligne pour tenir sur
+                    2 lignes dans la carte. */}
+                {r.text ? (
+                  <div
+                    className="text-[13px] text-gray-700 mt-1 line-clamp-2 [&_div]:inline [&_p]:inline [&_ul]:inline [&_ol]:inline [&_li]:inline [&_li]:mr-2 [&_li]:before:content-['•_'] [&_li]:before:text-gray-400 [&_br]:hidden"
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(normalizeObsText(r.text)) }}
+                  />
+                ) : (
+                  <div className="text-[13px] text-gray-400 mt-1">(sans texte)</div>
+                )}
                 <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                   <span className="text-[11px] font-medium text-gray-400 truncate max-w-[45%]">{r.chantierNom}</span>
                   <span className="ml-auto inline-flex items-center gap-1">

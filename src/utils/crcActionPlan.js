@@ -72,6 +72,9 @@ export const buildActionRows = (chantiers = [], today = todayISO()) => {
         key: `${chantier.id}_${obs.id}`,
         chantierId: chantier.id,
         chantierNom: nom,
+        // Propriete du CRC : seul le createur peut solder une action depuis le
+        // plan (meme regle que l'edition du module).
+        ownerId: chantier.ownerId || null,
         obsId: obs.id,
         number: obsDisplayNumber(obs, codes),
         category: obs.category || '',
@@ -88,6 +91,36 @@ export const buildActionRows = (chantiers = [], today = todayISO()) => {
   }
   rows.sort((a, b) => a.deadline.localeCompare(b.deadline) || a.chantierNom.localeCompare(b.chantierNom));
   return rows;
+};
+
+/**
+ * Change le statut d'une observation du DERNIER CR d'un chantier et renvoie le
+ * tableau `crrMeetings` mis a jour — ou `null` si rien n'a change (obs absente,
+ * statut identique), auquel cas l'appelant n'ecrit pas.
+ *
+ * Cible volontairement le dernier CR : c'est la source des lignes du plan
+ * (buildActionRows). Un obsId est unique par CR mais RE-GENERE au report d'un CR
+ * au suivant — chercher dans toutes les reunions pourrait toucher un ancien CR
+ * deja diffuse.
+ */
+export const setObsStatusInLastMeeting = (chantier, obsId, status) => {
+  const meetings = chantier?.crrMeetings || [];
+  if (meetings.length === 0) return null;
+
+  const lastIndex = meetings.length - 1;
+  const last = meetings[lastIndex];
+  let changed = false;
+
+  const observations = (last.observations || []).map((o) => {
+    if (o.id !== obsId || o.status === status) return o;
+    changed = true;
+    return { ...o, status };
+  });
+  if (!changed) return null;
+
+  const next = meetings.slice();
+  next[lastIndex] = { ...last, observations };
+  return next;
 };
 
 /** Noms de responsables (pastilles PAR) presents dans les lignes, tries. */

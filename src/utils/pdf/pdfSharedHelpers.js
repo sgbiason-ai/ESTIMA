@@ -117,8 +117,16 @@ const rasterizeSvgToPng = (img) => new Promise((resolve) => {
   out.src = canvas.toDataURL('image/png');
 });
 
-/** Charge une image en la rasterisant si c'est un SVG (compatibilité jsPDF). */
-const loadImageForPdf = async (source) => {
+/**
+ * Charge une image en la rasterisant si c'est un SVG (compatibilité jsPDF).
+ *
+ * EXPORTÉ : tout logo destiné à un PDF doit passer par ici, jamais par
+ * `loadImage` brut. jsPDF.addImage ne sait pas rendre un SVG — l'image se
+ * charge (elle s'affiche donc parfaitement dans l'app) mais le PDF sort
+ * SANS le logo, sans la moindre erreur. Piège rencontré sur les logos
+ * commune / co-traitant du CRC.
+ */
+export const loadImageForPdf = async (source) => {
   if (!source) return null;
   const img = await loadImage(source);
   if (!img) return null;

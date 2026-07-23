@@ -6,7 +6,7 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { buildTheme } from './buildTheme';
-import { loadImage } from './pdfSharedHelpers';
+import { loadImageForPdf } from './pdfSharedHelpers';
 import { getMotifColor } from '../motifColors';
 import { getHolidayLabel, getWeekendName } from '../frenchHolidays';
 
@@ -108,7 +108,8 @@ export async function generateExpenseNotesPdf(opts) {
   let titleX = margin;
   if (branding.logo) {
     try {
-      const img = await loadImage(branding.logo);
+      // loadImageForPdf : rasterise les SVG (jsPDF ne les rend pas)
+      const img = await loadImageForPdf(branding.logo);
       if (img) {
         const maxLogoH = 18;
         const ratio = img.width / img.height;
