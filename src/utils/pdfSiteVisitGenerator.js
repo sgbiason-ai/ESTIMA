@@ -843,8 +843,6 @@ const drawObservations = async (doc, visit, THEME, obsViewKey = DEFAULT_PDF_VIEW
 
   doc.addPage();
   let y = 20;
-  let pageStarted = true;
-
   // Titre section
   doc.setFont('Helvetica', 'bold');
   doc.setFontSize(14);
@@ -856,6 +854,16 @@ const drawObservations = async (doc, visit, THEME, obsViewKey = DEFAULT_PDF_VIEW
   const miniMaps = await Promise.all(
     observations.map((obs, i) => buildObsMiniMap(obs, visit, THEME, i, obsViewKey).catch(() => null))
   );
+
+  // ── Grille : 2 observations par page ──
+  // Chaque page est coupée en deux slots égaux (séparateur à mi-hauteur) ; les
+  // photos se réduisent pour tenir dans leur slot. Une observation dont la
+  // partie incompressible ne laisse aucune place aux photos dans un demi-slot
+  // (texte très long) prend la page entière.
+  const BOTTOM = PH - M.bottom;
+  const SLOT_GAP = 5; // demi-espace autour du séparateur central
+  let pageTop = y;    // 30 sur la première page (titre de section), 20 ensuite
+  let slotPos = 0;    // 0 = moitié haute, 1 = moitié basse
 
   for (let i = 0; i < observations.length; i++) {
     const obs = observations[i];
@@ -873,26 +881,53 @@ const drawObservations = async (doc, visit, THEME, obsViewKey = DEFAULT_PDF_VIEW
     const hasMap = mapImages.length > 0;
     const textColW = hasMap ? CW - MAP_W - 5 - 13 : CW - 13; // largeur texte réduite si carte
 
-    // Estimer la hauteur nécessaire — mesurer avec la police de DESSIN du texte
-    // d'observation (9pt normal, cf. plus bas), sinon le wrap est calculé à 14pt
-    // (titre « Observations ») → lignes trop longues dessinées à 9pt → débordement.
+    // Mesurer le texte avec la police de DESSIN (9pt normal, cf. plus bas),
+    // sinon le wrap est calculé à 14pt (titre « Observations ») → lignes trop
+    // longues dessinées à 9pt → débordement.
     doc.setFont('Helvetica', 'normal');
     doc.setFontSize(9);
     const textLines = text ? doc.splitTextToSize(text, textColW) : [];
     const textH = textLines.length * 4;
-    const hasImages = images.length > 0;
+    // Photos réellement chargées : une photo Storage KO ne compte pas (elle ne
+    // sera pas dessinée — inutile de réserver la place ou de forcer une page).
+    const nPhotos = images.filter((im) => {
+      const cached = imageCache.get(typeof im === 'string' ? im : im.src);
+      return cached && cached.w && cached.h;
+    }).length;
+    const hasImages = nPhotos > 0;
     const hasSegment = obs.segmentFrom && obs.segmentTo;
-    const leftH = 16 + (hasSegment ? 15 : 0) + textH + 6;
-    const estimatedH = Math.max(leftH, hasMap ? MAP_H + 10 : 0) + (hasImages ? 85 : 0) + 10;
 
-    // Saut de page si pas assez de place
-    if (y + estimatedH > PH - M.bottom && !pageStarted) {
-      doc.addPage();
-      y = 20;
-      pageStarted = true;
+    // ── Attribution du slot ──
+    // Pleine page si : plus de 2 photos (elles gardent ainsi une taille
+    // confortable au lieu d'être compressées dans un demi-slot), ou hauteur
+    // incompressible (en-tête + segment + texte à gauche, mini-carte à droite)
+    // ne laissant pas ~25 mm aux photos dans un demi-slot (texte très long).
+    const leftH = 11 + (hasSegment ? 13 : 0) + (textLines.length ? textH + 4 : 0);
+    const fixedH = Math.max(leftH, hasMap ? MAP_H + 4 : 0);
+    const midY = (pageTop + BOTTOM) / 2;
+    const needsFullPage = nPhotos > 2
+      || fixedH + (hasImages ? 25 : 0) > midY - SLOT_GAP - pageTop;
+
+    let slotTop, slotBottom;
+    if (needsFullPage) {
+      if (slotPos === 1) { doc.addPage(); pageTop = 20; }
+      slotTop = pageTop;
+      slotBottom = BOTTOM;
+    } else if (slotPos === 0) {
+      slotTop = pageTop;
+      slotBottom = midY - SLOT_GAP;
+    } else {
+      // Séparateur tracé ICI, quand la moitié basse est réellement occupée —
+      // pas à la fin de l'observation du haut (une bascule pleine page de la
+      // suivante laisserait un trait orphelin sur une demi-page vide).
+      doc.setDrawColor(...lightenRgb(THEME.primary, 0.85));
+      doc.setLineWidth(0.3);
+      doc.line(M.left + 13, midY, PW - M.right, midY);
+      doc.setLineWidth(0.2);
+      slotTop = midY + SLOT_GAP;
+      slotBottom = BOTTOM;
     }
-
-    pageStarted = false;
+    y = slotTop;
     const obsStartY = y;
 
     // ── En-tete observation ──
@@ -994,65 +1029,106 @@ const drawObservations = async (doc, visit, THEME, obsViewKey = DEFAULT_PDF_VIEW
       y = Math.max(y, obsStartY + MAP_H + 4);
     }
 
-    // ── Images (grandes, cote a cote si 2+) ──
+    // ── Images, en rangées ──
+    // Les photos verticales tiennent à 3 de front sans devenir illisibles ;
+    // les horizontales à 2. Chaque rangée est mise à l'échelle sur une hauteur
+    // commune pour occuper la largeur utile (des photos empilées à demi-largeur
+    // gaspillaient une page entière pour 3 clichés).
     if (hasImages) {
-      const maxImgW = images.length === 1 ? CW - 13 : (CW - 13 - 4) / 2;
-      const maxImgH = 75;
-      let imgX = M.left + 13;
+      const GAP = 4;
+      const AVAIL_W = CW - 13;
+      const MAX_ROW_H = 75;
 
-      for (let j = 0; j < images.length; j++) {
-        const imgData = images[j];
+      const loaded = [];
+      for (const imgData of images) {
         const imgSrc = typeof imgData === 'string' ? imgData : imgData.src;
         const cached = imageCache.get(imgSrc);
-        if (!cached) continue; // image non chargee (Storage/fetch KO)
-
-        try {
-          const aspect = cached.w / cached.h;
-          let imgW = Math.min(maxImgW, cached.w * 0.264);
-          let imgH = imgW / aspect;
-          if (imgH > maxImgH) { imgH = maxImgH; imgW = imgH * aspect; }
-          if (imgW > maxImgW) { imgW = maxImgW; imgH = imgW / aspect; }
-
-          if (y + imgH + 5 > PH - M.bottom) {
-            doc.addPage();
-            y = 20;
-            imgX = M.left + 13;
-          }
-
-          doc.setDrawColor(...THEME.borders);
-          doc.setLineWidth(0.2);
-          doc.roundedRect(imgX - 0.5, y - 0.5, imgW + 1, imgH + 1, 1, 1, 'S');
-          doc.addImage(cached.uri, 'JPEG', imgX, y, imgW, imgH);
-
-          if (typeof imgData === 'object' && imgData.lat != null && imgData.lng != null) {
-            doc.setFont('Helvetica', 'italic');
-            doc.setFontSize(6);
-            doc.setTextColor(59, 130, 246);
-            const url = `https://www.google.com/maps?q=${imgData.lat},${imgData.lng}`;
-            doc.textWithLink('GPS', imgX, y + imgH + 3, { url });
-          }
-
-          if (images.length <= 2 && j === 0 && images.length > 1) {
-            imgX += imgW + 4;
-          } else {
-            y += imgH + 6;
-            imgX = M.left + 13;
-          }
-        } catch { /* image non chargee */ }
+        if (!cached || !cached.w || !cached.h) continue; // image non chargee (Storage/fetch KO)
+        loaded.push({ data: imgData, cached, aspect: cached.w / cached.h });
       }
 
-      if (images.length === 2) {
-        y += maxImgH + 6;
+      // Portrait = plus haut que large (une photo carrée reste en rangée de 2)
+      const allPortrait = loaded.length > 0 && loaded.every(im => im.aspect < 0.95);
+      const perRow = allPortrait ? 3 : 2;
+      const cellW = (AVAIL_W - GAP * (perRow - 1)) / perRow;
+
+      const rows = [];
+      for (let k = 0; k < loaded.length; k += perRow) rows.push(loaded.slice(k, k + perRow));
+
+      // Hauteur naturelle de chaque rangée : remplit la largeur utile, sans
+      // dépasser la hauteur max ni agrandir une photo au-delà de sa taille
+      // naturelle. Dernière rangée incomplète : garder le gabarit des rangées
+      // au-dessus, sinon une photo esseulée s'affiche plus grande.
+      const rowHeights = rows.map((row) => {
+        const sumAspect = row.reduce((s, im) => s + im.aspect, 0);
+        const rowW = AVAIL_W - GAP * (row.length - 1);
+        let rowH = Math.min(rowW / sumAspect, MAX_ROW_H, ...row.map(im => im.cached.h * 0.264));
+        if (rows.length > 1 && row.length < perRow) {
+          rowH = Math.min(rowH, ...row.map(im => cellW / im.aspect));
+        }
+        return rowH;
+      });
+
+      // Adapter la pile de rangées à la place restante du slot : réduction
+      // proportionnelle uniquement (jamais d'agrandissement).
+      const fixedGaps = 7 * (rows.length - 1) + 3; // respirations + marge lien GPS
+      let availH = slotBottom - y - fixedGaps;
+      const sumH = rowHeights.reduce((s, h) => s + h, 0);
+      let shrink = sumH > availH ? Math.max(availH, 0) / sumH : 1;
+
+      // Pleine page saturée par un très long texte : plutôt que de réduire des
+      // rangées sous le seuil de lisibilité (omission à 8 mm), les photos
+      // continuent sur la page suivante — comme le faisait l'ancien flux.
+      // Jamais atteint en demi-slot : une seule rangée y dispose d'au moins
+      // 22 mm (réserve de 25 mm dans needsFullPage).
+      if (needsFullPage && rowHeights.some(h => h * shrink < 8)) {
+        doc.addPage();
+        pageTop = 20;
+        y = 20;
+        availH = BOTTOM - y - fixedGaps;
+        shrink = sumH > availH ? Math.max(availH, 0) / sumH : 1;
       }
+
+      rows.forEach((row, rowIdx) => {
+        const rowH = rowHeights[rowIdx] * shrink;
+        if (rowH < 8) return; // slot saturé : mieux vaut omettre qu'écraser
+
+        // Centrer la rangée dans la colonne de contenu : une rangée incomplète
+        // ou réduite n'occupe pas toute la largeur utile.
+        const widths = row.map(im => rowH * im.aspect);
+        const rowTotalW = widths.reduce((s, w) => s + w, 0) + GAP * (row.length - 1);
+        let imgX = M.left + 13 + Math.max(0, (AVAIL_W - rowTotalW) / 2);
+
+        row.forEach((im, colIdx) => {
+          const imgW = widths[colIdx];
+          try {
+            doc.setDrawColor(...THEME.borders);
+            doc.setLineWidth(0.2);
+            doc.roundedRect(imgX - 0.5, y - 0.5, imgW + 1, rowH + 1, 1, 1, 'S');
+            doc.addImage(im.cached.uri, 'JPEG', imgX, y, imgW, rowH);
+
+            if (typeof im.data === 'object' && im.data.lat != null && im.data.lng != null) {
+              doc.setFont('Helvetica', 'italic');
+              doc.setFontSize(6);
+              doc.setTextColor(59, 130, 246);
+              const url = `https://www.google.com/maps?q=${im.data.lat},${im.data.lng}`;
+              doc.textWithLink('GPS', imgX, y + rowH + 3, { url });
+            }
+          } catch { /* image illisible pour jsPDF */ }
+          imgX += imgW + GAP;
+        });
+
+        y += rowH + 6;
+        if (rowIdx < rows.length - 1) y += 1; // respiration entre rangées
+      });
     }
 
-    // ── Separateur ──
-    if (i < observations.length - 1) {
-      doc.setDrawColor(...lightenRgb(THEME.primary, 0.85));
-      doc.setLineWidth(0.3);
-      doc.line(M.left + 13, y, PW - M.right, y);
-      doc.setLineWidth(0.2);
-      y += 8;
+    // ── Slot suivant : moitié basse de cette page, ou page neuve ──
+    if (!needsFullPage && slotPos === 0 && i < observations.length - 1) {
+      slotPos = 1;
+    } else {
+      slotPos = 0;
+      if (i < observations.length - 1) { doc.addPage(); pageTop = 20; }
     }
   }
 };

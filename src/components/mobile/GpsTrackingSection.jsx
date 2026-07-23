@@ -173,6 +173,9 @@ export default function GpsTrackingSection({
     endTime: finalize ? new Date().toISOString() : null,
     coordinates,
     distance: Math.round(totalDistance(coordinates)),
+    // De nouveaux points enregistrés → la trace redevient nettoyable (le
+    // verrou cleanedAt ne vaut que pour la trace figée qu'il a nettoyée).
+    cleanedAt: null,
   }), []);
 
   const flushCurrentTracking = useCallback(({ finalize = false } = {}) => {
@@ -320,7 +323,10 @@ export default function GpsTrackingSection({
   }, [finishRecording]);
 
   const cleanExistingTrace = useCallback(() => {
-    const cleaned = cleanGpsTrace(liveCoords);
+    // Une seule fois par trace : sans lissage (points aberrants uniquement),
+    // et marquée cleanedAt — réappliquer le nettoyage dégradait le tracé.
+    if (tracking?.cleanedAt) { onToast?.('Trace déjà nettoyée'); return; }
+    const cleaned = cleanGpsTrace(liveCoords, { smoothing: false });
     setTraceBeforeClean(liveCoords);
     liveCoordsRef.current = cleaned;
     setLiveCoords(cleaned);
@@ -328,6 +334,7 @@ export default function GpsTrackingSection({
       ...tracking,
       coordinates: cleaned,
       distance: Math.round(totalDistance(cleaned)),
+      cleanedAt: new Date().toISOString(),
     });
     onToast?.(`Trace nettoyée — ${liveCoords.length} → ${cleaned.length} points`);
   }, [liveCoords, tracking, onToast, persistTracking]);
@@ -336,8 +343,10 @@ export default function GpsTrackingSection({
     if (!traceBeforeClean) return;
     liveCoordsRef.current = traceBeforeClean;
     setLiveCoords(traceBeforeClean);
+    // Retirer cleanedAt : la trace restaurée redevient nettoyable.
+    const { cleanedAt: _cleanedAt, ...rest } = tracking || {};
     persistTracking({
-      ...tracking,
+      ...rest,
       coordinates: traceBeforeClean,
       distance: Math.round(totalDistance(traceBeforeClean)),
     });
@@ -411,8 +420,9 @@ export default function GpsTrackingSection({
             <div className="flex items-center gap-1">
               {traceBeforeClean && <button onClick={undoTraceCleaning} title="Annuler le nettoyage"
                 className="p-2.5 rounded-xl bg-gray-100 text-gray-600 active:bg-gray-200 transition"><Undo2 size={15} /></button>}
-              <button onClick={cleanExistingTrace} title="Nettoyer la trace GPS"
-                className="p-2.5 rounded-xl bg-blue-50 text-blue-600 active:bg-blue-100 transition"><Wand2 size={15} /></button>
+              <button onClick={cleanExistingTrace} disabled={!!tracking?.cleanedAt}
+                title={tracking?.cleanedAt ? 'Trace déjà nettoyée (une seule fois par trace)' : 'Nettoyer la trace GPS'}
+                className={`p-2.5 rounded-xl transition ${tracking?.cleanedAt ? 'bg-gray-100 text-gray-300' : 'bg-blue-50 text-blue-600 active:bg-blue-100'}`}><Wand2 size={15} /></button>
             </div>
           )}
 

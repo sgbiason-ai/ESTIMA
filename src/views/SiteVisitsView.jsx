@@ -422,17 +422,21 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
     setLiveCoords(simplified);
     if (fullVisit?.id) {
       const ref = doc(db, 'companies', companyId, 'site_visits', fullVisit.id);
-      await updateDoc(ref, { 'gpsTracking.endTime': new Date().toISOString(), 'gpsTracking.coordinates': simplified, 'gpsTracking.distance': Math.round(totalDistance(simplified)) }).catch(() => {});
+      // Nouveaux points enregistrés → la trace redevient nettoyable.
+      await updateDoc(ref, { 'gpsTracking.endTime': new Date().toISOString(), 'gpsTracking.coordinates': simplified, 'gpsTracking.distance': Math.round(totalDistance(simplified)), 'gpsTracking.cleanedAt': null }).catch(() => {});
       handleLoadDetail(fullVisit.id);
     }
   }, [companyId, fullVisit?.id, liveCoords, handleLoadDetail]);
 
   const handleCleanTrace = useCallback(() => {
     if (!fullVisit || liveCoords.length < 3) return;
-    const cleaned = cleanGpsTrace(liveCoords);
+    // Une seule fois par trace : sans lissage (points aberrants uniquement),
+    // et marquée cleanedAt — réappliquer le nettoyage dégradait le tracé.
+    if (fullVisit.gpsTracking?.cleanedAt) { showToast('Trace déjà nettoyée'); return; }
+    const cleaned = cleanGpsTrace(liveCoords, { smoothing: false });
     const updated = {
       ...fullVisit,
-      gpsTracking: { ...fullVisit.gpsTracking, coordinates: cleaned, distance: Math.round(totalDistance(cleaned)) },
+      gpsTracking: { ...fullVisit.gpsTracking, coordinates: cleaned, distance: Math.round(totalDistance(cleaned)), cleanedAt: new Date().toISOString() },
     };
     setTraceBeforeClean(liveCoords);
     setLiveCoords(cleaned);
@@ -443,9 +447,11 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
 
   const handleUndoTraceClean = useCallback(() => {
     if (!fullVisit || !traceBeforeClean) return;
+    // Retirer cleanedAt : la trace restaurée redevient nettoyable.
+    const { cleanedAt: _cleanedAt, ...tracking } = fullVisit.gpsTracking || {};
     const updated = {
       ...fullVisit,
-      gpsTracking: { ...fullVisit.gpsTracking, coordinates: traceBeforeClean, distance: Math.round(totalDistance(traceBeforeClean)) },
+      gpsTracking: { ...tracking, coordinates: traceBeforeClean, distance: Math.round(totalDistance(traceBeforeClean)) },
     };
     setLiveCoords(traceBeforeClean);
     setFullVisit(updated);
@@ -779,9 +785,10 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
                   <div className="flex items-center gap-1">
                     {traceBeforeClean && <button onClick={handleUndoTraceClean} title="Annuler le nettoyage"
                       className="p-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition"><Undo2 size={12} /></button>}
-                    <button onClick={handleCleanTrace} title="Supprimer les points GPS aberrants et lisser la trace"
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 text-[10px] font-bold transition">
-                      <Wand2 size={12} /> Nettoyer
+                    <button onClick={handleCleanTrace} disabled={!!tracking.cleanedAt}
+                      title={tracking.cleanedAt ? 'Trace déjà nettoyée (une seule fois par trace)' : 'Supprimer les points GPS aberrants'}
+                      className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition ${tracking.cleanedAt ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}>
+                      <Wand2 size={12} /> {tracking.cleanedAt ? 'Nettoyée' : 'Nettoyer'}
                     </button>
                   </div>
                 )}

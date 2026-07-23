@@ -212,7 +212,13 @@ function cleanSegment(segment, config) {
   }
 
   const withoutSpikes = removeTriangleOutliers(removeTriangleOutliers(plausible));
-  const smoothed = withoutSpikes.map((point, index, list) => {
+
+  // Filtre médian + lissage exponentiel : réservé aux traces BRUTES (arrêt
+  // d'enregistrement). Ces deux passes ne sont PAS idempotentes — réappliquées
+  // sur une trace déjà lissée, elles rabotent les virages à chaque passage.
+  // Le nettoyage manuel (« Nettoyer ») passe smoothing:false : il ne retire que
+  // les points aberrants, sans déformer le tracé.
+  const smoothed = config.smoothing === false ? withoutSpikes : withoutSpikes.map((point, index, list) => {
     if (index === 0 || index === list.length - 1) return point;
     const window = [list[index - 1], point, list[index + 1]];
     return { ...point, lat: median(window.map(item => item.lat)), lng: median(window.map(item => item.lng)) };
