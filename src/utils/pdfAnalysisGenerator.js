@@ -274,6 +274,7 @@ export const generateAnalysisPDF = async ({
   // Phase après négociation : les offres passées sont déjà résolues (fusion
   // initial + négocié) par l'appelant — ce flag ne sert qu'au libellé.
   negoActive = false,
+  returnFile = false,
 }) => {
   const doc = new jsPDF('p', 'mm', 'a4');
   const dateStr = new Date().toLocaleDateString('fr-FR');
@@ -525,5 +526,9 @@ export const generateAnalysisPDF = async ({
 
   const safeTitle = sanitizeFilename(project?.title || project?.name || "Export");
   const safeTranche = sanitizeFilename(activeTrancheId === 'global' ? 'Global' : activeTrancheId);
-  doc.save(`Analyse_${safeTitle}_${safeTranche}_${new Date().toISOString().slice(0, 10)}.pdf`);
+  const filename = `Analyse_${safeTitle}_${safeTranche}_${new Date().toISOString().slice(0, 10)}.pdf`;
+  if (returnFile) {
+    return { blob: doc.output('blob'), filename };
+  }
+  doc.save(filename);
 };

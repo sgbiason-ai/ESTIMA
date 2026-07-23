@@ -711,5 +711,9 @@ export const generateProfessionalPDF = async (project, clientQtyMaps, type = 'ES
     return { blobUrl: URL.createObjectURL(blob), suggestedName, blob };
   }
 
+  if (options.returnFile) {
+    return { blob, filename: suggestedName };
+  }
+
   await saveFileWithPicker(blob, suggestedName, FILE_TYPES.pdf, PICKER_IDS.exportPdf);
 };

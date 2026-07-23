@@ -27,6 +27,7 @@ export async function generateNegoLetterPDF({
   analysisCompanies = [],
   chaptersData = [],
   bpuRefMap = null,
+  returnFile = false,
 }) {
   // Construire un map { ref → unit } à partir des chapitres pour lookup ultérieur
   const unitByRef = new Map();
@@ -592,7 +593,11 @@ export async function generateNegoLetterPDF({
 
   stampPdfCredit(doc);
   const safeName = sanitizeFilename(companyName);
-  doc.save(`Courrier_Negociation_${safeName}.pdf`);
+  const filename = `Courrier_Negociation_${safeName}.pdf`;
+  if (returnFile) {
+    return { blob: doc.output('blob'), filename };
+  }
+  doc.save(filename);
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

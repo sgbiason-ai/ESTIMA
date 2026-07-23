@@ -2,9 +2,13 @@
 //
 // Vue detail d'une fiche marche — lecture seule + exports EXE1/EXE4-6.
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import Icon from './Icon';
 import { dateFr } from './formatters';
+import {
+  buildMobileDocAdminExportContext,
+  getMobileDocAdminExportTargets,
+} from '../../utils/docAdmin/mobileExportContext';
 
 // ─── OS type labels ────────────────────────────────────────────────────────
 const OS_LABELS = {
@@ -120,62 +124,32 @@ const SectionCard = ({ title, icon, color, children }) => (
 export default function DocAdminDetailView({ fiche, onToast, isLandscape }) {
   const [activeTab, setActiveTab] = useState('resume');
   const [exporting, setExporting] = useState(null);
+  const [selectedGroupeId, setSelectedGroupeId] = useState(null);
 
   const { sectionA, sectionB, sectionD } = fiche;
   const lots = sectionD?.lots || [];
+  const isAlloti = lots.length > 0
+    && (sectionB?.groupesAttributaires || []).length > 0;
 
-  // ── Collecter tous les EXE par entreprise ──
-  // Marché alloti : données dans exeParEntreprise[groupeId]
-  // Marché seul : données à la racine (fiche.exe1, fiche.reception, fiche.exe10)
-  const allExeEntries = useMemo(() => {
-    const map = fiche.exeParEntreprise || {};
-    const groups = fiche.sectionB?.groupesAttributaires || [];
-    const entries = Object.entries(map);
+  const allExeEntries = useMemo(
+    () => getMobileDocAdminExportTargets(fiche),
+    [fiche],
+  );
+  const displayedExeEntries = isAlloti
+    ? allExeEntries.filter((entry) => entry.groupeId === selectedGroupeId)
+    : allExeEntries;
 
-    // Marché alloti avec exeParEntreprise rempli
-    if (entries.length > 0) {
-      return entries.map(([groupeId, data]) => {
-        const group = groups.find((g) => g.groupeId === groupeId);
-        const name = group?.entreprise?.nomCommercial ||
-          group?.entreprise?.denominationSociale ||
-          fiche.sectionB?.mandataire?.nomCommercial ||
-          'Entreprise';
-        return { groupeId, name, data };
-      });
-    }
-
-    // Marché seul : EXE stockés à la racine de la fiche
-    const rootExe1 = fiche.exe1 || [];
-    const rootReception = fiche.reception || {};
-    const rootExe10 = fiche.exe10 || {};
-    const hasRootData = rootExe1.length > 0 ||
-      Object.keys(rootReception).length > 0 ||
-      Object.keys(rootExe10).length > 0;
-
-    if (hasRootData) {
-      return [{
-        groupeId: '_root',
-        name: fiche.sectionB?.mandataire?.nomCommercial ||
-          fiche.sectionB?.mandataire?.denominationSociale || 'Entreprise',
-        data: { exe1: rootExe1, reception: rootReception, exe10: rootExe10 },
-      }];
-    }
-
-    return [];
-  }, [fiche]);
+  useEffect(() => {
+    setSelectedGroupeId(null);
+  }, [fiche.id]);
 
   // ── Export EXE ──
   const handleExport = useCallback(async (type, groupeId, index) => {
     const key = `${type}-${groupeId}-${index ?? ''}`;
     setExporting(key);
     try {
-      // Données EXE : soit à la racine (marché seul) soit dans exeParEntreprise
-      const exeData = groupeId === '_root'
-        ? { exe1: fiche.exe1 || [], reception: fiche.reception || {}, exe10: fiche.exe10 || {} }
-        : fiche.exeParEntreprise?.[groupeId];
-      if (!exeData) return;
-
-      const virtualFiche = { ...fiche };
+      const { fiche: virtualFiche, data: exeData } =
+        buildMobileDocAdminExportContext(fiche, groupeId);
 
       if (type === 'exe1') {
         const osList = exeData.exe1 || [];
@@ -287,17 +261,65 @@ export default function DocAdminDetailView({ fiche, onToast, isLandscape }) {
         {/* ─── TAB EXE DOCS ───────────────────────────────────────────── */}
         {activeTab === 'exe' && (
           <div>
+            {isAlloti && (
+              <div className="bg-white rounded-xl border border-gray-200 p-3 mb-3">
+                <div className="text-xs font-bold text-gray-900 mb-1">
+                  Attributaire et lots à exporter
+                </div>
+                <div className="text-[11px] text-gray-700 mb-3">
+                  Sélection obligatoire avant de télécharger un document.
+                </div>
+                <div className="space-y-2">
+                  {allExeEntries.map((entry) => {
+                    const selected = entry.groupeId === selectedGroupeId;
+                    return (
+                      <button
+                        key={entry.groupeId}
+                        type="button"
+                        onClick={() => setSelectedGroupeId(entry.groupeId)}
+                        className={`w-full text-left rounded-xl border px-3 py-2.5 transition active:scale-[0.99] ${
+                          selected
+                            ? 'bg-gray-900 border-gray-900 text-white'
+                            : 'bg-gray-100 border-gray-200 text-gray-900'
+                        }`}
+                      >
+                        <div className="text-xs font-bold">{entry.name}</div>
+                        <div className={`text-[10px] mt-0.5 ${
+                          selected ? 'text-gray-200' : 'text-gray-700'
+                        }`}>
+                          {entry.lotLabels.length > 0
+                            ? entry.lotLabels.join(' · ')
+                            : 'Aucun lot attribué'}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {allExeEntries.length === 0 && (
               <div className="text-center py-10 text-gray-700 text-sm">
                 Aucun document EXE renseigné
               </div>
             )}
 
-            {allExeEntries.map(({ groupeId, name, data }) => (
+            {isAlloti && !selectedGroupeId && allExeEntries.length > 0 && (
+              <div className="text-center py-8 text-gray-700 text-sm">
+                Sélectionnez un attributaire ci-dessus.
+              </div>
+            )}
+
+            {displayedExeEntries.map(({ groupeId, name, lotLabels, data }) => (
               <div key={groupeId} className="mb-4">
-                {/* Entreprise header (si plusieurs) */}
-                {allExeEntries.length > 1 && (
-                  <div className="text-xs font-bold text-rose-400 mb-2 px-1">{name}</div>
+                {/* Entreprise et lots actifs */}
+                {isAlloti && (
+                  <div className="mb-2 px-1">
+                    <div className="text-xs font-bold text-rose-600">{name}</div>
+                    <div className="text-[10px] text-gray-700">
+                      {lotLabels.join(' · ') || 'Aucun lot attribué'}
+                    </div>
+                  </div>
                 )}
 
                 {/* EXE1-T — Ordres de Service */}

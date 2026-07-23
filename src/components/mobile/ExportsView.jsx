@@ -90,6 +90,8 @@ export default function ExportsView({ onExport, companies = [] }) {
                   <button
                     onClick={() => handleClick(item, false)}
                     disabled={isBusy}
+                    aria-label={`Télécharger ${item.label} au format ${item.format}`}
+                    title={`Télécharger ${item.label}`}
                     className={`w-9 h-9 rounded-xl border flex items-center justify-center transition ${
                       isBusy ? 'bg-gray-50 border-gray-200 opacity-40'
                         : 'bg-blue-50 border-blue-200 active:bg-blue-100'
@@ -100,6 +102,8 @@ export default function ExportsView({ onExport, companies = [] }) {
                     <button
                       onClick={() => handleClick(item, true)}
                       disabled={isBusy}
+                      aria-label={`Partager ${item.label} au format ${item.format}`}
+                      title={`Partager ${item.label}`}
                       className={`w-9 h-9 rounded-xl border flex items-center justify-center transition ${
                         isBusy ? 'bg-gray-50 border-gray-200 opacity-40'
                           : 'bg-gray-50 border-gray-200 active:bg-gray-100'

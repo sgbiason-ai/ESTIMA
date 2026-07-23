@@ -605,6 +605,7 @@ export const generateRaoPDF = async (optionsParams) => {
     // Phase « après négo » active dans l'analyse : le détail des prix unitaires
     // reprend alors les prix négociés (fusion initial + négocié par article).
     negoActive = false,
+    returnFile = false,
   } = optionsParams;
 
   // Taux de TVA configurable par projet (défaut 20 %), partagé par toutes les sorties RAO (audit F2).
@@ -3108,5 +3109,9 @@ export const generateRaoPDF = async (optionsParams) => {
 
   const safeName = (consultation?.objet || project?.name || 'RAO').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '').replace(/_+/g, '_').replace(/^_|_$/g, '').slice(0, 60);
   stampPdfCredit(doc);
-  doc.save(`RAO_${safeName}_${new Date().toISOString().slice(0, 10)}.pdf`);
+  const filename = `RAO_${safeName}_${new Date().toISOString().slice(0, 10)}.pdf`;
+  if (returnFile) {
+    return { blob: doc.output('blob'), filename };
+  }
+  doc.save(filename);
 };

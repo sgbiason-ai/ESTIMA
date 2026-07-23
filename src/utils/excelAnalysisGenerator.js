@@ -487,6 +487,7 @@ export async function generateAnalysisExcel({
   // Phase après négociation : les offres passées sont déjà résolues (fusion
   // initial + négocié) par l'appelant — ce flag ne sert qu'au libellé.
   negoActive = false,
+  returnFile = false,
 }) {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'EstimaVRD';
@@ -596,7 +597,11 @@ export async function generateAnalysisExcel({
 
   stampExcelCredit(wb);
   const buffer = await wb.xlsx.writeBuffer();
-  saveAs(new Blob([buffer], {
+  const blob = new Blob([buffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  }), filename);
+  });
+  if (returnFile) {
+    return { blob, filename };
+  }
+  saveAs(blob, filename);
 }

@@ -21,7 +21,7 @@ const loadCoverPagePdf      = () => import('../../utils/pdfCoverPageGenerator');
 const loadNegoLetterPdf     = () => import('../../utils/pdf/pdfNegoLetterGenerator');
 
 // ─── PARTAGE NATIF ──────────────────────────────────────────────────────────
-import { setShareMode } from '../../utils/fileSaver';
+import { deliverMobileExport } from '../../utils/mobileExportDelivery';
 
 // ─── COMPOSANTS MOBILE ──────────────────────────────────────────────────────
 import MobileStyles    from './MobileStyles';
@@ -53,6 +53,7 @@ import { useOrientation }   from '../../hooks/useOrientation';
 import { useRobustSave, loadDraft, clearDraft } from '../../hooks/useRobustSave';
 import { useNegoTemplate }  from '../../hooks/useNegoTemplate';
 import { computeChaptersData, computeAnalysisStats, getEffectiveOffers } from '../../utils/analysisCompute';
+import { buildRaoConsultation, prepareMobileRaoExportData } from '../../utils/mobileRaoExportData';
 import { usePresence, useCoEditors } from '../../hooks/usePresence';
 import CoEditBanner from '../common/CoEditBanner';
 
@@ -325,8 +326,12 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
     // chaptersData + stats sont des calculs derives (non stockes en Firestore) :
     // on les recalcule a la demande pour les exports analyse/RAO
     const analysisData = fullProject.analysis || {};
-    // Phase « après négo » (scoringConfig.basis du doc analysis).
-    const negoBasis = analysisData.scoringConfig?.basis === 'nego';
+    // Source de vérité : analysis/data. Le scoringConfig du projet racine n'est
+    // qu'un fallback de compatibilité pour les anciens dossiers.
+    const scoringConfig = analysisData.scoringConfig
+      || fullProject.scoringConfig
+      || { maxScore: 40, mode: 'f1', basis: 'initial' };
+    const negoBasis = scoringConfig.basis === 'nego';
     const rawCompanies = analysisData.companies || [];
     // Companies avec offers pré-résolues (fusion initial + négocié) — pour les
     // générateurs Analyse/NegoLetter, qui n'opèrent pas leur propre résolution.
@@ -339,56 +344,58 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
       ? computeChaptersData(fullProject, analysisCompanies, currentQtyMap)
       : [];
     const computedStats = (exportType === 'Analyse' || exportType === 'AnalyseExcel')
-      ? computeAnalysisStats(computedChapters, analysisCompanies, fullProject.scoringConfig, negoBasis ? 'nego' : 'initial')
+      ? computeAnalysisStats(computedChapters, analysisCompanies, scoringConfig, negoBasis ? 'nego' : 'initial')
       : null;
 
-    // RAO : companies RAW (parité desktop — RaoView.jsx passe analysis.companies
-    // non résolu). generateRaoPDF résout lui-même offres base + variantes + rabais
-    // selon negoActive ; les totaux dénormalisés des variantes (v.totalNego) ont
-    // été calculés à l'import avec des companies RAW — repasser des companies
-    // déjà mélangées romprait la cohérence base/variante (fallback de prix).
-    const raoChapters = exportType === 'RAO'
-      ? computeChaptersData(fullProject, rawCompanies, currentQtyMap, negoBasis ? 'nego' : 'initial')
-      : [];
-    const raoStats = exportType === 'RAO'
-      ? computeAnalysisStats(raoChapters, rawCompanies, fullProject.scoringConfig, negoBasis ? 'nego' : 'initial')
+    // RAO : reconstruit le même payload métier que la vue desktop à partir des
+    // documents analysis/data + rao/data (tranche, PSE, classements et négo).
+    const raoExportData = exportType === 'RAO'
+      ? prepareMobileRaoExportData({
+          project: fullProject,
+          analysisData,
+          clientQtyMaps: calcHook.clientQtyMaps,
+          tranches: tranchesList,
+        })
       : null;
 
     try {
       setToast(share ? `Partage ${exportType}…` : `Export ${exportType}…`);
-      setShareMode(share);
+      let generatedFile = null;
 
       switch (exportType) {
         case 'BPU': {
           const { generateProfessionalExcel } = await loadExcelGenerator();
-          await generateProfessionalExcel(fullProject, calcHook.clientQtyMaps, 'BPU', bpuCfg, {
+          generatedFile = await generateProfessionalExcel(fullProject, calcHook.clientQtyMaps, 'BPU', bpuCfg, {
             selectedExports: ['global'],
             tranches: tranchesList,
+            returnFile: true,
           }, branding);
           break;
         }
         case 'DQE': {
           const { generateProfessionalExcel } = await loadExcelGenerator();
-          await generateProfessionalExcel(fullProject, calcHook.clientQtyMaps, 'ESTIMATION', bpuCfg, {
+          generatedFile = await generateProfessionalExcel(fullProject, calcHook.clientQtyMaps, 'ESTIMATION', bpuCfg, {
             selectedExports: trancheIds,
             includeSummary: tranchesHook.hasTranches,
             tranches: tranchesList,
+            returnFile: true,
           }, branding);
           break;
         }
         case 'Estim': {
           const { generateProfessionalPDF } = await loadPdfGenerator();
-          await generateProfessionalPDF(fullProject, calcHook.clientQtyMaps, 'ESTIMATION', bpuCfg, {
+          generatedFile = await generateProfessionalPDF(fullProject, calcHook.clientQtyMaps, 'ESTIMATION', bpuCfg, {
             selectedExports: trancheIds,
             includeSummary: tranchesHook.hasTranches,
             tranches: tranchesList,
+            returnFile: true,
           }, branding);
           break;
         }
         case 'Analyse': {
           const { generateAnalysisPDF } = await loadAnalysisPdf();
           if (analysisCompanies.length === 0) { setToast('Aucune analyse disponible'); return; }
-          await generateAnalysisPDF({
+          generatedFile = await generateAnalysisPDF({
             project: fullProject,
             companies: analysisCompanies,
             chaptersData: computedChapters,
@@ -396,57 +403,67 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
             bpuRefMap: calcHook.refMap,
             activeTrancheId,
             tranches: tranchesList,
-            analysisMode: analysisData.analysisMode || 'global',
-            scoringConfig: fullProject.scoringConfig || null,
+            analysisMode: analysisData.analysisMode || 'none',
+            scoringConfig,
             branding,
             negoActive: negoBasis,
+            returnFile: true,
           });
           break;
         }
         case 'RAO': {
           const { generateRaoPDF } = await loadRaoPdf();
-          if (rawCompanies.length === 0) { setToast('Aucune analyse disponible'); return; }
-          await generateRaoPDF({
+          if (!raoExportData?.companies.length) { setToast('Aucune analyse disponible'); return; }
+          generatedFile = await generateRaoPDF({
             project: fullProject,
-            consultation: fullProject.consultation || {},
-            criteria: fullProject.criteria || [],
-            rao: fullProject.rao || {},
-            analysisCompanies: rawCompanies,
-            scores: analysisData.scores || {},
-            ranking: analysisData.ranking || [],
+            consultation: raoExportData.consultation,
+            criteria: raoExportData.criteria,
+            rao: raoExportData.rao,
+            analysisCompanies: raoExportData.companies,
+            ranking: raoExportData.ranking,
+            rankingInitial: raoExportData.rankingInitial,
+            rankingNego: raoExportData.rankingNego,
             branding,
-            analysisStats: raoStats,
-            chaptersData: raoChapters,
+            analysisStats: raoExportData.analysisStats,
+            analysisStatsInitial: raoExportData.analysisStatsInitial,
+            chaptersData: raoExportData.chaptersData,
             bpuRefMap: calcHook.refMap,
-            activeTrancheId,
+            activeTrancheId: raoExportData.activeTrancheId,
             tranches: tranchesList,
-            analysisMode: analysisData.analysisMode || 'global',
-            scoringConfig: fullProject.scoringConfig || null,
+            raoTrancheName: raoExportData.raoTrancheName,
+            analysisMode: raoExportData.analysisMode,
+            scoringConfig: raoExportData.scoringConfig,
             clientQtyMaps: calcHook.clientQtyMaps,
-            negoActive: negoBasis,
+            optionChapters: raoExportData.optionChapters,
+            includedOptions: raoExportData.includedOptions,
+            negotiationPhase: raoExportData.negotiationPhase,
+            negoComparison: raoExportData.negoComparison,
+            negoActive: raoExportData.negoActive,
+            returnFile: true,
           });
           break;
         }
         case 'CoverPage': {
           const { generateCoverPagePDF } = await loadCoverPagePdf();
-          await generateCoverPagePDF(fullProject, branding);
+          generatedFile = await generateCoverPagePDF(fullProject, branding, { returnFile: true });
           break;
         }
         case 'AnalyseExcel': {
           const { generateAnalysisExcel } = await loadAnalysisExcel();
           if (analysisCompanies.length === 0) { setToast('Aucune analyse disponible'); return; }
-          await generateAnalysisExcel({
+          generatedFile = await generateAnalysisExcel({
             project: fullProject,
             companies: analysisCompanies,
             chaptersData: computedChapters,
             stats: computedStats,
-            scoringConfig: fullProject.scoringConfig || null,
+            scoringConfig,
             bpuRefMap: calcHook.refMap,
             activeTrancheId,
             tranches: tranchesList,
             branding,
             clientQtyMaps: calcHook.clientQtyMaps,
             negoActive: negoBasis,
+            returnFile: true,
           });
           break;
         }
@@ -457,7 +474,7 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
           if (!companyName) { setToast('Entreprise introuvable'); return; }
           const companiesData = fullProject.rao?.companies || {};
           const nego = companiesData[companyName]?.negotiation || {};
-          const consultation = fullProject.consultation || {};
+          const consultation = buildRaoConsultation(fullProject, fullProject.rao || {});
           const raoLetterConfig = fullProject.rao?.letterConfig || {};
           const letterConfig = {
             signatoryName: raoLetterConfig.signatoryName ?? consultation.client ?? '',
@@ -466,7 +483,7 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
             adresseEntreprise: nego.adresseEntreprise || '',
             adresseExpediteur: '',
           };
-          await generateNegoLetterPDF({
+          generatedFile = await generateNegoLetterPDF({
             companyName,
             questions: nego.questions || '',
             letterConfig,
@@ -477,6 +494,7 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
             analysisCompanies,
             chaptersData: computedChapters,
             bpuRefMap: calcHook.refMap,
+            returnFile: true,
           });
           break;
         }
@@ -485,14 +503,19 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
           return;
       }
 
+      const deliveryStatus = await deliverMobileExport(generatedFile, share);
+      if (deliveryStatus === 'cancelled') {
+        setToast(share ? 'Partage annulé ou indisponible' : 'Téléchargement annulé');
+        setTimeout(() => setToast(null), 2400);
+        return;
+      }
+
       setToast(`${exportType} ${share ? 'partagé' : 'exporté'} ✓`);
       setTimeout(() => setToast(null), 2400);
     } catch (err) {
       console.error(`[Mobile] Erreur export ${exportType}:`, err);
       setToast(`Erreur export ${exportType}`);
       setTimeout(() => setToast(null), 3000);
-    } finally {
-      setShareMode(false);
     }
   }, [fullProject, calcHook, tranchesHook, resources, negoTemplate]);
 

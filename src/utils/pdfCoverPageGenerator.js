@@ -9,7 +9,7 @@ import { sanitizeFilename, loadLogos, drawCoverPage } from './pdf/pdfSharedHelpe
 import { buildTheme } from './pdf/buildTheme';
 import { getCurrentPhaseCode } from './phaseModel';
 
-export const generateCoverPagePDF = async (project, branding = null) => {
+export const generateCoverPagePDF = async (project, branding = null, options = {}) => {
   const doc = new jsPDF();
   const today = new Date().toLocaleDateString('fr-FR');
   const THEME = buildTheme(branding);
@@ -35,5 +35,8 @@ export const generateCoverPagePDF = async (project, branding = null) => {
   const fileName = `Page_de_garde_${sanitizeFilename(project?.name || 'projet')}.pdf`;
   stampPdfCredit(doc);
   const blob = doc.output('blob');
+  if (options.returnFile) {
+    return { blob, filename: fileName };
+  }
   await saveFileWithPicker(blob, fileName, FILE_TYPES.pdf, PICKER_IDS.exportPdf);
 };
