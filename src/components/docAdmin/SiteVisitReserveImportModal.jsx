@@ -17,6 +17,11 @@ export default function SiteVisitReserveImportModal({
   loadVisit,
   onImport,
   existingReserveCount = 0,
+  title = 'Importer une visite de site',
+  description = 'Toutes les observations et toutes leurs photos deviendront les réserves de l’annexe EXE4 / EXE5.',
+  actionLabel = 'Importer',
+  replacementMessage = null,
+  excludedVisitIds = [],
 }) {
   const [search, setSearch] = useState('');
   const [importingId, setImportingId] = useState(null);
@@ -40,12 +45,13 @@ export default function SiteVisitReserveImportModal({
 
   const filteredVisits = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return visits || [];
+    const excluded = new Set(excludedVisitIds || []);
     return (visits || []).filter((visit) => (
-      [visit.nom, visit.lieu, visit.client, visit.date]
-        .some((value) => String(value || '').toLowerCase().includes(term))
+      !excluded.has(visit.id)
+      && (!term || [visit.nom, visit.lieu, visit.client, visit.date]
+        .some((value) => String(value || '').toLowerCase().includes(term)))
     ));
-  }, [search, visits]);
+  }, [excludedVisitIds, search, visits]);
 
   if (!isOpen) return null;
 
@@ -82,9 +88,9 @@ export default function SiteVisitReserveImportModal({
             <ClipboardList size={20} strokeWidth={1.5} />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-base font-bold text-gray-900">Importer une visite de site</h2>
+            <h2 className="text-base font-bold text-gray-900">{title}</h2>
             <p className="text-xs text-gray-500 mt-1">
-              Toutes les observations et toutes leurs photos deviendront les réserves de l’annexe EXE4 / EXE5.
+              {description}
             </p>
           </div>
           <button
@@ -98,9 +104,9 @@ export default function SiteVisitReserveImportModal({
         </div>
 
         <div className="px-6 pt-4 space-y-3">
-          {existingReserveCount > 0 && (
+          {(replacementMessage || existingReserveCount > 0) && (
             <div className="px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800">
-              L’import remplacera les {existingReserveCount} réserve{existingReserveCount > 1 ? 's' : ''} actuellement présentes.
+              {replacementMessage || `L’import remplacera les ${existingReserveCount} réserve${existingReserveCount > 1 ? 's' : ''} actuellement présentes.`}
             </div>
           )}
           {error && (
@@ -156,7 +162,7 @@ export default function SiteVisitReserveImportModal({
                       </div>
                     </div>
                     <div className="shrink-0 text-xs font-semibold text-blue-600">
-                      {isImporting ? <Loader size={16} className="animate-spin" /> : visit.obsCount ? 'Importer' : 'Vide'}
+                      {isImporting ? <Loader size={16} className="animate-spin" /> : visit.obsCount ? actionLabel : 'Vide'}
                     </div>
                   </button>
                 );

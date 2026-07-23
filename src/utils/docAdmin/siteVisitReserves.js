@@ -6,6 +6,28 @@ const normalizeText = (value) => stripHtml(value || '')
   .replace(/\n{3,}/g, '\n\n')
   .trim();
 
+const cloneImages = (images) => (Array.isArray(images) ? images : [])
+  .filter((image) => !!getReserveImageSrc(image))
+  .map((image) => (typeof image === 'object' && image ? { ...image } : image));
+
+export const getSiteVisitObservationNumber = (observation, index = 0) => {
+  const value = observation?.numero
+    ?? observation?.number
+    ?? observation?.repere
+    ?? observation?.observationNumber
+    ?? index + 1;
+  return String(value || index + 1).trim();
+};
+
+export const normalizeObservationNumber = (value) => {
+  const normalized = String(value || '')
+    .trim()
+    .toUpperCase()
+    .replace(/^OBS(?:ERVATION)?[\s._-]*/u, '')
+    .replace(/\s+/g, '');
+  return /^\d+$/.test(normalized) ? String(Number(normalized)) : normalized;
+};
+
 export const getReserveImageSrc = (image) => (
   typeof image === 'string' ? image : image?.src || ''
 );
@@ -30,13 +52,11 @@ export const siteVisitToReserves = (visit, importedAt = new Date().toISOString()
 
   const observations = Array.isArray(visit.observations) ? visit.observations : [];
   const reserves = observations.map((observation, index) => {
-    const images = (Array.isArray(observation?.images) ? observation.images : [])
-      .filter((image) => !!getReserveImageSrc(image))
-      .map((image) => (typeof image === 'object' && image ? { ...image } : image));
+    const images = cloneImages(observation?.images);
 
     return {
       id: `visite_${visit.id || 'sans-id'}_${observation?.id || index + 1}`,
-      numero: String(index + 1),
+      numero: getSiteVisitObservationNumber(observation, index),
       designation: normalizeText(observation?.text) || `Observation ${index + 1}`,
       delaiLevee: '',
       images,
@@ -87,5 +107,82 @@ export const siteVisitToReserves = (visit, importedAt = new Date().toISOString()
         observations: mapObservations,
       },
     },
+  };
+};
+
+export const siteVisitToControlSource = (visit, importedAt = new Date().toISOString()) => {
+  if (!visit) return null;
+  const observations = (Array.isArray(visit.observations) ? visit.observations : []).map((observation, index) => ({
+    id: observation?.id || `controle_${index + 1}`,
+    numero: getSiteVisitObservationNumber(observation, index),
+    text: normalizeText(observation?.text) || `Observation ${index + 1}`,
+    images: cloneImages(observation?.images),
+    date: observation?.date || visit.date || '',
+  }));
+
+  return {
+    id: visit.id || '',
+    nom: visit.nom || 'Visite de contrôle',
+    lieu: visit.lieu || '',
+    client: visit.client || '',
+    date: visit.date || '',
+    importedAt,
+    observationCount: observations.length,
+    photoCount: observations.reduce((total, observation) => total + observation.images.length, 0),
+    observations,
+  };
+};
+
+export const applyControlObservation = (reserve, observation) => {
+  const next = { ...reserve };
+  // Les photos restent stockées une seule fois dans la visite de contrôle
+  // embarquée, afin de limiter la taille du document Firestore.
+  delete next.controlImages;
+  return {
+    ...next,
+    controlObservationId: observation?.id || '',
+    controlObservationNumber: observation?.numero || '',
+    controlText: observation?.text || '',
+    controlDate: observation?.date || '',
+  };
+};
+
+export const getReserveControlImages = (reserve, controlSource) => {
+  if (Array.isArray(reserve?.controlImages) && reserve.controlImages.length > 0) {
+    return reserve.controlImages;
+  }
+  return controlSource?.observations
+    ?.find((observation) => observation.id === reserve?.controlObservationId)
+    ?.images || [];
+};
+
+/**
+ * Associe une seconde visite aux réserves initiales.
+ * Le numéro d'observation constitue le repère stable ; un rapprochement manuel
+ * reste possible dans le formulaire EXE8 / EXE9.
+ */
+export const matchControlVisitToReserves = (reserves, visit, importedAt = new Date().toISOString()) => {
+  const source = siteVisitToControlSource(visit, importedAt);
+  if (!source) return { reserves: reserves || [], source: null };
+
+  const observationsByNumber = new Map(
+    source.observations.map((observation) => [
+      normalizeObservationNumber(observation.numero),
+      observation,
+    ]),
+  );
+
+  return {
+    source,
+    reserves: (reserves || []).map((reserve, index) => {
+      const reserveNumber = reserve?.numero || String(index + 1);
+      const observation = observationsByNumber.get(normalizeObservationNumber(reserveNumber));
+      return applyControlObservation({
+        ...reserve,
+        leveeStatus: ['levee', 'maintenue', 'partiellement_levee'].includes(reserve?.leveeStatus)
+          ? reserve.leveeStatus
+          : 'a_qualifier',
+      }, observation);
+    }),
   };
 };

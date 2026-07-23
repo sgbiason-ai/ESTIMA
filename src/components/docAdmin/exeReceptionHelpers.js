@@ -72,6 +72,7 @@ export const createEmptyReceptionData = () => ({
   dateAchevementRetenue: '', typeReception: 'sans_reserve',
   reserves: [{ numero: '1', designation: '', delaiLevee: '', images: [] }],
   reserveSourceVisit: null,
+  reserveControlSourceVisit: null,
   reservePdfMode: 'detailed',
   observationsReserves: '',
   refactionMontant: '', dateLettreRefaction: '',

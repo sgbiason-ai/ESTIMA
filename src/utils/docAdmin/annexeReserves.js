@@ -34,7 +34,7 @@ const dataUrlToBytes = (dataUrl) => {
   return bytes;
 };
 
-const loadReserveImage = async (entry, cache) => {
+export const loadReserveImage = async (entry, cache) => {
   const src = getReserveImageSrc(entry);
   if (!src) return null;
   if (cache.has(src)) return cache.get(src);

@@ -4,9 +4,20 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   ArrowLeft, FileText, FileDown, Loader, Save,
-  Calendar, UserCheck, Pen
+  Calendar, UserCheck, Pen, MapPin, Images, Link2,
+  CheckCircle2, AlertCircle, SplitSquareHorizontal,
 } from 'lucide-react';
 import { RibbonGroup, RibbonBtnLarge, RibbonContainer, RibbonHeader, RibbonSpacer } from '../common/RibbonParts';
+import { useMobileSiteVisits } from '../../hooks/useMobileSiteVisits';
+import { useToast } from '../../contexts/ToastContext';
+import {
+  applyControlObservation,
+  getReserveImages,
+  getReserveControlImages,
+  getReserveImageSrc,
+  matchControlVisitToReserves,
+} from '../../utils/docAdmin/siteVisitReserves';
+import SiteVisitReserveImportModal from './SiteVisitReserveImportModal';
 import {
   createEmptyReceptionData,
   PdfDocumentHeader, PdfSectionHeader, ReadOnlySectionsAD,
@@ -308,16 +319,224 @@ const TabEXE9 = ({ fiche, data, update }) => {
   );
 };
 
+const STATUS_OPTIONS = [
+  { value: 'levee', label: 'Levée', icon: CheckCircle2, active: 'bg-emerald-600 text-white border-emerald-600' },
+  { value: 'maintenue', label: 'Maintenue', icon: AlertCircle, active: 'bg-red-600 text-white border-red-600' },
+  { value: 'partiellement_levee', label: 'Partiellement levée', icon: SplitSquareHorizontal, active: 'bg-amber-500 text-white border-amber-500' },
+];
+
+const ControlPhotos = ({ images, label }) => {
+  const entries = getReserveImages({ images });
+  if (entries.length === 0) {
+    return <span className="text-[10px] text-gray-400">{label} : aucune photo</span>;
+  }
+  return (
+    <div>
+      <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-gray-500">{label} · {entries.length}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {entries.map((image, index) => (
+          <img
+            key={`${label}-${index}-${getReserveImageSrc(image)}`}
+            src={getReserveImageSrc(image)}
+            alt={`${label} ${index + 1}`}
+            className="h-14 w-16 rounded-lg border border-gray-200 object-cover"
+            loading="lazy"
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const LeveeControlPanel = ({
+  data,
+  onOpenVisitImport,
+  updateReserve,
+  associateObservation,
+}) => {
+  const reserveEntries = (data.reserves || [])
+    .map((reserve, index) => ({ reserve, index }))
+    .filter(({ reserve }) => reserve.designation);
+  const source = data.reserveControlSourceVisit;
+  const observations = source?.observations || [];
+  const qualifiedCount = reserveEntries.filter(({ reserve }) => (
+    ['levee', 'maintenue', 'partiellement_levee'].includes(reserve.leveeStatus)
+  )).length;
+
+  return (
+    <div className="mx-auto mb-3 max-w-[210mm] rounded-2xl border border-amber-200 bg-white p-4">
+      <div className="flex flex-wrap items-start gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+          <Link2 size={18} strokeWidth={1.5} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-sm font-bold text-gray-900">Annexe comparative de levée</h3>
+            {reserveEntries.length > 0 && (
+              <span className={`rounded-lg px-2 py-0.5 text-[10px] font-bold ${
+                qualifiedCount === reserveEntries.length
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : 'bg-amber-100 text-amber-700'
+              }`}>
+                {qualifiedCount}/{reserveEntries.length} qualifiée{reserveEntries.length > 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+          <p className="mt-0.5 text-[11px] text-gray-600">
+            Le numéro d’observation relie la réserve initiale au constat et aux photos de la seconde visite.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onOpenVisitImport}
+          className="flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] font-bold text-amber-800 hover:bg-amber-100"
+        >
+          <MapPin size={13} />
+          {source ? 'Remplacer la visite de contrôle' : 'Choisir la visite de contrôle'}
+        </button>
+      </div>
+
+      {source && (
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-[11px] text-blue-800">
+          <span className="font-bold">{source.nom}</span>
+          {source.date && <span>{new Date(source.date).toLocaleDateString('fr-FR')}</span>}
+          {source.lieu && <span>{source.lieu}</span>}
+          <span>{source.observationCount} observation{source.observationCount > 1 ? 's' : ''}</span>
+          <span className="flex items-center gap-1"><Images size={11} /> {source.photoCount} photo{source.photoCount > 1 ? 's' : ''}</span>
+        </div>
+      )}
+
+      {reserveEntries.length === 0 ? (
+        <div className="mt-3 rounded-xl border border-dashed border-gray-300 px-4 py-5 text-center text-xs text-gray-500">
+          Aucune réserve initiale. Importez d’abord la visite source dans l’EXE4 ou l’EXE5.
+        </div>
+      ) : (
+        <div className="mt-3 space-y-2">
+          {reserveEntries.map(({ reserve, index: reserveIndex }) => {
+            const hasControl = !!reserve.controlObservationId;
+            return (
+              <div key={reserve.id || reserve.numero} className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(220px,0.8fr)]">
+                  <div className="min-w-0">
+                    <div className="flex items-start gap-2">
+                      <span className="shrink-0 rounded-lg bg-gray-900 px-2 py-1 text-[10px] font-bold text-white">
+                        Obs. {reserve.numero}
+                      </span>
+                      <p className="text-xs font-semibold leading-relaxed text-gray-900">{reserve.designation}</p>
+                    </div>
+                    <div className="mt-2">
+                      <ControlPhotos images={reserve.images} label="Avant" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block">
+                      <span className="mb-1 block text-[9px] font-bold uppercase tracking-wider text-gray-500">Observation de contrôle associée</span>
+                      <select
+                        value={reserve.controlObservationId || ''}
+                        onChange={(event) => associateObservation(reserveIndex, event.target.value)}
+                        disabled={!source}
+                        className={`h-9 w-full rounded-xl border px-2.5 text-xs outline-none ${
+                          hasControl
+                            ? 'border-blue-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-100'
+                            : 'border-amber-300 bg-amber-50 text-amber-800'
+                        } disabled:border-gray-200 disabled:bg-gray-100 disabled:text-gray-400`}
+                      >
+                        <option value="">Aucune observation associée</option>
+                        {observations.map((observation) => (
+                          <option key={observation.id} value={observation.id}>
+                            Obs. {observation.numero} — {observation.text}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <textarea
+                      value={reserve.controlText || ''}
+                      onChange={(event) => updateReserve(reserveIndex, { controlText: event.target.value })}
+                      rows={2}
+                      placeholder="Constat de contrôle…"
+                      className="w-full resize-y rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-900 outline-none placeholder:text-gray-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                    />
+                    <ControlPhotos images={getReserveControlImages(reserve, source)} label="Après" />
+                  </div>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-1.5 border-t border-gray-200 pt-2.5">
+                  {STATUS_OPTIONS.map((status) => {
+                    const Icon = status.icon;
+                    const isActive = reserve.leveeStatus === status.value;
+                    return (
+                      <button
+                        key={status.value}
+                        type="button"
+                        onClick={() => updateReserve(reserveIndex, { leveeStatus: status.value })}
+                        className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-[10px] font-bold transition-colors ${
+                          isActive ? status.active : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-100'
+                        }`}
+                      >
+                        <Icon size={12} /> {status.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Composant principal — ExeLeveeForm
 // ═══════════════════════════════════════════════════════════════════════════
-export default function ExeLeveeForm({ fiche, onBack, onGenerate, onSave, isSaving }) {
+export default function ExeLeveeForm({ fiche, user, companyId, onBack, onGenerate, onSave, isSaving }) {
+  const toast = useToast();
+  const {
+    visits: siteVisits,
+    isLoading: isLoadingSiteVisits,
+    loadVisit,
+  } = useMobileSiteVisits(user, companyId);
   const [data, setData] = useState(() => ({ ...createEmptyReceptionData(), ...(fiche?.reception || {}) }));
   const [activeTab, setActiveTab] = useState('exe8');
   const [isGenerating, setIsGenerating] = useState(null);
+  const [showControlVisitImport, setShowControlVisitImport] = useState(false);
   const scrollRef = useRef(null);
 
   const update = useCallback((field, value) => setData((p) => ({ ...p, [field]: value })), []);
+  const updateReserve = useCallback((reserveIndex, patch) => {
+    if (reserveIndex < 0) return;
+    setData((previous) => {
+      const reserves = [...(previous.reserves || [])];
+      reserves[reserveIndex] = { ...reserves[reserveIndex], ...patch };
+      return { ...previous, reserves };
+    });
+  }, []);
+
+  const associateObservation = useCallback((reserveIndex, observationId) => {
+    setData((previous) => {
+      const reserves = [...(previous.reserves || [])];
+      const observation = previous.reserveControlSourceVisit?.observations
+        ?.find((item) => item.id === observationId);
+      reserves[reserveIndex] = applyControlObservation(reserves[reserveIndex], observation);
+      return { ...previous, reserves };
+    });
+  }, []);
+
+  const handleImportControlVisit = useCallback(async (visit) => {
+    setData((previous) => {
+      const matched = matchControlVisitToReserves(previous.reserves || [], visit);
+      return {
+        ...previous,
+        reserves: matched.reserves,
+        reserveControlSourceVisit: matched.source,
+        exe8_dateSignatureMoe: previous.exe8_dateSignatureMoe || visit.date || '',
+        exe9_datePVLevee: previous.exe9_datePVLevee || visit.date || '',
+      };
+    });
+    toast.success('Visite de contrôle associée aux réserves par numéro d’observation.');
+  }, [toast]);
 
   // Auto-save (same pattern as ExeReceptionForm)
   const saveTimeoutRef = useRef(null);
@@ -389,11 +608,31 @@ export default function ExeLeveeForm({ fiche, onBack, onGenerate, onSave, isSavi
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto bg-gray-200 py-4 px-4">
+        <LeveeControlPanel
+          data={data}
+          onOpenVisitImport={() => setShowControlVisitImport(true)}
+          updateReserve={updateReserve}
+          associateObservation={associateObservation}
+        />
         <div className="mx-auto bg-white shadow-lg rounded-sm px-[20mm] py-[15mm]" style={{ maxWidth: '210mm', minHeight: '297mm' }}>
           {activeTab === 'exe8' && <TabEXE8 fiche={fiche} data={data} update={update} />}
           {activeTab === 'exe9' && <TabEXE9 fiche={fiche} data={data} update={update} />}
         </div>
       </div>
+
+      <SiteVisitReserveImportModal
+        isOpen={showControlVisitImport}
+        onClose={() => setShowControlVisitImport(false)}
+        visits={siteVisits}
+        isLoading={isLoadingSiteVisits}
+        loadVisit={loadVisit}
+        onImport={handleImportControlVisit}
+        title="Sélectionner la visite de contrôle"
+        description="Les observations seront rapprochées des réserves initiales grâce à leur numéro repère."
+        actionLabel="Associer"
+        replacementMessage={data.reserveControlSourceVisit ? 'Cette sélection remplacera la visite de contrôle actuellement associée.' : null}
+        excludedVisitIds={[data.reserveSourceVisit?.id].filter(Boolean)}
+      />
     </div>
   );
 }

@@ -5,6 +5,10 @@ import { saveAs } from 'file-saver';
 import { appendEstimaWordCredit } from '../estimaWordCredit';
 import { loadMoeSignatureWithDimensions } from './moeDefaults.js';
 import { formatDateLocale } from '../dateHelpers';
+import {
+  generateAnnexeLeveeReservesDocx,
+  generateAnnexeLeveeReservesPdf,
+} from './annexeLeveeReserves';
 
 const loadMarianneImage = async () => {
   try {
@@ -362,6 +366,7 @@ export const exportExe8Pdf = async (fiche, rawData) => {
   pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8);
   pdf.text("Date de mise \u00e0 jour : 01/04/2019.", mL, h.getY());
 
+  await generateAnnexeLeveeReservesPdf(pdf, data, 'EXE8', fiche);
   pdf.save(`EXE8_${(fiche.nom || 'levee-reserves').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`);
   return 'pdf';
 };
@@ -401,7 +406,7 @@ export const exportExe8Docx = async (fiche, rawData) => {
       const binaryString = atob(base64Data);
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
-      marianneRun = new ImageRun({ data: bytes, transformation: { width: 140, height: 80 } });
+      marianneRun = new ImageRun({ data: bytes, transformation: { width: 140, height: 80 }, type: 'jpg' });
     } catch { /* skip */ }
   }
 
@@ -560,7 +565,7 @@ export const exportExe8Docx = async (fiche, rawData) => {
       for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
       const sigMaxW = 150, sigMaxH = 80;
       const sigRatio = Math.min(sigMaxW / moeSigDocx.width, sigMaxH / moeSigDocx.height, 1);
-      moeSigRun = new ImageRun({ data: bytes, transformation: { width: Math.round(moeSigDocx.width * sigRatio), height: Math.round(moeSigDocx.height * sigRatio) } });
+      moeSigRun = new ImageRun({ data: bytes, transformation: { width: Math.round(moeSigDocx.width * sigRatio), height: Math.round(moeSigDocx.height * sigRatio) }, type: 'png' });
     } catch { /* skip */ }
   }
 
@@ -612,7 +617,7 @@ export const exportExe8Docx = async (fiche, rawData) => {
       for (let i = 0; i < binaryString2.length; i++) bytes2[i] = binaryString2.charCodeAt(i);
       const sigMaxW2 = 150, sigMaxH2 = 80;
       const sigRatio2 = Math.min(sigMaxW2 / moeSigDocx.width, sigMaxH2 / moeSigDocx.height, 1);
-      const moeSigRun2 = new ImageRun({ data: bytes2, transformation: { width: Math.round(moeSigDocx.width * sigRatio2), height: Math.round(moeSigDocx.height * sigRatio2) } });
+      const moeSigRun2 = new ImageRun({ data: bytes2, transformation: { width: Math.round(moeSigDocx.width * sigRatio2), height: Math.round(moeSigDocx.height * sigRatio2) }, type: 'png' });
       children.push(new Paragraph({ children: [moeSigRun2], spacing: { after: 100 } }));
     } catch { /* skip */ }
   }
@@ -621,6 +626,7 @@ export const exportExe8Docx = async (fiche, rawData) => {
   // Pied de page
   children.push(para([text('Date de mise \u00e0 jour : 01/04/2019.', { size: 16 })], { after: 0 }));
 
+  children.push(...await generateAnnexeLeveeReservesDocx(data, 'EXE8', fiche));
   appendEstimaWordCredit(children);
 
   const doc = new Document({ sections: [{ properties: { page: { margin: { top: 720, bottom: 720, left: 1080, right: 1080 } } }, children }] });

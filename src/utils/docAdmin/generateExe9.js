@@ -6,6 +6,10 @@ import { saveAs } from 'file-saver';
 import { appendEstimaWordCredit } from '../estimaWordCredit';
 import { loadMoeSignatureWithDimensions } from './moeDefaults.js';
 import { formatDateLocale } from '../dateHelpers';
+import {
+  generateAnnexeLeveeReservesDocx,
+  generateAnnexeLeveeReservesPdf,
+} from './annexeLeveeReserves';
 
 const dots = (n = 40) => '.'.repeat(n);
 const formatDate = (s) => formatDateLocale(s, { fallback: dots(20) });
@@ -342,6 +346,7 @@ export const exportExe9Pdf = async (fiche, rawData) => {
   pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8);
   pdf.text("Date de mise \u00e0 jour : 01/04/2019.", mL, y);
 
+  await generateAnnexeLeveeReservesPdf(pdf, data, 'EXE9', fiche);
   pdf.save(`EXE9_${(fiche.nom || 'levee-reserves').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`);
   return 'pdf';
 };
@@ -530,7 +535,7 @@ export const exportExe9Docx = async (fiche, rawData) => {
       const sigMaxW = 150, sigMaxH = 80;
       const sigRatio = Math.min(sigMaxW / moeSigDocx.width, sigMaxH / moeSigDocx.height, 1);
       children.push(new Paragraph({
-        children: [new ImageRun({ data: bytes, transformation: { width: Math.round(moeSigDocx.width * sigRatio), height: Math.round(moeSigDocx.height * sigRatio) } })],
+        children: [new ImageRun({ data: bytes, transformation: { width: Math.round(moeSigDocx.width * sigRatio), height: Math.round(moeSigDocx.height * sigRatio) }, type: 'png' })],
         alignment: AlignmentType.RIGHT, spacing: { after: 100 },
       }));
     } catch { /* skip */ }
@@ -614,6 +619,7 @@ export const exportExe9Docx = async (fiche, rawData) => {
   // Pied de page
   children.push(para([text('Date de mise \u00e0 jour : 01/04/2019.', { size: 16 })], { after: 0 }));
 
+  children.push(...await generateAnnexeLeveeReservesDocx(data, 'EXE9', fiche));
   appendEstimaWordCredit(children);
 
   const doc = new Document({ sections: [{ properties: { page: { margin: { top: 720, bottom: 720, left: 1080, right: 1080 } } }, children }] });
