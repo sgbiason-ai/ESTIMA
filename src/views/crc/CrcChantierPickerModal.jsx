@@ -6,10 +6,11 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Search, FolderOpen, FileText, Link2, Trash2, Calendar } from 'lucide-react';
+import { X, Search, FolderOpen, FileText, Link2, Trash2, Calendar, CheckCircle2, RotateCcw } from 'lucide-react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { confirm } from '../../utils/globalUI';
+import { partitionChantiers, formatArchivedAt } from '../../utils/crcChantierStatus';
 
 // Format date FR court "14 avr" / "14 avr 2025"
 const formatShortDate = (isoDate) => {
@@ -48,10 +49,13 @@ export default function CrcChantierPickerModal({
   onSelect,
   onDelete,
   canDelete = () => true,
+  onSetArchived,
   companyId,
 }) {
   const [query, setQuery] = useState('');
   const [projectsById, setProjectsById] = useState({});
+  // 'active' | 'archived' — onglet courant du selecteur
+  const [tab, setTab] = useState('active');
 
   // Fetch projects une fois a l'ouverture pour resoudre les linkedProjectId
   useEffect(() => {
@@ -74,16 +78,29 @@ export default function CrcChantierPickerModal({
     return () => { cancelled = true; };
   }, [isOpen, companyId]);
 
-  // Filtre par recherche
+  // Partition en cours / terminees, puis filtre par recherche dans l'onglet actif
+  const { active, archived } = useMemo(() => partitionChantiers(chantiers), [chantiers]);
+  const scoped = tab === 'archived' ? archived : active;
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return chantiers;
-    return chantiers.filter((c) => {
+    if (!q) return scoped;
+    return scoped.filter((c) => {
       const nom = (c.crrConfig?.chantierInfo?.nom || '').toLowerCase();
       const lieu = (c.crrConfig?.chantierInfo?.lieu || '').toLowerCase();
       return nom.includes(q) || lieu.includes(q);
     });
-  }, [chantiers, query]);
+  }, [scoped, query]);
+
+  // A l'ouverture, se placer sur l'onglet qui contient l'affaire courante :
+  // rouvrir le selecteur depuis un chantier termine ne doit pas afficher une
+  // liste ou il est absent.
+  useEffect(() => {
+    if (!isOpen) return;
+    setQuery('');
+    setTab(archived.some((c) => c.id === activeId) ? 'archived' : 'active');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   // ESC pour fermer
   useEffect(() => {
@@ -132,10 +149,33 @@ export default function CrcChantierPickerModal({
         <div className="shrink-0 bg-white/80 backdrop-blur-xl border-b border-gray-200/60 px-6 py-4 flex items-center gap-4">
           <FolderOpen size={18} className="text-blue-500" />
           <h2 className="text-lg font-bold text-gray-900 tracking-tight">Choisir une affaire</h2>
-          <div className="text-xs text-gray-400">
-            {filtered.length} {filtered.length > 1 ? 'affaires' : 'affaire'}
-            {query && ` (filtrees sur ${chantiers.length})`}
+
+          {/* Segment En cours / Terminees */}
+          <div className="flex items-center bg-gray-100 rounded-xl p-0.5">
+            {[
+              { id: 'active', label: 'En cours', count: active.length },
+              { id: 'archived', label: 'Terminées', count: archived.length },
+            ].map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  tab === t.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'
+                }`}
+              >
+                {t.label}
+                <span className={`px-1.5 rounded-md text-[10px] font-bold ${
+                  tab === t.id ? 'bg-gray-100 text-gray-600' : 'text-gray-400'
+                }`}>{t.count}</span>
+              </button>
+            ))}
           </div>
+
+          {query && (
+            <div className="text-xs text-gray-400">
+              {filtered.length} sur {scoped.length}
+            </div>
+          )}
           <div className="flex-1" />
           <div className="relative w-64">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -163,7 +203,13 @@ export default function CrcChantierPickerModal({
             <div className="h-full flex flex-col items-center justify-center text-gray-400 py-20">
               <FolderOpen size={48} strokeWidth={1.5} className="mb-3 opacity-50" />
               <p className="text-sm">
-                {chantiers.length === 0 ? 'Aucune affaire. Cliquez sur "Nouvelle affaire".' : 'Aucun resultat pour cette recherche.'}
+                {query
+                  ? 'Aucun résultat pour cette recherche.'
+                  : tab === 'archived'
+                    ? 'Aucune affaire terminée. Clôturez un chantier depuis le bouton « Terminer » du ruban.'
+                    : chantiers.length === 0
+                      ? 'Aucune affaire. Cliquez sur « Nouvelle affaire ».'
+                      : 'Aucune affaire en cours — toutes vos affaires sont terminées.'}
               </p>
             </div>
           ) : (
@@ -194,16 +240,31 @@ export default function CrcChantierPickerModal({
                       isActive ? 'border-blue-400 ring-2 ring-blue-100' : 'border-gray-200/60'
                     }`}
                   >
-                    {/* Bouton suppression (visible au hover) */}
-                    {canDelete(c) && (
-                      <button
-                        onClick={(e) => handleDelete(e, c)}
-                        className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all"
-                        title="Supprimer le chantier"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
+                    {/* Actions au survol : terminer/réactiver puis supprimer */}
+                    <div className="absolute top-3 right-3 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+                      {onSetArchived && canDelete(c) && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onSetArchived(c.id, tab !== 'archived'); }}
+                          className={`p-1.5 rounded-lg transition-all ${
+                            tab === 'archived'
+                              ? 'text-gray-300 hover:text-blue-600 hover:bg-blue-50'
+                              : 'text-gray-300 hover:text-emerald-600 hover:bg-emerald-50'
+                          }`}
+                          title={tab === 'archived' ? 'Réactiver le chantier' : 'Terminer le chantier'}
+                        >
+                          {tab === 'archived' ? <RotateCcw size={14} /> : <CheckCircle2 size={14} />}
+                        </button>
+                      )}
+                      {canDelete(c) && (
+                        <button
+                          onClick={(e) => handleDelete(e, c)}
+                          className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all"
+                          title="Supprimer le chantier"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
 
                     {/* Logo / placeholder */}
                     <div className="flex items-start gap-3 mb-3">
@@ -241,6 +302,16 @@ export default function CrcChantierPickerModal({
                         </>
                       )}
                     </div>
+
+                    {/* Badge chantier termine */}
+                    {c.archivedAt && (
+                      <div className="inline-flex items-center gap-1.5 px-2 py-1 mr-1.5 rounded-lg bg-amber-50 border border-amber-100 text-[10px] font-medium text-amber-700">
+                        <CheckCircle2 size={11} strokeWidth={2} className="shrink-0" />
+                        <span className="truncate">
+                          Terminé{formatArchivedAt(c.archivedAt) ? ` le ${formatArchivedAt(c.archivedAt)}` : ''}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Badge projet ESTIMA lie */}
                     {linkedProjectId && (

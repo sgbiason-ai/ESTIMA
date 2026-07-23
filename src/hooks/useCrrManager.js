@@ -201,8 +201,13 @@ export const useCrrManager = ({
   useEffect(() => {
     if (projectHash === lastSavedHashRef.current) return;
     lastSavedHashRef.current = projectHash;
+    // Lecture seule (non-proprietaire OU affaire terminee) : pas de saveFn.
+    // Sans ce garde-fou, triggerSave laisse le statut fige sur 'waiting' →
+    // l'alerte beforeunload « modifications non enregistrees » se declenche
+    // sur une affaire qu'on ne fait que consulter.
+    if (!onSaveProject) return;
     triggerSave(project);
-  }, [projectHash, triggerSave, project]);
+  }, [projectHash, triggerSave, project, onSaveProject]);
 
   // Ref toujours a jour pour le handler visibilitychange (pas de closure stale)
   const projectRef = useRef(project);

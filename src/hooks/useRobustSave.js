@@ -126,12 +126,16 @@ export function useRobustSave({ saveFn, draftKey, debounceMs = 1500, maxRetries 
   }, [debounceMs, executeSave]);
 
   // ── forceSave : bypass debounce ───────────────────────────────────────────
+  // Retourne la promesse de l'ecriture : un appelant qui s'apprete a ecrire le
+  // meme document par un autre chemin (ex. archivage d'une affaire CRC) peut
+  // l'attendre, sinon la sauvegarde en vol — un setDoc sans merge — ecraserait
+  // le champ qui vient d'etre pose. executeSave ne rejette jamais (catch interne),
+  // les appelants qui ignorent le retour restent donc corrects.
   const forceSave = useCallback(() => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
-    if (pendingDataRef.current) {
-      executeSave();
-    }
+    if (pendingDataRef.current) return executeSave();
+    return Promise.resolve();
   }, [executeSave]);
 
   // ── Protection beforeunload + visibilitychange + pagehide ─────────────────

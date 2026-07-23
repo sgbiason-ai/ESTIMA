@@ -9,10 +9,12 @@ import {
   Building2, Users, ListTree, Edit3, Eye, FileDown, Mail, FolderOpen,
   HelpCircle, Compass, Archive, UploadCloud, ArrowLeftRight,
   FileText as FileWord, X, MapPin, Minimize2, Send, AlertCircle,
+  CheckCircle2, RotateCcw, CalendarClock,
 } from 'lucide-react';
-import { doc, getDoc, setDoc, collection, getDocs, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { deleteCrrImage } from '../../utils/crrImageStorage';
+import { isChantierArchived, countOpenObservations, formatArchivedAt } from '../../utils/crcChantierStatus';
 import { loadDraft, clearDraft } from '../../hooks/useRobustSave';
 import { DEFAULT_BRANDING } from '../../data/branding';
 import CrcLinkProjectModal from './CrcLinkProjectModal';
@@ -39,6 +41,7 @@ import { toast, confirm } from '../../utils/globalUI';
 
 import { RibbonButton, RibbonDivider, RibbonGroup } from './CrcRibbon';
 import CrcChantierPickerModal from './CrcChantierPickerModal';
+import CrcActionPlanModal from './CrcActionPlanModal';
 import CrcMeetingTabs from './CrcMeetingTabs';
 import CrcCategoriesModal from './CrcCategoriesModal';
 import CrcInfoChantierModal from './CrcInfoChantierModal';
@@ -121,9 +124,14 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
             }
           }
         }
-        const target = docs.find((d) => d.id === lastId) || docs[0];
+        // Une affaire terminee n'est jamais ouverte d'office : elle ne revient
+        // que si l'utilisateur l'avait explicitement selectionnee (lastId).
+        const target = docs.find((d) => d.id === lastId)
+          || docs.find((d) => !isChantierArchived(d));
         if (target) {
-          const targetCanEdit = target.ownerId === user.uid;
+          // Affaire terminee = lecture seule : ni restauration de brouillon,
+          // ni resynchronisation du projet lie (aucune ecriture silencieuse).
+          const targetCanEdit = target.ownerId === user.uid && !isChantierArchived(target);
           // Verifier s'il y a un brouillon localStorage plus recent
           const draftKey = `draft_crr_${target.id}`;
           const draft = loadDraft(draftKey);
@@ -263,8 +271,8 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
 
   const handleSelectChantier = useCallback(async (c) => {
     let docToSet = c;
-    // Sync auto si lié à un projet
-    if (c.linkedProjectId && companyId && c.ownerId === user?.uid) {
+    // Sync auto si lié à un projet — jamais sur une affaire terminée (lecture seule)
+    if (c.linkedProjectId && companyId && c.ownerId === user?.uid && !isChantierArchived(c)) {
       try {
         const projSnap = await getDoc(doc(db, 'companies', companyId, 'projects', c.linkedProjectId));
         if (projSnap.exists()) {
@@ -290,7 +298,12 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
     }
   }, [companyId, user]);
 
-  const canEdit = crrDoc?.ownerId === user?.uid;
+  // Deux verrous distincts, volontairement separes dans l'UI :
+  //  - propriete  : « seul le createur peut modifier »
+  //  - archivage  : « chantier termine » (reversible en un clic par le createur)
+  const isArchived = isChantierArchived(crrDoc);
+  const isOwner = !!crrDoc && crrDoc.ownerId === user?.uid;
+  const canEdit = isOwner && !isArchived;
 
   const manager = useCrrManager({
     project: crrDoc,
@@ -300,6 +313,55 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
   });
 
   const chantierName = manager.crrConfig.chantierInfo?.nom || '';
+
+  // ── TERMINER / REACTIVER UNE AFFAIRE ──────────────────────────────────────
+  // Archivage non destructif : un simple champ `archivedAt` sur le document.
+  // L'affaire sort des listes courantes et passe en lecture seule ; rien n'est
+  // supprime (les photos Storage restent intactes, contrairement a Supprimer).
+  const setChantierArchived = useCallback(async (chantierId, archived) => {
+    const target = chantiers.find((c) => c.id === chantierId);
+    if (!target) return;
+    if (target.ownerId !== user?.uid) {
+      toast.warning('Seul le créateur peut terminer ou réactiver cette affaire.');
+      return;
+    }
+    const nom = target.crrConfig?.chantierInfo?.nom || 'Sans nom';
+
+    if (archived) {
+      const open = countOpenObservations(target);
+      const crCount = (target.crrMeetings || []).length;
+      let msg = `Terminer le chantier "${nom}" ?\n\n${crCount} compte-rendu${crCount > 1 ? 's' : ''} conservé${crCount > 1 ? 's' : ''}.`;
+      if (open > 0) {
+        msg += `\n\nATTENTION : ${open} observation${open > 1 ? 's' : ''} non soldée${open > 1 ? 's' : ''} sur le dernier CR.`;
+      }
+      msg += '\n\nL\'affaire passera en lecture seule et rejoindra l\'onglet « Terminées ». Réversible à tout moment.';
+      const ok = await confirm(msg, { danger: open > 0 });
+      if (!ok) return;
+      // Vider le debounce AVANT de verrouiller : une saisie encore en attente
+      // serait sinon perdue (canEdit passe a false → plus de saveFn).
+      if (crrDoc?.id === chantierId) await manager.forceSave();
+    }
+
+    const archivedAt = archived ? new Date().toISOString() : null;
+    try {
+      await updateDoc(doc(db, 'companies', companyId, 'crr', chantierId), archived
+        ? { archivedAt, archivedBy: user?.email || '' }
+        : { archivedAt: deleteField(), archivedBy: deleteField() });
+
+      const apply = (c) => {
+        if (c.id !== chantierId) return c;
+        if (archived) return { ...c, archivedAt, archivedBy: user?.email || '' };
+        const { archivedAt: _at, archivedBy: _by, ...rest } = c;
+        return rest;
+      };
+      setChantiers((prev) => prev.map(apply));
+      setCrrDoc((prev) => (prev?.id === chantierId ? apply(prev) : prev));
+      toast.success(archived ? `Chantier « ${nom} » terminé.` : `Chantier « ${nom} » réactivé.`);
+    } catch (err) {
+      console.error('[CRC] Erreur archivage chantier:', err);
+      toast.error("Impossible de modifier l'état de l'affaire.");
+    }
+  }, [chantiers, companyId, user, crrDoc, manager]);
 
   // ── Présence + co-édition (alerte d'écrasement) ───────────────────────────
   usePresence({
@@ -346,6 +408,20 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
   const [showSendMailModal, setShowSendMailModal] = useState(false);
   const { config: smtpConfig, isConfigured: smtpConfigured } = useSmtpConfig();
   const [showChantierPicker, setShowChantierPicker] = useState(false);
+  const [showActionPlan, setShowActionPlan] = useState(false);
+
+  // Ouverture d'une affaire depuis le plan d'actions : selectionne le chantier
+  // ET recale le CR actif sur son dernier CR (celui qui porte les actions).
+  // Indispensable : activeMeetingId n'est pas remis a zero au changement
+  // d'affaire, un id d'un autre chantier resterait actif.
+  const handleOpenFromActionPlan = useCallback(async (chantierId) => {
+    const c = chantiers.find((x) => x.id === chantierId);
+    if (!c) return;
+    setShowActionPlan(false);
+    await handleSelectChantier(c);
+    const meetings = c.crrMeetings || [];
+    if (meetings.length > 0) manager.setActiveMeetingId(meetings[meetings.length - 1].id);
+  }, [chantiers, handleSelectChantier, manager]);
   const [importModal, setImportModal] = useState(null);
   const importFileRef = useRef(null);
 
@@ -790,6 +866,26 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
               title={crrDoc?.crrConfig?.chantierInfo?.nom || 'Choisir une affaire parmi la liste'}
               wrap
             />
+            {/* Terminer / Reactiver — reserve au createur (isOwner), pas a canEdit
+                qui est deja faux une fois l'affaire terminee. */}
+            <RibbonButton
+              icon={isArchived ? RotateCcw : CheckCircle2}
+              label={isArchived ? 'Réactiver' : 'Terminer'}
+              onClick={() => setChantierArchived(crrDoc.id, !isArchived)}
+              disabled={!crrDoc || !isOwner}
+              variant={isArchived ? 'primary' : 'accent'}
+              title={isArchived
+                ? 'Rouvrir ce chantier : il redevient modifiable et repasse en affaire en cours'
+                : 'Clôturer ce chantier : lecture seule et classement dans les affaires terminées (réversible)'}
+            />
+            <RibbonButton
+              icon={CalendarClock}
+              label="Plan d'actions"
+              onClick={() => setShowActionPlan(true)}
+              disabled={chantiers.length === 0}
+              variant="accent"
+              title="Échéancier transversal : toutes les actions datées non soldées de tous les chantiers en cours"
+            />
           </RibbonGroup>
 
           <RibbonDivider />
@@ -874,7 +970,26 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
 
       <CoEditBanner editors={coEditors} />
 
-      {crrDoc && !canEdit && (
+      {/* Affaire terminée : le bandeau porte l'action de réouverture, sinon le
+          seul moyen de sortir du mode lecture est de deviner le bouton du ruban. */}
+      {crrDoc && isArchived && (
+        <div className="shrink-0 px-4 py-2 bg-amber-100 text-amber-800 text-xs font-bold flex items-center justify-center gap-3 border-b border-amber-200">
+          <span className="flex items-center gap-1.5">
+            <CheckCircle2 size={13} />
+            Chantier terminé{formatArchivedAt(crrDoc.archivedAt) ? ` le ${formatArchivedAt(crrDoc.archivedAt)}` : ''} — lecture seule
+          </span>
+          {isOwner && (
+            <button
+              onClick={() => setChantierArchived(crrDoc.id, false)}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/80 border border-amber-300 text-amber-800 hover:bg-white transition-all active:scale-[0.97]"
+            >
+              <RotateCcw size={11} /> Réactiver
+            </button>
+          )}
+        </div>
+      )}
+
+      {crrDoc && !isArchived && !canEdit && (
         <div className="shrink-0 px-4 py-2 bg-indigo-100 text-indigo-700 text-xs font-bold text-center border-b border-indigo-200">
           Lecture seule — seul le créateur peut modifier ce compte rendu
         </div>
@@ -964,7 +1079,15 @@ export default function CrcView({ onBackToHub, user, companyId, onNavigateModule
         onSelect={handleSelectChantier}
         onDelete={handleDeleteChantier}
         canDelete={(chantier) => chantier.ownerId === user?.uid}
+        onSetArchived={setChantierArchived}
         companyId={companyId}
+      />
+
+      <CrcActionPlanModal
+        isOpen={showActionPlan}
+        onClose={() => setShowActionPlan(false)}
+        chantiers={chantiers}
+        onOpenChantier={handleOpenFromActionPlan}
       />
 
       <CrcCategoriesModal isOpen={showCategoriesModal && canEdit} onClose={() => setShowCategoriesModal(false)}
