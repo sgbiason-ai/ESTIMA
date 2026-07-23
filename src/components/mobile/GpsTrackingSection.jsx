@@ -14,29 +14,69 @@ import {
 } from '../../utils/geoHelpers';
 
 const GpsMapView = lazyWithReload(() => import('./GpsMapView'));
+const EMPTY_GPS_TRACKING = Object.freeze({
+  coordinates: Object.freeze([]),
+  startTime: null,
+  endTime: null,
+  distance: 0,
+});
 
 // ─── Composant principal ───────────────────────────────────────────────────
 
-export default function GpsTrackingSection({ meeting, manager, obsByCategory, onToast, externalObsMarkers, readOnly = false }) {
-  const tracking = meeting?.gpsTracking || { coordinates: [], startTime: null, endTime: null };
+export default function GpsTrackingSection({
+  meeting,
+  manager,
+  obsByCategory,
+  onToast,
+  onFlushTracking,
+  onRecordingChange,
+  externalObsMarkers,
+  readOnly = false,
+}) {
+  const tracking = useMemo(
+    () => meeting?.gpsTracking || EMPTY_GPS_TRACKING,
+    [meeting?.gpsTracking]
+  );
   const [isRecording, setIsRecording] = useState(false);
   const [liveCoords, setLiveCoords] = useState(tracking.coordinates || []);
   const [fullscreenMap, setFullscreenMap] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [lastAccuracy, setLastAccuracy] = useState(null);
+  const [gpsError, setGpsError] = useState(null);
   const [liveBearing, setLiveBearing] = useState(null); // cap de déplacement (° depuis le nord)
   const lastBearingPtRef = useRef(null);
   const watchIdRef = useRef(null);
   const wakeLockRef = useRef(null);
   const timerRef = useRef(null);
-  const startTimeRef = useRef(null);
+  const recordingStartedAtRef = useRef(null);
+  const startTimeRef = useRef(tracking.startTime || null);
+  const liveCoordsRef = useRef(tracking.coordinates || []);
+  const isRecordingRef = useRef(false);
+  const pendingBreakRef = useRef(false);
+  const acceptedSinceFlushRef = useRef(0);
+  const trackingRef = useRef(tracking);
+  const managerRef = useRef(manager);
+  const onToastRef = useRef(onToast);
+  const onFlushTrackingRef = useRef(onFlushTracking);
+  const onRecordingChangeRef = useRef(onRecordingChange);
   const gpsProcessorRef = useRef(createGpsFixProcessor(tracking.coordinates || []));
   const [traceBeforeClean, setTraceBeforeClean] = useState(null);
 
+  trackingRef.current = tracking;
+  managerRef.current = manager;
+  onToastRef.current = onToast;
+  onFlushTrackingRef.current = onFlushTracking;
+  onRecordingChangeRef.current = onRecordingChange;
+
   // Sync liveCoords quand le meeting change
   useEffect(() => {
-    if (!isRecording) setLiveCoords(tracking.coordinates || []);
-  }, [meeting?.id, tracking.coordinates?.length, isRecording]);
+    if (!isRecording) {
+      const nextCoordinates = tracking.coordinates || [];
+      liveCoordsRef.current = nextCoordinates;
+      startTimeRef.current = tracking.startTime || null;
+      setLiveCoords(nextCoordinates);
+    }
+  }, [meeting?.id, tracking.coordinates, tracking.startTime, isRecording]);
 
   useEffect(() => setTraceBeforeClean(null), [meeting?.id]);
 
@@ -89,52 +129,136 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
       });
     });
     return markers;
-  }, [obsByCategory, liveCoords, tracking.coordinates]);
+  }, [externalObsMarkers, obsByCategory, liveCoords, tracking.coordinates]);
 
   // ── Wake Lock ──
-  const requestWakeLock = async () => {
+  const requestWakeLock = useCallback(async () => {
     try {
       if ('wakeLock' in navigator) {
         wakeLockRef.current = await navigator.wakeLock.request('screen');
       }
     } catch { /* non supporté ou refusé */ }
-  };
+  }, []);
 
-  const releaseWakeLock = () => {
+  const releaseWakeLock = useCallback(() => {
     wakeLockRef.current?.release();
     wakeLockRef.current = null;
-  };
+  }, []);
 
   // ── Start/Stop recording ──
+  const stopWatchAndTimer = useCallback(() => {
+    if (watchIdRef.current != null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  const persistTracking = useCallback((payload) => {
+    managerRef.current?.updateMeetingField('gpsTracking', payload);
+    try {
+      const pending = onFlushTrackingRef.current?.(payload);
+      if (pending?.catch) pending.catch((error) => console.warn('GPS flush error:', error));
+    } catch (error) {
+      console.warn('GPS flush error:', error);
+    }
+  }, []);
+
+  const createTrackingPayload = useCallback((coordinates, { finalize = false } = {}) => ({
+    ...trackingRef.current,
+    startTime: startTimeRef.current || trackingRef.current.startTime || null,
+    endTime: finalize ? new Date().toISOString() : null,
+    coordinates,
+    distance: Math.round(totalDistance(coordinates)),
+  }), []);
+
+  const flushCurrentTracking = useCallback(({ finalize = false } = {}) => {
+    if (!isRecordingRef.current) return null;
+    const payload = createTrackingPayload(liveCoordsRef.current, { finalize });
+    persistTracking(payload);
+    acceptedSinceFlushRef.current = 0;
+    return payload;
+  }, [createTrackingPayload, persistTracking]);
+
+  const finishRecording = useCallback(({ errorMessage = null, notify = true } = {}) => {
+    if (!isRecordingRef.current) return;
+
+    isRecordingRef.current = false;
+    setIsRecording(false);
+    onRecordingChangeRef.current?.(false);
+    stopWatchAndTimer();
+    releaseWakeLock();
+
+    const rawCoordinates = liveCoordsRef.current;
+    const rawCount = rawCoordinates.length;
+    const simplified = cleanGpsTrace(rawCoordinates);
+    liveCoordsRef.current = simplified;
+    setLiveCoords(simplified);
+    persistTracking(createTrackingPayload(simplified, { finalize: true }));
+    acceptedSinceFlushRef.current = 0;
+
+    if (errorMessage) {
+      setGpsError(errorMessage);
+      onToastRef.current?.(errorMessage);
+    } else if (notify) {
+      onToastRef.current?.(`Tracé enregistré — ${simplified.length} pts (${rawCount - simplified.length} supprimés)`);
+    }
+  }, [createTrackingPayload, persistTracking, releaseWakeLock, stopWatchAndTimer]);
+
+  const getGpsErrorMessage = useCallback((error) => {
+    if (error?.code === 1) {
+      return 'Localisation refusée. Autorisez la position précise dans les réglages du Pixel, puis réessayez.';
+    }
+    if (error?.code === 3) {
+      return 'Le GPS ne répond pas. Placez-vous à découvert, vérifiez la localisation, puis réessayez.';
+    }
+    return 'Position GPS indisponible. Vérifiez la localisation et votre connexion, puis réessayez.';
+  }, []);
+
   const startRecording = useCallback(() => {
+    if (isRecordingRef.current) return;
     if (!navigator.geolocation) {
-      onToast?.('Géolocalisation non disponible');
+      const message = 'Géolocalisation non disponible sur cet appareil.';
+      setGpsError(message);
+      onToastRef.current?.(message);
+      onRecordingChangeRef.current?.(false);
       return;
     }
 
+    const currentCoordinates = liveCoordsRef.current;
+    const hasExistingTrack = currentCoordinates.some(point =>
+      Number.isFinite(point?.lat) && Number.isFinite(point?.lng)
+    );
+    const startedAt = startTimeRef.current || trackingRef.current.startTime || new Date().toISOString();
+
+    startTimeRef.current = startedAt;
+    recordingStartedAtRef.current = Date.now();
+    pendingBreakRef.current = hasExistingTrack;
+    acceptedSinceFlushRef.current = 0;
+    isRecordingRef.current = true;
+    setGpsError(null);
+    setLastAccuracy(null);
+    setElapsed(0);
     setIsRecording(true);
-    startTimeRef.current = Date.now();
+    onRecordingChangeRef.current?.(true);
     requestWakeLock();
 
-    // Timer pour le compteur
     timerRef.current = setInterval(() => {
-      setElapsed(Date.now() - startTimeRef.current);
+      setElapsed(Date.now() - recordingStartedAtRef.current);
     }, 1000);
 
-    // Sauvegarder le startTime
-    if (manager) {
-      manager.updateMeetingField('gpsTracking', {
-        ...tracking,
-        startTime: new Date().toISOString(),
-        coordinates: liveCoords,
-      });
-    }
+    // Le même startTime est réutilisé pendant toute la trace, y compris à la reprise.
+    persistTracking(createTrackingPayload(currentCoordinates));
 
-    // GPS watch
     lastBearingPtRef.current = null;
-    gpsProcessorRef.current = createGpsFixProcessor(liveCoords);
-    watchIdRef.current = navigator.geolocation.watchPosition(
+    gpsProcessorRef.current = createGpsFixProcessor(hasExistingTrack ? [] : currentCoordinates);
+    try {
+      watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
+        if (!isRecordingRef.current) return;
         const point = {
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
@@ -144,100 +268,111 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
         setLastAccuracy(point.accuracy);
         const filteredPoint = gpsProcessorRef.current.push(point);
         if (!filteredPoint) return;
-        // Cap de déplacement : heading GPS si dispo (en mouvement), sinon cap entre 2 fixes ≥5m
-        {
-          const h = pos.coords.heading, s = pos.coords.speed;
-          let cand = (h != null && !Number.isNaN(h) && s != null && s > 0.5) ? h : null;
-          const lastPt = lastBearingPtRef.current;
-          if (lastPt == null || haversine(lastPt, filteredPoint) >= 5) {
-            if (cand == null && lastPt) cand = bearingBetween(lastPt, filteredPoint);
-            lastBearingPtRef.current = filteredPoint;
-          }
-          if (cand != null) setLiveBearing(prev => smoothBearing(prev, cand));
+
+        // Cap de déplacement : heading GPS si dispo (en mouvement), sinon cap entre 2 fixes ≥5m.
+        const heading = pos.coords.heading;
+        const speed = pos.coords.speed;
+        let candidate = (heading != null && !Number.isNaN(heading) && speed != null && speed > 0.5)
+          ? heading
+          : null;
+        const lastPoint = lastBearingPtRef.current;
+        if (lastPoint == null || haversine(lastPoint, filteredPoint) >= 5) {
+          if (candidate == null && lastPoint) candidate = bearingBetween(lastPoint, filteredPoint);
+          lastBearingPtRef.current = filteredPoint;
         }
-        setLiveCoords(prev => {
-          const updated = [...prev, filteredPoint];
-          // Sauvegarde périodique (tous les 5 points)
-          if (updated.length % 5 === 0 && manager) {
-            manager.updateMeetingField('gpsTracking', {
-              startTime: tracking.startTime || new Date().toISOString(),
-              coordinates: updated,
-              distance: Math.round(totalDistance(updated)),
-            });
-          }
-          return updated;
-        });
+        if (candidate != null) setLiveBearing(previous => smoothBearing(previous, candidate));
+
+        const breakMarker = pendingBreakRef.current
+          ? [{ break: true, timestamp: filteredPoint.timestamp }]
+          : [];
+        pendingBreakRef.current = false;
+        const updated = [...liveCoordsRef.current, ...breakMarker, filteredPoint];
+        liveCoordsRef.current = updated;
+        setLiveCoords(updated);
+
+        acceptedSinceFlushRef.current += 1;
+        if (acceptedSinceFlushRef.current >= 5) {
+          persistTracking(createTrackingPayload(updated));
+          acceptedSinceFlushRef.current = 0;
+        }
       },
-      (err) => {
-        console.warn('GPS error:', err.message);
+      (error) => {
+        if (!isRecordingRef.current) return;
+        console.warn('GPS error:', error?.message);
+        finishRecording({ errorMessage: getGpsErrorMessage(error), notify: false });
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 2000 }
-    );
-  }, [manager, tracking, liveCoords, onToast]);
+      );
+    } catch (error) {
+      console.warn('GPS start error:', error);
+      finishRecording({ errorMessage: getGpsErrorMessage(error), notify: false });
+    }
+  }, [
+    createTrackingPayload,
+    finishRecording,
+    getGpsErrorMessage,
+    persistTracking,
+    requestWakeLock,
+  ]);
 
   const stopRecording = useCallback(() => {
-    setIsRecording(false);
-    releaseWakeLock();
-
-    if (watchIdRef.current != null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-    }
-
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-
-    // Nettoyage final : précision, pointes, lissage, espacement et simplification 2 m.
-    const rawCount = liveCoords.length;
-    const simplified = cleanGpsTrace(liveCoords);
-    setLiveCoords(simplified);
-
-    if (manager) {
-      manager.updateMeetingField('gpsTracking', {
-        startTime: tracking.startTime,
-        endTime: new Date().toISOString(),
-        coordinates: simplified,
-        distance: Math.round(totalDistance(simplified)),
-      });
-    }
-
-    onToast?.(`Tracé enregistré — ${simplified.length} pts (${rawCount - simplified.length} supprimés)`);
-  }, [manager, tracking, liveCoords, onToast]);
+    finishRecording();
+  }, [finishRecording]);
 
   const cleanExistingTrace = useCallback(() => {
     const cleaned = cleanGpsTrace(liveCoords);
     setTraceBeforeClean(liveCoords);
+    liveCoordsRef.current = cleaned;
     setLiveCoords(cleaned);
-    manager?.updateMeetingField('gpsTracking', {
+    persistTracking({
       ...tracking,
       coordinates: cleaned,
       distance: Math.round(totalDistance(cleaned)),
     });
     onToast?.(`Trace nettoyée — ${liveCoords.length} → ${cleaned.length} points`);
-  }, [liveCoords, manager, tracking, onToast]);
+  }, [liveCoords, tracking, onToast, persistTracking]);
 
   const undoTraceCleaning = useCallback(() => {
     if (!traceBeforeClean) return;
+    liveCoordsRef.current = traceBeforeClean;
     setLiveCoords(traceBeforeClean);
-    manager?.updateMeetingField('gpsTracking', {
+    persistTracking({
       ...tracking,
       coordinates: traceBeforeClean,
       distance: Math.round(totalDistance(traceBeforeClean)),
     });
     setTraceBeforeClean(null);
     onToast?.('Nettoyage annulé');
-  }, [traceBeforeClean, manager, tracking, onToast]);
+  }, [traceBeforeClean, tracking, onToast, persistTracking]);
 
-  // Cleanup au démontage
+  // Android peut figer/fermer l'onglet sans laisser le temps au bouton Arrêter.
   useEffect(() => {
-    return () => {
-      if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current);
-      if (timerRef.current) clearInterval(timerRef.current);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flushCurrentTracking();
+    };
+    const handlePageHide = () => {
+      if (!isRecordingRef.current) return;
+      flushCurrentTracking({ finalize: true });
+      isRecordingRef.current = false;
+      setIsRecording(false);
+      onRecordingChangeRef.current?.(false);
+      stopWatchAndTimer();
       releaseWakeLock();
     };
-  }, []);
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', handlePageHide);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', handlePageHide);
+      flushCurrentTracking({ finalize: true });
+      isRecordingRef.current = false;
+      onRecordingChangeRef.current?.(false);
+      stopWatchAndTimer();
+      releaseWakeLock();
+    };
+  }, [flushCurrentTracking, releaseWakeLock, stopWatchAndTimer]);
 
   const distance = totalDistance(liveCoords);
   const hasTrack = liveCoords.length > 0;
@@ -300,6 +435,14 @@ export default function GpsTrackingSection({ meeting, manager, obsByCategory, on
             </button>
           ))}
         </div>
+        {gpsError && !isRecording && (
+          <div
+            role="alert"
+            className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-semibold leading-snug text-red-700"
+          >
+            {gpsError}
+          </div>
+        )}
       </div>
 
       {/* ── Carte (occupe tout l'espace restant, ou plein écran) ── */}

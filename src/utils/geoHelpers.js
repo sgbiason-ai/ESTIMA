@@ -129,8 +129,10 @@ export function getCurrentPosition() {
 export async function fetchIgnRoute(from, to, retries = 2) {
   const url = `https://data.geopf.fr/navigation/itineraire?resource=bdtopo-osrm&start=${from.lng},${from.lat}&end=${to.lng},${to.lat}&profile=car&optimization=fastest&getSteps=false&getBbox=false&distanceUnit=meter&timeUnit=second`;
   for (let attempt = 0; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, { signal: controller.signal });
       if (res.ok) {
         const data = await res.json();
         const geom = data?.geometry;
@@ -139,6 +141,7 @@ export async function fetchIgnRoute(from, to, retries = 2) {
         }
       }
     } catch { /* retry */ }
+    finally { clearTimeout(timeoutId); }
     if (attempt < retries) await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
   }
   return null;

@@ -30,7 +30,8 @@ export function clearDraft(key) {
 /**
  * @param {Object} options
  * @param {(data: any) => Promise<void>} options.saveFn   — fonction de sauvegarde Firestore
- * @param {string|null}  options.draftKey   — clé localStorage pour brouillon (null = désactivé)
+ * @param {string|null|((data: any) => string|null)} options.draftKey
+ *        Clé localStorage fixe ou dérivée des données (null = désactivé).
  * @param {number}       [options.debounceMs=1500] — délai debounce en ms
  * @param {number}       [options.maxRetries=3]    — nombre max de tentatives
  */
@@ -46,6 +47,7 @@ export function useRobustSave({ saveFn, draftKey, debounceMs = 1500, maxRetries 
   const pendingDataRef = useRef(null);
   const saveTimerRef = useRef(null);
   const retryTimerRef = useRef(null);
+  const inFlightRef = useRef(null);
   const retryCountRef = useRef(0);
   const statusRef = useRef('idle');
   const lastSavedJsonRef = useRef('');
@@ -58,13 +60,18 @@ export function useRobustSave({ saveFn, draftKey, debounceMs = 1500, maxRetries 
   // Resout la cle de brouillon. Si draftKey est une FONCTION, on la derive de la
   // donnee elle-meme → impossible d'ecrire le brouillon d'une entite sous la cle
   // d'une autre lors d'un changement rapide (fuite inter-entite).
-  const resolveDraftKey = (data) => {
+  const resolveDraftKey = useCallback((data) => {
     const dk = draftKeyRef.current;
     return typeof dk === 'function' ? dk(data) : dk;
-  };
+  }, []);
+
+  const updateStatus = useCallback((status) => {
+    statusRef.current = status;
+    setSaveStatus(status);
+  }, []);
 
   // ── Helper : écriture brouillon localStorage avec timestamp ───────────────
-  const writeDraft = (data) => {
+  const writeDraft = useCallback((data) => {
     const key = resolveDraftKey(data);
     if (!key || !data) return;
     try {
@@ -72,41 +79,88 @@ export function useRobustSave({ saveFn, draftKey, debounceMs = 1500, maxRetries 
     } catch (e) {
       console.warn('[RobustSave] Brouillon non sauvegardé:', e);
     }
-  };
+  }, [resolveDraftKey]);
 
   // ── executeSave : tentative + retry avec backoff ──────────────────────────
   const executeSave = useCallback(async () => {
+    // Un debounce peut expirer pendant qu'une écriture précédente est encore
+    // en vol. Attendre cette écriture puis repartir sur la dernière donnée,
+    // sinon ce debounce serait consommé sans réellement sauvegarder.
+    if (inFlightRef.current) {
+      saveTimerRef.current = null;
+      const currentTask = inFlightRef.current;
+      await currentTask;
+      if (pendingDataRef.current) return executeSave();
+      return;
+    }
+
     const data = pendingDataRef.current;
     if (!data || !saveFnRef.current) return;
 
-    setSaveStatus('saving');
-    try {
-      await saveFnRef.current(data);
-      setSaveStatus('saved');
-      retryCountRef.current = 0;
-      if (pendingDataRef.current === data) pendingDataRef.current = null;
-      lastSavedJsonRef.current = JSON.stringify(data);
-      const doneKey = resolveDraftKey(data);
-      if (doneKey) safeStorage.remove(doneKey);
-    } catch (err) {
-      console.error('[RobustSave] Erreur sauvegarde:', err);
-      retryCountRef.current++;
-      if (retryCountRef.current < maxRetries) {
-        if (retryCountRef.current === 2) {
-          toast.warning('Connexion instable, nouvelle tentative...', { duration: 3000 });
-        }
-        const backoff = Math.min(1000 * Math.pow(2, retryCountRef.current), 8000);
-        retryTimerRef.current = setTimeout(executeSave, backoff);
-      } else {
-        setSaveStatus('error');
+    saveTimerRef.current = null;
+    retryTimerRef.current = null;
+    updateStatus('saving');
+
+    const task = (async () => {
+      try {
+        await saveFnRef.current(data);
         retryCountRef.current = 0;
-        toast.error('Sauvegarde impossible. Vos données sont conservées localement.', {
-          title: 'Erreur de connexion',
-          duration: 10000,
-        });
+        lastSavedJsonRef.current = JSON.stringify(data);
+
+        // Une sauvegarde plus ancienne ne doit jamais effacer le brouillon
+        // d'une modification arrivée pendant son écriture réseau.
+        if (pendingDataRef.current === data) {
+          pendingDataRef.current = null;
+          const doneKey = resolveDraftKey(data);
+          if (doneKey) safeStorage.remove(doneKey);
+          updateStatus('saved');
+        } else if (pendingDataRef.current) {
+          updateStatus('waiting');
+        } else {
+          // Une sauvegarde plus récente a déjà terminé entre-temps.
+          updateStatus('saved');
+        }
+      } catch (err) {
+        console.error('[RobustSave] Erreur sauvegarde:', err);
+
+        // Si une donnée plus récente attend déjà, abandonner le retry de
+        // l'ancienne version : la dernière version sera écrite juste après.
+        if (pendingDataRef.current !== data && pendingDataRef.current) {
+          retryCountRef.current = 0;
+          updateStatus('waiting');
+          return;
+        }
+
+        retryCountRef.current++;
+        if (retryCountRef.current < maxRetries) {
+          if (retryCountRef.current === 2) {
+            toast.warning('Connexion instable, nouvelle tentative...', { duration: 3000 });
+          }
+          const backoff = Math.min(1000 * Math.pow(2, retryCountRef.current), 8000);
+          retryTimerRef.current = setTimeout(executeSave, backoff);
+        } else {
+          updateStatus('error');
+          retryCountRef.current = 0;
+          toast.error('Sauvegarde impossible. Vos données sont conservées localement.', {
+            title: 'Erreur de connexion',
+            duration: 10000,
+          });
+        }
+      } finally {
+        inFlightRef.current = null;
+
+        // Une modification arrivée pendant l'écriture repart immédiatement
+        // si aucun debounce/retry n'est déjà programmé.
+        if (pendingDataRef.current && pendingDataRef.current !== data
+            && !saveTimerRef.current && !retryTimerRef.current) {
+          saveTimerRef.current = setTimeout(executeSave, 0);
+        }
       }
-    }
-  }, [maxRetries, toast]);
+    })();
+
+    inFlightRef.current = task;
+    return task;
+  }, [maxRetries, resolveDraftKey, toast, updateStatus]);
 
   // ── triggerSave : debounce + brouillon localStorage ───────────────────────
   const triggerSave = useCallback((data) => {
@@ -114,7 +168,7 @@ export function useRobustSave({ saveFn, draftKey, debounceMs = 1500, maxRetries 
 
     writeDraft(data);
 
-    setSaveStatus('waiting');
+    updateStatus('waiting');
 
     // Annuler le debounce précédent
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -123,7 +177,7 @@ export function useRobustSave({ saveFn, draftKey, debounceMs = 1500, maxRetries 
     retryCountRef.current = 0;
 
     saveTimerRef.current = setTimeout(executeSave, debounceMs);
-  }, [debounceMs, executeSave]);
+  }, [debounceMs, executeSave, updateStatus, writeDraft]);
 
   // ── forceSave : bypass debounce ───────────────────────────────────────────
   // Retourne la promesse de l'ecriture : un appelant qui s'apprete a ecrire le
@@ -131,11 +185,20 @@ export function useRobustSave({ saveFn, draftKey, debounceMs = 1500, maxRetries 
   // l'attendre, sinon la sauvegarde en vol — un setDoc sans merge — ecraserait
   // le champ qui vient d'etre pose. executeSave ne rejette jamais (catch interne),
   // les appelants qui ignorent le retour restent donc corrects.
-  const forceSave = useCallback(() => {
+  const forceSave = useCallback(async () => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
-    if (pendingDataRef.current) return executeSave();
-    return Promise.resolve();
+    saveTimerRef.current = null;
+    retryTimerRef.current = null;
+
+    if (inFlightRef.current) await inFlightRef.current;
+
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+    saveTimerRef.current = null;
+    retryTimerRef.current = null;
+
+    if (pendingDataRef.current) await executeSave();
   }, [executeSave]);
 
   // ── Protection beforeunload + visibilitychange + pagehide ─────────────────
@@ -172,7 +235,7 @@ export function useRobustSave({ saveFn, draftKey, debounceMs = 1500, maxRetries 
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('pagehide', handlePageHide);
     };
-  }, [executeSave]);
+  }, [executeSave, writeDraft]);
 
   // ── Auto-flush périodique : rattrape les debounces ratés ──────────────────
   useEffect(() => {

@@ -10,10 +10,16 @@ const APP_SUPER_ADMIN_EMAIL = 'samuel.biason@papyrus-be.fr';
 export const useMobileSiteVisits = (user, companyId) => {
   const [visits, setVisits] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const fetchVisits = useCallback(async () => {
-    if (!user || !companyId) return;
+    if (!user || !companyId) {
+      setVisits([]);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
+    setError('');
     try {
       const isSuperUser = user.email === APP_SUPER_ADMIN_EMAIL;
       const visitsRef = collection(db, 'companies', companyId, 'site_visits');
@@ -55,6 +61,7 @@ export const useMobileSiteVisits = (user, companyId) => {
       setVisits(list);
     } catch (e) {
       console.error('Erreur chargement visites :', e);
+      setError('Impossible de charger les visites. Vérifiez votre connexion puis réessayez.');
     } finally {
       setIsLoading(false);
     }
@@ -98,7 +105,7 @@ export const useMobileSiteVisits = (user, companyId) => {
   }, [companyId, user]);
 
   const createVisit = useCallback(async () => {
-    if (!companyId) return null;
+    if (!companyId || !user?.uid) throw new Error('Utilisateur ou entreprise indisponible');
     const id = `sv_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     const visit = {
       id,
@@ -116,7 +123,24 @@ export const useMobileSiteVisits = (user, companyId) => {
       sharedWith: [],
     };
     try {
-      await setDoc(doc(db, 'companies', companyId, 'site_visits', id), visit);
+      const writePromise = setDoc(doc(db, 'companies', companyId, 'site_visits', id), visit);
+      const reportLateFailure = (err) => {
+        console.error('[SiteVisit] Création différée échouée :', err);
+        setError('La nouvelle visite reste en attente de synchronisation.');
+      };
+
+      // Firestore garde l'écriture dans son cache persistant hors ligne, mais
+      // sa Promise ne se résout qu'au retour du réseau. Ouvrir la visite tout
+      // de suite évite un bouton « Création… » bloqué sur le chantier.
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        writePromise.catch(reportLateFailure);
+      } else {
+        const outcome = await Promise.race([
+          writePromise.then(() => 'synced'),
+          new Promise(resolve => setTimeout(() => resolve('queued'), 6000)),
+        ]);
+        if (outcome === 'queued') writePromise.catch(reportLateFailure);
+      }
       return { ...visit, isOwner: true, isReadOnly: false };
     } catch (err) {
       console.error('[SiteVisit] Erreur création:', err);
@@ -169,5 +193,15 @@ export const useMobileSiteVisits = (user, companyId) => {
     await batch.commit();
   }, [companyId, user]);
 
-  return { visits, isLoading, refetch: fetchVisits, loadVisit, saveVisit, createVisit, deleteVisit, updateSharing };
+  return {
+    visits,
+    isLoading,
+    error,
+    refetch: fetchVisits,
+    loadVisit,
+    saveVisit,
+    createVisit,
+    deleteVisit,
+    updateSharing,
+  };
 };

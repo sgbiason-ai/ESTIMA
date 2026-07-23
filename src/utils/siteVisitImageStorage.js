@@ -11,7 +11,7 @@
 // Les anciennes photos en base64 (string) restent lues telles quelles : pas de
 // migration, juste une coexistence (string base64 OU objet { src, path }).
 
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { storage } from '../firebaseStorage';
 import { compressImage } from './imageCompressor';
 
@@ -24,6 +24,36 @@ const dataUrlToBlob = (dataUrl) => {
   const arr = new Uint8Array(bytes.length);
   for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
   return new Blob([arr], { type: mime });
+};
+
+const createStoragePath = ({ companyId, visitId, obsId }) => {
+  const ts = Date.now();
+  const rand = Math.random().toString(36).slice(2, 8);
+  return `companies/${companyId}/site_visits/${visitId}/${obsId}/${ts}_${rand}.jpg`;
+};
+
+const uploadBlobWithTimeout = async (blob, path) => {
+  const storageRef = ref(storage, path);
+  const uploadTask = uploadBytesResumable(storageRef, blob, { contentType: 'image/jpeg' });
+  await new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      uploadTask.cancel();
+      reject(new Error('Délai d’envoi photo dépassé'));
+    }, 20000);
+    uploadTask.on(
+      'state_changed',
+      undefined,
+      (error) => {
+        clearTimeout(timeoutId);
+        reject(error);
+      },
+      () => {
+        clearTimeout(timeoutId);
+        resolve();
+      }
+    );
+  });
+  return getDownloadURL(storageRef);
 };
 
 // ── Upload d'une nouvelle photo (depuis un File input) ─────────────────────
@@ -48,17 +78,53 @@ export const uploadSiteVisitImage = async (file, { companyId, visitId, obsId, wi
   const lng = typeof compressed === 'object' ? compressed.lng : undefined;
 
   // 2. Upload
-  const ts = Date.now();
-  const rand = Math.random().toString(36).slice(2, 8);
-  const path = `companies/${companyId}/site_visits/${visitId}/${obsId}/${ts}_${rand}.jpg`;
+  const path = createStoragePath({ companyId, visitId, obsId });
   const blob = dataUrlToBlob(dataSrc);
-  const storageRef = ref(storage, path);
-  await uploadBytes(storageRef, blob, { contentType: 'image/jpeg' });
-  const url = await getDownloadURL(storageRef);
+  const localFallback = { src: dataSrc, pendingStorage: true };
+  if (lat != null && lng != null) {
+    localFallback.lat = lat;
+    localFallback.lng = lng;
+  }
 
-  const out = { src: url, path };
-  if (lat != null && lng != null) { out.lat = lat; out.lng = lng; }
-  return out;
+  // Sur chantier, conserver la photo dans le brouillon même sans réseau.
+  // Elle reste affichable et exportable ; une future édition pourra la
+  // resynchroniser vers Storage.
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return localFallback;
+  }
+
+  try {
+    const url = await uploadBlobWithTimeout(blob, path);
+    const out = { src: url, path };
+    if (lat != null && lng != null) { out.lat = lat; out.lng = lng; }
+    return out;
+  } catch (error) {
+    console.warn('[Visite] Photo conservée localement, envoi Storage différé :', error?.code || error?.message);
+    return localFallback;
+  }
+};
+
+/**
+ * Retente l'envoi d'une photo conservée en base64 après une coupure réseau.
+ * En cas de nouvel échec, retourne l'objet local inchangé.
+ */
+export const syncPendingSiteVisitImage = async (img, { companyId, visitId, obsId }) => {
+  if (!img?.pendingStorage || typeof img.src !== 'string' || !img.src.startsWith('data:image/')) return img;
+  if (!companyId || !visitId || !obsId || (typeof navigator !== 'undefined' && navigator.onLine === false)) return img;
+
+  const path = createStoragePath({ companyId, visitId, obsId });
+  try {
+    const url = await uploadBlobWithTimeout(dataUrlToBlob(img.src), path);
+    const synced = { src: url, path };
+    if (img.lat != null && img.lng != null) {
+      synced.lat = img.lat;
+      synced.lng = img.lng;
+    }
+    return synced;
+  } catch (error) {
+    console.warn('[Visite] Resynchronisation photo différée :', error?.code || error?.message);
+    return img;
+  }
 };
 
 // ── Suppression d'une photo Storage ────────────────────────────────────────

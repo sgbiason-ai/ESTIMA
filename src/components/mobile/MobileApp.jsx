@@ -3,7 +3,7 @@
 // Vue mobile PWA d'EstimaVRD — consultation + exports.
 // Se branche sur les mêmes données Firestore que le desktop.
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useMobileProjects }      from '../../hooks/useMobileProjects';
 import { useMobileFichesMarche } from '../../hooks/useMobileFichesMarche';
 import { useDatabase }            from '../../hooks/useDatabase';
@@ -88,7 +88,17 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
   const { chantiers: crcChantiers, actionRows: crcActionRows, isLoading: crcLoading, error: crcError, refetch: crcRefetch, loadChantier, saveChantier, setChantierArchived: setCrcArchived } = useMobileCrc(user, companyId);
   const { devisList: moeDevisList, isLoading: moeLoading, refetch: moeRefetch, loadDevis: loadMoeDevis } = useMobileDevisMoe(user, companyId);
   const { fiches: adminFiches, isLoading: adminLoading, refetch: adminRefetch, loadFiche } = useMobileFichesMarche(user, companyId);
-  const { visits: siteVisits, isLoading: visitsLoading, refetch: visitsRefetch, loadVisit, saveVisit, createVisit, deleteVisit, updateSharing } = useMobileSiteVisits(user, companyId);
+  const {
+    visits: siteVisits,
+    isLoading: visitsLoading,
+    error: visitsError,
+    refetch: visitsRefetch,
+    loadVisit,
+    saveVisit,
+    createVisit,
+    deleteVisit,
+    updateSharing,
+  } = useMobileSiteVisits(user, companyId);
   const dbHook = useDatabase(user, companyId);
   const resources = useAppResources(user, companyId);
   // Template lettre négo (user pref Firestore) — null = fallback dans le générateur
@@ -107,6 +117,9 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
   const [selectedVisit, setSelectedVisit]     = useState(null);
   const [fullVisit, setFullVisit]             = useState(null);
   const [visitLoading, setVisitLoading]       = useState(false);
+  const [visitCreating, setVisitCreating]     = useState(false);
+  const [siteVisitUploading, setSiteVisitUploading] = useState(false);
+  const [siteVisitGpsActive, setSiteVisitGpsActive] = useState(false);
   const [selectedMoeDevis, setSelectedMoeDevis] = useState(null);
   const [fullMoeDevis, setFullMoeDevis]       = useState(null);
   const [moeDevisLoading, setMoeDevisLoading] = useState(false);
@@ -114,15 +127,21 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
   const [fullFiche, setFullFiche]             = useState(null);
   const [ficheLoading, setFicheLoading]       = useState(false);
   const [toast, setToast]                     = useState(null);
+  const visitLoadRequestRef = useRef(0);
+
+  const triggerToast = useCallback((msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2400);
+  }, []);
 
   // ── Sauvegarde robuste pour visites de site ──
   const siteVisitSaveFn = useCallback(async (data) => {
     if (!data?.id) return;
     await saveVisit(data.id, data);
   }, [saveVisit]);
-  const { saveStatus: svSaveStatus, triggerSave: svTriggerSave } = useRobustSave({
+  const { saveStatus: svSaveStatus, triggerSave: svTriggerSave, forceSave: svForceSave } = useRobustSave({
     saveFn: siteVisitSaveFn,
-    draftKey: selectedVisit?.id ? `draft_sv_${selectedVisit.id}` : null,
+    draftKey: data => data?.id ? `draft_sv_${data.id}` : null,
     debounceMs: 1500,
   });
   const handleSiteVisitSave = useCallback((id, data) => svTriggerSave(data), [svTriggerSave]);
@@ -245,43 +264,103 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
   }, [loadFiche]);
 
   const handleSelectVisit = useCallback(async (v) => {
+    if (siteVisitUploading) {
+      triggerToast('Attendez la fin de l’envoi de la photo');
+      return;
+    }
+    if (siteVisitGpsActive) {
+      triggerToast('Arrêtez le suivi GPS avant de changer de visite');
+      return;
+    }
+
+    // Laisser au brouillon courant le temps d'être envoyé sans bloquer
+    // indéfiniment la navigation si Firestore attend le retour du réseau.
+    await Promise.race([
+      svForceSave(),
+      new Promise(resolve => setTimeout(resolve, 1200)),
+    ]);
+
+    const requestId = ++visitLoadRequestRef.current;
     setSelectedVisit(v);
     setVisitLoading(true);
-    const data = await loadVisit(v.id);
-    // Vérifier si un brouillon local plus récent existe (sauvegarde interrompue)
-    const draft = loadDraft(`draft_sv_${v.id}`);
-    const svDraftAt = draft?._draftAt || 0;
-    const svFirestoreAt = data?.lastSaved ? new Date(data.lastSaved).getTime() : 0;
-    if (!data?.isReadOnly && draft && svDraftAt > svFirestoreAt) {
-      const { _draftAt, ...cleanDraft } = draft;
-      setFullVisit(cleanDraft);
-      // Re-pousser le brouillon vers Firestore. On ne nettoie le brouillon
-      // local QU'APRÈS confirmation de la sauvegarde : si le réseau est encore
-      // KO, il reste disponible et l'auto-save reprendra à la 1re modif.
-      try {
-        await saveVisit(v.id, cleanDraft);
-        clearDraft(`draft_sv_${v.id}`);
-        visitsRefetch();
-        setToast('Brouillon local synchronisé ✓');
-      } catch {
-        setToast('Brouillon restauré — sync en attente réseau');
+
+    try {
+      const data = await loadVisit(v.id);
+      if (requestId !== visitLoadRequestRef.current) return;
+      if (!data) {
+        setSelectedVisit(null);
+        setFullVisit(null);
+        triggerToast('Visite introuvable ou inaccessible');
+        return;
       }
-      setTimeout(() => setToast(null), 2600);
-    } else {
-      setFullVisit(data);
-      if (draft) clearDraft(`draft_sv_${v.id}`);
+
+      // Vérifier si un brouillon local plus récent existe (sauvegarde interrompue).
+      const draftKey = `draft_sv_${v.id}`;
+      const draft = loadDraft(draftKey);
+      const svDraftAt = draft?._draftAt || 0;
+      const svFirestoreAt = data.lastSaved ? new Date(data.lastSaved).getTime() : 0;
+      if (!data.isReadOnly && draft && svDraftAt > svFirestoreAt) {
+        const { _draftAt, ...cleanDraft } = draft;
+        setFullVisit(cleanDraft);
+        triggerToast('Brouillon local restauré — synchronisation en cours');
+
+        // Ne pas bloquer l'ouverture hors ligne : Firestore confirmera
+        // l'écriture au retour du réseau, puis seulement le brouillon sera retiré.
+        saveVisit(v.id, cleanDraft)
+          .then(() => {
+            if (requestId !== visitLoadRequestRef.current) return;
+            clearDraft(draftKey);
+            visitsRefetch();
+            triggerToast('Brouillon local synchronisé ✓');
+          })
+          .catch(() => triggerToast('Brouillon conservé — réseau indisponible'));
+      } else {
+        setFullVisit(data);
+        if (draft) clearDraft(draftKey);
+      }
+    } catch (error) {
+      console.error('[Mobile] Erreur chargement visite :', error);
+      if (requestId === visitLoadRequestRef.current) {
+        setSelectedVisit(null);
+        setFullVisit(null);
+        triggerToast('Impossible de charger la visite');
+      }
+    } finally {
+      if (requestId === visitLoadRequestRef.current) setVisitLoading(false);
     }
-    setVisitLoading(false);
-  }, [loadVisit, saveVisit, visitsRefetch]);
+  }, [
+    loadVisit, saveVisit, siteVisitGpsActive, siteVisitUploading,
+    svForceSave, triggerToast, visitsRefetch,
+  ]);
 
   const handleCreateVisit = useCallback(async () => {
-    const visit = await createVisit();
-    if (visit) {
-      setSelectedVisit(visit);
-      setFullVisit(visit);
-      visitsRefetch();
+    if (visitCreating) return;
+    setVisitCreating(true);
+    try {
+      const visit = await createVisit();
+      if (visit) {
+        visitLoadRequestRef.current++;
+        setSelectedVisit(visit);
+        setFullVisit(visit);
+        visitsRefetch();
+      }
+    } catch (error) {
+      console.error('[Mobile] Erreur création visite :', error);
+      triggerToast('Impossible de créer la visite');
+    } finally {
+      setVisitCreating(false);
     }
-  }, [createVisit, visitsRefetch]);
+  }, [createVisit, triggerToast, visitCreating, visitsRefetch]);
+
+  const handleDeleteVisit = useCallback(async (visitId) => {
+    try {
+      await deleteVisit(visitId);
+      triggerToast('Visite supprimée');
+    } catch (error) {
+      console.error('[Mobile] Erreur suppression visite :', error);
+      triggerToast('Impossible de supprimer la visite');
+    }
+  }, [deleteVisit, triggerToast]);
 
   const goBack = useCallback(async () => {
     if (subView) { setSubView(null); }
@@ -302,21 +381,33 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
       setSelectedFiche(null);
       setFullFiche(null);
     } else if (selectedVisit) {
+      if (siteVisitUploading) {
+        triggerToast('Attendez la fin de l’envoi de la photo');
+        return;
+      }
+      if (siteVisitGpsActive) {
+        triggerToast('Arrêtez le suivi GPS avant de quitter');
+        return;
+      }
       // Confirmation avant de quitter une visite en cours
       const { confirm } = await import('../../utils/globalUI');
       const ok = await confirm('Quitter la visite ? Les modifications sont sauvegardées automatiquement.', { title: 'Retour' });
       if (!ok) return;
+      await Promise.race([
+        svForceSave(),
+        new Promise(resolve => setTimeout(resolve, 1200)),
+      ]);
+      visitLoadRequestRef.current++;
       setSelectedVisit(null);
       setFullVisit(null);
     } else if (activeModule) {
       setActiveModule(null);
     }
-  }, [subView, selectedProject, selectedChantier, selectedMoeDevis, selectedFiche, selectedVisit, activeModule]);
-
-  const triggerToast = useCallback((msg) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 2400);
-  }, []);
+  }, [
+    subView, selectedProject, selectedChantier, selectedMoeDevis, selectedFiche,
+    selectedVisit, activeModule, siteVisitGpsActive, siteVisitUploading,
+    svForceSave, triggerToast,
+  ]);
 
   // ── Export handler (share = true → partage natif, false → téléchargement) ──
   const handleExport = useCallback(async (exportType, share = false, opts = {}) => {
@@ -834,22 +925,22 @@ export default function MobileApp({ user, companyId, userModules = null, userMob
         {activeModule === 'site_visits' && (
           isTablet && isLandscape ? (
             <SplitView
-              List={<SiteVisitListView visits={siteVisits} loading={visitsLoading} onSelect={handleSelectVisit} onCreate={handleCreateVisit} onDelete={deleteVisit} onRefresh={visitsRefetch} isLandscape={false} />}
-              Detail={fullVisit && <SiteVisitDetailView visit={fullVisit} onSave={handleSiteVisitSave} onUpdateSharing={updateSharing} currentUser={user} saveStatus={svSaveStatus} onToast={triggerToast} isLandscape={isLandscape} branding={resources.masterBranding} companyId={companyId} />}
+              List={<SiteVisitListView visits={siteVisits} loading={visitsLoading} error={visitsError} creating={visitCreating} onSelect={handleSelectVisit} onCreate={handleCreateVisit} onDelete={handleDeleteVisit} onRefresh={visitsRefetch} isLandscape={false} />}
+              Detail={fullVisit && <SiteVisitDetailView key={fullVisit.id} visit={fullVisit} onSave={handleSiteVisitSave} onUpdateSharing={updateSharing} currentUser={user} saveStatus={svSaveStatus} onToast={triggerToast} onUploadingChange={setSiteVisitUploading} onGpsRecordingChange={setSiteVisitGpsActive} isLandscape={isLandscape} branding={resources.masterBranding} companyId={companyId} />}
               hasSelection={!!selectedVisit}
               loading={visitLoading}
               emptyIcon="camera"
               emptyLabel="Sélectionnez une visite à gauche"
             />
           ) : !selectedVisit ? (
-            <SiteVisitListView visits={siteVisits} loading={visitsLoading} onSelect={handleSelectVisit} onCreate={handleCreateVisit} onDelete={deleteVisit} onRefresh={visitsRefetch} isLandscape={isLandscape} />
+            <SiteVisitListView visits={siteVisits} loading={visitsLoading} error={visitsError} creating={visitCreating} onSelect={handleSelectVisit} onCreate={handleCreateVisit} onDelete={handleDeleteVisit} onRefresh={visitsRefetch} isLandscape={isLandscape} />
           ) : visitLoading ? (
             <div className="flex items-center justify-center py-20 gap-2 text-gray-500">
               <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
               <span className="text-sm">Chargement…</span>
             </div>
           ) : fullVisit ? (
-            <SiteVisitDetailView visit={fullVisit} onSave={handleSiteVisitSave} onUpdateSharing={updateSharing} currentUser={user} saveStatus={svSaveStatus} onToast={triggerToast} isLandscape={isLandscape} branding={resources.masterBranding} companyId={companyId} />
+            <SiteVisitDetailView key={fullVisit.id} visit={fullVisit} onSave={handleSiteVisitSave} onUpdateSharing={updateSharing} currentUser={user} saveStatus={svSaveStatus} onToast={triggerToast} onUploadingChange={setSiteVisitUploading} onGpsRecordingChange={setSiteVisitGpsActive} isLandscape={isLandscape} branding={resources.masterBranding} companyId={companyId} />
           ) : null
         )}
 

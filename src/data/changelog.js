@@ -8,10 +8,11 @@ export { APP_VERSION } from './appVersion';
 
 export const CHANGELOG = [
   {
-    version: '3.15.3',
+    version: '3.15.4',
     date: '2026-07-23',
     title: 'Documents administratifs et modules terrain',
     highlights: [
+      'Visites de site mobiles — fiabilisation terrain pour les téléphones Android : les observations se sauvegardent désormais au fil de la saisie, les photos prises hors connexion restent attachées à la visite et leur envoi est retenté à la réouverture, les derniers points GPS sont conservés même si l’application passe en arrière-plan, et les erreurs de chargement ou de localisation sont affichées clairement. Dans la barre d’actions, « Mesurer un segment » est placé avant « Ajouter une observation »',
       'Documents administratifs — EXE8 / EXE9 disposent désormais d’un contrôle complet de levée des réserves : sélection d’une seconde visite, rapprochement automatique par numéro d’observation avec correction manuelle, qualification Levée / Maintenue / Partiellement levée, constat éditable et photos de contrôle. Les exports PDF et Word ajoutent une annexe comparative commune avec la réserve initiale, le constat, le statut et les photos avant/après',
       'Documents administratifs mobiles — pour un marché alloti, l’attributaire et ses lots doivent désormais être sélectionnés explicitement avant l’export EXE1, EXE4, EXE5 ou EXE6. Le document généré reprend uniquement l’entreprise, les lots et les données EXE sélectionnés, sans mélanger les informations des autres attributaires',
       'Comptes Rendus — nouveau « Plan d’actions » transversal : un bouton du ruban ouvre un échéancier de toutes les actions datées (« POUR LE ») non soldées, tous chantiers en cours confondus, en lisant le dernier compte rendu de chaque affaire. Les actions sont classées En retard (avec le nombre de jours), Sous 7 jours et Plus tard, filtrables par chantier et par responsable (pastilles PAR) ; un clic sur une ligne ouvre directement l’affaire sur son dernier CR. Sur tablette, un onglet « Actions » de la liste des chantiers offre le même échéancier avec le filtre par responsable, et le compteur d’actions en retard apparaît en tête de liste',

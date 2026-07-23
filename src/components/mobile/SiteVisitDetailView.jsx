@@ -14,7 +14,6 @@ import {
   fmtCoord, fmtDist, fmtUncertainty, accuracyColor,
   haversine, computeUncertainty, getCurrentPosition, fetchIgnRoute, reverseGeocodeCommune,
 } from '../../utils/geoHelpers';
-import { deleteSiteVisitImage } from '../../utils/siteVisitImageStorage';
 import SiteVisitShareModal from '../../views/siteVisits/SiteVisitShareModal';
 import SiteVisitExportModal from '../../views/siteVisits/SiteVisitExportModal';
 
@@ -32,7 +31,7 @@ function SectionTab({ label, active, onClick }) {
 }
 
 // Barre d'actions fixe (bas d'écran). 3 états :
-//  1. défaut       → [Ajouter une observation] [Mesurer un segment]
+//  1. défaut       → [Mesurer un segment] [Ajouter une observation]
 //  2. mode mesure  → [Départ segment] [Observation Ponctuelle] [× fermer]
 //  3. mesure lancée→ distance routière live + [Fin] [× annuler]
 function SiteVisitActionBar({
@@ -112,13 +111,13 @@ function SiteVisitActionBar({
   return (
     <div className={card}>
       <div className="flex items-stretch gap-2">
-        <button onClick={onAddObs}
-          className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl text-[12px] font-bold leading-tight text-center bg-gray-900 text-white active:scale-[0.97] transition shadow-sm">
-          <Icon name="plus" size={15} color="#fff" /> Ajouter une observation
-        </button>
         <button onClick={onStartMeasure}
           className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl text-[12px] font-bold leading-tight text-center bg-blue-600 text-white active:scale-[0.97] transition shadow-sm">
           <Ruler size={15} className="shrink-0" /> Mesurer un segment
+        </button>
+        <button onClick={onAddObs}
+          className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl text-[12px] font-bold leading-tight text-center bg-gray-900 text-white active:scale-[0.97] transition shadow-sm">
+          <Icon name="plus" size={15} color="#fff" /> Ajouter une observation
         </button>
       </div>
     </div>
@@ -219,7 +218,19 @@ function ObsCard({ obs, number, onTap, onDelete, onViewImage, readOnly = false }
 
 // ─── Composant principal ───────────────────────────────────────────────────
 
-export default function SiteVisitDetailView({ visit, onSave, onUpdateSharing, currentUser, saveStatus, onToast, isLandscape, branding, companyId }) {
+export default function SiteVisitDetailView({
+  visit,
+  onSave,
+  onUpdateSharing,
+  currentUser,
+  saveStatus,
+  onToast,
+  onUploadingChange,
+  onGpsRecordingChange,
+  isLandscape,
+  branding,
+  companyId,
+}) {
   const [activeSection, setActiveSection] = useState('observations');
   const [editingObs, setEditingObs] = useState(null);
   const [viewingImage, setViewingImage] = useState(null);
@@ -227,9 +238,21 @@ export default function SiteVisitDetailView({ visit, onSave, onUpdateSharing, cu
   const [showShareModal, setShowShareModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [localVisit, setLocalVisit] = useState(visit);
+  const localVisitRef = useRef(visit);
   const canEdit = visit?.isOwner === true;
 
-  useEffect(() => setLocalVisit(visit), [visit]);
+  useEffect(() => {
+    localVisitRef.current = visit;
+    setLocalVisit(visit);
+  }, [visit]);
+
+  const updateLocalVisit = useCallback((updater) => {
+    setLocalVisit(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      localVisitRef.current = next;
+      return next;
+    });
+  }, []);
 
   // ── Auto-save via useEffect (pas de side-effect dans les setState updaters) ──
   const onSaveRef = useRef(onSave);
@@ -247,9 +270,21 @@ export default function SiteVisitDetailView({ visit, onSave, onUpdateSharing, cu
     updateMeetingField: (field, value) => {
       if (!canEdit) return;
       isUserEdit.current = true;
-      setLocalVisit(prev => ({ ...prev, [field]: value }));
+      updateLocalVisit(prev => ({ ...prev, [field]: value }));
     },
-  }), [canEdit]);
+  }), [canEdit, updateLocalVisit]);
+
+  // Le composant GPS peut être démonté avant que l'effet d'auto-save ne
+  // s'exécute. Cette voie écrit immédiatement le brouillon complet avec les
+  // derniers points reçus ; MobileApp gère ensuite le debounce/réseau.
+  const handleTrackingFlush = useCallback((gpsTracking) => {
+    if (!canEdit || !gpsTracking) return;
+    const updated = { ...localVisitRef.current, gpsTracking };
+    localVisitRef.current = updated;
+    isUserEdit.current = false;
+    setLocalVisit(updated);
+    onSaveRef.current(updated.id, updated);
+  }, [canEdit]);
 
   // ── Observations CRUD ──
   const addObservation = useCallback(() => {
@@ -261,34 +296,36 @@ export default function SiteVisitDetailView({ visit, onSave, onUpdateSharing, cu
       date: new Date().toISOString().split('T')[0],
     };
     isUserEdit.current = true;
-    setLocalVisit(prev => ({ ...prev, observations: [...(prev.observations || []), newObs] }));
+    updateLocalVisit(prev => ({ ...prev, observations: [...(prev.observations || []), newObs] }));
     setEditingObs(newObs);
-  }, [canEdit]);
+  }, [canEdit, updateLocalVisit]);
 
   const updateObservation = useCallback((obsId, patch) => {
     if (!canEdit) return;
     isUserEdit.current = true;
-    setLocalVisit(prev => ({
+    updateLocalVisit(prev => ({
       ...prev,
       observations: (prev.observations || []).map(o => o.id === obsId ? { ...o, ...patch } : o),
     }));
-  }, [canEdit]);
+  }, [canEdit, updateLocalVisit]);
 
   const deleteObservation = useCallback((obsId) => {
     if (!canEdit) return;
     isUserEdit.current = true;
-    setLocalVisit(prev => {
-      const removed = (prev.observations || []).find(o => o.id === obsId);
-      for (const img of (removed?.images || [])) deleteSiteVisitImage(img);
-      return { ...prev, observations: (prev.observations || []).filter(o => o.id !== obsId) };
-    });
-  }, [canEdit]);
+    // Les fichiers Storage sont volontairement conservés ici : supprimer
+    // avant confirmation Firestore pourrait casser une visite si le réseau
+    // tombe pendant l'auto-save. Un nettoyage différé pourra les purger.
+    updateLocalVisit(prev => ({
+      ...prev,
+      observations: (prev.observations || []).filter(o => o.id !== obsId),
+    }));
+  }, [canEdit, updateLocalVisit]);
 
   const updateInfo = useCallback((patch) => {
     if (!canEdit) return;
     isUserEdit.current = true;
-    setLocalVisit(prev => ({ ...prev, ...patch }));
-  }, [canEdit]);
+    updateLocalVisit(prev => ({ ...prev, ...patch }));
+  }, [canEdit, updateLocalVisit]);
 
   // ── Segments GPS (Départ / Fin / Point) — parité desktop SiteVisitsView ──
   const [pendingPoint, setPendingPoint] = useState(null);
@@ -327,7 +364,9 @@ export default function SiteVisitDetailView({ visit, onSave, onUpdateSharing, cu
 
       // Distance routière IGN (visu + distance), fallback vol d'oiseau (haversine).
       let routeCoords = null, distance = null, source = null;
-      const ign = await fetchIgnRoute(pointA, pointB);
+      // Une seule tentative courte sur mobile : en réseau faible, le repli
+      // vol d'oiseau doit rester disponible sans bloquer l'utilisateur.
+      const ign = await fetchIgnRoute(pointA, pointB, 0);
       if (ign && ign.distance > 0 && ign.coordinates?.length >= 2) {
         routeCoords = ign.coordinates.map(c => ({ lat: c[0], lng: c[1] }));
         distance = ign.distance;
@@ -349,13 +388,13 @@ export default function SiteVisitDetailView({ visit, onSave, onUpdateSharing, cu
         segmentRoute: routeCoords,
       };
       isUserEdit.current = true;
-      setLocalVisit(prev => ({ ...prev, observations: [...(prev.observations || []), newSeg] }));
+      updateLocalVisit(prev => ({ ...prev, observations: [...(prev.observations || []), newSeg] }));
       setMeasureMode(false);
       const label = source === 'ign' ? 'route IGN' : 'vol d\'oiseau';
       onToast?.(`Segment créé — ${fmtDist(distance)} (${label}) ${fmtUncertainty(uncertainty)}`);
     } catch { /* toast déjà émis */ }
     setGettingPosition(false);
-  }, [pendingPoint, gettingPosition, getPosition, onToast]);
+  }, [pendingPoint, gettingPosition, getPosition, onToast, updateLocalVisit]);
 
   const handlePoint = useCallback(async () => {
     if (gettingPosition) return;
@@ -370,12 +409,12 @@ export default function SiteVisitDetailView({ visit, onSave, onUpdateSharing, cu
         pointAccuracy: Math.round(pos.accuracy),
       };
       isUserEdit.current = true;
-      setLocalVisit(prev => ({ ...prev, observations: [...(prev.observations || []), newPt] }));
+      updateLocalVisit(prev => ({ ...prev, observations: [...(prev.observations || []), newPt] }));
       setMeasureMode(false);
       onToast?.(`Point marqué — ${fmtCoord(pos.lat, pos.lng)} (±${Math.round(pos.accuracy)}m)`);
     } catch { /* toast déjà émis */ }
     setGettingPosition(false);
-  }, [gettingPosition, getPosition, onToast]);
+  }, [gettingPosition, getPosition, onToast, updateLocalVisit]);
 
   const cancelPending = useCallback(() => { setPendingPoint(null); setMeasureMode(false); }, []);
 
@@ -458,7 +497,10 @@ export default function SiteVisitDetailView({ visit, onSave, onUpdateSharing, cu
     return () => { cancelled = true; };
   }, [firstGpsPoint, localVisit.commune, updateInfo]);
 
-  const observations = localVisit.observations || [];
+  const observations = useMemo(
+    () => localVisit.observations || [],
+    [localVisit.observations]
+  );
 
   // ── Export PDF (vues cartographiques choisies dans la modale) ──
   const runExportPdf = useCallback(async (views) => {
@@ -582,6 +624,8 @@ export default function SiteVisitDetailView({ visit, onSave, onUpdateSharing, cu
             onDelete={deleteObservation}
             onClose={() => setEditingObs(null)}
             onViewImage={setViewingImage}
+            onToast={onToast}
+            onUploadingChange={onUploadingChange}
             inline
             companyId={companyId}
             visitId={localVisit.id}
@@ -608,6 +652,8 @@ export default function SiteVisitDetailView({ visit, onSave, onUpdateSharing, cu
             manager={manager}
             obsByCategory={{}}
             onToast={onToast}
+            onFlushTracking={handleTrackingFlush}
+            onRecordingChange={onGpsRecordingChange}
             externalObsMarkers={obsMarkersForMap}
             readOnly={!canEdit}
           />
@@ -634,7 +680,7 @@ export default function SiteVisitDetailView({ visit, onSave, onUpdateSharing, cu
       <SiteVisitShareModal isOpen={showShareModal} onClose={() => setShowShareModal(false)} visit={localVisit}
         companyId={companyId} currentUser={currentUser} onSave={async members => {
           await onUpdateSharing(localVisit.id, members);
-          setLocalVisit(prev => ({ ...prev, sharedWith: members, accessUids: [currentUser.uid, ...members.map(member => member.uid)] }));
+          updateLocalVisit(prev => ({ ...prev, sharedWith: members, accessUids: [currentUser.uid, ...members.map(member => member.uid)] }));
           onToast?.('Partage mis à jour');
         }} />
 
