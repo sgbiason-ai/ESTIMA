@@ -323,10 +323,12 @@ export default function GpsTrackingSection({
   }, [finishRecording]);
 
   const cleanExistingTrace = useCallback(() => {
-    // Une seule fois par trace : sans lissage (points aberrants uniquement),
-    // et marquée cleanedAt — réappliquer le nettoyage dégradait le tracé.
+    // Une seule fois par trace (marquée cleanedAt) : le filtre médian et le
+    // lissage exponentiel de cleanGpsTrace ne sont pas idempotents —
+    // réappliqués sur une trace déjà nettoyée, ils rabotaient le tracé à
+    // chaque clic jusqu'à ne plus laisser grand-chose.
     if (tracking?.cleanedAt) { onToast?.('Trace déjà nettoyée'); return; }
-    const cleaned = cleanGpsTrace(liveCoords, { smoothing: false });
+    const cleaned = cleanGpsTrace(liveCoords);
     setTraceBeforeClean(liveCoords);
     liveCoordsRef.current = cleaned;
     setLiveCoords(cleaned);

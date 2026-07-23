@@ -430,10 +430,12 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
 
   const handleCleanTrace = useCallback(() => {
     if (!fullVisit || liveCoords.length < 3) return;
-    // Une seule fois par trace : sans lissage (points aberrants uniquement),
-    // et marquée cleanedAt — réappliquer le nettoyage dégradait le tracé.
+    // Une seule fois par trace (marquée cleanedAt) : le filtre médian et le
+    // lissage exponentiel de cleanGpsTrace ne sont pas idempotents —
+    // réappliqués sur une trace déjà nettoyée, ils rabotaient le tracé à
+    // chaque clic jusqu'à ne plus laisser grand-chose.
     if (fullVisit.gpsTracking?.cleanedAt) { showToast('Trace déjà nettoyée'); return; }
-    const cleaned = cleanGpsTrace(liveCoords, { smoothing: false });
+    const cleaned = cleanGpsTrace(liveCoords);
     const updated = {
       ...fullVisit,
       gpsTracking: { ...fullVisit.gpsTracking, coordinates: cleaned, distance: Math.round(totalDistance(cleaned)), cleanedAt: new Date().toISOString() },
