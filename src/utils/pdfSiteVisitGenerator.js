@@ -13,6 +13,13 @@ const PW = 210, PH = 297;
 const M = { top: 18, left: 15, right: 15, bottom: 18 };
 const CW = PW - M.left - M.right;
 
+// Vignettes cartographiques des observations (colonne de droite, en mm).
+// Vue simple = un carré 55x55 ; vue double = deux bandeaux 55x27 EMPILÉS —
+// deux carrés côte à côte tombaient à 26 mm de large, illisibles à l'impression.
+const OBS_MAP_W = 55;
+const OBS_MAP_GUTTER = 3;
+const OBS_MAP_H_DUAL = 27;
+
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
 const stripHtml = (str) => (str || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -598,43 +605,49 @@ const buildObsMiniMap = async (obs, visit, THEME, obsIdx, viewKey = DEFAULT_PDF_
   const padLng = Math.max((maxLng - minLng) * 0.25, 0.0005);
   minLat -= padLat; maxLat += padLat; minLng -= padLng; maxLng += padLng;
 
-  // Trouver le zoom optimal — on cherche un carré en PIXELS, pas en degrés
+  // Ratio du cadre de destination : carré en vue simple, paysage 55x27 en vue
+  // double (deux vignettes empilées). Le crop doit respecter ce ratio, sinon
+  // jsPDF étire l'image dans son cadre.
+  const view = resolveView(viewKey, DEFAULT_PDF_VIEWS.obs);
+  const isDual = !!view.dual;
+  const aspect = isDual ? OBS_MAP_W / OBS_MAP_H_DUAL : 1;
+
+  // Trouver le zoom optimal — cadre en PIXELS au ratio voulu, pas en degrés
   let zoom = 18;
   for (let z = 18; z >= 1; z--) {
-    const pxMinX = latLng2px(0, minLng, z).x;
-    const pxMaxX = latLng2px(0, maxLng, z).x;
-    const pxMinY = latLng2px(maxLat, 0, z).y;
-    const pxMaxY = latLng2px(minLat, 0, z).y;
-    const spanPx = Math.max(pxMaxX - pxMinX, pxMaxY - pxMinY, 128);
-    // Nombre de tuiles nécessaires pour couvrir le carré pixel
-    const tilesNeeded = Math.ceil(spanPx / 256) + 2; // +2 pour marges
-    if (tilesNeeded * tilesNeeded <= 16) { zoom = z; break; }
+    const spanX = latLng2px(0, maxLng, z).x - latLng2px(0, minLng, z).x;
+    const spanY = latLng2px(minLat, 0, z).y - latLng2px(maxLat, 0, z).y;
+    // Largeur qui englobe les bounds au ratio demandé (hauteur = largeur/ratio)
+    const w = Math.max(spanX, spanY * aspect, 128);
+    // Nombre de tuiles nécessaires pour couvrir le cadre (+2 pour marges)
+    const tilesX = Math.ceil(w / 256) + 2;
+    const tilesY = Math.ceil(w / aspect / 256) + 2;
+    if (tilesX * tilesY <= 16) { zoom = z; break; }
   }
 
-  // Calculer le carré en pixels au zoom choisi
+  // Calculer le cadre en pixels au zoom choisi
   const pxMinX = latLng2px(0, minLng, zoom).x;
   const pxMaxX = latLng2px(0, maxLng, zoom).x;
   const pxMinY = latLng2px(maxLat, 0, zoom).y;
   const pxMaxY = latLng2px(minLat, 0, zoom).y;
-  const cropSpan = Math.max(pxMaxX - pxMinX, pxMaxY - pxMinY, 128);
+  const cropW = Math.max(pxMaxX - pxMinX, (pxMaxY - pxMinY) * aspect, 128);
+  const cropH = cropW / aspect;
   const centerPxX = (pxMinX + pxMaxX) / 2;
   const centerPxY = (pxMinY + pxMaxY) / 2;
-  const half = cropSpan / 2;
+  const halfW = cropW / 2;
+  const halfH = cropH / 2;
 
-  // Tuiles nécessaires pour couvrir le carré pixel (avec marge)
-  const sqLeft = centerPxX - half;
-  const sqTop = centerPxY - half;
-  const sqRight = centerPxX + half;
-  const sqBottom = centerPxY + half;
-
-  const tileXmin = Math.floor(sqLeft / 256);
-  const tileXmax = Math.floor(sqRight / 256);
-  const tileYmin = Math.floor(sqTop / 256);
-  const tileYmax = Math.floor(sqBottom / 256);
+  // Tuiles nécessaires pour couvrir le cadre pixel (avec marge)
+  const tileXmin = Math.floor((centerPxX - halfW) / 256);
+  const tileXmax = Math.floor((centerPxX + halfW) / 256);
+  const tileYmin = Math.floor((centerPxY - halfH) / 256);
+  const tileYmax = Math.floor((centerPxY + halfH) / 256);
   const tilesW = (tileXmax - tileXmin + 1) * 256;
   const tilesH = (tileYmax - tileYmin + 1) * 256;
 
-  const SIZE = 512;
+  // Vignette de sortie au ratio du cadre PDF (512 de large, hauteur déduite)
+  const OUT_W = 512;
+  const OUT_H = Math.round(OUT_W / aspect);
 
   // Origine du canvas tuiles en coordonnées monde
   const worldOriginX = tileXmin * 256;
@@ -642,14 +655,14 @@ const buildObsMiniMap = async (obs, visit, THEME, obsIdx, viewKey = DEFAULT_PDF_
   const toX = (lng) => latLng2px(0, lng, zoom).x - worldOriginX;
   const toY = (lat) => latLng2px(lat, 0, zoom).y - worldOriginY;
 
-  // Crop carré — coordonnées dans le canvas tuiles
+  // Centre du crop — coordonnées dans le canvas tuiles
   const cx = centerPxX - worldOriginX;
   const cy = centerPxY - worldOriginY;
 
-  // Fonctions de coordonnées dans le crop
-  const scale = SIZE / cropSpan;
-  const cToX = (lng) => (toX(lng) - (cx - half)) * scale;
-  const cToY = (lat) => (toY(lat) - (cy - half)) * scale;
+  // Fonctions de coordonnées dans le crop (échelle identique sur X et Y)
+  const scale = OUT_W / cropW;
+  const cToX = (lng) => (toX(lng) - (cx - halfW)) * scale;
+  const cToY = (lat) => (toY(lat) - (cy - halfH)) * scale;
 
   // Route du segment résolue UNE fois : la vue double rend deux vignettes, il ne
   // faut pas refaire l'appel itinéraire IGN pour chacune.
@@ -674,13 +687,13 @@ const buildObsMiniMap = async (obs, visit, THEME, obsIdx, viewKey = DEFAULT_PDF_
     await drawTileStack(ctx, stack, zoom, tileXmin, tileXmax, tileYmin, tileYmax);
 
     const crop = document.createElement('canvas');
-    crop.width = SIZE;
-    crop.height = SIZE;
+    crop.width = OUT_W;
+    crop.height = OUT_H;
     const cctx = crop.getContext('2d');
     // Fond gris clair pour les zones hors tuiles
     cctx.fillStyle = '#e8edf2';
-    cctx.fillRect(0, 0, SIZE, SIZE);
-    cctx.drawImage(canvas, cx - half, cy - half, cropSpan, cropSpan, 0, 0, SIZE, SIZE);
+    cctx.fillRect(0, 0, OUT_W, OUT_H);
+    cctx.drawImage(canvas, cx - halfW, cy - halfH, cropW, cropH, 0, 0, OUT_W, OUT_H);
 
     // Dessiner le tracé GPS à proximité
     if (nearbyCoords.length > 1) {
@@ -745,13 +758,12 @@ const buildObsMiniMap = async (obs, visit, THEME, obsIdx, viewKey = DEFAULT_PDF_
     // Bordure arrondie
     cctx.strokeStyle = 'rgba(255,255,255,0.6)';
     cctx.lineWidth = 4;
-    cctx.strokeRect(2, 2, SIZE - 4, SIZE - 4);
+    cctx.strokeRect(2, 2, OUT_W - 4, OUT_H - 4);
 
     return crop.toDataURL('image/jpeg', 0.85);
   };
 
   // Vue double → deux vignettes (satellite + plan) sur le même cadrage
-  const view = resolveView(viewKey, DEFAULT_PDF_VIEWS.obs);
   const stacks = view.dual || [view.stack];
   const images = await Promise.all(stacks.map(stack => renderCrop(stack)));
   return images.filter(Boolean);
@@ -852,12 +864,12 @@ const drawObservations = async (doc, visit, THEME, obsViewKey = DEFAULT_PDF_VIEW
     const images = obs.images || [];
     const mapImages = miniMaps[i] || [];
 
-    // Dimensions mini-carte — la colonne fait toujours 55 mm ; en vue double,
-    // deux vignettes carrées se partagent la largeur (gouttière 3 mm).
-    const MAP_W = 55; // largeur de la colonne carte en mm
-    const GUTTER = 3;
-    const tileW = mapImages.length > 1 ? (MAP_W - GUTTER) / 2 : MAP_W;
-    const MAP_H = tileW; // vignettes carrées
+    // Dimensions mini-carte — la colonne fait toujours 55 mm de large ; en vue
+    // double, deux bandeaux 55x27 empilés (gouttière 3 mm), sinon un carré.
+    const MAP_W = OBS_MAP_W;
+    const isDualMap = mapImages.length > 1;
+    const tileH = isDualMap ? OBS_MAP_H_DUAL : MAP_W;
+    const MAP_H = isDualMap ? tileH * 2 + OBS_MAP_GUTTER : tileH; // hauteur du bloc
     const hasMap = mapImages.length > 0;
     const textColW = hasMap ? CW - MAP_W - 5 - 13 : CW - 13; // largeur texte réduite si carte
 
@@ -911,15 +923,15 @@ const drawObservations = async (doc, visit, THEME, obsViewKey = DEFAULT_PDF_VIEW
 
     y += 11;
 
-    // ── Mini-carte(s) à droite ──
+    // ── Mini-carte(s) à droite (empilées en vue double) ──
     if (hasMap) {
-      const mapY = obsStartY;
+      const mapX = PW - M.right - MAP_W;
       doc.setDrawColor(...THEME.borders);
       doc.setLineWidth(0.3);
       mapImages.forEach((img, k) => {
-        const mapX = PW - M.right - MAP_W + k * (tileW + GUTTER);
-        doc.roundedRect(mapX - 0.5, mapY - 0.5, tileW + 1, MAP_H + 1, 2, 2, 'S');
-        doc.addImage(img, 'JPEG', mapX, mapY, tileW, MAP_H);
+        const mapY = obsStartY + k * (tileH + OBS_MAP_GUTTER);
+        doc.roundedRect(mapX - 0.5, mapY - 0.5, MAP_W + 1, tileH + 1, 2, 2, 'S');
+        doc.addImage(img, 'JPEG', mapX, mapY, MAP_W, tileH);
       });
       doc.setLineWidth(0.2);
     }
