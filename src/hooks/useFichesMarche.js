@@ -72,6 +72,7 @@ export const createEmptyFiche = () => ({
     objet: '',
     referenceMarche: '',
     dateNotification: '',
+    dureePeriodePreparation: '',
     dureeExecution: '',
     uniteDuree: 'mois',
     adresseExecution: '',
@@ -142,12 +143,21 @@ export const useFichesMarche = (user, companyId) => {
   const selectedFiche = fiches.find((f) => f.id === selectedFicheId) || null;
 
   // ── Créer une nouvelle fiche ──────────────────────────────────────────────
-  const createFiche = useCallback(async (nom = 'Nouveau marché') => {
+  const createFiche = useCallback(async (nom = 'Nouveau marché', initialData = null) => {
     if (!companyId) return null;
 
     try {
-      const fiche = createEmptyFiche();
-      fiche.nom = nom;
+      const emptyFiche = createEmptyFiche();
+      const fiche = initialData
+        ? {
+            ...emptyFiche,
+            ...initialData,
+            id: emptyFiche.id,
+            nom: initialData.nom || nom,
+            createdAt: emptyFiche.createdAt,
+            updatedAt: emptyFiche.updatedAt,
+          }
+        : { ...emptyFiche, nom };
 
       await setDoc(dref(companyId, fiche.id), fiche);
       setSelectedFicheId(fiche.id);

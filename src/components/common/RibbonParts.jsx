@@ -180,10 +180,10 @@ export const RibbonHeader = ({ title, tabs, activeTab, onTabChange, rightContent
   </div>
 );
 
-export const RibbonContainer = ({ children, dark }) => (
+export const RibbonContainer = ({ children, dark, compact = false }) => (
   <RibbonThemeCtx.Provider value={!!dark}>
     <div
-      className={`flex items-stretch flex-nowrap border-b min-h-[68px] overflow-x-auto overflow-y-hidden overscroll-x-contain
+      className={`flex items-stretch flex-nowrap border-b ${compact ? 'min-h-[54px]' : 'min-h-[68px]'} overflow-x-auto overflow-y-hidden overscroll-x-contain
         [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent
         [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300/70
         [&::-webkit-scrollbar-thumb]:hover:bg-slate-400/80 ${

@@ -69,6 +69,8 @@ const CloudProjectPicker = ({
   setProject,     // setter projet actif (optionnel)
   onSelect,
   onClose,
+  selectionOnly = false,
+  title = 'Ouvrir un projet Cloud',
 }) => {
   const [cloudProjects, setCloudProjects] = useState([]);
   const [loading, setLoading]             = useState(true);
@@ -188,7 +190,7 @@ const CloudProjectPicker = ({
         {/* Header */}
         <div className="shrink-0 bg-white/80 backdrop-blur-xl border-b border-gray-200/60 px-6 py-4 flex items-center gap-4">
           <Cloud size={18} className="text-blue-500" />
-          <h2 className="text-lg font-bold text-gray-900 tracking-tight">Ouvrir un projet Cloud</h2>
+          <h2 className="text-lg font-bold text-gray-900 tracking-tight">{title}</h2>
           <div className="text-xs text-gray-400">
             {visibleProjects.length} {visibleProjects.length > 1 ? 'projets' : 'projet'}
             {selectedFolderId !== '__all__' && ` · ${folderLabel}`}
@@ -237,7 +239,8 @@ const CloudProjectPicker = ({
             handleCreateFolder={handleCreateFolder}
             handleRenameFolder={handleRenameFolder}
             handleDeleteFolder={handleDeleteFolder}
-            onProjectDrop={(targetFolderId, projectId) => handleMoveProject(projectId, targetFolderId)}
+            onProjectDrop={selectionOnly ? undefined : (targetFolderId, projectId) => handleMoveProject(projectId, targetFolderId)}
+            readOnly={selectionOnly}
           />
 
           {/* Grille de projets */}
@@ -281,8 +284,8 @@ const CloudProjectPicker = ({
                       key={proj.id}
                       role="button"
                       tabIndex={0}
-                      draggable
-                      onDragStart={(e) => {
+                      draggable={!selectionOnly}
+                      onDragStart={selectionOnly ? undefined : (e) => {
                         e.dataTransfer.setData('text/plain', proj.id);
                         e.dataTransfer.effectAllowed = 'move';
                       }}
@@ -293,7 +296,9 @@ const CloudProjectPicker = ({
                           onSelect(proj); onClose();
                         }
                       }}
-                      className={`group relative bg-white rounded-2xl border-2 p-5 transition-all overflow-hidden focus:outline-none focus:ring-2 focus:ring-blue-300 cursor-grab active:cursor-grabbing ${
+                      className={`group relative bg-white rounded-2xl border-2 p-5 transition-all overflow-hidden focus:outline-none focus:ring-2 focus:ring-blue-300 ${
+                        selectionOnly ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'
+                      } ${
                         isActive
                           ? `${fc.cardActive}`
                           : `${fc.card} ${fc.cardHover} hover:shadow-lg hover:-translate-y-0.5`
@@ -303,7 +308,7 @@ const CloudProjectPicker = ({
                       <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${fc.stripe}`} />
 
                       {/* Actions au hover : Déplacer (toujours), Supprimer (sauf projet actif) */}
-                      <div className="absolute top-3 right-3 flex items-center gap-0.5 z-10">
+                      {!selectionOnly && <div className="absolute top-3 right-3 flex items-center gap-0.5 z-10">
                         {isActive && (
                           <div className={`px-2 py-0.5 rounded-md text-[10px] font-bold mr-1 ${fc.badge}`}>
                             ACTIF
@@ -325,7 +330,7 @@ const CloudProjectPicker = ({
                             {isDeleting ? <RefreshCw size={14} className="animate-spin" /> : <Trash2 size={14} />}
                           </button>
                         )}
-                      </div>
+                      </div>}
 
                       {/* Nom + code (titre complet, wrap multiline) */}
                       <div className="pl-2 mb-3 pr-16">
@@ -373,7 +378,7 @@ const CloudProjectPicker = ({
       </div>
 
       {/* Modal déplacement projet (au-dessus, z-[9999]) */}
-      {movingProject && (
+      {!selectionOnly && movingProject && (
         <MoveFolderModal
           project={movingProject}
           folders={folders}

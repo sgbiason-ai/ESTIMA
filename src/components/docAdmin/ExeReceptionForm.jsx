@@ -756,7 +756,7 @@ export default function ExeReceptionForm({ fiche, user, companyId, dateFinRevise
             <span className="text-[10px] font-bold text-red-600">{dateProposeeError}</span>
           ) : null}
         />
-        <RibbonContainer>
+        <RibbonContainer compact>
           <RibbonGroup label="Navigation">
             <RibbonBtnLarge icon={ArrowLeft} label="Retour" onClick={onBack} title="Retour à la fiche marché" />
           </RibbonGroup>
@@ -799,7 +799,7 @@ export default function ExeReceptionForm({ fiche, user, companyId, dateFinRevise
       </div>
 
       {/* ── Zone de contenu : fond gris clair avec « feuille A4 » blanche centrée ── */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto bg-gray-200 py-8 px-4">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto bg-gray-200 py-4 px-4">
         <div className="mx-auto bg-white shadow-lg rounded-sm px-[20mm] py-[15mm]" style={{ maxWidth: '210mm', minHeight: '297mm' }}>
           {activeTab === 'exe4' && (
             <TabEXE4 fiche={fiche} data={data} update={update} updateReserve={updateReserve} addReserve={addReserve} removeReserve={removeReserve} onOpenVisitImport={() => setShowVisitImport(true)} dateFinRevisee={dateFinRevisee} dateProposeeError={dateProposeeError} />

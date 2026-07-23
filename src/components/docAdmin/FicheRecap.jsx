@@ -113,7 +113,7 @@ const Timeline = ({ dates, arretEvents, arretPeriodes }) => {
 
   if (!notification && !demarrage && !finTheorique) {
     return (
-      <div className="flex flex-col items-center justify-center h-32 rounded-2xl bg-gray-50 border border-gray-200 border-dashed text-gray-500">
+      <div className="flex flex-col items-center justify-center h-24 rounded-2xl bg-gray-50 border border-gray-200 border-dashed text-gray-500">
         <Clock size={24} className="mb-2 opacity-50" />
         <span className="text-[10px] uppercase font-bold tracking-widest">Planning non défini</span>
       </div>
@@ -121,7 +121,7 @@ const Timeline = ({ dates, arretEvents, arretPeriodes }) => {
   }
 
   return (
-    <div className="relative w-full h-40 select-none px-12">
+    <div className="relative w-full h-36 select-none px-12">
       {/* Barre de fond */}
       <div className="absolute top-1/2 left-8 right-8 h-2 -translate-y-1/2 bg-gray-200 rounded-full overflow-hidden shadow-inner">
         {/* Progression jusqu'à aujourd'hui */}
@@ -129,13 +129,13 @@ const Timeline = ({ dates, arretEvents, arretPeriodes }) => {
         
         {/* Zones d'arrêt */}
         {arretZones.map((z, i) => (
-          <div key={i} className="absolute top-0 bottom-0 bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.5)]" style={{ left: `${z.left}%`, width: `${z.width}%` }} />
+          <div key={i} className="absolute top-0 bottom-0 bg-red-500/80" style={{ left: `${z.left}%`, width: `${z.width}%` }} />
         ))}
       </div>
 
       {/* Marqueurs Principaux (Haut) */}
       {points.map((pt, i) => (
-        <div key={i} className="absolute top-[20px] flex flex-col items-center group" style={{ left: `calc(2rem + ${pt.pos} * calc(100% - 4rem) / 100)`, transform: 'translateX(-50%)' }}>
+        <div key={i} className="absolute top-[14px] flex flex-col items-center group" style={{ left: `calc(2rem + ${pt.pos} * calc(100% - 4rem) / 100)`, transform: 'translateX(-50%)' }}>
           <span className={`text-[10px] font-black uppercase tracking-wider mb-0.5 transition-colors ${pt.colorText}`}>{pt.label}</span>
           <span className="text-[10px] text-gray-500 font-bold mb-2 group-hover:text-gray-800 transition-colors">{formatDate(pt.date)}</span>
           <div className="w-px h-6 bg-gray-400 group-hover:bg-gray-500 transition-colors" />
@@ -145,7 +145,7 @@ const Timeline = ({ dates, arretEvents, arretPeriodes }) => {
 
       {/* Marqueurs OS (Bas) */}
       {osPoints.map((pt, i) => (
-        <div key={`os-${i}`} className="absolute bottom-[20px] flex flex-col items-center group" style={{ left: `calc(2rem + ${pt.pos} * calc(100% - 4rem) / 100)`, transform: 'translateX(-50%)' }}>
+        <div key={`os-${i}`} className="absolute bottom-[14px] flex flex-col items-center group" style={{ left: `calc(2rem + ${pt.pos} * calc(100% - 4rem) / 100)`, transform: 'translateX(-50%)' }}>
           <div className={`w-2.5 h-2.5 rounded-full border-2 border-white ${pt.colorBg} relative z-10 group-hover:scale-125 transition-transform`} />
           <div className="w-px h-6 bg-gray-400 mt-1 group-hover:bg-gray-500 transition-colors" />
           <span className="text-[9px] text-gray-500 font-bold mt-2 group-hover:text-gray-800 transition-colors">{formatDate(pt.date)}</span>
@@ -292,19 +292,17 @@ export default function FicheRecap({ fiche, ficheMere, isAlloti, activeGroupeId,
   if (!fiche) return null;
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6">
+    <div className="flex-1 overflow-y-auto p-4 md:p-5 space-y-4">
       
       {/* ── HEADER & STATS ── */}
-      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 p-6 rounded-3xl bg-white border border-gray-200 shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-64 h-64 bg-purple-500/10 rounded-full blur-[80px] pointer-events-none" />
-
-        <div className="flex items-center gap-5 relative z-10">
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-500/20 to-blue-500/10 border border-purple-500/20 shadow-inner">
-            <FileText size={28} className="text-purple-400" />
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-4 rounded-2xl bg-white border border-gray-200">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="p-3 rounded-2xl bg-purple-50 border border-purple-200">
+            <FileText size={24} className="text-purple-700" />
           </div>
-          <div>
-            <h2 className="text-xl font-black text-gray-800 tracking-tight">{fiche.nom || 'Marché sans nom'}</h2>
-            <p className="text-xs text-gray-500 mt-1.5 max-w-xl leading-relaxed line-clamp-2" title={D.objet}>{D.objet || 'Objet non défini'}</p>
+          <div className="min-w-0">
+            <h2 className="truncate text-lg font-black text-gray-900 tracking-tight">{fiche.nom || 'Marché sans nom'}</h2>
+            <p className="text-xs text-gray-600 mt-1 max-w-xl leading-relaxed line-clamp-2" title={D.objet}>{D.objet || 'Objet non défini'}</p>
             {isAlloti && fiche.sectionB?.mandataire?.nomCommercial && (
               <p className="text-[10px] font-bold text-blue-500 mt-1">
                 {fiche.sectionB.mandataire.nomCommercial} — {(D.lots || []).map(l => `Lot ${l.numero || '?'}`).join(', ')}
@@ -313,14 +311,14 @@ export default function FicheRecap({ fiche, ficheMere, isAlloti, activeGroupeId,
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-4 relative z-10 shrink-0">
-          <div className="flex flex-col px-5 py-3 rounded-2xl bg-gray-100 border border-gray-200 min-w-[140px]">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <div className="flex min-w-[125px] flex-col rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
             <span className="text-[9px] font-bold uppercase tracking-widest text-gray-500 mb-1 flex items-center gap-1.5"><Euro size={12}/> Montant (HT)</span>
-            <span className="text-lg font-black text-emerald-500">{totalOSHT > 0 ? totalOSHT.toLocaleString('fr-FR', { minimumFractionDigits: 2 }) + ' €' : '-'}</span>
+            <span className="text-base font-black text-emerald-700">{totalOSHT > 0 ? totalOSHT.toLocaleString('fr-FR', { minimumFractionDigits: 2 }) + ' €' : '-'}</span>
           </div>
-          <div className="flex flex-col px-5 py-3 rounded-2xl bg-gray-100 border border-gray-200 min-w-[140px]">
+          <div className="flex min-w-[125px] flex-col rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
             <span className="text-[9px] font-bold uppercase tracking-widest text-gray-500 mb-1 flex items-center gap-1.5"><FileText size={12}/> Ordres de Service</span>
-            <span className="text-lg font-black text-gray-800 flex items-baseline gap-2">
+            <span className="text-base font-black text-gray-900 flex items-baseline gap-2">
               {osList.length} 
               {!dateDemarrage && <span className="text-[9px] px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 uppercase tracking-widest">En attente OS1</span>}
             </span>
@@ -329,8 +327,8 @@ export default function FicheRecap({ fiche, ficheMere, isAlloti, activeGroupeId,
       </div>
 
       {/* ── FRISE CHRONOLOGIQUE ── */}
-      <div className="p-6 rounded-3xl bg-white border border-gray-200 shadow-xl">
-        <div className="flex items-center justify-between mb-4 px-2">
+      <div className="p-4 rounded-2xl bg-white border border-gray-200">
+        <div className="flex items-center justify-between mb-2 px-1">
           <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
             <Activity size={14} className="text-blue-400" /> Frise d'exécution
           </h3>
@@ -353,7 +351,7 @@ export default function FicheRecap({ fiche, ficheMere, isAlloti, activeGroupeId,
       </div>
 
       {/* ── DETAILS ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         
         {/* COLONNE GAUCHE : DÉTAIL PLANNING */}
         <div className="lg:col-span-2 space-y-4">
@@ -361,18 +359,18 @@ export default function FicheRecap({ fiche, ficheMere, isAlloti, activeGroupeId,
             <Calendar size={12} /> Paramètres de Délai
           </h3>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="p-4 rounded-2xl bg-white border border-gray-200 flex flex-col gap-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="p-3 rounded-2xl bg-white border border-gray-200 flex flex-col gap-1">
               <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Durée initiale</span>
               <span className="text-sm font-black text-gray-800">{D.dureeExecution ? `${D.dureeExecution} ${D.uniteDuree || 'mois'}` : '—'}</span>
             </div>
-            <div className="p-4 rounded-2xl bg-white border border-gray-200 flex flex-col gap-1">
+            <div className="p-3 rounded-2xl bg-white border border-gray-200 flex flex-col gap-1">
               <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider flex items-center gap-1"><Pause size={10} className="text-red-400"/> Jours d'arrêt cumulés</span>
               <span className="text-sm font-black text-red-400">{arretData.totalArretDays} jours</span>
             </div>
           </div>
 
-          <div className="flex items-center justify-between p-4 rounded-2xl bg-white border border-gray-200">
+          <div className="flex items-center justify-between p-3 rounded-2xl bg-white border border-gray-200">
             <div className="flex flex-col gap-1">
               <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider flex items-center gap-1.5">
                 <CloudSnow size={12} className="text-blue-400"/> Intempéries validées
@@ -396,7 +394,7 @@ export default function FicheRecap({ fiche, ficheMere, isAlloti, activeGroupeId,
           </h3>
 
           <div className="grid grid-cols-1 gap-3">
-            <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200 flex items-center gap-4 hover:bg-gray-100 transition-colors">
+            <div className="p-3 rounded-2xl bg-gray-50 border border-gray-200 flex items-center gap-3 hover:bg-gray-100 transition-colors">
               <div className="p-2.5 rounded-xl bg-gray-200 border border-gray-300 shrink-0">
                 <Building size={16} className="text-gray-500" />
               </div>
@@ -406,7 +404,7 @@ export default function FicheRecap({ fiche, ficheMere, isAlloti, activeGroupeId,
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 flex items-center gap-4 hover:bg-emerald-500/10 transition-colors">
+            <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center gap-3 hover:bg-emerald-100 transition-colors">
               <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 shrink-0">
                 <HardHat size={16} className="text-emerald-400" />
               </div>
@@ -416,7 +414,7 @@ export default function FicheRecap({ fiche, ficheMere, isAlloti, activeGroupeId,
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/10 flex items-center gap-4 hover:bg-amber-500/10 transition-colors">
+            <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 flex items-center gap-3 hover:bg-amber-100 transition-colors">
               <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 shrink-0">
                 <Flag size={16} className="text-amber-400" />
               </div>
@@ -432,7 +430,7 @@ export default function FicheRecap({ fiche, ficheMere, isAlloti, activeGroupeId,
 
       {/* ── VUE D'ENSEMBLE COMPARATIVE (marchés allotis) ── */}
       {isAlloti && allEntrepriseTimelines.length > 0 && (
-        <div className="p-6 rounded-3xl bg-white border border-gray-200 shadow-xl">
+        <div className="p-4 rounded-2xl bg-white border border-gray-200">
           <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-2 mb-4">
             <Activity size={14} className="text-purple-400" /> Vue d'ensemble — Toutes les entreprises
           </h3>

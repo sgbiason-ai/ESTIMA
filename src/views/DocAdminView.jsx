@@ -7,7 +7,9 @@ import {
   FileText, ClipboardList, FileCheck, FileMinus, FileOutput, FileWarning,
   ChevronRight, Loader, FolderOpen, HardHat
 } from 'lucide-react';
-import { useFichesMarche } from '../hooks/useFichesMarche';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+import { createEmptyFiche, useFichesMarche } from '../hooks/useFichesMarche';
 import { useDialog } from '../contexts/DialogContext';
 import { useToast } from '../contexts/ToastContext';
 import HelpPanel from '../components/help/HelpPanel';
@@ -18,10 +20,13 @@ import ExeReceptionForm from '../components/docAdmin/ExeReceptionForm';
 import ExeLeveeForm from '../components/docAdmin/ExeLeveeForm';
 import Exe10Form from '../components/docAdmin/Exe10Form';
 import FicheRecap from '../components/docAdmin/FicheRecap';
+import ProjectInheritancePreviewModal from '../components/docAdmin/ProjectInheritancePreviewModal';
 import { usePresence, useCoEditors } from '../hooks/usePresence';
 import CoEditBanner from '../components/common/CoEditBanner';
+import { inheritFicheFromEstimaProject } from '../utils/docAdmin/projectFicheInheritance';
 // Generators chargés dynamiquement pour le code-splitting
 const loadExeGenerator = (n) => import(`../utils/docAdmin/generateExe${n}.js`);
+const CloudProjectPicker = React.lazy(() => import('../components/modals/CloudProjectPicker'));
 
 // ─── Utilitaires de calcul de la date de fin révisée ────────────────────────
 export const getOSDate = (os) => {
@@ -97,12 +102,12 @@ export const getDateFinRevisee = (fiche) => {
 
 // ─── Couleurs des onglets entreprises ────────────────────────────────────────
 const ENTREPRISE_COLORS = [
-  { bg: 'bg-blue-500/20', text: 'text-blue-600', border: 'border-blue-500/40', glow: 'shadow-[0_0_10px_rgba(59,130,246,0.1)]', muted: 'text-blue-400', barBg: 'from-blue-50', barBorder: 'border-blue-200', dotBg: 'bg-blue-400' },
-  { bg: 'bg-emerald-500/20', text: 'text-emerald-600', border: 'border-emerald-500/40', glow: 'shadow-[0_0_10px_rgba(16,185,129,0.1)]', muted: 'text-emerald-400', barBg: 'from-emerald-50', barBorder: 'border-emerald-200', dotBg: 'bg-emerald-400' },
-  { bg: 'bg-amber-500/20', text: 'text-amber-600', border: 'border-amber-500/40', glow: 'shadow-[0_0_10px_rgba(245,158,11,0.1)]', muted: 'text-amber-400', barBg: 'from-amber-50', barBorder: 'border-amber-200', dotBg: 'bg-amber-400' },
-  { bg: 'bg-purple-500/20', text: 'text-purple-600', border: 'border-purple-500/40', glow: 'shadow-[0_0_10px_rgba(168,85,247,0.1)]', muted: 'text-purple-400', barBg: 'from-purple-50', barBorder: 'border-purple-200', dotBg: 'bg-purple-400' },
-  { bg: 'bg-cyan-500/20', text: 'text-cyan-600', border: 'border-cyan-500/40', glow: 'shadow-[0_0_10px_rgba(6,182,212,0.1)]', muted: 'text-cyan-400', barBg: 'from-cyan-50', barBorder: 'border-cyan-200', dotBg: 'bg-cyan-400' },
-  { bg: 'bg-rose-500/20', text: 'text-rose-600', border: 'border-rose-500/40', glow: 'shadow-[0_0_10px_rgba(244,63,94,0.1)]', muted: 'text-rose-400', barBg: 'from-rose-50', barBorder: 'border-rose-200', dotBg: 'bg-rose-400' },
+  { bg: 'bg-blue-500/20', text: 'text-blue-600', border: 'border-blue-500/40', muted: 'text-blue-400', barBg: 'from-blue-50', barBorder: 'border-blue-200', dotBg: 'bg-blue-400' },
+  { bg: 'bg-emerald-500/20', text: 'text-emerald-600', border: 'border-emerald-500/40', muted: 'text-emerald-400', barBg: 'from-emerald-50', barBorder: 'border-emerald-200', dotBg: 'bg-emerald-400' },
+  { bg: 'bg-amber-500/20', text: 'text-amber-600', border: 'border-amber-500/40', muted: 'text-amber-400', barBg: 'from-amber-50', barBorder: 'border-amber-200', dotBg: 'bg-amber-400' },
+  { bg: 'bg-purple-500/20', text: 'text-purple-600', border: 'border-purple-500/40', muted: 'text-purple-400', barBg: 'from-purple-50', barBorder: 'border-purple-200', dotBg: 'bg-purple-400' },
+  { bg: 'bg-cyan-500/20', text: 'text-cyan-600', border: 'border-cyan-500/40', muted: 'text-cyan-400', barBg: 'from-cyan-50', barBorder: 'border-cyan-200', dotBg: 'bg-cyan-400' },
+  { bg: 'bg-rose-500/20', text: 'text-rose-600', border: 'border-rose-500/40', muted: 'text-rose-400', barBg: 'from-rose-50', barBorder: 'border-rose-200', dotBg: 'bg-rose-400' },
 ];
 
 // ─── Configuration des documents EXE ────────────────────────────────────────
@@ -116,7 +121,7 @@ const EXE_DOCUMENTS = [
 
 // ─── Composant principal ────────────────────────────────────────────────────
 export default function DocAdminView({ onBackToHub, user, companyId }) {
-  const { confirm } = useDialog();
+  const { confirm, choose } = useDialog();
   const toast = useToast();
   const {
     fiches, isLoading,
@@ -127,6 +132,9 @@ export default function DocAdminView({ onBackToHub, user, companyId }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [projectPickerIntent, setProjectPickerIntent] = useState(null);
+  const [inheritancePreview, setInheritancePreview] = useState(null);
+  const [isProjectSyncing, setIsProjectSyncing] = useState(false);
 
   // ── Présence + co-édition (alerte d'écrasement) ───────────────────────────
   usePresence({
@@ -153,16 +161,105 @@ export default function DocAdminView({ onBackToHub, user, companyId }) {
 
   // ── Actions CRUD ──────────────────────────────────────────────────────────
   const handleCreate = async () => {
-    await createFiche('Nouveau marché');
-    setActiveView('fiche');
+    const choice = await choose(
+      'Comment souhaitez-vous initialiser la fiche marché ?',
+      [
+        {
+          key: 'from_estima',
+          label: "Depuis une affaire EstimaVRD",
+          description: 'Reprendre la Fiche affaire : MOA, MOE, objet, code, lieu et durées.',
+        },
+        {
+          key: 'blank',
+          label: 'Fiche vierge',
+          description: 'Créer une fiche marché indépendante à compléter manuellement.',
+        },
+      ],
+      { title: 'Nouvelle fiche marché' },
+    );
+
+    if (choice === 'from_estima') {
+      setProjectPickerIntent({ type: 'create' });
+      return;
+    }
+    if (choice === 'blank') {
+      await createFiche('Nouveau marché');
+      setActiveView('fiche');
+    }
   };
 
-  const handleSave = async (ficheData) => {
+  const handleSave = useCallback(async (ficheData) => {
     setIsSaving(true);
     const result = await saveFiche(ficheData);
     setIsSaving(false);
     return result;
-  };
+  }, [saveFiche]);
+
+  const prepareInheritancePreview = useCallback((baseFiche, project, isLinking) => {
+    const inheritance = inheritFicheFromEstimaProject(baseFiche, project);
+    setInheritancePreview({
+      project,
+      fiche: inheritance.fiche,
+      changes: inheritance.changes,
+      isLinking,
+    });
+  }, []);
+
+  const handleSelectEstimaProject = useCallback(async (project) => {
+    const intent = projectPickerIntent;
+    setProjectPickerIntent(null);
+    if (!intent) return;
+
+    if (intent.type === 'create') {
+      const { fiche } = inheritFicheFromEstimaProject(createEmptyFiche(), project);
+      const created = await createFiche(fiche.nom || 'Nouveau marché', fiche);
+      if (created) setActiveView('fiche');
+      return;
+    }
+
+    prepareInheritancePreview(intent.fiche, project, true);
+  }, [projectPickerIntent, createFiche, prepareInheritancePreview]);
+
+  const handleInheritFromProject = useCallback(async (ficheDraft) => {
+    const sourceProjectId = ficheDraft?.sourceEstima?.projectId;
+    if (!sourceProjectId) {
+      setProjectPickerIntent({ type: 'link', fiche: ficheDraft });
+      return;
+    }
+
+    setIsProjectSyncing(true);
+    try {
+      const projectSnap = await getDoc(doc(db, 'companies', companyId, 'projects', sourceProjectId));
+      if (!projectSnap.exists()) {
+        toast.error("L'affaire EstimaVRD liée n'existe plus");
+        return;
+      }
+
+      const project = { id: projectSnap.id, ...projectSnap.data() };
+      const inheritance = inheritFicheFromEstimaProject(ficheDraft, project);
+      if (inheritance.changes.length === 0) {
+        toast.info('La fiche marché est déjà à jour');
+        return;
+      }
+      setInheritancePreview({
+        project,
+        fiche: inheritance.fiche,
+        changes: inheritance.changes,
+        isLinking: false,
+      });
+    } catch (error) {
+      console.error("Erreur d'actualisation depuis l'affaire EstimaVRD :", error);
+      toast.error("Impossible de charger l'affaire EstimaVRD");
+    } finally {
+      setIsProjectSyncing(false);
+    }
+  }, [companyId, toast]);
+
+  const handleConfirmInheritance = useCallback(async () => {
+    if (!inheritancePreview?.fiche) return;
+    const saved = await handleSave(inheritancePreview.fiche);
+    if (saved) setInheritancePreview(null);
+  }, [inheritancePreview, handleSave]);
 
   const handleDelete = async (ficheId, ficheName) => {
     const ok = await confirm(
@@ -398,13 +495,13 @@ export default function DocAdminView({ onBackToHub, user, companyId }) {
       return (
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Barre entreprises persistante — couleur selon entreprise active */}
-          <div className={`shrink-0 bg-gradient-to-b ${activeColor.barBg} to-white border-b ${activeColor.barBorder} px-6 py-3 transition-colors duration-300`}>
-            <div className="flex items-center gap-2 mb-2">
+          <div className={`shrink-0 bg-gradient-to-b ${activeColor.barBg} to-white border-b ${activeColor.barBorder} px-4 py-2 transition-colors duration-300`}>
+            <div className="flex items-center gap-2 mb-1.5">
               <HardHat size={13} className={activeColor.muted} />
               <span className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-600">Entreprise attributaire</span>
               <div className="flex-1 h-px bg-gray-200" />
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex gap-1 overflow-x-auto">
               {groupesAttributaires.map((groupe, gIdx) => {
                 const isActive = groupe.groupeId === effectiveGroupeId;
                 const cc = ENTREPRISE_COLORS[gIdx % ENTREPRISE_COLORS.length];
@@ -416,9 +513,9 @@ export default function DocAdminView({ onBackToHub, user, companyId }) {
                     key={groupe.groupeId}
                     onClick={() => handleChangeGroupe(groupe.groupeId)}
                     className={`
-                      flex items-center gap-2.5 px-4 py-2 rounded-lg text-xs transition-all duration-200
+                      flex min-w-max items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all duration-200
                       ${isActive
-                        ? `${cc.bg} ${cc.text} border ${cc.border} ${cc.glow} font-bold`
+                        ? `bg-white ${cc.text} border ${cc.border} font-bold`
                         : 'text-gray-500 hover:text-gray-700 hover:bg-white border border-transparent'
                       }
                     `}
@@ -449,21 +546,10 @@ export default function DocAdminView({ onBackToHub, user, companyId }) {
     return (
       <div className="flex-1 flex flex-col overflow-hidden">
 
-        {/* ── Bandeau documents EXE (en haut, bien visible) ── */}
-        <div className="shrink-0 bg-gradient-to-b from-gray-50 to-white border-b border-gray-300 px-6 py-4">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="flex items-center gap-2">
-              <FileStack size={14} className="text-purple-400" />
-              <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-700">
-                Documents administratifs
-              </h3>
-            </div>
-            <div className="flex-1 h-px bg-gradient-to-r from-gray-300 to-transparent" />
-          </div>
-
-          {/* ── Onglets entreprises (marchés allotis uniquement) ── */}
+        {/* Navigation compacte : synthèse, fiche et documents EXE */}
+        <div className="shrink-0 space-y-2 border-b border-gray-200 bg-white px-4 py-2">
           {isAlloti && (
-            <div className="flex flex-wrap gap-2 mb-3 p-1.5 rounded-xl bg-gray-100 border border-gray-200">
+            <div className="flex gap-1 overflow-x-auto rounded-xl border border-gray-200 bg-gray-100 p-1">
               {groupesAttributaires.map((groupe, gIdx) => {
                 const isActive = groupe.groupeId === effectiveGroupeId;
                 const cc = ENTREPRISE_COLORS[gIdx % ENTREPRISE_COLORS.length];
@@ -476,43 +562,61 @@ export default function DocAdminView({ onBackToHub, user, companyId }) {
                     key={groupe.groupeId}
                     onClick={() => handleChangeGroupe(groupe.groupeId)}
                     className={`
-                      flex items-center gap-2.5 px-4 py-2 rounded-lg text-xs transition-all duration-200
+                      flex min-w-max items-center gap-2 rounded-lg border px-3 py-1.5 text-xs transition-all duration-200
                       ${isActive
-                        ? `${cc.bg} ${cc.text} border ${cc.border} ${cc.glow} font-bold`
-                        : 'text-gray-600 hover:text-gray-800 hover:bg-white border border-transparent'
+                        ? `bg-white ${cc.text} ${cc.border} font-bold`
+                        : 'border-transparent text-gray-600 hover:bg-white hover:text-gray-900'
                       }
                     `}
                   >
-                    <div className={`w-2.5 h-2.5 rounded-full ${isActive ? cc.dotBg : 'bg-gray-300'} shrink-0`} />
-                    <div className="flex flex-col items-start">
-                      <span className="text-[10px] font-black uppercase tracking-wider leading-none">
-                        {groupe.entreprise?.nomCommercial || '(Entreprise)'}
-                      </span>
-                      {lotsLabels && (
-                        <span className={`text-[8px] leading-none mt-1 ${isActive ? cc.muted : 'text-gray-400'}`}>
-                          {lotsLabels}
-                        </span>
-                      )}
-                    </div>
+                    <div className={`h-2 w-2 shrink-0 rounded-full ${isActive ? cc.dotBg : 'bg-gray-300'}`} />
+                    <span className="text-[10px] font-black uppercase tracking-wider">
+                      {groupe.entreprise?.nomCommercial || '(Entreprise)'}
+                    </span>
+                    {lotsLabels && <span className="text-[9px] text-gray-500">{lotsLabels}</span>}
                   </button>
                 );
               })}
             </div>
           )}
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex items-center gap-1 overflow-x-auto rounded-2xl bg-gray-100 p-1">
+            <button
+              onClick={() => setActiveView('recap')}
+              className={`flex h-9 min-w-max items-center gap-2 rounded-xl border px-3 text-[11px] font-bold transition-all ${
+                activeView === 'recap'
+                  ? 'border-purple-600 bg-purple-600 text-white'
+                  : 'border-transparent text-gray-600 hover:bg-white hover:text-gray-900'
+              }`}
+            >
+              <ClipboardList size={14} />
+              Synthèse
+            </button>
+            <button
+              onClick={() => setActiveView('fiche')}
+              className={`flex h-9 min-w-max items-center gap-2 rounded-xl border px-3 text-[11px] font-bold transition-all ${
+                activeView === 'fiche' || activeView === 'form'
+                  ? 'border-purple-600 bg-purple-600 text-white'
+                  : 'border-transparent text-gray-600 hover:bg-white hover:text-gray-900'
+              }`}
+            >
+              <FileText size={14} />
+              Fiche marché
+            </button>
+
+            <div className="mx-1 h-5 w-px shrink-0 bg-gray-300" />
+
             {EXE_DOCUMENTS.map((doc) => {
               const Icon = doc.icon;
               const colorMap = {
-                emerald: { border: 'border-emerald-500/40', bg: 'bg-emerald-500/15', text: 'text-emerald-400', glow: 'shadow-[0_0_12px_rgba(16,185,129,0.15)]', hover: 'hover:bg-emerald-500/25 hover:border-emerald-500/60' },
-                blue:    { border: 'border-blue-500/40',    bg: 'bg-blue-500/15',    text: 'text-blue-400',    glow: 'shadow-[0_0_12px_rgba(59,130,246,0.15)]', hover: 'hover:bg-blue-500/25 hover:border-blue-500/60' },
-                cyan:    { border: 'border-cyan-500/40',    bg: 'bg-cyan-500/15',    text: 'text-cyan-400',    glow: 'shadow-[0_0_12px_rgba(6,182,212,0.15)]', hover: 'hover:bg-cyan-500/25 hover:border-cyan-500/60' },
-                green:   { border: 'border-green-500/40',   bg: 'bg-green-500/15',   text: 'text-green-400',   glow: 'shadow-[0_0_12px_rgba(34,197,94,0.15)]', hover: 'hover:bg-green-500/25 hover:border-green-500/60' },
-                red:     { border: 'border-red-500/20',     bg: 'bg-red-500/5',      text: 'text-red-400',     glow: '', hover: '' },
-                amber:   { border: 'border-amber-500/40',   bg: 'bg-amber-500/15',   text: 'text-amber-400',   glow: 'shadow-[0_0_12px_rgba(245,158,11,0.15)]', hover: 'hover:bg-amber-500/25 hover:border-amber-500/60' },
-                purple:  { border: 'border-purple-500/40',  bg: 'bg-purple-500/15',  text: 'text-purple-400',  glow: 'shadow-[0_0_12px_rgba(168,85,247,0.15)]', hover: 'hover:bg-purple-500/25 hover:border-purple-500/60' },
+                emerald: 'text-emerald-700 hover:bg-emerald-50',
+                blue: 'text-blue-700 hover:bg-blue-50',
+                cyan: 'text-cyan-700 hover:bg-cyan-50',
+                green: 'text-green-700 hover:bg-green-50',
+                red: 'text-red-600',
+                amber: 'text-amber-700 hover:bg-amber-50',
+                purple: 'text-purple-700 hover:bg-purple-50',
               };
-              const cc = doc.ready ? colorMap[doc.color] : null;
 
               return (
                 <button
@@ -520,46 +624,20 @@ export default function DocAdminView({ onBackToHub, user, companyId }) {
                   onClick={() => handleOpenExe(doc.id)}
                   disabled={!doc.ready}
                   className={`
-                    flex items-center gap-2.5 px-4 py-2.5 rounded-xl border text-xs font-bold transition-all duration-200
+                    flex h-9 min-w-max items-center gap-2 rounded-xl border px-3 text-[11px] font-bold transition-all duration-200
                     ${doc.ready
-                      ? `${cc.bg} ${cc.border} ${cc.text} ${cc.glow} ${cc.hover} cursor-pointer hover:scale-[1.03] active:scale-[0.97]`
-                      : 'bg-gray-50 border-gray-200 text-gray-600 cursor-not-allowed'
+                      ? `border-transparent bg-white ${colorMap[doc.color]} active:scale-[0.97]`
+                      : 'cursor-not-allowed border-transparent text-gray-400 opacity-60'
                     }
                   `}
                   title={doc.ready ? `Remplir et générer ${doc.label} — ${doc.title}` : `${doc.label} — Bientôt disponible`}
                 >
-                  <Icon size={15} className={doc.ready ? '' : 'opacity-40'} />
-                  <div className="flex flex-col items-start">
-                    <span className="text-[10px] font-black uppercase tracking-wider leading-none">{doc.label}</span>
-                    <span className={`text-[8px] leading-none mt-0.5 ${doc.ready ? 'text-emerald-500/80' : 'text-gray-600'}`}>
-                      {doc.ready ? doc.title : 'Bientôt'}
-                    </span>
-                  </div>
-                  {doc.ready && (
-                    <span className="ml-1 px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                      Prêt
-                    </span>
-                  )}
+                  <Icon size={14} />
+                  <span className="font-black uppercase tracking-wider">{doc.label}</span>
                 </button>
               );
             })}
           </div>
-        </div>
-
-        {/* Sous-onglets pour la fiche */}
-        <div className="flex items-center gap-4 px-6 pt-4 border-b border-gray-200 shrink-0 bg-gray-50">
-          <button
-            onClick={() => setActiveView('recap')}
-            className={`pb-3 px-1 text-xs font-bold uppercase tracking-wider transition-all border-b-2 ${activeView === 'recap' ? 'border-purple-500 text-purple-400' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-          >
-            Synthèse & Planning
-          </button>
-          <button
-            onClick={() => setActiveView('fiche')}
-            className={`pb-3 px-1 text-xs font-bold uppercase tracking-wider transition-all border-b-2 ${activeView === 'fiche' || activeView === 'form' ? 'border-purple-500 text-purple-400' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-          >
-            Édition Fiche Marché
-          </button>
         </div>
 
         {/* Contenu principal */}
@@ -579,6 +657,8 @@ export default function DocAdminView({ onBackToHub, user, companyId }) {
             fiche={selectedFiche}
             onSave={handleSave}
             isSaving={isSaving}
+            onInheritFromProject={handleInheritFromProject}
+            isProjectSyncing={isProjectSyncing}
           />
         )}
       </div>
@@ -590,33 +670,58 @@ export default function DocAdminView({ onBackToHub, user, companyId }) {
 
       <HelpPanel isOpen={showHelp} onClose={() => setShowHelp(false)} moduleId="docAdmin" />
 
-      {/* Fond décoratif */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/4 left-1/3 w-[500px] h-[500px] bg-purple-500/5 rounded-full blur-[120px]" />
-      </div>
+      {projectPickerIntent && (
+        <React.Suspense
+          fallback={(
+            <div className="fixed inset-0 z-modal-backdrop flex items-center justify-center bg-black/25 backdrop-blur-sm">
+              <Loader size={24} className="animate-spin text-blue-600" />
+            </div>
+          )}
+        >
+          <CloudProjectPicker
+            companyId={companyId}
+            onSelect={handleSelectEstimaProject}
+            onClose={() => setProjectPickerIntent(null)}
+            selectionOnly
+            title="Choisir une affaire EstimaVRD"
+          />
+        </React.Suspense>
+      )}
+
+      {inheritancePreview && (
+        <ProjectInheritancePreviewModal
+          project={inheritancePreview.project}
+          changes={inheritancePreview.changes}
+          isLinking={inheritancePreview.isLinking}
+          isSaving={isSaving}
+          onClose={() => setInheritancePreview(null)}
+          onConfirm={handleConfirmInheritance}
+        />
+      )}
 
       {/* Header */}
-      <header className="relative z-10 flex items-center gap-4 px-6 py-3 border-b border-gray-200 shrink-0">
+      <header className="relative z-10 flex items-center gap-3 px-4 py-2 border-b border-gray-200 bg-white/80 backdrop-blur-xl shrink-0">
         <button
           onClick={onBackToHub}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl text-gray-500 hover:text-gray-800 hover:bg-gray-100 border border-transparent hover:border-gray-400 transition-all"
+          className="flex h-9 items-center gap-2 rounded-xl border border-transparent px-2.5 text-gray-600 transition-all hover:border-gray-300 hover:bg-gray-100 hover:text-gray-900"
         >
-          <ArrowLeft size={18} />
+          <ArrowLeft size={16} />
           <span className="text-[10px] font-black uppercase tracking-widest">Hub</span>
         </button>
 
-        <div className="h-6 w-px bg-gray-300" />
+        <div className="h-5 w-px bg-gray-300" />
 
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-purple-500/20 border border-purple-500/30">
-            <FileStack size={20} className="text-purple-400" />
+        <div className="flex min-w-0 items-center gap-2.5">
+          <div className="rounded-xl border border-purple-200 bg-purple-50 p-2">
+            <FileStack size={18} className="text-purple-700" />
           </div>
-          <div>
-            <h1 className="font-black text-lg text-gray-800 tracking-tight">Document Administratif</h1>
-            <p className="text-[10px] text-gray-500">Fiches Marché & Documents EXE</p>
+          <div className="min-w-0">
+            <h1 className="truncate text-base font-black tracking-tight text-gray-900">Documents administratifs</h1>
+            <p className="text-[10px] text-gray-600">Fiches marché et documents EXE</p>
           </div>
         </div>
 
+        <div className="flex-1" />
         <HelpButton onClick={() => setShowHelp(true)} />
       </header>
 
@@ -628,10 +733,10 @@ export default function DocAdminView({ onBackToHub, user, companyId }) {
       <div className="relative z-10 flex-1 flex overflow-hidden">
 
         {/* ── Panneau gauche : Liste des fiches marché ───────────────────── */}
-        <div className="w-72 shrink-0 border-r border-gray-200 flex flex-col bg-gray-50">
+        <div className="w-64 shrink-0 border-r border-gray-200 flex flex-col bg-gray-50">
 
           {/* Barre de recherche + bouton créer */}
-          <div className="p-3 space-y-2 border-b border-gray-200">
+          <div className="p-2 space-y-1.5 border-b border-gray-200">
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
@@ -639,12 +744,12 @@ export default function DocAdminView({ onBackToHub, user, companyId }) {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Rechercher un marché..."
-                className="w-full pl-9 pr-3 py-2 rounded-lg bg-white border border-gray-300 text-xs text-gray-800 placeholder-gray-400 focus:border-purple-500 focus:outline-none transition-all"
+                className="h-9 w-full rounded-xl border border-gray-300 bg-white pl-9 pr-3 text-xs text-gray-800 placeholder-gray-400 transition-all focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-100"
               />
             </div>
             <button
               onClick={handleCreate}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400 font-bold text-[10px] uppercase tracking-widest hover:bg-purple-500/20 hover:border-purple-400/50 transition-all"
+              className="flex h-9 w-full items-center justify-center gap-2 rounded-xl border border-purple-200 bg-purple-50 px-3 text-[10px] font-bold uppercase tracking-widest text-purple-700 transition-all hover:border-purple-300 hover:bg-purple-100"
             >
               <Plus size={14} />
               Nouvelle fiche marché
@@ -668,7 +773,7 @@ export default function DocAdminView({ onBackToHub, user, companyId }) {
                 </p>
               </div>
             ) : (
-              <div className="p-2 space-y-1">
+              <div className="p-1.5 space-y-1">
                 {filteredFiches.map((fiche) => {
                   const isSelected = selectedFicheId === fiche.id;
 
@@ -677,28 +782,31 @@ export default function DocAdminView({ onBackToHub, user, companyId }) {
                       key={fiche.id}
                       onClick={() => handleSelectFiche(fiche.id)}
                       className={`
-                        group relative flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-all
+                        group relative flex items-center gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-all
                         ${isSelected
-                          ? 'bg-purple-500/15 border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.1)]'
+                          ? 'bg-purple-50 border border-purple-200'
                           : 'border border-transparent hover:bg-gray-100 hover:border-gray-200'
                         }
                       `}
                     >
                       {/* Indicateur actif */}
                       <div className={`absolute left-0 w-1 rounded-full transition-all ${
-                        isSelected ? 'h-6 bg-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.5)]' : 'h-0'
+                        isSelected ? 'h-6 bg-purple-600' : 'h-0'
                       }`} />
 
                       <div className="flex-1 min-w-0">
-                        <p className={`text-xs font-bold truncate ${isSelected ? 'text-gray-800' : 'text-gray-700'}`}>
+                        <p className={`text-xs font-bold truncate ${isSelected ? 'text-gray-900' : 'text-gray-700'}`}>
                           {fiche.nom || 'Sans nom'}
                         </p>
-                        <p className="text-[9px] text-gray-600 mt-0.5 truncate">
+                        <p className="mt-0.5 truncate text-[10px] text-gray-600">
                           {fiche.sectionA?.designation || 'Pouvoir adj. non renseigné'}
                         </p>
-                        <p className="text-[9px] text-gray-500 mt-0.5">
-                          {new Date(fiche.updatedAt || fiche.createdAt).toLocaleDateString('fr-FR')}
-                        </p>
+                        <div className="mt-1 flex items-center gap-1.5 text-[9px] text-gray-500">
+                          <span>{new Date(fiche.updatedAt || fiche.createdAt).toLocaleDateString('fr-FR')}</span>
+                          {fiche.sourceEstima?.projectId && (
+                            <span className="rounded-md bg-blue-100 px-1.5 py-0.5 font-bold text-blue-700">ESTIMA</span>
+                          )}
+                        </div>
                       </div>
 
                       {/* Actions au hover */}
@@ -726,7 +834,7 @@ export default function DocAdminView({ onBackToHub, user, companyId }) {
           </div>
 
           {/* Compteur */}
-          <div className="px-3 py-2 border-t border-gray-200 text-[9px] text-gray-500 font-bold uppercase tracking-widest text-center">
+          <div className="px-2 py-1.5 border-t border-gray-200 text-[9px] text-gray-500 font-bold uppercase tracking-widest text-center">
             {fiches.length} fiche{fiches.length > 1 ? 's' : ''} marché
           </div>
         </div>

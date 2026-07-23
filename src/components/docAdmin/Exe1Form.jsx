@@ -56,10 +56,10 @@ const Section = ({ id, title, subtitle, icon: Icon, color, children, isOpen, onT
   const c = colorMap[color] || colorMap.emerald;
 
   return (
-    <div className={`rounded-2xl border ${c.border} ${c.bg} overflow-hidden transition-all duration-300 shadow-sm hover:shadow-md`}>
+    <div className={`rounded-2xl border ${c.border} ${c.bg} overflow-hidden`}>
       <button
         onClick={() => onToggle(id)}
-        className={`w-full flex items-center gap-4 px-5 py-4 transition-colors ${c.hover}`}
+        className={`w-full flex items-center gap-3 px-4 py-3 transition-colors ${c.hover}`}
       >
         {Icon && (
           <div className={`p-1.5 rounded-lg ${c.iconBg}`}>
@@ -74,7 +74,7 @@ const Section = ({ id, title, subtitle, icon: Icon, color, children, isOpen, onT
       </button>
 
       {isOpen && (
-        <div className="px-5 pb-5 pt-2 border-t border-gray-200">
+        <div className="px-4 pb-4 pt-3 border-t border-gray-200">
           {children}
         </div>
       )}
@@ -83,7 +83,7 @@ const Section = ({ id, title, subtitle, icon: Icon, color, children, isOpen, onT
 };
 
 // ─── Composant champ ────────────────────────────────────────────────────────
-const Field = ({ label, value, onChange, placeholder, type = 'text', className = '', rows, icon: Icon, small }) => {
+const Field = ({ label, value, onChange, placeholder, type = 'text', className = '', rows, icon: Icon }) => {
   const isTextarea = rows && rows > 1;
   const InputTag = isTextarea ? 'textarea' : 'input';
 
@@ -100,8 +100,8 @@ const Field = ({ label, value, onChange, placeholder, type = 'text', className =
   }
 
   return (
-    <div className={`flex flex-col gap-1.5 ${className}`}>
-      <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 flex items-center gap-1.5">
+    <div className={`flex flex-col gap-1 ${className}`}>
+      <label className="text-[10px] font-bold uppercase tracking-wider text-gray-600 flex items-center gap-1.5">
         {Icon && <Icon size={10} className="text-gray-600" />}
         {label}
       </label>
@@ -112,12 +112,12 @@ const Field = ({ label, value, onChange, placeholder, type = 'text', className =
         placeholder={placeholder}
         rows={rows}
         className={`
-          px-3.5 py-2.5 rounded-xl bg-white border border-gray-300
-          text-sm text-gray-800 placeholder-gray-400
-          hover:border-gray-400 hover:bg-gray-100
+          px-3 py-2 rounded-xl bg-white border border-gray-300
+          text-[13px] text-gray-800 placeholder-gray-400
+          hover:border-gray-400
           focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 focus:outline-none
-          transition-all duration-200 resize-none shadow-inner
-          ${isTextarea ? 'min-h-[80px]' : small ? 'h-9 text-xs px-3 py-2' : 'h-10'}
+          transition-all duration-200 resize-none
+          ${isTextarea ? 'min-h-[72px]' : 'h-9'}
         `}
       />
     </div>
@@ -329,7 +329,7 @@ export default function Exe1Form({ fiche, onBack, onGenerate, onSave, isSaving }
             </span>
           ) : null}
         />
-        <RibbonContainer>
+        <RibbonContainer compact>
 
           <RibbonGroup label="Navigation">
             <RibbonBtnLarge icon={ArrowLeft} label="Retour" onClick={onBack} title="Retour à la fiche marché" />
@@ -361,8 +361,8 @@ export default function Exe1Form({ fiche, onBack, onGenerate, onSave, isSaving }
       </div>
 
       {/* ── Liste des Ordres de Service ── */}
-      <div className="shrink-0 px-8 pt-5 pb-4 border-b border-gray-300 bg-gray-50">
-        <div className="flex items-center justify-between mb-3">
+      <div className="shrink-0 px-5 pt-3 pb-3 border-b border-gray-300 bg-gray-50">
+        <div className="flex items-center justify-between mb-2">
           <h3 className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-500">
             Ordres de Service ({dataList.length})
           </h3>
@@ -388,10 +388,10 @@ export default function Exe1Form({ fiche, onBack, onGenerate, onSave, isSaving }
             const TypeIcon = cfg.icon;
 
             const colorClasses = {
-              purple: { active: 'bg-purple-50 border-purple-400 shadow-[0_0_12px_rgba(168,85,247,0.1)]', dot: 'bg-purple-500', text: 'text-purple-600', muted: 'text-purple-500' },
-              blue:  { active: 'bg-blue-50 border-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.1)]',  dot: 'bg-blue-500',  text: 'text-blue-600',  muted: 'text-blue-500' },
-              red:   { active: 'bg-red-50 border-red-400 shadow-[0_0_12px_rgba(239,68,68,0.1)]',     dot: 'bg-red-500',   text: 'text-red-600',   muted: 'text-red-500' },
-              green: { active: 'bg-green-50 border-green-400 shadow-[0_0_12px_rgba(34,197,94,0.1)]', dot: 'bg-green-500', text: 'text-green-600', muted: 'text-green-500' },
+              purple: { active: 'bg-purple-50 border-purple-400', dot: 'bg-purple-500', text: 'text-purple-600', muted: 'text-purple-500' },
+              blue:  { active: 'bg-blue-50 border-blue-400', dot: 'bg-blue-500', text: 'text-blue-600', muted: 'text-blue-500' },
+              red:   { active: 'bg-red-50 border-red-400', dot: 'bg-red-500', text: 'text-red-600', muted: 'text-red-500' },
+              green: { active: 'bg-green-50 border-green-400', dot: 'bg-green-500', text: 'text-green-600', muted: 'text-green-500' },
             };
             const cc = colorClasses[cfg.color];
 
@@ -401,7 +401,7 @@ export default function Exe1Form({ fiche, onBack, onGenerate, onSave, isSaving }
             return (
               <div
                 key={idx}
-                className={`relative flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all duration-200 min-w-[180px] group ${
+                className={`relative flex items-center gap-2.5 px-3 py-2 rounded-xl border cursor-pointer transition-all duration-200 min-w-[170px] group ${
                   isActive
                     ? `${cc.active}`
                     : 'bg-white border-gray-200 hover:border-gray-400 hover:bg-gray-100'
@@ -447,7 +447,7 @@ export default function Exe1Form({ fiche, onBack, onGenerate, onSave, isSaving }
       </div>
 
       {/* Formulaire scrollable */}
-      <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
 
         {/* N° Ordre de service + Type */}
         <Section

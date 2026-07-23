@@ -77,7 +77,7 @@ export default function Exe10Form({ fiche, onBack, onGenerate, onSave, isSaving 
       {/* ═══ Ribbon — NO tabs, single EXE10 ═══ */}
       <div className="font-[system-ui,'Segoe_UI',sans-serif] select-none shrink-0 z-10">
         <RibbonHeader title={fiche?.nom || 'Sans nom'} />
-        <RibbonContainer>
+        <RibbonContainer compact>
           <RibbonGroup label="Navigation">
             <RibbonBtnLarge icon={ArrowLeft} label="Retour" onClick={onBack} title="Retour à la fiche marché" />
           </RibbonGroup>
@@ -93,7 +93,7 @@ export default function Exe10Form({ fiche, onBack, onGenerate, onSave, isSaving 
       </div>
 
       {/* ═══ A4 Content ═══ */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto bg-gray-200 py-8 px-4">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto bg-gray-200 py-4 px-4">
         <div className="mx-auto bg-white shadow-lg rounded-sm px-[20mm] py-[15mm]" style={{ maxWidth: '210mm', minHeight: '297mm' }}>
 
           {/* Header */}

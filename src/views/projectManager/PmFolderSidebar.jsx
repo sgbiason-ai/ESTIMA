@@ -22,6 +22,7 @@ const PmFolderSidebar = ({
   editingFolder, setEditingFolder, cloudProjects, rootFolders, getSubfolders,
   toggleExpand, handleCreateFolder, handleRenameFolder, handleSetFolderColor, handleDeleteFolder,
   onProjectDrop, colorMap = {},
+  readOnly = false,
 }) => {
 
   const dndEnabled = typeof onProjectDrop === 'function';
@@ -104,7 +105,7 @@ const PmFolderSidebar = ({
             </span>
           )}
 
-          {!isEditing && (
+          {!readOnly && !isEditing && (
             <div className={`flex items-center gap-0.5 transition-opacity shrink-0 ${HOVER_REVEAL}`}>
               <button onClick={e => { e.stopPropagation(); setCreatingFolder({ parentId: folder.id }); setNewFolderName(''); }}
                 title="Sous-dossier" aria-label="Créer un sous-dossier" className="p-0.5 rounded text-gray-400 hover:text-blue-500 hover:bg-blue-50">
@@ -143,7 +144,7 @@ const PmFolderSidebar = ({
           </div>
         )}
 
-        {creatingFolder?.parentId === folder.id && (
+        {!readOnly && creatingFolder?.parentId === folder.id && (
           <div className="flex items-center gap-1.5 px-3 py-1" style={{ paddingLeft: `${12 + (depth + 1) * 16 + 14}px` }}>
             <Folder size={12} className="text-gray-400 shrink-0" />
             <input
@@ -166,14 +167,16 @@ const PmFolderSidebar = ({
     <div className="w-52 shrink-0 border-r border-gray-200/60 bg-gray-50/50 flex flex-col overflow-hidden">
       <div className="flex items-center justify-between px-3 py-3 border-b border-gray-200/60 shrink-0">
         <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Dossiers</span>
-        <button
-          onClick={() => { setCreatingFolder({ parentId: null }); setNewFolderName(''); }}
-          title="Nouveau dossier"
-          aria-label="Nouveau dossier"
-          className="p-1 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
-        >
-          <FolderPlus size={14} />
-        </button>
+        {!readOnly && (
+          <button
+            onClick={() => { setCreatingFolder({ parentId: null }); setNewFolderName(''); }}
+            title="Nouveau dossier"
+            aria-label="Nouveau dossier"
+            className="p-1 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
+          >
+            <FolderPlus size={14} />
+          </button>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
@@ -213,7 +216,7 @@ const PmFolderSidebar = ({
           </div>
         )}
 
-        {creatingFolder?.parentId === null && (
+        {!readOnly && creatingFolder?.parentId === null && (
           <div className="flex items-center gap-1.5 px-2 py-1">
             <Folder size={13} className="text-gray-400 shrink-0" />
             <input
@@ -229,9 +232,11 @@ const PmFolderSidebar = ({
 
         {rootFolders.map(f => <FolderRow key={f.id} folder={f} />)}
 
-        {!foldersLoading && folders.length === 0 && creatingFolder === null && (
+        {!foldersLoading && folders.length === 0 && (readOnly || creatingFolder === null) && (
           <div className="px-3 py-4 text-center">
-            <p className="text-xs text-gray-400 leading-relaxed">Aucun dossier.<br />Cliquez sur + pour en créer.</p>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              {readOnly ? 'Aucun dossier.' : <>Aucun dossier.<br />Cliquez sur + pour en créer.</>}
+            </p>
           </div>
         )}
       </div>

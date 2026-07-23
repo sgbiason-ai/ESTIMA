@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Building2, Users, HardHat, FileText, Save, ChevronDown, ChevronRight,
-  Plus, Trash2, MapPin, Phone, Mail, Hash, Briefcase, UserPlus, Crown
+  Plus, Trash2, MapPin, Phone, Mail, Hash, Briefcase, UserPlus, Crown,
+  Link2, RefreshCw
 } from 'lucide-react';
 import { createEmptyEntreprise } from '../../hooks/useFichesMarche';
 
@@ -44,7 +45,7 @@ const MontantInput = ({ value, onChange }) => {
         }
       }}
       placeholder="0,00"
-      className="w-36 px-2 py-1.5 rounded bg-white border border-gray-300 text-xs text-gray-800 placeholder-gray-400 focus:border-emerald-500 focus:outline-none text-right"
+      className="h-9 w-32 rounded-lg border border-gray-300 bg-white px-2 text-xs text-gray-800 placeholder-gray-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100 text-right"
     />
   );
 };
@@ -55,8 +56,8 @@ const Field = ({ label, value, onChange, placeholder, type = 'text', required, c
   const InputTag = isTextarea ? 'textarea' : 'input';
 
   return (
-    <div className={`flex flex-col gap-1.5 ${className}`}>
-      <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 flex items-center gap-1.5">
+    <div className={`flex flex-col gap-1 ${className}`}>
+      <label className="text-[10px] font-bold uppercase tracking-wider text-gray-600 flex items-center gap-1.5">
         {Icon && <Icon size={10} className="text-gray-600" />}
         {label}
         {required && <span className="text-red-400">*</span>}
@@ -68,12 +69,12 @@ const Field = ({ label, value, onChange, placeholder, type = 'text', required, c
         placeholder={placeholder}
         rows={rows}
         className={`
-          px-3.5 py-2.5 rounded-xl bg-white border border-gray-300
-          text-sm text-gray-800 placeholder-gray-400
-          hover:border-gray-400 hover:bg-gray-100
+          px-3 py-2 rounded-xl bg-white border border-gray-300
+          text-[13px] text-gray-800 placeholder-gray-400
+          hover:border-gray-400
           focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 focus:outline-none
-          transition-all duration-200 resize-none shadow-inner
-          ${isTextarea ? 'min-h-[80px]' : 'h-10'}
+          transition-all duration-200 resize-none
+          ${isTextarea ? 'min-h-[72px]' : 'h-9'}
         `}
       />
     </div>
@@ -81,35 +82,35 @@ const Field = ({ label, value, onChange, placeholder, type = 'text', required, c
 };
 
 // ─── Section pliable ────────────────────────────────────────────────────────
-const Section = ({ id, title, subtitle, icon: Icon, color, children, isOpen, onToggle }) => {
+const Section = ({ id, title, subtitle, icon: Icon, color, children, isOpen = true, onToggle }) => {
 
   const colorMap = {
-    emerald: { bg: 'bg-emerald-500/5', border: 'border-emerald-500/20', text: 'text-emerald-400', iconBg: 'bg-emerald-500/15', hover: 'hover:bg-emerald-500/10' },
-    blue:    { bg: 'bg-blue-500/5',    border: 'border-blue-500/20',    text: 'text-blue-400',    iconBg: 'bg-blue-500/15', hover: 'hover:bg-blue-500/10' },
-    amber:   { bg: 'bg-amber-500/5',   border: 'border-amber-500/20',   text: 'text-amber-400',   iconBg: 'bg-amber-500/15', hover: 'hover:bg-amber-500/10' },
-    purple:  { bg: 'bg-purple-500/5',  border: 'border-purple-500/20',  text: 'text-purple-400',  iconBg: 'bg-purple-500/15', hover: 'hover:bg-purple-500/10' },
+    emerald: { border: 'border-emerald-200', text: 'text-emerald-700', iconBg: 'bg-emerald-100', hover: 'hover:bg-emerald-50' },
+    blue:    { border: 'border-blue-200',    text: 'text-blue-700',    iconBg: 'bg-blue-100',    hover: 'hover:bg-blue-50' },
+    amber:   { border: 'border-amber-200',   text: 'text-amber-700',   iconBg: 'bg-amber-100',   hover: 'hover:bg-amber-50' },
+    purple:  { border: 'border-purple-200',  text: 'text-purple-700',  iconBg: 'bg-purple-100',  hover: 'hover:bg-purple-50' },
   };
 
   const c = colorMap[color] || colorMap.emerald;
 
   return (
-    <div className={`rounded-2xl border ${c.border} ${c.bg} overflow-hidden transition-all duration-300 shadow-sm hover:shadow-md`}>
-      <button
-        onClick={() => onToggle(id)}
-        className={`w-full flex items-center gap-4 px-5 py-4 transition-colors ${c.hover}`}
+    <div className={`rounded-2xl border ${c.border} bg-white overflow-hidden`}>
+      <div
+        onClick={onToggle ? () => onToggle(id) : undefined}
+        className={`w-full flex items-center gap-3 px-4 py-3 transition-colors ${onToggle ? `${c.hover} cursor-pointer` : ''}`}
       >
         <div className={`p-1.5 rounded-lg ${c.iconBg}`}>
           <Icon size={16} className={c.text} />
         </div>
         <div className="text-left flex-1">
-          <h3 className={`text-xs font-black uppercase tracking-wider ${c.text}`}>{title}</h3>
-          {subtitle && <p className="text-[10px] text-gray-500 mt-0.5">{subtitle}</p>}
+          <h3 className={`text-[11px] font-black uppercase tracking-wider ${c.text}`}>{title}</h3>
+          {subtitle && <p className="text-[10px] text-gray-600 mt-0.5">{subtitle}</p>}
         </div>
-        {isOpen ? <ChevronDown size={16} className="text-gray-500" /> : <ChevronRight size={16} className="text-gray-500" />}
-      </button>
+        {onToggle && (isOpen ? <ChevronDown size={16} className="text-gray-500" /> : <ChevronRight size={16} className="text-gray-500" />)}
+      </div>
 
       {isOpen && (
-        <div className="px-5 pb-5 pt-2 border-t border-gray-200">
+        <div className="px-4 pb-4 pt-3 border-t border-gray-200">
           {children}
         </div>
       )}
@@ -123,8 +124,8 @@ const EntrepriseFields = ({ data, onChange, nameLabel = 'Nom commercial', requir
   const update = (field, value) => onChange({ ...data, [field]: value });
 
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+    <div className="space-y-2.5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
         <Field
           label={nameLabel}
           value={data.nomCommercial}
@@ -140,7 +141,7 @@ const EntrepriseFields = ({ data, onChange, nameLabel = 'Nom commercial', requir
           placeholder="Forme juridique et raison sociale"
         />
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
         <Field
           label="Adresse"
           value={data.adresse}
@@ -163,7 +164,7 @@ const EntrepriseFields = ({ data, onChange, nameLabel = 'Nom commercial', requir
           className="md:col-span-2"
         />
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
         <Field
           label="Téléphone"
           value={data.telephone}
@@ -198,25 +199,22 @@ const EntrepriseFields = ({ data, onChange, nameLabel = 'Nom commercial', requir
 };
 
 // ─── Composant principal ────────────────────────────────────────────────────
-export default function FicheForm({ fiche, onSave, isSaving }) {
+export default function FicheForm({
+  fiche,
+  onSave,
+  isSaving,
+  onInheritFromProject,
+  isProjectSyncing = false,
+}) {
   // État local éditable (copie de la fiche)
   const [form, setForm] = useState(null);
   const [hasChanges, setHasChanges] = useState(false);
 
-  // État des sections
-  const [openSections, setOpenSections] = useState({
-    sectionA: true,
-    sectionB: true,
-    sectionC: true,
-    sectionD: true,
-  });
+  const [activeSection, setActiveSection] = useState('sectionA');
 
-  const toggleSection = useCallback((id) => {
-    setOpenSections((prev) => ({ ...prev, [id]: !prev[id] }));
-  }, []);
-
-  const expandAll = () => setOpenSections({ sectionA: true, sectionB: true, sectionC: true, sectionD: true });
-  const collapseAll = () => setOpenSections({ sectionA: false, sectionB: false, sectionC: false, sectionD: false });
+  useEffect(() => {
+    setActiveSection('sectionA');
+  }, [fiche?.id]);
 
   // Synchroniser quand la fiche change (sélection d'une autre fiche)
   useEffect(() => {
@@ -247,7 +245,10 @@ export default function FicheForm({ fiche, onSave, isSaving }) {
       setForm(clone);
       setHasChanges(false);
     }
-  }, [fiche?.id]);
+    // La révision Firestore suffit : une émission concernant une autre fiche
+    // ne doit pas effacer les saisies locales encore non sauvegardées.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fiche?.id, fiche?.updatedAt]);
 
   // Helpers de mise à jour
   const updateField = useCallback((section, field, value) => {
@@ -448,51 +449,72 @@ export default function FicheForm({ fiche, onSave, isSaving }) {
   const isGroupement = B.type === 'groupement';
   const cotraitants = B.cotraitants || [];
   const nbEntreprises = 1 + cotraitants.length; // mandataire + co-traitants
+  const sectionTabs = [
+    { id: 'sectionA', short: 'A', label: 'Maître d’ouvrage', icon: Building2, color: 'emerald' },
+    { id: 'sectionD', short: 'D', label: 'Marché', icon: FileText, color: 'purple' },
+    { id: 'sectionB', short: 'B', label: hasLots ? 'Attributaires' : 'Titulaire', icon: HardHat, color: 'blue' },
+    { id: 'sectionC', short: 'C', label: 'Maître d’œuvre', icon: Users, color: 'amber' },
+  ];
+  const tabColors = {
+    emerald: 'bg-emerald-600 text-white border-emerald-600',
+    purple: 'bg-purple-600 text-white border-purple-600',
+    blue: 'bg-blue-600 text-white border-blue-600',
+    amber: 'bg-amber-600 text-white border-amber-600',
+  };
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header avec nom + bouton save */}
-      <div className="flex items-center gap-4 px-8 py-5 bg-white backdrop-blur-md border-b border-gray-300 shrink-0 shadow-sm z-10">
-        <div className="flex-1">
+      <div className="flex items-center gap-3 px-5 py-3 bg-white/90 backdrop-blur-xl border-b border-gray-200 shrink-0 z-10">
+        <div className="min-w-0 flex-1">
           <input
             type="text"
             value={form.nom || ''}
             onChange={(e) => updateRoot('nom', e.target.value)}
             placeholder="Nom du marché..."
-            className="text-lg font-black text-gray-800 bg-transparent border-none outline-none placeholder-gray-400 w-full"
+            className="w-full truncate bg-transparent text-base font-black text-gray-900 outline-none placeholder-gray-400"
           />
-          <p className="text-[10px] text-gray-600 mt-0.5">
+          <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-gray-600">
+            <span>
             Créée le {new Date(form.createdAt).toLocaleDateString('fr-FR')}
             {form.updatedAt && ` · Modifiée le ${new Date(form.updatedAt).toLocaleDateString('fr-FR')}`}
-          </p>
+            </span>
+            {form.sourceEstima?.projectId && (
+              <span className="flex min-w-0 items-center gap-1.5 font-semibold text-blue-700">
+                <Link2 size={11} className="shrink-0" />
+                <span className="truncate">
+                Affaire liée : {form.sourceEstima.projectName || 'Sans nom'}
+                {form.sourceEstima.projectCode ? ` · ${form.sourceEstima.projectCode}` : ''}
+                </span>
+              </span>
+            )}
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        {onInheritFromProject && (
           <button
-            onClick={expandAll}
-            className="text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gray-800 transition-colors"
+            type="button"
+            onClick={() => onInheritFromProject(form)}
+            disabled={isProjectSyncing}
+            className="flex h-9 shrink-0 items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 text-[10px] font-black uppercase tracking-wider text-blue-700 transition-all hover:border-blue-300 hover:bg-blue-100 active:scale-[0.98] disabled:opacity-50"
           >
-            Tout déplier
+            {isProjectSyncing
+              ? <RefreshCw size={14} className="animate-spin" />
+              : form.sourceEstima?.projectId
+                ? <RefreshCw size={14} />
+                : <Link2 size={14} />}
+            {form.sourceEstima?.projectId ? 'Actualiser' : 'Lier une affaire'}
           </button>
-          <div className="w-px h-3 bg-gray-300" />
-          <button
-            onClick={collapseAll}
-            className="text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gray-800 transition-colors"
-          >
-            Tout replier
-          </button>
-        </div>
-
-        <div className="w-px h-6 bg-gray-300 mx-2" />
+        )}
 
         <button
           onClick={handleSave}
           disabled={!hasChanges || isSaving}
           className={`
-              flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300
+              flex h-9 shrink-0 items-center gap-2 rounded-xl px-3.5 text-sm font-bold transition-all duration-200
             ${hasChanges
-                ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/30 hover:scale-[1.02] active:scale-[0.98] shadow-[0_0_15px_rgba(16,185,129,0.15)]'
-              : 'bg-gray-50 border border-gray-200 text-gray-600 cursor-not-allowed'
+                ? 'bg-emerald-600 border border-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.98]'
+              : 'bg-gray-100 border border-gray-200 text-gray-500 cursor-not-allowed'
             }
           `}
         >
@@ -503,18 +525,46 @@ export default function FicheForm({ fiche, onSave, isSaving }) {
         </button>
       </div>
 
+      <div className="shrink-0 border-b border-gray-200 bg-white px-5 py-2">
+        <div className="flex w-full max-w-3xl items-center gap-1 overflow-x-auto rounded-2xl bg-gray-100 p-1">
+          {sectionTabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeSection === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveSection(tab.id)}
+                className={`flex min-w-max flex-1 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-[11px] font-bold transition-all ${
+                  isActive
+                    ? tabColors[tab.color]
+                    : 'border-transparent text-gray-600 hover:bg-white hover:text-gray-900'
+                }`}
+              >
+                <span className={`flex h-5 w-5 items-center justify-center rounded-md text-[10px] font-black ${
+                  isActive ? 'bg-white/20' : 'bg-white text-gray-500'
+                }`}>
+                  {tab.short}
+                </span>
+                <Icon size={14} strokeWidth={1.75} />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Formulaire scrollable */}
-      <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
+      <div className="flex-1 overflow-y-auto px-5 py-4">
 
         {/* ── Section A : Pouvoir adjudicateur ────────────────────────────── */}
+        {activeSection === 'sectionA' && (
         <Section
           id="sectionA"
           title="A — Pouvoir adjudicateur / Maître d'ouvrage"
           subtitle="Collectivité ou organisme acheteur"
           icon={Building2}
           color="emerald"
-          isOpen={openSections.sectionA}
-          onToggle={toggleSection}
         >
           <div className="space-y-3">
             <Field
@@ -587,16 +637,16 @@ export default function FicheForm({ fiche, onSave, isSaving }) {
             </div>
           </div>
         </Section>
+        )}
 
         {/* ── Section D : Objet du marché (affiché avant B pour définir les lots d'abord) ── */}
+        {activeSection === 'sectionD' && (
         <Section
           id="sectionD"
           title="D — Objet du marché"
           subtitle="Description, référence et lots"
           icon={FileText}
           color="purple"
-          isOpen={openSections.sectionD}
-          onToggle={toggleSection}
         >
           <div className="space-y-3">
             <Field
@@ -708,9 +758,10 @@ export default function FicheForm({ fiche, onSave, isSaving }) {
             </div>
           </div>
         </Section>
+        )}
 
         {/* ── Section B : Titulaire(s) du marché ─────────────────────────────── */}
-        {(() => {
+        {activeSection === 'sectionB' && (() => {
           const groupes = B.groupesAttributaires || [];
           const assignedLotIndices = new Set(groupes.flatMap((g) => g.lotIndices));
           const unassignedLots = lots.map((_, i) => i).filter((i) => !assignedLotIndices.has(i));
@@ -727,8 +778,6 @@ export default function FicheForm({ fiche, onSave, isSaving }) {
               }
               icon={HardHat}
               color="blue"
-              isOpen={openSections.sectionB}
-              onToggle={toggleSection}
             >
               {hasLots ? (
                 /* ── Mode alloti : groupes attributaires ──────────────────────── */
@@ -772,7 +821,7 @@ export default function FicheForm({ fiche, onSave, isSaving }) {
                                   className={`
                                     px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border
                                     ${isSelected
-                                      ? 'bg-blue-500/20 text-blue-400 border-blue-500/40 shadow-[0_0_8px_rgba(59,130,246,0.1)]'
+                                      ? 'bg-blue-100 text-blue-700 border-blue-300'
                                       : isInOtherGroup
                                         ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-pointer'
                                         : 'bg-white text-gray-500 border-gray-300 hover:border-blue-400 hover:text-blue-400'
@@ -835,7 +884,7 @@ export default function FicheForm({ fiche, onSave, isSaving }) {
                       className={`
                         px-4 py-2 rounded-md text-[10px] font-black uppercase tracking-widest transition-all
                         ${!isGroupement
-                          ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30 shadow-[0_0_10px_rgba(59,130,246,0.1)]'
+                          ? 'bg-blue-100 text-blue-700 border border-blue-300'
                           : 'text-gray-500 hover:text-gray-700 border border-transparent'
                         }
                       `}
@@ -847,7 +896,7 @@ export default function FicheForm({ fiche, onSave, isSaving }) {
                       className={`
                         px-4 py-2 rounded-md text-[10px] font-black uppercase tracking-widest transition-all
                         ${isGroupement
-                          ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30 shadow-[0_0_10px_rgba(59,130,246,0.1)]'
+                          ? 'bg-blue-100 text-blue-700 border border-blue-300'
                           : 'text-gray-500 hover:text-gray-700 border border-transparent'
                         }
                       `}
@@ -963,14 +1012,13 @@ export default function FicheForm({ fiche, onSave, isSaving }) {
         })()}
 
         {/* ── Section C : Maître d'œuvre ───────────────────────────────────── */}
+        {activeSection === 'sectionC' && (
         <Section
           id="sectionC"
           title="C — Maître d'œuvre"
           subtitle="Bureau d'études ou service technique"
           icon={Users}
           color="amber"
-          isOpen={openSections.sectionC}
-          onToggle={toggleSection}
         >
           <EntrepriseFields
             data={C}
@@ -978,6 +1026,7 @@ export default function FicheForm({ fiche, onSave, isSaving }) {
             required
           />
         </Section>
+        )}
 
       </div>
     </div>

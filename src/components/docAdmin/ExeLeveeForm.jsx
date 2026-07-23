@@ -373,7 +373,7 @@ export default function ExeLeveeForm({ fiche, onBack, onGenerate, onSave, isSavi
             </span>
           ) : null}
         />
-        <RibbonContainer>
+        <RibbonContainer compact>
           <RibbonGroup label="Navigation">
             <RibbonBtnLarge icon={ArrowLeft} label="Retour" onClick={onBack} title="Retour à la fiche marché" />
           </RibbonGroup>
@@ -388,7 +388,7 @@ export default function ExeLeveeForm({ fiche, onBack, onGenerate, onSave, isSavi
         </RibbonContainer>
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto bg-gray-200 py-8 px-4">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto bg-gray-200 py-4 px-4">
         <div className="mx-auto bg-white shadow-lg rounded-sm px-[20mm] py-[15mm]" style={{ maxWidth: '210mm', minHeight: '297mm' }}>
           {activeTab === 'exe8' && <TabEXE8 fiche={fiche} data={data} update={update} />}
           {activeTab === 'exe9' && <TabEXE9 fiche={fiche} data={data} update={update} />}
