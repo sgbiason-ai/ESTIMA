@@ -46,6 +46,9 @@ import CoEditBanner from '../components/common/CoEditBanner';
 // PROVISOIRE — Mode Tesla depuis le desktop
 const TeslaModeView = lazyWithReload(() => import('./TeslaModeView'));
 
+// Mode Annotation (plans épinglés) — lazy : chargé à l'ouverture de l'onglet « Plans »
+const PlanAnnotationView = lazyWithReload(() => import('./siteVisits/PlanAnnotationView'));
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // ─── Composant Principal ─────────────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -84,6 +87,7 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
   });
   const [detailLoading, setDetailLoading] = useState(false);
   const [fullscreenMap, setFullscreenMap] = useState(false);
+  const [mapPanelTab, setMapPanelTab] = useState('map'); // volet droit : 'map' | 'plans'
   const [highlightedObs, setHighlightedObs] = useState(null);
   const [splitPct, setSplitPct] = useState(50);
   const [draggingSplit, setDraggingSplit] = useState(false);
@@ -210,10 +214,14 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
     const ok = await confirm(`Supprimer la visite "${visitNom}" et toutes ses données ?`, { danger: true });
     if (!ok) return;
     try {
-      // Nettoyer les photos Storage de la visite avant de supprimer le doc.
+      // Nettoyer les photos et plans Storage de la visite avant de supprimer le doc.
       const data = selectedId === visitId && fullVisit ? fullVisit : await loadVisit(visitId);
       for (const obs of (data?.observations || [])) {
         for (const img of (obs.images || [])) deleteSiteVisitImage(img);
+      }
+      if ((data?.plans || []).length > 0) {
+        const { deletePlan } = await import('../utils/siteVisitPlanStorage');
+        for (const plan of data.plans) deletePlan(plan);
       }
       await deleteDoc(doc(db, 'companies', companyId, 'site_visits', visitId));
       refetch();
@@ -243,6 +251,27 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
     triggerSave(updated);
     setEditingObs(null);
   }, [fullVisit, editingObs, triggerSave]);
+
+  // ── Mode Annotation (plans + pins) — même chemin de sauvegarde que le reste
+  //    (setFullVisit + triggerSave du useRobustSave, debounce 1,5 s) ──
+  const handlePlanVisitChange = useCallback((partial) => {
+    if (!fullVisit?.isOwner) return;
+    const updated = { ...fullVisit, ...partial };
+    setFullVisit(updated);
+    triggerSave(updated);
+  }, [fullVisit, triggerSave]);
+
+  // Ouverture d'une obs depuis un pin : l'obs peut venir d'être créée dans le
+  // même tick (onChangeVisit pas encore flushé) → on attend qu'elle existe
+  // dans fullVisit avant d'ouvrir ObsEditModal.
+  const [pendingEditObsId, setPendingEditObsId] = useState(null);
+  useEffect(() => {
+    if (!pendingEditObsId) return;
+    const obs = (fullVisit?.observations || []).find(o => o.id === pendingEditObsId);
+    if (obs) setEditingObs(obs);
+    setPendingEditObsId(null);
+  }, [pendingEditObsId, fullVisit]);
+  const handleEditObsFromPlan = useCallback((obsId) => setPendingEditObsId(obsId), []);
 
   // ── Create visit ──
   const handleCreateVisit = useCallback(async () => {
@@ -938,13 +967,23 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
             <div className={`w-0.5 h-8 rounded-full transition-colors ${draggingSplit ? 'bg-blue-500' : 'bg-gray-300 group-hover:bg-blue-400'}`} />
           </div>
 
-          {/* ── Droite : carte Leaflet ── */}
+          {/* ── Droite : carte Leaflet | plans annotés ── */}
           <div className="flex flex-col min-h-0 relative" style={{ width: `${100 - splitPct}%` }}>
-            {hasMap && !fullscreenMap ? (
+            {!fullscreenMap ? (
               <>
                 <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 shrink-0">
-                  <span className="text-xs font-bold text-gray-900">Carte terrain</span>
-                  <div className="flex items-center gap-2">
+                  {/* Segmented control Carte | Plans */}
+                  <div className="flex gap-0.5 bg-gray-100 p-0.5 rounded-lg">
+                    <button onClick={() => setMapPanelTab('map')}
+                      className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition ${mapPanelTab === 'map' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-700'}`}>
+                      Carte
+                    </button>
+                    <button onClick={() => setMapPanelTab('plans')}
+                      className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition ${mapPanelTab === 'plans' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-700'}`}>
+                      Plans{fullVisit.plans?.length ? ` (${fullVisit.plans.length})` : ''}
+                    </button>
+                  </div>
+                  {mapPanelTab === 'map' && hasMap && <div className="flex items-center gap-2">
                     {/* Tile layer switcher */}
                     <div className="flex items-center gap-1">
                       <div className="flex gap-0.5 bg-gray-100 p-0.5 rounded-lg">
@@ -965,8 +1004,26 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
                       className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 transition active:scale-[0.95]" title="Plein écran">
                       <Maximize2 size={14} className="text-gray-600" />
                     </button>
-                  </div>
+                  </div>}
                 </div>
+                {mapPanelTab === 'plans' ? (
+                <div className="flex-1 min-h-0 p-3">
+                  <Suspense fallback={
+                    <div className="h-full flex items-center justify-center">
+                      <RefreshCw size={18} className="animate-spin text-gray-300" />
+                    </div>
+                  }>
+                    <PlanAnnotationView
+                      visit={fullVisit}
+                      companyId={companyId}
+                      onChangeVisit={handlePlanVisitChange}
+                      onEditObs={handleEditObsFromPlan}
+                      isMobile={false}
+                      readOnly={!canEdit}
+                    />
+                  </Suspense>
+                </div>
+                ) : hasMap ? (
                 <div className="flex-1 min-h-0 relative">
                   {renderMap('100%')}
 
@@ -1005,13 +1062,14 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
                     </button>
                   </div>
                 </div>
+                ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
+                  <MapPin size={40} className="mb-3 opacity-30" />
+                  <p className="text-xs">Aucune donnée terrain</p>
+                  <p className="text-[10px] text-gray-300 mt-1">Cliquez « Départ » ou « Tracé GPS » pour commencer</p>
+                </div>
+                )}
               </>
-            ) : !hasMap ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
-                <MapPin size={40} className="mb-3 opacity-30" />
-                <p className="text-xs">Aucune donnée terrain</p>
-                <p className="text-[10px] text-gray-300 mt-1">Cliquez « Départ » ou « Tracé GPS » pour commencer</p>
-              </div>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-gray-300">
                 <Maximize2 size={32} className="mb-2 opacity-30" />

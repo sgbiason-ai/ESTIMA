@@ -34,10 +34,14 @@ const countPhotos = (observations) =>
 
 // ─── DESSIN EN-TETE (pages 2+) ───────────────────────────────────────────────
 
+// Dimensions lues sur la page COURANTE (doc.internal.pageSize) : les pages de
+// plans annotés peuvent être en paysage, les constantes PW/PH ne suffisent plus.
 const drawHeader = (doc, THEME, visitName, date, logoMoe) => {
+  const pw = doc.internal.pageSize.getWidth();
+
   // Bande fine en haut
   doc.setFillColor(...THEME.primary);
-  doc.rect(0, 0, PW, 3, 'F');
+  doc.rect(0, 0, pw, 3, 'F');
 
   // Logo petit
   if (logoMoe) {
@@ -51,34 +55,37 @@ const drawHeader = (doc, THEME, visitName, date, logoMoe) => {
   doc.setFont('Helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(...THEME.text);
-  doc.text(fitTextToWidth(doc, visitName || 'Visite de Site', PW * 0.6), PW / 2, 10, { align: 'center' });
+  doc.text(fitTextToWidth(doc, visitName || 'Visite de Site', pw * 0.6), pw / 2, 10, { align: 'center' });
 
   doc.setFont('Helvetica', 'normal');
   doc.setFontSize(7);
   doc.setTextColor(...THEME.lightText);
-  doc.text(date ? formatDateLong(date) : '', PW - M.right, 10, { align: 'right' });
+  doc.text(date ? formatDateLong(date) : '', pw - M.right, 10, { align: 'right' });
 
   // Ligne separatrice
   doc.setDrawColor(...THEME.borders);
-  doc.line(M.left, 15, PW - M.right, 15);
+  doc.line(M.left, 15, pw - M.right, 15);
 };
 
 // ─── DESSIN PIED DE PAGE ──────────────────────────────────────────────────────
 
 const drawFooter = (doc, THEME, pageNum, totalPages, branding) => {
-  const y = PH - 10;
+  const pw = doc.internal.pageSize.getWidth();
+  const ph = doc.internal.pageSize.getHeight();
+  const cw = pw - M.left - M.right;
+  const y = ph - 10;
   doc.setDrawColor(...THEME.borders);
-  doc.line(M.left, y - 2, PW - M.right, y - 2);
+  doc.line(M.left, y - 2, pw - M.right, y - 2);
 
   // Coordonnees entreprise
   doc.setFont('Helvetica', 'normal');
   doc.setFontSize(6);
   doc.setTextColor(...THEME.lightText);
   const footer = [branding?.companyName, branding?.phone, branding?.email].filter(Boolean).join(' • ');
-  if (footer) doc.text(fitTextToWidth(doc, footer, CW / 2), M.left, y + 1);
+  if (footer) doc.text(fitTextToWidth(doc, footer, cw / 2), M.left, y + 1);
 
   // Numero de page
-  doc.text(`${pageNum} / ${totalPages}`, PW - M.right, y + 1, { align: 'right' });
+  doc.text(`${pageNum} / ${totalPages}`, pw - M.right, y + 1, { align: 'right' });
 };
 
 // ─── PAGE DE GARDE ────────────────────────────────────────────────────────────
@@ -476,7 +483,9 @@ export const generateSiteVisitOverviewMap = async (visit, options = {}) => (
 // ─── PAGE VUE AERIENNE ────────────────────────────────────────────────────────
 
 const drawMapPage = async (doc, mapImage, visit, THEME) => {
-  doc.addPage();
+  // Orientation explicite : jsPDF mémorise l'orientation du dernier addPage
+  // (pages de plans annotés possiblement en paysage).
+  doc.addPage('a4', 'p');
   const startY = 20;
 
   // Titre section
@@ -548,6 +557,150 @@ const drawMapPage = async (doc, mapImage, visit, THEME) => {
     doc.setFontSize(9);
     doc.setTextColor(...THEME.lightText);
     doc.text('Aucune donnée GPS — carte non générée', PW / 2, mapY + 40, { align: 'center' });
+  }
+};
+
+// ─── PAGES PLANS ANNOTÉS ─────────────────────────────────────────────────────
+
+// Precharge les plans importes (visit.plans) en dataURL, comme preloadObsImages :
+// getBlob sur plan.path via le SDK, fallback fetch de plan.src avec retry
+// '?swbust=' (le SW CacheFirst peut resservir une reponse opaque). Un plan en
+// echec est simplement ignore. Retourne Map<planId, { w, h, uri }>.
+const preloadPlanImages = async (visit) => {
+  const cache = new Map();
+  const plans = visit?.plans || [];
+  if (!plans.length) return cache;
+
+  let fbGetBlob, fbRef, fbStorage;
+  try {
+    const fbMod = await import('firebase/storage');
+    fbGetBlob = fbMod.getBlob;
+    fbRef = fbMod.ref;
+    fbStorage = (await import('../firebaseStorage')).storage;
+  } catch { /* Firebase non disponible */ }
+
+  const blobToDataUrl = (blob) => new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(blob);
+  });
+
+  for (const plan of plans) {
+    if (!plan?.id || cache.has(plan.id)) continue;
+    const src = plan.src || null;
+
+    let dataUri = null;
+    if (src && src.startsWith('data:')) {
+      dataUri = src;
+    } else if (plan.path && fbGetBlob && fbStorage) {
+      try { dataUri = await blobToDataUrl(await fbGetBlob(fbRef(fbStorage, plan.path))); } catch { /* fallback */ }
+    }
+    if (!dataUri && src && !src.startsWith('data:')) {
+      try {
+        let resp = await fetch(src);
+        if (!resp.ok) resp = await fetch(src + (src.includes('?') ? '&' : '?') + 'swbust=' + Date.now());
+        if (resp.ok) dataUri = await blobToDataUrl(await resp.blob());
+      } catch { /* plan ignore */ }
+    }
+    if (dataUri) {
+      const img = await loadImage(dataUri).catch(() => null);
+      if (img) cache.set(plan.id, { w: img.width, h: img.height, uri: dataUri });
+    }
+  }
+  return cache;
+};
+
+// Compose l'image d'un plan avec ses pastilles d'observation (canvas 2D), au
+// style exact des marqueurs de la carte (buildMapCanvas) : cercle THEME.primary,
+// lisere blanc, ombre, numero blanc gras = index de l'obs dans visit.observations
+// + 1 (jamais persiste). Taille adaptee a la resolution du plan.
+const buildAnnotatedPlanImage = async (plan, cached, observations, THEME) => {
+  const img = await loadImage(cached.uri);
+  const canvas = document.createElement('canvas');
+  canvas.width = cached.w;
+  canvas.height = cached.h;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+  // Diametre ~2,4 % du cote max de l'image, minimum 30 px ; ombre, lisere et
+  // police croissent proportionnellement (base carte : r=11, lisere 2, 13px).
+  const maxSide = Math.max(canvas.width, canvas.height);
+  const r = Math.max(30, maxSide * 0.024) / 2;
+  const off = Math.max(1, r / 11);
+  const primaryCss = `rgb(${THEME.primary[0]},${THEME.primary[1]},${THEME.primary[2]})`;
+
+  observations.forEach((obs, idx) => {
+    const pin = obs?.planPin;
+    if (!pin || pin.planId !== plan.id || pin.x == null || pin.y == null) return;
+    const ox = pin.x * canvas.width;
+    const oy = pin.y * canvas.height;
+    // Ombre
+    ctx.beginPath(); ctx.arc(ox + off, oy + off, r + off, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fill();
+    // Cercle
+    ctx.beginPath(); ctx.arc(ox, oy, r, 0, Math.PI * 2);
+    ctx.fillStyle = primaryCss; ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = Math.max(2, (r * 2) / 11); ctx.stroke();
+    // Numero
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${Math.round((r * 13) / 11)}px system-ui`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(idx + 1), ox, oy);
+  });
+
+  return canvas.toDataURL('image/jpeg', 0.92);
+};
+
+// Une page par plan importe, entre la carte pleine page et les observations.
+// Orientation par plan (paysage si l'image est plus large que haute), gabarit
+// calque sur drawMapPage : titre, sous-titre, image centree ratio preserve dans
+// un cadre arrondi. Un plan sans pastille est inclus quand meme.
+const drawAnnotatedPlanPages = async (doc, visit, planImages, THEME) => {
+  const observations = visit.observations || [];
+
+  for (const plan of (visit.plans || [])) {
+    const cached = plan?.id ? planImages.get(plan.id) : null;
+    if (!cached) continue; // plan non charge → ignore silencieusement
+
+    let annotated = null;
+    try { annotated = await buildAnnotatedPlanImage(plan, cached, observations, THEME); } catch { /* plan illisible */ }
+    if (!annotated) continue;
+
+    doc.addPage('a4', cached.w > cached.h ? 'l' : 'p');
+    const pw = doc.internal.pageSize.getWidth();
+    const ph = doc.internal.pageSize.getHeight();
+    const cw = pw - M.left - M.right;
+    const startY = 20;
+
+    // Titre section
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(...THEME.primary);
+    doc.text(fitTextToWidth(doc, `Plan annoté — ${plan.name || 'Plan'}`, cw), M.left, startY);
+
+    // Sous-titre
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...THEME.lightText);
+    doc.text('Les numéros renvoient aux observations · Plan sans échelle', M.left, startY + 6);
+
+    // Image centree, ratio preserve, dans un cadre arrondi
+    const imgY = startY + 12;
+    const maxH = ph - imgY - 20; // reserve pied de page
+    let imgW = cw;
+    let imgH = (imgW / cached.w) * cached.h;
+    if (imgH > maxH) { imgH = maxH; imgW = (imgH / cached.h) * cached.w; }
+    const imgX = M.left + (cw - imgW) / 2;
+
+    try {
+      doc.setDrawColor(...THEME.borders);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(imgX, imgY, imgW, imgH, 2, 2, 'S');
+      doc.addImage(annotated, 'JPEG', imgX + 0.5, imgY + 0.5, imgW - 1, imgH - 1);
+      doc.setLineWidth(0.2);
+    } catch { /* image illisible pour jsPDF */ }
   }
 };
 
@@ -841,7 +994,8 @@ const drawObservations = async (doc, visit, THEME, obsViewKey = DEFAULT_PDF_VIEW
 
   const imageCache = await preloadObsImages(observations);
 
-  doc.addPage();
+  // Orientation explicite : ne pas hériter d'une éventuelle page plan en paysage.
+  doc.addPage('a4', 'p');
   let y = 20;
   // Titre section
   doc.setFont('Helvetica', 'bold');
@@ -910,7 +1064,7 @@ const drawObservations = async (doc, visit, THEME, obsViewKey = DEFAULT_PDF_VIEW
 
     let slotTop, slotBottom;
     if (needsFullPage) {
-      if (slotPos === 1) { doc.addPage(); pageTop = 20; }
+      if (slotPos === 1) { doc.addPage('a4', 'p'); pageTop = 20; }
       slotTop = pageTop;
       slotBottom = BOTTOM;
     } else if (slotPos === 0) {
@@ -1082,7 +1236,7 @@ const drawObservations = async (doc, visit, THEME, obsViewKey = DEFAULT_PDF_VIEW
       // Jamais atteint en demi-slot : une seule rangée y dispose d'au moins
       // 22 mm (réserve de 25 mm dans needsFullPage).
       if (needsFullPage && rowHeights.some(h => h * shrink < 8)) {
-        doc.addPage();
+        doc.addPage('a4', 'p');
         pageTop = 20;
         y = 20;
         availH = BOTTOM - y - fixedGaps;
@@ -1128,7 +1282,7 @@ const drawObservations = async (doc, visit, THEME, obsViewKey = DEFAULT_PDF_VIEW
       slotPos = 1;
     } else {
       slotPos = 0;
-      if (i < observations.length - 1) { doc.addPage(); pageTop = 20; }
+      if (i < observations.length - 1) { doc.addPage('a4', 'p'); pageTop = 20; }
     }
   }
 };
@@ -1136,11 +1290,14 @@ const drawObservations = async (doc, visit, THEME, obsViewKey = DEFAULT_PDF_VIEW
 // ─── EXPORT PRINCIPAL ─────────────────────────────────────────────────────────
 
 // options.obsMapView / options.overviewMapView : cles de PDF_MAP_VIEWS (ignTiles).
+// options.includePlans : inclure les pages « Plan annoté » (defaut true, sans
+// effet si la visite n'a pas de plans).
 export const generateSiteVisitPdf = async (visit, options = {}) => {
   const {
     branding = null,
     obsMapView = DEFAULT_PDF_VIEWS.obs,
     overviewMapView = DEFAULT_PDF_VIEWS.overview,
+    includePlans = true,
   } = options;
   const THEME = buildTheme(branding);
 
@@ -1174,7 +1331,13 @@ export const generateSiteVisitPdf = async (visit, options = {}) => {
     if (mapImage) await drawMapPage(doc, mapImage, visit, THEME);
   }
 
-  // ── Pages 3+ : Observations ──
+  // ── Pages plans annotés (entre la carte et les observations) ──
+  if (includePlans && (visit.plans || []).length > 0) {
+    const planImages = await preloadPlanImages(visit);
+    await drawAnnotatedPlanPages(doc, visit, planImages, THEME);
+  }
+
+  // ── Pages suivantes : Observations ──
   await drawObservations(doc, visit, THEME, obsMapView);
 
   // ── En-tetes et pieds de page (pages 2+) ──

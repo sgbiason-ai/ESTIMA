@@ -4,7 +4,7 @@
 // Partagee desktop / mobile.
 
 import React, { useState } from 'react';
-import { X, FileDown, Layers, Map as MapIcon } from 'lucide-react';
+import { X, FileDown, Layers, Map as MapIcon, FileImage } from 'lucide-react';
 import {
   PDF_MAP_VIEWS, PDF_OVERVIEW_VIEWS, DEFAULT_PDF_VIEWS,
   buildTileUrl, lng2tileX, lat2tileY,
@@ -20,8 +20,9 @@ const loadPdfViewPrefs = () => {
     return {
       obs: PDF_MAP_VIEWS[raw.obs] ? raw.obs : DEFAULT_PDF_VIEWS.obs,
       overview: PDF_OVERVIEW_VIEWS[raw.overview] ? raw.overview : DEFAULT_PDF_VIEWS.overview,
+      plans: raw.plans !== false, // inclure les plans annotés (défaut : oui)
     };
-  } catch { return { ...DEFAULT_PDF_VIEWS }; }
+  } catch { return { ...DEFAULT_PDF_VIEWS, plans: true }; }
 };
 
 const savePdfViewPrefs = (prefs) => {
@@ -98,7 +99,7 @@ export default function SiteVisitExportModal({ isOpen, onClose, visit, onExport 
   const handleExport = () => {
     savePdfViewPrefs(prefs);
     onClose();
-    onExport({ obsMapView: prefs.obs, overviewMapView: prefs.overview });
+    onExport({ obsMapView: prefs.obs, overviewMapView: prefs.overview, includePlans: prefs.plans });
   };
 
   const sectionLabel = "flex items-center gap-1.5 text-[11px] text-gray-500 font-medium mb-2";
@@ -143,6 +144,23 @@ export default function SiteVisitExportModal({ isOpen, onClose, visit, onExport 
                   />
                 ))}
               </div>
+            </div>
+          )}
+
+          {(visit?.plans?.length || 0) > 0 && (
+            <div>
+              <label className={sectionLabel}><FileImage size={11} /> Plans annotés</label>
+              <label className="flex items-center gap-2.5 rounded-2xl border border-gray-200/60 bg-white px-3 py-2.5 cursor-pointer hover:border-gray-300 transition">
+                <input
+                  type="checkbox"
+                  checked={prefs.plans}
+                  onChange={(e) => { const v = e.target.checked; setPrefs(p => ({ ...p, plans: v })); }}
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-xs font-medium text-gray-800">
+                  Inclure les plans annotés ({visit.plans.length})
+                </span>
+              </label>
             </div>
           )}
 

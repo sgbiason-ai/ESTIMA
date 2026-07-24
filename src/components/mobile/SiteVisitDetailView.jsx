@@ -1,8 +1,9 @@
 // src/components/mobile/SiteVisitDetailView.jsx
 // Vue détail d'une visite de site — observations + terrain.
 
-import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect, Suspense } from 'react';
 import { MapPin, Flag, LocateFixed, X, Navigation, Ruler, Share2, LockKeyhole } from 'lucide-react';
+import lazyWithReload from '../../utils/lazyWithReload';
 import Icon from './Icon';
 import { dateFr } from './formatters';
 import { stripHtml } from '../../utils/formatObsText';
@@ -16,6 +17,10 @@ import {
 } from '../../utils/geoHelpers';
 import SiteVisitShareModal from '../../views/siteVisits/SiteVisitShareModal';
 import SiteVisitExportModal from '../../views/siteVisits/SiteVisitExportModal';
+
+// Mode Annotation (plans épinglés) — lazy : ne pèse sur le bundle mobile
+// qu'à l'ouverture de l'onglet (l'import de plan tire pdfjs en plus).
+const PlanAnnotationView = lazyWithReload(() => import('../../views/siteVisits/PlanAnnotationView'));
 
 // ─── Sous-composants ───────────────────────────────────────────────────────
 
@@ -327,6 +332,25 @@ export default function SiteVisitDetailView({
     updateLocalVisit(prev => ({ ...prev, ...patch }));
   }, [canEdit, updateLocalVisit]);
 
+  // ── Mode Annotation (plans + pins) — même chemin d'autosave que les autres éditions ──
+  const handlePlanChange = useCallback((partial) => {
+    if (!canEdit) return;
+    isUserEdit.current = true;
+    updateLocalVisit(prev => ({ ...prev, ...partial }));
+  }, [canEdit, updateLocalVisit]);
+
+  // Ouverture d'une obs depuis un pin : l'obs peut venir d'être créée dans le
+  // même tick (onChangeVisit pas encore flushé) → on attend qu'elle existe
+  // dans le state avant d'ouvrir l'éditeur.
+  const [pendingEditObsId, setPendingEditObsId] = useState(null);
+  useEffect(() => {
+    if (!pendingEditObsId) return;
+    const obs = (localVisit.observations || []).find(o => o.id === pendingEditObsId);
+    if (obs) setEditingObs(obs);
+    setPendingEditObsId(null);
+  }, [pendingEditObsId, localVisit.observations]);
+  const handleEditObsFromPlan = useCallback((obsId) => setPendingEditObsId(obsId), []);
+
   // ── Segments GPS (Départ / Fin / Point) — parité desktop SiteVisitsView ──
   const [pendingPoint, setPendingPoint] = useState(null);
   const [gettingPosition, setGettingPosition] = useState(false);
@@ -611,6 +635,7 @@ export default function SiteVisitDetailView({
       <div className={`flex gap-1 mx-4 p-1 bg-gray-100 rounded-2xl ${isLandscape ? 'mb-1' : 'mb-2'}`}>
         <SectionTab label="Observations" active={activeSection === 'observations'} onClick={() => setActiveSection('observations')} />
         <SectionTab label="Terrain" active={activeSection === 'terrain'} onClick={() => setActiveSection('terrain')} />
+        <SectionTab label="Annotation" active={activeSection === 'annotation'} onClick={() => setActiveSection('annotation')} />
       </div>
 
       {/* ── Content ── */}
@@ -645,6 +670,26 @@ export default function SiteVisitDetailView({
           </div>
         )}
 
+        {/* Annotation : plans épinglés (montage/démontage normal, contrairement au Terrain) */}
+        {!editingObs && activeSection === 'annotation' && (
+          <div className="h-full">
+            <Suspense fallback={
+              <div className="h-full flex items-center justify-center">
+                <span className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            }>
+              <PlanAnnotationView
+                visit={localVisit}
+                companyId={companyId}
+                onChangeVisit={handlePlanChange}
+                onEditObs={handleEditObsFromPlan}
+                isMobile
+                readOnly={!canEdit}
+              />
+            </Suspense>
+          </div>
+        )}
+
         {/* Terrain toujours monté (GPS en arrière-plan), masqué si pas actif ou si éditeur ouvert */}
         <div className="h-full" style={{ display: activeSection === 'terrain' && !editingObs ? 'block' : 'none' }}>
           <GpsTrackingSection
@@ -660,8 +705,9 @@ export default function SiteVisitDetailView({
         </div>
       </div>
 
-      {/* ── Barre d'actions fixe (bas) — masquée pendant l'édition d'une observation ── */}
-      {canEdit && !editingObs && (
+      {/* ── Barre d'actions fixe (bas) — masquée pendant l'édition d'une observation
+          et en mode Annotation (qui a son propre bouton « Ajouter un pin ») ── */}
+      {canEdit && !editingObs && activeSection !== 'annotation' && (
         <div className="shrink-0 px-4 pt-2 pb-3 bg-white/70 backdrop-blur-xl">
           <SiteVisitActionBar
             measureMode={measureMode}
