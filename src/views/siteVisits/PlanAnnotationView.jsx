@@ -502,8 +502,20 @@ export default function PlanAnnotationView({ visit, companyId, onChangeVisit, on
   }, [getRelPos, handleTap]);
 
   const handlePointerCancel = useCallback((e) => {
+    if (!pointersRef.current.has(e.pointerId)) return;
     pointersRef.current.delete(e.pointerId);
-    if (pointersRef.current.size === 0) gestureRef.current = null;
+    const g = gestureRef.current;
+    if (!g) return;
+    if (pointersRef.current.size === 0) {
+      // Plus aucun contact : geste terminé (une annulation ne déclenche jamais un tap).
+      gestureRef.current = null;
+    } else if (g.type === 'pinch' && pointersRef.current.size === 1) {
+      // Un doigt du pinch annulé (bord d'écran, palm-rejection, reprise par l'OS) →
+      // on repart en pan avec le doigt restant, sinon la visionneuse se fige
+      // (handlePointerMove exige size >= 2 pour le pinch). Cf. handlePointerUp.
+      const [q] = [...pointersRef.current.values()];
+      gestureRef.current = { type: 'pan', startX: q.x, startY: q.y, lastX: q.x, lastY: q.y, t0: performance.now(), moved: true };
+    }
   }, []);
 
   // ── Import (module chargé paresseusement : il tire pdfjs) ──

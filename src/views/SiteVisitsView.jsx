@@ -229,14 +229,32 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
     } catch (e) { console.error('Erreur suppression:', e); }
   }, [companyId, selectedId, fullVisit, loadVisit, refetch]);
 
+  // ── Sauvegarde plein-document, protégée pendant un enregistrement GPS ──
+  // Pendant un tracé, la trace fraîche vit dans liveCoords + Firestore (écrite
+  // par updateDoc tous les 5 points et à l'arrêt) ; fullVisit.gpsTracking reste
+  // volontairement périmé. Un save plein-document ne doit donc PAS réécrire
+  // gpsTracking (setDoc merge l'écraserait, trace perdue) : on l'omet du payload,
+  // merge laisse le champ serveur intact. Les actions de nettoyage de trace
+  // écrivent gpsTracking volontairement et ne tournent qu'à l'arrêt (triggerSave direct).
+  const isRecordingRef = useRef(false);
+  useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
+  const saveVisitData = useCallback((updated) => {
+    if (isRecordingRef.current && updated && 'gpsTracking' in updated) {
+      const { gpsTracking: _gps, ...rest } = updated;
+      triggerSave(rest);
+    } else {
+      triggerSave(updated);
+    }
+  }, [triggerSave]);
+
   // ── Save visit info (modal) ──
   const handleSaveInfo = useCallback((info) => {
     if (!fullVisit?.isOwner) return;
     const updated = { ...fullVisit, ...info };
     setFullVisit(updated);
-    triggerSave(updated);
+    saveVisitData(updated);
     refetch();
-  }, [fullVisit, triggerSave, refetch]);
+  }, [fullVisit, saveVisitData, refetch]);
 
   // ── Save observation (text + images) ──
   const handleSaveObsText = useCallback((newText, newImages) => {
@@ -248,9 +266,9 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
     );
     const updated = { ...fullVisit, observations: updatedObs };
     setFullVisit(updated);
-    triggerSave(updated);
+    saveVisitData(updated);
     setEditingObs(null);
-  }, [fullVisit, editingObs, triggerSave]);
+  }, [fullVisit, editingObs, saveVisitData]);
 
   // ── Mode Annotation (plans + pins) — même chemin de sauvegarde que le reste
   //    (setFullVisit + triggerSave du useRobustSave, debounce 1,5 s) ──
@@ -258,8 +276,8 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
     if (!fullVisit?.isOwner) return;
     const updated = { ...fullVisit, ...partial };
     setFullVisit(updated);
-    triggerSave(updated);
-  }, [fullVisit, triggerSave]);
+    saveVisitData(updated);
+  }, [fullVisit, saveVisitData]);
 
   // Ouverture d'une obs depuis un pin : l'obs peut venir d'être créée dans le
   // même tick (onChangeVisit pas encore flushé) → on attend qu'elle existe
@@ -352,12 +370,12 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
       const updatedObs = [...(fullVisit.observations || []), newSeg];
       const updated = { ...fullVisit, observations: updatedObs };
       setFullVisit(updated);
-      triggerSave(updated);
+      saveVisitData(updated);
       const label = source === 'ign' ? 'IGN' : 'vol d\'oiseau';
       showToast(`Segment créé — ${fmtDist(distance)} (${label}) ${fmtUncertainty(uncertainty)}`);
     } catch (e) { showToast('Erreur GPS : ' + e.message); }
     setGettingPosition(false);
-  }, [fullVisit, pendingPoint, gettingPosition, getPosition, triggerSave]);
+  }, [fullVisit, pendingPoint, gettingPosition, getPosition, saveVisitData]);
 
   const cancelPending = useCallback(() => setPendingPoint(null), []);
 
@@ -379,11 +397,11 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
       const updatedObs = [...(fullVisit.observations || []), newPt];
       const updated = { ...fullVisit, observations: updatedObs };
       setFullVisit(updated);
-      triggerSave(updated);
+      saveVisitData(updated);
       showToast(`Point marqué — ${fmtCoord(pos.lat, pos.lng)} (±${Math.round(pos.accuracy)}m)`);
     } catch (e) { showToast('Erreur GPS : ' + e.message); }
     setGettingPosition(false);
-  }, [fullVisit, gettingPosition, getPosition, triggerSave]);
+  }, [fullVisit, gettingPosition, getPosition, saveVisitData]);
 
   // ── Delete segment/obs ──
   const handleDeleteObs = useCallback((obsId) => {
@@ -393,8 +411,8 @@ export default function SiteVisitsView({ companyId, masterBranding }) {
     const updatedObs = (fullVisit.observations || []).filter(o => o.id !== obsId);
     const updated = { ...fullVisit, observations: updatedObs };
     setFullVisit(updated);
-    triggerSave(updated);
-  }, [fullVisit, triggerSave]);
+    saveVisitData(updated);
+  }, [fullVisit, saveVisitData]);
 
   // ── Zoom to segment on map ──
   const zoomToSegment = useCallback((obs) => {

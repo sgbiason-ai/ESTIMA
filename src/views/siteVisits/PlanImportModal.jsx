@@ -74,30 +74,51 @@ export default function PlanImportModal({ file, companyId, visitId, onClose, onI
     const pages = [...selected].sort((a, b) => a - b);
     const finalName = name.trim() || baseName;
     setProgress({ done: 0, total: pages.length });
+    const plans = [];
+    // Import page par page, tolérant à l'échec : une page qui ne se rend pas en
+    // haute résolution (canvas trop grand sur tablette, page corrompue) ne doit
+    // pas faire perdre les pages déjà abouties ni les laisser orphelines sur Storage.
     try {
       const { uploadPlanImage } = await import('../../utils/siteVisitPlanStorage');
-      const plans = [];
       for (let i = 0; i < pages.length; i++) {
         const p = pages[i];
-        const { dataUrl, width, height } = await s.renderPage(p, EXPORT_MAX_DIM);
-        const plan = await uploadPlanImage({
-          dataUrl, width, height,
-          name: pages.length > 1 ? `${finalName} – p.${p}` : finalName,
-          page: p,
-          companyId,
-          visitId,
-        });
-        plans.push(plan);
+        try {
+          const { dataUrl, width, height } = await s.renderPage(p, EXPORT_MAX_DIM);
+          const plan = await uploadPlanImage({
+            dataUrl, width, height,
+            name: pages.length > 1 ? `${finalName} – p.${p}` : finalName,
+            page: p,
+            companyId,
+            visitId,
+          });
+          plans.push(plan);
+        } catch (err) {
+          console.error(`[Plans] Import de la page ${p} échoué:`, err);
+        }
         setProgress({ done: i + 1, total: pages.length });
       }
-      onImported(plans);
-      onClose(); // le démontage détruit la session PDF
     } catch (err) {
+      // Échec inattendu (chargement du module) : les pages déjà abouties sont
+      // tout de même committées ci-dessous, les autres restent à réessayer.
       console.error('[Plans] Import du PDF échoué:', err);
-      setError("L'import a échoué. Vérifiez la connexion puis réessayez.");
-      setProgress(null);
-      importingRef.current = false;
     }
+    // Committer immédiatement les pages réussies → jamais orphelines sur Storage.
+    if (plans.length) onImported(plans);
+    if (plans.length === pages.length) {
+      onClose(); // toutes les pages abouties → le démontage détruit la session PDF
+      return;
+    }
+    // Échec partiel ou total : on garde la modale ouverte et on ne re-cible que
+    // les pages en échec (les réussies sont déjà enregistrées dans la visite).
+    const notDone = pages.filter(p => !plans.some(pl => pl.page === p));
+    setProgress(null);
+    importingRef.current = false;
+    setSelected(new Set(notDone));
+    setError(
+      plans.length
+        ? `${plans.length} page${plans.length > 1 ? 's' : ''} importée${plans.length > 1 ? 's' : ''}. Échec sur ${notDone.length} page${notDone.length > 1 ? 's' : ''} (${notDone.join(', ')}) — réessayez.`
+        : "L'import a échoué. Vérifiez la connexion puis réessayez."
+    );
   };
 
   const requestClose = () => { if (!progress) onClose(); };
