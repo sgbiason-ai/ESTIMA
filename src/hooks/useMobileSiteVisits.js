@@ -151,6 +151,26 @@ export const useMobileSiteVisits = (user, companyId) => {
   const deleteVisit = useCallback(async (visitId) => {
     if (!companyId) return;
     try {
+      // Purger Storage (photos d'obs + plans) avant de supprimer le doc,
+      // en best-effort : un fichier manquant ne doit pas bloquer la suppression
+      // (même motif que SiteVisitsView.handleDelete côté desktop).
+      let data = null;
+      try {
+        const snap = await getDoc(doc(db, 'companies', companyId, 'site_visits', visitId));
+        if (snap.exists()) data = snap.data();
+      } catch { /* purge best-effort, la suppression du doc reste prioritaire */ }
+      if ((data?.observations || []).some(obs => (obs.images || []).length > 0)) {
+        import('../utils/siteVisitImageStorage').then(({ deleteSiteVisitImage }) => {
+          for (const obs of (data.observations || [])) {
+            for (const img of (obs.images || [])) deleteSiteVisitImage(img);
+          }
+        }).catch(() => {});
+      }
+      if ((data?.plans || []).length > 0) {
+        import('../utils/siteVisitPlanStorage').then(({ deletePlan }) => {
+          for (const plan of data.plans) deletePlan(plan);
+        }).catch(() => {});
+      }
       await deleteDoc(doc(db, 'companies', companyId, 'site_visits', visitId));
       setVisits(prev => prev.filter(v => v.id !== visitId));
     } catch (err) {
